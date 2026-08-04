@@ -284,11 +284,7 @@ final class BondedCompanionTalentPageService {
             }
             if (effect.getEffectKey().equalsIgnoreCase(talent.getId())
                     && Math.abs(effect.getMultiplier() - 1.0) < 0.0001) {
-                String description = LocalizedText.resolveConfigValue(language,
-                        talent.getDescription(), "");
-                if (!description.isBlank() && !summaries.contains(description)) {
-                    summaries.add(description);
-                }
+                // This is a talent marker used by NPC behavior, not a second player-facing effect.
                 continue;
             }
             summaries.add(formatEffectSummary(language, effect));

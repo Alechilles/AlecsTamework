@@ -378,6 +378,9 @@ public final class TameworkCompanionTalentsPage
         commandBuilder.set("#TalentDetailStatus.Text", selectedEntry.status());
         commandBuilder.set("#TalentDetailRequirements.Text", resolveRequirementText(selectedEntry));
         commandBuilder.set("#TalentDetailEffects.Text", selectedEntry.effectSummary());
+        boolean hasEffects = !selectedEntry.effectSummary().isBlank();
+        commandBuilder.set("#TalentDetailEffectsLabel.Visible", hasEffects);
+        commandBuilder.set("#TalentDetailEffects.Visible", hasEffects);
         if (selectedEntry.canPurchase()) {
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
@@ -480,9 +483,7 @@ public final class TameworkCompanionTalentsPage
         public TreeNodeEntry {
             requiredTalentIds = requiredTalentIds == null ? List.of() : List.copyOf(requiredTalentIds);
             requiredTalentNames = requiredTalentNames == null ? List.of() : List.copyOf(requiredTalentNames);
-            effectSummary = effectSummary == null || effectSummary.isBlank()
-                    ? LocalizedText.resolve((String) null, "tamework.ui.talents.effects.none")
-                    : effectSummary;
+            effectSummary = effectSummary == null ? "" : effectSummary;
         }
     }
 
