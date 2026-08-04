@@ -20,33 +20,33 @@ public final class TameworkShoulderRideComponent
                             TameworkShoulderRideComponent::setOwnerUuid,
                             TameworkShoulderRideComponent::getOwnerUuid)
                     .add()
-                    .append(new KeyedCodec<>("WasInteractable", Codec.BOOLEAN),
-                            TameworkShoulderRideComponent::setWasInteractable,
-                            TameworkShoulderRideComponent::wasInteractable)
+                    .<Boolean>append(new KeyedCodec<>("WasInteractable", Codec.BOOLEAN),
+                            TameworkShoulderRideComponent::setWasInteractableValue,
+                            TameworkShoulderRideComponent::getWasInteractableValue)
                     .add()
-                    .append(new KeyedCodec<>("WasIntangible", Codec.BOOLEAN),
-                            TameworkShoulderRideComponent::setWasIntangible,
-                            TameworkShoulderRideComponent::wasIntangible)
+                    .<Boolean>append(new KeyedCodec<>("WasIntangible", Codec.BOOLEAN),
+                            TameworkShoulderRideComponent::setWasIntangibleValue,
+                            TameworkShoulderRideComponent::getWasIntangibleValue)
                     .add()
-                    .append(new KeyedCodec<>("WasInvulnerable", Codec.BOOLEAN),
-                            TameworkShoulderRideComponent::setWasInvulnerable,
-                            TameworkShoulderRideComponent::wasInvulnerable)
+                    .<Boolean>append(new KeyedCodec<>("WasInvulnerable", Codec.BOOLEAN),
+                            TameworkShoulderRideComponent::setWasInvulnerableValue,
+                            TameworkShoulderRideComponent::getWasInvulnerableValue)
                     .add()
-                    .append(new KeyedCodec<>("WasFrozen", Codec.BOOLEAN),
-                            TameworkShoulderRideComponent::setWasFrozen,
-                            TameworkShoulderRideComponent::wasFrozen)
+                    .<Boolean>append(new KeyedCodec<>("WasFrozen", Codec.BOOLEAN),
+                            TameworkShoulderRideComponent::setWasFrozenValue,
+                            TameworkShoulderRideComponent::getWasFrozenValue)
                     .add()
-                    .append(new KeyedCodec<>("StateCaptured", Codec.BOOLEAN),
-                            TameworkShoulderRideComponent::setStateCaptured,
-                            TameworkShoulderRideComponent::hasCapturedState)
+                    .<Boolean>append(new KeyedCodec<>("StateCaptured", Codec.BOOLEAN),
+                            TameworkShoulderRideComponent::setStateCapturedValue,
+                            TameworkShoulderRideComponent::getStateCapturedValue)
                     .add().build();
 
     private UUID ownerUuid;
-    private boolean wasInteractable;
-    private boolean wasIntangible;
-    private boolean wasInvulnerable;
-    private boolean wasFrozen;
-    private boolean stateCaptured;
+    private Boolean wasInteractable;
+    private Boolean wasIntangible;
+    private Boolean wasInvulnerable;
+    private Boolean wasFrozen;
+    private Boolean stateCaptured;
 
     public TameworkShoulderRideComponent() {
     }
@@ -65,11 +65,11 @@ public final class TameworkShoulderRideComponent
     }
 
     private TameworkShoulderRideComponent(UUID ownerUuid,
-                                          boolean wasInteractable,
-                                          boolean wasIntangible,
-                                          boolean wasInvulnerable,
-                                          boolean wasFrozen,
-                                          boolean stateCaptured) {
+                                          Boolean wasInteractable,
+                                          Boolean wasIntangible,
+                                          Boolean wasInvulnerable,
+                                          Boolean wasFrozen,
+                                          Boolean stateCaptured) {
         this.ownerUuid = ownerUuid;
         this.wasInteractable = wasInteractable;
         this.wasIntangible = wasIntangible;
@@ -93,42 +93,66 @@ public final class TameworkShoulderRideComponent
     }
 
     public boolean wasInteractable() {
+        return Boolean.TRUE.equals(wasInteractable);
+    }
+
+    private Boolean getWasInteractableValue() {
         return wasInteractable;
     }
 
-    public void setWasInteractable(boolean wasInteractable) {
+    private void setWasInteractableValue(Boolean wasInteractable) {
         this.wasInteractable = wasInteractable;
     }
 
     public boolean wasIntangible() {
+        return Boolean.TRUE.equals(wasIntangible);
+    }
+
+    private Boolean getWasIntangibleValue() {
         return wasIntangible;
     }
 
-    public void setWasIntangible(boolean wasIntangible) {
+    private void setWasIntangibleValue(Boolean wasIntangible) {
         this.wasIntangible = wasIntangible;
     }
 
     public boolean wasInvulnerable() {
+        return Boolean.TRUE.equals(wasInvulnerable);
+    }
+
+    private Boolean getWasInvulnerableValue() {
         return wasInvulnerable;
     }
 
-    public void setWasInvulnerable(boolean wasInvulnerable) {
+    private void setWasInvulnerableValue(Boolean wasInvulnerable) {
         this.wasInvulnerable = wasInvulnerable;
     }
 
     public boolean wasFrozen() {
+        return Boolean.TRUE.equals(wasFrozen);
+    }
+
+    private Boolean getWasFrozenValue() {
         return wasFrozen;
     }
 
-    public void setWasFrozen(boolean wasFrozen) {
+    private void setWasFrozenValue(Boolean wasFrozen) {
         this.wasFrozen = wasFrozen;
     }
 
     public boolean hasCapturedState() {
+        return Boolean.TRUE.equals(stateCaptured)
+                || wasInteractable != null
+                || wasIntangible != null
+                || wasInvulnerable != null
+                || wasFrozen != null;
+    }
+
+    private Boolean getStateCapturedValue() {
         return stateCaptured;
     }
 
-    public void setStateCaptured(boolean stateCaptured) {
+    private void setStateCapturedValue(Boolean stateCaptured) {
         this.stateCaptured = stateCaptured;
     }
 
