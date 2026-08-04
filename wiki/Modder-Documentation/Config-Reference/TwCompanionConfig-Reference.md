@@ -109,13 +109,18 @@ one exact refund claim; an unavailable or denied operation charges nothing.
 
 ### `Command.ShoulderRide`
 
-- `Enabled`: shows the bonded-card `To Me` control for an active matching NPC.
+- `Enabled`: shows the `To Me` control for an active matching NPC.
 - `OffsetX`, `OffsetY`, `OffsetZ`: passenger attachment offset relative to the
   player. All three values must be finite.
 
 The first press mounts the NPC instantly using Hytale's entity-mount system;
-the next press sets it down. This capability is disabled by default and should
-only be enabled for models whose scale and pose suit a shoulder attachment.
+the next press sets it down. While mounted, Tamework freezes the NPC's normal
+behavior without changing its role, removes interaction, and marks it intangible
+and invulnerable. Its pose follows the player's rotation. The original physical
+flags are restored on dismount; because the role never changes, persistence
+always retains the canonical companion role. This capability is disabled by
+default and should only be enabled for models whose scale and pose suit a
+shoulder attachment.
 
 ### `Command.Travel`
 - `CrossWorldRecallEnabled`: allows recall to bridge world changes.

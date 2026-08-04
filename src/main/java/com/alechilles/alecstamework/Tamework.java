@@ -215,6 +215,7 @@ import com.alechilles.alecstamework.npc.network.MountedRidePacketHandler;
 import com.alechilles.alecstamework.npc.systems.MountedRideRiderCleanupSystem;
 import com.alechilles.alecstamework.npc.systems.MountedRideRiderFollowSystem;
 import com.alechilles.alecstamework.npc.systems.ShoulderRideNpcFollowSystem;
+import com.alechilles.alecstamework.npc.systems.ShoulderRideNpcStateSystem;
 import com.alechilles.alecstamework.npc.systems.NpcDebugDisplayResumeOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.NpcMountedNameplateVisibilitySystem;
 import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
@@ -239,8 +240,11 @@ import com.hypixel.hytale.server.core.io.ServerManager;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
 import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
+import com.hypixel.hytale.server.core.entity.Frozen;
 import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entity.component.Interactable;
+import com.hypixel.hytale.server.core.modules.entity.component.Intangible;
+import com.hypixel.hytale.server.core.modules.entity.component.Invulnerable;
 import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
@@ -849,6 +853,15 @@ public class Tamework extends JavaPlugin {
                             TransformComponent.getComponentType(),
                             Velocity.getComponentType(),
                             DeathComponent.getComponentType())
+            );
+            getEntityStoreRegistry().registerSystem(
+                    new ShoulderRideNpcStateSystem(
+                            shoulderRideComponentType,
+                            mountedComponentType,
+                            Interactable.getComponentType(),
+                            Intangible.getComponentType(),
+                            Invulnerable.getComponentType(),
+                            Frozen.getComponentType())
             );
         }
         getEntityStoreRegistry().registerSystem(

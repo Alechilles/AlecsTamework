@@ -64,7 +64,6 @@ public final class ShoulderRideNpcFollowSystem
         if (store.getComponent(npcRef, deathType) != null
                 || !isValidTarget(marker, playerRef, store)) {
             commands.tryRemoveComponent(npcRef, mountedType);
-            commands.tryRemoveComponent(npcRef, markerType);
             return;
         }
         TransformComponent playerTransform =
@@ -73,10 +72,15 @@ public final class ShoulderRideNpcFollowSystem
                 commands.getComponent(npcRef, transformType);
         if (playerTransform == null || npcTransform == null) {
             commands.tryRemoveComponent(npcRef, mountedType);
-            commands.tryRemoveComponent(npcRef, markerType);
             return;
         }
         npcTransform.setPosition(playerTransform.getPosition());
+        npcTransform.getRotation().setYaw(
+                playerTransform.getRotation().yaw());
+        npcTransform.getRotation().setPitch(
+                playerTransform.getRotation().pitch());
+        npcTransform.getRotation().setRoll(
+                playerTransform.getRotation().roll());
         Velocity velocity = commands.getComponent(npcRef, velocityType);
         if (velocity != null) velocity.setZero();
     }

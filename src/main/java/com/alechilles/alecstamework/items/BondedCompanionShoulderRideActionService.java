@@ -13,11 +13,18 @@ import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Rotation3f;
+import com.hypixel.hytale.protocol.AnimationSlot;
 import com.hypixel.hytale.protocol.MountController;
+import com.hypixel.hytale.server.core.entity.Frozen;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
+import com.hypixel.hytale.server.core.modules.entity.component.Intangible;
+import com.hypixel.hytale.server.core.modules.entity.component.Interactable;
+import com.hypixel.hytale.server.core.modules.entity.component.Invulnerable;
+import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -165,6 +172,9 @@ final class BondedCompanionShoulderRideActionService {
                 if (!isAttached(npcRef, playerRef, store)) return false;
                 return queueToggle(npcRef, store, settings, ownerUuid, true);
             }
+            if (store.getComponent(npcRef, markerType) != null) {
+                return false;
+            }
             var mountedByType = MountedByComponent.getComponentType();
             MountedByComponent mountedBy = mountedByType == null ? null
                     : store.getComponent(playerRef, mountedByType);
@@ -202,13 +212,38 @@ final class BondedCompanionShoulderRideActionService {
             if (detach) {
                 if (!isAttached(liveNpc, livePlayer, liveStore)) return;
                 liveStore.tryRemoveComponent(liveNpc, mountedType);
-                liveStore.tryRemoveComponent(liveNpc, markerType);
                 return;
             }
             if (settings == null || !settings.isConfigured()
-                    || liveStore.getComponent(liveNpc, mountedType) != null) return;
+                    || liveStore.getComponent(liveNpc, mountedType) != null
+                    || liveStore.getComponent(liveNpc, markerType) != null) return;
+            NPCEntity npc = liveStore.getComponent(liveNpc,
+                    NPCEntity.getComponentType());
+            if (npc == null || npc.getRole() == null
+                    || liveStore.getComponent(liveNpc,
+                    DeathComponent.getComponentType()) != null) return;
+            boolean wasInteractable = liveStore.getComponent(liveNpc,
+                    Interactable.getComponentType()) != null;
+            boolean wasIntangible = liveStore.getComponent(liveNpc,
+                    Intangible.getComponentType()) != null;
+            boolean wasInvulnerable = liveStore.getComponent(liveNpc,
+                    Invulnerable.getComponentType()) != null;
+            boolean wasFrozen = liveStore.getComponent(liveNpc,
+                    Frozen.getComponentType()) != null;
             liveStore.putComponent(liveNpc, markerType,
-                    new TameworkShoulderRideComponent(ownerUuid));
+                    new TameworkShoulderRideComponent(ownerUuid,
+                            wasInteractable, wasIntangible,
+                            wasInvulnerable, wasFrozen));
+            liveStore.ensureAndGetComponent(liveNpc,
+                    Frozen.getComponentType());
+            liveStore.ensureAndGetComponent(liveNpc,
+                    Intangible.getComponentType());
+            liveStore.ensureAndGetComponent(liveNpc,
+                    Invulnerable.getComponentType());
+            liveStore.tryRemoveComponent(liveNpc,
+                    Interactable.getComponentType());
+            npc.playAnimation(liveNpc, AnimationSlot.Movement, null,
+                    liveStore);
             liveStore.putComponent(liveNpc, mountedType, new MountedComponent(
                     livePlayer, new Rotation3f((float) settings.getOffsetX(),
                     (float) settings.getOffsetY(),
