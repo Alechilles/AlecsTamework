@@ -110,10 +110,10 @@ public final class AvatarFlightMountSessionSystem extends EntityTickingSystem<En
             Ref<EntityStore> playerRef,
             AvatarFlightMountSessionComponent session,
             UUID playerUuid) {
-        if (session.getPhase() == AvatarFlightMountPhase.RESTORING) return null;
         if (!AvatarFlightRuntimeEpoch.isCurrent(session.getRuntimeEpoch())) {
             return AvatarFlightMountLifecycleService.EndReason.SERVER_RESTART;
         }
+        if (AvatarFlightMountLifecycleService.isRestorationInProgress(session)) return null;
         if (store.getComponent(playerRef, deathType) != null) {
             return AvatarFlightMountLifecycleService.EndReason.PLAYER_DEAD;
         }

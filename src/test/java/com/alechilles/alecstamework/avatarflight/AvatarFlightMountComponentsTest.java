@@ -64,4 +64,18 @@ class AvatarFlightMountComponentsTest {
         assertFalse(AvatarFlightRuntimeEpoch.isCurrent(previousSource.getRuntimeEpoch()));
         assertFalse(AvatarFlightRuntimeEpoch.isCurrent("previous-process"));
     }
+
+    /**
+     * Covers the crash path where disconnect cleanup persisted its in-progress marker before the
+     * process died. A new server must resume that cleanup rather than leave the player transformed.
+     */
+    @Test
+    void staleRestoringSessionIsNotTreatedAsActiveCleanup() {
+        AvatarFlightMountSessionComponent session = new AvatarFlightMountSessionComponent(
+                "npc-uuid", "world", "flight-config", 42L);
+        session.setPhase(AvatarFlightMountPhase.RESTORING);
+        session.setRuntimeEpoch("previous-process");
+
+        assertFalse(AvatarFlightMountLifecycleService.isRestorationInProgress(session));
+    }
 }

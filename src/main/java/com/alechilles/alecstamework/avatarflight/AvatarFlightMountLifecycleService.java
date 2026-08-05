@@ -97,7 +97,7 @@ public final class AvatarFlightMountLifecycleService {
             AvatarFlightActivator.Result disabled = activator.disable(store, playerRef, playerUuid);
             return new Result(disabled.ok(), disabled.message());
         }
-        if (session.getPhase() == AvatarFlightMountPhase.RESTORING) {
+        if (isRestorationInProgress(session)) {
             return Result.ok("Avatar-flight mount cleanup already in progress.");
         }
         session.setPhase(AvatarFlightMountPhase.RESTORING);
@@ -116,6 +116,15 @@ public final class AvatarFlightMountLifecycleService {
         ComponentType<EntityStore, AvatarFlightMountSessionComponent> type =
                 AvatarFlightMountSessionComponent.getComponentType();
         return type != null && store.getComponent(playerRef, type) != null;
+    }
+
+    /**
+     * A persisted RESTORING marker belongs only to the process that started the teardown.
+     * A later process must resume it so a crash cannot leave the player transformed forever.
+     */
+    static boolean isRestorationInProgress(@Nonnull AvatarFlightMountSessionComponent session) {
+        return session.getPhase() == AvatarFlightMountPhase.RESTORING
+                && AvatarFlightRuntimeEpoch.isCurrent(session.getRuntimeEpoch());
     }
 
     private AvatarFlightMountSessionComponent createSession(Store<EntityStore> store,
