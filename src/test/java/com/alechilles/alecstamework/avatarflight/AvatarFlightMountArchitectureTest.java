@@ -79,6 +79,8 @@ class AvatarFlightMountArchitectureTest {
         assertTrue(visibility.contains("iterator.remove()"));
         assertFalse(parking.contains(
                 "removeIfPresent(store, npcRef, EntityTrackerSystems.Visible.getComponentType())"));
+        assertTrue(parking.contains("null, null, true, store"),
+                "parked sources must be detached from world-spawn despawning");
     }
 
     /** Protects the regression where the normal F dismount packet skipped avatar-flight sessions. */

@@ -58,7 +58,11 @@ public final class AvatarFlightNpcParkingService {
         if (!npcRef.isValid() || emptyRoleIndex < 0) {
             return false;
         }
-        RoleChangeSystem.requestRoleChange(npcRef, role, emptyRoleIndex, false, null, null, store);
+        // Empty_Role has no persistent population ownership. Detach the parked
+        // companion so the world-spawn despawner cannot remove it before the
+        // avatar-flight teardown restores its original role.
+        RoleChangeSystem.requestRoleChange(
+                npcRef, role, emptyRoleIndex, false, null, null, true, store);
         removeIfPresent(store, npcRef, Interactable.getComponentType());
         source.setPhase(AvatarFlightMountPhase.ACTIVE);
         return true;
