@@ -75,6 +75,14 @@ public final class BondedCompanionCaptureAuthor {
             return rejected(intent, completion, Status.DATABASE_FAILED);
         }
         Status intrinsic = intrinsicDenial(intent);
+        if (intrinsic == Status.CHANCE_FAILED) {
+            if (intent.attemptEvidence().sourceConsumption()
+                    == com.alechilles.alecstamework.api.CaptureSourceConsumption
+                    .RESOLVED_ATTEMPT) {
+                return resolvedFailedRoll(intent, completion);
+            }
+            return rejected(intent, completion, intrinsic);
+        }
         if (intrinsic != null) return rejected(intent, completion, intrinsic);
         PolicyCheck checked = safePolicy(intent);
         PolicyDecision decision = checked.decision();
@@ -200,6 +208,16 @@ public final class BondedCompanionCaptureAuthor {
         boolean delivered = feedback.failure(intent, completion, Status.REPLAYED);
         return new Result(
                 Status.REPLAYED, true, cleanupOutcome, delivered);
+    }
+
+    private Result resolvedFailedRoll(
+            BondedCompanionCaptureIntent intent,
+            BondedCompanionCaptureFeedbackDispatcher.CompletionContext completion
+    ) {
+        var completed = feedback.failedRoll(intent, completion);
+        return new Result(completed.spent()
+                ? Status.CHANCE_FAILED : Status.FINALIZATION_FAILED,
+                false, null, completed.feedbackDelivered());
     }
 
     private Result rejected(

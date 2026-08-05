@@ -69,6 +69,35 @@ class BondedCompanionCapturePipelineTest {
     }
 
     @Test
+    void resolvedFailedRollSpendsOneSourceItemBeforeFailureNotification() {
+        Harness harness = new Harness();
+        var source = intent(snapshot(), false, true, true, true, true);
+        var resolvedFailure = new BondedCompanionCaptureIntent(
+                source.callerNamespace(), source.idempotencyKey(),
+                source.actorUuid(), source.worldKey(), source.hotbarSlot(),
+                source.sourceFingerprint(), source.sourceNpcUuid(),
+                new BondedCompanionCaptureAttemptEvidence(
+                        UUID.fromString("30000000-0000-0000-0000-000000000003"),
+                        "Draconic_Stone", "HyDragonDraconicStone", 4L,
+                        null, -1L, CaptureSourceConsumption.RESOLVED_ATTEMPT,
+                        CaptureSuccessDisposition.STORE_BONDED_COMPANION,
+                        CaptureAttemptOutcome.FAILED_ROLL, "roll-failed"),
+                source.roleId(), source.species(), source.rosterId(),
+                source.rosterRevision(), source.snapshot(),
+                source.completionEffect(), source.targetValid(), false,
+                source.tranquilized(), source.toolAccess(),
+                source.ownerAllowed(), source.roleAllowed(), source.familyId(),
+                source.familySelection());
+
+        var result = harness.author.capture(resolvedFailure);
+
+        assertEquals(BondedCompanionCaptureAuthor.Status.CHANCE_FAILED,
+                result.status());
+        assertFalse(result.durable());
+        assertEquals(List.of("spend", "message"), harness.events);
+    }
+
+    @Test
     void nonTranquilizedTargetLeavesSourceAndItemUntouched() {
         assertRejected(intent(snapshot(), true, false, true, true, true),
                 BondedCompanionCaptureAuthor.Status.TRANQUILIZED_REQUIRED);

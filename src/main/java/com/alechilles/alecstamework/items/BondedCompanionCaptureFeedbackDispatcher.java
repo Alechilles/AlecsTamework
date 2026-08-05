@@ -178,6 +178,32 @@ public final class BondedCompanionCaptureFeedbackDispatcher {
         return safeMessage(intent, context, message(status, context));
     }
 
+    /** Finalizes a failed roll only when its frozen policy spends resolved attempts. */
+    FailedRollResult failedRoll(
+            @Nullable BondedCompanionCaptureIntent intent,
+            @Nullable CompletionContext context
+    ) {
+        if (intent == null || intent.attemptEvidence().sourceConsumption()
+                != com.alechilles.alecstamework.api.CaptureSourceConsumption
+                .RESOLVED_ATTEMPT) {
+            return new FailedRollResult(false, failure(intent, context,
+                    BondedCompanionCaptureAuthor.Status.CHANCE_FAILED));
+        }
+        boolean spent;
+        try {
+            spent = sink.spend(intent, context);
+        } catch (RuntimeException | LinkageError failure) {
+            spent = false;
+        }
+        if (!spent) {
+            return new FailedRollResult(false, safeMessage(intent, context,
+                    "The capture roll failed, but the capture item could not "
+                    + "be finalized. Keep it unchanged and contact an admin."));
+        }
+        return new FailedRollResult(true, failure(intent, context,
+                BondedCompanionCaptureAuthor.Status.CHANCE_FAILED));
+    }
+
     private boolean safeMessage(
             BondedCompanionCaptureIntent intent,
             CompletionContext context,
@@ -242,6 +268,8 @@ public final class BondedCompanionCaptureFeedbackDispatcher {
     }
 
     enum SuccessStatus { APPLIED, EFFECT_FAILED, FINALIZATION_FAILED }
+
+    record FailedRollResult(boolean spent, boolean feedbackDelivered) {}
 
     record SuccessResult(
             @Nonnull SuccessStatus status,
