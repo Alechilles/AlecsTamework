@@ -346,6 +346,15 @@ final class BondedCompanionTalentPageService {
         }
     }
 
+    private static long longInteger(Map<String, String> attributes,
+                                    String key, long fallback) {
+        try {
+            return Math.max(0L, Long.parseLong(attributes.get(key)));
+        } catch (RuntimeException ignored) {
+            return fallback;
+        }
+    }
+
     private static String text(Map<String, String> attributes, String key) {
         String value = attributes.get(key);
         return value == null || value.isBlank() ? null : value.trim();
@@ -380,7 +389,8 @@ final class BondedCompanionTalentPageService {
             TameworkTalentsComponent talents = new TameworkTalentsComponent(configId,
                     Math.max(0, integer(data, "talentSpentPoints", 0)),
                     text(data, "talents") == null ? new String[0]
-                            : text(data, "talents").split("\\s*,\\s*"));
+                            : text(data, "talents").split("\\s*,\\s*"),
+                    longInteger(data, "talentAllocationRevision", 0L));
             return new State(owner, row.rosterId(), row.profileId(), row.roleId(),
                     displayName == null ? "Companion" : displayName,
                     text(data, "levelingConfigId"), Math.max(1,
@@ -395,7 +405,8 @@ final class BondedCompanionTalentPageService {
             talents = new TameworkTalentsComponent(text(data, "talentConfigId"),
                     Math.max(0, integer(data, "talentSpentPoints", 0)),
                     text(data, "talents") == null ? new String[0]
-                            : text(data, "talents").split("\\s*,\\s*"));
+                            : text(data, "talents").split("\\s*,\\s*"),
+                    longInteger(data, "talentAllocationRevision", 0L));
             liveNpcUuid = view.activeLease() == null ? null
                     : view.activeLease().liveNpcUuid();
         }

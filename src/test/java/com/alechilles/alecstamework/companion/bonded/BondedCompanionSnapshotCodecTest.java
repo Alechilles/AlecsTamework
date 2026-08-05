@@ -153,6 +153,8 @@ class BondedCompanionSnapshotCodecTest {
                 "Bonded_Miniwyvern_Storm", "Nimbus", "Male", "storm-crest",
                 "{\"ability\":\"dash\"}"
         );
+        snapshot = snapshot.withTalents(new TameworkTalentsComponent(
+                "talents", 1, new String[] {"flame-breath"}, 7L));
         BondedCompanionSnapshotPresentationMapper mapper =
                 new BondedCompanionSnapshotPresentationMapper(roleId ->
                         new BondedCompanionSnapshotPresentationMapper
@@ -174,6 +176,7 @@ class BondedCompanionSnapshotCodecTest {
         assertEquals("20.0", presentation.data().get("currentXp"));
         assertEquals("talents", presentation.data().get("talentConfigId"));
         assertEquals("1", presentation.data().get("talentSpentPoints"));
+        assertEquals("7", presentation.data().get("talentAllocationRevision"));
         assertEquals("63.25", presentation.data().get("healthPercent"));
         assertEquals("253.0", presentation.data().get("currentHealth"));
         assertEquals("400.0", presentation.data().get("maxHealth"));

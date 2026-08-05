@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.api.BondedCompanionProfileView;
 import com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nonnull;
@@ -75,7 +76,13 @@ final class BondedCompanionPanelLiveProfileOverlay {
                 || progression.talentConfigId().equals(data.get("talentConfigId")))
                 && (progression.talentSpentPoints() == null
                 || Integer.toString(progression.talentSpentPoints()).equals(
-                        data.get("talentSpentPoints")))) {
+                        data.get("talentSpentPoints")))
+                && (progression.talentAllocationRevision() == null
+                || Long.toString(progression.talentAllocationRevision()).equals(
+                        data.get("talentAllocationRevision")))
+                && (progression.purchasedTalentIds() == null
+                || String.join(", ", progression.purchasedTalentIds()).equals(
+                        data.get("talents")))) {
             return profile;
         }
         Map<String, String> updated = new LinkedHashMap<>(data);
@@ -88,6 +95,14 @@ final class BondedCompanionPanelLiveProfileOverlay {
         if (progression.talentSpentPoints() != null) {
             updated.put("talentSpentPoints", Integer.toString(
                     progression.talentSpentPoints()));
+        }
+        if (progression.talentAllocationRevision() != null) {
+            updated.put("talentAllocationRevision", Long.toString(
+                    progression.talentAllocationRevision()));
+        }
+        if (progression.purchasedTalentIds() != null) {
+            updated.put("talents", String.join(", ",
+                    progression.purchasedTalentIds()));
         }
         return copy(profile, profile.displayName(), updated);
     }
@@ -162,7 +177,24 @@ final class BondedCompanionPanelLiveProfileOverlay {
             int level,
             double currentXp,
             @Nullable String talentConfigId,
-            @Nullable Integer talentSpentPoints
+            @Nullable Integer talentSpentPoints,
+            @Nullable Long talentAllocationRevision,
+            @Nullable List<String> purchasedTalentIds
     ) {
+        ProgressionSnapshot(
+                @Nonnull String levelingConfigId,
+                int level,
+                double currentXp,
+                @Nullable String talentConfigId,
+                @Nullable Integer talentSpentPoints
+        ) {
+            this(levelingConfigId, level, currentXp, talentConfigId,
+                    talentSpentPoints, null, null);
+        }
+
+        ProgressionSnapshot {
+            purchasedTalentIds = purchasedTalentIds == null
+                    ? null : List.copyOf(purchasedTalentIds);
+        }
     }
 }

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -82,6 +83,32 @@ class BondedCompanionPanelLiveProfileOverlayTest {
         assertEquals(profile.revision(), updated.revision());
         assertEquals(profile.state(), updated.state());
         assertEquals(profile.activeLease(), updated.activeLease());
+    }
+
+    /** Regression: a role change must not combine the live tree with stale purchased IDs. */
+    @Test
+    void activeProgressionSupersedesTheCompleteDurableTalentAllocation() {
+        var profile = BondedPanelTestFixtures.profile(
+                "profile-1", 9L, BondedCompanionStateView.ACTIVE,
+                UUID.fromString("71000000-0000-0000-0000-000000000009"),
+                Map.of("levelingConfigId", "wyvern-leveling", "level", "12",
+                        "currentXp", "43.5", "talentConfigId", "wild-talents",
+                        "talentSpentPoints", "3", "talentAllocationRevision", "1",
+                        "talents", "shared-root, shared-upgrade"));
+        var live = new BondedCompanionPanelLiveProfileOverlay.ProgressionSnapshot(
+                "wyvern-leveling", 12, 43.5, "fire-talents", 1, 7L,
+                List.of("fire-root"));
+
+        var updated = BondedCompanionPanelLiveProfileOverlay.withProgression(
+                profile, live);
+
+        assertEquals("fire-talents", updated.snapshotPresentationData().get(
+                "talentConfigId"));
+        assertEquals("1", updated.snapshotPresentationData().get(
+                "talentSpentPoints"));
+        assertEquals("7", updated.snapshotPresentationData().get(
+                "talentAllocationRevision"));
+        assertEquals("fire-root", updated.snapshotPresentationData().get("talents"));
     }
 
     @Test

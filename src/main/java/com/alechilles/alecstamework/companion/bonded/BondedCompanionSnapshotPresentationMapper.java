@@ -74,6 +74,8 @@ public final class BondedCompanionSnapshotPresentationMapper {
             // captured list when a player resets talents.
             data.put("talentSpentPoints", Integer.toString(
                     state.talents().getSpentPoints()));
+            data.put("talentAllocationRevision", Long.toString(
+                    state.talents().getAllocationRevision()));
             data.put("talents", String.join(", ",
                     state.talents().getPurchasedTalentIds()));
         }

@@ -215,7 +215,10 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
         return new BondedCompanionPanelLiveProfileOverlay.ProgressionSnapshot(
                 leveling.configId(), leveling.level(), leveling.currentXp(),
                 talentConfig == null ? null : talentConfig.getId(),
-                talentConfig == null ? null : talents.getSpentPoints());
+                talentConfig == null ? null : talents.getSpentPoints(),
+                talentConfig == null ? null : talents.getAllocationRevision(),
+                talentConfig == null ? null : java.util.Arrays.asList(
+                        talents.getPurchasedTalentIds()));
     }
 
     @Nullable
