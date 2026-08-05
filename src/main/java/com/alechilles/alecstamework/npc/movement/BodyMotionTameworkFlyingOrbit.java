@@ -140,9 +140,9 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
 
         Vector3d selfPosition = transform.getPosition();
         TameworkRideMountComponent tameworkRide = avoidObstacles
-                ? tameworkRide(ref, componentAccessor) : null;
+                ? this.tameworkRide(ref, componentAccessor) : null;
         NPCMountComponent nativeMount = avoidObstacles
-                ? nativeMount(ref, componentAccessor) : null;
+                ? this.resolveNativeMount(ref, componentAccessor) : null;
         boolean autonomousAvoidance = avoidObstacles && !isRiderControlled(tameworkRide, nativeMount);
         if (autonomousAvoidance) {
             obstacleAvoidance.beginUpdate(dt);
@@ -312,7 +312,7 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
     }
 
     @Nullable
-    private NPCMountComponent nativeMount(
+    private NPCMountComponent resolveNativeMount(
             @Nonnull Ref<EntityStore> ref,
             @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         ComponentType<EntityStore, NPCMountComponent> type = NPCMountComponent.getComponentType();
