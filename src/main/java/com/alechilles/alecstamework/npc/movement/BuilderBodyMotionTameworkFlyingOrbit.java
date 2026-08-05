@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.movement;
 import com.google.gson.JsonElement;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderDescriptorState;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
+import com.hypixel.hytale.server.npc.asset.builder.holder.BooleanHolder;
 import com.hypixel.hytale.server.npc.asset.builder.holder.DoubleHolder;
 import com.hypixel.hytale.server.npc.asset.builder.holder.EnumHolder;
 import com.hypixel.hytale.server.npc.asset.builder.holder.NumberArrayHolder;
@@ -35,6 +36,7 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
     private final NumberArrayHolder desiredAltitudeRange = new NumberArrayHolder();
     private final DoubleHolder climbRelativeSpeed = new DoubleHolder();
     private final DoubleHolder sinkRelativeSpeed = new DoubleHolder();
+    private final BooleanHolder avoidObstacles = new BooleanHolder();
 
     @Nonnull
     @Override
@@ -91,6 +93,9 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
         getDouble(data, "SinkRelativeSpeed", sinkRelativeSpeed, 0.5,
                 DoubleRangeValidator.between(0, 2), BuilderDescriptorState.WorkInProgress,
                 "Downward steering strength while above the desired altitude range.", null);
+        getBoolean(data, "AvoidObstacles", avoidObstacles, true,
+                BuilderDescriptorState.WorkInProgress,
+                "Whether autonomous flight probes blocks and steers around obstructions.", null);
         return this;
     }
 
@@ -188,6 +193,10 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
 
     double getSinkRelativeSpeed(BuilderSupport support) {
         return sinkRelativeSpeed.get(support.getExecutionContext());
+    }
+
+    boolean isAvoidObstacles(BuilderSupport support) {
+        return avoidObstacles.get(support.getExecutionContext());
     }
 
     enum Mode implements Supplier<String> {

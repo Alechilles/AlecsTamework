@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework.npc.movement;
 
+import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
+import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ComponentAccessor;
+import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.physics.util.PhysicsMath;
@@ -10,6 +13,7 @@ import com.hypixel.hytale.server.npc.corecomponents.BodyMotionBase;
 import com.hypixel.hytale.server.npc.movement.Steering;
 import com.hypixel.hytale.server.npc.movement.controllers.MotionController;
 import com.hypixel.hytale.server.npc.movement.controllers.MotionControllerFly;
+import com.hypixel.hytale.server.npc.movement.controllers.ProbeMoveData;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.concurrent.ThreadLocalRandom;
@@ -24,6 +28,7 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
     private static final double RADIAL_CORRECTION_WEIGHT = 0.85;
     private static final double WANDER_ENVELOPE_RADIUS_MULTIPLIER = 1.75;
     private static final double WANDER_ENVELOPE_ALTITUDE_MARGIN = 8.0;
+    private static final int WANDER_CANDIDATE_LIMIT = 3;
 
     private final BuilderBodyMotionTameworkFlyingOrbit.Mode mode;
     private final double orbitRadius;
@@ -43,11 +48,29 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
     private final double[] desiredAltitudeRange;
     private final double climbRelativeSpeed;
     private final double sinkRelativeSpeed;
+    private final boolean avoidObstacles;
+    private final FlyingObstacleAvoidance obstacleAvoidance = new FlyingObstacleAvoidance();
+    private final ProbeMoveData obstacleProbeData = new ProbeMoveData();
     private final Vector3d targetPosition = new Vector3d();
     private final Vector3d wanderDestination = new Vector3d();
+    private final Vector3d waypointRoute = new Vector3d();
+    private final Vector3d obstacleReference = new Vector3d();
+    private final Vector3d obstacleProbeOrigin = new Vector3d();
     private final Vector3d passThroughDestination = new Vector3d();
     private final Vector3d translation = new Vector3d();
     private final Vector3d facingDirection = new Vector3d();
+    private final Vector3d[] wanderCandidates = {
+            new Vector3d(), new Vector3d(), new Vector3d()
+    };
+    private final double[] wanderClearances = new double[WANDER_CANDIDATE_LIMIT];
+    private final FlyingObstacleAvoidance.Probe obstacleProbe = this::probeObstacle;
+
+    @Nullable
+    private Ref<EntityStore> obstacleProbeRef;
+    @Nullable
+    private MotionControllerFly obstacleProbeController;
+    @Nullable
+    private ComponentAccessor<EntityStore> obstacleProbeAccessor;
 
     private Phase phase = Phase.ORBIT;
     private double phaseRemaining;
@@ -79,6 +102,7 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
         desiredAltitudeRange = builder.getDesiredAltitudeRange(support);
         climbRelativeSpeed = builder.getClimbRelativeSpeed(support);
         sinkRelativeSpeed = builder.getSinkRelativeSpeed(support);
+        avoidObstacles = builder.isAvoidObstacles(support);
         beginOrbit();
     }
 
@@ -89,6 +113,7 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
         hasWanderDestination = false;
         wanderRetargetRemaining = 0.0;
         hasPassThroughDestination = false;
+        obstacleAvoidance.reset();
         if (mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.CYCLE) {
             beginOrbit();
         }
@@ -113,69 +138,107 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
             return true;
         }
 
-        if (mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.CYCLE) {
-            tickPhase(dt);
-        }
         Vector3d selfPosition = transform.getPosition();
-        boolean approaching = usesApproachSteering(mode, phase);
-        boolean facingTarget = facesTarget(mode, phase);
-        boolean wandering = mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.WANDER_TARGET;
-        boolean passingThrough = mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.PASS_THROUGH_TARGET;
-        if (wandering) {
-            updateWanderDestination(selfPosition, targetPosition, dt);
-            resolveWaypointTranslation(
-                    selfPosition.x(), selfPosition.y(), selfPosition.z(),
-                    wanderDestination.x(), wanderDestination.y(), wanderDestination.z(),
-                    wanderStopDistance, relativeSpeed, translation);
-        } else if (passingThrough) {
-            if (!hasPassThroughDestination) {
-                double altitudeOffset = randomDuration(desiredAltitudeRange[0], desiredAltitudeRange[1]);
-                resolvePassThroughDestination(
-                        selfPosition.x(), selfPosition.z(),
-                        targetPosition.x(), targetPosition.y(), targetPosition.z(),
-                        passThroughDistance, altitudeOffset, passThroughDestination);
-                hasPassThroughDestination = true;
-            }
-            resolveWaypointTranslation(
-                    selfPosition.x(), selfPosition.y(), selfPosition.z(),
-                    passThroughDestination.x(), passThroughDestination.y(), passThroughDestination.z(),
-                    passThroughStopDistance, relativeSpeed, translation);
-        } else if (mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.FACE_TARGET) {
-            translation.zero();
-        } else if (!approaching) {
-            resolveOrbitTranslation(
-                    selfPosition.x(), selfPosition.z(), targetPosition.x(), targetPosition.z(),
-                    orbitRadius, orbitRadiusTolerance, orbitDirection, relativeSpeed, translation);
+        TameworkRideMountComponent tameworkRide = avoidObstacles
+                ? tameworkRide(ref, componentAccessor) : null;
+        NPCMountComponent nativeMount = avoidObstacles
+                ? nativeMount(ref, componentAccessor) : null;
+        boolean autonomousAvoidance = avoidObstacles && !isRiderControlled(tameworkRide, nativeMount);
+        if (autonomousAvoidance) {
+            obstacleAvoidance.beginUpdate(dt);
+            bindObstacleProbe(ref, selfPosition, fly, componentAccessor);
         } else {
-            resolveApproachTranslation(
-                    selfPosition.x(), selfPosition.z(), targetPosition.x(), targetPosition.z(),
-                    approachStopDistance, approachSlowDownDistance, relativeSpeed, translation);
+            obstacleAvoidance.reset();
         }
 
-        double altitudeCorrection = 0.0;
-        if (!wandering && !passingThrough) {
-            altitudeCorrection = resolveTargetRelativeAltitudeCorrection(
-                    selfPosition.y(), targetPosition.y(), desiredAltitudeRange, climbRelativeSpeed, sinkRelativeSpeed);
-            translation.y = altitudeCorrection;
+        try {
+            if (mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.CYCLE) {
+                tickPhase(dt);
+            }
+            boolean approaching = usesApproachSteering(mode, phase);
+            boolean facingTarget = facesTarget(mode, phase);
+            boolean wandering = mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.WANDER_TARGET;
+            boolean passingThrough = mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.PASS_THROUGH_TARGET;
+            if (wandering) {
+                updateWanderDestination(selfPosition, targetPosition, dt, autonomousAvoidance, fly);
+                resolveWaypointTranslation(
+                        selfPosition.x(), selfPosition.y(), selfPosition.z(),
+                        wanderDestination.x(), wanderDestination.y(), wanderDestination.z(),
+                        wanderStopDistance, relativeSpeed, translation);
+            } else if (passingThrough) {
+                if (!hasPassThroughDestination) {
+                    double altitudeOffset = randomDuration(desiredAltitudeRange[0], desiredAltitudeRange[1]);
+                    resolvePassThroughDestination(
+                            selfPosition.x(), selfPosition.z(),
+                            targetPosition.x(), targetPosition.y(), targetPosition.z(),
+                            passThroughDistance, altitudeOffset, passThroughDestination);
+                    hasPassThroughDestination = true;
+                }
+                resolveWaypointTranslation(
+                        selfPosition.x(), selfPosition.y(), selfPosition.z(),
+                        passThroughDestination.x(), passThroughDestination.y(), passThroughDestination.z(),
+                        passThroughStopDistance, relativeSpeed, translation);
+            } else if (mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.FACE_TARGET) {
+                translation.zero();
+            } else if (!approaching) {
+                resolveOrbitTranslation(
+                        selfPosition.x(), selfPosition.z(), targetPosition.x(), targetPosition.z(),
+                        orbitRadius, orbitRadiusTolerance, orbitDirection, relativeSpeed, translation);
+            } else {
+                resolveApproachTranslation(
+                        selfPosition.x(), selfPosition.z(), targetPosition.x(), targetPosition.z(),
+                        approachStopDistance, approachSlowDownDistance, relativeSpeed, translation);
+            }
+
+            double altitudeCorrection = 0.0;
+            if (!wandering && !passingThrough) {
+                altitudeCorrection = resolveTargetRelativeAltitudeCorrection(
+                        selfPosition.y(), targetPosition.y(), desiredAltitudeRange,
+                        climbRelativeSpeed, sinkRelativeSpeed);
+                translation.y = altitudeCorrection;
+            }
+
+            if (shouldApplyObstacleAvoidance(
+                    avoidObstacles, tameworkRide, nativeMount, translation)) {
+                resolveTargetDirection(
+                        selfPosition.x(), selfPosition.z(),
+                        targetPosition.x(), targetPosition.z(), obstacleReference);
+                obstacleAvoidance.adjust(
+                        translation,
+                        obstacleReference,
+                        fly.getMaximumSpeed(),
+                        fly.getCurrentTurnRadius(),
+                        obstacleProbe,
+                        translation);
+            }
+
+            desiredSteering.setTranslation(translation);
+            Vector3d yawDirection = facingTarget
+                    ? resolveTargetDirection(
+                            selfPosition.x(), selfPosition.z(),
+                            targetPosition.x(), targetPosition.z(), facingDirection)
+                    : translation;
+            if (yawDirection.lengthSquared() > MIN_DIRECTION_LENGTH * MIN_DIRECTION_LENGTH) {
+                desiredSteering.setYaw(PhysicsMath.headingFromDirection(yawDirection.x, yawDirection.z));
+            }
+            if (altitudeCorrection != 0.0
+                    && translation.x * translation.x + translation.z * translation.z
+                    <= MIN_DIRECTION_LENGTH * MIN_DIRECTION_LENGTH) {
+                desiredSteering.setPitch(
+                        altitudeCorrection > 0.0 ? fly.getMaxClimbAngle() : -fly.getMaxSinkAngle());
+            }
+            desiredSteering.setRelativeTurnSpeed(1.0);
+            return true;
+        } finally {
+            clearObstacleProbeContext();
         }
-        desiredSteering.setTranslation(translation);
-        Vector3d yawDirection = facingTarget
-                ? resolveTargetDirection(selfPosition.x(), selfPosition.z(), targetPosition.x(), targetPosition.z(), facingDirection)
-                : translation;
-        if (yawDirection.lengthSquared() > MIN_DIRECTION_LENGTH * MIN_DIRECTION_LENGTH) {
-            desiredSteering.setYaw(PhysicsMath.headingFromDirection(yawDirection.x, yawDirection.z));
-        }
-        if (altitudeCorrection != 0.0
-                && translation.x * translation.x + translation.z * translation.z <= MIN_DIRECTION_LENGTH * MIN_DIRECTION_LENGTH) {
-            desiredSteering.setPitch(altitudeCorrection > 0.0 ? fly.getMaxClimbAngle() : -fly.getMaxSinkAngle());
-        }
-        desiredSteering.setRelativeTurnSpeed(1.0);
-        return true;
     }
 
     private void updateWanderDestination(@Nonnull Vector3d selfPosition,
                                          @Nonnull Vector3d currentTargetPosition,
-                                         double dt) {
+                                         double dt,
+                                         boolean preflight,
+                                         @Nonnull MotionControllerFly fly) {
         wanderRetargetRemaining -= Math.max(0.0, dt);
         boolean reachedDestination = selfPosition.distanceSquared(wanderDestination)
                 <= wanderStopDistance * wanderStopDistance;
@@ -185,11 +248,46 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
                 wanderRadiusRange, desiredAltitudeRange);
         if (!hasWanderDestination || wanderRetargetRemaining <= 0.0
                 || reachedDestination || outsideSafetyEnvelope) {
-            chooseWanderDestination(currentTargetPosition);
+            chooseWanderDestination(selfPosition, currentTargetPosition, preflight, fly);
         }
     }
 
-    private void chooseWanderDestination(@Nonnull Vector3d currentTargetPosition) {
+    private void chooseWanderDestination(@Nonnull Vector3d selfPosition,
+                                         @Nonnull Vector3d currentTargetPosition,
+                                         boolean preflight,
+                                         @Nonnull MotionControllerFly fly) {
+        if (!preflight) {
+            generateWanderCandidate(currentTargetPosition, wanderDestination);
+        } else {
+            int candidateCount = 0;
+            for (int i = 0; i < WANDER_CANDIDATE_LIMIT; i++) {
+                Vector3d candidate = wanderCandidates[i];
+                generateWanderCandidate(currentTargetPosition, candidate);
+                waypointRoute.set(candidate).sub(selfPosition);
+                double clearance = obstacleAvoidance.probeWaypoint(
+                        waypointRoute,
+                        fly.getMaximumSpeed(),
+                        fly.getCurrentTurnRadius(),
+                        obstacleProbe);
+                wanderClearances[i] = clearance;
+                candidateCount++;
+                if (clearance >= 1.0) {
+                    break;
+                }
+            }
+            int selected = selectWanderCandidate(wanderClearances, candidateCount);
+            if (selected >= 0) {
+                wanderDestination.set(wanderCandidates[selected]);
+            } else {
+                generateWanderCandidate(currentTargetPosition, wanderDestination);
+            }
+        }
+        wanderRetargetRemaining = randomDuration(wanderRetargetTimeRange[0], wanderRetargetTimeRange[1]);
+        hasWanderDestination = true;
+    }
+
+    private void generateWanderCandidate(@Nonnull Vector3d currentTargetPosition,
+                                         @Nonnull Vector3d output) {
         ThreadLocalRandom random = ThreadLocalRandom.current();
         double minimumRadius = wanderRadiusRange[0];
         double maximumRadius = wanderRadiusRange[1];
@@ -198,12 +296,53 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
         double radius = Math.sqrt(radiusSquared);
         double angle = random.nextDouble(Math.PI * 2.0);
         double altitude = randomDuration(desiredAltitudeRange[0], desiredAltitudeRange[1]);
-        wanderDestination.set(
+        output.set(
                 currentTargetPosition.x() + Math.cos(angle) * radius,
                 currentTargetPosition.y() + altitude,
                 currentTargetPosition.z() + Math.sin(angle) * radius);
-        wanderRetargetRemaining = randomDuration(wanderRetargetTimeRange[0], wanderRetargetTimeRange[1]);
-        hasWanderDestination = true;
+    }
+
+    @Nullable
+    private TameworkRideMountComponent tameworkRide(
+            @Nonnull Ref<EntityStore> ref,
+            @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
+        ComponentType<EntityStore, TameworkRideMountComponent> type =
+                TameworkRideMountComponent.getComponentType();
+        return type == null ? null : componentAccessor.getComponent(ref, type);
+    }
+
+    @Nullable
+    private NPCMountComponent nativeMount(
+            @Nonnull Ref<EntityStore> ref,
+            @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
+        ComponentType<EntityStore, NPCMountComponent> type = NPCMountComponent.getComponentType();
+        return type == null ? null : componentAccessor.getComponent(ref, type);
+    }
+
+    private void bindObstacleProbe(@Nonnull Ref<EntityStore> ref,
+                                   @Nonnull Vector3d selfPosition,
+                                   @Nonnull MotionControllerFly fly,
+                                   @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
+        obstacleProbeRef = ref;
+        obstacleProbeOrigin.set(selfPosition);
+        obstacleProbeController = fly;
+        obstacleProbeAccessor = componentAccessor;
+    }
+
+    private double probeObstacle(@Nonnull Vector3d direction) {
+        Ref<EntityStore> ref = obstacleProbeRef;
+        MotionControllerFly fly = obstacleProbeController;
+        ComponentAccessor<EntityStore> componentAccessor = obstacleProbeAccessor;
+        if (ref == null || fly == null || componentAccessor == null) {
+            return 0.0;
+        }
+        return fly.probeMove(ref, obstacleProbeOrigin, direction, obstacleProbeData, componentAccessor);
+    }
+
+    private void clearObstacleProbeContext() {
+        obstacleProbeRef = null;
+        obstacleProbeController = null;
+        obstacleProbeAccessor = null;
     }
 
     private void tickPhase(double dt) {
@@ -239,6 +378,40 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
                                @Nonnull Phase phase) {
         return mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.FACE_TARGET
                 || usesApproachSteering(mode, phase);
+    }
+
+    static boolean isRiderControlled(@Nullable TameworkRideMountComponent tameworkRide,
+                                     @Nullable NPCMountComponent nativeMount) {
+        return tameworkRide != null || nativeMount != null;
+    }
+
+    static boolean shouldApplyObstacleAvoidance(boolean enabled,
+                                                @Nullable TameworkRideMountComponent tameworkRide,
+                                                @Nullable NPCMountComponent nativeMount,
+                                                @Nonnull Vector3d desiredTranslation) {
+        return enabled
+                && !isRiderControlled(tameworkRide, nativeMount)
+                && Double.isFinite(desiredTranslation.x)
+                && Double.isFinite(desiredTranslation.y)
+                && Double.isFinite(desiredTranslation.z)
+                && desiredTranslation.lengthSquared() > MIN_DIRECTION_LENGTH * MIN_DIRECTION_LENGTH;
+    }
+
+    static int selectWanderCandidate(@Nonnull double[] clearanceFractions, int candidateCount) {
+        int limit = Math.min(Math.max(0, candidateCount), clearanceFractions.length);
+        int bestIndex = -1;
+        double bestClearance = -1.0;
+        for (int i = 0; i < limit; i++) {
+            double clearance = clearanceFractions[i];
+            if (clearance >= 1.0) {
+                return i;
+            }
+            if (clearance > bestClearance) {
+                bestClearance = clearance;
+                bestIndex = i;
+            }
+        }
+        return bestIndex;
     }
 
     static double resolveAltitudeCorrection(double currentY,

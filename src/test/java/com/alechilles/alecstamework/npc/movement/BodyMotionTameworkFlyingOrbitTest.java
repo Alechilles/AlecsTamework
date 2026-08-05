@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
+import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
 
@@ -169,5 +171,38 @@ class BodyMotionTameworkFlyingOrbitTest {
         assertEquals(4.0, destination.x, EPSILON);
         assertEquals(12.0, destination.y, EPSILON);
         assertEquals(18.0, destination.z, EPSILON);
+    }
+
+    @Test
+    void anyMountedComponentDisablesAvoidance() {
+        assertTrue(BodyMotionTameworkFlyingOrbit.isRiderControlled(
+                new TameworkRideMountComponent(), null));
+        assertTrue(BodyMotionTameworkFlyingOrbit.isRiderControlled(
+                null, new NPCMountComponent()));
+        assertFalse(BodyMotionTameworkFlyingOrbit.isRiderControlled(null, null));
+    }
+
+    @Test
+    void avoidanceGateRequiresEnabledAutonomousTranslation() {
+        assertTrue(BodyMotionTameworkFlyingOrbit.shouldApplyObstacleAvoidance(
+                true, null, null, new Vector3d(1.0, 0.0, 0.0)));
+        assertFalse(BodyMotionTameworkFlyingOrbit.shouldApplyObstacleAvoidance(
+                false, null, null, new Vector3d(1.0, 0.0, 0.0)));
+        assertFalse(BodyMotionTameworkFlyingOrbit.shouldApplyObstacleAvoidance(
+                true, new TameworkRideMountComponent(), null, new Vector3d(1.0, 0.0, 0.0)));
+        assertFalse(BodyMotionTameworkFlyingOrbit.shouldApplyObstacleAvoidance(
+                true, null, null, new Vector3d()));
+    }
+
+    @Test
+    void wanderCandidateSelectsFirstClearCorridor() {
+        assertEquals(1, BodyMotionTameworkFlyingOrbit.selectWanderCandidate(
+                new double[] { 0.0, 1.0, 0.0 }, 2));
+    }
+
+    @Test
+    void wanderCandidateFallsBackToGreatestPartialClearance() {
+        assertEquals(1, BodyMotionTameworkFlyingOrbit.selectWanderCandidate(
+                new double[] { 0.4, 0.7, 0.6 }, 3));
     }
 }
