@@ -19,6 +19,7 @@ public record BondedCompanionPolicy(
         long sessionDurationSeconds,
         long summonCooldownSeconds,
         @Nullable String summonAuraEffectId,
+        @Nullable String expiryWarningEffectId,
         @Nullable RevivePrice revivePrice,
         @Nonnull FeatureFlags features
 ) {
@@ -32,6 +33,9 @@ public record BondedCompanionPolicy(
         summonAuraEffectId = summonAuraEffectId == null
                 || summonAuraEffectId.isBlank()
                 ? null : summonAuraEffectId.trim();
+        expiryWarningEffectId = expiryWarningEffectId == null
+                || expiryWarningEffectId.isBlank()
+                ? null : expiryWarningEffectId.trim();
         if (revision < 0L || maximumOwned < 0 || maximumActive < 0
                 || sessionDurationSeconds < 0L
                 || summonCooldownSeconds < 0L) {
@@ -43,11 +47,23 @@ public record BondedCompanionPolicy(
             long revision, String rosterId, String familyId,
             Set<String> allowedRoles, int maximumOwned, int maximumActive,
             long sessionDurationSeconds, long summonCooldownSeconds,
+            @Nullable String summonAuraEffectId,
             @Nullable RevivePrice revivePrice, FeatureFlags features
     ) {
         this(revision, rosterId, familyId, allowedRoles, maximumOwned,
                 maximumActive, sessionDurationSeconds, summonCooldownSeconds,
-                null, revivePrice, features);
+                summonAuraEffectId, null, revivePrice, features);
+    }
+
+    public BondedCompanionPolicy(
+            long revision, String rosterId, String familyId,
+            Set<String> allowedRoles, int maximumOwned, int maximumActive,
+            long sessionDurationSeconds, long summonCooldownSeconds,
+            @Nullable RevivePrice revivePrice, FeatureFlags features
+    ) {
+        this(revision, rosterId, familyId, allowedRoles, maximumOwned,
+                maximumActive, sessionDurationSeconds, summonCooldownSeconds,
+                null, null, revivePrice, features);
     }
 
     @Nullable

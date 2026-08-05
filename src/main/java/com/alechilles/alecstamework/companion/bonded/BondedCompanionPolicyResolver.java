@@ -137,6 +137,7 @@ public final class BondedCompanionPolicyResolver {
                 source.maximumActive(), source.sessionDurationSeconds(),
                 source.summonCooldownSeconds(),
                 source.summonAuraEffectId(),
+                source.expiryWarningEffectId(),
                 mapPrice(price),
                 new BondedCompanionPolicy.FeatureFlags(
                         flags.capture(), flags.provision(), flags.summon(),

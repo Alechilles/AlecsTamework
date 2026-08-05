@@ -31,6 +31,18 @@ public final class BondedCompanionExpiryWarningSchedule {
         };
     }
 
+    /** Returns the configured companion effect only for the 30-second visual warning. */
+    public static Optional<String> modelEffectId(
+            Warning warning, String configuredEffectId
+    ) {
+        if (warning == null || warning.secondsRemaining() != 30
+                || configuredEffectId == null) {
+            return Optional.empty();
+        }
+        String effectId = configuredEffectId.trim();
+        return effectId.isEmpty() ? Optional.empty() : Optional.of(effectId);
+    }
+
     public record Warning(int secondsRemaining, NotificationStyle style) {
     }
 }

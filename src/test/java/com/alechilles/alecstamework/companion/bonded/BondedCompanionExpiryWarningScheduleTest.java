@@ -35,4 +35,22 @@ class BondedCompanionExpiryWarningScheduleTest {
         assertTrue(BondedCompanionExpiryWarningSchedule.warning(
                 Long.MAX_VALUE, 100_000L).isEmpty());
     }
+
+    @Test
+    void selects_a_configured_model_effect_only_for_the_thirty_second_warning() {
+        BondedCompanionExpiryWarningSchedule.Warning thirtySeconds =
+                BondedCompanionExpiryWarningSchedule.warning(130_000L, 100_000L)
+                        .orElseThrow();
+        BondedCompanionExpiryWarningSchedule.Warning tenSeconds =
+                BondedCompanionExpiryWarningSchedule.warning(110_000L, 100_000L)
+                        .orElseThrow();
+
+        assertEquals("HyDragon_Dragon_Desummon", BondedCompanionExpiryWarningSchedule
+                .modelEffectId(thirtySeconds, " HyDragon_Dragon_Desummon ")
+                .orElseThrow());
+        assertTrue(BondedCompanionExpiryWarningSchedule
+                .modelEffectId(tenSeconds, "HyDragon_Dragon_Desummon").isEmpty());
+        assertTrue(BondedCompanionExpiryWarningSchedule
+                .modelEffectId(thirtySeconds, " ").isEmpty());
+    }
 }

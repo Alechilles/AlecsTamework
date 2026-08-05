@@ -82,6 +82,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     private final HytaleBondedCompanionWorldGateway world;
     private final com.alechilles.alecstamework.persistence.bonded
             .BondedCompanionStore store;
+    private final BondedCompanionRosterRegistry rosters;
     private final LongSupplier clock;
     private final BondedCompanionCaptureAuthor captureAuthor;
     @Nullable
@@ -103,6 +104,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
             HytaleBondedCompanionWorldGateway world,
             com.alechilles.alecstamework.persistence.bonded
                     .BondedCompanionStore store,
+            BondedCompanionRosterRegistry rosters,
             LongSupplier clock,
             BondedCompanionCaptureAuthor captureAuthor,
             BondedCompanionCaptureEventPublisher captureEvents
@@ -119,6 +121,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         this.durability = durability;
         this.world = world;
         this.store = store;
+        this.rosters = rosters;
         this.clock = clock;
         this.captureAuthor = captureAuthor;
         this.captureEvents = captureEvents;
@@ -239,7 +242,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         return new TameworkBondedCompanionComposition(
                 runtime, api, changes, diagnostics,
                 transitions, projections, observer, localLifecycle,
-                cleanup, durability, world, store, clock, captureAuthor,
+                cleanup, durability, world, store, rosters, clock, captureAuthor,
                 captureEvents
         );
     }
@@ -385,6 +388,19 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         if (!operational()) return null;
         return store.findProfile(lease.ownerUuid(), lease.rosterId(),
                 lease.profileId()).map(profile -> profile.displayName())
+                .orElse(null);
+    }
+
+    /** Resolves the current roster's optional 30-second expiry presentation. */
+    @Nullable
+    public String expiryWarningEffectIdFor(
+            @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease
+    ) {
+        if (!operational()) return null;
+        return store.findProfile(lease.ownerUuid(), lease.rosterId(),
+                lease.profileId()).flatMap(profile -> rosters.resolve(
+                        lease.rosterId(), profile.familyId()))
+                .map(BondedCompanionRosterRegistry.RosterDefinition::expiryWarningEffectId)
                 .orElse(null);
     }
 

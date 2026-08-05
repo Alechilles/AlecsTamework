@@ -52,6 +52,7 @@ public final class TwBondedCompanionRosterConfig implements
     long sessionDurationSeconds;
     long summonCooldownSeconds;
     String summonAuraEffectId;
+    String expiryWarningEffectId;
     RevivePriceDefinition revivePrice;
     RoleRevivePriceDefinition[] revivePriceByRole = RoleRevivePriceDefinition.EMPTY_ARRAY;
     FeatureToggles features = new FeatureToggles();
@@ -163,6 +164,9 @@ public final class TwBondedCompanionRosterConfig implements
         }
         if (!explicitTopLevelKeys.contains("SummonAuraEffectId")) {
             summonAuraEffectId = parent.summonAuraEffectId;
+        }
+        if (!explicitTopLevelKeys.contains("ExpiryWarningEffectId")) {
+            expiryWarningEffectId = parent.expiryWarningEffectId;
         }
         inheritRevivePrice(parent, explicitTopLevelKeys,
                 explicitNestedKeysByTopLevel);
@@ -351,6 +355,12 @@ public final class TwBondedCompanionRosterConfig implements
     @Nullable
     public String getSummonAuraEffectId() {
         return normalize(summonAuraEffectId);
+    }
+
+    /** Optional visual effect applied to a finite lease at its 30-second warning. */
+    @Nullable
+    public String getExpiryWarningEffectId() {
+        return normalize(expiryWarningEffectId);
     }
 
     @Nullable

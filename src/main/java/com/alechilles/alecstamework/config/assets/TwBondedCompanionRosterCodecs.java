@@ -200,6 +200,17 @@ public final class TwBondedCompanionRosterCodecs {
                             + "summoned. Omission inherits; blank disables it."
             )
             .add()
+            .<String>append(
+                    new KeyedCodec<>("ExpiryWarningEffectId", Codec.STRING),
+                    (asset, value) -> asset.expiryWarningEffectId = value,
+                    asset -> asset.getExpiryWarningEffectId()
+            )
+            .documentation(
+                    "Optional EntityEffect applied to the live companion at "
+                            + "the 30-second expiry warning. Omission inherits; "
+                            + "blank disables it."
+            )
+            .add()
             .<TwBondedCompanionRosterConfig.RevivePriceDefinition>append(
                     new KeyedCodec<>("RevivePrice", REVIVE_PRICE_CODEC),
                     (asset, value) -> asset.revivePrice = value,

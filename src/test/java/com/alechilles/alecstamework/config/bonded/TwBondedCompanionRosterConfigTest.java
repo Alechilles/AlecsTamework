@@ -101,6 +101,7 @@ class TwBondedCompanionRosterConfigTest {
                   "SessionDurationSeconds": 600,
                   "SummonCooldownSeconds": 30,
                   "SummonAuraEffectId": "HyDragon_DragonStone_SummonAura",
+                  "ExpiryWarningEffectId": "HyDragon_Dragon_Desummon",
                   "RevivePrice": {"Costs": [{"ItemId": "Ingredient_Life_Essence", "Quantity": 2}]},
                   "Features": {
                     "Capture": true,
@@ -129,6 +130,8 @@ class TwBondedCompanionRosterConfigTest {
         assertEquals(30L, definition.summonCooldownSeconds());
         assertEquals("HyDragon_DragonStone_SummonAura",
                 definition.summonAuraEffectId());
+        assertEquals("HyDragon_Dragon_Desummon",
+                definition.expiryWarningEffectId());
         assertEquals(2, definition.revivePrice().costs().getFirst().quantity());
         assertTrue(definition.features().capture());
         assertThrows(

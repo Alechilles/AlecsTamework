@@ -10,6 +10,9 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.system.tick.TickingSystem;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.asset.type.entityeffect.config.EntityEffect;
+import com.hypixel.hytale.server.core.asset.type.entityeffect.config.OverlapBehavior;
+import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -90,7 +93,31 @@ public final class BondedCompanionExpiryWarningSystem
                 + " expires in " + warning.secondsRemaining() + "s";
         if (!notifications.show(owner, message, warning.style())) {
             delivered.remove(key);
+            return;
         }
+        applyModelEffect(world, store, lease, warning);
+    }
+
+    private void applyModelEffect(
+            World world,
+            Store<EntityStore> store,
+            BondedCompanionProjectionValidator.LeaseExpectation lease,
+            BondedCompanionExpiryWarningSchedule.Warning warning
+    ) {
+        BondedCompanionExpiryWarningSchedule.modelEffectId(
+                warning, composition.expiryWarningEffectIdFor(lease))
+                .ifPresent(effectId -> {
+                    Ref<EntityStore> companionRef = world.getEntityRef(
+                            lease.liveNpcUuid());
+                    if (companionRef == null || !companionRef.isValid()) return;
+                    EntityEffect effect = EntityEffect.getAssetMap().getAsset(effectId);
+                    EffectControllerComponent controller = store.getComponent(
+                            companionRef, EffectControllerComponent.getComponentType());
+                    if (effect == null || controller == null) return;
+                    controller.addEffect(companionRef, effect,
+                            Math.max(0.05F, effect.getDuration()),
+                            OverlapBehavior.OVERWRITE, store);
+                });
     }
 
     private static Player resolveOwner(
