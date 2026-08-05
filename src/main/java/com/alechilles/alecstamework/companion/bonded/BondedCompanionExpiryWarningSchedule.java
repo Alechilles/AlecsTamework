@@ -8,6 +8,7 @@ import java.util.Optional;
  * Determines which, if any, expiry warning should be shown for a finite companion lease.
  */
 public final class BondedCompanionExpiryWarningSchedule {
+    private static final float EXPIRY_CLEANUP_GRACE_SECONDS = 2F;
 
     private BondedCompanionExpiryWarningSchedule() {
     }
@@ -41,6 +42,19 @@ public final class BondedCompanionExpiryWarningSchedule {
         }
         String effectId = configuredEffectId.trim();
         return effectId.isEmpty() ? Optional.empty() : Optional.of(effectId);
+    }
+
+    /** Keeps a completed disappearance effect active until lease cleanup removes its target. */
+    public static float effectDurationSeconds(
+            long expiresAtMs, long nowMs, float configuredDuration
+    ) {
+        float minimumDuration = Math.max(0.05F, configuredDuration);
+        if (expiresAtMs <= nowMs) {
+            return minimumDuration;
+        }
+        float remainingLeaseSeconds = (expiresAtMs - nowMs) / 1_000F;
+        return Math.max(minimumDuration,
+                remainingLeaseSeconds + EXPIRY_CLEANUP_GRACE_SECONDS);
     }
 
     public record Warning(int secondsRemaining, NotificationStyle style) {

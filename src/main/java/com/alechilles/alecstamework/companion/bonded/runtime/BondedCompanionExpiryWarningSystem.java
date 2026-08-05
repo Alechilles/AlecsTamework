@@ -68,7 +68,7 @@ public final class BondedCompanionExpiryWarningSystem
             }
             BondedCompanionExpiryWarningSchedule.warning(
                     lease.expiresAtMs(), nowMs).ifPresent(warning ->
-                    sendIfDue(world, store, lease, warning));
+                    sendIfDue(world, store, lease, warning, nowMs));
         }
         delivered.removeIf(key -> key.worldKey().equals(world.getName())
                 && !activeLeaseTokens.contains(key.leaseToken()));
@@ -78,7 +78,8 @@ public final class BondedCompanionExpiryWarningSystem
             World world,
             Store<EntityStore> store,
             BondedCompanionProjectionValidator.LeaseExpectation lease,
-            BondedCompanionExpiryWarningSchedule.Warning warning
+            BondedCompanionExpiryWarningSchedule.Warning warning,
+            long nowMs
     ) {
         WarningKey key = new WarningKey(world.getName(), lease.leaseToken(),
                 warning.secondsRemaining());
@@ -97,14 +98,15 @@ public final class BondedCompanionExpiryWarningSystem
             delivered.remove(key);
             return;
         }
-        applyModelEffect(world, store, lease, warning);
+        applyModelEffect(world, store, lease, warning, nowMs);
     }
 
     private void applyModelEffect(
             World world,
             Store<EntityStore> store,
             BondedCompanionProjectionValidator.LeaseExpectation lease,
-            BondedCompanionExpiryWarningSchedule.Warning warning
+            BondedCompanionExpiryWarningSchedule.Warning warning,
+            long nowMs
     ) {
         BondedCompanionExpiryWarningSchedule.modelEffectId(
                 warning, composition.expiryWarningEffectIdFor(lease))
@@ -117,7 +119,9 @@ public final class BondedCompanionExpiryWarningSystem
                             effectTarget, EffectControllerComponent.getComponentType());
                     if (effect == null || controller == null) return;
                     controller.addEffect(effectTarget, effect,
-                            Math.max(0.05F, effect.getDuration()),
+                            BondedCompanionExpiryWarningSchedule.effectDurationSeconds(
+                                    lease.expiresAtMs(), nowMs,
+                                    effect.getDuration()),
                             OverlapBehavior.OVERWRITE, store);
                 });
     }

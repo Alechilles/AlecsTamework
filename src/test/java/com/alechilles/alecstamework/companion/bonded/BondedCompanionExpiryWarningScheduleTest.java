@@ -53,4 +53,10 @@ class BondedCompanionExpiryWarningScheduleTest {
         assertTrue(BondedCompanionExpiryWarningSchedule
                 .modelEffectId(thirtySeconds, " ").isEmpty());
     }
+
+    @Test
+    void keeps_the_expiry_effect_active_through_the_next_cleanup_pass() {
+        assertEquals(32.75F, BondedCompanionExpiryWarningSchedule
+                .effectDurationSeconds(130_750L, 100_000L, 30F));
+    }
 }
