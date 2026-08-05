@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.bonded.runtime;
 
+import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionCleanupService;
 import com.alechilles.alecstamework.damage.ExpiryDismountFallProtectionService;
@@ -45,30 +46,35 @@ final class ExpiryDismountFallProtectionArmer {
     private static UUID riderUuid(
             Store<EntityStore> store, Ref<EntityStore> companionRef
     ) {
-        String rawUuid = null;
+        String rideRiderUuid = null;
         ComponentType<EntityStore, TameworkRideMountComponent> rideMountType =
                 TameworkRideMountComponent.getComponentType();
         if (rideMountType != null) {
             TameworkRideMountComponent rideMount = store.getComponent(
                     companionRef, rideMountType);
-            rawUuid = rideMount == null ? null : rideMount.getRiderUuid();
+            rideRiderUuid = rideMount == null ? null : rideMount.getRiderUuid();
         }
-        if (rawUuid == null || rawUuid.isBlank()) {
-            ComponentType<EntityStore, TameworkMountedGlideComponent>
-                    mountedGlideType = TameworkMountedGlideComponent
-                            .getComponentType();
-            if (mountedGlideType != null) {
-                TameworkMountedGlideComponent mountedGlide = store.getComponent(
-                        companionRef, mountedGlideType);
-                rawUuid = mountedGlide == null
-                        ? null : mountedGlide.getRiderUuid();
-            }
+        String glideRiderUuid = null;
+        ComponentType<EntityStore, TameworkMountedGlideComponent>
+                mountedGlideType = TameworkMountedGlideComponent
+                        .getComponentType();
+        if (mountedGlideType != null) {
+            TameworkMountedGlideComponent mountedGlide = store.getComponent(
+                    companionRef, mountedGlideType);
+            glideRiderUuid = mountedGlide == null
+                    ? null : mountedGlide.getRiderUuid();
         }
-        if (rawUuid == null || rawUuid.isBlank()) return null;
-        try {
-            return UUID.fromString(rawUuid);
-        } catch (IllegalArgumentException ignored) {
-            return null;
+        String avatarFlightRiderUuid = null;
+        ComponentType<EntityStore, AvatarFlightSourceComponent>
+                avatarFlightSourceType = AvatarFlightSourceComponent
+                        .getComponentType();
+        if (avatarFlightSourceType != null) {
+            AvatarFlightSourceComponent avatarFlightSource = store.getComponent(
+                    companionRef, avatarFlightSourceType);
+            avatarFlightRiderUuid = avatarFlightSource == null
+                    ? null : avatarFlightSource.getRiderUuid();
         }
+        return ExpiryDismountRiderUuidResolver.resolve(
+                rideRiderUuid, glideRiderUuid, avatarFlightRiderUuid);
     }
 }
