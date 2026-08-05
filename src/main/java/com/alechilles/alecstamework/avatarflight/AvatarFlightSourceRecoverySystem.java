@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.avatarflight;
 
+import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -74,6 +75,7 @@ public final class AvatarFlightSourceRecoverySystem extends EntityTickingSystem<
             return;
         }
         if (paired) return;
+        recordStaleSourceOwner(store, sourceRef, source);
         commandBuffer.run(bufferStore -> {
             if (!sourceRef.isValid()) return;
             AvatarFlightSourceComponent current = bufferStore.getComponent(sourceRef, sourceType);
@@ -82,6 +84,22 @@ public final class AvatarFlightSourceRecoverySystem extends EntityTickingSystem<
                     current.getOriginX(), current.getOriginY(), current.getOriginZ(), current.getOriginYaw());
             bufferStore.tryRemoveComponent(sourceRef, sourceType);
         });
+    }
+
+    private static void recordStaleSourceOwner(
+            Store<EntityStore> store,
+            Ref<EntityStore> sourceRef,
+            AvatarFlightSourceComponent source
+    ) {
+        if (AvatarFlightRuntimeEpoch.isCurrent(source.getRuntimeEpoch())) {
+            return;
+        }
+        var ownerType = TameworkOwnerComponent.getComponentType();
+        TameworkOwnerComponent owner = ownerType == null
+                ? null : store.getComponent(sourceRef, ownerType);
+        if (owner != null) {
+            AvatarFlightStaleOwnerRecoveryRegistry.record(owner.getOwnerId());
+        }
     }
 
     @Nullable

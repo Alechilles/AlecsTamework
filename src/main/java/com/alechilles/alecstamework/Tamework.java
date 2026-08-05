@@ -36,6 +36,7 @@ import com.alechilles.alecstamework.avatarflight.AvatarFlightRiderVisualComponen
 import com.alechilles.alecstamework.avatarflight.AvatarFlightRiderVisualCleanupSystem;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceRecoverySystem;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightStaleOwnerRecoveryRegistry;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceVisibilitySystem;
 import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
@@ -176,6 +177,10 @@ import com.alechilles.alecstamework.companion.bonded.runtime
         .BondedCompanionMaintenanceSystem;
 import com.alechilles.alecstamework.companion.bonded.runtime
         .BondedCompanionDeathSystem;
+import com.alechilles.alecstamework.companion.command.timed.runtime
+        .TimedSummonOwnerDeathSystem;
+import com.alechilles.alecstamework.companion.command.timed.runtime
+        .TimedSummonOwnerLifecycleService;
 import com.alechilles.alecstamework.persistence.runtime
         .PublicPersistenceShutdownReport;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationEntitySystem;
@@ -1062,6 +1067,19 @@ public class Tamework extends JavaPlugin {
         apiComposition.activateCapturePolicyRuntime(
                 itemFeatureRegistry, capturePolicyRegistry
         );
+        TimedSummonOwnerLifecycleService timedSummonOwnerLifecycle =
+                new TimedSummonOwnerLifecycleService(
+                        () -> api.commandTimedSummoning(),
+                        () -> persistenceComposition.facades().queries()
+                                .projectedTimedSummons()
+                );
+        getEntityStoreRegistry().registerSystem(
+                new TimedSummonOwnerDeathSystem(
+                        timedSummonOwnerLifecycle,
+                        Player.getComponentType(),
+                        UUIDComponent.getComponentType()
+                )
+        );
         companionXpEventDebugLogService = new CompanionXpEventDebugLogService(
                 () -> api,
                 message -> getLogger().at(Level.INFO).log(message)
@@ -1232,6 +1250,15 @@ public class Tamework extends JavaPlugin {
         TameworkEventRegistrationSupport.registerGlobal(
                 this,
                 PlayerDisconnectEvent.class,
+                event -> timedSummonOwnerLifecycle.onOwnerLogout(
+                        event == null || event.getPlayerRef() == null
+                                ? null : event.getPlayerRef().getUuid()
+                ),
+                "timed summon owner logout storage"
+        );
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
+                PlayerDisconnectEvent.class,
                 new AvatarFlightDisconnectRecoveryService()::onPlayerDisconnect,
                 "avatar flight disconnect cleanup"
         );
@@ -1294,6 +1321,24 @@ public class Tamework extends JavaPlugin {
                 AddPlayerToWorldEvent.class,
                 this::onPlayerAddedToWorldForOverrides,
                 "loaded world override initialization"
+        );
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
+                AddPlayerToWorldEvent.class,
+                event -> {
+                    PlayerRef playerRef = event == null || event.getHolder() == null
+                            ? null : event.getHolder().getComponent(
+                            PlayerRef.getComponentType()
+                    );
+                    if (playerRef != null
+                            && AvatarFlightStaleOwnerRecoveryRegistry.claim(
+                            playerRef.getUuid())) {
+                        timedSummonOwnerLifecycle.onStaleAvatarFlightRecovery(
+                                playerRef.getUuid()
+                        );
+                    }
+                },
+                "stale avatar flight roster storage"
         );
         TameworkEventRegistrationSupport.registerGlobal(
                 this,
