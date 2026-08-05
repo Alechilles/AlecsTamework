@@ -13,6 +13,7 @@ import com.hypixel.hytale.server.core.inventory.InventoryComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.Map;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -33,6 +34,15 @@ public final class AvatarFlightActivator {
                          @Nonnull Ref<EntityStore> ref,
                          @Nonnull UUID playerUuid,
                          @Nullable String configId) {
+        return enable(store, ref, playerUuid, configId, Map.of());
+    }
+
+    @Nonnull
+    public Result enable(@Nonnull Store<EntityStore> store,
+                         @Nonnull Ref<EntityStore> ref,
+                         @Nonnull UUID playerUuid,
+                         @Nullable String configId,
+                         @Nullable Map<String, String> sourceAttachmentIds) {
         TwAvatarFlightConfig config = TwAvatarFlightConfig.resolve(configId);
         if (!config.isEnabled()) {
             return Result.fail("Avatar flight config is disabled: " + safeConfigId(config));
@@ -49,7 +59,7 @@ public final class AvatarFlightActivator {
             return Result.fail("Hold Flightmaster's Talisman before starting avatar flight.");
         }
         boolean applyModel = config.getModel().isApplyModel();
-        if (applyModel && !modelService.apply(store, ref, playerUuid, config)) {
+        if (applyModel && !modelService.apply(store, ref, playerUuid, config, sourceAttachmentIds)) {
             return Result.fail("Avatar flight model asset not found: " + config.getModel().getModelId());
         }
         if (applyModel) {

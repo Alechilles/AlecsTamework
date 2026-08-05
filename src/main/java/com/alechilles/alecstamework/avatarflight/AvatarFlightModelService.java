@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.avatarflight;
 
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
+import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.asset.type.model.config.Model;
@@ -12,6 +13,7 @@ import com.hypixel.hytale.server.core.modules.entity.player.PlayerSkinComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
@@ -31,6 +33,14 @@ public final class AvatarFlightModelService {
                          @Nonnull Ref<EntityStore> ref,
                          @Nonnull UUID playerUuid,
                          @Nonnull TwAvatarFlightConfig config) {
+        return apply(store, ref, playerUuid, config, Map.of());
+    }
+
+    public boolean apply(@Nonnull Store<EntityStore> store,
+                         @Nonnull Ref<EntityStore> ref,
+                         @Nonnull UUID playerUuid,
+                         @Nonnull TwAvatarFlightConfig config,
+                         @Nullable Map<String, String> sourceAttachmentIds) {
         TwAvatarFlightConfig.ModelSettings modelSettings = config.getModel();
         ModelAsset modelAsset = ModelAsset.getAssetMap().getAsset(modelSettings.getModelId());
         if (modelAsset == null) {
@@ -42,7 +52,9 @@ public final class AvatarFlightModelService {
         }
         float scale = clampScale(modelAsset, (float) modelSettings.getScale());
         store.putComponent(ref, ModelComponent.getComponentType(),
-                new ModelComponent(createAvatarFlightModel(modelAsset, scale, modelSettings, config.getAnimation())));
+                new ModelComponent(createAvatarFlightModel(
+                        modelAsset, scale, modelSettings, config.getAnimation(), sourceAttachmentIds
+                )));
         return true;
     }
 
@@ -98,8 +110,15 @@ public final class AvatarFlightModelService {
     private static Model createAvatarFlightModel(@Nonnull ModelAsset modelAsset,
                                                  float scale,
                                                  @Nonnull TwAvatarFlightConfig.ModelSettings modelSettings,
-                                                 @Nonnull TwAvatarFlightConfig.AnimationSettings animation) {
-        Model baseModel = Model.createScaledModel(modelAsset, scale);
+                                                 @Nonnull TwAvatarFlightConfig.AnimationSettings animation,
+                                                 @Nullable Map<String, String> sourceAttachmentIds) {
+        Map<String, String> attachmentSelections = supportedSourceAttachments(
+                sourceAttachmentIds,
+                CompanionModelAttachmentService.resolveAttachmentOptionIds(modelAsset)
+        );
+        Model baseModel = attachmentSelections.isEmpty()
+                ? Model.createScaledModel(modelAsset, scale)
+                : Model.createScaledModel(modelAsset, scale, attachmentSelections);
         boolean hasCameraOverride = modelSettings.getCameraPositionOffset() != null;
         boolean hasEyeHeightOverride = modelSettings.getEyeHeight() != null;
         if (!animation.isPoseAnimationsEnabled() && !hasCameraOverride && !hasEyeHeightOverride) {
@@ -135,6 +154,16 @@ public final class AvatarFlightModelService {
                 baseModel.getDetailBoxes(),
                 baseModel.getPhobia(),
                 baseModel.getPhobiaModelAssetId()
+        );
+    }
+
+    @Nonnull
+    static Map<String, String> supportedSourceAttachments(
+            @Nullable Map<String, String> sourceAttachmentIds,
+            @Nullable Map<String, Set<String>> targetAttachmentOptions) {
+        return CompanionModelAttachmentService.filterAttachmentSelections(
+                sourceAttachmentIds,
+                targetAttachmentOptions
         );
     }
 

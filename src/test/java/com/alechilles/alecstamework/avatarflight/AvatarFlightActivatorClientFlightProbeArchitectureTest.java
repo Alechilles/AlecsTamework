@@ -73,7 +73,8 @@ class AvatarFlightActivatorClientFlightProbeArchitectureTest {
 
         int activeSessionCheck = enableBody.indexOf("store.getComponent(ref, flightType) != null");
         int talismanCheck = enableBody.indexOf("inventoryGuard.isTalismanSelected(store, ref)");
-        int modelReplacement = enableBody.indexOf("modelService.apply(store, ref, playerUuid, config)");
+        int modelReplacement = enableBody.indexOf(
+                "modelService.apply(store, ref, playerUuid, config, sourceAttachmentIds)");
         assertTrue(activeSessionCheck >= 0 && activeSessionCheck < modelReplacement,
                 "repeat enable requests must stop before replacing the player model");
         assertTrue(talismanCheck >= 0 && talismanCheck < modelReplacement,

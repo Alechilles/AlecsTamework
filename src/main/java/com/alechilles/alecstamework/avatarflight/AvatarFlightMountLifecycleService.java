@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.avatarflight;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.AvatarFlightMountingSettings;
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
+import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -11,6 +12,7 @@ import com.hypixel.hytale.server.core.modules.entity.component.TransformComponen
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
+import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
@@ -63,8 +65,11 @@ public final class AvatarFlightMountLifecycleService {
         store.putComponent(playerRef, sessionType, session);
         store.putComponent(npcRef, sourceType, source);
         movePlayerToSource(store, playerRef, npcRef);
+        Map<String, String> sourceAttachmentIds =
+                CompanionModelAttachmentService.resolveCurrentAttachments(npcRef, store);
         AvatarFlightActivator.Result enabled = activator.enable(
-                store, playerRef, UUID.fromString(prepared.playerUuid()), prepared.config().getId());
+                store, playerRef, UUID.fromString(prepared.playerUuid()),
+                prepared.config().getId(), sourceAttachmentIds);
         if (!enabled.ok()) {
             rollback(store, npcRef, playerRef, sessionType, sourceType, source, prepared.playerUuid());
             return Result.fail(enabled.message());

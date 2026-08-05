@@ -1,11 +1,17 @@
 package com.alechilles.alecstamework.avatarflight;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class AvatarFlightModelServiceArchitectureTest {
@@ -24,7 +30,7 @@ class AvatarFlightModelServiceArchitectureTest {
     void avatarFlightModelSwapInjectsPoseAnimationSetsIntoRuntimeModel() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("createAvatarFlightModel(modelAsset, scale, modelSettings, config.getAnimation())"),
+        assertTrue(source.contains("modelAsset, scale, modelSettings, config.getAnimation(), sourceAttachmentIds"),
                 "transformed avatar models should be enriched before the ModelComponent is applied");
         assertTrue(source.contains("Model.createScaledModel(modelAsset, scale)"),
                 "enrichment should start from the normal scaled model so hitbox, camera, attachments, and texture stay intact");
@@ -36,6 +42,37 @@ class AvatarFlightModelServiceArchitectureTest {
                 "modder-provided animation set ids should win over the generic Tamework defaults");
         assertTrue(source.contains("AvatarFlightPoseAnimationCatalog.standardDefinitionsFor(animation)"),
                 "runtime injection should use the shared standard pose catalog");
+    }
+
+    @Test
+    void mountedAvatarCarriesForwardSelectionsSupportedByItsFlightModel() throws Exception {
+        Method resolver = Arrays.stream(AvatarFlightModelService.class.getDeclaredMethods())
+                .filter(method -> method.getName().equals("supportedSourceAttachments"))
+                .findFirst()
+                .orElse(null);
+
+        assertNotNull(resolver,
+                "mounting must retain source attachment selections that the avatar-flight model supports");
+        resolver.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<String, String> selections = (Map<String, String>) resolver.invoke(
+                null,
+                Map.of("Skin", "OldOrange", "Horns", "Long"),
+                Map.of("Skin", Set.of("OldOrange", "Cobalt"))
+        );
+
+        assertEquals(Map.of("Skin", "OldOrange"), selections);
+    }
+
+    @Test
+    void mountLifecyclePassesSourceAttachmentsIntoAvatarModelCreation() throws Exception {
+        String lifecycle = Files.readString(Path.of(
+                "src", "main", "java", "com", "alechilles", "alecstamework",
+                "avatarflight", "AvatarFlightMountLifecycleService.java"
+        ), StandardCharsets.UTF_8);
+
+        assertTrue(lifecycle.contains("CompanionModelAttachmentService.resolveCurrentAttachments(npcRef, store)"));
+        assertTrue(lifecycle.contains("prepared.config().getId(), sourceAttachmentIds"));
     }
 
     @Test
