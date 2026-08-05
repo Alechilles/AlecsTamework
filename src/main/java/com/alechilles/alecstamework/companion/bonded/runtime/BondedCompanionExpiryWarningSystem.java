@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.companion.bonded.runtime;
 
 import com.alechilles.alecstamework.TameworkBondedCompanionComposition;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightMountPhase;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightMountSessionComponent;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionExpiryWarningSchedule;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionProjectionValidator;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
@@ -107,17 +109,42 @@ public final class BondedCompanionExpiryWarningSystem
         BondedCompanionExpiryWarningSchedule.modelEffectId(
                 warning, composition.expiryWarningEffectIdFor(lease))
                 .ifPresent(effectId -> {
-                    Ref<EntityStore> companionRef = world.getEntityRef(
-                            lease.liveNpcUuid());
-                    if (companionRef == null || !companionRef.isValid()) return;
+                    Ref<EntityStore> effectTarget = resolveEffectTarget(
+                            world, store, lease);
+                    if (effectTarget == null || !effectTarget.isValid()) return;
                     EntityEffect effect = EntityEffect.getAssetMap().getAsset(effectId);
                     EffectControllerComponent controller = store.getComponent(
-                            companionRef, EffectControllerComponent.getComponentType());
+                            effectTarget, EffectControllerComponent.getComponentType());
                     if (effect == null || controller == null) return;
-                    controller.addEffect(companionRef, effect,
+                    controller.addEffect(effectTarget, effect,
                             Math.max(0.05F, effect.getDuration()),
                             OverlapBehavior.OVERWRITE, store);
                 });
+    }
+
+    private static Ref<EntityStore> resolveEffectTarget(
+            World world,
+            Store<EntityStore> store,
+            BondedCompanionProjectionValidator.LeaseExpectation lease
+    ) {
+        Ref<EntityStore> ownerRef = world.getEntityRef(lease.ownerUuid());
+        ComponentType<EntityStore, AvatarFlightMountSessionComponent> sessionType =
+                AvatarFlightMountSessionComponent.getComponentType();
+        AvatarFlightMountSessionComponent session = ownerRef == null
+                || !ownerRef.isValid() || sessionType == null ? null
+                : store.getComponent(ownerRef, sessionType);
+        if (usesOwnerAvatarModel(session, lease.liveNpcUuid())) {
+            return ownerRef;
+        }
+        return world.getEntityRef(lease.liveNpcUuid());
+    }
+
+    static boolean usesOwnerAvatarModel(
+            AvatarFlightMountSessionComponent session, UUID companionUuid
+    ) {
+        return session != null && companionUuid != null
+                && session.getPhase() == AvatarFlightMountPhase.ACTIVE
+                && companionUuid.toString().equals(session.getSourceNpcUuid());
     }
 
     private static Player resolveOwner(
