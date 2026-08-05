@@ -71,7 +71,8 @@ public final class HytalePersistenceLiveBoundariesFactory {
         return new PublicPersistenceLiveBoundaries(
                 new HytaleCompanionCaptureBoundary(
                         new HytaleCompanionCaptureWorldGateway(
-                                captureSourceReceiptsType
+                                captureSourceReceiptsType,
+                                retirementType
                         )
                 ),
                 new HytaleCompanionCaptureReleaseBoundary(

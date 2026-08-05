@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.companion.capture.runtime.CompanionCaptureTa
 import com.alechilles.alecstamework.companion.capture.runtime.CompanionCaptureTameWorldAttempt.ReceiptPersistence;
 import com.alechilles.alecstamework.companion.capture.runtime.CompanionCaptureTameWorldAttempt.TargetProbe;
 import com.alechilles.alecstamework.items.persistence.HytaleCapturedArtifactAdapter;
+import com.alechilles.alecstamework.npc.components.TameworkPersistenceRetirementComponent;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.runtime.chunk
@@ -54,13 +55,17 @@ final class HytaleCompanionCaptureTameAttemptGateway
             HytaleCapturedArtifactAdapter artifacts,
             ComponentType<
                     EntityStore,
-                    TameworkCaptureSourceReceiptsComponent> receiptType
+                    TameworkCaptureSourceReceiptsComponent> receiptType,
+            ComponentType<
+                    EntityStore,
+                    TameworkPersistenceRetirementComponent> retirementType
     ) {
         this.world = world;
         this.store = store;
         this.request = request;
         this.source = new HytaleCompanionCaptureAttemptGateway(
-                world, store, request, artifacts, receiptType
+                world, store, request, artifacts, receiptType,
+                retirementType, operation
         );
         this.target = new HytaleCaptureTameTargetGateway(
                 world, store, request, operation

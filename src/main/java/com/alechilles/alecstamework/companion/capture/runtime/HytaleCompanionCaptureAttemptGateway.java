@@ -13,6 +13,8 @@ import com.alechilles.alecstamework.companion.capture.runtime.ResolvedCaptureSou
 import com.alechilles.alecstamework.companion.capture.runtime.ResolvedCaptureSourceWorldExecutor.ReceiptAttempt;
 import com.alechilles.alecstamework.companion.capture.runtime.ResolvedCaptureSourceWorldExecutor.SpendProbe;
 import com.alechilles.alecstamework.items.persistence.HytaleCapturedArtifactAdapter;
+import com.alechilles.alecstamework.npc.components.TameworkPersistenceRetirementComponent;
+import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
@@ -41,6 +43,10 @@ final class HytaleCompanionCaptureAttemptGateway implements AttemptGateway {
     private final ComponentType<
             EntityStore,
             TameworkCaptureSourceReceiptsComponent> receiptType;
+    private final ComponentType<
+            EntityStore,
+            TameworkPersistenceRetirementComponent> retirementType;
+    private final OperationEnvelope operation;
     private boolean consumedThisCall;
 
     HytaleCompanionCaptureAttemptGateway(
@@ -48,15 +54,19 @@ final class HytaleCompanionCaptureAttemptGateway implements AttemptGateway {
             Store<EntityStore> store,
             CompanionCaptureRequest request,
             HytaleCapturedArtifactAdapter artifacts,
-            ComponentType<
-                    EntityStore,
-                    TameworkCaptureSourceReceiptsComponent> receiptType
+            ComponentType<EntityStore, TameworkCaptureSourceReceiptsComponent>
+                    receiptType,
+            ComponentType<EntityStore, TameworkPersistenceRetirementComponent>
+                    retirementType,
+            OperationEnvelope operation
     ) {
         this.world = world;
         this.store = store;
         this.request = request;
         this.artifacts = artifacts;
         this.receiptType = receiptType;
+        this.retirementType = retirementType;
+        this.operation = operation;
     }
 
     @Override
@@ -285,6 +295,25 @@ final class HytaleCompanionCaptureAttemptGateway implements AttemptGateway {
             return RetirementAttempt.absent();
         }
         try {
+            TameworkPersistenceRetirementComponent expected =
+                    TameworkPersistenceRetirementComponent.exact(
+                            request.profileId(), operation
+                    );
+            TameworkPersistenceRetirementComponent existing =
+                    store.getComponent(target, retirementType);
+            if (existing != null && !existing.matches(
+                    request.profileId(), operation
+            )) {
+                return RetirementAttempt.conflict(null);
+            }
+            store.putComponent(target, retirementType, expected);
+            TameworkPersistenceRetirementComponent installed =
+                    store.getComponent(target, retirementType);
+            if (installed == null || !installed.matches(
+                    request.profileId(), operation
+            )) {
+                return RetirementAttempt.retryable(null);
+            }
             store.removeEntity(target, RemoveReason.REMOVE);
         } catch (RuntimeException | LinkageError failure) {
             return classifyRemovalReadback(failure);

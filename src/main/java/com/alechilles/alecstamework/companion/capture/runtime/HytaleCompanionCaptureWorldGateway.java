@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.companion.capture.runtime;
 
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
 import com.alechilles.alecstamework.items.persistence.HytaleCapturedArtifactAdapter;
+import com.alechilles.alecstamework.npc.components.TameworkPersistenceRetirementComponent;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.runtime.player
@@ -26,17 +27,24 @@ public final class HytaleCompanionCaptureWorldGateway
     private final ComponentType<
             EntityStore,
             TameworkCaptureSourceReceiptsComponent> receiptType;
+    private final ComponentType<
+            EntityStore,
+            TameworkPersistenceRetirementComponent> retirementType;
 
     public HytaleCompanionCaptureWorldGateway(
             @Nonnull ComponentType<
                     EntityStore,
-                    TameworkCaptureSourceReceiptsComponent> receiptType
+                    TameworkCaptureSourceReceiptsComponent> receiptType,
+            @Nonnull ComponentType<
+                    EntityStore,
+                    TameworkPersistenceRetirementComponent> retirementType
     ) {
         this(
                 new CompanionCaptureWorldExecutor(),
                 new CompanionCaptureTameWorldExecutor(),
                 new HytaleCapturedArtifactAdapter(),
-                receiptType
+                receiptType,
+                retirementType
         );
     }
 
@@ -45,13 +53,17 @@ public final class HytaleCompanionCaptureWorldGateway
             @Nonnull HytaleCapturedArtifactAdapter artifacts,
             @Nonnull ComponentType<
                     EntityStore,
-                    TameworkCaptureSourceReceiptsComponent> receiptType
+                    TameworkCaptureSourceReceiptsComponent> receiptType,
+            @Nonnull ComponentType<
+                    EntityStore,
+                    TameworkPersistenceRetirementComponent> retirementType
     ) {
         this(
                 executor,
                 new CompanionCaptureTameWorldExecutor(),
                 artifacts,
-                receiptType
+                receiptType,
+                retirementType
         );
     }
 
@@ -61,7 +73,10 @@ public final class HytaleCompanionCaptureWorldGateway
             @Nonnull HytaleCapturedArtifactAdapter artifacts,
             @Nonnull ComponentType<
                     EntityStore,
-                    TameworkCaptureSourceReceiptsComponent> receiptType
+                    TameworkCaptureSourceReceiptsComponent> receiptType,
+            @Nonnull ComponentType<
+                    EntityStore,
+                    TameworkPersistenceRetirementComponent> retirementType
     ) {
         this.executor = Objects.requireNonNull(executor, "executor");
         this.tameExecutor = Objects.requireNonNull(
@@ -70,6 +85,9 @@ public final class HytaleCompanionCaptureWorldGateway
         this.artifacts = Objects.requireNonNull(artifacts, "artifacts");
         this.receiptType = Objects.requireNonNull(
                 receiptType, "receiptType"
+        );
+        this.retirementType = Objects.requireNonNull(
+                retirementType, "retirementType"
         );
     }
 
@@ -96,7 +114,7 @@ public final class HytaleCompanionCaptureWorldGateway
             );
         }
         HytaleCompanionCaptureAttemptGateway attempts = attempts(
-                world, store, request
+                world, store, request, operation
         );
         return request.failedAttempt() || request.tameAndCommandLink()
                 ? LiveOperationResult.retryable(
@@ -127,12 +145,13 @@ public final class HytaleCompanionCaptureWorldGateway
                             request,
                             operation,
                             artifacts,
-                            receiptType
-                    )
+                            receiptType,
+                            retirementType
+                        )
             );
         }
         HytaleCompanionCaptureAttemptGateway attempts = attempts(
-                world, store, request
+                world, store, request, operation
         );
         if (!request.failedAttempt()) {
             return completed(executor.execute(
@@ -205,10 +224,12 @@ public final class HytaleCompanionCaptureWorldGateway
     private HytaleCompanionCaptureAttemptGateway attempts(
             World world,
             Store<EntityStore> store,
-            CompanionCaptureRequest request
+            CompanionCaptureRequest request,
+            OperationEnvelope operation
     ) {
         return new HytaleCompanionCaptureAttemptGateway(
-                world, store, request, artifacts, receiptType
+                world, store, request, artifacts, receiptType,
+                retirementType, operation
         );
     }
 
