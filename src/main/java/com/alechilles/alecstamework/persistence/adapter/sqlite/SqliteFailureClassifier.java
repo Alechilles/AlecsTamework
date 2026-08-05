@@ -45,6 +45,15 @@ public final class SqliteFailureClassifier {
         if (containsAny(message, "DRIVER_MISSING", "NATIVE_UNAVAILABLE", "DATABASE_MISSING")) {
             return result(StorageFailureKind.UNAVAILABLE, "sqlite_unavailable", operation, false, failure);
         }
+        if (containsAny(message, "CAPTURE_PREPARE_NOT_EXACT_LIVE_PROFILE")) {
+            return result(
+                    StorageFailureKind.UNKNOWN,
+                    "sqlite_operation_precondition",
+                    operation,
+                    true,
+                    failure
+            );
+        }
         return result(StorageFailureKind.UNKNOWN, "sqlite_unknown", operation, false, failure);
     }
 

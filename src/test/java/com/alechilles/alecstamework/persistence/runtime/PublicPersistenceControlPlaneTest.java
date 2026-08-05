@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.persistence.runtime;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteFailureClassifier;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceReadinessLevel;
@@ -186,6 +187,40 @@ class PublicPersistenceControlPlaneTest {
                 control.snapshot().features().get(
                         PublicPersistenceFeatureRegistry.CAPTURE
                 ).unitsFailed() > 0
+        );
+    }
+
+    /** Guards the capture-race warning reported on 2026-08-05. */
+    @Test
+    void capturePreconditionRollbackDoesNotMakeAllPersistenceReadOnly() {
+        PersistenceFeatureRegistry registry =
+                PublicPersistenceFeatureRegistry.create();
+        PersistenceStartupCoordinator startup = ready(registry);
+        PublicPersistenceControlPlane control =
+                new PublicPersistenceControlPlane(registry);
+        control.bind(startup);
+
+        control.unitOfWorkCompleted(
+                CompanionCaptureDefinition.KIND,
+                new PersistenceTransactionResult.RolledBack<>(
+                        SqliteFailureClassifier.classify(
+                                new IllegalStateException(
+                                        "capture_prepare_not_exact_live_profile"
+                                ),
+                                "companion_capture"
+                        )
+                )
+        );
+
+        assertEquals(
+                PersistenceReadinessLevel.MUTATION_READY,
+                startup.report().readiness()
+        );
+        assertNull(control.snapshot().lastGlobalFailureCode());
+        control.requireAdmission(
+                CompanionCaptureDefinition.KIND,
+                "companion_capture",
+                captureScopes(PROFILE)
         );
     }
 
