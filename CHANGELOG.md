@@ -1,323 +1,203 @@
 # Changelog
 
-## 3.0.0 - Persistence Replacement and Companion Systems Overhaul - 2026-07-20
+## 3.0.0 - Persistence Replacement and Companion Systems Overhaul - 2026-08-04
 
 ### Added
-- Added a config-gated companion `To Me` control that instantly mounts small companions on their owner's shoulder; role assets choose standing and crouching attachment offsets. Shoulder companions smoothly track the player's current pose, settle into their idle animation, pause their normal AI, cannot be interacted with or collided with, and are invulnerable until set down.
-- Loaded normal linked-companion cards now expose configured flight/ground mode
-  switching alongside bonded roster cards.
-- Embedded Patchwork 1.0.0 as Tamework's asset-patch runtime. A newer compatible standalone or embedded Patchwork copy can win the shared version-first election, while asset-only packs can depend on Patchwork and ship only JSON patch definitions.
-- Added composable Patchwork conditions and registered mod-data JSON sources for optional integrations. The former Tamework-setting check is replaced by general JSON-path comparisons against registered mod data roots.
-- Companion species, equipment, traits, levels, and talents can now influence travel speed on foot and while natively ridden.
+- Added a replacement persistence system built around one canonical companion
+  profile, stable identity aliases, durable lifecycle state, idempotent
+  operations, crash recovery, and ordered projections.
+- Added an immutable import path for public schema v2-v4 databases and the
+  released DAT companion bundle. Source files are left untouched; tester-only
+  schema v5-v9 databases are refused instead of being modified or merged.
 - Added durable owner-population limits, role-based population groups, and
-  command-family rosters. Companion capacity and command membership now remain
-  consistent across capture, release, death, storage, world travel, and server
-  restarts.
-- Added data-driven timed companion summoning and storage, including per-role
-  durations, warnings, logout storage policy, expiry, and resummon cooldowns.
+  command-family rosters that remain consistent across capture, release, death,
+  storage, world travel, and server restarts.
+- Added data-driven timed companion summoning and storage with per-role
+  durations, expiry warnings, logout policy, resummon cooldowns, and safe rider
+  dismount protection when a summon expires.
 - Added idempotent dormant companion provisioning and activation for
-  integrations such as HyDragon's bonded Miniwyvern, without reintroducing
-  physical bonded-vessel item states.
-- Added exact multi-item paid command revival for Dead and Lost companions,
-  with pre-charge admission checks and durable exact refunds when a terminal
-  failure is proven.
-- Added resolved probabilistic capture attempts that consume their configured
-  source exactly once after either terminal result, plus successful in-place
-  tame-and-command-link capture for command-roster integrations.
+  integrations such as HyDragon's bonded Miniwyvern.
+- Added exact multi-item paid revival for Dead and Lost command companions,
+  including pre-charge admission, operation-specific escrow, crash recovery,
+  and exact refunds when a terminal failure is proven.
+- Added `TwCapturePolicyConfig` and opt-in probabilistic capture through
+  `TwSpawnerConfig.ChanceMode: Probability`. Capture attempts resolve and
+  consume their configured source exactly once, support in-place tame-and-link
+  workflows, and report specific denial or success reasons.
+- Added channeled wild capture with configurable channel audio/effects, Dragon
+  Stone burst visuals, and capped homing visual projectiles that can also be
+  launched through a reusable interaction extension.
 - Added restart-safe bonded capture completion evidence for integrations,
-  including live notifications and exact owner/roster/source-NPC lookup without
-  generic companion profile dependencies.
-- Added direct captured-item intake for configured coops. A captured companion
-  can now move into a coop without an intermediate live spawn or duplicate.
-- Restored `/tw debugdb export` for the replacement persistence system. It
-  creates a bounded, redacted support ZIP containing operational status,
-  counters, and durable diagnostic summaries without copying the database,
-  world save, player identities, coordinates, or inventory contents.
-- Added `TwCapturePolicyConfig` and opt-in probabilistic capture mechanics on
-  `TwSpawnerConfig`. Existing spawner configs remain deterministic unless they
-  explicitly select `ChanceMode: Probability`.
-- Added a capability-gated transactional profile-data contract with versioned reads, revision-fenced idempotent compare-and-set, and restart-visible operation lookup. Legacy profile-data reads/writes remain source/binary compatible.
-- Added `/tw debug set` and `/tw debug get` command groups for needs and breeding tuning. Their NPC-targeted commands now use Hytale's standard `--world`, `--entity`, cone, ray, sphere, range, role, and nearest selectors.
-- Replaced `/tw npcspawntamed <role> <quantity>` with `/tw spawntamed <role>`, including live role completion and optional `--count`, `--radius`, and `--attachment` switches.
-- Added reserved built-in interaction extensions for atomic mapped attachment equipment, replacement, and empty-hand removal. Asset packs can now consume newly equipped items, return the exact replaced or removed item, and roll back model, persistence, and inventory state together without per-item Java handlers.
-- Added `TwBreedingConfig.Inheritance.AttachmentInheritance.ExcludedSets` so equipment and other non-genetic model attachment sets can be excluded from offspring inheritance while normal appearance traits still inherit.
-- Added a private server licensing template for negotiated custom plugins,
-  private forks, and server-specific adaptations of Tamework systems.
-- Added `TwDynamicAttachmentsConfig` so mods can conditionally change NPC model attachments by role, display name, needs, happiness, traits, life stage, gender, tamed state, ownership, owner name/UUID, or NPC state, with permanent and reversible while-matching persistence modes and percentage thresholds for needs and happiness rules.
-- Added a `/tw settings` needs resource mode with Accurate, Auto Fast, and Always Fast options so crowded servers can bypass expensive food/water path checks and consume valid nearby resources directly.
-- Added an experimental transformed-player dragon flight debug prototype behind `/tw debugdragonflight`, with configurable avatar flight settings for jump lift, sprint boost, crouch descent, backward airbrake, hover damping, and pitch-based speed/altitude tradeoffs.
-- Added a creative-available Flightmaster's Talisman item for transformed dragon flight controls, with left click mapped to upward flaps and right click mapped to airbraking while avatar flight is active.
-- Added `/tw debugdragonflight flightprobe` for temporarily enabling non-creative client flight and player input logging while testing avatar-flight controls.
-- Avatar flight can read client flight vertical velocity during diagnostics, but the native client flight capability remains a standalone probe because it overrides custom avatar movement.
-- Avatar-flight combat abilities now support a configurable real-time, per-slot cooldown. Ability2 and Ability3 remain independently tracked for each active transformed-player session, with a dimmed live whole-second countdown in the flight HUD while either slot is unavailable.
-- Added Vigour charges and a compact speed/Vigour HUD for transformed avatar flight, with upward flaps and forward boosts spending charges and recharge limited to grounded recovery or high-speed flight.
-- Added a separate avatar-flight `MaxGlideSpeed` cap so dive-only glide cannot reach boosted maximum speed by default.
-- Added charged avatar-flight launch tuning so holding crouch on the ground can spend Vigour for a stronger takeoff with configurable charge time, launch impulse, and partial/full charge costs.
-- Added a temporary avatar-flight launch charge HUD bar above the pitch/speed display while holding grounded crouch launch, including a marker for the minimum valid release threshold.
-- Added configurable launch particles for grounded charge pulses, canceled or rejected releases, and staged partial, mid, or full charged takeoffs.
-- Added configurable scene-lit wind bursts for successful avatar-flight forward and upward boosts, with inherited per-species scaling.
-- Added configurable positional launch audio with varied sampled wind-charge gusts, a full-charge cue, a cancellation fizzle, and partial, mid, or full takeoff bursts.
-- Added configurable positional wind cues for successful avatar-flight upward flaps, forward boosts, and airbrake activation.
-- Added reusable animation-timed wing-flap audio and a subtle sustained fast-flight loop for avatar-flight models.
-- Added a compact avatar-flight pitch readout and red target-speed marker above the speed bar to make climb, dive, and boost speed trends easier to tune in game.
-- Added a complete lower-right avatar-flight control row for crouch launch, forward boost, upward flap, and airbrake, with dedicated artwork, frames, and input labels while the tool-only Flightmaster's Talisman hides Hytale's native weapon ability strip.
-- Avatar-flight combat abilities can now supply optional per-ability glyph textures while retaining the standard control frame and layout.
-- Added `/tw debugdragonflight inputprobe` for avatar-flight input logging without enabling the separate client-flight capability probe.
-- Added expanded avatar-flight controller diagnostics for raw sprint input, stale input age, client flying sync, visual override ownership, overlay suppression, and forced animation IDs.
-- Added configurable one-shot animation hooks for successful avatar-flight upward flaps, forward boosts, and airbrake activation, including selectable Action or Movement slot layering, per-cue durations, and graceful validation against each transformed model.
-- Added an AvatarFlight asset namespace generator script that can create fake-rider-safe model and animation variants while preserving `MountAnchor` and assigning the transformed model a dedicated `AF_Origin` pose root.
-- AvatarFlight namespace generation now warns when grounded player locomotion aliases (`Sprint`, `JumpSprint`, and `StepSprint`) are missing from transformed-player avatar models.
-- Added asset-configured avatar-flight mounting for NPC interactions. Tamed mounts now transform their rider into the configured flight model, hide the same companion for the full session, and restore it with F, grounded back+crouch, or automatic lifecycle recovery. Disconnect and crash recovery restores orphaned companions, while server restarts invalidate persisted mount pairs and restore the player's ordinary skin model instead of resuming a stale transformation.
-- Added species-configurable avatar-flight model trails for successful launches, upward flaps, forward boosts, and sustained near-maximum-speed gliding, with separate start/stop thresholds to prevent flicker.
+  including owner, roster, source-NPC, and live-notification details.
+- Added direct captured-item intake for configured coops so the same canonical
+  companion can enter a coop without an intermediate live spawn.
+- Added a capability-gated profile-data API with versioned reads,
+  revision-fenced idempotent compare-and-set, and restart-visible operation
+  lookup while retaining the legacy profile-data API for compatibility.
+- Restored `/tw debugdb export` with a bounded, redacted support ZIP containing
+  operational status and durable diagnostic summaries without copying player
+  identities, coordinates, inventories, world saves, or the database itself.
+- Added a config-gated `To Me` control for shoulder-riding companions. Role
+  assets define standing and crouching offsets; mounted companions track the
+  owner's pose, idle naturally, suspend AI, collision, and interaction, and
+  remain invulnerable until set down.
+- Added `TwCompanionMovementConfig` so species, equipment, traits, levels, and
+  talents can modify travel speed on foot and while natively ridden.
+- Added configurable XP for actively summoned companions and the
+  `TameworkHasTalent` NPC sensor for talent-aware role behavior.
+- Embedded Patchwork 1.2.1 as Tamework's non-destructive JSON asset-patch
+  runtime, including version-first runtime election, Tamework macros,
+  composable conditions, and registered mod-data JSON sources.
+- Added `TwDynamicAttachmentsConfig` for permanent or reversible,
+  while-matching NPC attachment changes based on role, name, needs, happiness,
+  traits, life stage, gender, tame/owner state, and percentage thresholds.
+- Added atomic built-in interaction extensions for mapped attachment equipment,
+  replacement, and empty-hand removal, including inventory/model/persistence
+  rollback without per-item Java handlers.
+- Added `ChangeAppearance` to interaction `SetRole` effects so an asset can
+  choose whether a role change also updates the NPC's visible appearance.
+- Added `TwBreedingConfig.Inheritance.AttachmentInheritance.ExcludedSets` so
+  equipment and other non-genetic attachment sets can be excluded from
+  offspring inheritance.
+- Added `/tw debug set` and `/tw debug get` groups for needs and breeding
+  tuning with Hytale's standard world, entity, cone, ray, sphere, range, role,
+  and nearest selectors.
+- Added Accurate, Auto Fast, and Always Fast needs-resource modes under
+  `/tw settings` so crowded servers can bypass expensive food and water path
+  checks when appropriate.
+- Added asset-configured transformed-player Avatar Flight. Tamed mounts can
+  transform their rider, hide and preserve the original companion, and restore
+  both safely on manual dismount, disconnect, crash recovery, or restart.
+- Added the Flightmaster's Talisman with configurable upward flaps, directional
+  boosts, airbraking, crouch descent, pitch-based glide, native ground speed,
+  camera/eye-height overrides, and per-species movement tuning.
+- Added Avatar Flight Vigour, charged crouch launches, separate cruise/glide
+  caps, a compact speed/pitch/charge HUD, control hints, and configurable
+  per-slot combat abilities with glyphs and live cooldown countdowns.
+- Added bounded Avatar Flight XP for qualified fast-flight time, plus six
+  purchasable talent effects for Vigour, boost, glide, climb, and flight-speed
+  tuning.
+- Added configurable Avatar Flight launch/boost particles, positional and
+  looping audio, one-shot animation hooks, fast-flight state, and model trails.
+- Added an Avatar Flight asset namespace generator for rider-safe model and
+  animation variants with a dedicated `AF_Origin` pose root.
+- Added `TameworkConfirmLanding` so large or pitched flying NPCs can confirm
+  physical touchdown instead of relying only on the base `Land` goal.
+- Added `TameworkFlyingOrbit`, a configurable flying body motion with cycle,
+  orbit, approach, face-target, target-relative wandering, and pass-through
+  modes for aerial combat and ambient behavior.
+- Added explicit player-model and Avatar Flight input/client-flight probes for
+  isolated model, control, and movement diagnostics.
+- Added Draconic Altar recipes for enabled tranquilizer equipment.
+- Added a private-server licensing template for negotiated custom plugins,
+  private forks, and server-specific adaptations.
 
 ### Changed
-- Bonded companion cards now show a thin XP bar above health without changing
-  the card layout, and their level/talent tooltip lists configured level-based
-  stat bonuses.
-- Moved Tamework's bundled patch definitions to the neutral `Server/Patchwork/Patches` root. Patchwork still reads the legacy `Server/Tamework/Patches` root while Tamework is installed, and neutral definitions win matching legacy-definition conflicts.
-- Replaced `/tw patches` administration with Patchwork's `/patchwork status`, `/patchwork reload`, and `/patchwork selftest` commands. Regeneration now reports unsupported live activation as restart-required instead of relying on Tamework-specific reload hooks.
-- Bonded roster panels now appear faster and keep controls reliable while live
-  active-companion progression and countdown updates are coalesced instead of
-  repeatedly rebuilding the panel.
-- Replaced the unreleased July persistence lineage with one fresh
-  `tamework-state.sqlite` schema-v1 target. Public schema v2-v4 data and the
-  released DAT bundle import through an immutable source snapshot; the original
-  files remain unchanged. Tester-only schema v5-v9 databases are refused
-  without creating or modifying a replacement target.
-- Companion capture/release, configured-coop capture/release, saved death/Lost
-  restoration, and profile extension data now use one canonical companion
-  profile and lifecycle authority.
-- Persistence-backed gameplay now uses one shared idempotent operation protocol
-  and one ordered projection outbox instead of feature-specific persistence
-  journals, recovery queues, and duplicate in-memory lifecycle caches.
-- All restored population, roster, timed summon, provisioning, capture,
-  revival, and coop-item behavior now shares the replacement persistence
-  lifecycle, operation, recovery, readiness, and projection authorities.
-- Durable death or Lost state now requires positive saved-death, destructive
-  removal, or delete-on-remove-world evidence. Ordinary unload, absence, and
-  timeout do not reclassify a companion as dead or Lost.
-- Avatar-flight configs can now set native grounded movement speed per species; the default matches Hytale's vanilla mount speed and restores ordinary player speed while airborne, swimming, or dismounted.
-- Avatar flight now keeps Flightmaster's Talisman selected, temporarily suppresses active utility equipment, and places its custom controls inside Hytale's right-side shortcut hints. This prevents equipped shields or other hotbar items from restoring the native combat ability strip while mounted; utility selection returns on dismount.
-- Automatic companion following across login, portals, and other world changes is now disabled by default. Explicit Follow remains a local command, and explicit cross-world Recall remains available.
-- Avatar-flight configs can now override transformed-model camera position and eye height per species while preserving the model's authored look yaw and pitch behavior.
-- Avatar-flight `FlyFast` animation and airborne Vigour recharge now remain active while horizontal speed is at or above 80% of sustainable glide speed, allowing strong ordinary flight and dives to maintain the state after a boost ends.
-- Avatar-flight airbraking now uses the upward-flap wing-displacement sound by default.
-- Removed Tamework's runtime asset-pack reordering and legacy pack replacement so asset precedence follows the game's manifest load-order configuration.
-- Managed companion identity now follows one stable profile across changing entity UUID aliases, allowing command items and recovery paths to resolve historical UUIDs without creating a second NPC.
-- SimpleClaims tamed-companion protection now follows its native full-world, admin, member-permission, player-ally, party-ally, and outsider policy. The configured `AllowDamagePermissionKey` is a Hytale server permission; the old raw SimpleClaims party-key grant remains for one compatibility release with a deprecation warning.
-- Updated Alec's Tamework from GPL-3.0 to a source-available license that allows unmodified dependency use and example/template reuse while reserving forks, modified copies, and Tamework system reuse for separate written permission.
-- SimpleClaims breeding limits continue to use direct claim lookup and claim
-  counts. Owner and population-group companion caps now use durable positive
-  reservations and sealed world reconciliation, preventing unloaded or
-  in-flight companions from bypassing admission limits.
-- Added a dedicated model and texture for Flightmaster's Talisman.
-- Avatar flight keeps the transformed NordicDrake model and its full equipped fake-rider visual enabled by default.
-- `/tw debugplayermodel` now requires the explicit `unsafe` argument before replacing the player's model.
-- Avatar-flight Q boosts now use directional thrust by default, with upward boost lift capped below flaps and downward boost input applying full directional dive thrust.
-- Avatar-flight dive and climb tuning now uses ramping maneuver loads so diving builds speed more slowly, pitch-up spends momentum more gradually, and clean unboosted dive/pull-up loops recover most but not all lost altitude.
-- Avatar-flight charged launch now defaults to holding crouch on the ground instead of holding jump, keeping airborne crouch as direct descent once no grounded launch charge is active.
-- Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Talisman flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
+- Companion capture/release, configured-coop capture/release, death/Lost
+  restoration, profile extensions, population, rosters, timed summons,
+  provisioning, and revival now share one persistence lifecycle and operation
+  authority instead of feature-specific journals and caches.
+- Dead or Lost state now requires positive saved-death, destructive-removal, or
+  delete-on-remove-world evidence. Ordinary unloads, absence, and timeouts no
+  longer reclassify companions.
+- Managed companion identity now follows one stable profile across entity UUID
+  changes, allowing command items, coops, and recovery paths to resolve
+  historical aliases without duplicating an NPC.
+- Automatic companion following across login, portals, and world changes is
+  disabled by default. Explicit Follow remains local and explicit cross-world
+  Recall remains available.
+- Bonded and normal linked panels now refresh live health, needs, progression,
+  revival, countdown, and flight-mode state without repeatedly rebuilding the
+  page. Configured companions can switch between ground and flight modes from
+  either panel; bonded cards also show XP progress, level/talent bonuses, and
+  retain the correct role-specific talent tree.
+- Bonded companion talents can now modify finite summon duration and resummon
+  cooldown in addition to their progression and movement effects.
+- Bonded summon expiry now has a configurable warning schedule and protects
+  riders from unsafe dismounts while the companion is being stored.
+- Refreshed the command radial artwork and layout, including a correctly placed
+  close button and consistent linked-panel controls.
+- Deepened the built-in bear roar audio so configured bear interactions carry
+  a fuller low-frequency layer.
+- Moved bundled patch definitions to `Server/Patchwork/Patches`. The legacy
+  `Server/Tamework/Patches` root remains readable while Tamework is installed,
+  with neutral definitions taking precedence on conflicts.
+- Replaced `/tw patches` with `/patchwork status`, `/patchwork reload`, and
+  `/patchwork selftest`. Regeneration reports restart-required when live
+  activation is unavailable.
+- Removed runtime asset-pack reordering and legacy pack replacement so asset
+  precedence follows Hytale manifest load order.
+- SimpleClaims companion protection now follows its native full-world, admin,
+  member-permission, player-ally, party-ally, and outsider rules. Owner and
+  population-group caps use durable reservations while breeding limits continue
+  to use direct claim counts.
+- Replaced `/tw npcspawntamed <role> <quantity>` with
+  `/tw spawntamed <role>`, live role completion, and optional `--count`,
+  `--radius`, and `--attachment` switches.
+- `/tw debugplayermodel` now requires the explicit `unsafe` argument.
+- Migrated the project build and release packaging from Maven to the shared
+  Gradle build, including configuration-cache support.
+- Updated Alec's Tamework from GPL-3.0 to the Alec's Tamework Source Available
+  License 1.0. Unmodified dependency use and example/template reuse remain
+  allowed; forks, modified copies, and reuse of Tamework systems require
+  separate written permission.
 
 ### Fixed
-- Fixed normal linked panels requiring a close and reopen to show changing
-  health, needs, progression, revival, and countdown state. Live values now
-  refresh on a coalesced five-second cycle, while visible short countdowns and
-  post-revive state use faster targeted refreshes.
-- Fixed mods that declare `Alechilles:Patchwork` as a required dependency
-  failing to load when Tamework was their only Patchwork provider. Tamework
-  now exposes its bundled Patchwork plugin identity to the loader.
-- Fixed flight-mode buttons staying visually stale in normal linked panels and
-  becoming unresponsive after the first update in bonded roster panels.
-- Fixed automatic Hytale world backups failing on Windows while Tamework persistence was active. Tamework's process locks now use Hytale's backup-excluded `LOCK` layout.
-- Fixed imported companion worlds remaining read-only when NPCs continued
-  loading during startup reconciliation. Tamework now rebuilds moving world
-  evidence and retries safely until persistence becomes mutation-ready.
-- Fixed large or pitched flying NPCs remaining on their `Fly` controller after their collision
-  box had already touched terrain. Asset authors can now confirm physical touchdown with the
-  `TameworkConfirmLanding` action instead of relying only on the base `Land` positional goal.
-- Fixed avatar-flight rider armor binding to the transformed mount and the fake
-  rider inheriting mount pitch/bank poses. Generated avatar models and
-  Tamework's injected pose clips now share a dedicated `AF_Origin`, while the
-  rider keeps the standard player skeleton required by appearance and armor
-  attachments.
-- Fixed previously tamed companions captured with public Tamework `v2.16.1`
-  remaining trapped in their filled spawner after replacement-persistence import
-  when the old profile did not save its optional tamed-state field.
-- Fixed timed command-roster and bonded companions reverting to their original
-  role after an interaction role swap when their summon session ended. Their
-  current role now saves with the companion snapshot for the next summon.
-- Fixed logging out while riding a summoned Avatar Flight companion saving its
-  temporary `Empty_Role` parking state over the companion's roster role.
-  Previously affected bonded companions recover their durable role when loaded.
-- Fixed bonded-roster revival payments being recoverable only from changing
-  inventory totals. Each payment now moves into a hidden operation-specific
-  escrow, saves with the player before revival commits, and is consumed or
-  returned exactly once from canonical operation evidence. Recovery can resume
-  after any saved payment or partial refund, even if payment policy changed
-  while the player was offline. Ambiguous receipts from earlier builds remain
-  quarantined instead of guessing a refund or deleting another payment.
-- Fixed successful tame-and-link capture updating the companion and command
-  roster but still reporting failure when its timed-summon event was committed
-  after the original request timestamp. Composite capture, revival, and
-  provisioning events now publish from their own canonical lease timestamp,
-  and worlds containing an event written before this fix recover normally on
-  startup.
-- Fixed tame-and-link capture failing when a mixed-case NPC role ID had been
-  lowercased by an earlier snapshot. New snapshots preserve exact Hytale role
-  casing, while tester-only case-damaged profiles can complete one safe
-  transition into the correctly cased tamed role.
-- Fixed linked timed companions becoming impossible to dismiss, summon, or
-  capture after an earlier snapshot lowercased a mixed-case role ID. Restart
-  recovery now rechecks the exact live companion, completes case-only matches,
-  and clears only that operation's persistence block; genuinely different
-  roles remain safely contained.
-- Capture items with a required status effect now show a clear warning when
-  that effect is missing; tranquilizer-based captures specifically tell the
-  player that the target must be tranquilized.
-- Captured spawners now treat generic role IDs such as `Wolf_Black` and
-  `Deer_Stag` as species identity rather than custom NPC names, so their item
-  titles show only the localized species name while genuine custom names remain
-  intact.
-- Capturing a companion whose canonical current alias is live but still marked
-  Unloaded or assigned to another world now reconciles that stale location
-  through the shared profile operation before capture. Historical aliases and
-  other identity conflicts still fail closed with specific diagnostics.
-- Fixed captured spawners created by public Tamework `v2.16.1` doing nothing
-  after a world imported into replacement persistence. Their original item
-  state now joins the imported canonical profile and capture record through the
-  same receipt-first release operation used by newly captured companions.
-- Fixed public-world migration remaining permanently read-only when an ordinary
-  linked companion was unloaded. Startup now waits until Hytale reports all
-  startup worlds loaded, then resolves sealed live observations to Active and
-  sealed absence to Unloaded through the same canonical profile operation.
-- Fixed configured coops ignoring companions whose live UUID changed after a
-  spawner release. Coop intake now resolves the current UUID alias back to its
-  stable companion profile before capture.
-- Fixed successful spawner capture and release omitting their configured sound
-  and particle effects. Success feedback now plays only after the durable
-  operation publishes.
-- Fixed dead linked companions showing no respawn cooldown and becoming
-  revivable after the un-authored 60-second global default. The panel now shows
-  the canonical saved cooldown, hides Revive until it expires, and honors each
-  role's configured cooldown duration.
-- Fixed filled spawner release consuming the captured item without spawning
-  its companion when Hytale could not clone a codec-less live player
-  component. Player inventory receipts now use Hytale's own world-thread save
-  holder pattern, preserving crash recovery without cloning the player entity.
-- Fixed grounded AvatarFlight transformations crashing the client when a transformed model supplied a shorter footstep-interval array than the preceding player animation. Generated AvatarFlight model variants now remove unsafe footstep intervals, while fake riders once again attach the player's full skin, cosmetics, and equipment immediately by default.
-- Fixed the custom avatar-flight controls crashing the client shortly after appearing by using Hytale's safe base custom-HUD layer, reusing one keyed HUD across flight toggles, and throttling changed state instead of continuously resending unchanged UI commands.
-- Fixed direct cross-world Recall repeatedly draining the old source after a successful destination insert or trying to insert an NPC before its destination chunk was retained. Transfers now wait for the exact destination chunk and install a detached destination transform, while failed inserts restore the original source transform.
-- Fixed cross-world Recall allowing the source world's saved chunk to resurrect
-  an old copy of the companion. Transfers now make the source removal durable
-  before preserving and inserting the same NPC in the destination world.
-- Fixed individual unloaded recalls sometimes waiting until another companion
-  happened to load the source area. Each request now leases its own canonical
-  source chunk, including across worlds.
-- Fixed linked companions remaining unavailable when a delete-on-remove world
-  closed. Tamework now freezes their complete state at the terminal world
-  boundary and authors Lost recovery from that positive evidence.
-- Fixed transformed avatar-flight players remaining under custom flight control after entering liquid instead of switching to native swimming.
-- Fixed avatar-flight wing-flap sounds accumulating during forward flight or remaining silent while hovering. Configured one-shot flap cues now play at a state-specific cadence without restarting movement animations.
-- Fixed transformed avatar-flight models sometimes freezing on their final flight frame after landing while stationary instead of immediately returning to idle.
-- Fixed AvatarFlight cleanup replaying equipment before restoring the player skin, which could leave clothing visible through equipped armor after dismounting.
-- Fixed prefab saving unregistering Tamework's generated asset-patch pack and silently removing bucket-on-trough interactions until the server restarted.
-- Fixed permanent companion deaths being quarantined after Hytale rejected Tamework's corpse hold as a duplicate native death component.
-- Fixed permanent companion deaths from utility or builder damage being left in recovery quarantine when the original damage had no resolvable death cause.
-- Fixed non-revivable companion deaths corrupting the corpse-removal component during chunk unloading, which could crash the game or leave a dead companion stuck in the world.
-- Fixed linked companions being recalled on the player's initial world join. Login now establishes the travel session without treating it as a portal transition, while later world changes in the same connection still allow configured followers to travel.
-- Fixed Hold and other successful state commands retaining the companion's previous cached command state on the linked item until a later refresh, which could make a held companion follow during a subsequent portal transition.
-- Fixed Return Home and Recall from the linked panel retaining a loaded companion's previous cached command state. Cross-world following now also rechecks the live source NPC state, so a stale Follow cache cannot move a companion that was most recently told to Hold or Return Home.
-- Fixed portal following racing generated-instance teardown because the transfer queue used a fixed delay from the pre-arrival world event. Eligible followers now queue when the player's entity is actually installed in the destination world.
-- Fixed a physically completed same-world Return Home move briefly classifying
-  an unobserved companion as Lost. It now remains Unloaded until the destination
-  projection is observed.
-- Fixed captured growing offspring changing sex-specific or variant roles when released from handheld capture items. Life-stage role lineage now round-trips with the companion, and legacy captured babies retain their captured role instead of falling back to the first role in a current breeding family.
-- Fixed legacy linked companions with unknown command state being treated as followers on login, which could queue the same companions for recall every time an old world was loaded.
-- Fixed `/tw setbreedingready true` and the equivalent Public API mutation clearing Tamework's cooldown fields without clearing Hytale's breeding alarm, which could make the first breeding attempt succeed while later forced-ready attempts silently stopped before pairing.
-- Fixed a temporary SQLite database lock permanently disabling Tamework persistence until the world session restarted. The affected operation still fails safely after bounded retries, but later taming, spawning, capture, coop, and recovery writes can proceed as soon as the lock clears.
-- Fixed nearby-panel cards showing a Link action for loaded companions whose live state already links them to the current command tool.
-- Fixed linked companions becoming permanently unreachable after their generated instance was deleted. Tamework now retires only the deleted instance store's live identity and commits Lost recovery from the terminal world-removal boundary while the complete snapshot is still available. Other live aliases remain protected from duplicate recovery, and relocation diagnostics distinguish a submitted Lost transition from one that persistence rejected.
-- Fixed linked-panel Recall being rejected as unavailable after the player entered another world or generated instance. Panel actions now resolve the player's current destination-world entity through the stable player reference, and recalling one valid companion no longer fails because a different link on the same command item has damaged or conflicting identity metadata.
-- Fixed named linked companions reverting to their species name in the panel after their chunk unloaded or the world restarted. Ordinary unloaded rows now use the latest live state snapshot, then memoized durable profile metadata, before falling back to older command-item metadata. Names consistently prefer an explicit display name, then the translated role name, then the raw role id, including lowercase saved ids such as `tamed_chicken`.
-- Fixed Recall after a coop-released companion unloads. The released live
-  companion now participates in ordinary relocation, and repeated equivalent
-  Recall requests coalesce while its chunks load. For public `v2.16.1` worlds
-  where the released NPC is genuinely absent, one verified retained coop
-  snapshot now changes the initial imported Unloaded entry to Lost after a
-  clean Recall search finishes, allowing Revive without treating ordinary
-  timeouts or uncertain transfers as death evidence.
-- Fixed linked companions removed by destructive external cleanup becoming
-  unrecoverable Recall entries. A complete last-live snapshot now transitions
-  an explicit destructive removal to Lost recovery, while ordinary chunk
-  unloads continue to relocate the original NPC. Restoration reserves the
-  replacement UUID for the original profile so recovery cannot create a second
-  identity, and known captured, dead, cooped, or Lost states use their specific
-  player warning instead of generic unavailability.
-- Fixed handheld capture items losing or delaying a linked companion's panel status when capture clears ownership. Command links are now frozen before the ownership transition, published only after capture succeeds, and shown as captured immediately even while the retired source projection finishes despawning.
-- Added durable captured-item intake for supported managed coops. Eligible
-  filled spawners now move the same companion profile into coop residency and
-  retire the item only after that transition publishes; ordinary filled-item
-  use still releases the companion normally.
-- Fixed daytime coop release repeatedly returning residents to the coop because
-  randomized spawn placement was recalculated between the release checks.
-- Fixed breeding sweep and cooldown paths treating negative Hytale world timestamps as missing; `0` is the only unset sentinel.
-- Fixed packaged servers printing a false `SEVERE` SLF4J binder warning when Tamework opened its SQLite data store.
-- Fixed custom `SetOwner` effects so a missing or malformed UUID is rejected; an owner name alone can no longer clear or overwrite ownership.
-- Fixed runtime and Public API damage decisions to use the same live owner precedence (owner component, command-link owner, then persisted NPC-name owner) and role-resolved protection settings.
-- Fixed linked-companion restoration preserving the saved companion state
-  through chunk unload and restart. Legacy item-metadata links retain free
-  restoration, while owner/command-family roster entries in Dead or Lost state
-  use the server-authoritative paid revival recipe and exact item quantities.
-- Rebuilt the avatar-flight launch particle sequence with scene-lit, translucent custom wind sprites, rotating arcs, curved orbiting charge motes, helical launch streaks, upward mist, and radial ground dust, drawing from Hytale's battleaxe whirlwind and Wind Spirit effects.
-- Fixed transformed avatar flight leaving a local-only copy of the owner's armor floating under the dragon after mounting or toggling armor visibility.
-- Fixed experimental avatar-flight fake rider attachments to keep original model paths for player clothing, armor, and third-party equipment instead of generating runtime rider asset variants that could crash other clients.
-- Fixed transformed avatar flight sending hidden-equipment updates back to the local owner client every tick, removing a crash-adjacent warning loop seen when moving as the NordicDrake.
-- Fixed avatar flight input capture so stale movement-state fallback no longer makes jump, crouch, or sprint appear held after the packet state is gone.
-- Fixed Flightmaster's Talisman airbraking so right-click takes priority over forward input, damps horizontal and vertical velocity toward hover, and avatar flight pitch trading continues while gliding on existing momentum.
-- Tuned Flightmaster's Talisman airbraking to slow down more gradually, and forced avatar flight movement states so hovering, normal flight, and shift-boost flight can use flying animations instead of fall animation.
-- Fixed avatar flight hover restart after a full Flightmaster's Talisman airbrake stop, restored obvious held-crouch descent, corrected pitch speed/altitude trading so looking down dives and looking up spends momentum, and moved animation/pose overrides later in the tick order so flying animations and dragon pitch/roll are applied after base movement states.
-- Fixed avatar flight input projection so passive glide momentum after a sharp turn no longer gets misread as held-backward input and traps the player in slow reverse flight.
-- Reworked avatar flight pitch-up handling so looking upward redirects dive momentum into a sharper climbing arc, preserving stronger forward motion while trading speed for noticeable altitude before stalling.
-- Fixed avatar flight animation and pose sync so the owner client receives the same saved flying-state update used by native flight, pitch follows look pitch directly, turn banking applies from trajectory changes, and stale roll/pitch clears when landing or disabling avatar flight.
-- Fixed a sharp-turn avatar flight bug that could create runaway horizontal speed and leave airbraking unable to recover.
-- Fixed transformed dragon flight animations by explicitly sending configurable movement-slot animations (`FlyIdle`, `Fly`, and `FlyFast` by default) to the owner client while avatar flight is active.
-- Fixed transformed avatar flight interfering with native grounded sprint visuals; grounded transformed movement now leaves walk/run/sprint animation state, model-authored locomotion sets, and overlay slots to the base client, only suppressing overlays while custom flight visuals are active.
-- Fixed Flightmaster's Talisman sprint boost detection when client movement packets omit movement-state payloads but the current player movement state still reports sprinting.
-- Added Q forward boost for Flightmaster's Talisman, slowed dive-only speed gain, restored a small forward start from hover/stall, and fixed the compact avatar-flight HUD background color syntax.
-- Fixed avatar-flight sprint boost speed so shift can exceed normal cruise speed instead of being immediately clamped back to the regular forward cap.
-- Fixed airborne avatar-flight sprint detection by preserving and reading the live movement-state sprint flag instead of overwriting it during custom flight-state updates.
-- Fixed avatar-flight shift boosts feeling inactive when Hytale only exposes a one-frame airborne sprint pulse by keeping detected boost pulses active for a short configurable duration.
-- Fixed Flightmaster's Talisman Q and sprint-edge boosts so they apply once per press instead of repeating on cooldown, and removed the compact avatar-flight HUD root background that rendered as a missing-texture placeholder.
-- Fixed `/tw debugplayermodel unsafe` so positive test scales are no longer clamped to the model asset's authored min/max range.
-- Fixed transformed avatar flight trying to layer player item/combat/emote animations onto dragon models by periodically suppressing non-movement animation slots while flight is active.
-- Fixed transformed avatar flight still rendering held player equipment on dragon models by continuously hiding the real transformed player's hand and armor equipment visuals while avatar flight is active, independent of fake rider visuals.
-- Reworked experimental avatar-flight rider visuals to attach the saved player model to the transformed dragon model instead of spawning a native mounted rider entity, avoiding the crash-prone mounted-rider client path.
-- Restored experimental avatar-flight rider visuals to attach the saved player model directly to the transformed dragon, keeping the test path closer to the intended final rider.
-- Fixed avatar flight level glide so stalled flight no longer refills full cruise speed for free, low-speed glide sinks harder, and the speed/Vigour HUD no longer renders its root as a broken image over the hotbar.
-- Fixed flat avatar-flight glide so level forward flight continues bleeding speed below neutral cruise instead of sustaining a free no-Vigour cruise forever.
-- Fixed shallow downward avatar-flight glide so tiny negative pitch angles can no longer preserve max glide speed or carry one flap's vertical lift for minutes.
-- Tuned neutral and shallow downward avatar-flight glide to bleed horizontal speed much more gradually, so it no longer decelerates harder than a shallow climb.
-- Added avatar-flight rider attachment diagnostics to print the saved rider model and texture paths, plus skip reasons, while testing model-anchor options.
-- Anchored the experimental avatar-flight fake rider model through a Tamework `MountAnchor` player-model wrapper instead of attaching the vanilla player model directly.
-- Adjusted the experimental avatar-flight fake rider wrapper so the player model attaches from the hips and uses a basic seated leg pose.
-- Improved experimental avatar-flight fake rider visuals by carrying over the saved player model's appearance attachments for face, hair, and clothing tests.
-- Expanded experimental avatar-flight fake rider appearance matching by resolving the player's skin cosmetics into rider attachments for hair, clothing, accessories, and selected facial parts.
-- Adjusted the experimental avatar-flight fake rider seated pose so the rider's arms reach forward while the hands stay flush with the forearms.
-- Added an experimental avatar-flight fake rider equipment snapshot that tries to mirror currently visible hand and armor items as rider model attachments.
-- Fixed experimental avatar-flight fake rider equipment snapshots to honor armor cosmetic hiding, so helmets, chest pieces, gloves, leggings, and boots can hide the same hair, accessories, and clothing slots they hide on normal players.
-- Fixed avatar-flight held items floating on the transformed dragon by excluding hand items from the fake rider model-attachment snapshot until hand equipment can be anchored correctly.
-- Isolated the experimental avatar-flight fake rider body skeleton from dragon flight and pitch/bank animation tracks, while preserving the rider head node for look tracking.
-- Restored experimental avatar-flight fake rider armor mirroring, fixed owner armor hiding to use the engine empty item key, and namespaced fake rider node IDs so player/flight animation tracks do not target the rider attachment by copied player IDs.
-- Added armor model attachments for the experimental avatar-flight fake rider, so equipped armor can bind to the seated rider without generating separate armor assets.
-- Fixed experimental avatar-flight fake rider clothing and armor visibility refreshes so hidden armor no longer keeps suppressing the rider's underlying clothes.
-- Fixed experimental avatar-flight fake rider visuals so armor cosmetic hiding also hides the rider's clothing and accessory attachments for other players.
-- Fixed charged avatar-flight launch so stateless movement packets no longer break a held ground charge into tiny failed releases after the first takeoff.
-- Fixed avatar-flight activation leaking into native creative-style flight by removing the normal-mode client `canFly` activation probe.
-- Fixed transformed avatar flight banking poses by supporting single-slot combined pitch/bank pose animations, allowing generic `Origin` pose clips to work when separate overlay slots do not render on transformed players.
-- Fixed transformed avatar flight pose setup so standard Tamework pitch/bank animation sets are injected into the runtime player model instead of requiring every model asset to declare them.
-- Improved transformed avatar flight pose smoothing with a generic injected pitch/bank breakpoint grid, including 40-degree pitch and 30-degree bank poses.
-- Improved transformed avatar flight bank sensitivity so sharp turns and full lateral input can reach stronger bank poses.
-- Disabled the experimental avatar-flight fake rider visual by default after client crashes from the native mounted-rider path, while keeping transformed owner equipment hiding active.
+- Fixed public v2.16.1 captured companions and filled spawners failing to
+  restore after import, including records without an optional tamed-state field.
+- Fixed imported worlds remaining read-only when companions continued loading
+  during startup reconciliation; mutation readiness now retries from sealed
+  live-world evidence.
+- Fixed mixed-case role IDs and interaction role swaps being lost across timed
+  storage, capture, restart, or Avatar Flight parking states.
+- Fixed stale companion locations and changed live UUIDs blocking capture,
+  configured-coop intake, release, Recall, or command-roster operations.
+- Fixed cross-world Recall inserting before destination chunks were retained,
+  redraining completed sources, or allowing saved source chunks to resurrect a
+  duplicate. Each request now retains its exact source/destination evidence and
+  coalesces equivalent retries.
+- Fixed generated-instance deletion, delete-on-remove worlds, and verified
+  destructive cleanup leaving linked companions permanently unreachable.
+  Complete terminal snapshots can now author Lost recovery without treating
+  ordinary unloads as death.
+- Fixed login and portal transitions recalling companions from stale Follow
+  state. Hold, Return Home, and Recall now publish their current command state
+  before later travel decisions.
+- Fixed linked-panel actions resolving the player's old world after a portal or
+  instance transition, and prevented one damaged link from blocking other valid
+  companions on the same command item.
+- Fixed unloaded linked cards losing custom names, capture state, revive
+  cooldowns, or role-configured revival costs.
+- Fixed captured-item names treating generic role IDs as custom names, and
+  added clear required-status warnings plus success sounds and particles only
+  after durable capture/release publication.
+- Fixed coop intake and release across UUID alias changes, deterministic release
+  placement, and recall of companions previously released from a coop.
+- Fixed growing captured offspring changing sex-specific or variant roles when
+  released; life-stage role lineage now round-trips with the companion.
+- Fixed `/tw setbreedingready true` and the equivalent API call leaving
+  Hytale's breeding alarm active, and fixed breeding/cooldown logic treating
+  valid negative Hytale world timestamps as unset.
+- Fixed temporary SQLite locks permanently disabling later persistence writes.
+  Operations still fail safely after bounded retries and recover once the lock
+  clears.
+- Fixed automatic Hytale backups failing on Windows while persistence was
+  active by moving process locks to Hytale's backup-excluded `LOCK` layout.
+- Removed a false packaged-server SLF4J binder `SEVERE` warning when opening
+  Tamework's SQLite store.
+- Fixed permanent or non-revivable companion deaths being quarantined, corrupting
+  corpse-removal state, or remaining stuck when no death cause was resolvable.
+- Fixed `SetOwner` accepting missing or malformed UUIDs, and aligned runtime
+  and Public API damage decisions on the same live-owner precedence and
+  role-resolved protection settings.
+- Fixed prefab saving unregistering the generated asset-patch pack and removing
+  patched interactions until restart.
+- Fixed large or pitched flying NPCs remaining on their Fly controller after
+  collision had already reached the ground.
+- Fixed transformed Avatar Flight lifecycle cleanup, swimming handoff, movement
+  input projection, equipment restoration, HUD reuse, rider/model isolation,
+  animation state, and speed clamping so the final configured flight path no
+  longer carries the unreleased prototype's crash-prone native-rider behavior.
 
 ## 2.16.1 - Server Stability Hotfix - 2026-07-01
 
