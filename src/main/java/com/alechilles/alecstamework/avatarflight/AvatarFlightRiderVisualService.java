@@ -344,7 +344,7 @@ public final class AvatarFlightRiderVisualService {
                                            @Nonnull AvatarFlightEquipmentAttachmentResolver.EquipmentSnapshot equipment,
                                            boolean includeAppearanceAttachments) {
         Tamework instance = Tamework.getInstance();
-        if (instance == null || instance.getLogger() == null) {
+        if (instance == null || !instance.isDebugAvatarFlightEnabled() || instance.getLogger() == null) {
             return;
         }
         int savedAttachmentCount = savedModel.getAttachments() == null ? 0 : savedModel.getAttachments().length;
@@ -386,7 +386,7 @@ public final class AvatarFlightRiderVisualService {
                                                   @Nullable Model baseModel,
                                                   @Nullable Model savedModel) {
         Tamework instance = Tamework.getInstance();
-        if (instance == null || instance.getLogger() == null) {
+        if (instance == null || !instance.isDebugAvatarFlightEnabled() || instance.getLogger() == null) {
             return;
         }
         instance.getLogger().at(Level.INFO).log(String.format(

@@ -26,7 +26,10 @@ public final class AvatarFlightDebugLogService {
                                        boolean applyingVelocity,
                                        boolean hasFlightVisualOverrides,
                                        boolean suppressingOverlays) {
-        if (!config.getDebug().isLogControllerTicks()) {
+        Tamework instance = Tamework.getInstance();
+        if (!config.getDebug().isLogControllerTicks()
+                || instance == null
+                || !instance.isDebugAvatarFlightEnabled()) {
             return;
         }
         long now = System.currentTimeMillis();
@@ -34,8 +37,7 @@ public final class AvatarFlightDebugLogService {
             return;
         }
         nextControllerLogAtMs = now + TimeUnit.SECONDS.toMillis(1L);
-        Tamework instance = Tamework.getInstance();
-        if (instance == null || instance.getLogger() == null) {
+        if (instance.getLogger() == null) {
             return;
         }
         instance.getLogger().at(Level.INFO).log(formatControllerTick(

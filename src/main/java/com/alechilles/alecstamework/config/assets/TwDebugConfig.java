@@ -130,6 +130,13 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
             .documentation("Debug setting for flying companion landing and grounded handoff diagnostics.")
             .add()
             .<Boolean>append(
+                    new KeyedCodec<>("AvatarFlight", Codec.BOOLEAN),
+                    (section, value) -> section.avatarFlight = value,
+                    section -> section.avatarFlight
+            )
+            .documentation("Debug setting for transformed-player avatar-flight diagnostics. Disabled by default.")
+            .add()
+            .<Boolean>append(
                     new KeyedCodec<>("RespawnTrace", Codec.BOOLEAN),
                     (section, value) -> section.respawnTrace = value,
                     section -> section.respawnTrace
@@ -379,6 +386,9 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
         if (!nestedExplicitKeys.contains("FlyingCompanion")) {
             debugCommands.flyingCompanion = parent.debugCommands.flyingCompanion;
         }
+        if (!nestedExplicitKeys.contains("AvatarFlight")) {
+            debugCommands.avatarFlight = parent.debugCommands.avatarFlight;
+        }
         if (!nestedExplicitKeys.contains("RespawnTrace")) {
             debugCommands.respawnTrace = parent.debugCommands.respawnTrace;
         }
@@ -423,6 +433,7 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
         private boolean needsTelemetryDiagnostics;
         private boolean harvest;
         private boolean flyingCompanion;
+        private boolean avatarFlight;
         private boolean respawnTrace;
 
         public boolean isHook() {
@@ -484,6 +495,10 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public boolean isFlyingCompanion() {
             return flyingCompanion;
+        }
+
+        public boolean isAvatarFlight() {
+            return avatarFlight;
         }
 
         public boolean isRespawnTrace() {

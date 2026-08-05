@@ -407,6 +407,7 @@ public class Tamework extends JavaPlugin {
     private volatile boolean debugHarvestLogs;
     private volatile boolean debugRespawnTraceLogs;
     private volatile boolean debugFlyingCompanionLogs;
+    private volatile boolean debugAvatarFlightLogs;
 
     public Tamework(@Nonnull JavaPluginInit init) {
         super(init);
@@ -1779,6 +1780,7 @@ public class Tamework extends JavaPlugin {
         setDebugHarvestEnabled(commands.isHarvest());
         setDebugRespawnTraceEnabled(commands.isRespawnTrace());
         setDebugFlyingCompanionEnabled(commands.isFlyingCompanion());
+        setDebugAvatarFlightEnabled(commands.isAvatarFlight());
         String roleFilter = commands.getDespawnRoleFilter();
         if (roleFilter == null || roleFilter.isBlank()) {
             clearDebugDespawnRoleFilter();
@@ -1804,6 +1806,7 @@ public class Tamework extends JavaPlugin {
                         + ", harvest=" + isDebugHarvestEnabled()
                         + ", respawnTrace=" + isDebugRespawnTraceEnabled()
                         + ", flyingCompanion=" + isDebugFlyingCompanionEnabled()
+                        + ", avatarFlight=" + isDebugAvatarFlightEnabled()
                         + ", despawnRoleFilter="
                         + (getDebugDespawnRoleFilter() == null ? "<none>" : getDebugDespawnRoleFilter())
         );
@@ -3380,6 +3383,15 @@ public class Tamework extends JavaPlugin {
     public boolean toggleDebugFlyingCompanionEnabled() {
         debugFlyingCompanionLogs = !debugFlyingCompanionLogs;
         return debugFlyingCompanionLogs;
+    }
+
+    public boolean isDebugAvatarFlightEnabled() {
+        return debugAvatarFlightLogs;
+    }
+
+    public boolean setDebugAvatarFlightEnabled(boolean enabled) {
+        debugAvatarFlightLogs = enabled;
+        return debugAvatarFlightLogs;
     }
 
     // Logs a warning if required global config fields are missing.

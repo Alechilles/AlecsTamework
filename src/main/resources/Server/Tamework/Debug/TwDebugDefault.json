@@ -15,6 +15,7 @@
     "NeedsSeek": false,
     "NeedsTelemetry": true,
     "Harvest": false,
+    "AvatarFlight": false,
     "RespawnTrace": false
   }
 }

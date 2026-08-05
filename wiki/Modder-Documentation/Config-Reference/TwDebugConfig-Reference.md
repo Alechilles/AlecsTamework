@@ -54,6 +54,7 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 - `NeedsDamage`: enables needs-damage diagnostics (`/tw debugneedsdamage`)
 - `NeedsSeek`: enables needs-seek target resolution diagnostics (`/tw debugneedsseek`)
 - `NeedsTelemetry`: enables rate-limited Alec's Telemetry needs context events (`/tw debugneedstelemetry`); events are still recorded only when Tamework telemetry is enabled
+- `AvatarFlight`: enables transformed-player avatar-flight diagnostics; disabled by default and additionally requires the avatar-flight asset's `Debug.LogControllerTicks` setting
 - `RespawnTrace`: enables linked companion revive and lost-recovery trace diagnostics (`/tw debugrespawntrace`)
 
 ## Defaults and Usage Notes

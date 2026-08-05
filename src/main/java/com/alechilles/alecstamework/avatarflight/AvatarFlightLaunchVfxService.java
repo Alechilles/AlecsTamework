@@ -168,7 +168,7 @@ public final class AvatarFlightLaunchVfxService {
                                     double scale) {
         if (config == null || !config.getDebug().isLogControllerTicks()) return;
         Tamework plugin = Tamework.getInstance();
-        if (plugin == null || plugin.getLogger() == null) return;
+        if (plugin == null || !plugin.isDebugAvatarFlightEnabled() || plugin.getLogger() == null) return;
         plugin.getLogger().at(Level.INFO).log(String.format(
                 Locale.ROOT,
                 "TameworkAvatarFlight debug: launchVfx config=%s system=%s emitted=%s position=%.2f/%.2f/%.2f scale=%.2f",
