@@ -122,6 +122,7 @@ final class HytaleCompanionProjectionAttemptGateway implements AttemptGateway {
         }
         try {
             postAdd.apply(
+                    world,
                     result.reference(),
                     result.npc(),
                     store,
