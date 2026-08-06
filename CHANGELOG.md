@@ -6,6 +6,8 @@
 - Added a shared attitude target for tamed companions, letting dependent mods
   opt their companion groups into retaliation from player-hostile creatures
   without replacing base-game attitude assets.
+- Added reusable autonomous-aerial Hold, favorite-item follow, and native
+  airborne-mode transition components for downstream companion mods.
 - Added reusable large-ground and autonomous-flying NPC follow components so
   downstream mods can share one implementation while overriding species tuning.
 - Shared flying followers inherit `TameworkFlyingOrbit` obstacle avoidance and

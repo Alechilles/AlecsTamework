@@ -1,0 +1,579 @@
+{
+  "Type": "Component",
+  "Class": "Instruction",
+  "Interface": "Tamework.Instruction.SeekFood.PlayerFollow.Flying",
+  "DefaultState": ".FollowItem",
+  "ResetOnStateChange": true,
+  "Parameters": {
+    "_ImportStates": [
+      "Idle"
+    ],
+    "AttractiveItemSet": {
+      "Value": [],
+      "TypeHint": "String"
+    },
+    "FollowTargetSlot": {
+      "Value": "LockedTarget"
+    },
+    "LandingPositionSlot": {
+      "Value": "Tamework_Aerial_Favorite_Landing"
+    },
+    "FlightSeekStopDistance": {
+      "Value": 5
+    },
+    "GroundApproachDistanceRange": {
+      "Value": [
+        1.5,
+        2
+      ]
+    },
+    "ReturnParentState": {
+      "Value": "Idle",
+      "Description": "Imported parent state restored after the attractive item target is lost."
+    }
+  },
+  "Content": {
+    "$Comment": "Follow a player holding a favorite item, settle safely, and return to vanilla idle when the item is lost.",
+    "Continue": true,
+    "Sensor": {
+      "Type": "Any"
+    },
+    "Instructions": [
+      {
+        "$Comment": "Do not let Hytale's post-behavior avoidance pass push the NPC away from its favorite-item target.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "Target",
+          "TargetSlot": {
+            "Compute": "FollowTargetSlot"
+          },
+          "Filters": [
+            {
+              "Type": "ItemInHand",
+              "Items": {
+                "Compute": "AttractiveItemSet"
+              }
+            },
+            {
+              "Type": "Not",
+              "Filter": {
+                "Type": "Attitude",
+                "Attitudes": [
+                  "Hostile",
+                  "Ignore"
+                ]
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "IgnoreForAvoidance",
+            "TargetSlot": {
+              "Compute": "FollowTargetSlot"
+            }
+          }
+        ]
+      },
+      {
+        "$Comment": "Take off before pursuing a favorite item from the ground.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".FollowItem"
+            },
+            {
+              "Type": "MotionController",
+              "MotionController": "Walk"
+            },
+            {
+              "Type": "Target",
+              "TargetSlot": {
+                "Compute": "FollowTargetSlot"
+              },
+              "Filters": [
+                {
+                  "Type": "ItemInHand",
+                  "Items": {
+                    "Compute": "AttractiveItemSet"
+                  }
+                },
+                {
+                  "Type": "Not",
+                  "Filter": {
+                    "Type": "Attitude",
+                    "Attitudes": [
+                      "Hostile",
+                      "Ignore"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "BodyMotion": {
+          "Type": "TakeOff",
+          "JumpSpeed": 4
+        }
+      },
+      {
+        "$Comment": "If the item is lost before takeoff, release the target and restore vanilla idle.",
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".FollowItem"
+            },
+            {
+              "Type": "MotionController",
+              "MotionController": "Walk"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Target",
+                "TargetSlot": {
+                  "Compute": "FollowTargetSlot"
+                },
+                "Filters": [
+                  {
+                    "Type": "ItemInHand",
+                    "Items": {
+                      "Compute": "AttractiveItemSet"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "ReleaseTarget",
+            "TargetSlot": {
+              "Compute": "FollowTargetSlot"
+            }
+          },
+          {
+            "Type": "ParentState",
+            "State": {
+              "Compute": "ReturnParentState"
+            }
+          }
+        ]
+      },
+      {
+        "$Comment": "Fly toward a favorite-item target while outside the landing approach radius.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "Target",
+              "TargetSlot": {
+                "Compute": "FollowTargetSlot"
+              },
+              "Filters": [
+                {
+                  "Type": "ItemInHand",
+                  "Items": {
+                    "Compute": "AttractiveItemSet"
+                  }
+                },
+                {
+                  "Type": "Not",
+                  "Filter": {
+                    "Type": "Attitude",
+                    "Attitudes": [
+                      "Hostile",
+                      "Ignore"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "Type": "State",
+              "State": ".FollowItem"
+            },
+            {
+              "Type": "MotionController",
+              "MotionController": "Fly"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Target",
+                "TargetSlot": {
+                  "Compute": "FollowTargetSlot"
+                },
+                "Range": {
+                  "Compute": "FlightSeekStopDistance"
+                },
+                "Filters": [
+                  {
+                    "Type": "ItemInHand",
+                    "Items": {
+                      "Compute": "AttractiveItemSet"
+                    }
+                  },
+                  {
+                    "Type": "Not",
+                    "Filter": {
+                      "Type": "Attitude",
+                      "Attitudes": [
+                        "Hostile",
+                        "Ignore"
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "BodyMotion": {
+          "Type": "Seek",
+          "SlowDownDistance": 8,
+          "StopDistance": 5,
+          "RelativeSpeed": 0.4
+        }
+      },
+      {
+        "$Comment": "Capture the nearby target position and hand it to the safe landing controller.",
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "Target",
+              "TargetSlot": {
+                "Compute": "FollowTargetSlot"
+              },
+              "Range": {
+                "Compute": "FlightSeekStopDistance"
+              },
+              "Filters": [
+                {
+                  "Type": "ItemInHand",
+                  "Items": {
+                    "Compute": "AttractiveItemSet"
+                  }
+                },
+                {
+                  "Type": "Not",
+                  "Filter": {
+                    "Type": "Attitude",
+                    "Attitudes": [
+                      "Hostile",
+                      "Ignore"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "Type": "State",
+              "State": ".FollowItem"
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "StorePosition",
+            "Slot": {
+              "Compute": "LandingPositionSlot"
+            }
+          },
+          {
+            "Type": "State",
+            "State": ".FollowItemLanding"
+          }
+        ]
+      },
+      {
+        "$Comment": "Let Tamework finish a safe landing toward the stored position even if the item is put away.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "ReadPosition",
+              "Slot": {
+                "Compute": "LandingPositionSlot"
+              },
+              "Range": 64
+            },
+            {
+              "Type": "State",
+              "State": ".FollowItemLanding"
+            },
+            {
+              "Type": "MotionController",
+              "MotionController": "Fly"
+            }
+          ]
+        },
+        "BodyMotion": {
+          "Type": "Land",
+          "RelativeSpeed": 0.4,
+          "SlowDownDistance": 1,
+          "StopDistance": 0.5,
+          "UsePathfinder": true
+        }
+      },
+      {
+        "$Comment": "After touchdown, switch to the grounded approach while the favorite item remains held.",
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".FollowItemLanding"
+            },
+            {
+              "Type": "MotionController",
+              "MotionController": "Walk"
+            },
+            {
+              "Type": "Target",
+              "TargetSlot": {
+                "Compute": "FollowTargetSlot"
+              },
+              "Filters": [
+                {
+                  "Type": "ItemInHand",
+                  "Items": {
+                    "Compute": "AttractiveItemSet"
+                  }
+                },
+                {
+                  "Type": "Not",
+                  "Filter": {
+                    "Type": "Attitude",
+                    "Attitudes": [
+                      "Hostile",
+                      "Ignore"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "State",
+            "State": ".FollowItemGrounded"
+          }
+        ]
+      },
+      {
+        "$Comment": "Approach the target on foot after safe touchdown.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "Target",
+              "TargetSlot": {
+                "Compute": "FollowTargetSlot"
+              },
+              "Filters": [
+                {
+                  "Type": "ItemInHand",
+                  "Items": {
+                    "Compute": "AttractiveItemSet"
+                  }
+                },
+                {
+                  "Type": "Not",
+                  "Filter": {
+                    "Type": "Attitude",
+                    "Attitudes": [
+                      "Hostile",
+                      "Ignore"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "Type": "State",
+              "State": ".FollowItemGrounded"
+            },
+            {
+              "Type": "MotionController",
+              "MotionController": "Walk"
+            }
+          ]
+        },
+        "BodyMotion": {
+          "Type": "MaintainDistance",
+          "DesiredDistanceRange": {
+            "Compute": "GroundApproachDistanceRange"
+          },
+          "RelativeForwardsSpeed": 0.3,
+          "RelativeBackwardsSpeed": 0.3
+        }
+      },
+      {
+        "$Comment": "If a target is lost while freely flying, release it and restore vanilla idle.",
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".FollowItem"
+            },
+            {
+              "Type": "MotionController",
+              "MotionController": "Fly"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Target",
+                "TargetSlot": {
+                  "Compute": "FollowTargetSlot"
+                },
+                "Filters": [
+                  {
+                    "Type": "ItemInHand",
+                    "Items": {
+                      "Compute": "AttractiveItemSet"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "ReleaseTarget",
+            "TargetSlot": {
+              "Compute": "FollowTargetSlot"
+            }
+          },
+          {
+            "Type": "ParentState",
+            "State": {
+              "Compute": "ReturnParentState"
+            }
+          }
+        ]
+      },
+      {
+        "$Comment": "When landing loses its item, wait for touchdown, release, take off, and return idle.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".FollowItemLanding"
+            },
+            {
+              "Type": "MotionController",
+              "MotionController": "Walk"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Target",
+                "TargetSlot": {
+                  "Compute": "FollowTargetSlot"
+                },
+                "Filters": [
+                  {
+                    "Type": "ItemInHand",
+                    "Items": {
+                      "Compute": "AttractiveItemSet"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "ReleaseTarget",
+            "TargetSlot": {
+              "Compute": "FollowTargetSlot"
+            }
+          },
+          {
+            "Type": "ParentState",
+            "State": {
+              "Compute": "ReturnParentState"
+            },
+            "ClearBodyMotion": false
+          }
+        ],
+        "BodyMotion": {
+          "Type": "TakeOff",
+          "JumpSpeed": 4
+        }
+      },
+      {
+        "$Comment": "Grounded target loss uses the same safe release and vanilla return path.",
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".FollowItemGrounded"
+            },
+            {
+              "Type": "MotionController",
+              "MotionController": "Walk"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Target",
+                "TargetSlot": {
+                  "Compute": "FollowTargetSlot"
+                },
+                "Filters": [
+                  {
+                    "Type": "ItemInHand",
+                    "Items": {
+                      "Compute": "AttractiveItemSet"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "ReleaseTarget",
+            "TargetSlot": {
+              "Compute": "FollowTargetSlot"
+            }
+          },
+          {
+            "Type": "ParentState",
+            "State": {
+              "Compute": "ReturnParentState"
+            },
+            "ClearBodyMotion": false
+          }
+        ],
+        "BodyMotion": {
+          "Type": "TakeOff",
+          "JumpSpeed": 4
+        }
+      }
+    ]
+  },
+  "$Comment": "Flying favorite-item follow behavior for autonomous aerial companions."
+}
