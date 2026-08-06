@@ -1,0 +1,267 @@
+{
+  "$Comment": "Reusable native walk/fly controller transition for autonomous aerial companions.",
+  "Type": "Component",
+  "Class": "Instruction",
+  "Interface": "Tamework.Instruction.AirborneModeTransition",
+  "Content": {
+    "Continue": true,
+    "Sensor": {
+      "Type": "Any"
+    },
+    "Instructions": [
+      {
+        "$Comment": "Neutralize stale Tamework landing state from one global path after grounded grounded releases the companion.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "Flag",
+          "Name": {
+            "Compute": "GroundedActivityFlagName"
+          },
+          "Set": false
+        },
+        "Instructions": [
+          {
+            "Continue": true,
+            "Sensor": {
+              "Type": "Any",
+              "Once": true
+            },
+            "Actions": [
+              {
+                "Type": "TameworkSetFlyingCompanionMode",
+                "Mode": "Follow"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "$Comment": "Consume the tamed companion airborne-mode command and flip the selected mode.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "TameworkHook",
+          "HookId": {
+            "Compute": "ToggleAirborneModeHookId"
+          },
+          "Consume": true
+        },
+        "Instructions": [
+          {
+            "Sensor": {
+              "Type": "Flag",
+              "Name": {
+                "Compute": "AirborneModeFlagName"
+              }
+            },
+            "Actions": [
+              {
+                "Type": "SetFlag",
+                "Name": {
+                  "Compute": "AirborneModeFlagName"
+                },
+                "SetTo": false
+              }
+            ]
+          },
+          {
+            "Sensor": {
+              "Type": "Flag",
+              "Name": {
+                "Compute": "AirborneModeFlagName"
+              },
+              "Set": false
+            },
+            "Actions": [
+              {
+                "Type": "SetFlag",
+                "Name": {
+                  "Compute": "AirborneModeFlagName"
+                },
+                "SetTo": true
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "$Comment": "Take off when airborne mode is selected and no grounded grounded activity owns the companion.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "Flag",
+              "Name": {
+                "Compute": "AirborneModeFlagName"
+              }
+            },
+            {
+              "Type": "Flag",
+              "Name": {
+                "Compute": "GroundedActivityFlagName"
+              },
+              "Set": false
+            },
+            {
+              "Type": "MotionController",
+              "MotionController": "Walk"
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "PlayAnimation",
+            "Slot": "Status"
+          }
+        ],
+        "BodyMotion": {
+          "Type": "TakeOff",
+          "JumpSpeed": {
+            "Compute": "TakeOffJumpSpeed"
+          }
+        }
+      },
+      {
+        "$Comment": "Land when airborne mode is cleared, using a safe stone/soil landing ray.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "Flag",
+              "Name": {
+                "Compute": "AirborneModeFlagName"
+              },
+              "Set": false
+            },
+            {
+              "Type": "MotionController",
+              "MotionController": "Fly"
+            }
+          ]
+        },
+        "Instructions": [
+          {
+            "Sensor": {
+              "Type": "AdjustPosition",
+              "Offset": [
+                0,
+                1,
+                0
+              ],
+              "Sensor": {
+                "Type": "SearchRay",
+                "Name": {
+                  "Compute": "LandingRayName"
+                },
+                "Range": {
+                  "Compute": "LandingSearchRange"
+                },
+                "Angle": {
+                  "Compute": "LandingSearchAngle"
+                },
+                "Blocks": {
+                  "Compute": "LandingBlocks"
+                }
+              }
+            },
+            "BodyMotion": {
+              "Type": "Land",
+              "UsePathfinder": false,
+              "SkipSteering": false,
+              "SlowDownDistance": {
+                "Compute": "LandingSlowDownDistance"
+              },
+              "StopDistance": {
+                "Compute": "LandingStopDistance"
+              },
+              "HeightDifference": {
+                "Compute": "LandingHeightDifference"
+              },
+              "GoalLenience": {
+                "Compute": "LandingGoalLenience"
+              },
+              "DesiredAltitudeWeight": {
+                "Compute": "LandingDesiredAltitudeWeight"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "$Comment": "Clear the landing ray after a walk touchdown.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "Flag",
+              "Name": {
+                "Compute": "AirborneModeFlagName"
+              },
+              "Set": false
+            },
+            {
+              "Type": "MotionController",
+              "MotionController": "Walk"
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "ResetSearchRays"
+          }
+        ]
+      }
+    ]
+  },
+  "Parameters": {
+    "ToggleAirborneModeHookId": {
+      "Value": "Tamework.Command.ToggleAirborneMode",
+      "Description": "Tamework hook consumed to toggle autonomous airborne mode."
+    },
+    "AirborneModeFlagName": {
+      "Value": "AirborneMode",
+      "Description": "NPC flag that records whether autonomous airborne mode is enabled."
+    },
+    "GroundedActivityFlagName": {
+      "Value": "Tamework_AirborneMode_GroundedActivity",
+      "Description": "NPC flag that prevents takeoff while a grounded activity owns the companion."
+    },
+    "LandingRayName": {
+      "Value": "Tamework_AirborneMode_LandingRay",
+      "Description": "Search-ray name used by the native landing branch."
+    },
+    "LandingBlocks": {
+      "Value": "StoneAndSoil",
+      "Description": "Block set accepted by the landing search ray."
+    },
+    "TakeOffJumpSpeed": {
+      "Value": 4
+    },
+    "LandingSearchRange": {
+      "Value": 64
+    },
+    "LandingSearchAngle": {
+      "Value": 90
+    },
+    "LandingSlowDownDistance": {
+      "Value": 5
+    },
+    "LandingStopDistance": {
+      "Value": 0.5
+    },
+    "LandingHeightDifference": {
+      "Value": [
+        -3,
+        2
+      ]
+    },
+    "LandingGoalLenience": {
+      "Value": 3
+    },
+    "LandingDesiredAltitudeWeight": {
+      "Value": 0
+    }
+  }
+}

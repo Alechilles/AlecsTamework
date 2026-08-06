@@ -3,6 +3,8 @@
 ## 3.0.0 - Persistence Replacement and Companion Systems Overhaul - 2026-08-04
 
 ### Added
+- Added reusable autonomous-aerial Hold, favorite-item follow, and native
+  airborne-mode transition components for downstream companion mods.
 - Added reusable large-ground and autonomous-flying NPC follow components so
   downstream mods can share one implementation while overriding species tuning.
 - Shared flying followers inherit `TameworkFlyingOrbit` obstacle avoidance and

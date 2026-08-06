@@ -1,0 +1,132 @@
+{
+  "$Comment": "Flying hold behavior for autonomous aerial companions using Tamework's managed landing controller.",
+  "Type": "Component",
+  "Class": "Instruction",
+  "Interface": "Tamework.Instruction.Hold",
+  "Parameters": {
+    "HoldGroundAnimation": {
+      "Value": "Idle",
+      "Description": "Animation to apply once the companion is grounded in hold mode."
+    },
+    "HoldLandingSearchRange": {
+      "Value": 20,
+      "Description": "Search-ray range used to find a landing spot while entering grounded hold."
+    },
+    "HoldLandingSearchAngle": {
+      "Value": 45,
+      "Description": "Search-ray angle used to find a landing spot while entering grounded hold."
+    },
+    "HoldLandingSlowDownDistance": {
+      "Value": 5,
+      "Description": "Distance from landing point where descent begins to slow."
+    },
+    "HoldLandingStopDistance": {
+      "Value": 0.5,
+      "Description": "Distance from landing point considered grounded enough for hold."
+    },
+    "HoldLandingGoalLenience": {
+      "Value": 3,
+      "Description": "Goal lenience used during landing descent."
+    }
+  },
+  "Content": {
+    "$Comment": "Release combat targets, land if airborne, then stay grounded with the landed idle posture.",
+    "Continue": true,
+    "Sensor": {
+      "Type": "Any"
+    },
+    "Instructions": [
+      {
+        "$Comment": "Keep combat target released while in hold mode.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "Any",
+          "Once": true
+        },
+        "Actions": [
+          {
+            "Type": "ReleaseTarget",
+            "TargetSlot": "LockedTarget"
+          },
+          {
+            "Type": "SetFlag",
+            "Name": "HoldFlying_GroundedPoseApplied",
+            "SetTo": false
+          }
+        ]
+      },
+      {
+        "$Comment": "While airborne, let Tamework's targeted landing controller fly toward the configured landing spot.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "MotionController",
+          "MotionController": "Fly"
+        },
+        "Instructions": [
+          {
+            "Actions": [
+              {
+                "Type": "SetFlag",
+                "Name": "HoldFlying_GroundedPoseApplied",
+                "SetTo": false
+              }
+            ]
+          },
+          {
+            "BodyMotion": {
+              "Type": "Nothing"
+            }
+          }
+        ]
+      },
+      {
+        "$Comment": "Apply the landed idle pose once the companion reaches the ground.",
+        "Enabled": {
+          "Compute": "!isEmpty(HoldGroundAnimation)"
+        },
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "MotionController",
+              "MotionController": "Walk"
+            },
+            {
+              "Type": "Flag",
+              "Name": "HoldFlying_GroundedPoseApplied",
+              "Set": false
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "ResetSearchRays"
+          },
+          {
+            "Type": "PlayAnimation",
+            "Slot": "Status",
+            "Animation": {
+              "Compute": "HoldGroundAnimation"
+            }
+          },
+          {
+            "Type": "SetFlag",
+            "Name": "HoldFlying_GroundedPoseApplied",
+            "SetTo": true
+          }
+        ]
+      },
+      {
+        "$Comment": "Once grounded, remain stationary in the landed posture.",
+        "Sensor": {
+          "Type": "MotionController",
+          "MotionController": "Walk"
+        },
+        "BodyMotion": {
+          "Type": "Nothing"
+        }
+      }
+    ]
+  }
+}

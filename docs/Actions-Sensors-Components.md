@@ -69,6 +69,94 @@ when the owner target is temporarily unavailable. Parameters:
 }
 ```
 
+### `Component_Tamework_Instruction_Hold_Flying`
+
+Flying Hold behavior for companions using Tamework's managed landing
+controller. It releases combat, waits for the landing controller to complete,
+applies a grounded animation once, and remains stationary after touchdown.
+Parameters:
+
+- `HoldGroundAnimation`
+- `HoldLandingSearchRange`
+- `HoldLandingSearchAngle`
+- `HoldLandingSlowDownDistance`
+- `HoldLandingStopDistance`
+- `HoldLandingGoalLenience`
+
+```json
+{
+  "Reference": "Component_Tamework_Instruction_Hold_Flying",
+  "Modify": {
+    "HoldGroundAnimation": "Idle"
+  }
+}
+```
+
+### `Component_Tamework_Instruction_SeekFood_PlayerFollow_Flying`
+
+Aerial counterpart to `Component_Tamework_Instruction_SeekFood_PlayerFollow`.
+It pursues a non-hostile player holding an attractive item, lands safely near
+the target, approaches on foot, and returns to an imported parent state when
+the item is lost. Parameters:
+
+- `_ImportStates`
+- `AttractiveItemSet`
+- `FollowTargetSlot`
+- `LandingPositionSlot`
+- `FlightSeekStopDistance`
+- `GroundApproachDistanceRange`
+- `ReturnParentState`
+
+```json
+{
+  "Reference": "Component_Tamework_Instruction_SeekFood_PlayerFollow_Flying",
+  "Modify": {
+    "AttractiveItemSet": ["Food_Fish_Raw"],
+    "FollowTargetSlot": "LockedTarget",
+    "LandingPositionSlot": "MyMod_Aerial_Favorite_Landing",
+    "FlightSeekStopDistance": 5,
+    "GroundApproachDistanceRange": [1.5, 2],
+    "ReturnParentState": "Idle"
+  }
+}
+```
+
+### `Component_Tamework_Instruction_Airborne_Mode_Transition`
+
+Parameterized autonomous transition between native `Walk` and `Fly` motion
+controllers. It consumes a downstream hook, toggles an airborne flag, respects
+a grounded-activity gate, and performs takeoff or safe ray-based landing.
+Parameters:
+
+- `ToggleAirborneModeHookId`
+- `AirborneModeFlagName`
+- `GroundedActivityFlagName`
+- `LandingRayName`
+- `LandingBlocks`
+- `TakeOffJumpSpeed`
+- `LandingSearchRange`
+- `LandingSearchAngle`
+- `LandingSlowDownDistance`
+- `LandingStopDistance`
+- `LandingHeightDifference`
+- `LandingGoalLenience`
+- `LandingDesiredAltitudeWeight`
+
+Consumers without a grounded activity should use a private flag name that they
+never set; the component's `Set: false` gate then remains open.
+
+```json
+{
+  "Reference": "Component_Tamework_Instruction_Airborne_Mode_Transition",
+  "Modify": {
+    "ToggleAirborneModeHookId": "MyMod.Command.ToggleAirborneMode",
+    "AirborneModeFlagName": "AirborneMode",
+    "GroundedActivityFlagName": "MyMod_UnusedGroundedActivity",
+    "LandingRayName": "MyMod_AirborneMode_LandingRay"
+  }
+}
+```
+
 ## NPC Action Builder IDs
 - `TameworkInteract`: Runs the optimized interaction pipeline (`TwInteractionConfig`).
 - `TameworkInteractPrompt`: Updates prompt text from the first currently matching interaction entry.
