@@ -1,0 +1,66 @@
+{
+  "$Comment": "Reusable large-NPC ground follow behavior that maintains a configurable separation before teleporting.",
+  "Type": "Component",
+  "Class": "Instruction",
+  "Interface": "Tamework.Instruction.Follow",
+  "Parameters": {
+    "MasterTargetSlot": { "Value": "MasterTarget", "Description": "Target slot used to track the owner/master." },
+    "FollowTeleportThresholdRange": { "Value": 40, "Description": "Distance beyond which the NPC teleports back to its owner." },
+    "FollowSeekSlowDownDistance": { "Value": 20, "Description": "Distance from the owner where the NPC begins slowing down." },
+    "FollowSeekStopDistance": { "Value": 8, "Description": "Minimum separation maintained while catching up to the owner." },
+    "FollowMaintainDistanceRange": { "Value": [10, 16], "Description": "Preferred separation maintained while following the owner." },
+    "FollowRelativeSpeed": { "Value": 1, "Description": "Relative speed used while following the owner." }
+  },
+  "Content": {
+    "Continue": true,
+    "Sensor": { "Type": "Any" },
+    "Instructions": [
+      {
+        "Sensor": {
+          "Type": "Target",
+          "TargetSlot": { "Compute": "MasterTargetSlot" },
+          "Range": 24
+        },
+        "BodyMotion": {
+          "Type": "Seek",
+          "SlowDownDistance": { "Compute": "FollowSeekSlowDownDistance" },
+          "StopDistance": { "Compute": "FollowSeekStopDistance" },
+          "RelativeSpeed": { "Compute": "FollowRelativeSpeed" }
+        }
+      },
+      {
+        "Sensor": {
+          "Type": "Target",
+          "TargetSlot": { "Compute": "MasterTargetSlot" },
+          "Range": { "Compute": "FollowTeleportThresholdRange" }
+        },
+        "BodyMotion": {
+          "Type": "MaintainDistance",
+          "DesiredDistanceRange": { "Compute": "FollowMaintainDistanceRange" },
+          "StrafingDurationRange": [1, 1],
+          "StrafingFrequencyRange": [2, 2],
+          "MoveThreshold": 0.2,
+          "RelativeForwardsSpeed": { "Compute": "FollowRelativeSpeed" },
+          "RelativeBackwardsSpeed": { "Compute": "FollowRelativeSpeed" }
+        }
+      },
+      {
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            { "Type": "Target", "TargetSlot": { "Compute": "MasterTargetSlot" } },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Target",
+                "TargetSlot": { "Compute": "MasterTargetSlot" },
+                "Range": { "Compute": "FollowTeleportThresholdRange" }
+              }
+            }
+          ]
+        },
+        "BodyMotion": { "Type": "Teleport" }
+      }
+    ]
+  }
+}

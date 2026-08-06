@@ -2,6 +2,73 @@
 
 This file maps Tamework's currently registered NPC builders, item interactions, runtime components, and `/tw` commands.
 
+## Shared NPC Instruction Components
+
+Use these components from downstream role assets with `Reference` and override
+species tuning through `Modify`. Do not copy their instruction bodies into each
+mod; consuming the shared IDs lets future Tamework fixes apply automatically.
+
+### `Component_Tamework_Instruction_Follow_Large`
+
+Ground follow behavior for large NPCs. It seeks its owner at close range,
+maintains a configurable separation, and teleports after a configurable maximum
+distance. Parameters:
+
+- `MasterTargetSlot`
+- `FollowTeleportThresholdRange`
+- `FollowSeekSlowDownDistance`
+- `FollowSeekStopDistance`
+- `FollowMaintainDistanceRange`
+- `FollowRelativeSpeed`
+
+```json
+{
+  "Reference": "Component_Tamework_Instruction_Follow_Large",
+  "Modify": {
+    "MasterTargetSlot": "MasterTarget",
+    "FollowTeleportThresholdRange": 60,
+    "FollowSeekSlowDownDistance": 32,
+    "FollowSeekStopDistance": 16,
+    "FollowMaintainDistanceRange": [16, 24],
+    "FollowRelativeSpeed": 1
+  }
+}
+```
+
+### `Component_Tamework_Instruction_Follow_Flying`
+
+Autonomous flying follow behavior that takes off from `Walk`, maintains a
+target-relative altitude, wanders around its owner with
+`TameworkFlyingOrbit`, teleports after extreme separation, and hovers safely
+when the owner target is temporarily unavailable. Parameters:
+
+- `MasterTargetSlot`
+- `FollowDesiredAltitudeRange`
+- `FollowTeleportThresholdRange`
+- `FollowOrbitRadiusRange`
+- `FollowOrbitRetargetTimeRange`
+- `FollowOrbitStopDistance`
+- `FollowOrbitRelativeSpeed`
+- `FollowHoverRadius`
+- `FollowHoverRelativeSpeed`
+
+```json
+{
+  "Reference": "Component_Tamework_Instruction_Follow_Flying",
+  "Modify": {
+    "MasterTargetSlot": "MasterTarget",
+    "FollowDesiredAltitudeRange": [4, 8],
+    "FollowTeleportThresholdRange": 60,
+    "FollowOrbitRadiusRange": [16, 24],
+    "FollowOrbitRetargetTimeRange": [3, 6],
+    "FollowOrbitStopDistance": 3,
+    "FollowOrbitRelativeSpeed": 0.65,
+    "FollowHoverRadius": 1.75,
+    "FollowHoverRelativeSpeed": 0.12
+  }
+}
+```
+
 ## NPC Action Builder IDs
 - `TameworkInteract`: Runs the optimized interaction pipeline (`TwInteractionConfig`).
 - `TameworkInteractPrompt`: Updates prompt text from the first currently matching interaction entry.

@@ -1,0 +1,142 @@
+{
+  "$Comment": "Reusable autonomous flying follow behavior for aerial companions.",
+  "Type": "Component",
+  "Class": "Instruction",
+  "Interface": "Tamework.Instruction.Follow",
+  "Parameters": {
+    "MasterTargetSlot": {
+      "Value": "MasterTarget",
+      "Description": "Target slot used to track the owner/master."
+    },
+    "FollowDesiredAltitudeRange": {
+      "Value": [4, 8],
+      "Description": "Preferred altitude range to maintain while following."
+    },
+    "FollowTeleportThresholdRange": {
+      "Value": 40,
+      "Description": "Distance beyond which teleport fallback is used instead of normal flight catch-up."
+    },
+    "FollowOrbitRadiusRange": {
+      "Value": [12, 18],
+      "Description": "Wander orbit radius range maintained around the owner."
+    },
+    "FollowOrbitRetargetTimeRange": {
+      "Value": [3, 6],
+      "Description": "Delay range between choosing new orbit points around the owner."
+    },
+    "FollowOrbitStopDistance": {
+      "Value": 3,
+      "Description": "Distance from a selected orbit point considered reached."
+    },
+    "FollowOrbitRelativeSpeed": {
+      "Value": 0.45,
+      "Description": "Relative speed used while wandering around the owner."
+    },
+    "FollowHoverRadius": {
+      "Value": 1.75,
+      "Description": "Small hover orbit radius used when already near the owner."
+    },
+    "FollowHoverRelativeSpeed": {
+      "Value": 0.12,
+      "Description": "Relative speed used for close hover/orbit behavior."
+    }
+  },
+  "Content": {
+    "$Comment": "Take off when grounded, orbit the owner while airborne, and teleport only after a large separation.",
+    "Continue": true,
+    "Sensor": { "Type": "Any" },
+    "Instructions": [
+      {
+        "$Comment": "Keep combat target released while in follow mode.",
+        "Continue": true,
+        "Sensor": { "Type": "Any", "Once": true },
+        "Actions": [
+          { "Type": "ReleaseTarget", "TargetSlot": "LockedTarget" }
+        ]
+      },
+      {
+        "$Comment": "If grounded, take off before running the flying follow behavior.",
+        "Continue": true,
+        "Sensor": { "Type": "MotionController", "MotionController": "Walk" },
+        "BodyMotion": { "Type": "TakeOff", "JumpSpeed": 4 }
+      },
+      {
+        "$Comment": "Maintain a suitable airborne altitude while follow mode is active.",
+        "Continue": true,
+        "Sensor": { "Type": "MotionController", "MotionController": "Fly" },
+        "Actions": [
+          {
+            "Type": "OverrideAltitude",
+            "DesiredAltitudeRange": { "Compute": "FollowDesiredAltitudeRange" }
+          }
+        ]
+      },
+      {
+        "$Comment": "Teleport back to the owner if they are far beyond normal catch-up range.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            { "Type": "MotionController", "MotionController": "Fly" },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Target",
+                "TargetSlot": { "Compute": "MasterTargetSlot" },
+                "Range": { "Compute": "FollowTeleportThresholdRange" }
+              }
+            },
+            { "Type": "Target", "TargetSlot": { "Compute": "MasterTargetSlot" } }
+          ]
+        },
+        "BodyMotion": { "Type": "Teleport" }
+      },
+      {
+        "$Comment": "Wander through a broad orbit around the owner instead of directly seeking their position.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            { "Type": "MotionController", "MotionController": "Fly" },
+            {
+              "Type": "Target",
+              "TargetSlot": { "Compute": "MasterTargetSlot" },
+              "Range": { "Compute": "FollowTeleportThresholdRange" }
+            }
+          ]
+        },
+        "HeadMotion": { "Type": "Watch" },
+        "BodyMotion": {
+          "Type": "TameworkFlyingOrbit",
+          "Mode": "WANDER_TARGET",
+          "WanderRadiusRange": { "Compute": "FollowOrbitRadiusRange" },
+          "WanderRetargetTimeRange": { "Compute": "FollowOrbitRetargetTimeRange" },
+          "WanderStopDistance": { "Compute": "FollowOrbitStopDistance" },
+          "RelativeSpeed": { "Compute": "FollowOrbitRelativeSpeed" },
+          "DesiredAltitudeRange": { "Compute": "FollowDesiredAltitudeRange" }
+        }
+      },
+      {
+        "$Comment": "Fallback hover if the owner target is temporarily unavailable but the companion is still airborne.",
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            { "Type": "MotionController", "MotionController": "Fly" },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Target",
+                "TargetSlot": { "Compute": "MasterTargetSlot" }
+              }
+            }
+          ]
+        },
+        "BodyMotion": {
+          "Type": "WanderInCircle",
+          "Radius": { "Compute": "FollowHoverRadius" },
+          "RelativeSpeed": { "Compute": "FollowHoverRelativeSpeed" }
+        }
+      }
+    ]
+  }
+}
