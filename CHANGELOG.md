@@ -212,6 +212,9 @@
   clears.
 - Fixed a confirmed rolled-back persistence operation disabling all later
   capture, release, coop, Recall, and companion-state writes.
+- Fixed tamed companions remaining owned by their original Hytale spawn marker
+  or beacon, which could unload and restore them after players left the area.
+  Existing loaded companions now repair both sides of that spawn relationship.
 - Fixed automatic Hytale backups failing on Windows while persistence was
   active by moving process locks to Hytale's backup-excluded `LOCK` layout.
 - Removed a false packaged-server SLF4J binder `SEVERE` warning when opening

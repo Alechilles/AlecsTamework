@@ -13,6 +13,7 @@ import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
+import com.alechilles.alecstamework.npc.spawning.CompanionSpawnAuthorityService;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.hypixel.hytale.component.ComponentType;
@@ -28,8 +29,6 @@ import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
-import com.hypixel.hytale.server.npc.components.SpawnBeaconReference;
-import com.hypixel.hytale.server.npc.components.SpawnMarkerReference;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
@@ -108,7 +107,7 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
         }
         store.putComponent(npcRef, tamedType, new TameworkTamedComponent(value));
         if (value) {
-            detachFromSpawnReferences(npcRef, store);
+            CompanionSpawnAuthorityService.detach(npcRef, store);
             applyDisableSpawnDrivenDespawn(npcRef, store);
             CompanionProgressionBootstrapService.ensureProgressionComponents(npcRef, store);
         }
@@ -242,7 +241,7 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
         if (tamedType != null) {
             store.putComponent(npcRef, tamedType, new TameworkTamedComponent(true));
         }
-        detachFromSpawnReferences(npcRef, store);
+        CompanionSpawnAuthorityService.detach(npcRef, store);
         applyDisableSpawnDrivenDespawn(npcRef, store);
         logDespawnDebug("start_taming", npcRef, store, null);
         CompanionProgressionBootstrapService.ensureProgressionComponents(npcRef, store);
@@ -368,43 +367,6 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
         }
         npc.setSpawnConfiguration(DISABLE_DESPAWN_SPAWN_CONFIGURATION);
         return true;
-    }
-
-    // Detaches tameable NPCs from spawn marker/beacon ownership so marker-lost cleanup cannot reclaim companions.
-    private boolean detachFromSpawnReferences(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        if (npcRef == null || !npcRef.isValid() || store == null) {
-            return false;
-        }
-        boolean detached = false;
-        ComponentType<EntityStore, SpawnMarkerReference> markerReferenceType = null;
-        try {
-            markerReferenceType = SpawnMarkerReference.getComponentType();
-        } catch (RuntimeException | LinkageError ignored) {
-            markerReferenceType = null;
-        }
-        if (markerReferenceType != null && store.getComponent(npcRef, markerReferenceType) != null) {
-            store.tryRemoveComponent(npcRef, markerReferenceType);
-            detached = true;
-        }
-        ComponentType<EntityStore, SpawnBeaconReference> beaconReferenceType = null;
-        try {
-            beaconReferenceType = SpawnBeaconReference.getComponentType();
-        } catch (RuntimeException | LinkageError ignored) {
-            beaconReferenceType = null;
-        }
-        if (beaconReferenceType != null && store.getComponent(npcRef, beaconReferenceType) != null) {
-            store.tryRemoveComponent(npcRef, beaconReferenceType);
-            detached = true;
-        }
-        ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
-        if (npcType == null) {
-            return detached;
-        }
-        NPCEntity npc = store.getComponent(npcRef, npcType);
-        if (npc == null) {
-            return detached;
-        }
-        return npc.updateSpawnTrackingState(false) || detached;
     }
 
     private static void logDespawnDebug(String stage,

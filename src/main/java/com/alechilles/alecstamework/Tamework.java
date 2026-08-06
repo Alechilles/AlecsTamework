@@ -193,6 +193,7 @@ import com.alechilles.alecstamework.ui.TameworkSettingsAnnouncementService;
 import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileComponent;
 import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionProgressionBootstrapOnLoadSystem;
+import com.alechilles.alecstamework.npc.systems.CompanionSpawnAuthorityCleanupSystems;
 import com.alechilles.alecstamework.npc.systems.SummonedCompanionExperienceSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionPassiveBreedingSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionLifeStageResumeOnLoadSystem;
@@ -273,6 +274,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.components.SpawnBeaconReference;
 import com.hypixel.hytale.server.npc.components.SpawnMarkerReference;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.spawning.spawnmarkers.SpawnMarkerEntity;
 
 /**
  * Main entry point for the Alec's Tamework! plugin.
@@ -895,6 +897,20 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(
                 new CompanionProgressionBootstrapOnLoadSystem(NPCEntity.getComponentType(), tamedComponentType)
         );
+        getEntityStoreRegistry().registerSystem(
+                new CompanionSpawnAuthorityCleanupSystems.Npc(
+                        NPCEntity.getComponentType(), tamedComponentType
+                )
+        );
+        ComponentType<EntityStore, SpawnMarkerEntity> spawnMarkerEntityType =
+                resolveOptionalSpawnMarkerEntityComponentType();
+        if (spawnMarkerEntityType != null) {
+            getEntityStoreRegistry().registerSystem(
+                    new CompanionSpawnAuthorityCleanupSystems.Marker(
+                            spawnMarkerEntityType, tamedComponentType
+                    )
+            );
+        }
         getEntityStoreRegistry().registerSystem(
                 new SummonedCompanionExperienceSystem(
                         NPCEntity.getComponentType(),
@@ -2052,6 +2068,19 @@ public class Tamework extends JavaPlugin {
             getLogger().at(Level.WARNING).withCause(error).log(
                     "SpawnBeaconReference component type is unavailable; companion despawn diagnostics will skip beacon "
                             + "reference tracking."
+            );
+            return null;
+        }
+    }
+
+    @Nullable
+    private ComponentType<EntityStore, SpawnMarkerEntity> resolveOptionalSpawnMarkerEntityComponentType() {
+        try {
+            return SpawnMarkerEntity.getComponentType();
+        } catch (RuntimeException | LinkageError error) {
+            getLogger().at(Level.WARNING).withCause(error).log(
+                    "SpawnMarkerEntity component type is unavailable; loaded marker reverse-reference repair is "
+                            + "disabled."
             );
             return null;
         }

@@ -13,8 +13,8 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
+import com.alechilles.alecstamework.npc.spawning.CompanionSpawnAuthorityService;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
-import com.hypixel.hytale.assetstore.map.AssetMapWithIndexes;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -219,14 +219,7 @@ final class HytaleCaptureTameTargetGateway {
     }
 
     private void detachSpawnAuthority(ResolvedTarget target) {
-        removeIfPresent(target.reference(), target.markerType());
-        removeIfPresent(target.reference(), target.beaconType());
-        target.npc().updateSpawnTrackingState(false);
-        target.npc().setSpawnConfiguration(
-                AssetMapWithIndexes.NOT_FOUND
-        );
-        target.npc().setEnvironment(AssetMapWithIndexes.NOT_FOUND);
-        target.npc().setSpawnRoleIndex(AssetMapWithIndexes.NOT_FOUND);
+        CompanionSpawnAuthorityService.detach(target.reference(), store);
     }
 
     private void applyAuxiliaryState(
@@ -391,22 +384,6 @@ final class HytaleCaptureTameTargetGateway {
             );
         }
         return roleId.trim();
-    }
-
-    private <T extends Component<EntityStore>> boolean present(
-            Ref<EntityStore> reference,
-            ComponentType<EntityStore, T> type
-    ) {
-        return type != null && store.getComponent(reference, type) != null;
-    }
-
-    private <T extends Component<EntityStore>> void removeIfPresent(
-            Ref<EntityStore> reference,
-            ComponentType<EntityStore, T> type
-    ) {
-        if (present(reference, type)) {
-            store.tryRemoveComponent(reference, type);
-        }
     }
 
     @Nullable
