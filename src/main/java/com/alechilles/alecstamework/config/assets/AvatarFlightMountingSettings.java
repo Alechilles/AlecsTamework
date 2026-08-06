@@ -20,12 +20,12 @@ public final class AvatarFlightMountingSettings {
             .<Boolean>append(new KeyedCodec<>("RequireGroundedDismount", Codec.BOOLEAN),
                     (settings, value) -> settings.requireGroundedDismount = value == null || value,
                     settings -> settings.requireGroundedDismount)
-            .documentation("Whether voluntary dismount requires the avatar to be grounded. Inheritance: missing nested key inherits parent value.")
+            .documentation("Whether the back+crouch dismount gesture requires the avatar to be grounded. The explicit dismount key remains available while airborne. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Boolean>append(new KeyedCodec<>("RestoreNpcAtLastSafeGround", Codec.BOOLEAN),
                     (settings, value) -> settings.restoreNpcAtLastSafeGround = value == null || value,
                     settings -> settings.restoreNpcAtLastSafeGround)
-            .documentation("Whether normal dismount restores the source NPC at the most recent grounded avatar position. Inheritance: missing nested key inherits parent value.")
+            .documentation("Whether grounded normal dismount restores the source NPC at the most recent safe-ground position. Airborne normal dismount restores it at the current flight position. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("PlayerDismountOffset", Codec.DOUBLE),
                     (settings, value) -> settings.playerDismountOffset = nonNegative(value, 1.75),

@@ -101,8 +101,10 @@ public final class AvatarFlightMountLifecycleService {
             return Result.ok("Avatar-flight mount cleanup already in progress.");
         }
         session.setPhase(AvatarFlightMountPhase.RESTORING);
+        AvatarFlightRestorationPolicy.Position restoration = selectRestorationPosition(
+                store, playerRef, session, reason);
         AvatarFlightActivator.Result disabled = activator.disable(store, playerRef, playerUuid);
-        restoreSourceAndPlacePlayer(store, playerRef, session, reason);
+        restoreSourceAndPlacePlayer(store, playerRef, session, restoration);
         store.tryRemoveComponent(playerRef, sessionType);
         log(reason == EndReason.NORMAL ? Level.INFO : Level.WARNING, "ended", session, reason);
         if (disabled.ok()) {
@@ -162,30 +164,58 @@ public final class AvatarFlightMountLifecycleService {
     private void restoreSourceAndPlacePlayer(Store<EntityStore> store,
                                              Ref<EntityStore> playerRef,
                                              AvatarFlightMountSessionComponent session,
-                                             EndReason reason) {
+                                             AvatarFlightRestorationPolicy.Position restoration) {
         Ref<EntityStore> sourceRef = resolve(store, session.getSourceNpcUuid());
         TwAvatarFlightConfig config = TwAvatarFlightConfig.resolve(session.getConfigId());
         AvatarFlightMountingSettings settings = config == null
                 ? new AvatarFlightMountingSettings()
                 : config.getMounting();
-        boolean useLastSafe = reason == EndReason.NORMAL
-                && settings.isRestoreNpcAtLastSafeGround()
-                && session.isLastSafeGroundValid();
-        double x = useLastSafe ? session.getLastSafeGroundX() : session.getOriginX();
-        double y = useLastSafe ? session.getLastSafeGroundY() : session.getOriginY();
-        double z = useLastSafe ? session.getLastSafeGroundZ() : session.getOriginZ();
-        float yaw = useLastSafe ? session.getLastSafeGroundYaw() : session.getOriginYaw();
         if (sourceRef != null && sourceRef.isValid()) {
             ComponentType<EntityStore, AvatarFlightSourceComponent> sourceType =
                     AvatarFlightSourceComponent.getComponentType();
             AvatarFlightSourceComponent source = sourceType == null ? null : store.getComponent(sourceRef, sourceType);
             if (source != null) {
                 source.setPhase(AvatarFlightMountPhase.RESTORING);
-                parking.restore(store, sourceRef, source, x, y, z, yaw);
+                parking.restore(store, sourceRef, source,
+                        restoration.x(), restoration.y(), restoration.z(), restoration.yaw());
                 store.tryRemoveComponent(sourceRef, sourceType);
             }
         }
-        placePlayer(store, playerRef, x, y, z, yaw, settings.getPlayerDismountOffset());
+        placePlayer(store, playerRef,
+                restoration.x(), restoration.y(), restoration.z(), restoration.yaw(),
+                settings.getPlayerDismountOffset());
+    }
+
+    private AvatarFlightRestorationPolicy.Position selectRestorationPosition(
+            Store<EntityStore> store,
+            Ref<EntityStore> playerRef,
+            AvatarFlightMountSessionComponent session,
+            EndReason reason
+    ) {
+        TwAvatarFlightConfig config = TwAvatarFlightConfig.resolve(session.getConfigId());
+        AvatarFlightMountingSettings settings = config == null
+                ? new AvatarFlightMountingSettings()
+                : config.getMounting();
+        ComponentType<EntityStore, AvatarFlightInputComponent> inputType =
+                AvatarFlightInputComponent.getComponentType();
+        AvatarFlightInputComponent input = inputType == null ? null : store.getComponent(playerRef, inputType);
+        TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
+        AvatarFlightRestorationPolicy.Position current = currentPosition(transform);
+        Boolean grounded = input == null ? null : input.isOnGround();
+        return AvatarFlightRestorationPolicy.select(session, settings, reason, current, grounded);
+    }
+
+    @Nullable
+    private static AvatarFlightRestorationPolicy.Position currentPosition(@Nullable TransformComponent transform) {
+        if (transform == null || transform.getPosition() == null || transform.getRotation() == null) {
+            return null;
+        }
+        return new AvatarFlightRestorationPolicy.Position(
+                transform.getPosition().x,
+                transform.getPosition().y,
+                transform.getPosition().z,
+                transform.getRotation().yaw()
+        );
     }
 
     private static void movePlayerToSource(Store<EntityStore> store,

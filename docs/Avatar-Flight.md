@@ -32,7 +32,7 @@ On a clean disconnect, Tamework queues that cleanup on the player's world thread
 - While avatar flight is active, the lower-right ability HUD shows a complete custom row for crouch launch, forward boost, upward flap, airbrake, and any configured combat abilities. The row sits inside Hytale's right-side shortcut hints. Flightmaster's Talisman remains tool-only, active utility equipment is temporarily deselected, and hotbar selection stays locked to the talisman so weapon controls cannot replace or overlap the flight controls. The previous utility selection is restored on dismount. Combat glyph labels identify the default E/R layout; the native ability binding itself remains remappable.
 - Crouch applies direct downward movement while airborne unless it began as a grounded launch charge.
 - Entering liquid exits custom flight velocity and returns control to native swimming until the player leaves the liquid.
-- Press F to immediately dismount from an NPC-backed avatar-flight session. Grounded back + crouch remains an alternate hold-to-dismount input; the default hold is `750ms`, and back intent suppresses launch charging while the hold is active.
+- Press F to immediately dismount from an NPC-backed avatar-flight session, including while airborne. An airborne normal dismount restores the companion at the current flight position. Grounded back + crouch remains an alternate hold-to-dismount input; the default hold is `750ms`, and back intent suppresses launch charging while the hold is active.
 - Forward boost uses the configured boost input/action and spends Vigour. Q is the default reliable input path because airborne sprint is not consistently detectable.
 
 While transformed but not actively using Tamework's custom flight velocity, grounded movement-state ownership stays with the base player client. Tamework still reads packet input for launch and talisman actions and suppresses unsafe item/action overlay animation slots, but it does not rewrite grounded walk/run/sprint movement state. When custom flight ends, Tamework sends one cleanup pass for flight-owned movement and pose animation overrides, then native grounded animation selection resumes.
@@ -153,8 +153,8 @@ The camera override preserves the ModelAsset's existing yaw and pitch target set
 ### Mounting
 
 - `DismountHoldMs`: grounded back+crouch hold duration required for voluntary dismount.
-- `RequireGroundedDismount`: blocks voluntary dismount while airborne when true.
-- `RestoreNpcAtLastSafeGround`: restores the source at the most recent grounded avatar transform for a normal dismount; exceptional cleanup uses the original mount origin.
+- `RequireGroundedDismount`: blocks the back+crouch hold gesture while airborne when true. The immediate F-key dismount remains available.
+- `RestoreNpcAtLastSafeGround`: restores the source at the most recent grounded avatar transform for a grounded normal dismount. Airborne normal dismount restores at the current flight position; exceptional cleanup uses the original mount origin.
 - `PlayerDismountOffset`: distance used to place the player behind the restored NPC.
 
 Omitting `Mounting` inherits the complete parent section. An explicit `Mounting` object overrides only its explicit nested keys and inherits the remaining values.
