@@ -1,0 +1,15 @@
+{
+  "Groups": {
+    "Neutral": [
+      "Prey",
+      "PreyBig"
+    ],
+    "Ignore": [
+      "Predators",
+      "PredatorsBig"
+    ],
+    "Hostile": [
+      "Tamework_TamedCompanion"
+    ]
+  }
+}

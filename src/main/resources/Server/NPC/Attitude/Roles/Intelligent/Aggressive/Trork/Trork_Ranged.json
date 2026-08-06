@@ -1,0 +1,15 @@
+{
+  "Groups": {
+    "Hostile": [
+      "Kweebec",
+      "Birds",
+      "Tamework_TamedCompanion"
+    ],
+    "Ignore": [
+      "Kweebec_Prisoner"
+    ],
+    "Revered": [
+      "Trork_Chieftain"
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "Groups": {
+    "Hostile": [
+      "Critters",
+      "Tamework_TamedCompanion"
+    ]
+  }
+}

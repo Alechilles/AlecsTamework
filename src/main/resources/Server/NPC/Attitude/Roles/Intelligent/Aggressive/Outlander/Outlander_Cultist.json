@@ -1,0 +1,9 @@
+{
+  "Groups": {
+    "Hostile": [
+      "Birds",
+      "Deer",
+      "Tamework_TamedCompanion"
+    ]
+  }
+}

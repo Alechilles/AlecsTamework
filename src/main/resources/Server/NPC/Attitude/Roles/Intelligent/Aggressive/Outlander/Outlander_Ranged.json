@@ -1,0 +1,11 @@
+{
+  "Groups": {
+    "Hostile": [
+      "Birds",
+      "Tamework_TamedCompanion"
+    ],
+    "Revered": [
+      "Outlander_Marauder"
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "Groups": {
+    "Hostile": [
+      "Trork",
+      "Undead",
+      "Void",
+      "Tamework_TamedCompanion"
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "Groups": {
+    "Friendly": [
+      "Goblin"
+    ],
+    "Revered": [
+      "Goblin_Lobber"
+    ],
+    "Hostile": [
+      "Tamework_TamedCompanion"
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "Groups": {
+    "Hostile": [
+      "Kweebec",
+      "Birds",
+      "Deer",
+      "Tamework_TamedCompanion"
+    ],
+    "Ignore": [
+      "Kweebec_Prisoner"
+    ]
+  }
+}
