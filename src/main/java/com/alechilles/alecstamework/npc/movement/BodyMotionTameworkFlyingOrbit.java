@@ -77,6 +77,7 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
     private int orbitDirection = 1;
     private boolean hasWanderDestination;
     private double wanderRetargetRemaining;
+    private boolean returningToWanderTarget;
     private boolean hasPassThroughDestination;
 
     BodyMotionTameworkFlyingOrbit(@Nonnull BuilderBodyMotionTameworkFlyingOrbit builder,
@@ -112,6 +113,7 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
                          @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         hasWanderDestination = false;
         wanderRetargetRemaining = 0.0;
+        returningToWanderTarget = false;
         hasPassThroughDestination = false;
         obstacleAvoidance.reset();
         if (mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.CYCLE) {
@@ -130,12 +132,18 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
         MotionController active = role.getActiveMotionController();
         if (!(active instanceof MotionControllerFly fly)
                 || sensorInfo == null || !sensorInfo.getPositionProvider().providePosition(targetPosition)) {
+            returningToWanderTarget = updateWanderReturnState(
+                    returningToWanderTarget, false, 0.0,
+                    wanderRadiusRange[0], wanderRadiusRange[1]);
             obstacleAvoidance.reset();
             return true;
         }
 
         TransformComponent transform = componentAccessor.getComponent(ref, TransformComponent.getComponentType());
         if (transform == null) {
+            returningToWanderTarget = updateWanderReturnState(
+                    returningToWanderTarget, false, 0.0,
+                    wanderRadiusRange[0], wanderRadiusRange[1]);
             obstacleAvoidance.reset();
             return true;
         }
@@ -162,11 +170,23 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
             boolean wandering = mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.WANDER_TARGET;
             boolean passingThrough = mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.PASS_THROUGH_TARGET;
             if (wandering) {
-                updateWanderDestination(selfPosition, targetPosition, dt, autonomousAvoidance, fly);
-                resolveWaypointTranslation(
-                        selfPosition.x(), selfPosition.y(), selfPosition.z(),
-                        wanderDestination.x(), wanderDestination.y(), wanderDestination.z(),
-                        wanderStopDistance, relativeSpeed, translation);
+                double targetOffsetX = selfPosition.x() - targetPosition.x();
+                double targetOffsetZ = selfPosition.z() - targetPosition.z();
+                returningToWanderTarget = updateWanderReturnState(
+                        returningToWanderTarget,
+                        true,
+                        targetOffsetX * targetOffsetX + targetOffsetZ * targetOffsetZ,
+                        wanderRadiusRange[0], wanderRadiusRange[1]);
+                if (returningToWanderTarget) {
+                    hasWanderDestination = false;
+                } else {
+                    updateWanderDestination(selfPosition, targetPosition, dt, autonomousAvoidance, fly);
+                }
+                resolveWanderTranslation(
+                        returningToWanderTarget,
+                        selfPosition, targetPosition, wanderDestination,
+                        wanderRadiusRange[0], wanderStopDistance,
+                        relativeSpeed, translation);
             } else if (passingThrough) {
                 if (!hasPassThroughDestination) {
                     double altitudeOffset = randomDuration(desiredAltitudeRange[0], desiredAltitudeRange[1]);
@@ -193,7 +213,7 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
             }
 
             double altitudeCorrection = 0.0;
-            if (!wandering && !passingThrough) {
+            if (shouldApplyTargetRelativeAltitude(wandering, passingThrough, returningToWanderTarget)) {
                 altitudeCorrection = resolveTargetRelativeAltitudeCorrection(
                         selfPosition.y(), targetPosition.y(), desiredAltitudeRange,
                         climbRelativeSpeed, sinkRelativeSpeed);
@@ -414,6 +434,43 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
             }
         }
         return bestIndex;
+    }
+
+    static boolean updateWanderReturnState(boolean returning,
+                                           boolean distanceAvailable,
+                                           double horizontalDistanceSquared,
+                                           double minimumRadius,
+                                           double maximumRadius) {
+        if (!distanceAvailable) {
+            return returning;
+        }
+        double boundary = returning ? minimumRadius : maximumRadius;
+        return horizontalDistanceSquared > boundary * boundary;
+    }
+
+    static boolean shouldApplyTargetRelativeAltitude(boolean wandering,
+                                                     boolean passingThrough,
+                                                     boolean returningToWanderTarget) {
+        return !passingThrough && (!wandering || returningToWanderTarget);
+    }
+
+    static Vector3d resolveWanderTranslation(boolean returning,
+                                             @Nonnull Vector3d selfPosition,
+                                             @Nonnull Vector3d targetPosition,
+                                             @Nonnull Vector3d wanderDestination,
+                                             double minimumRadius,
+                                             double wanderStopDistance,
+                                             double speed,
+                                             @Nonnull Vector3d output) {
+        if (returning) {
+            return resolveApproachTranslation(
+                    selfPosition.x(), selfPosition.z(), targetPosition.x(), targetPosition.z(),
+                    minimumRadius, minimumRadius, speed, output);
+        }
+        return resolveWaypointTranslation(
+                selfPosition.x(), selfPosition.y(), selfPosition.z(),
+                wanderDestination.x(), wanderDestination.y(), wanderDestination.z(),
+                wanderStopDistance, speed, output);
     }
 
     static double resolveAltitudeCorrection(double currentY,
