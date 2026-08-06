@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.0.0 - Persistence Replacement and Companion Systems Overhaul - 2026-08-04
+## 3.0.0 - Persistence Replacement and Companion Systems Overhaul - Unreleased
 
 ### Added
 - Added a shared attitude target for tamed companions, letting dependent mods
@@ -27,6 +27,8 @@
 - Added data-driven timed companion summoning and storage with per-role
   durations, expiry warnings, logout policy, resummon cooldowns, and safe rider
   dismount protection when a summon expires.
+- Added configurable model effects for bonded-companion expiry warnings so
+  downstream mods can visibly signal that a timed summon is about to end.
 - Added idempotent dormant companion provisioning and activation for
   integrations such as HyDragon's bonded Miniwyvern.
 - Added exact multi-item paid revival for Dead and Lost command companions,
@@ -127,6 +129,10 @@
   cooldown in addition to their progression and movement effects.
 - Bonded summon expiry now has a configurable warning schedule and protects
   riders from unsafe dismounts while the companion is being stored.
+- Autonomous flying companions now probe their actual movement corridor before
+  committing to a route, steer around nearby trees and structures, and return
+  toward their owner or combat target when they drift beyond their configured
+  wander range.
 - Refreshed the command radial artwork and layout, including a correctly placed
   close button and consistent linked-panel controls.
 - Deepened the built-in bear roar audio so configured bear interactions carry
@@ -210,6 +216,11 @@
   input projection, equipment restoration, HUD reuse, rider/model isolation,
   animation state, and speed clamping so the final configured flight path no
   longer carries the unreleased prototype's crash-prone native-rider behavior.
+- Fixed timed companions and Avatar Flight forms losing attachment selections,
+  talent state, expiry effects, or their parked companion during role changes,
+  logout, teardown recovery, and protected dismounts.
+- Fixed successful or retired capture attempts being reconsidered by later
+  systems, and restored the owner's follow target after summoning a companion.
 
 ## 2.16.1 - Server Stability Hotfix - 2026-07-01
 
