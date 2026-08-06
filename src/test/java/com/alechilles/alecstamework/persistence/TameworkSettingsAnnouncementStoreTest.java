@@ -33,9 +33,9 @@ class TameworkSettingsAnnouncementStoreTest {
         assertTrue(announcement.enabled());
         assertEquals(TameworkSettingsAnnouncementStore.BUILT_IN_ANNOUNCEMENT_ID, announcement.announcementId());
         assertTrue(announcement.useBuiltInText());
-        assertEquals("Important Alec's Tamework Update", announcement.title());
+        assertEquals("Alec's Tamework 3.0: Persistence Rework", announcement.title());
         assertEquals(
-                "New features, settings, or updates have been added to Tamework that require your attention.",
+                "Tamework's persistence system has been completely reworked.",
                 announcement.subtitle()
         );
         assertTrue(announcement.bodyLines().size() >= 3);
@@ -107,7 +107,7 @@ class TameworkSettingsAnnouncementStoreTest {
         assertFalse(announcement.useBuiltInText());
         assertEquals("Custom Server Announcement", announcement.title());
         assertEquals(
-                "New features, settings, or updates have been added to Tamework that require your attention.",
+                "Tamework's persistence system has been completely reworked.",
                 announcement.subtitle()
         );
         assertFalse(announcement.bodyLines().isEmpty());
@@ -216,12 +216,12 @@ class TameworkSettingsAnnouncementStoreTest {
     }
 
     @Test
-    void selectAnnouncementSkipsPlayerAlreadyRecordedOnCurrentVersion() {
+    void selectAnnouncementDoesNotReplaySeenAnnouncementAfterVersionUpdate() {
         UUID playerUuid = UUID.randomUUID();
         ResolvedAnnouncement updateAnnouncement = updateAnnouncement("settings-review-v2");
         AnnouncementOptOutState state = new AnnouncementOptOutState(
                 Map.of(),
-                Map.of(playerUuid, TameworkSettingsAnnouncementStore.WELCOME_ANNOUNCEMENT_ID),
+                Map.of(playerUuid, "settings-review-v2"),
                 Map.of(playerUuid, "2.11.2")
         );
 
@@ -229,7 +229,7 @@ class TameworkSettingsAnnouncementStoreTest {
                 updateAnnouncement,
                 state,
                 playerUuid,
-                "2.11.2",
+                "3.0.2",
                 false
         );
 

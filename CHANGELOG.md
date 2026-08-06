@@ -50,6 +50,8 @@
 - Restored `/tw debugdb export` with a bounded, redacted support ZIP containing
   operational status and durable diagnostic summaries without copying player
   identities, coordinates, inventories, world saves, or the database itself.
+- Added a one-time 3.0 persistence-rework announcement with instructions for
+  collecting `/tw debugdb export` support data and reporting issues.
 - Added a config-gated `To Me` control for shoulder-riding companions. Role
   assets define standing and crouching offsets; mounted companions track the
   owner's pose, idle naturally, suspend AI, collision, and interaction, and
@@ -162,6 +164,8 @@
   separate written permission.
 
 ### Fixed
+- Fixed settings announcements replaying after every Tamework update; they now
+  reappear only when a player has not seen the current announcement.
 - Fixed fully charged Avatar Flight launches sometimes being replaced by a
   tiny second charge before the movement tick applied the launch.
 - Fixed Avatar Flight ending midair during longer flights by keeping the hidden

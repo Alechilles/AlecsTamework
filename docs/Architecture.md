@@ -104,7 +104,7 @@ This document is a high-level map of how Alec's Tamework is organized and where 
   writers, journals, recovery scanners, readiness graphs, and duplicate
   command/spawner cache authorities remain absent.
 - Runtime combat and Public API damage evaluation share one live owner-policy resolver: owner component first, then command-link owner, then persisted NPC-name owner, with role-effective protection settings.
-- Settings announcements are selected per player: no announcement/version history shows the welcome message, older recorded Tamework versions show the current update notice, and current-version history suppresses automatic notices.
+- Settings announcements are selected per player: no announcement history shows the welcome message; later notices appear once only when their announcement ID is new to that player and they are updating from an older Tamework version.
 
 ## Where to look
 - Entrypoint: `src/main/java/com/alechilles/alecstamework/Tamework.java`

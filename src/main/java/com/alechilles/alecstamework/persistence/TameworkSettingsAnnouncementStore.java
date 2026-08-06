@@ -26,7 +26,7 @@ public final class TameworkSettingsAnnouncementStore {
     public static final String ANNOUNCEMENT_FILE_NAME = "tamework-settings-announcement.json";
     public static final String ANNOUNCEMENT_STATE_FILE_NAME = "tamework-settings-announcement-state.json";
     public static final String WELCOME_ANNOUNCEMENT_ID = "welcome-v1";
-    public static final String BUILT_IN_ANNOUNCEMENT_ID = "settings-review-v2";
+    public static final String BUILT_IN_ANNOUNCEMENT_ID = "persistence-rework-v3";
     public static final String WELCOME_TITLE_KEY = "tamework.ui.settingsAnnouncement.welcome.title";
     public static final String WELCOME_SUBTITLE_KEY = "tamework.ui.settingsAnnouncement.welcome.subtitle";
     public static final String WELCOME_OPT_OUT_LABEL_KEY = "tamework.ui.settingsAnnouncement.welcome.optOut";
@@ -47,9 +47,9 @@ public final class TameworkSettingsAnnouncementStore {
     private static final int CURRENT_VERSION = 1;
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
     private static final Object STATE_LOCK = new Object();
-    private static final String DEFAULT_TITLE = "Important Alec's Tamework Update";
+    private static final String DEFAULT_TITLE = "Alec's Tamework 3.0: Persistence Rework";
     private static final String DEFAULT_SUBTITLE =
-            "New features, settings, or updates have been added to Tamework that require your attention.";
+            "Tamework's persistence system has been completely reworked.";
     private static final String DEFAULT_OPT_OUT_LABEL = "Don't show again until next announcement";
     private static final String DEFAULT_WELCOME_TITLE = "Welcome to Alec's Tamework";
     private static final String DEFAULT_WELCOME_SUBTITLE =
@@ -61,9 +61,9 @@ public final class TameworkSettingsAnnouncementStore {
             "This welcome appears the first time an eligible player uses Tamework. Future version-specific notices only appear for players who have already used Tamework on an older version."
     };
     private static final String[] DEFAULT_BODY_LINES = {
-            "As of Alec's Tamework v2.8.0+, many important settings were migrated to the \"/tw settings\" menu. If you have not checked these settings, please click \"Review Settings\" to ensure everything is set up the way you would expect for your server.",
-            "This includes things like \"Hunger/Thirst damage\" being enabled by default, and \"per-player/per-claim taming/breeding limits\" that may be vitally important to server owners.",
-            "These popups are only shown to OPs and players with the permissions to use /tw settings, and will only appear after major changes that have been deemed important enough to require your immediate attention."
+            "The new persistence system is designed to make companion data more reliable, but a major rework can still have hiccups. Please keep an eye out for unexpected companion, capture, storage, or restore behavior.",
+            "If you run into an issue, run /tw debugdb export before restarting if possible. This creates a redacted support package under Data/diagnostics.",
+            "Then create an issue in the Discord server's Issues and Bug Reports channel: https://discord.gg/uP5bNTVSze. Include your full server log and the exported package."
     };
 
     private TameworkSettingsAnnouncementStore() {
@@ -424,6 +424,12 @@ public final class TameworkSettingsAnnouncementStore {
                                                         @Nullable String currentTameworkVersion,
                                                         boolean ignoreOptOutState) {
         if (!ignoreOptOutState && !shouldShowAnnouncement(updateAnnouncement, state, playerUuid)) {
+            return false;
+        }
+        String lastShownAnnouncementId = state == null
+                ? null
+                : state.lastShownAnnouncementIdByPlayerUuid().get(playerUuid);
+        if (updateAnnouncement.announcementId().equals(lastShownAnnouncementId)) {
             return false;
         }
         String previousVersion = state == null ? null : state.lastSeenTameworkVersionByPlayerUuid().get(playerUuid);
