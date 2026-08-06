@@ -189,6 +189,7 @@ git commit -m "Refactor: consume shared aerial components"
 
 **Files:**
 - Modify: `tools/verify_flying_companions.py`
+- Modify: `Server/NPC/Roles/_Core/Templates/AH_Template_Aerial_Neutral.json`
 - Modify: `Server/NPC/Roles/_Core/Templates/AH_Template_Aerial_Tamed.json`
 - Modify: `Server/NPC/Roles/_Core/Templates/AH_Template_Dragon_Frost_Tamed.json`
 - Delete: `Server/NPC/Roles/_Core/Components/AH_Component_Tamework_Instruction_Aerial_Follow_Item.json`
