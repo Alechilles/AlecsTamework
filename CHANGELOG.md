@@ -164,6 +164,8 @@
   separate written permission.
 
 ### Fixed
+- Fixed the bonded-roster flight/ground button intermittently ignoring clicks
+  after live health, level, XP, or other card updates.
 - Fixed settings announcements replaying after every Tamework update; they now
   reappear only when a player has not seen the current announcement.
 - Fixed fully charged Avatar Flight launches sometimes being replaced by a

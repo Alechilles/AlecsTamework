@@ -103,14 +103,21 @@ class TameworkCommandSelectionPageRefreshTest {
     }
 
     @Test
-    void dynamicProgressionWritesProgressionSelectorsWithoutStableEvents() throws Exception {
+    void dynamicProgressionRefreshKeepsBondedFlightToggleClickable() throws Exception {
         CapturedPackets packets = new CapturedPackets();
-        AtomicReference<CommandPanelFeaturePresentation> feature = new AtomicReference<>(feature(4, false));
+        AtomicReference<CommandPanelFeaturePresentation> feature =
+                new AtomicReference<>(feature(4, true));
         TameworkCommandSelectionPage page = page(packets, feature);
-        build(page); feature.set(feature(5, false)); refresh(page, true);
+        build(page); feature.set(feature(5, true)); refresh(page, true);
         CapturedUpdate update = packets.updates.getFirst();
         assertCommand(update, "#TameworkLinkedPanelList[0] #BondedLevelText.Text");
-        assertEquals(0, update.events.getEvents().length);
+        assertTrue(java.util.Arrays.stream(update.events.getEvents()).anyMatch(event ->
+                        event.type == com.hypixel.hytale.protocol.packets.interface_
+                                .CustomUIEventBindingType.Activating
+                                && ("#TameworkLinkedPanelList[0] "
+                                + "#BondedFlightToggleButton").equals(event.selector)
+                                && event.data.contains("__bonded_flight_toggle__:" + CARD)),
+                "An unrelated bonded-card refresh must retain the flight-toggle click binding.");
     }
 
     @Test

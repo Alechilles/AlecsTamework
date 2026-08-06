@@ -62,13 +62,8 @@ final class LinkedNpcPanelCardDynamicPresenter {
                 commands, selector, current.bonded(), language);
         BondedCompanionCardPresenter.refreshProgressionState(
                 commands, selector, current.bonded(), pendingUnlink, language);
-        String attribute = com.alechilles.alecstamework.api
-                .BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE;
-        if (!Objects.equals(previous.bonded().attributes().get(attribute),
-                current.bonded().attributes().get(attribute))) {
-            BondedCompanionCardPresenter.bindFlightToggleEvents(
-                    events, selector, npcUuid, current.bonded(), bindingConfig);
-        }
+        BondedCompanionCardPresenter.bindFlightToggleEvents(
+                events, selector, npcUuid, current.bonded(), bindingConfig);
     }
 
     private static boolean vitalsChanged(LinkedNpcEntry previous, LinkedNpcEntry current) {
