@@ -51,13 +51,11 @@ public final class AvatarFlightSourceRecoverySystem extends EntityTickingSystem<
         AvatarFlightMountSessionComponent session = riderRef == null || !riderRef.isValid()
                 ? null : store.getComponent(riderRef, sessionType);
         boolean sourceDead = store.getComponent(sourceRef, deathType) != null;
-        boolean paired = session != null
-                && sourceUuid.getUuid().toString().equals(session.getSourceNpcUuid())
-                && AvatarFlightRuntimeEpoch.isCurrent(source.getRuntimeEpoch())
-                && AvatarFlightRuntimeEpoch.isCurrent(session.getRuntimeEpoch())
-                && session.getPhase() != AvatarFlightMountPhase.RESTORING;
+        boolean lifecycleOwned = AvatarFlightSourceRecoveryPolicy.isLifecycleOwned(
+                session, source, sourceUuid.getUuid().toString());
+        boolean activePair = lifecycleOwned && session.getPhase() != AvatarFlightMountPhase.RESTORING;
         if (sourceDead) {
-            if (paired && riderRef != null && riderRef.isValid()) {
+            if (activePair && riderRef != null && riderRef.isValid()) {
                 UUID riderUuid = parse(source.getRiderUuid());
                 if (riderUuid != null) {
                     commandBuffer.run(bufferStore -> lifecycle.end(
@@ -74,7 +72,7 @@ public final class AvatarFlightSourceRecoverySystem extends EntityTickingSystem<
             });
             return;
         }
-        if (paired) return;
+        if (lifecycleOwned) return;
         recordStaleSourceOwner(store, sourceRef, source);
         commandBuffer.run(bufferStore -> {
             if (!sourceRef.isValid()) return;

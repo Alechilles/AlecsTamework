@@ -164,6 +164,8 @@
 ### Fixed
 - Fixed Avatar Flight ending midair during longer flights by keeping the hidden
   parked companion attached to its rider instead of leaving it in the takeoff chunk.
+- Fixed Avatar Flight sometimes moving a companion back to its takeoff location
+  during or shortly after a normal dismount.
 - Fixed Avatar Flight's temporary parking role replacing a companion's real
   species, display name, or tamed state in Beast Flute persistence.
 - Fixed shared flying components using computed values for Hytale fields that
