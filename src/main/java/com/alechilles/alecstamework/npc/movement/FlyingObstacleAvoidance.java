@@ -34,6 +34,7 @@ final class FlyingObstacleAvoidance {
     private int probesThisUpdate;
     private int rememberedSide;
     private boolean avoiding;
+    private boolean blocked;
 
     @FunctionalInterface
     interface Probe {
@@ -48,6 +49,7 @@ final class FlyingObstacleAvoidance {
         probesThisUpdate = 0;
         rememberedSide = 0;
         avoiding = false;
+        blocked = false;
         heldDirection.zero();
     }
 
@@ -69,9 +71,13 @@ final class FlyingObstacleAvoidance {
         double desiredMagnitude = desired.length();
         if (!isFinite(desired) || !Double.isFinite(desiredMagnitude) || desiredMagnitude <= EPSILON) {
             avoiding = false;
+            blocked = false;
             return output.set(desired);
         }
         if (probeRemaining > 0.0) {
+            if (blocked) {
+                return output.zero();
+            }
             return avoiding
                     ? output.set(heldDirection).mul(desiredMagnitude * heldSpeedScale)
                     : output.set(desired);
@@ -84,9 +90,15 @@ final class FlyingObstacleAvoidance {
             double heldClearance = probeClearance(heldDirection, lookahead, probe);
             probeRemaining = PROBE_INTERVAL_SECONDS;
             if (heldClearance >= MIN_USEFUL_CLEARANCE) {
+                blocked = false;
                 heldSpeedScale = Math.min(1.0, heldClearance);
                 return output.set(heldDirection).mul(desiredMagnitude * heldSpeedScale);
             }
+            avoiding = false;
+            blocked = true;
+            holdRemaining = 0.0;
+            heldSpeedScale = 0.0;
+            heldDirection.zero();
             return output.zero();
         }
 
@@ -94,11 +106,27 @@ final class FlyingObstacleAvoidance {
         probeRemaining = PROBE_INTERVAL_SECONDS;
         if (primaryClearance + EPSILON >= 1.0) {
             avoiding = false;
+            blocked = false;
             heldSpeedScale = 1.0;
             return output.set(desired);
         }
 
+        if (avoiding) {
+            double heldClearance = probeClearance(heldDirection, lookahead, probe);
+            if (heldClearance >= MIN_USEFUL_CLEARANCE) {
+                blocked = false;
+                holdRemaining = HOLD_SECONDS;
+                fanCooldownRemaining = HOLD_SECONDS;
+                heldSpeedScale = Math.min(1.0, heldClearance);
+                return output.set(heldDirection).mul(desiredMagnitude * heldSpeedScale);
+            }
+            avoiding = false;
+            heldSpeedScale = 0.0;
+            heldDirection.zero();
+        }
+
         if (fanCooldownRemaining > 0.0) {
+            blocked = true;
             return output.zero();
         }
 
@@ -121,10 +149,14 @@ final class FlyingObstacleAvoidance {
         fanCooldownRemaining = HOLD_SECONDS;
         if (bestIndex < 0 || bestClearance < MIN_USEFUL_CLEARANCE) {
             avoiding = false;
+            blocked = true;
+            heldSpeedScale = 0.0;
+            heldDirection.zero();
             return output.zero();
         }
 
         avoiding = true;
+        blocked = false;
         holdRemaining = HOLD_SECONDS;
         heldDirection.set(candidates[bestIndex]);
         heldSpeedScale = Math.min(1.0, bestClearance);
@@ -181,6 +213,15 @@ final class FlyingObstacleAvoidance {
                 axisX = 0.0;
                 axisZ = 1.0;
             }
+        }
+
+        if (horizontalLength <= EPSILON) {
+            setCandidate(candidates[0], axisX, axisZ, 0.0, CLIMB_ANGLE);
+            setCandidate(candidates[1], axisX, axisZ, -SIDE_ANGLE, 0.0);
+            setCandidate(candidates[2], axisX, axisZ, SIDE_ANGLE, 0.0);
+            setCandidate(candidates[3], axisX, axisZ, -SIDE_ANGLE, DIAGONAL_CLIMB_ANGLE);
+            setCandidate(candidates[4], axisX, axisZ, SIDE_ANGLE, DIAGONAL_CLIMB_ANGLE);
+            return;
         }
 
         double basePitch = Math.asin(Math.max(-1.0, Math.min(1.0, original.y)));

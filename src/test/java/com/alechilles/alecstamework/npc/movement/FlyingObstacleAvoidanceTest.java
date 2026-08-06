@@ -119,6 +119,33 @@ class FlyingObstacleAvoidanceTest {
     }
 
     @Test
+    void fullyTrappedStopPersistsInsideCadenceWindow() {
+        FlyingObstacleAvoidance avoidance = new FlyingObstacleAvoidance();
+        avoidance.beginUpdate(0.1);
+        avoidance.adjust(
+                new Vector3d(1.0, 0.0, 0.0),
+                new Vector3d(1.0, 0.0, 0.0),
+                12.0,
+                0.0,
+                direction -> direction.length() * 0.2,
+                new Vector3d());
+
+        avoidance.beginUpdate(0.05);
+        Vector3d result = avoidance.adjust(
+                new Vector3d(1.0, 0.0, 0.0),
+                new Vector3d(1.0, 0.0, 0.0),
+                12.0,
+                0.0,
+                direction -> {
+                    throw new AssertionError("blocked cadence tick must not probe");
+                },
+                new Vector3d());
+
+        assertEquals(0.0, result.lengthSquared(), EPSILON);
+        assertEquals(0, avoidance.getProbesThisUpdate());
+    }
+
+    @Test
     void descendingObstacleUsesLevelOrUpwardAlternative() {
         FlyingObstacleAvoidance avoidance = new FlyingObstacleAvoidance();
         avoidance.beginUpdate(0.1);
@@ -161,6 +188,87 @@ class FlyingObstacleAvoidanceTest {
 
         assertTrue(held.z > 0.0);
         assertEquals(0, avoidance.getProbesThisUpdate());
+    }
+
+    @Test
+    void heldRouteClosureRemainsStoppedInsideNextCadenceWindow() {
+        FlyingObstacleAvoidance avoidance = new FlyingObstacleAvoidance();
+        avoidance.beginUpdate(0.1);
+        avoidance.adjust(
+                new Vector3d(1.0, 0.0, 0.0),
+                new Vector3d(1.0, 0.0, 0.0),
+                12.0,
+                0.0,
+                direction -> direction.z > 0.0 && direction.y == 0.0
+                        ? direction.length() : 0.0,
+                new Vector3d());
+
+        avoidance.beginUpdate(FlyingObstacleAvoidance.PROBE_INTERVAL_SECONDS);
+        Vector3d stopped = avoidance.adjust(
+                new Vector3d(1.0, 0.0, 0.0),
+                new Vector3d(1.0, 0.0, 0.0),
+                12.0,
+                0.0,
+                direction -> 0.0,
+                new Vector3d());
+        assertEquals(0.0, stopped.lengthSquared(), EPSILON);
+
+        avoidance.beginUpdate(0.05);
+        Vector3d stillStopped = avoidance.adjust(
+                new Vector3d(1.0, 0.0, 0.0),
+                new Vector3d(1.0, 0.0, 0.0),
+                12.0,
+                0.0,
+                direction -> {
+                    throw new AssertionError("known-blocked held route must not resume");
+                },
+                new Vector3d());
+        assertEquals(0.0, stillStopped.lengthSquared(), EPSILON);
+    }
+
+    @Test
+    void clearHeldRouteExtendsHoldWithOnlyTwoProbes() {
+        FlyingObstacleAvoidance avoidance = new FlyingObstacleAvoidance();
+        avoidance.beginUpdate(0.1);
+        avoidance.adjust(
+                new Vector3d(1.0, 0.0, 0.0),
+                new Vector3d(1.0, 0.0, 0.0),
+                12.0,
+                0.0,
+                direction -> direction.z > 0.0 && direction.y == 0.0
+                        ? direction.length() : 0.0,
+                new Vector3d());
+
+        avoidance.beginUpdate(FlyingObstacleAvoidance.HOLD_SECONDS);
+        Vector3d result = avoidance.adjust(
+                new Vector3d(1.0, 0.0, 0.0),
+                new Vector3d(1.0, 0.0, 0.0),
+                12.0,
+                0.0,
+                direction -> direction.z > 0.0 && direction.y == 0.0
+                        ? direction.length() : 0.0,
+                new Vector3d());
+
+        assertTrue(result.z > 0.0);
+        assertEquals(2, avoidance.getProbesThisUpdate());
+    }
+
+    @Test
+    void upwardCeilingCanChooseLevelLateralEscape() {
+        FlyingObstacleAvoidance avoidance = new FlyingObstacleAvoidance();
+        avoidance.beginUpdate(0.1);
+
+        Vector3d result = avoidance.adjust(
+                new Vector3d(0.0, 1.0, 0.0),
+                new Vector3d(1.0, 0.0, 0.0),
+                12.0,
+                0.0,
+                direction -> Math.abs(direction.y) < EPSILON
+                        ? direction.length() : 0.0,
+                new Vector3d());
+
+        assertTrue(Math.hypot(result.x, result.z) > 0.0);
+        assertEquals(0.0, result.y, EPSILON);
     }
 
     @Test

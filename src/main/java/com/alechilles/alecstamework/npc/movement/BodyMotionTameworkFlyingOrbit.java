@@ -130,11 +130,13 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
         MotionController active = role.getActiveMotionController();
         if (!(active instanceof MotionControllerFly fly)
                 || sensorInfo == null || !sensorInfo.getPositionProvider().providePosition(targetPosition)) {
+            obstacleAvoidance.reset();
             return true;
         }
 
         TransformComponent transform = componentAccessor.getComponent(ref, TransformComponent.getComponentType());
         if (transform == null) {
+            obstacleAvoidance.reset();
             return true;
         }
 
