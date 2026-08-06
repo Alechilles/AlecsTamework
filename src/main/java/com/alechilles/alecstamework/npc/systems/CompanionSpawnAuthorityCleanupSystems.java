@@ -13,6 +13,9 @@ import com.hypixel.hytale.component.system.RefSystem;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.spawning.spawnmarkers.SpawnMarkerEntity;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.function.Predicate;
 import javax.annotation.Nonnull;
 
 /** Load-time repair systems for both sides of companion spawn authority. */
@@ -82,14 +85,19 @@ public final class CompanionSpawnAuthorityCleanupSystems {
     public static final class Marker extends RefSystem<EntityStore> {
         private final ComponentType<EntityStore, SpawnMarkerEntity> markerType;
         private final ComponentType<EntityStore, TameworkTamedComponent> tamedType;
+        private final Predicate<UUID> projectedTamedLookup;
         private final Query<EntityStore> query;
 
         public Marker(
                 ComponentType<EntityStore, SpawnMarkerEntity> markerType,
-                ComponentType<EntityStore, TameworkTamedComponent> tamedType
+                ComponentType<EntityStore, TameworkTamedComponent> tamedType,
+                Predicate<UUID> projectedTamedLookup
         ) {
             this.markerType = markerType;
             this.tamedType = tamedType;
+            this.projectedTamedLookup = Objects.requireNonNull(
+                    projectedTamedLookup, "projectedTamedLookup"
+            );
             this.query = Query.and(markerType);
         }
 
@@ -103,7 +111,11 @@ public final class CompanionSpawnAuthorityCleanupSystems {
             commandBuffer.run(bufferStore -> {
                 if (reference.isValid()) {
                     CompanionSpawnAuthorityService.detachLoadedTamedMembers(
-                            reference, bufferStore, markerType, tamedType
+                            reference,
+                            bufferStore,
+                            markerType,
+                            tamedType,
+                            projectedTamedLookup
                     );
                 }
             });

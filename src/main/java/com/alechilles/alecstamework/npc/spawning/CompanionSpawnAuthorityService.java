@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Predicate;
 import javax.annotation.Nullable;
 
 /**
@@ -64,10 +65,12 @@ public final class CompanionSpawnAuthorityService {
             Ref<EntityStore> markerRef,
             Store<EntityStore> store,
             ComponentType<EntityStore, SpawnMarkerEntity> markerType,
-            ComponentType<EntityStore, TameworkTamedComponent> tamedType
+            ComponentType<EntityStore, TameworkTamedComponent> tamedType,
+            Predicate<UUID> projectedTamedLookup
     ) {
         if (markerRef == null || !markerRef.isValid() || store == null
-                || markerType == null || tamedType == null) {
+                || markerType == null || tamedType == null
+                || projectedTamedLookup == null) {
             return 0;
         }
         SpawnMarkerEntity marker = store.getComponent(markerRef, markerType);
@@ -78,23 +81,28 @@ public final class CompanionSpawnAuthorityService {
         if (references == null || references.length == 0) {
             return 0;
         }
-        List<LoadedMember> tamedMembers = new ArrayList<>();
+        List<MarkerMember> tamedMembers = new ArrayList<>();
         for (InvalidatablePersistentRef member : references.clone()) {
             if (member == null) {
                 continue;
             }
+            UUID memberUuid = member.getUuid();
             Ref<EntityStore> npcRef = member.getEntity(store);
             TameworkTamedComponent tamed = npcRef == null || !npcRef.isValid()
                     ? null
                     : store.getComponent(npcRef, tamedType);
-            if (tamed == null || !tamed.isTamed()) {
+            boolean loadedTamed = tamed != null && tamed.isTamed();
+            if (!loadedTamed
+                    && !isProjectedTamed(memberUuid, projectedTamedLookup)) {
                 continue;
             }
-            tamedMembers.add(new LoadedMember(npcRef, member.getUuid()));
+            tamedMembers.add(new MarkerMember(npcRef, memberUuid));
         }
         int detached = 0;
-        for (LoadedMember member : tamedMembers) {
-            boolean changed = detach(member.reference(), store);
+        for (MarkerMember member : tamedMembers) {
+            boolean changed = member.reference() != null
+                    && member.reference().isValid()
+                    && detach(member.reference(), store);
             if (containsMarkerMember(marker, member.uuid())) {
                 removeMarkerMember(marker, member.uuid());
                 markMarkerDirty(markerRef, store);
@@ -108,6 +116,20 @@ public final class CompanionSpawnAuthorityService {
             prepareRespawnIfEmpty(marker, store);
         }
         return detached;
+    }
+
+    private static boolean isProjectedTamed(
+            @Nullable UUID npcUuid,
+            Predicate<UUID> projectedTamedLookup
+    ) {
+        if (npcUuid == null) {
+            return false;
+        }
+        try {
+            return projectedTamedLookup.test(npcUuid);
+        } catch (RuntimeException failure) {
+            return false;
+        }
     }
 
     static int removeMarkerMember(SpawnMarkerEntity marker, UUID npcUuid) {
@@ -244,23 +266,21 @@ public final class CompanionSpawnAuthorityService {
             SpawnMarkerEntity marker,
             Store<EntityStore> store
     ) {
-        if (marker.getSpawnCount() > 0) {
+        if (marker.getSpawnCount() > 0 || marker.getCachedMarker() == null
+                || marker.getCachedMarker().isRealtimeRespawn()) {
             return;
         }
-        if (marker.getCachedMarker() != null
-                && !marker.getCachedMarker().isRealtimeRespawn()) {
-            try {
-                Instant spawnAfter = store.getResource(
-                        WorldTimeResource.getResourceType()
-                ).getGameTime();
-                Duration delay = marker.pollGameTimeRespawn();
-                if (delay != null) {
-                    spawnAfter = spawnAfter.plus(delay);
-                }
-                marker.setSpawnAfter(spawnAfter);
-            } catch (RuntimeException | LinkageError ignored) {
-                // Marker initialization will retain its existing respawn state.
+        try {
+            Instant spawnAfter = store.getResource(
+                    WorldTimeResource.getResourceType()
+            ).getGameTime();
+            Duration delay = marker.pollGameTimeRespawn();
+            if (delay != null) {
+                spawnAfter = spawnAfter.plus(delay);
             }
+            marker.setSpawnAfter(spawnAfter);
+        } catch (RuntimeException | LinkageError ignored) {
+            // Marker initialization will retain its existing respawn state.
         }
         marker.setNpcReferences(null);
         StoredFlock storedFlock = marker.getStoredFlock();
@@ -340,7 +360,10 @@ public final class CompanionSpawnAuthorityService {
         ComponentType<EntityStore, T> get();
     }
 
-    private record LoadedMember(Ref<EntityStore> reference, UUID uuid) {
+    private record MarkerMember(
+            @Nullable Ref<EntityStore> reference,
+            UUID uuid
+    ) {
     }
 
     private record Types(

@@ -20,6 +20,7 @@ import com.alechilles.alecstamework.api.internal.ReplacementTameworkApiFactory;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import com.alechilles.alecstamework.api.internal.TraitEffectRegistry;
 import com.alechilles.alecstamework.api.internal.TraitEffectRuntime;
+import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.assets.TameworkAssetEditorPackService;
 import com.alechilles.alecstamework.integration.patchwork.TameworkPatchworkRuntime;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightComponent;
@@ -907,7 +908,9 @@ public class Tamework extends JavaPlugin {
         if (spawnMarkerEntityType != null) {
             getEntityStoreRegistry().registerSystem(
                     new CompanionSpawnAuthorityCleanupSystems.Marker(
-                            spawnMarkerEntityType, tamedComponentType
+                            spawnMarkerEntityType,
+                            tamedComponentType,
+                            this::isProjectedTamedCompanion
                     )
             );
         }
@@ -1665,6 +1668,19 @@ public class Tamework extends JavaPlugin {
 
     public static Tamework getInstance() {
         return instance;
+    }
+
+    private boolean isProjectedTamedCompanion(UUID npcUuid) {
+        TameworkPersistenceComposition persistence = persistenceComposition;
+        if (persistence == null || npcUuid == null) {
+            return false;
+        }
+        return persistence.facades().queries()
+                .projectedProfile(new NpcAlias(npcUuid))
+                .filter(profile -> profile.tamed()
+                        && profile.currentAlias() != null
+                        && npcUuid.equals(profile.currentAlias().value()))
+                .isPresent();
     }
 
     public TranslationRegistry getTranslationRegistry() {
