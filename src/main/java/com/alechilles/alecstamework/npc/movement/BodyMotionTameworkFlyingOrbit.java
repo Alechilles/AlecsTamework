@@ -28,7 +28,8 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
     private static final double RADIAL_CORRECTION_WEIGHT = 0.85;
     private static final double WANDER_ENVELOPE_RADIUS_MULTIPLIER = 1.75;
     private static final double WANDER_ENVELOPE_ALTITUDE_MARGIN = 8.0;
-    private static final int WANDER_CANDIDATE_LIMIT = 3;
+    private static final int WAYPOINT_CANDIDATE_LIMIT = 3;
+    private static final double PASS_THROUGH_LANE_ANGLE = Math.toRadians(30.0);
 
     private final BuilderBodyMotionTameworkFlyingOrbit.Mode mode;
     private final double orbitRadius;
@@ -59,10 +60,11 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
     private final Vector3d passThroughDestination = new Vector3d();
     private final Vector3d translation = new Vector3d();
     private final Vector3d facingDirection = new Vector3d();
-    private final Vector3d[] wanderCandidates = {
+    private final Vector3d[] waypointCandidates = {
             new Vector3d(), new Vector3d(), new Vector3d()
     };
-    private final double[] wanderClearances = new double[WANDER_CANDIDATE_LIMIT];
+    private final double[] waypointClearances = new double[WAYPOINT_CANDIDATE_LIMIT];
+    private final WaypointPreflightGate wanderPreflightGate = new WaypointPreflightGate();
     private final FlyingObstacleAvoidance.Probe obstacleProbe = this::probeObstacle;
 
     @Nullable
@@ -114,6 +116,7 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
         hasWanderDestination = false;
         wanderRetargetRemaining = 0.0;
         returningToWanderTarget = false;
+        wanderPreflightGate.reset();
         hasPassThroughDestination = false;
         obstacleAvoidance.reset();
         if (mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.CYCLE) {
@@ -169,6 +172,7 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
             boolean facingTarget = facesTarget(mode, phase);
             boolean wandering = mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.WANDER_TARGET;
             boolean passingThrough = mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.PASS_THROUGH_TARGET;
+            boolean deferWaypointMovement = false;
             if (wandering) {
                 double targetOffsetX = selfPosition.x() - targetPosition.x();
                 double targetOffsetZ = selfPosition.z() - targetPosition.z();
@@ -179,8 +183,14 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
                         wanderRadiusRange[0], wanderRadiusRange[1]);
                 if (returningToWanderTarget) {
                     hasWanderDestination = false;
-                } else {
-                    updateWanderDestination(selfPosition, targetPosition, dt, autonomousAvoidance, fly);
+                    wanderPreflightGate.reset();
+                } else if (!wanderPreflightGate.consumeMovementPending()) {
+                    boolean preflighted = updateWanderDestination(
+                            selfPosition, targetPosition, dt, autonomousAvoidance, fly);
+                    if (preflighted) {
+                        wanderPreflightGate.markPreflighted();
+                        deferWaypointMovement = true;
+                    }
                 }
                 resolveWanderTranslation(
                         returningToWanderTarget,
@@ -190,10 +200,19 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
             } else if (passingThrough) {
                 if (!hasPassThroughDestination) {
                     double altitudeOffset = randomDuration(desiredAltitudeRange[0], desiredAltitudeRange[1]);
-                    resolvePassThroughDestination(
+                    resolvePassThroughCandidates(
                             selfPosition.x(), selfPosition.z(),
                             targetPosition.x(), targetPosition.y(), targetPosition.z(),
-                            passThroughDistance, altitudeOffset, passThroughDestination);
+                            passThroughDistance, altitudeOffset, waypointCandidates);
+                    passThroughDestination.set(waypointCandidates[0]);
+                    if (autonomousAvoidance) {
+                        int candidateCount = probeWaypointCandidates(
+                                selfPosition, waypointCandidates, WAYPOINT_CANDIDATE_LIMIT, fly);
+                        selectWaypointDestination(
+                                waypointCandidates, waypointClearances,
+                                candidateCount, passThroughDestination);
+                        deferWaypointMovement = true;
+                    }
                     hasPassThroughDestination = true;
                 }
                 resolveWaypointTranslation(
@@ -219,6 +238,8 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
                         climbRelativeSpeed, sinkRelativeSpeed);
                 translation.y = altitudeCorrection;
             }
+
+            deferPreflightedWaypointMovement(deferWaypointMovement, translation);
 
             if (shouldApplyObstacleAvoidance(
                     avoidObstacles, tameworkRide, nativeMount, translation)) {
@@ -256,11 +277,11 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
         }
     }
 
-    private void updateWanderDestination(@Nonnull Vector3d selfPosition,
-                                         @Nonnull Vector3d currentTargetPosition,
-                                         double dt,
-                                         boolean preflight,
-                                         @Nonnull MotionControllerFly fly) {
+    private boolean updateWanderDestination(@Nonnull Vector3d selfPosition,
+                                            @Nonnull Vector3d currentTargetPosition,
+                                            double dt,
+                                            boolean preflight,
+                                            @Nonnull MotionControllerFly fly) {
         wanderRetargetRemaining -= Math.max(0.0, dt);
         boolean reachedDestination = selfPosition.distanceSquared(wanderDestination)
                 <= wanderStopDistance * wanderStopDistance;
@@ -270,42 +291,53 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
                 wanderRadiusRange, desiredAltitudeRange);
         if (!hasWanderDestination || wanderRetargetRemaining <= 0.0
                 || reachedDestination || outsideSafetyEnvelope) {
-            chooseWanderDestination(selfPosition, currentTargetPosition, preflight, fly);
+            return chooseWanderDestination(selfPosition, currentTargetPosition, preflight, fly);
         }
+        return false;
     }
 
-    private void chooseWanderDestination(@Nonnull Vector3d selfPosition,
-                                         @Nonnull Vector3d currentTargetPosition,
-                                         boolean preflight,
-                                         @Nonnull MotionControllerFly fly) {
+    private boolean chooseWanderDestination(@Nonnull Vector3d selfPosition,
+                                            @Nonnull Vector3d currentTargetPosition,
+                                            boolean preflight,
+                                            @Nonnull MotionControllerFly fly) {
         if (!preflight) {
             generateWanderCandidate(currentTargetPosition, wanderDestination);
         } else {
-            int candidateCount = 0;
-            for (int i = 0; i < WANDER_CANDIDATE_LIMIT; i++) {
-                Vector3d candidate = wanderCandidates[i];
+            for (Vector3d candidate : waypointCandidates) {
                 generateWanderCandidate(currentTargetPosition, candidate);
-                waypointRoute.set(candidate).sub(selfPosition);
-                double clearance = obstacleAvoidance.probeWaypoint(
-                        waypointRoute,
-                        fly.getMaximumSpeed(),
-                        fly.getCurrentTurnRadius(),
-                        obstacleProbe);
-                wanderClearances[i] = clearance;
-                candidateCount++;
-                if (clearance >= 1.0) {
-                    break;
-                }
             }
-            int selected = selectWanderCandidate(wanderClearances, candidateCount);
-            if (selected >= 0) {
-                wanderDestination.set(wanderCandidates[selected]);
-            } else {
+            int candidateCount = probeWaypointCandidates(
+                    selfPosition, waypointCandidates, WAYPOINT_CANDIDATE_LIMIT, fly);
+            if (selectWaypointDestination(
+                    waypointCandidates, waypointClearances, candidateCount, wanderDestination) == null) {
                 generateWanderCandidate(currentTargetPosition, wanderDestination);
             }
         }
         wanderRetargetRemaining = randomDuration(wanderRetargetTimeRange[0], wanderRetargetTimeRange[1]);
         hasWanderDestination = true;
+        return preflight;
+    }
+
+    private int probeWaypointCandidates(@Nonnull Vector3d selfPosition,
+                                        @Nonnull Vector3d[] candidates,
+                                        int candidateCount,
+                                        @Nonnull MotionControllerFly fly) {
+        int limit = Math.min(candidateCount, candidates.length);
+        int probed = 0;
+        for (int i = 0; i < limit; i++) {
+            waypointRoute.set(candidates[i]).sub(selfPosition);
+            double clearance = obstacleAvoidance.probeWaypoint(
+                    waypointRoute,
+                    fly.getMaximumSpeed(),
+                    fly.getCurrentTurnRadius(),
+                    obstacleProbe);
+            waypointClearances[i] = clearance;
+            probed++;
+            if (clearance >= 1.0) {
+                break;
+            }
+        }
+        return probed;
     }
 
     private void generateWanderCandidate(@Nonnull Vector3d currentTargetPosition,
@@ -419,7 +451,7 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
                 && desiredTranslation.lengthSquared() > MIN_DIRECTION_LENGTH * MIN_DIRECTION_LENGTH;
     }
 
-    static int selectWanderCandidate(@Nonnull double[] clearanceFractions, int candidateCount) {
+    static int selectWaypointCandidate(@Nonnull double[] clearanceFractions, int candidateCount) {
         int limit = Math.min(Math.max(0, candidateCount), clearanceFractions.length);
         int bestIndex = -1;
         double bestClearance = -1.0;
@@ -434,6 +466,23 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
             }
         }
         return bestIndex;
+    }
+
+    @Nullable
+    static Vector3d selectWaypointDestination(@Nonnull Vector3d[] candidates,
+                                              @Nonnull double[] clearances,
+                                              int candidateCount,
+                                              @Nonnull Vector3d output) {
+        int selected = selectWaypointCandidate(clearances, candidateCount);
+        return selected >= 0 && selected < candidates.length
+                ? output.set(candidates[selected]) : null;
+    }
+
+    static void deferPreflightedWaypointMovement(boolean preflighted,
+                                                 @Nonnull Vector3d translation) {
+        if (preflighted) {
+            translation.zero();
+        }
     }
 
     static boolean updateWanderReturnState(boolean returning,
@@ -549,6 +598,39 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
                                                   double passThroughDistance,
                                                   double altitudeOffset,
                                                   @Nonnull Vector3d output) {
+        return resolvePassThroughCandidate(
+                selfX, selfZ, targetX, targetY, targetZ,
+                passThroughDistance, altitudeOffset, 0.0, output);
+    }
+
+    static void resolvePassThroughCandidates(double selfX,
+                                             double selfZ,
+                                             double targetX,
+                                             double targetY,
+                                             double targetZ,
+                                             double passThroughDistance,
+                                             double altitudeOffset,
+                                             @Nonnull Vector3d[] output) {
+        resolvePassThroughCandidate(
+                selfX, selfZ, targetX, targetY, targetZ,
+                passThroughDistance, altitudeOffset, 0.0, output[0]);
+        resolvePassThroughCandidate(
+                selfX, selfZ, targetX, targetY, targetZ,
+                passThroughDistance, altitudeOffset, -PASS_THROUGH_LANE_ANGLE, output[1]);
+        resolvePassThroughCandidate(
+                selfX, selfZ, targetX, targetY, targetZ,
+                passThroughDistance, altitudeOffset, PASS_THROUGH_LANE_ANGLE, output[2]);
+    }
+
+    private static Vector3d resolvePassThroughCandidate(double selfX,
+                                                        double selfZ,
+                                                        double targetX,
+                                                        double targetY,
+                                                        double targetZ,
+                                                        double passThroughDistance,
+                                                        double altitudeOffset,
+                                                        double laneAngle,
+                                                        @Nonnull Vector3d output) {
         double directionX = targetX - selfX;
         double directionZ = targetZ - selfZ;
         double directionLength = Math.sqrt(directionX * directionX + directionZ * directionZ);
@@ -559,10 +641,14 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
             directionX /= directionLength;
             directionZ /= directionLength;
         }
+        double angleCos = Math.cos(laneAngle);
+        double angleSin = Math.sin(laneAngle);
+        double laneX = directionX * angleCos - directionZ * angleSin;
+        double laneZ = directionX * angleSin + directionZ * angleCos;
         return output.set(
-                targetX + directionX * passThroughDistance,
+                targetX + laneX * passThroughDistance,
                 targetY + altitudeOffset,
-                targetZ + directionZ * passThroughDistance);
+                targetZ + laneZ * passThroughDistance);
     }
 
     static Vector3d resolveWaypointTranslation(double selfX,
@@ -633,6 +719,24 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
 
     private static double clamp(double value, double min, double max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    static final class WaypointPreflightGate {
+        private boolean movementPending;
+
+        void markPreflighted() {
+            movementPending = true;
+        }
+
+        boolean consumeMovementPending() {
+            boolean pending = movementPending;
+            movementPending = false;
+            return pending;
+        }
+
+        void reset() {
+            movementPending = false;
+        }
     }
 
     enum Phase {

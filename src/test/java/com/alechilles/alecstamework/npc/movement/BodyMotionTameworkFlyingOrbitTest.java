@@ -259,6 +259,55 @@ class BodyMotionTameworkFlyingOrbitTest {
     }
 
     @Test
+    void passThroughPreflightSelectsClearAlternateLane() {
+        Vector3d[] candidates = {
+                new Vector3d(18.0, 13.0, 0.0),
+                new Vector3d(15.6, 13.0, -9.0),
+                new Vector3d(15.6, 13.0, 9.0)
+        };
+
+        Vector3d selected = BodyMotionTameworkFlyingOrbit.selectWaypointDestination(
+                candidates, new double[] { 0.2, 1.0, 0.7 }, 3, new Vector3d());
+
+        assertEquals(candidates[1], selected);
+    }
+
+    @Test
+    void passThroughCandidatesPreserveConfiguredDistanceAcrossAlternateLanes() {
+        Vector3d[] candidates = { new Vector3d(), new Vector3d(), new Vector3d() };
+
+        BodyMotionTameworkFlyingOrbit.resolvePassThroughCandidates(
+                -8.0, 0.0, 0.0, 10.0, 0.0, 18.0, 3.0, candidates);
+
+        for (Vector3d candidate : candidates) {
+            assertEquals(18.0, Math.hypot(candidate.x, candidate.z), EPSILON);
+            assertEquals(13.0, candidate.y, EPSILON);
+        }
+        assertTrue(candidates[1].z < 0.0);
+        assertTrue(candidates[2].z > 0.0);
+    }
+
+    @Test
+    void preflightTickDefersWaypointMovementForAFullLiveAvoidanceBudget() {
+        Vector3d translation = new Vector3d(0.8, 0.2, -0.4);
+
+        BodyMotionTameworkFlyingOrbit.deferPreflightedWaypointMovement(true, translation);
+
+        assertEquals(0.0, translation.lengthSquared(), EPSILON);
+    }
+
+    @Test
+    void wanderPreflightGuaranteesOneMovementTickBeforeAnotherRetarget() {
+        BodyMotionTameworkFlyingOrbit.WaypointPreflightGate gate =
+                new BodyMotionTameworkFlyingOrbit.WaypointPreflightGate();
+
+        gate.markPreflighted();
+
+        assertTrue(gate.consumeMovementPending());
+        assertFalse(gate.consumeMovementPending());
+    }
+
+    @Test
     void anyMountedComponentDisablesAvoidance() {
         assertTrue(BodyMotionTameworkFlyingOrbit.isRiderControlled(
                 new TameworkRideMountComponent(), null));
@@ -281,13 +330,13 @@ class BodyMotionTameworkFlyingOrbitTest {
 
     @Test
     void wanderCandidateSelectsFirstClearCorridor() {
-        assertEquals(1, BodyMotionTameworkFlyingOrbit.selectWanderCandidate(
+        assertEquals(1, BodyMotionTameworkFlyingOrbit.selectWaypointCandidate(
                 new double[] { 0.0, 1.0, 0.0 }, 2));
     }
 
     @Test
     void wanderCandidateFallsBackToGreatestPartialClearance() {
-        assertEquals(1, BodyMotionTameworkFlyingOrbit.selectWanderCandidate(
+        assertEquals(1, BodyMotionTameworkFlyingOrbit.selectWaypointCandidate(
                 new double[] { 0.4, 0.7, 0.6 }, 3));
     }
 }
