@@ -123,6 +123,7 @@ git commit -m "Feat: publish shared aerial components"
 - Modify: `scripts/validate_assets.py`
 - Modify: `scripts/tests/test_validate_assets.py`
 - Modify: `src/main/resources/Server/NPC/Roles/Creature/HyDragon/Templates/Template_HyDragon_Dragon_Tamed.json`
+- Modify: `src/main/resources/Server/NPC/Roles/Creature/HyDragon/Templates/Template_Wyvern_Mini_Flying_Tamed.json`
 - Delete: `src/main/resources/Server/NPC/Roles/Creature/HyDragon/Components/Component_HyDragon_Instruction_Airborne_Mode_Transition.json`
 - Delete: `src/main/resources/Server/NPC/Roles/Creature/HyDragon/Components/Component_Tamework_Instruction_Hold_Flying.json`
 - Modify: `CHANGELOG.md`
@@ -156,9 +157,10 @@ Expected: failure because the validator function or migrated wiring is absent.
 
 - [ ] **Step 3: Rewire and remove local copies**
 
-Replace the local airborne transition reference with the Tamework component and
-the exact `Modify` values above. Preserve all numeric landing defaults. Delete
-both local files; do not wire the orphaned flying Hold into active roles.
+Replace both active local airborne transition references with the Tamework
+component and the exact `Modify` values above. Preserve all numeric landing
+defaults. Delete both local files; do not wire the orphaned flying Hold into
+active roles.
 
 - [ ] **Step 4: Verify GREEN**
 
