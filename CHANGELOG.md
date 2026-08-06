@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.0.1 - Linked Patchwork Asset-Pack Hotfix - Unreleased
+## 3.0.2 - Linked Patchwork Asset-Pack Hotfix - Unreleased
 
 ### Added
 - Added a shared attitude target for tamed companions, letting dependent mods
