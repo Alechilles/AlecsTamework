@@ -168,7 +168,7 @@ final class PublicPersistenceControlPlane
             enterGlobal(unknown.failure());
         } else if (result instanceof
                 PersistenceTransactionResult.RolledBack<?> rolledBack
-                && globalFailure(rolledBack.failure())) {
+                && globalRolledBackFailure(rolledBack.failure())) {
             enterGlobal(rolledBack.failure());
         }
     }
@@ -323,6 +323,11 @@ final class PublicPersistenceControlPlane
             case IO, CORRUPT, SCHEMA, UNAVAILABLE, DECODE, UNKNOWN -> true;
             case BUSY, TIMEOUT -> false;
         };
+    }
+
+    private boolean globalRolledBackFailure(StorageFailure failure) {
+        return failure.kind() != StorageFailureKind.UNKNOWN
+                && globalFailure(failure);
     }
 
     private void enterGlobal(StorageFailure failure) {

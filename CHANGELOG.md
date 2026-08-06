@@ -209,6 +209,8 @@
 - Fixed temporary SQLite locks permanently disabling later persistence writes.
   Operations still fail safely after bounded retries and recover once the lock
   clears.
+- Fixed a confirmed rolled-back persistence operation disabling all later
+  capture, release, coop, Recall, and companion-state writes.
 - Fixed automatic Hytale backups failing on Windows while persistence was
   active by moving process locks to Hytale's backup-excluded `LOCK` layout.
 - Removed a false packaged-server SLF4J binder `SEVERE` warning when opening

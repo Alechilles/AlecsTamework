@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.runtime;
 
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
+import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureDefinition;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteFailureClassifier;
@@ -144,7 +145,7 @@ class PublicPersistenceControlPlaneTest {
     }
 
     @Test
-    void unboundedReadOrUnknownCommitEntersOneGlobalReadOnlyMode() {
+    void unknownReadFailureEntersGlobalReadOnlyMode() {
         PersistenceFeatureRegistry registry =
                 PublicPersistenceFeatureRegistry.create();
         PersistenceStartupCoordinator startup = ready(registry);
@@ -155,8 +156,8 @@ class PublicPersistenceControlPlaneTest {
         control.readCompleted(
                 TEST_READ,
                 PersistenceReadResult.failed(failure(
-                        StorageFailureKind.IO,
-                        "database_unreadable",
+                        StorageFailureKind.UNKNOWN,
+                        "sqlite_unknown",
                         false
                 ))
         );
@@ -166,9 +167,19 @@ class PublicPersistenceControlPlaneTest {
                 startup.report().readiness()
         );
         assertEquals(
-                "database_unreadable",
+                "sqlite_unknown",
                 control.snapshot().lastGlobalFailureCode()
         );
+    }
+
+    @Test
+    void unknownTransactionOutcomeEntersGlobalReadOnlyMode() {
+        PersistenceFeatureRegistry registry =
+                PublicPersistenceFeatureRegistry.create();
+        PersistenceStartupCoordinator startup = ready(registry);
+        PublicPersistenceControlPlane control =
+                new PublicPersistenceControlPlane(registry);
+        control.bind(startup);
 
         control.unitOfWorkCompleted(
                 CompanionCaptureDefinition.KIND,
@@ -180,13 +191,46 @@ class PublicPersistenceControlPlaneTest {
         );
 
         assertEquals(
-                "database_unreadable",
+                PersistenceReadinessLevel.GLOBAL_READ_ONLY,
+                startup.report().readiness()
+        );
+        assertEquals(
+                "commit_outcome_unknown",
                 control.snapshot().lastGlobalFailureCode()
         );
-        assertTrue(
+        assertEquals(
+                1,
                 control.snapshot().features().get(
                         PublicPersistenceFeatureRegistry.CAPTURE
-                ).unitsFailed() > 0
+                ).unitsFailed()
+        );
+    }
+
+    @Test
+    void rolledBackIoFailureEntersGlobalReadOnlyMode() {
+        PersistenceFeatureRegistry registry =
+                PublicPersistenceFeatureRegistry.create();
+        PersistenceStartupCoordinator startup = ready(registry);
+        PublicPersistenceControlPlane control =
+                new PublicPersistenceControlPlane(registry);
+        control.bind(startup);
+
+        control.unitOfWorkCompleted(
+                CompanionCoopCaptureDefinition.KIND,
+                new PersistenceTransactionResult.RolledBack<>(failure(
+                        StorageFailureKind.IO,
+                        "sqlite_io",
+                        false
+                ))
+        );
+
+        assertEquals(
+                PersistenceReadinessLevel.GLOBAL_READ_ONLY,
+                startup.report().readiness()
+        );
+        assertEquals(
+                "sqlite_io",
+                control.snapshot().lastGlobalFailureCode()
         );
     }
 
@@ -210,6 +254,37 @@ class PublicPersistenceControlPlaneTest {
                                 "companion_capture"
                         )
                 )
+        );
+
+        assertEquals(
+                PersistenceReadinessLevel.MUTATION_READY,
+                startup.report().readiness()
+        );
+        assertNull(control.snapshot().lastGlobalFailureCode());
+        control.requireAdmission(
+                CompanionCaptureDefinition.KIND,
+                "companion_capture",
+                captureScopes(PROFILE)
+        );
+    }
+
+    /** Guards a rolled-back co-op failure from disabling unrelated persistence. */
+    @Test
+    void confirmedUnknownRollbackDoesNotMakeAllPersistenceReadOnly() {
+        PersistenceFeatureRegistry registry =
+                PublicPersistenceFeatureRegistry.create();
+        PersistenceStartupCoordinator startup = ready(registry);
+        PublicPersistenceControlPlane control =
+                new PublicPersistenceControlPlane(registry);
+        control.bind(startup);
+
+        control.unitOfWorkCompleted(
+                CompanionCoopCaptureDefinition.KIND,
+                new PersistenceTransactionResult.RolledBack<>(failure(
+                        StorageFailureKind.UNKNOWN,
+                        "sqlite_unknown",
+                        false
+                ))
         );
 
         assertEquals(
