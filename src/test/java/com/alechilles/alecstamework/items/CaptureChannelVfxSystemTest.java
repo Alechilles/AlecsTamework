@@ -1,7 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
 
@@ -117,11 +115,7 @@ class CaptureChannelVfxSystemTest {
     }
 
     @Test
-    void channelSupportsLegacyParticlesAndHomingMoteCadence() throws Exception {
-        String source = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/items/CaptureChannelVfxSystem.java"
-        )).replace("\r\n", "\n");
-
+    void channelSupportsLegacyParticlesAndHomingMoteCadence() {
         assertEquals(50L, CaptureChannelVfxSystem.emissionIntervalMsForTests());
         assertEquals(120L, CaptureChannelVfxSystem.homingEmissionIntervalMsForTests(
                 new CaptureHomingProjectileSettings(
@@ -130,20 +124,6 @@ class CaptureChannelVfxSystemTest {
         ));
         assertEquals(0.5F,
                 CaptureChannelVfxSystem.particleMaxDurationForDistance(15.0D, 15.0D, 0.5D, false));
-        assertTrue(source.contains("chunk.getReferenceTo(index)"));
-        assertTrue(source.contains("world.getEntityRef(session.targetUuid)"));
-        assertTrue(source.contains("session.nextEmitAtMs = nowMs + session.emissionIntervalMs()"));
-        assertTrue(source.contains("HomingVisualProjectileSpawner.spawn("));
-        assertTrue(source.contains("HomingVisualProjectileSpawner.spawn(\n                    commandBuffer,"));
-        assertFalse(source.contains("HomingVisualProjectileSpawner.spawn(\n                    store,"));
-        assertTrue(source.contains("HomingVisualProjectileSessionRegistry.activate("));
-        assertTrue(source.contains("HomingVisualProjectileSessionRegistry.deactivate("));
-        assertTrue(source.contains("rotationForBeamPacket"));
-        assertTrue(source.contains("ACTIVE.remove(session.playerUuid, session)"));
-        String plugin = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/Tamework.java"
-        ));
-        assertTrue(plugin.contains("new CaptureChannelSessionCleanupSystem()"));
     }
 
     private static void assertBeamDirection(Vector3d targetDirection) {

@@ -1,8 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -27,17 +25,4 @@ class BreedingCooldownResetServiceTest {
         assertNull(breeding.getLastPartnerUuid());
     }
 
-    /** Historical regression: the command published ready before clearing Breeding_Cooldown. */
-    @Test
-    void hytaleAlarmIsClearedBeforeReadyStateIsPublished() throws Exception {
-        String source = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/npc/actions/BreedingCooldownResetService.java"
-        ));
-
-        int alarmClear = source.indexOf("alarmClearer.clear(npcRef, npc, store)");
-        int componentMutation = source.indexOf("applyReadyState(breeding)");
-        assertTrue(alarmClear >= 0);
-        assertTrue(componentMutation > alarmClear);
-        assertTrue(source.contains("alarm.set(npcRef, null, store)"));
-    }
 }

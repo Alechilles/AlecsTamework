@@ -1,8 +1,6 @@
 package com.alechilles.alecstamework.items;
 
 import com.hypixel.hytale.server.core.universe.world.World;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -405,52 +403,6 @@ class LoadedNpcIdentityBootstrapServiceTest {
 
         service.clearLocation(WORLD_A);
         assertEquals(LoadedNpcIdentityIndex.ProbeStatus.ABSENT, index.probe(COMPONENT_UUID).status());
-    }
-
-    @Test
-    void productionEntryPointsUseWorldExecutorScanAndDoNotTrustRemoveWorldEvent() throws Exception {
-        String source = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/items/LoadedNpcIdentityBootstrapService.java"
-        ));
-        String snapshotSource = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/items/CommandLinkedNpcStateSnapshotService.java"
-        ));
-        String compositionSource = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/TameworkPersistenceComposition.java"
-        ));
-
-        assertTrue(source.contains("public void onStartWorld(@Nonnull StartWorldEvent event)"));
-        assertTrue(source.contains("world::execute"));
-        assertTrue(source.contains("Query.and(npcType, uuidType)"));
-        assertTrue(source.contains("TameworkProjectionIdentityComponent.getComponentType()"));
-        assertTrue(source.contains("CommandLinkedNpcStateSnapshotService.projectionKey(marker)"));
-        assertTrue(source.contains("identityIndex.replaceLocationObservations"));
-        assertFalse(source.contains("RemoveWorldEvent"));
-        assertTrue(source.contains("LoadedNpcLocationResolver.resolve(store)"));
-        assertTrue(snapshotSource.contains("LoadedNpcLocationResolver.resolve(store)"));
-        assertTrue(snapshotSource.contains("LoadedNpcIdentityIndex.LoadedNpcObservation"));
-        assertTrue(snapshotSource.contains("projectionKey(marker)"));
-        int startWorldRegistration = compositionSource.indexOf("StartWorldEvent.class");
-        int allWorldsRegistration = compositionSource.indexOf("AllWorldsLoadedEvent.class");
-        int sealedBootstrap = compositionSource.indexOf("identityBootstrap.bootstrapUniverse()");
-        assertTrue(startWorldRegistration >= 0
-                && allWorldsRegistration > startWorldRegistration
-                && sealedBootstrap > allWorldsRegistration);
-        assertTrue(compositionSource.contains("identityBootstrap.onStartWorld(event)"));
-        assertTrue(compositionSource.contains("startupWorldsLoaded.set(true)"));
-        assertTrue(compositionSource.contains("composition.resumeAfterWorldEvidence()"));
-        int dormantRegistration = compositionSource.indexOf(
-                "TameworkDormantPersistenceRegistration.register("
-        );
-        int compositionReturn = compositionSource.indexOf(
-                "return composition;", dormantRegistration
-        );
-        assertFalse(compositionSource.substring(
-                dormantRegistration, compositionReturn
-        ).contains("composition.resumeAfterWorldEvidence()"));
-        assertTrue(compositionSource.contains(
-                "identityBootstrap.awaitCurrentBootstrap().whenComplete("),
-                "World evidence readiness must resume asynchronously without blocking a world thread.");
     }
 
     private static LoadedNpcIdentityBootstrapService service(

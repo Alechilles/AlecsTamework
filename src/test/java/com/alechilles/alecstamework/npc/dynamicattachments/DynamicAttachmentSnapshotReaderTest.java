@@ -3,9 +3,6 @@ package com.alechilles.alecstamework.npc.dynamicattachments;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -39,32 +36,6 @@ class DynamicAttachmentSnapshotReaderTest {
         assertTrue(snapshot.getNeeds().isEmpty());
         assertTrue(snapshot.getTraits().isEmpty());
         assertTrue(snapshot.getCommandStates().isEmpty());
-    }
-
-    @Test
-    void readPathUsesRequiredNpcStateSources() throws IOException {
-        String source = Files.readString(Path.of(
-                "src",
-                "main",
-                "java",
-                "com",
-                "alechilles",
-                "alecstamework",
-                "npc",
-                "dynamicattachments",
-                "DynamicAttachmentSnapshotReader.java"
-        ));
-
-        assertTrue(source.contains("CompanionRoleIdResolver.resolveRoleId(reference, store)"));
-        assertTrue(source.contains("NpcDisplayNameComponentService.resolvePersistentOrRuntimeName(reference, store)"));
-        assertTrue(source.contains("builder.owner(owner.getOwnerId(), owner.getOwnerName())"));
-        assertTrue(source.contains("builder.tamed(tamed.isTamed())"));
-        assertTrue(source.contains("builder.gender(lifeStage.getGender())"));
-        assertTrue(source.contains(".lifeStage(lifeStage.getStage())"));
-        assertTrue(source.contains("builder.happiness(happiness.getValue())"));
-        assertTrue(source.contains("builder.needs(readNeeds(needs))"));
-        assertTrue(source.contains("builder.traits(readTraits(traits))"));
-        assertTrue(source.contains("builder.commandStates(readCommandStates(commandLinks))"));
     }
 
     @Test

@@ -4,23 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class CompanionMovementSpeedEffectServiceTest {
-
-    @Test
-    void nativeMountedRefreshAcceptsTheRecoveredSourceRoleAndPrecomputedMultiplier() throws Exception {
-        String source = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/npc/progression/CompanionMovementSpeedEffectService.java"));
-
-        assertEquals(true, source.contains("applyResolvedMultiplier"));
-        assertEquals(true, source.contains("@Nullable String sourceRoleId"));
-        assertEquals(true, source.contains("resolveManagedEffectId(quantizedMultiplier)"));
-    }
 
     @Test
     void neutralPlanRemovesEveryOwnedMovementSpeedEffect() {

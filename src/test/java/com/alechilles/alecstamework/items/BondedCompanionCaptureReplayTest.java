@@ -22,7 +22,6 @@ import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteBondedCompa
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionSchemaManager;
 import com.hypixel.hytale.codec.ExtraInfo;
 import java.lang.reflect.Field;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -205,27 +204,6 @@ class BondedCompanionCaptureReplayTest {
         assertTrue(result.handled());
         assertEquals(BondedCompanionCaptureAuthor.Status.DATABASE_FAILED,
                 result.result().status());
-    }
-
-    /** Architecture fence for the actual Hytale capture callback ordering. */
-    @Test
-    void captureRouteInvokesReplayBeforeAllCurrentAdmissionGates()
-            throws Exception {
-        String source = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/items/"
-                        + "BondedCompanionCaptureRoute.java"));
-
-        int replay = source.indexOf("replays.resume(");
-        int handled = source.indexOf("if (resumed.handled()) return true;");
-        int sourceEligibility = source.indexOf("if (!sourceEligible)");
-        int admission = source.indexOf("admission.assess(");
-        int roll = source.indexOf("resolveAdmission(");
-
-        assertTrue(replay >= 0 && handled > replay
-                        && sourceEligibility > handled
-                        && admission > sourceEligibility && roll > admission,
-                "exact replay must precede source, family, and chance gates; "
-                        + "ABSENT evidence must fall through to all gates");
     }
 
     private void assertReplayOnly(

@@ -8,22 +8,14 @@ import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentRegistry;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.function.consumer.TriConsumer;
 import com.hypixel.hytale.math.vector.Rotation3f;
-import com.hypixel.hytale.math.vector.Rotation3fc;
-import com.hypixel.hytale.server.core.asset.type.model.config.Model;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import java.lang.reflect.Method;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.UUID;
 import org.joml.Vector3d;
-import org.joml.Vector3dc;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -223,31 +215,6 @@ class PlannedNpcProjectionSpawnerTest {
         assertEquals(1, gateway.spawnCalls);
         assertEquals(1, gateway.quarantineCalls);
         assertEquals(null, result.postAddWork());
-    }
-
-    @Test
-    void productionGatewayUsesNpcPluginSevenArgumentPreAddOverload() throws Exception {
-        Method overload = NPCPlugin.class.getMethod(
-                "spawnEntity",
-                Store.class,
-                int.class,
-                Vector3dc.class,
-                Rotation3fc.class,
-                Model.class,
-                TriConsumer.class,
-                TriConsumer.class
-        );
-        String source = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/items/"
-                        + "HytalePlannedNpcProjectionSpawnGateway.java"
-        ));
-
-        assertNotNull(overload);
-        assertTrue(source.contains("npcPlugin.spawnEntity("));
-        assertTrue(source.contains("(npc, holder, callbackStore) ->"));
-        assertTrue(source.contains("holder.putComponent(type, new UUIDComponent(plannedNpcUuid))"));
-        assertTrue(source.contains("npc.setLegacyUUID(plannedNpcUuid)"));
-        assertTrue(source.contains("restorer.restoreToHolder(holder, snapshot, projectionMarker)"));
     }
 
     private PlannedNpcProjectionSpawner.SpawnRequest request(

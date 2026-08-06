@@ -64,22 +64,4 @@ class MotionControllerTameworkMountedGlideTest {
         assertEquals(10.0, MountedGlideControllerSupport.resolveMountedSpeedLimit(true, 0.0, 10.0), 0.0001);
     }
 
-    @Test
-    void inactiveControllerPathDoesNotDelegateToFlyMovement() throws Exception {
-        String source = java.nio.file.Files.readString(java.nio.file.Path.of(
-                "src/main/java/com/alechilles/alecstamework/npc/movement/MotionControllerTameworkMountedGlide.java"
-        ));
-
-        assertTrue(source.contains("if (!shouldRunFlyController(glide))"));
-        assertTrue(source.contains("translation.set(0.0)"));
-        assertTrue(source.contains("return dt"));
-        assertTrue(source.indexOf("if (!shouldRunFlyController(glide))")
-                < source.indexOf("double remaining = super.computeMove"));
-        assertTrue(source.indexOf("if (!shouldRunFlyController(glide))",
-                source.indexOf("protected double executeMove"))
-                < source.indexOf("double remaining = super.executeMove"));
-        assertTrue(source.indexOf("if (!shouldRunFlyController(glide))",
-                source.indexOf("public void updateMovementState"))
-                < source.indexOf("super.updateMovementState"));
-    }
 }

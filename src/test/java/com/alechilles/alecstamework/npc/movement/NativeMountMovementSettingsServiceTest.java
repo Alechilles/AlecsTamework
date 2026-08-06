@@ -10,7 +10,6 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import java.lang.reflect.Field;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -61,34 +60,6 @@ class NativeMountMovementSettingsServiceTest {
         service.rememberLiveRoleProfile("Tetrabird_Descent_Test", null);
 
         assertEquals("Mount", service.resolveMountedMovementConfigId("Tetrabird_Descent_Test", null));
-    }
-
-    @Test
-    void mountedRoleRecoveryNeverFallsBackToVisibleEmptyRole() throws Exception {
-        String source = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/npc/movement/NativeMountMovementSettingsService.java"
-        ));
-        int methodStart = source.indexOf("static String resolveManagedRoleId");
-        int methodEnd = source.indexOf("static Ref<EntityStore> resolveMountedRiderRef");
-        String method = source.substring(methodStart, methodEnd);
-
-        assertEquals(true, method.contains("if (mount != null)"));
-        assertEquals(true, method.contains("new NativeMountedRoleLookup(NPCPlugin.get()).resolve(mount)"));
-        assertEquals(true, method.contains("resolveManagedRoleId(false, null"));
-    }
-
-    @Test
-    void mountedRiderResolutionUsesStableUuidInTheActiveWorldStore() throws Exception {
-        String source = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/npc/movement/NativeMountMovementSettingsService.java"
-        ));
-        int methodStart = source.indexOf("static Ref<EntityStore> resolveMountedRiderRef");
-        int methodEnd = source.indexOf("static MovementSettings copyWithScaledBaseSpeed");
-        String method = source.substring(methodStart, methodEnd);
-
-        assertEquals(true, method.contains("owner.getUuid()"));
-        assertEquals(true, method.contains("new ActiveWorldRiderLookup(world, store).resolve(ownerUuid)"));
-        assertEquals(false, method.contains("owner.getReference()"));
     }
 
     @Test

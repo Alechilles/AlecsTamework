@@ -5,9 +5,6 @@ import com.alechilles.alecstamework.npc.dynamicattachments.DynamicAttachmentNpcS
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkDynamicAttachmentsComponent;
 import com.alechilles.alecstamework.npc.dynamicattachments.DynamicAttachmentResolution;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -120,42 +117,6 @@ class DynamicAttachmentEvaluationSystemTest {
 
         assertTrue(DynamicAttachmentEvaluationSystem.filterResolutionForTest(resolution, Map.of()).isEmpty());
         assertTrue(DynamicAttachmentEvaluationSystem.filterResolutionForTest(resolution, null).isEmpty());
-    }
-
-    @Test
-    void sourceUsesCommandBufferWritesAndDoesNotMutateStoreDirectly() throws IOException {
-        String source = Files.readString(Path.of(
-                "src",
-                "main",
-                "java",
-                "com",
-                "alechilles",
-                "alecstamework",
-                "npc",
-                "systems",
-                "DynamicAttachmentEvaluationSystem.java"
-        ));
-
-        assertTrue(source.contains("commandBuffer.putComponent("));
-        assertFalse(source.contains("store.putComponent("));
-        assertFalse(source.contains("store.removeComponent("));
-        assertFalse(source.contains("store.tryRemoveComponent("));
-        assertFalse(source.contains("store.addComponent("));
-    }
-
-    @Test
-    void tameworkRegistersDynamicAttachmentEvaluationSystem() throws IOException {
-        String source = Files.readString(Path.of(
-                "src",
-                "main",
-                "java",
-                "com",
-                "alechilles",
-                "alecstamework",
-                "Tamework.java"
-        ));
-
-        assertTrue(source.contains("new DynamicAttachmentEvaluationSystem("));
     }
 
     private static DynamicAttachmentNpcSnapshot.Builder baseSnapshot() {

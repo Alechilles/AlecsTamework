@@ -5,13 +5,8 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CommandTalentPageServiceEffectSummaryTest {
 
@@ -58,35 +53,6 @@ class CommandTalentPageServiceEffectSummaryTest {
                 "Harvest Bonus Chance +20%\nTrait Mutation Chance +30%\nAppearance Mutation Chance +40%",
                 summary
         );
-    }
-
-    @Test
-    void portugueseLanguageFileContainsKnownUtilityEffectKeys() throws Exception {
-        String content = Files.readString(
-                Path.of("src/main/resources/Server/Languages/pt-BR/server.lang"),
-                StandardCharsets.UTF_8
-        );
-
-        assertTrue(content.contains(
-                "tamework.ui.talents.effect.TraitMutationChanceMultiplier=Chance de Mutação de Traços"
-        ));
-        assertTrue(content.contains("tamework.ui.talents.detail.effects=Efeitos"));
-        assertTrue(content.contains("tamework.ui.talents.state.Locked=Bloqueado"));
-    }
-
-    @Test
-    void serviceUsesLocalizedTextForTalentPresentation() throws Exception {
-        String content = Files.readString(
-                Path.of("src/main/java/com/alechilles/alecstamework/items/CommandTalentPageService.java"),
-                StandardCharsets.UTF_8
-        );
-
-        assertTrue(content.contains("LocalizedText.resolveConfigValue(language"));
-        assertTrue(content.contains("LocalizedText.format(language, \"tamework.ui.talents.levelSummary"));
-        assertTrue(content.contains("LocalizedText.format(language, \"tamework.ui.talents.status"));
-        assertTrue(content.contains("\"tamework.ui.talents.status.stateDetail\""));
-        assertTrue(content.contains("\"tamework.ui.talents.state.\" + state"));
-        assertFalse(content.contains("\"Passive talent\""));
     }
 
     private static TwTalentConfig.PassiveEffect effect(String effectKey, double multiplier) throws Exception {

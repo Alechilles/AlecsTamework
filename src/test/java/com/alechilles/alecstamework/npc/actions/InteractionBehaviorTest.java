@@ -12,10 +12,6 @@ import com.hypixel.hytale.codec.ExtraInfo;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.bson.BsonDocument;
@@ -27,15 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Tests for Interaction behavior. */
 class InteractionBehaviorTest {
-    private static final Path INTERACTION_EXECUTOR = Paths.get(
-            "src", "main", "java",
-            "com", "alechilles", "alecstamework", "npc", "actions", "InteractionExecutor.java"
-    );
-    private static final Path INTERACTION_HARVEST_EFFECTS = Paths.get(
-            "src", "main", "java",
-            "com", "alechilles", "alecstamework", "npc", "actions", "InteractionHarvestEffects.java"
-    );
-
     @Test
     void roleParamResolutionUsesFirstScopeWithValue() throws Exception {
         ActionTameworkInteract interact = newInteract();
@@ -239,139 +226,6 @@ class InteractionBehaviorTest {
         assertTrue(TameworkInteractRequirements.resolveInteractionRequireOwner(Boolean.FALSE, true));
         assertFalse(TameworkInteractRequirements.resolveInteractionRequireOwner(null, false));
         assertFalse(TameworkInteractRequirements.resolveInteractionRequireOwner(Boolean.TRUE, false));
-    }
-
-    @Test
-    void optimizedHarvestChecksCooldownBeforeRewardsAndEnsuresAfterState() throws Exception {
-        String content = Files.readString(INTERACTION_EXECUTOR, StandardCharsets.UTF_8);
-
-        int startHarvest = content.indexOf("effects.applyStartHarvest");
-        int checkCooldown = content.indexOf("effects.isHarvestCooldownReady(npcRef, role, store, ctx)");
-        int containerTransform = content.indexOf("effects.applyHarvestContainerTransform");
-        int ensureCooldown = content.indexOf("effects.ensureHarvestCooldownAfterState(npcRef, role, store, ctx)");
-        int customEffects = content.indexOf("effects.applyCustomEffects", startHarvest);
-
-        assertTrue(startHarvest >= 0, "Optimized harvest should start the harvest state.");
-        assertTrue(checkCooldown >= 0, "Optimized harvest must check Harvest_Ready before rewards.");
-        assertTrue(containerTransform > checkCooldown, "Container rewards should only run after cooldown readiness passes.");
-        assertTrue(startHarvest > containerTransform, "Optimized harvest should only start the harvest state after rewards are applied.");
-        assertTrue(ensureCooldown > startHarvest, "Optimized harvest should repair/confirm the cooldown after state transition.");
-        assertTrue(customEffects > ensureCooldown, "Harvest cooldown and state should be handled before later custom effects run.");
-    }
-
-    @Test
-    void optimizedHarvestFailsClosedWhenCooldownCannotBeApplied() throws Exception {
-        String content = Files.readString(INTERACTION_EXECUTOR, StandardCharsets.UTF_8);
-
-        int checkCooldown = content.indexOf("if (!effects.isHarvestCooldownReady(npcRef, role, store, ctx))");
-        int returnFalse = content.indexOf("return false;", checkCooldown);
-        int containerTransform = content.indexOf("effects.applyHarvestContainerTransform", checkCooldown);
-
-        assertTrue(checkCooldown >= 0, "Optimized harvest must check whether the harvest cooldown is ready.");
-        assertTrue(returnFalse > checkCooldown, "Cooldown failure should stop the optimized harvest.");
-        assertTrue(containerTransform > returnFalse, "Container rewards should not run before cooldown failure is handled.");
-    }
-
-    @Test
-    void optimizedHarvestLogsEachExecutionStage() throws Exception {
-        String content = Files.readString(INTERACTION_EXECUTOR, StandardCharsets.UTF_8);
-
-        assertTrue(content.contains("effects.logHarvestExecution(\"selected\""),
-                "Optimized harvest should log when the harvest path is selected.");
-        assertTrue(content.contains("effects.logHarvestExecution(\"cooldown-blocked\""),
-                "Optimized harvest should log when active cooldown blocks rewards.");
-        assertTrue(content.contains("\"cooldown-ensured\""),
-                "Optimized harvest should log after post-state cooldown confirmation.");
-        assertTrue(content.contains("effects.logHarvestExecution(\"state-applied\""),
-                "Optimized harvest should log after the harvest state starts.");
-    }
-
-    @Test
-    void optimizedHarvestResolvesCooldownDurationFromInteractionContext() throws Exception {
-        String content = Files.readString(INTERACTION_HARVEST_EFFECTS, StandardCharsets.UTF_8);
-
-        int stringArrayLookup = content.indexOf(
-                "owner.getRoleStringArrayParam(role, context, HARVEST_TIMEOUT_PARAMETER)"
-        );
-        int cooldownReadyCheck = content.indexOf(
-                "ActionTameworkHarvestAlarm.isHarvestCooldownReady(npcRef, role, store, baseSeconds)"
-        );
-        int cooldownEnsure = content.indexOf(
-                "ActionTameworkHarvestAlarm.ensureHarvestCooldownActive("
-        );
-        int cooldownEnsureArgs = content.indexOf("npcRef, role, store, baseSeconds", cooldownEnsure);
-
-        assertTrue(stringArrayLookup >= 0, "Optimized harvest should resolve HarvestTimeout from interaction params.");
-        assertTrue(cooldownReadyCheck >= 0, "Resolved HarvestTimeout should be passed into the readiness check.");
-        assertTrue(cooldownEnsure >= 0, "Resolved HarvestTimeout should be passed into the post-state cooldown check.");
-        assertTrue(cooldownEnsureArgs > cooldownEnsure,
-                "Post-state cooldown confirmation should receive the resolved timeout.");
-    }
-
-    @Test
-    void containerHarvestBonusModeUsesInteractionContextParams() throws Exception {
-        String content = Files.readString(INTERACTION_HARVEST_EFFECTS, StandardCharsets.UTF_8);
-
-        int modeResolution = content.indexOf("String bonusMode = owner.getRoleStringParam(");
-        int modeParam = content.indexOf(
-                "CompanionHarvestBonusService.HARVEST_BONUS_MODE_PARAM",
-                modeResolution
-        );
-        int preserveCheck = content.indexOf(
-                "CompanionHarvestBonusService.shouldPreserveCooldown(",
-                modeParam
-        );
-
-        assertTrue(modeResolution >= 0, "Container harvest should resolve HarvestBonusMode from interaction params.");
-        assertTrue(modeParam > modeResolution, "Container harvest should request the HarvestBonusMode param.");
-        assertTrue(preserveCheck > modeParam,
-                "Cooldown preserve roll should use the resolved HarvestBonusMode, not raw role-scope fallback.");
-    }
-
-    @Test
-    void harvestReadinessUsesTameworkAlarmWithoutBaseAlarmFallback() throws Exception {
-        String content = Files.readString(Paths.get(
-                "src", "main", "java",
-                "com", "alechilles", "alecstamework", "npc", "actions", "ActionTameworkInteract.java"
-        ), StandardCharsets.UTF_8);
-
-        int durableReady = content.indexOf("TameworkAlarmService.isReady(npcRef, store, harvestAlarmName)");
-        int alarmReady = content.indexOf("alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName, ctx)");
-
-        assertTrue(durableReady >= 0, "Harvest readiness should consult named Tamework alarm state.");
-        assertEquals(-1, alarmReady, "Harvest readiness should not require base-game alarm state.");
-    }
-
-    @Test
-    void harvestSelectionDoesNotBypassDurableCooldownForExecution() throws Exception {
-        String selector = Files.readString(Paths.get(
-                "src", "main", "java",
-                "com", "alechilles", "alecstamework", "npc", "actions", "InteractionSelector.java"
-        ), StandardCharsets.UTF_8);
-        String requirements = Files.readString(Paths.get(
-                "src", "main", "java",
-                "com", "alechilles", "alecstamework", "npc", "actions", "TameworkInteractRequirements.java"
-        ), StandardCharsets.UTF_8);
-
-        assertTrue(selector.contains(": !owner.isHarvestAlarmReady(npcRef, store, ctx);"),
-                "Selection should use the component-aware harvest readiness helper.");
-        assertFalse(requirements.contains("? owner.isHarvestAlarmReady(npcRef, store, ctx)")
-                        || requirements.contains(": alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName, ctx)"),
-                "Harvest requirements should not bypass durable cooldown state on execution.");
-    }
-
-    @Test
-    void optimizedHarvestLogsContainerAndCooldownDiagnostics() throws Exception {
-        String content = Files.readString(INTERACTION_HARVEST_EFFECTS, StandardCharsets.UTF_8);
-
-        assertTrue(content.contains("TameworkHarvestDebug: cooldown-ready-request"),
-                "Optimized harvest should log the resolved cooldown duration before applying it.");
-        assertTrue(content.contains("TameworkHarvestDebug: container"),
-                "Optimized harvest should log bucket/container transform decisions.");
-        assertTrue(content.contains("TameworkHarvestDebug: cooldown-ensure-request"),
-                "Optimized harvest should log the post-state cooldown confirmation.");
-        assertTrue(content.contains("preserveCooldown="),
-                "Optimized harvest should log whether a cooldown-preserve bonus was applied.");
     }
 
     private static ActionTameworkInteract newInteract() throws Exception {

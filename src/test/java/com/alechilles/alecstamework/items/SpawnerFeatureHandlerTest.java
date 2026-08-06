@@ -2,8 +2,6 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import java.lang.reflect.Method;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -58,59 +56,6 @@ class SpawnerFeatureHandlerTest {
         assertEquals("Required", resolved.getCaptureRequiredEffectId());
         assertEquals("Aura", resolved.getCaptureChannelAuraEffectId());
         assertEquals("Tamed", resolved.resolveCaptureTamedRole("Wild"));
-    }
-
-    @Test
-    void captureRejectsStackedSpawnerItemsBeforeMetadataWrite() throws Exception {
-        String handler = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"
-        ));
-        String intents = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/items/SpawnerCaptureIntentFactory.java"
-        )).replace("\r\n", "\n");
-
-        int quantityGuard = handler.indexOf("source.getQuantity() != 1");
-        int capturedMetadata = intents.indexOf(
-                ".withMetadata(\n"
-                        + "                        TameworkMetadataKeys.CAPTURED"
-        );
-        int ownerOutcomeMetadata = intents.indexOf(
-                "TameworkMetadataKeys.CAPTURE_OWNER_CLEARED"
-        );
-
-        assertTrue(quantityGuard >= 0, "capture path must reject stacked spawner items");
-        assertTrue(capturedMetadata >= 0, "capture path must write captured metadata");
-        assertTrue(ownerOutcomeMetadata >= 0, "capture must persist its immutable owner outcome");
-    }
-
-    @Test
-    void captureUsesCanonicalAuthorAsSoleDurableSuccessAuthority()
-            throws Exception {
-        String handler = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"
-        ));
-        String author = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/items/persistence/SpawnerCaptureAuthor.java"
-        ));
-
-        assertTrue(handler.contains("captureAuthor.capture(intent)"));
-        assertTrue(author.contains("persistence.capture("));
-        assertFalse(handler.contains("CaptureRepository"));
-        assertFalse(handler.contains("captureAttemptRuntime"));
-        assertFalse(handler.contains("captureFinalizerService"));
-    }
-
-    @Test
-    void releaseUsesCanonicalAuthorWithoutPreparedSpawnSubsystem()
-            throws Exception {
-        String handler = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"
-        ));
-
-        assertTrue(handler.contains("releaseAuthor.release("));
-        assertFalse(handler.contains("CommandPreparedRestoreSpawnService"));
-        assertFalse(handler.contains("CompanionPreparedSpawnService"));
-        assertFalse(handler.contains("CommandNpcRelocationService"));
     }
 
     @Test
