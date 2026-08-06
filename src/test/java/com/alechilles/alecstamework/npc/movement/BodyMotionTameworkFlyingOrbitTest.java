@@ -154,6 +154,91 @@ class BodyMotionTameworkFlyingOrbitTest {
     }
 
     @Test
+    void wanderReturnStartsOnlyBeyondMaximumRadius() {
+        assertFalse(BodyMotionTameworkFlyingOrbit.updateWanderReturnState(
+                false, true, 18.0 * 18.0, 12.0, 18.0));
+        assertTrue(BodyMotionTameworkFlyingOrbit.updateWanderReturnState(
+                false, true, 18.01 * 18.01, 12.0, 18.0));
+    }
+
+    @Test
+    void wanderReturnStaysLatchedUntilMinimumRadius() {
+        assertTrue(BodyMotionTameworkFlyingOrbit.updateWanderReturnState(
+                true, true, 15.0 * 15.0, 12.0, 18.0));
+        assertFalse(BodyMotionTameworkFlyingOrbit.updateWanderReturnState(
+                true, true, 12.0 * 12.0, 12.0, 18.0));
+        assertFalse(BodyMotionTameworkFlyingOrbit.updateWanderReturnState(
+                true, true, 11.99 * 11.99, 12.0, 18.0));
+    }
+
+    @Test
+    void equalWanderRadiiUseOneStableBoundary() {
+        assertFalse(BodyMotionTameworkFlyingOrbit.updateWanderReturnState(
+                false, true, 12.0 * 12.0, 12.0, 12.0));
+        assertTrue(BodyMotionTameworkFlyingOrbit.updateWanderReturnState(
+                false, true, 12.01 * 12.01, 12.0, 12.0));
+        assertFalse(BodyMotionTameworkFlyingOrbit.updateWanderReturnState(
+                true, true, 12.0 * 12.0, 12.0, 12.0));
+    }
+
+    @Test
+    void unavailableSteeringPreservesReturnLatchUntilMinimumRadius() {
+        boolean returning = BodyMotionTameworkFlyingOrbit.updateWanderReturnState(
+                false, true, 20.0 * 20.0, 12.0, 18.0);
+        returning = BodyMotionTameworkFlyingOrbit.updateWanderReturnState(
+                returning, false, 0.0, 12.0, 18.0);
+        returning = BodyMotionTameworkFlyingOrbit.updateWanderReturnState(
+                returning, true, 15.0 * 15.0, 12.0, 18.0);
+
+        assertTrue(returning);
+
+        returning = BodyMotionTameworkFlyingOrbit.updateWanderReturnState(
+                returning, true, 12.0 * 12.0, 12.0, 18.0);
+        assertFalse(returning);
+    }
+
+    @Test
+    void returningWanderIgnoresStaleWaypointAndSeeksLiveTarget() {
+        Vector3d result = BodyMotionTameworkFlyingOrbit.resolveWanderTranslation(
+                true,
+                new Vector3d(24.0, 5.0, 0.0),
+                new Vector3d(0.0, 0.0, 0.0),
+                new Vector3d(30.0, 5.0, 0.0),
+                12.0,
+                3.0,
+                0.5,
+                new Vector3d());
+
+        assertEquals(-0.5, result.x, EPSILON);
+        assertEquals(0.0, result.y, EPSILON);
+        assertEquals(0.0, result.z, EPSILON);
+    }
+
+    @Test
+    void ordinaryWanderStillFliesTowardSelectedWaypoint() {
+        Vector3d result = BodyMotionTameworkFlyingOrbit.resolveWanderTranslation(
+                false,
+                new Vector3d(24.0, 5.0, 0.0),
+                new Vector3d(0.0, 0.0, 0.0),
+                new Vector3d(30.0, 5.0, 0.0),
+                12.0,
+                3.0,
+                0.5,
+                new Vector3d());
+
+        assertEquals(0.5, result.x, EPSILON);
+        assertEquals(0.0, result.y, EPSILON);
+        assertEquals(0.0, result.z, EPSILON);
+    }
+
+    @Test
+    void returningWanderUsesTargetRelativeAltitudeCorrection() {
+        assertTrue(BodyMotionTameworkFlyingOrbit.shouldApplyTargetRelativeAltitude(true, false, true));
+        assertFalse(BodyMotionTameworkFlyingOrbit.shouldApplyTargetRelativeAltitude(true, false, false));
+        assertFalse(BodyMotionTameworkFlyingOrbit.shouldApplyTargetRelativeAltitude(true, true, true));
+    }
+
+    @Test
     void passThroughDestinationContinuesBeyondCapturedTarget() {
         Vector3d destination = BodyMotionTameworkFlyingOrbit.resolvePassThroughDestination(
                 -8.0, 0.0, 0.0, 10.0, 0.0, 18.0, 3.0, new Vector3d());
