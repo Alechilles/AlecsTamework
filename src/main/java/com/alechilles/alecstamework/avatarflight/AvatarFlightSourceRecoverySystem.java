@@ -57,7 +57,7 @@ public final class AvatarFlightSourceRecoverySystem extends EntityTickingSystem<
                 && AvatarFlightRuntimeEpoch.isCurrent(session.getRuntimeEpoch())
                 && session.getPhase() != AvatarFlightMountPhase.RESTORING;
         if (sourceDead) {
-            if (riderRef != null && riderRef.isValid()) {
+            if (paired && riderRef != null && riderRef.isValid()) {
                 UUID riderUuid = parse(source.getRiderUuid());
                 if (riderUuid != null) {
                     commandBuffer.run(bufferStore -> lifecycle.end(
@@ -66,12 +66,12 @@ public final class AvatarFlightSourceRecoverySystem extends EntityTickingSystem<
                             riderUuid,
                             AvatarFlightMountLifecycleService.EndReason.SOURCE_MISSING
                     ));
+                    return;
                 }
-            } else {
-                commandBuffer.run(bufferStore -> {
-                    if (sourceRef.isValid()) bufferStore.tryRemoveComponent(sourceRef, sourceType);
-                });
             }
+            commandBuffer.run(bufferStore -> {
+                if (sourceRef.isValid()) bufferStore.tryRemoveComponent(sourceRef, sourceType);
+            });
             return;
         }
         if (paired) return;

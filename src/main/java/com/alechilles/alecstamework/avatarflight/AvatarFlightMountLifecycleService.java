@@ -74,7 +74,7 @@ public final class AvatarFlightMountLifecycleService {
             rollback(store, npcRef, playerRef, sessionType, sourceType, source, prepared.playerUuid());
             return Result.fail(enabled.message());
         }
-        if (!parking.park(store, npcRef, role, source, prepared.emptyRoleIndex())) {
+        if (!parking.park(store, npcRef, playerRef, role, source, prepared.emptyRoleIndex())) {
             rollback(store, npcRef, playerRef, sessionType, sourceType, source, prepared.playerUuid());
             return Result.fail("Avatar-flight mount failed while parking source NPC.");
         }

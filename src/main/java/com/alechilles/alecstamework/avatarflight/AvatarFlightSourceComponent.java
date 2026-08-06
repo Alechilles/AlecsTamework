@@ -61,6 +61,15 @@ public final class AvatarFlightSourceComponent implements Component<EntityStore>
             .append(new KeyedCodec<>("WasVisible", Codec.BOOLEAN),
                     AvatarFlightSourceComponent::setWasVisible,
                     AvatarFlightSourceComponent::wasVisible).add()
+            .append(new KeyedCodec<>("WasFrozen", Codec.BOOLEAN),
+                    AvatarFlightSourceComponent::setWasFrozen,
+                    AvatarFlightSourceComponent::wasFrozen).add()
+            .append(new KeyedCodec<>("WasIntangible", Codec.BOOLEAN),
+                    AvatarFlightSourceComponent::setWasIntangible,
+                    AvatarFlightSourceComponent::wasIntangible).add()
+            .append(new KeyedCodec<>("WasInvulnerable", Codec.BOOLEAN),
+                    AvatarFlightSourceComponent::setWasInvulnerable,
+                    AvatarFlightSourceComponent::wasInvulnerable).add()
             .append(new KeyedCodec<>("Phase", Codec.STRING),
                     AvatarFlightSourceComponent::setPhaseName,
                     AvatarFlightSourceComponent::getPhaseName).add()
@@ -84,8 +93,11 @@ public final class AvatarFlightSourceComponent implements Component<EntityStore>
     private float originRoll;
     private boolean wasInteractable;
     private boolean wasVisible;
+    private boolean wasFrozen;
+    private boolean wasIntangible;
+    private boolean wasInvulnerable;
     private AvatarFlightMountPhase phase = AvatarFlightMountPhase.PREPARING;
-    private int schemaVersion = 1;
+    private int schemaVersion = 2;
 
     public AvatarFlightSourceComponent() {
     }
@@ -144,6 +156,12 @@ public final class AvatarFlightSourceComponent implements Component<EntityStore>
     public void setWasInteractable(boolean value) { wasInteractable = value; }
     public boolean wasVisible() { return wasVisible; }
     public void setWasVisible(boolean value) { wasVisible = value; }
+    public boolean wasFrozen() { return wasFrozen; }
+    public void setWasFrozen(boolean value) { wasFrozen = value; }
+    public boolean wasIntangible() { return wasIntangible; }
+    public void setWasIntangible(boolean value) { wasIntangible = value; }
+    public boolean wasInvulnerable() { return wasInvulnerable; }
+    public void setWasInvulnerable(boolean value) { wasInvulnerable = value; }
     @Nonnull public AvatarFlightMountPhase getPhase() { return phase == null ? AvatarFlightMountPhase.PREPARING : phase; }
     public void setPhase(@Nullable AvatarFlightMountPhase value) { phase = value == null ? AvatarFlightMountPhase.PREPARING : value; }
     @Nonnull public String getPhaseName() { return getPhase().name(); }
@@ -161,6 +179,9 @@ public final class AvatarFlightSourceComponent implements Component<EntityStore>
         copy.captureOrigin(originX, originY, originZ, originYaw, originPitch, originRoll);
         copy.wasInteractable = wasInteractable;
         copy.wasVisible = wasVisible;
+        copy.wasFrozen = wasFrozen;
+        copy.wasIntangible = wasIntangible;
+        copy.wasInvulnerable = wasInvulnerable;
         copy.phase = getPhase();
         copy.schemaVersion = schemaVersion;
         return copy;

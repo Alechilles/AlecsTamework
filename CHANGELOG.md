@@ -162,6 +162,10 @@
   separate written permission.
 
 ### Fixed
+- Fixed Avatar Flight ending midair during longer flights by keeping the hidden
+  parked companion attached to its rider instead of leaving it in the takeoff chunk.
+- Fixed Avatar Flight's temporary parking role replacing a companion's real
+  species, display name, or tamed state in Beast Flute persistence.
 - Fixed shared flying components using computed values for Hytale fields that
   only accept literals, which caused downstream flying NPC roles to fail
   validation.

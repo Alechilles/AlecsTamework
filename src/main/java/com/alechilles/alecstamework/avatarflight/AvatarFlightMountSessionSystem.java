@@ -14,6 +14,7 @@ import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
+import com.hypixel.hytale.server.core.modules.entity.system.UpdateLocationSystems;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Set;
 import java.util.UUID;
@@ -29,9 +30,11 @@ public final class AvatarFlightMountSessionSystem extends EntityTickingSystem<En
     private final ComponentType<EntityStore, TransformComponent> transformType;
     private final ComponentType<EntityStore, DeathComponent> deathType;
     private final AvatarFlightMountLifecycleService lifecycle = new AvatarFlightMountLifecycleService();
+    private final AvatarFlightSourceFollowService sourceFollow = new AvatarFlightSourceFollowService();
     private final Query<EntityStore> query;
     private final Set<Dependency<EntityStore>> dependencies = Set.of(
-            new SystemDependency<>(Order.BEFORE, AvatarFlightMovementSystem.class)
+            new SystemDependency<>(Order.BEFORE, AvatarFlightMovementSystem.class),
+            new SystemDependency<>(Order.BEFORE, UpdateLocationSystems.TickingSystem.class)
     );
 
     public AvatarFlightMountSessionSystem(
@@ -76,6 +79,7 @@ public final class AvatarFlightMountSessionSystem extends EntityTickingSystem<En
             scheduleEnd(playerRef, playerUuid.getUuid(), session, forced, commandBuffer);
             return;
         }
+        syncSourceToRider(store, session, transform, commandBuffer);
         if (input.isOnGround() && transform.getPosition() != null && transform.getRotation() != null) {
             session.captureLastSafeGround(
                     transform.getPosition().x,
@@ -136,6 +140,19 @@ public final class AvatarFlightMountSessionSystem extends EntityTickingSystem<En
             return AvatarFlightMountLifecycleService.EndReason.SERVER_RESTART;
         }
         return null;
+    }
+
+    private void syncSourceToRider(
+            Store<EntityStore> store,
+            AvatarFlightMountSessionComponent session,
+            TransformComponent riderTransform,
+            CommandBuffer<EntityStore> commandBuffer) {
+        Ref<EntityStore> sourceRef = resolve(store, session.getSourceNpcUuid());
+        if (sourceRef == null || !sourceRef.isValid()) {
+            return;
+        }
+        sourceFollow.sync(riderTransform,
+                commandBuffer.getComponent(sourceRef, transformType));
     }
 
     private void scheduleEnd(Ref<EntityStore> playerRef,

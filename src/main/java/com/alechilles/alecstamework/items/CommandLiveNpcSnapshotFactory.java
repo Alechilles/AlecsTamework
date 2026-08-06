@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.avatarflight.AvatarFlightSnapshotRoleResolver;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
 import com.alechilles.alecstamework.npc.NpcDisplayNameComponentService;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
@@ -14,6 +16,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
@@ -29,7 +32,8 @@ final class CommandLiveNpcSnapshotFactory {
     CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot capture(
             Ref<EntityStore> npcRef,
             Store<EntityStore> store,
-            NPCEntity npc
+            NPCEntity npc,
+            @Nullable CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot previous
     ) {
         if (npcRef == null || !npcRef.isValid() || store == null
                 || npc == null || npc.getUuid() == null) {
@@ -51,21 +55,62 @@ final class CommandLiveNpcSnapshotFactory {
                 ? owner.getOwnerId() : links.getOwnerId();
         String ownerName = owner == null ? null : owner.getOwnerName();
 
-        String roleId = resolveRoleId(npc);
+        String liveRoleId = resolveRoleId(npc);
+        AvatarFlightSourceComponent flightSource = component(
+                npcRef, store, AvatarFlightSourceComponent.getComponentType()
+        );
+        String roleId = AvatarFlightSnapshotRoleResolver.resolve(
+                liveRoleId, flightSource
+        );
+        boolean parkedForAvatarFlight = !Objects.equals(liveRoleId, roleId);
+        if (parkedForAvatarFlight && previous == null) {
+            return null;
+        }
         String customName = resolveCustomName(npcRef, store);
+        CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot captured =
+                new CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot(
+                        npc.getUuid(),
+                        ownerId,
+                        ownerName,
+                        toolIds,
+                        roleId,
+                        TamedStateResolver.isTamed(npcRef, store),
+                        customName,
+                        resolveDisplayName(
+                                npcRef, store, npc, roleId, customName
+                        ),
+                        position(npcRef, store),
+                        links.hasHome() ? links.getHomePosition() : null
+                );
+        return parkedForAvatarFlight
+                ? preserveParkedPresentation(captured, previous)
+                : captured;
+    }
+
+    /** Prevents Empty_Role parking from replacing durable companion presentation and tame state. */
+    static CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot preserveParkedPresentation(
+            CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot captured,
+            @Nullable CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot previous
+    ) {
+        boolean sameCompanionAndRole = previous != null
+                && captured.npcUuid().equals(previous.npcUuid())
+                && Objects.equals(captured.roleId(), previous.roleId());
+        String customName = captured.customName() != null
+                ? captured.customName()
+                : sameCompanionAndRole ? previous.customName() : null;
+        String displayName = sameCompanionAndRole ? previous.displayName() : null;
+        boolean tamed = sameCompanionAndRole ? previous.tamed() : captured.tamed();
         return new CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot(
-                npc.getUuid(),
-                ownerId,
-                ownerName,
-                toolIds,
-                roleId,
-                TamedStateResolver.isTamed(npcRef, store),
+                captured.npcUuid(),
+                captured.ownerId(),
+                captured.ownerName(),
+                captured.toolIds(),
+                captured.roleId(),
+                tamed,
                 customName,
-                resolveDisplayName(
-                        npcRef, store, npc, roleId, customName
-                ),
-                position(npcRef, store),
-                links.hasHome() ? links.getHomePosition() : null
+                displayName,
+                captured.lastKnownPosition(),
+                captured.homePosition()
         );
     }
 

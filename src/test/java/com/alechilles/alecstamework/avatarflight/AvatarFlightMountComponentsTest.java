@@ -31,22 +31,31 @@ class AvatarFlightMountComponentsTest {
     }
 
     @Test
-    void sourceClonePreservesRoleAndVisibilitySnapshot() {
+    void sourceCloneAndCodecPreserveRecoverySnapshot() {
         AvatarFlightSourceComponent source = new AvatarFlightSourceComponent("rider", "Tamed_Drake", 7);
         source.setPreviousState("Idle");
         source.setPreviousSubState("Default");
         source.setPreviousMotionController("Walk");
         source.setWasInteractable(true);
         source.setWasVisible(true);
+        source.setWasFrozen(true);
+        source.setWasIntangible(true);
+        source.setWasInvulnerable(true);
         source.captureOrigin(1.0, 2.0, 3.0, 0.1f, 0.2f, 0.3f);
 
         AvatarFlightSourceComponent copy = source.clone();
+        AvatarFlightSourceComponent persisted = AvatarFlightSourceComponent.CODEC.decode(
+                AvatarFlightSourceComponent.CODEC.encode(copy, new ExtraInfo()),
+                new ExtraInfo());
 
         assertEquals("rider", copy.getRiderUuid());
         assertEquals("Tamed_Drake", copy.getOriginalRoleId());
         assertEquals(7, copy.getOriginalRoleIndex());
         assertTrue(copy.wasInteractable());
         assertTrue(copy.wasVisible());
+        assertTrue(persisted.wasFrozen());
+        assertTrue(persisted.wasIntangible());
+        assertTrue(persisted.wasInvulnerable());
         assertEquals(0.3f, copy.getOriginRoll());
         assertTrue(AvatarFlightRuntimeEpoch.isCurrent(copy.getRuntimeEpoch()));
     }

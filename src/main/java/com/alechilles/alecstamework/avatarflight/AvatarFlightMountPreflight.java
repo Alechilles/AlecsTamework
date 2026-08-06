@@ -89,6 +89,7 @@ public final class AvatarFlightMountPreflight {
                 || has(store, npcRef, AvatarFlightSourceComponent.getComponentType())
                 || has(store, playerRef, AvatarFlightComponent.getComponentType())
                 || has(store, playerRef, MountedComponent.getComponentType())
+                || has(store, npcRef, MountedComponent.getComponentType())
                 || has(store, npcRef, NPCMountComponent.getComponentType())
                 || has(store, playerRef, TameworkRideRiderComponent.getComponentType())
                 || has(store, npcRef, TameworkRideMountComponent.getComponentType())

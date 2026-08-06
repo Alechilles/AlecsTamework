@@ -208,7 +208,8 @@ public final class CommandLinkedNpcStateSnapshotService {
             return;
         }
         LiveLinkedNpcSnapshot snapshot =
-                snapshotFactory.capture(reference, store, npc);
+                snapshotFactory.capture(
+                        reference, store, npc, snapshotsByNpc.get(npcUuid));
         if (snapshot == null) {
             snapshotsByNpc.remove(npcUuid);
             return;

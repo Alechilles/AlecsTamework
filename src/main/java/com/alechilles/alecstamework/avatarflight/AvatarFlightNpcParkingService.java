@@ -1,10 +1,16 @@
 package com.alechilles.alecstamework.avatarflight;
 
+import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.protocol.AnimationSlot;
+import com.hypixel.hytale.protocol.MountController;
+import com.hypixel.hytale.server.core.entity.Frozen;
+import com.hypixel.hytale.server.core.modules.entity.component.Intangible;
 import com.hypixel.hytale.server.core.modules.entity.component.Interactable;
+import com.hypixel.hytale.server.core.modules.entity.component.Invulnerable;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystems;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -47,15 +53,19 @@ public final class AvatarFlightNpcParkingService {
         );
         source.setWasInteractable(store.getComponent(npcRef, Interactable.getComponentType()) != null);
         source.setWasVisible(store.getComponent(npcRef, EntityTrackerSystems.Visible.getComponentType()) != null);
+        source.setWasFrozen(store.getComponent(npcRef, Frozen.getComponentType()) != null);
+        source.setWasIntangible(store.getComponent(npcRef, Intangible.getComponentType()) != null);
+        source.setWasInvulnerable(store.getComponent(npcRef, Invulnerable.getComponentType()) != null);
         return source;
     }
 
     public boolean park(@Nonnull Store<EntityStore> store,
                         @Nonnull Ref<EntityStore> npcRef,
+                        @Nonnull Ref<EntityStore> riderRef,
                         @Nonnull Role role,
                         @Nonnull AvatarFlightSourceComponent source,
                         int emptyRoleIndex) {
-        if (!npcRef.isValid() || emptyRoleIndex < 0) {
+        if (!npcRef.isValid() || !riderRef.isValid() || emptyRoleIndex < 0) {
             return false;
         }
         // Empty_Role has no persistent population ownership. Detach the parked
@@ -63,7 +73,13 @@ public final class AvatarFlightNpcParkingService {
         // avatar-flight teardown restores its original role.
         RoleChangeSystem.requestRoleChange(
                 npcRef, role, emptyRoleIndex, false, null, null, true, store);
+        ensure(store, npcRef, Frozen.getComponentType());
+        ensure(store, npcRef, Intangible.getComponentType());
+        ensure(store, npcRef, Invulnerable.getComponentType());
         removeIfPresent(store, npcRef, Interactable.getComponentType());
+        removeIfPresent(store, npcRef, EntityTrackerSystems.Visible.getComponentType());
+        store.putComponent(npcRef, MountedComponent.getComponentType(),
+                new MountedComponent(riderRef, new Rotation3f(), MountController.Minecart));
         source.setPhase(AvatarFlightMountPhase.ACTIVE);
         return true;
     }
@@ -78,6 +94,7 @@ public final class AvatarFlightNpcParkingService {
         if (!npcRef.isValid()) {
             return;
         }
+        removeIfPresent(store, npcRef, MountedComponent.getComponentType());
         moveNpc(store, npcRef, x, y, z, yaw, 0.0f, 0.0f);
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
         if (npc != null && npc.getRole() != null && source.getOriginalRoleIndex() >= 0) {
@@ -100,6 +117,10 @@ public final class AvatarFlightNpcParkingService {
         if (source.wasInteractable()) {
             ensure(store, npcRef, Interactable.getComponentType());
         }
+        restorePresence(store, npcRef, EntityTrackerSystems.Visible.getComponentType(), source.wasVisible());
+        restorePresence(store, npcRef, Frozen.getComponentType(), source.wasFrozen());
+        restorePresence(store, npcRef, Intangible.getComponentType(), source.wasIntangible());
+        restorePresence(store, npcRef, Invulnerable.getComponentType(), source.wasInvulnerable());
     }
 
     private static void moveNpc(Store<EntityStore> store,
@@ -140,5 +161,17 @@ public final class AvatarFlightNpcParkingService {
     private static <T extends com.hypixel.hytale.component.Component<EntityStore>> void ensure(
             Store<EntityStore> store, Ref<EntityStore> ref, ComponentType<EntityStore, T> type) {
         if (type != null && store.getComponent(ref, type) == null) store.ensureAndGetComponent(ref, type);
+    }
+
+    private static <T extends com.hypixel.hytale.component.Component<EntityStore>> void restorePresence(
+            Store<EntityStore> store,
+            Ref<EntityStore> ref,
+            ComponentType<EntityStore, T> type,
+            boolean present) {
+        if (present) {
+            ensure(store, ref, type);
+        } else {
+            removeIfPresent(store, ref, type);
+        }
     }
 }
