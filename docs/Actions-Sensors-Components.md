@@ -45,9 +45,6 @@ when the owner target is temporarily unavailable. Parameters:
 - `MasterTargetSlot`
 - `FollowDesiredAltitudeRange`
 - `FollowTeleportThresholdRange`
-- `FollowTeleportOffsetRange`
-- `FollowTeleportOffsetSector`
-- `FollowTeleportMaxYOffset`
 - `FollowOrbitRadiusRange`
 - `FollowOrbitRetargetTimeRange`
 - `FollowOrbitStopDistance`
@@ -62,9 +59,6 @@ when the owner target is temporarily unavailable. Parameters:
     "MasterTargetSlot": "MasterTarget",
     "FollowDesiredAltitudeRange": [4, 8],
     "FollowTeleportThresholdRange": 60,
-    "FollowTeleportOffsetRange": [4, 6],
-    "FollowTeleportOffsetSector": 120,
-    "FollowTeleportMaxYOffset": 8,
     "FollowOrbitRadiusRange": [16, 24],
     "FollowOrbitRetargetTimeRange": [3, 6],
     "FollowOrbitStopDistance": 3,
@@ -102,8 +96,8 @@ Parameters:
 
 Aerial counterpart to `Component_Tamework_Instruction_SeekFood_PlayerFollow`.
 It pursues a non-hostile player holding an attractive item, lands safely near
-the target, approaches on foot, and returns to an imported parent state when
-the item is lost. Parameters:
+the target, approaches on foot, and returns to the imported `Idle` parent state
+when the item is lost. Parameters:
 
 - `_ImportStates`
 - `AttractiveItemSet`
@@ -111,7 +105,6 @@ the item is lost. Parameters:
 - `LandingPositionSlot`
 - `FlightSeekStopDistance`
 - `GroundApproachDistanceRange`
-- `ReturnParentState`
 
 ```json
 {
@@ -121,8 +114,7 @@ the item is lost. Parameters:
     "FollowTargetSlot": "LockedTarget",
     "LandingPositionSlot": "MyMod_Aerial_Favorite_Landing",
     "FlightSeekStopDistance": 5,
-    "GroundApproachDistanceRange": [1.5, 2],
-    "ReturnParentState": "Idle"
+    "GroundApproachDistanceRange": [1.5, 2]
   }
 }
 ```
@@ -139,7 +131,6 @@ Parameters:
 - `GroundedActivityFlagName`
 - `LandingRayName`
 - `LandingBlocks`
-- `TakeOffJumpSpeed`
 - `LandingSearchRange`
 - `LandingSearchAngle`
 - `LandingSlowDownDistance`

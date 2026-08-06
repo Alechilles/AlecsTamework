@@ -16,18 +16,6 @@
       "Value": 40,
       "Description": "Distance beyond which teleport fallback is used instead of normal flight catch-up."
     },
-    "FollowTeleportOffsetRange": {
-      "Value": [0, 0],
-      "Description": "Minimum and maximum horizontal offset from the owner used when teleporting."
-    },
-    "FollowTeleportOffsetSector": {
-      "Value": 0,
-      "Description": "Angular sector around the owner used when choosing the teleport offset."
-    },
-    "FollowTeleportMaxYOffset": {
-      "Value": 5,
-      "Description": "Maximum vertical adjustment used to find an accessible teleport destination."
-    },
     "FollowOrbitRadiusRange": {
       "Value": [12, 18],
       "Description": "Wander orbit radius range maintained around the owner."
@@ -103,9 +91,9 @@
         },
         "BodyMotion": {
           "Type": "Teleport",
-          "OffsetRange": { "Compute": "FollowTeleportOffsetRange" },
-          "OffsetSector": { "Compute": "FollowTeleportOffsetSector" },
-          "MaxYOffset": { "Compute": "FollowTeleportMaxYOffset" }
+          "OffsetRange": [4, 6],
+          "OffsetSector": 120,
+          "MaxYOffset": 8
         }
       },
       {

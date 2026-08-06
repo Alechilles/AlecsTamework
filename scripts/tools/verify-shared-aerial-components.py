@@ -12,6 +12,7 @@ from typing import Any, Iterable
 ROOT = Path(__file__).resolve().parents[2]
 COMPONENT_ROOT = ROOT / "src/main/resources/Server/NPC/Roles/_Core/Components"
 EXPECTED = {
+    "Component_Tamework_Instruction_Follow_Flying.json": "Tamework.Instruction.Follow",
     "Component_Tamework_Instruction_Hold_Flying.json": "Tamework.Instruction.Hold",
     "Component_Tamework_Instruction_SeekFood_PlayerFollow_Flying.json":
         "Tamework.Instruction.SeekFood.PlayerFollow.Flying",
@@ -66,23 +67,36 @@ def validate_hold(component: dict[str, Any], errors: list[str]) -> None:
     require(not motions, "flying Hold must not compete with Tamework's landing controller", errors)
 
 
+def validate_follow(component: dict[str, Any], errors: list[str]) -> None:
+    teleports = [node for node in dictionaries(component) if node.get("Type") == "Teleport"]
+    require(len(teleports) == 1, "flying follow must define one teleport fallback", errors)
+    if len(teleports) == 1:
+        teleport = teleports[0]
+        require(teleport.get("OffsetRange") == [4, 6],
+                "flying follow teleport must use a schema-valid literal offset range", errors)
+        require(teleport.get("OffsetSector") == 120,
+                "flying follow teleport must use a schema-valid literal offset sector", errors)
+        require(teleport.get("MaxYOffset") == 8,
+                "flying follow teleport must use a schema-valid literal maximum Y offset", errors)
+
+
 def validate_favorite_item(component: dict[str, Any], errors: list[str]) -> None:
     required = {
         "_ImportStates", "AttractiveItemSet", "FollowTargetSlot", "LandingPositionSlot",
-        "FlightSeekStopDistance", "GroundApproachDistanceRange", "ReturnParentState",
+        "FlightSeekStopDistance", "GroundApproachDistanceRange",
     }
     require(required <= set(component.get("Parameters", {})),
             "flying favorite-item follow is missing public parameters", errors)
     exits = [node for node in dictionaries(component) if node.get("Type") == "ParentState"]
     require(bool(exits), "flying favorite-item follow must return to its parent state", errors)
-    require(all(node.get("State") == {"Compute": "ReturnParentState"} for node in exits),
-            "favorite-item parent exits must compute ReturnParentState", errors)
+    require(all(node.get("State") == "Idle" for node in exits),
+            "favorite-item parent exits must use the schema-valid literal Idle state", errors)
 
 
 def validate_transition(component: dict[str, Any], errors: list[str]) -> None:
     required = {
         "ToggleAirborneModeHookId", "AirborneModeFlagName", "GroundedActivityFlagName",
-        "LandingRayName", "LandingBlocks", "TakeOffJumpSpeed", "LandingSearchRange",
+        "LandingRayName", "LandingBlocks", "LandingSearchRange",
         "LandingSearchAngle", "LandingSlowDownDistance", "LandingStopDistance",
         "LandingHeightDifference", "LandingGoalLenience", "LandingDesiredAltitudeWeight",
     }
@@ -96,9 +110,8 @@ def validate_transition(component: dict[str, Any], errors: list[str]) -> None:
                 and node.get("Name") == {"Compute": "LandingRayName"}
                 and node.get("Blocks") == {"Compute": "LandingBlocks"} for node in nodes),
             "airborne transition landing ray must use computed name and block set", errors)
-    require(any(node.get("Type") == "TakeOff"
-                and node.get("JumpSpeed") == {"Compute": "TakeOffJumpSpeed"} for node in nodes),
-            "airborne transition takeoff speed must be configurable", errors)
+    require(any(node.get("Type") == "TakeOff" and node.get("JumpSpeed") == 4 for node in nodes),
+            "airborne transition takeoff must use a schema-valid literal jump speed", errors)
     require(any(node.get("Type") == "Flag"
                 and node.get("Name") == {"Compute": "GroundedActivityFlagName"}
                 and node.get("Set") is False for node in nodes),
@@ -110,9 +123,12 @@ def main() -> int:
     manifest = json.loads((ROOT / "src/main/resources/manifest.json").read_text(encoding="utf-8"))
     require(manifest.get("Version") == "3.0.0", "Tamework must remain version 3.0.0", errors)
     components = load_components(errors)
+    follow = components.get("Component_Tamework_Instruction_Follow_Flying.json")
     hold = components.get("Component_Tamework_Instruction_Hold_Flying.json")
     favorite = components.get("Component_Tamework_Instruction_SeekFood_PlayerFollow_Flying.json")
     transition = components.get("Component_Tamework_Instruction_Airborne_Mode_Transition.json")
+    if follow is not None:
+        validate_follow(follow, errors)
     if hold is not None:
         validate_hold(hold, errors)
     if favorite is not None:

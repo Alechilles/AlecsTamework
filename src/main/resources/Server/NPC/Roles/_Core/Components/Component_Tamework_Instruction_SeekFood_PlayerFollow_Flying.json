@@ -26,10 +26,6 @@
         1.5,
         2
       ]
-    },
-    "ReturnParentState": {
-      "Value": "Idle",
-      "Description": "Imported parent state restored after the attractive item target is lost."
     }
   },
   "Content": {
@@ -161,9 +157,7 @@
           },
           {
             "Type": "ParentState",
-            "State": {
-              "Compute": "ReturnParentState"
-            }
+            "State": "Idle"
           }
         ]
       },
@@ -462,9 +456,7 @@
           },
           {
             "Type": "ParentState",
-            "State": {
-              "Compute": "ReturnParentState"
-            }
+            "State": "Idle"
           }
         ]
       },
@@ -510,9 +502,7 @@
           },
           {
             "Type": "ParentState",
-            "State": {
-              "Compute": "ReturnParentState"
-            },
+            "State": "Idle",
             "ClearBodyMotion": false
           }
         ],
@@ -562,9 +552,7 @@
           },
           {
             "Type": "ParentState",
-            "State": {
-              "Compute": "ReturnParentState"
-            },
+            "State": "Idle",
             "ClearBodyMotion": false
           }
         ],

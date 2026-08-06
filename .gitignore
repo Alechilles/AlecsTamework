@@ -38,6 +38,7 @@ artifacts/
 /docs/superpowers/
 /.superpowers/
 /.worktrees/
+/.asset-tools/
 
 # Private local agreements
 /private-agreements/

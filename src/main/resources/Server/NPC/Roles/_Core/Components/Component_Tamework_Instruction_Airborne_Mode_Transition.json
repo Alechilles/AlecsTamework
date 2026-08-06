@@ -116,9 +116,7 @@
         ],
         "BodyMotion": {
           "Type": "TakeOff",
-          "JumpSpeed": {
-            "Compute": "TakeOffJumpSpeed"
-          }
+          "JumpSpeed": 4
         }
       },
       {
@@ -235,9 +233,6 @@
     "LandingBlocks": {
       "Value": "StoneAndSoil",
       "Description": "Block set accepted by the landing search ray."
-    },
-    "TakeOffJumpSpeed": {
-      "Value": 4
     },
     "LandingSearchRange": {
       "Value": 64

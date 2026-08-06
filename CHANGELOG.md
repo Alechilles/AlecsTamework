@@ -12,9 +12,8 @@
   downstream mods can share one implementation while overriding species tuning.
 - Shared flying followers inherit `TameworkFlyingOrbit` obstacle avoidance and
   return-to-range improvements without copying the instruction component.
-- Flying-follow teleport recovery now supports configurable horizontal and
-  vertical placement offsets so large companions can avoid overlapping their
-  owner when choosing a valid destination.
+- Flying-follow teleport recovery now chooses a clear position beside the owner
+  instead of overlapping the owner's occupied position.
 - Added a replacement persistence system built around one canonical companion
   profile, stable identity aliases, durable lifecycle state, idempotent
   operations, crash recovery, and ordered projections.
@@ -161,6 +160,9 @@
   separate written permission.
 
 ### Fixed
+- Fixed shared flying components using computed values for Hytale fields that
+  only accept literals, which caused downstream flying NPC roles to fail
+  validation.
 - Fixed public v2.16.1 captured companions and filled spawners failing to
   restore after import, including records without an optional tamed-state field.
 - Fixed imported worlds remaining read-only when companions continued loading
