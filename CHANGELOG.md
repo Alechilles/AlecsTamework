@@ -1,16 +1,12 @@
 # Changelog
 
-## 3.1.0 - Shared Follow Components - 2026-08-05
+## 3.0.0 - Persistence Replacement and Companion Systems Overhaul - 2026-08-04
 
 ### Added
 - Added reusable large-ground and autonomous-flying NPC follow components so
   downstream mods can share one implementation while overriding species tuning.
 - Shared flying followers inherit `TameworkFlyingOrbit` obstacle avoidance and
   return-to-range improvements without copying the instruction component.
-
-## 3.0.0 - Persistence Replacement and Companion Systems Overhaul - 2026-08-04
-
-### Added
 - Added a replacement persistence system built around one canonical companion
   profile, stable identity aliases, durable lifecycle state, idempotent
   operations, crash recovery, and ordered projections.
