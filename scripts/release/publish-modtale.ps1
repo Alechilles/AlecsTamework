@@ -203,12 +203,23 @@ $versionFieldName = if ([string]::IsNullOrWhiteSpace($config.modtale.versionFiel
 $changelogFieldName = if ([string]::IsNullOrWhiteSpace($config.modtale.changelogFieldName)) { "changelog" } else { $config.modtale.changelogFieldName }
 $channelFieldName = if ([string]::IsNullOrWhiteSpace($config.modtale.channelFieldName)) { "channel" } else { $config.modtale.channelFieldName }
 $gameVersionFieldName = if ([string]::IsNullOrWhiteSpace($config.modtale.gameVersionFieldName)) { "gameVersions" } else { $config.modtale.gameVersionFieldName }
+$modIds = @($config.modtale.dependencies | ForEach-Object {
+    $dependencyProjectId = "$($_.projectId)".Trim()
+    $version = "$($_.version)".Trim()
+    if ([string]::IsNullOrWhiteSpace($dependencyProjectId) -or [string]::IsNullOrWhiteSpace($version)) {
+        throw "Each modtale.dependencies entry must include projectId and version."
+    }
+    "$dependencyProjectId`:$version"
+})
 
 if ($DryRun) {
     Write-Host "Dry-run: would publish '$ArtifactPath' to Modtale project '$projectId'."
     Write-Host "Endpoint: $endpoint"
     Write-Host "Version: $normalizedVersion"
     Write-Host "Channel: $channel"
+    if ($modIds.Count -gt 0) {
+        Write-Host "Required dependencies: $($modIds -join ', ')"
+    }
     if ([string]::IsNullOrWhiteSpace($projectId)) {
         Write-Host "Note: modtale.projectId is empty in $ConfigPath."
     }
@@ -235,6 +246,10 @@ $curlArgs = @(
 
 foreach ($gameVersion in @($config.modtale.gameVersions)) {
     $curlArgs += @("-F", "$gameVersionFieldName=$gameVersion")
+}
+
+foreach ($modId in $modIds) {
+    $curlArgs += @("-F", "modIds=$modId")
 }
 
 $curlArgs += @("-F", "file=@$ArtifactPath")
@@ -288,6 +303,7 @@ if ($statusCodeInt -lt 200 -or $statusCodeInt -ge 300) {
             $changelogFieldName = $changelog
             $channelFieldName = $channel
             $gameVersionFieldName = @($config.modtale.gameVersions)
+            modIds = $modIds
         }
         $updatePayload = $updatePayloadObject | ConvertTo-Json -Depth 16 -Compress
 

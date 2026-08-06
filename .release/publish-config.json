@@ -20,6 +20,11 @@
         "id": 1560961,
         "slug": "creditor",
         "type": "embeddedLibrary"
+      },
+      {
+        "id": 1634146,
+        "slug": "patchwork",
+        "type": "requiredDependency"
       }
     ]
   },
@@ -30,7 +35,13 @@
     "versionFieldName": "versionNumber",
     "changelogFieldName": "changelog",
     "channelFieldName": "channel",
-    "gameVersionFieldName": "gameVersions"
+    "gameVersionFieldName": "gameVersions",
+    "dependencies": [
+      {
+        "projectId": "bcd2bd29-98f7-4917-a999-6afd704c2191",
+        "version": "1.2.1"
+      }
+    ]
   },
   "modifold": {
     "projectSlug": "alecs-tamework",
@@ -38,7 +49,9 @@
     "versionPrefix": "v",
     "gameVersions": ["0.5.7", "0.5.6", "0.5.5", "0.5.4", "0.5.3", "0.5.2", "0.5.1", "0.5.0"],
     "loaders": ["Vanilla"],
-    "dependencies": []
+    "dependencies": [
+      { "slug": "patchwork", "type": "required" }
+    ]
   }
 }
 
