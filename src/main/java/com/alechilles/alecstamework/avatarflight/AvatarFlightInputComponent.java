@@ -408,7 +408,7 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
     }
 
     public void beginLaunchCharge(long nowMs) {
-        if (!isLaunchCharging()) {
+        if (!isLaunchCharging() && launchReleasedAtMs == 0L) {
             launchChargeStartedAtMs = nowMs;
         }
     }

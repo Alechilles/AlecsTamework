@@ -162,6 +162,8 @@
   separate written permission.
 
 ### Fixed
+- Fixed fully charged Avatar Flight launches sometimes being replaced by a
+  tiny second charge before the movement tick applied the launch.
 - Fixed Avatar Flight ending midair during longer flights by keeping the hidden
   parked companion attached to its rider instead of leaving it in the takeoff chunk.
 - Fixed Avatar Flight sometimes moving a companion back to its takeoff location

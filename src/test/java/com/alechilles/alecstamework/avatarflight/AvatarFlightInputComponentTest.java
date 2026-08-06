@@ -212,6 +212,20 @@ class AvatarFlightInputComponentTest {
     }
 
     @Test
+    void pendingFullChargeReleaseCannotBeOverwrittenByPacketStateChatter() {
+        AvatarFlightInputComponent input = new AvatarFlightInputComponent();
+
+        input.beginLaunchCharge(1_000L);
+        input.queueLaunchRelease(4_000L);
+        input.beginLaunchCharge(4_050L);
+        input.queueLaunchRelease(4_100L);
+
+        assertTrue(input.consumeLaunchRelease(4_150L, 1_000L));
+        assertEquals(3_000L, input.getLaunchHoldMs(),
+                "a queued full-charge release must remain authoritative until the movement tick consumes it");
+    }
+
+    @Test
     void cancellingLaunchChargePreventsReleaseQueue() {
         AvatarFlightInputComponent input = new AvatarFlightInputComponent();
 
