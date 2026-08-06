@@ -12,6 +12,9 @@
   downstream mods can share one implementation while overriding species tuning.
 - Shared flying followers inherit `TameworkFlyingOrbit` obstacle avoidance and
   return-to-range improvements without copying the instruction component.
+- Flying-follow teleport recovery now supports configurable horizontal and
+  vertical placement offsets so large companions can avoid overlapping their
+  owner when choosing a valid destination.
 - Added a replacement persistence system built around one canonical companion
   profile, stable identity aliases, durable lifecycle state, idempotent
   operations, crash recovery, and ordered projections.

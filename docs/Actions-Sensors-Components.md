@@ -45,6 +45,9 @@ when the owner target is temporarily unavailable. Parameters:
 - `MasterTargetSlot`
 - `FollowDesiredAltitudeRange`
 - `FollowTeleportThresholdRange`
+- `FollowTeleportOffsetRange`
+- `FollowTeleportOffsetSector`
+- `FollowTeleportMaxYOffset`
 - `FollowOrbitRadiusRange`
 - `FollowOrbitRetargetTimeRange`
 - `FollowOrbitStopDistance`
@@ -59,6 +62,9 @@ when the owner target is temporarily unavailable. Parameters:
     "MasterTargetSlot": "MasterTarget",
     "FollowDesiredAltitudeRange": [4, 8],
     "FollowTeleportThresholdRange": 60,
+    "FollowTeleportOffsetRange": [4, 6],
+    "FollowTeleportOffsetSector": 120,
+    "FollowTeleportMaxYOffset": 8,
     "FollowOrbitRadiusRange": [16, 24],
     "FollowOrbitRetargetTimeRange": [3, 6],
     "FollowOrbitStopDistance": 3,
