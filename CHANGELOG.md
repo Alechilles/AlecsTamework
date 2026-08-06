@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.0.0 - Persistence Replacement and Companion Systems Overhaul - Unreleased
+## 3.0.1 - Linked Patchwork Asset-Pack Hotfix - Unreleased
 
 ### Added
 - Added a shared attitude target for tamed companions, letting dependent mods
@@ -61,6 +61,8 @@
 - Embedded Patchwork 1.2.1 as Tamework's non-destructive JSON asset-patch
   runtime, including version-first runtime election, Tamework macros,
   composable conditions, and registered mod-data JSON sources.
+- Updated the embedded Patchwork runtime to 1.2.2 so linked development asset
+  packs are discovered and patched normally.
 - Added `TwDynamicAttachmentsConfig` for permanent or reversible,
   while-matching NPC attachment changes based on role, name, needs, happiness,
   traits, life stage, gender, tame/owner state, and percentage thresholds.
