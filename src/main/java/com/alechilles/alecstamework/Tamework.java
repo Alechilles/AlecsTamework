@@ -905,15 +905,6 @@ public class Tamework extends JavaPlugin {
         );
         ComponentType<EntityStore, SpawnMarkerEntity> spawnMarkerEntityType =
                 resolveOptionalSpawnMarkerEntityComponentType();
-        if (spawnMarkerEntityType != null) {
-            getEntityStoreRegistry().registerSystem(
-                    new CompanionSpawnAuthorityCleanupSystems.Marker(
-                            spawnMarkerEntityType,
-                            tamedComponentType,
-                            this::isProjectedTamedCompanion
-                    )
-            );
-        }
         getEntityStoreRegistry().registerSystem(
                 new SummonedCompanionExperienceSystem(
                         NPCEntity.getComponentType(),
@@ -1009,8 +1000,26 @@ public class Tamework extends JavaPlugin {
                     populationGroupConfigRegistry
             );
         } catch (RuntimeException genericStartupFailure) {
+            if (spawnMarkerEntityType != null) {
+                getEntityStoreRegistry().registerSystem(
+                        new CompanionSpawnAuthorityCleanupSystems.Marker(
+                                spawnMarkerEntityType,
+                                tamedComponentType,
+                                ignored -> false
+                        )
+                );
+            }
             activateBondedOnlyFallback(genericStartupFailure);
             return;
+        }
+        if (spawnMarkerEntityType != null) {
+            getEntityStoreRegistry().registerSystem(
+                    new CompanionSpawnAuthorityCleanupSystems.Marker(
+                            spawnMarkerEntityType,
+                            tamedComponentType,
+                            this::isProjectedTamedCompanion
+                    )
+            );
         }
         commandNpcRelocationService = new CommandNpcRelocationService(
                 getLogger(),
