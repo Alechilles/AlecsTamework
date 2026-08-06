@@ -33,4 +33,25 @@ record BreedingPairContext(
     public Vector3d spawnAnchor() {
         return spawnAnchor == null ? null : new Vector3d(spawnAnchor);
     }
+
+    @Nonnull
+    BreedingPairContext withParentOwners(
+            @Nonnull BreedingOffspringProgressionService.OwnerSnapshot ownerA,
+            @Nonnull BreedingOffspringProgressionService.OwnerSnapshot ownerB
+    ) {
+        return new BreedingPairContext(
+                parentAUuid,
+                parentBUuid,
+                parentARoleId,
+                parentBRoleId,
+                parentARoleIndex,
+                parentBRoleIndex,
+                spawnAnchor,
+                ownerA,
+                ownerB,
+                parentATamed,
+                parentBTamed,
+                breedingConfigId
+        );
+    }
 }

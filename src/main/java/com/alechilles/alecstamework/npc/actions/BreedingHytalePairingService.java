@@ -4,8 +4,6 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
-import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
-import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -34,6 +32,7 @@ final class BreedingHytalePairingService {
     private static final double SPAWN_HEIGHT_OFFSET = 1.0;
 
     private final BreedingPartnerService partnerService;
+    private final BreedingPairAdmissionRegistry admissionRegistry;
     private final BreedingParentCooldownResolver cooldownResolver =
             new BreedingParentCooldownResolver();
     private final BreedingPairEffectsService pairEffects =
@@ -45,8 +44,12 @@ final class BreedingHytalePairingService {
     private final BreedingClaimLimitPolicyService limitPolicy =
             new BreedingClaimLimitPolicyService();
 
-    BreedingHytalePairingService(@Nonnull BreedingPartnerService partnerService) {
+    BreedingHytalePairingService(
+            @Nonnull BreedingPartnerService partnerService,
+            @Nonnull BreedingPairAdmissionRegistry admissionRegistry
+    ) {
         this.partnerService = partnerService;
+        this.admissionRegistry = admissionRegistry;
     }
 
     boolean tryPassive(
@@ -113,20 +116,56 @@ final class BreedingHytalePairingService {
         if (candidate == null || population == null || !population.allowed()) {
             return false;
         }
-        World world = candidate.world();
         BreedingPairContext context = createContext(candidate, config);
+        BreedingPairAdmissionRegistry.Lease admission =
+                admissionRegistry.tryAcquire(
+                        candidate.store(),
+                        context.parentAUuid(),
+                        context.parentBUuid()
+                );
+        if (admission == null) {
+            logDebug("Breeding pairing skipped because a parent already has a scheduled birth.");
+            return false;
+        }
         if (!applyPairEffects(candidate, config, commandBuffer)) {
+            admission.close();
             return false;
         }
         reserveSweepHeadroom(population, pendingClaims, pendingOwners);
-        delayedEffects.schedule(
-                world,
-                context.parentAUuid(),
-                context.parentBUuid(),
-                () -> birthService.spawn(world, context),
-                () -> logDebug("Breeding delayed pairing canceled before spawn.")
-        );
-        return true;
+        return scheduleBirth(candidate.world(), context, admission);
+    }
+
+    private boolean scheduleBirth(
+            @Nonnull World world,
+            @Nonnull BreedingPairContext context,
+            @Nonnull BreedingPairAdmissionRegistry.Lease admission
+    ) {
+        try {
+            delayedEffects.schedule(
+                    world,
+                    context.parentAUuid(),
+                    context.parentBUuid(),
+                    () -> {
+                        try {
+                            birthService.spawn(world, context);
+                        } finally {
+                            admission.close();
+                        }
+                    },
+                    () -> {
+                        try {
+                            logDebug("Breeding delayed pairing canceled before spawn.");
+                        } finally {
+                            admission.close();
+                        }
+                    }
+            );
+            return true;
+        } catch (RuntimeException | LinkageError failure) {
+            admission.close();
+            logDebug("Breeding delayed pairing could not be scheduled.");
+            return false;
+        }
     }
 
     @Nullable
@@ -180,8 +219,8 @@ final class BreedingHytalePairingService {
                 store,
                 world,
                 resolveSpawnAnchor(sourceRef, partnerRef, store),
-                owner(sourceRef, store),
-                owner(partnerRef, store)
+                BreedingOwnerSnapshotResolver.resolve(sourceRef, store),
+                BreedingOwnerSnapshotResolver.resolve(partnerRef, store)
         );
     }
 
@@ -297,40 +336,6 @@ final class BreedingHytalePairingService {
         ComponentType<EntityStore, TameworkBreedingComponent> type =
                 TameworkBreedingComponent.getComponentType();
         return type == null ? null : store.getComponent(ref, type);
-    }
-
-    @Nonnull
-    private static BreedingOffspringProgressionService.OwnerSnapshot owner(
-            @Nonnull Ref<EntityStore> ref,
-            @Nonnull Store<EntityStore> store
-    ) {
-        ComponentType<EntityStore, TameworkOwnerComponent> ownerType =
-                TameworkOwnerComponent.getComponentType();
-        TameworkOwnerComponent owner = ownerType == null
-                ? null
-                : store.getComponent(ref, ownerType);
-        UUID ownerId = owner == null ? null : owner.getOwnerId();
-        if (ownerId == null) {
-            ownerId = commandOwner(ref, store);
-        }
-        return ownerId == null
-                ? BreedingOffspringProgressionService.OwnerSnapshot.empty()
-                : new BreedingOffspringProgressionService.OwnerSnapshot(
-                        ownerId, owner == null ? null : owner.getOwnerName()
-                );
-    }
-
-    @Nullable
-    private static UUID commandOwner(
-            @Nonnull Ref<EntityStore> ref,
-            @Nonnull Store<EntityStore> store
-    ) {
-        ComponentType<EntityStore, TameworkCommandLinksComponent> type =
-                TameworkCommandLinksComponent.getComponentType();
-        TameworkCommandLinksComponent links = type == null
-                ? null
-                : store.getComponent(ref, type);
-        return links == null ? null : links.getOwnerId();
     }
 
     @Nullable

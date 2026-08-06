@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
@@ -34,7 +35,13 @@ final class InteractionBreedingEffects {
 
     InteractionBreedingEffects(ActionTameworkInteract owner) {
         this.owner = owner;
-        this.offspringService = new BreedingOffspringService(new BreedingPartnerService());
+        Tamework plugin = Tamework.getInstance();
+        BreedingPairAdmissionRegistry admissionRegistry = plugin == null
+                ? new BreedingPairAdmissionRegistry()
+                : plugin.getBreedingPairAdmissionRegistry();
+        this.offspringService = new BreedingOffspringService(
+                new BreedingPartnerService(), admissionRegistry
+        );
     }
 
     boolean applyStartBreeding(@Nullable BreedInteraction interaction,

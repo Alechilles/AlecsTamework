@@ -41,7 +41,15 @@ public final class PassiveBreedingSweepService {
     private final BreedingPopulationTypeService populationTypeService;
 
     public PassiveBreedingSweepService() {
-        this.offspringService = new BreedingOffspringService(new BreedingPartnerService());
+        this(new BreedingPairAdmissionRegistry());
+    }
+
+    public PassiveBreedingSweepService(
+            @Nonnull BreedingPairAdmissionRegistry admissionRegistry
+    ) {
+        this.offspringService = new BreedingOffspringService(
+                new BreedingPartnerService(), admissionRegistry
+        );
         this.populationTypeService = new BreedingPopulationTypeService();
     }
 
@@ -154,7 +162,9 @@ public final class PassiveBreedingSweepService {
         );
         if (typeKey != null && !typeKey.isBlank()) {
             reservations.add(new PassiveBreedingBirthReservation(
-                    typeKey, new Vector3d(candidate.position())
+                    typeKey,
+                    new Vector3d(candidate.position()),
+                    BreedingFertilityOffspringService.maxOffspringPerBreed()
             ));
         }
     }
@@ -246,7 +256,7 @@ public final class PassiveBreedingSweepService {
                     .sub(center)
                     .lengthSquared();
             if (Double.isFinite(distanceSq) && distanceSq <= radiusSq) {
-                count++;
+                count += Math.max(0, reservation.count());
             }
         }
         return count;
@@ -303,5 +313,9 @@ record PassiveBreedingSweepCandidate(Ref<EntityStore> ref,
                                      TwBreedingConfig config) {
 }
 
-record PassiveBreedingBirthReservation(String typeKey, Vector3d position) {
+record PassiveBreedingBirthReservation(
+        String typeKey,
+        Vector3d position,
+        int count
+) {
 }

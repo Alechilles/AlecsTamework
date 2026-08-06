@@ -22,9 +22,8 @@ import org.joml.Vector3d;
 /**
  * Resolves and spawns a litter from current world state after the pairing animation.
  *
- * <p>Capacity is checked once against the released SimpleClaims scan and current
- * world store. The resulting headroom bounds this litter without creating durable
- * leases.
+ * <p>Capacity is checked against the released SimpleClaims scan and the current
+ * nearby same-type population immediately before the litter is spawned.
  */
 final class BreedingOffspringBirthService {
     private static final double SPAWN_HEIGHT_OFFSET = 1.0;
@@ -35,6 +34,10 @@ final class BreedingOffspringBirthService {
             new BreedingOffspringSpawnService(new BreedingOffspringRoleResolver());
     private final BreedingClaimLimitPolicyService limitPolicy =
             new BreedingClaimLimitPolicyService();
+    private final BreedingPopulationTypeService populationTypeService =
+            new BreedingPopulationTypeService();
+    private final BreedingNearbyPopulationAllowance nearbyAllowance =
+            new BreedingNearbyPopulationAllowance();
     private final BreedingCooldownService cooldownService =
             new BreedingCooldownService();
     private final BreedingPairingEffectsService effectsService =
@@ -54,21 +57,59 @@ final class BreedingOffspringBirthService {
         if (store == null || parents == null) {
             return;
         }
-        BreedingFertilityOffspringService.FertilityRoll fertility =
-                fertilityService.rollOffspring(parents.parentA(), parents.parentB(), store);
-        if (fertility.offspringCount() <= 0) {
-            logNoOffspring(context, fertility);
-            return;
-        }
         SpawnSetup setup = resolveSetup(store, parents, context);
         if (setup == null) {
             return;
         }
-        BirthAllowance allowance = resolveAllowance(
-                store, context, setup, fertility.offspringCount()
+        BreedingPairContext liveContext = refreshParentOwners(
+                store, parents, context, setup
         );
-        int spawnedCount = spawnChildren(store, parents, context, setup, allowance);
-        finishLitter(store, parents, context, fertility, spawnedCount);
+        if (liveContext == null) {
+            return;
+        }
+        BreedingFertilityOffspringService.FertilityRoll fertility =
+                fertilityService.rollOffspring(parents.parentA(), parents.parentB(), store);
+        if (fertility.offspringCount() <= 0) {
+            logNoOffspring(liveContext, fertility);
+            return;
+        }
+        BirthAllowance allowance = resolveAllowance(
+                store, liveContext, setup, fertility.offspringCount()
+        );
+        int spawnedCount = spawnChildren(
+                store, parents, liveContext, setup, allowance
+        );
+        finishLitter(store, parents, liveContext, fertility, spawnedCount);
+    }
+
+    @Nullable
+    private BreedingPairContext refreshParentOwners(
+            @Nonnull Store<EntityStore> store,
+            @Nonnull ParentRefs parents,
+            @Nonnull BreedingPairContext context,
+            @Nonnull SpawnSetup setup
+    ) {
+        BreedingOffspringProgressionService.OwnerSnapshot parentA =
+                BreedingOwnerSnapshotResolver.resolve(parents.parentA(), store);
+        BreedingOffspringProgressionService.OwnerSnapshot parentB =
+                BreedingOwnerSnapshotResolver.resolve(parents.parentB(), store);
+        TwBreedingConfig.PairingSettings pairing = setup.config() == null
+                ? null
+                : setup.config().resolvePairing(firstNonBlank(
+                        setup.parentARole(), setup.parentBRole()
+                ));
+        boolean requireSameOwner = pairing != null
+                && pairing.isRequireSameOwner();
+        if (!BreedingOwnerSnapshotResolver.allowsDelayedBirth(
+                requireSameOwner, parentA, parentB
+        )) {
+            logInfo(String.format(
+                    "Breeding delayed birth canceled after parent ownership changed: parentA=%s parentB=%s.",
+                    context.parentAUuid(), context.parentBUuid()
+            ));
+            return null;
+        }
+        return context.withParentOwners(parentA, parentB);
     }
 
     @Nullable
@@ -91,9 +132,21 @@ final class BreedingOffspringBirthService {
         if (position == null) {
             return null;
         }
+        TwBreedingConfig config = resolveConfig(context.breedingConfigId());
+        if (context.breedingConfigId() != null
+                && !context.breedingConfigId().isBlank()
+                && config == null) {
+            logInfo(String.format(
+                    "Breeding delayed birth canceled because config %s no longer resolves: parentA=%s parentB=%s.",
+                    context.breedingConfigId(),
+                    context.parentAUuid(),
+                    context.parentBUuid()
+            ));
+            return null;
+        }
         return new SpawnSetup(
                 npcPlugin,
-                resolveConfig(context.breedingConfigId()),
+                config,
                 parentARole,
                 parentBRole,
                 position,
@@ -127,7 +180,45 @@ final class BreedingOffspringBirthService {
         int count = decision.capEnforced()
                 ? Math.min(requested, decision.remainingHeadroom())
                 : requested;
+        count = limitByNearbyPopulation(store, setup, firstRole, count);
         return new BirthAllowance(Math.max(0, count), firstRole);
+    }
+
+    private int limitByNearbyPopulation(
+            @Nonnull Store<EntityStore> store,
+            @Nonnull SpawnSetup setup,
+            @Nonnull BreedingResolvedSpawnRole firstRole,
+            int requested
+    ) {
+        TwBreedingConfig config = setup.config();
+        String pairingRole = firstNonBlank(
+                setup.parentARole(), firstRole.roleId()
+        );
+        TwBreedingConfig.PairingSettings pairing = config == null
+                ? null
+                : config.resolvePairing(pairingRole);
+        if (pairing == null) {
+            return requested;
+        }
+        int maxNearby = pairing.resolveMaxNearbySameType(pairingRole);
+        String typeKey = populationTypeService.resolveTypeKey(
+                firstRole.roleId(), config
+        );
+        if (maxNearby <= 0 || typeKey == null || typeKey.isBlank()) {
+            return requested;
+        }
+        double radius = sanitizeRadius(pairing.getBreedRadius());
+        int existing = populationTypeService.countNearbyOfType(
+                store, setup.position(), radius, config, typeKey
+        );
+        int allowed = nearbyAllowance.limit(requested, existing, maxNearby);
+        if (allowed < requested) {
+            logInfo(String.format(
+                    "Breeding litter limited by nearby population: type=%s existing=%d max=%d requested=%d allowed=%d.",
+                    typeKey, existing, maxNearby, requested, allowed
+            ));
+        }
+        return allowed;
     }
 
     private int spawnChildren(
@@ -340,6 +431,10 @@ final class BreedingOffspringBirthService {
         return first != null && !first.isBlank()
                 ? first
                 : second != null && !second.isBlank() ? second : null;
+    }
+
+    private static double sanitizeRadius(double radius) {
+        return !Double.isFinite(radius) || radius <= 0.0 ? 10.0 : radius;
     }
 
     @Nonnull

@@ -21,8 +21,13 @@ import javax.annotation.Nullable;
 final class BreedingOffspringService {
     private final BreedingHytalePairingService pairingService;
 
-    BreedingOffspringService(@Nonnull BreedingPartnerService partnerService) {
-        this.pairingService = new BreedingHytalePairingService(partnerService);
+    BreedingOffspringService(
+            @Nonnull BreedingPartnerService partnerService,
+            @Nonnull BreedingPairAdmissionRegistry admissionRegistry
+    ) {
+        this.pairingService = new BreedingHytalePairingService(
+                partnerService, admissionRegistry
+        );
     }
 
     boolean tryCompletePairing(@Nullable Ref<EntityStore> sourceRef,

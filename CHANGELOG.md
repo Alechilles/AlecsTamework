@@ -214,7 +214,14 @@
   capture, release, coop, Recall, and companion-state writes.
 - Fixed tamed companions remaining owned by their original Hytale spawn marker
   or beacon, which could unload and restore them after players left the area.
-  Existing loaded companions now repair both sides of that spawn relationship.
+  Existing companions and markers now repair both sides of that relationship,
+  even when the other entity is not loaded at the same time.
+- Prevented overlapping queued breedings from reusing the same parent and now
+  rechecks nearby population limits when each delayed litter is born, containing
+  rare animal floods after leaving and returning to an area.
+- Delayed births now refresh both parents' ownership before spawning. Pairings
+  configured to require one owner are canceled if ownership changed, rather
+  than giving offspring a stale or scan-order-dependent owner.
 - Fixed automatic Hytale backups failing on Windows while persistence was
   active by moving process locks to Hytale's backup-excluded `LOCK` layout.
 - Removed a false packaged-server SLF4J binder `SEVERE` warning when opening

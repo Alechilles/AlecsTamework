@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.npc.actions.BreedingPairAdmissionRegistry;
 import com.alechilles.alecstamework.npc.actions.PassiveBreedingSweepService;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.util.StoreScopedState;
@@ -25,7 +26,13 @@ public final class CompanionPassiveBreedingSystem extends TickingSystem<EntitySt
     private final StoreScopedState<TickState> statesByStore = new StoreScopedState<>(TickState::new);
 
     public CompanionPassiveBreedingSystem() {
-        this.sweepService = new PassiveBreedingSweepService();
+        this(new BreedingPairAdmissionRegistry());
+    }
+
+    public CompanionPassiveBreedingSystem(
+            @Nonnull BreedingPairAdmissionRegistry admissionRegistry
+    ) {
+        this.sweepService = new PassiveBreedingSweepService(admissionRegistry);
     }
 
     @Override

@@ -146,7 +146,14 @@ Behavior:
 - `MinHappiness` is ignored when the happiness system or breeding happiness requirement is disabled.
 - When a manually selected pair is found: applies parent cooldown, pair movement, hearts, delayed offspring spawn.
 - Fertility intentionally resolves a litter of zero through four offspring. Tamework multiplies the two resolved parent fertility factors, clamps the expected litter to four, guarantees the whole-number portion, and uses one fractional roll for at most one additional child. Similar-looking siblings from one admitted litter are not duplicate callbacks.
-- `Pairing.MaxNearbySameType` is checked against nearby live NPCs.
+- `Pairing.MaxNearbySameType` is checked against nearby live NPCs. Passive
+  sweeps reserve the maximum possible litter, and delayed births recheck live
+  headroom immediately before spawning.
+- A parent can belong to only one queued manual or passive pairing at a time;
+  the admission is released when the delayed birth completes or is canceled.
+- Delayed births refresh both parent owners before spawning. When
+  `Pairing.RequireSameOwner` is enabled, the birth is canceled if both parents
+  no longer have the same known owner.
 - Direct SimpleClaims rules may require a claim and apply per-chunk or
   total-claim breeding limits.
 - Pairing can require the same role, require different adult roles in one lifecycle family, allow any adult in one lifecycle family, or explicitly allow any role through `TwBreedingConfig.Pairing.RoleCompatibility`.

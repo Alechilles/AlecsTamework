@@ -104,6 +104,7 @@ import com.alechilles.alecstamework.interactions.TameworkLaunchProjectileInterac
 import com.alechilles.alecstamework.interactions.TameworkManagedCoopCaptureCrateInteraction;
 import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
+import com.alechilles.alecstamework.npc.actions.BreedingPairAdmissionRegistry;
 import com.alechilles.alecstamework.npc.actions.HeldItemAttachmentInteractionService;
 import com.alechilles.alecstamework.integration.creditor.CreditorIntegration;
 import com.alechilles.alecstamework.integration.nameplatebuilder.NameplateBuilderBridgeLoader;
@@ -357,6 +358,8 @@ public class Tamework extends JavaPlugin {
     private final Object overrideAssetEventSuppressionLock = new Object();
     private final OwnerPopulationLiveIndex ownerPopulationLiveIndex =
             new OwnerPopulationLiveIndex();
+    private final BreedingPairAdmissionRegistry breedingPairAdmissionRegistry =
+            new BreedingPairAdmissionRegistry();
     private int overrideAssetEventSuppressionDepth;
     private boolean globalReconcilePendingAfterOverrideReload;
     private ComponentType<EntityStore, TameworkOwnerComponent> ownerComponentType;
@@ -946,7 +949,9 @@ public class Tamework extends JavaPlugin {
                 )
         );
         getEntityStoreRegistry().registerSystem(new CompanionNeedsSystem());
-        getEntityStoreRegistry().registerSystem(new CompanionPassiveBreedingSystem());
+        getEntityStoreRegistry().registerSystem(
+                new CompanionPassiveBreedingSystem(breedingPairAdmissionRegistry)
+        );
         apiEventBus = new TameworkEventBus(getLogger());
         runtimeDataDirectory = new TameworkDataPathService(getLogger())
                 .resolveAndInitializeDataPathLayout(getDataDirectory())
@@ -1690,6 +1695,11 @@ public class Tamework extends JavaPlugin {
                         && profile.currentAlias() != null
                         && npcUuid.equals(profile.currentAlias().value()))
                 .isPresent();
+    }
+
+    @Nonnull
+    public BreedingPairAdmissionRegistry getBreedingPairAdmissionRegistry() {
+        return breedingPairAdmissionRegistry;
     }
 
     public TranslationRegistry getTranslationRegistry() {
