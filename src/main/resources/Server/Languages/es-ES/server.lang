@@ -49,3 +49,19 @@ tamework.ui.notifications.capture.rosterFull=Tu lista de compañeros está llena
 tamework.ui.notifications.capture.toolRequired=Se requiere una herramienta de captura para usar {0}.
 tamework.ui.notifications.capture.chanceFailed={0} no logró capturar a {1}.
 tamework.ui.notifications.capture.unavailable=La captura no está disponible ahora mismo.
+
+# ===== Tamework UI: Anuncio de configuración =====
+tamework.ui.settingsAnnouncement.welcome.title=Te damos la bienvenida a Alec's Tamework
+tamework.ui.settingsAnnouncement.welcome.subtitle=Tamework incorpora ajustes compartidos de compañeros, progreso y servidor para muchos mods.
+tamework.ui.settingsAnnouncement.welcome.body.intro=Gracias por instalar Alec's Tamework. Este framework incorpora funciones compartidas para muchos mods, como propiedad de compañeros, comandos, necesidades, felicidad, cría, rasgos, viaje, reanimación, telemetría e integraciones opcionales.
+tamework.ui.settingsAnnouncement.welcome.body.settings=El menú /tw settings permite a los propietarios de servidores elegir qué partes de esta experiencia estarán activas. Desde ahí puedes revisar preajustes, protección de propiedad, reglas de captura y vínculo, límites de población, daño por necesidades, felicidad, cría pasiva, cría por sexo, rasgos, reanimación y viaje. Usa /telemetry consent para elegir las opciones de telemetría.
+tamework.ui.settingsAnnouncement.welcome.body.scope=Este mensaje de bienvenida aparece la primera vez que un OP o jugador local en solitario usa Tamework. Los futuros avisos específicos de versión solo se mostrarán si hay actualizaciones críticas que requieran tu atención.
+tamework.ui.settingsAnnouncement.welcome.optOut=No volver a mostrar
+tamework.ui.settingsAnnouncement.title=Alec's Tamework 3.0: Reestructuración de la persistencia
+tamework.ui.settingsAnnouncement.subtitle=El sistema de persistencia de Tamework se ha reestructurado por completo.
+tamework.ui.settingsAnnouncement.body.intro=El nuevo sistema de persistencia está diseñado para que los datos de los compañeros sean más fiables, pero una reestructuración grande aún puede tener algunos contratiempos. Presta atención a comportamientos inesperados relacionados con compañeros, capturas, almacenamiento o restauración.
+tamework.ui.settingsAnnouncement.body.defaults=Si encuentras algún problema, ejecuta /tw debugdb export antes de reiniciar si es posible. Esto crea un paquete de soporte depurado en Data/diagnostics.
+tamework.ui.settingsAnnouncement.body.scope=Después, crea un informe en el canal Issues and Bug Reports del servidor de Discord: https://discord.gg/uP5bNTVSze. Incluye el registro completo del servidor y el paquete exportado.
+tamework.ui.settingsAnnouncement.optOut=No volver a mostrar hasta el próximo anuncio
+tamework.ui.settingsAnnouncement.button.later=Más tarde
+tamework.ui.settingsAnnouncement.button.review=Revisar configuración
