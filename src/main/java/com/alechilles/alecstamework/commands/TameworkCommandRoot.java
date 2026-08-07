@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.persistence.diagnostics
 import com.alechilles.alecstamework.persistence.diagnostics
         .BondedCompanionDiagnosticContributor;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractCommandCollection;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
@@ -16,26 +17,40 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
     public static final String ROOT_PERMISSION = "tamework.command.tw";
 
     public TameworkCommandRoot() {
-        this(null, null);
+        this(null, null, null, new SpawnBeaconVisualizationService());
     }
 
     public TameworkCommandRoot(
             @Nullable PersistenceDiagnosticsReader persistenceDiagnostics
     ) {
-        this(persistenceDiagnostics, null);
+        this(persistenceDiagnostics, null, null, new SpawnBeaconVisualizationService());
     }
 
     public TameworkCommandRoot(
             @Nullable PersistenceDiagnosticsReader persistenceDiagnostics,
             @Nullable PersistenceDiagnosticExporter persistenceExporter
     ) {
-        this(persistenceDiagnostics, persistenceExporter, null);
+        this(persistenceDiagnostics, persistenceExporter, null, new SpawnBeaconVisualizationService());
     }
 
     public TameworkCommandRoot(
             @Nullable PersistenceDiagnosticsReader persistenceDiagnostics,
             @Nullable PersistenceDiagnosticExporter persistenceExporter,
             @Nullable BondedCompanionDiagnosticContributor bondedDiagnostics
+    ) {
+        this(
+                persistenceDiagnostics,
+                persistenceExporter,
+                bondedDiagnostics,
+                new SpawnBeaconVisualizationService()
+        );
+    }
+
+    public TameworkCommandRoot(
+            @Nullable PersistenceDiagnosticsReader persistenceDiagnostics,
+            @Nullable PersistenceDiagnosticExporter persistenceExporter,
+            @Nullable BondedCompanionDiagnosticContributor bondedDiagnostics,
+            @Nonnull SpawnBeaconVisualizationService spawnBeaconVisualizationService
     ) {
         super("tw", "Tamework commands.");
         requirePermission(ROOT_PERMISSION);
@@ -83,7 +98,7 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
         addSubCommand(new TameworkDebugFlyingCompanionCommand());
         addSubCommand(new TameworkDebugXpEventsCommand());
         addSubCommand(new TameworkShowHitboxesCommand());
-        addSubCommand(new TameworkShowSpawnBeaconsCommand());
+        addSubCommand(new TameworkShowSpawnBeaconsCommand(spawnBeaconVisualizationService));
         addSubCommand(new TameworkShowSpawnMarkersCommand());
         addSubCommand(new TameworkDeleteSpawnMarkerCommand());
         addSubCommand(new TameworkDebugDbCommand(

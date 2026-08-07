@@ -33,11 +33,11 @@ each covered natural beacon.
 
 ### Command and session registry
 
-`TameworkShowSpawnBeaconsCommand` owns player tracking sessions keyed by player
-UUID. A session records its world, requested radius, and generation ID. A
-one-second delayed callback returns to the world thread, validates the player
-reference and world, refreshes that player's coverage, then schedules the next
-tick.
+The plugin owns a `SpawnBeaconVisualizationService`, which keeps player
+tracking sessions keyed by player UUID. A session records its world and
+requested radius. Each world with active sessions has one one-second delayed
+refresh loop; the callback returns to that world's thread, validates all player
+references, refreshes their union coverage, then schedules the next tick.
 
 The registry computes the union of all active sessions in each world. Multiple
 players therefore share one proxy for a covered source beacon. Disabling or
@@ -79,6 +79,10 @@ On every refresh, a proxy is removed when its source beacon is invalid,
 unloaded, or outside every active session radius. When the final session for a
 world ends, every proxy owned by this feature in that world is removed.
 Invalid/disconnected player references automatically end their sessions.
+World removal immediately drops sessions and proxy references by world
+identity, preventing a later same-name world from inheriting stale state.
+Plugin shutdown stops all delayed loops and requests removal of proxies from
+worlds that still accept work.
 
 Proxy ownership is tracked in memory by source UUID and proxy reference. The
 command removes only proxies it created and never removes or modifies natural

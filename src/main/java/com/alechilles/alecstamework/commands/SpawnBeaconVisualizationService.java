@@ -34,7 +34,6 @@ import org.joml.Vector3d;
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -43,39 +42,41 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 
 /**
  * Maintains non-persistent visual proxies for loaded natural spawn beacons.
  */
-final class SpawnBeaconVisualizationService {
+public final class SpawnBeaconVisualizationService implements AutoCloseable {
     private static final long REFRESH_INTERVAL_MS = 1000L;
     private static final int MAX_SUMMARIES = 8;
 
-    private final AtomicLong sessionSequence = new AtomicLong();
     private final Map<UUID, TrackingSession> activeSessions = new ConcurrentHashMap<>();
-    private final Map<World, WorldState> worldStates = new ConcurrentHashMap<>();
+    private final Map<SpawnBeaconVisualizationWorldState.Key, SpawnBeaconVisualizationWorldState>
+            worldStates = new ConcurrentHashMap<>();
+    private volatile boolean closed;
 
     EnableResult enable(@Nonnull World world,
                         @Nonnull Store<EntityStore> store,
                         @Nonnull PlayerRef playerRef,
                         double radius) {
         UUID playerUuid = playerRef.getUuid();
-        if (playerUuid == null) {
+        if (closed || playerUuid == null) {
             return new EnableResult(0, 0, radius, List.of());
         }
 
-        long sessionId = sessionSequence.incrementAndGet();
-        TrackingSession session = new TrackingSession(sessionId, world, store, playerRef, radius);
+        TrackingSession session = new TrackingSession(world, store, playerRef, radius);
         TrackingSession previous = activeSessions.put(playerUuid, session);
         if (previous != null && previous.world() != world) {
-            scheduleRefresh(previous.world(), previous.store());
+            requestRefresh(previous.world());
         }
 
-        RefreshResult refresh = refreshWorld(world, store);
-        scheduleTrackingTick(playerUuid, session);
-        return new EnableResult(refresh.visibleCount(), refresh.skippedCount(), radius, refresh.summaries());
+        SpawnBeaconVisualizationWorldState state = getOrCreateWorldState(world, store);
+        RefreshResult refresh = refreshWorld(state);
+        if (refresh.stateActive() && state.startLoop()) {
+            scheduleWorldTick(state);
+        }
+        return buildEnableResult(refresh.loadedBeacons(), state, playerRef, store, radius);
     }
 
     DisableResult disable(@Nonnull UUID playerUuid,
@@ -85,78 +86,188 @@ final class SpawnBeaconVisualizationService {
         if (removed == null) {
             return new DisableResult(false);
         }
-        if (removed.world() == currentWorld) {
-            refreshWorld(currentWorld, currentStore);
+        if (removed.world() == currentWorld && removed.store() == currentStore) {
+            SpawnBeaconVisualizationWorldState state = worldStates.get(
+                    new SpawnBeaconVisualizationWorldState.Key(currentWorld)
+            );
+            if (state != null) {
+                refreshWorld(state);
+            }
         } else {
-            scheduleRefresh(removed.world(), removed.store());
+            requestRefresh(removed.world());
         }
         return new DisableResult(true);
     }
 
-    private void scheduleTrackingTick(@Nonnull UUID playerUuid, @Nonnull TrackingSession session) {
+    /** Drops all tracking and owned references for a world that is being removed. */
+    public void removeWorld(@Nonnull World world) {
+        activeSessions.entrySet().removeIf(entry -> entry.getValue().world() == world);
+        SpawnBeaconVisualizationWorldState state = worldStates.remove(
+                new SpawnBeaconVisualizationWorldState.Key(world)
+        );
+        if (state != null) {
+            state.deactivate();
+            state.clearOwnership();
+        }
+    }
+
+    /** Stops future refreshes and removes proxies from worlds that still accept work. */
+    @Override
+    public void close() {
+        if (closed) {
+            return;
+        }
+        closed = true;
+        activeSessions.clear();
+        List<SpawnBeaconVisualizationWorldState> states = List.copyOf(worldStates.values());
+        worldStates.clear();
+        for (SpawnBeaconVisualizationWorldState state : states) {
+            state.deactivate();
+            try {
+                state.world().execute(() -> removeAllProxies(state.store(), state));
+            } catch (RuntimeException ignored) {
+                state.clearOwnership();
+            }
+        }
+    }
+
+    private SpawnBeaconVisualizationWorldState getOrCreateWorldState(
+            @Nonnull World world,
+            @Nonnull Store<EntityStore> store) {
+        var key = new SpawnBeaconVisualizationWorldState.Key(world);
+        SpawnBeaconVisualizationWorldState current = worldStates.get(key);
+        if (current != null) {
+            return current;
+        }
+        var created = new SpawnBeaconVisualizationWorldState(world, store);
+        SpawnBeaconVisualizationWorldState raced = worldStates.putIfAbsent(key, created);
+        return raced == null ? created : raced;
+    }
+
+    private void scheduleWorldTick(@Nonnull SpawnBeaconVisualizationWorldState state) {
         CompletableFuture.runAsync(
-                () -> session.world().execute(() -> runTrackingTick(playerUuid, session)),
+                () -> dispatchWorldTick(state),
                 CompletableFuture.delayedExecutor(REFRESH_INTERVAL_MS, TimeUnit.MILLISECONDS)
         );
     }
 
-    private void runTrackingTick(@Nonnull UUID playerUuid, @Nonnull TrackingSession expected) {
-        TrackingSession current = activeSessions.get(playerUuid);
-        if (current != expected || current.sessionId() != expected.sessionId()) {
+    private void dispatchWorldTick(@Nonnull SpawnBeaconVisualizationWorldState state) {
+        if (!isCurrent(state)) {
             return;
         }
-
-        refreshWorld(expected.world(), expected.store());
-        if (activeSessions.get(playerUuid) == expected) {
-            scheduleTrackingTick(playerUuid, expected);
+        try {
+            state.world().execute(() -> runWorldTick(state));
+        } catch (RuntimeException ignored) {
+            removeWorld(state.world());
         }
     }
 
-    private void scheduleRefresh(@Nonnull World world, @Nonnull Store<EntityStore> store) {
-        world.execute(() -> refreshWorld(world, store));
+    private void runWorldTick(@Nonnull SpawnBeaconVisualizationWorldState state) {
+        if (!isCurrent(state)) {
+            return;
+        }
+        RefreshResult refresh = refreshWorld(state);
+        if (refresh.stateActive() && isCurrent(state)) {
+            scheduleWorldTick(state);
+        }
     }
 
-    private RefreshResult refreshWorld(@Nonnull World world, @Nonnull Store<EntityStore> store) {
+    private boolean isCurrent(@Nonnull SpawnBeaconVisualizationWorldState state) {
+        return !closed
+                && state.active()
+                && worldStates.get(new SpawnBeaconVisualizationWorldState.Key(state.world())) == state;
+    }
+
+    private void requestRefresh(@Nonnull World world) {
+        SpawnBeaconVisualizationWorldState state = worldStates.get(
+                new SpawnBeaconVisualizationWorldState.Key(world)
+        );
+        if (state == null || !isCurrent(state)) {
+            return;
+        }
+        try {
+            world.execute(() -> {
+                if (isCurrent(state)) {
+                    refreshWorld(state);
+                }
+            });
+        } catch (RuntimeException ignored) {
+            removeWorld(world);
+        }
+    }
+
+    private RefreshResult refreshWorld(@Nonnull SpawnBeaconVisualizationWorldState state) {
+        World world = state.world();
+        Store<EntityStore> store = state.store();
         List<SpawnBeaconVisualizationCoverage.ViewerRange> viewers = collectViewers(world, store);
-        WorldState state = worldStates.get(world);
         if (viewers.isEmpty()) {
-            if (state != null) {
-                removeAllProxies(store, state);
-                worldStates.remove(world, state);
-            }
+            removeAllProxies(store, state);
+            worldStates.remove(new SpawnBeaconVisualizationWorldState.Key(world), state);
+            state.deactivate();
             return RefreshResult.EMPTY;
         }
 
-        if (state == null) {
-            state = new WorldState();
-            worldStates.put(world, state);
-        }
-
-        List<BeaconSnapshot> covered = collectCoveredBeacons(store, viewers);
+        List<BeaconSnapshot> loaded = collectLoadedBeacons(store);
         Set<UUID> retainedSources = new HashSet<>();
-        int skipped = 0;
-        List<BeaconSummary> summaries = new ArrayList<>();
-        for (BeaconSnapshot beacon : covered) {
+        for (BeaconSnapshot beacon : loaded) {
+            if (!SpawnBeaconVisualizationCoverage.isCovered(beacon.position(), viewers)) {
+                continue;
+            }
             retainedSources.add(beacon.sourceUuid());
-            Ref<EntityStore> existing = state.proxies.get(beacon.sourceUuid());
+            Ref<EntityStore> existing = state.proxies().get(beacon.sourceUuid());
             if (existing != null && existing.isValid()) {
-                addSummary(summaries, beacon);
                 continue;
             }
             if (existing != null) {
-                state.proxies.remove(beacon.sourceUuid());
+                state.proxies().remove(beacon.sourceUuid());
             }
             Ref<EntityStore> proxy = createProxy(store, beacon, state);
-            if (proxy == null) {
-                skipped++;
-            } else {
-                state.proxies.put(beacon.sourceUuid(), proxy);
-                addSummary(summaries, beacon);
+            if (proxy != null) {
+                state.proxies().put(beacon.sourceUuid(), proxy);
             }
         }
 
         removeStaleProxies(store, state, retainedSources);
-        return new RefreshResult(covered.size() - skipped, skipped, List.copyOf(summaries));
+        return new RefreshResult(List.copyOf(loaded), true);
+    }
+
+    private EnableResult buildEnableResult(
+            @Nonnull Collection<BeaconSnapshot> loaded,
+            @Nonnull SpawnBeaconVisualizationWorldState state,
+            @Nonnull PlayerRef playerRef,
+            @Nonnull Store<EntityStore> store,
+            double radius) {
+        Ref<EntityStore> playerEntityRef = playerRef.getReference();
+        if (playerEntityRef == null || !playerEntityRef.isValid()
+                || playerEntityRef.getStore() != store) {
+            return new EnableResult(0, 0, radius, List.of());
+        }
+        TransformComponent transform = store.getComponent(
+                playerEntityRef, TransformComponent.getComponentType()
+        );
+        if (transform == null) {
+            return new EnableResult(0, 0, radius, List.of());
+        }
+
+        var viewer = new SpawnBeaconVisualizationCoverage.ViewerRange(
+                new Vector3d(transform.getPosition()), radius
+        );
+        int visible = 0;
+        int skipped = 0;
+        List<BeaconSummary> summaries = new ArrayList<>();
+        for (BeaconSnapshot beacon : loaded) {
+            if (!SpawnBeaconVisualizationCoverage.isCovered(beacon.position(), List.of(viewer))) {
+                continue;
+            }
+            Ref<EntityStore> proxy = state.proxies().get(beacon.sourceUuid());
+            if (proxy == null || !proxy.isValid()) {
+                skipped++;
+                continue;
+            }
+            visible++;
+            addSummary(summaries, beacon);
+        }
+        return new EnableResult(visible, skipped, radius, List.copyOf(summaries));
     }
 
     private List<SpawnBeaconVisualizationCoverage.ViewerRange> collectViewers(
@@ -169,7 +280,8 @@ final class SpawnBeaconVisualizationService {
                 continue;
             }
             Ref<EntityStore> playerEntityRef = session.playerRef().getReference();
-            if (playerEntityRef == null || !playerEntityRef.isValid() || playerEntityRef.getStore() != store) {
+            if (playerEntityRef == null || !playerEntityRef.isValid()
+                    || playerEntityRef.getStore() != store) {
                 activeSessions.remove(entry.getKey(), session);
                 continue;
             }
@@ -187,9 +299,7 @@ final class SpawnBeaconVisualizationService {
         return viewers;
     }
 
-    private List<BeaconSnapshot> collectCoveredBeacons(
-            @Nonnull Store<EntityStore> store,
-            @Nonnull Collection<SpawnBeaconVisualizationCoverage.ViewerRange> viewers) {
+    private List<BeaconSnapshot> collectLoadedBeacons(@Nonnull Store<EntityStore> store) {
         List<BeaconSnapshot> beacons = new ArrayList<>();
         ComponentType<EntityStore, LegacySpawnBeaconEntity> beaconType =
                 LegacySpawnBeaconEntity.getComponentType();
@@ -204,9 +314,7 @@ final class SpawnBeaconVisualizationService {
         store.forEachChunk(query, (ArchetypeChunk<EntityStore> chunk,
                                    CommandBuffer<EntityStore> commandBuffer) -> {
             for (int index = 0; index < chunk.size(); index++) {
-                LegacySpawnBeaconEntity beacon = chunk.getComponent(
-                        index, beaconType
-                );
+                LegacySpawnBeaconEntity beacon = chunk.getComponent(index, beaconType);
                 TransformComponent transform = chunk.getComponent(
                         index, TransformComponent.getComponentType()
                 );
@@ -214,18 +322,16 @@ final class SpawnBeaconVisualizationService {
                 if (beacon == null || transform == null || uuid == null || uuid.getUuid() == null) {
                     continue;
                 }
-                Vector3d position = new Vector3d(transform.getPosition());
-                if (!SpawnBeaconVisualizationCoverage.isCovered(position, viewers)) {
-                    continue;
-                }
                 String configId = beacon.getSpawnConfigId();
-                if ((configId == null || configId.isBlank()) && beacon.getSpawnWrapper() != null) {
+                if ((configId == null || configId.isBlank())
+                        && beacon.getSpawnWrapper() != null
+                        && beacon.getSpawnWrapper().getSpawn() != null) {
                     configId = beacon.getSpawnWrapper().getSpawn().getId();
                 }
                 beacons.add(new BeaconSnapshot(
                         uuid.getUuid(),
                         configId,
-                        position,
+                        new Vector3d(transform.getPosition()),
                         new Rotation3f(transform.getRotation()),
                         beacon
                 ));
@@ -236,7 +342,7 @@ final class SpawnBeaconVisualizationService {
 
     private Ref<EntityStore> createProxy(@Nonnull Store<EntityStore> store,
                                          @Nonnull BeaconSnapshot snapshot,
-                                         @Nonnull WorldState state) {
+                                         @Nonnull SpawnBeaconVisualizationWorldState state) {
         try {
             Model model = resolveModel(snapshot.beacon());
             String configId = snapshot.configId();
@@ -296,9 +402,9 @@ final class SpawnBeaconVisualizationService {
     }
 
     private void removeStaleProxies(@Nonnull Store<EntityStore> store,
-                                    @Nonnull WorldState state,
+                                    @Nonnull SpawnBeaconVisualizationWorldState state,
                                     @Nonnull Set<UUID> retainedSources) {
-        var iterator = state.proxies.entrySet().iterator();
+        var iterator = state.proxies().entrySet().iterator();
         while (iterator.hasNext()) {
             Map.Entry<UUID, Ref<EntityStore>> entry = iterator.next();
             if (retainedSources.contains(entry.getKey())) {
@@ -306,16 +412,16 @@ final class SpawnBeaconVisualizationService {
             }
             removeProxy(store, entry.getValue());
             iterator.remove();
-            state.warnedSources.remove(entry.getKey());
+            state.warnedSources().remove(entry.getKey());
         }
     }
 
-    private void removeAllProxies(@Nonnull Store<EntityStore> store, @Nonnull WorldState state) {
-        for (Ref<EntityStore> proxy : state.proxies.values()) {
+    private void removeAllProxies(@Nonnull Store<EntityStore> store,
+                                  @Nonnull SpawnBeaconVisualizationWorldState state) {
+        for (Ref<EntityStore> proxy : state.proxies().values()) {
             removeProxy(store, proxy);
         }
-        state.proxies.clear();
-        state.warnedSources.clear();
+        state.clearOwnership();
     }
 
     private void removeProxy(@Nonnull Store<EntityStore> store, Ref<EntityStore> proxy) {
@@ -325,9 +431,9 @@ final class SpawnBeaconVisualizationService {
     }
 
     private void warnOnce(@Nonnull BeaconSnapshot snapshot,
-                          @Nonnull WorldState state,
+                          @Nonnull SpawnBeaconVisualizationWorldState state,
                           @Nonnull RuntimeException failure) {
-        if (!state.warnedSources.add(snapshot.sourceUuid())) {
+        if (!state.warnedSources().add(snapshot.sourceUuid())) {
             return;
         }
         Tamework plugin = Tamework.getInstance();
@@ -351,8 +457,7 @@ final class SpawnBeaconVisualizationService {
     record BeaconSummary(String configId, Vector3d position) {
     }
 
-    private record TrackingSession(long sessionId,
-                                   World world,
+    private record TrackingSession(World world,
                                    Store<EntityStore> store,
                                    PlayerRef playerRef,
                                    double radius) {
@@ -365,14 +470,8 @@ final class SpawnBeaconVisualizationService {
                                   LegacySpawnBeaconEntity beacon) {
     }
 
-    private record RefreshResult(int visibleCount,
-                                 int skippedCount,
-                                 List<BeaconSummary> summaries) {
-        private static final RefreshResult EMPTY = new RefreshResult(0, 0, List.of());
+    private record RefreshResult(List<BeaconSnapshot> loadedBeacons, boolean stateActive) {
+        private static final RefreshResult EMPTY = new RefreshResult(List.of(), false);
     }
 
-    private static final class WorldState {
-        private final Map<UUID, Ref<EntityStore>> proxies = new HashMap<>();
-        private final Set<UUID> warnedSources = new HashSet<>();
-    }
 }

@@ -19,11 +19,13 @@ import java.util.UUID;
  * Toggles exact-model visualization proxies for loaded natural spawn beacons.
  */
 public final class TameworkShowSpawnBeaconsCommand extends AbstractPlayerCommand {
-    private static final SpawnBeaconVisualizationService VISUALIZATION_SERVICE =
-            new SpawnBeaconVisualizationService();
+    private final SpawnBeaconVisualizationService visualizationService;
 
-    public TameworkShowSpawnBeaconsCommand() {
+    public TameworkShowSpawnBeaconsCommand(
+            @Nonnull SpawnBeaconVisualizationService visualizationService
+    ) {
         super("showspawnbeacons", "Toggle natural spawn beacon visualization.");
+        this.visualizationService = visualizationService;
         setAllowsExtraArguments(true);
     }
 
@@ -49,7 +51,7 @@ public final class TameworkShowSpawnBeaconsCommand extends AbstractPlayerCommand
         }
         if (parse.mode() == TameworkShowSpawnMarkersCommandSupport.Mode.OFF) {
             SpawnBeaconVisualizationService.DisableResult result =
-                    VISUALIZATION_SERVICE.disable(playerUuid, world, store);
+                    visualizationService.disable(playerUuid, world, store);
             commandContext.sender().sendMessage(Message.raw(
                     result.wasActive()
                             ? "Spawn beacon visualization disabled."
@@ -59,7 +61,7 @@ public final class TameworkShowSpawnBeaconsCommand extends AbstractPlayerCommand
         }
 
         SpawnBeaconVisualizationService.EnableResult result =
-                VISUALIZATION_SERVICE.enable(world, store, playerRef, parse.radius());
+                visualizationService.enable(world, store, playerRef, parse.radius());
         commandContext.sender().sendMessage(Message.raw(
                 "Spawn beacon visualization enabled within "
                         + formatNumber(result.radius())

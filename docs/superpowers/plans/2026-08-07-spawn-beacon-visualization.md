@@ -4,7 +4,7 @@
 
 **Goal:** Add `/tw showspawnbeacons [radius|off]` so loaded natural spawn beacons are represented by exact-model, non-spawning visual proxies.
 
-**Architecture:** A focused command manages player sessions while a dedicated visualization service scans loaded `LegacySpawnBeaconEntity` sources, computes union coverage, and owns presentation-only proxy references per world. A small pure coverage policy provides the behavioral test seam; engine ECS work remains world-thread-bound and is verified by compilation, Workshop reference validation, and optional live testing.
+**Architecture:** A focused command uses a plugin-owned visualization service that manages player sessions, runs one refresh loop per active world, scans loaded `LegacySpawnBeaconEntity` sources, computes union coverage, and owns presentation-only proxy references per world identity. A small pure coverage policy provides the behavioral test seam; engine ECS work remains world-thread-bound and is verified by compilation, Workshop reference validation, and optional live testing.
 
 **Tech Stack:** Java 25, Hytale release/0.5.7 server API, Hytale ECS, JUnit 5, Gradle
 
@@ -118,7 +118,7 @@ final class SpawnBeaconVisualizationService {
 }
 ```
 
-Internally keep concurrent player-session and per-world proxy maps. Refresh on the world thread every second, collect all valid viewer ranges for that world, collect source snapshots before mutating the store, retain one proxy per covered source UUID, and remove stale owned proxies with `RemoveReason.REMOVE`.
+Internally keep concurrent player-session and identity-keyed per-world proxy maps. Run one refresh loop per active world, collect all valid viewer ranges for that world, collect source snapshots before mutating the store, retain one proxy per covered source UUID, and remove stale owned proxies with `RemoveReason.REMOVE`. The plugin closes the service during shutdown and removes identity-matched state on `RemoveWorldEvent`.
 
 - [ ] **Step 3: Implement exact Hytale 0.5.7 visual selection**
 

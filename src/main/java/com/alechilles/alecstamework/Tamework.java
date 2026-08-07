@@ -40,6 +40,7 @@ import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceRecoverySyste
 import com.alechilles.alecstamework.avatarflight.AvatarFlightStaleOwnerRecoveryRegistry;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceVisibilitySystem;
 import com.alechilles.alecstamework.commands.TameworkCommandRoot;
+import com.alechilles.alecstamework.commands.SpawnBeaconVisualizationService;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.NameItemRegistry;
@@ -327,6 +328,8 @@ public class Tamework extends JavaPlugin {
     private CrashTelemetryService crashTelemetryService;
     private final TameworkTelemetryEvents telemetryEvents = new TameworkTelemetryEvents();
     private TameworkSettingsAnnouncementService settingsAnnouncementService;
+    private final SpawnBeaconVisualizationService spawnBeaconVisualizationService =
+            new SpawnBeaconVisualizationService();
     private boolean globalAssetsRegistered;
     private boolean companionAssetsRegistered;
     private boolean spawnerAssetsRegistered;
@@ -1259,7 +1262,8 @@ public class Tamework extends JavaPlugin {
                     new TameworkCommandRoot(
                             persistenceComposition.diagnosticsReader(),
                             persistenceComposition.diagnosticsExporter(),
-                            bondedCompanionComposition.diagnostics()
+                            bondedCompanionComposition.diagnostics(),
+                            spawnBeaconVisualizationService
                     )
             );
         }
@@ -1399,6 +1403,12 @@ public class Tamework extends JavaPlugin {
                 this::onWorldRemovedForProgressionTiming,
                 "progression timing world cleanup"
         );
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
+                RemoveWorldEvent.class,
+                this::onWorldRemovedForSpawnBeaconVisualization,
+                "spawn beacon visualization world cleanup"
+        );
         reconcileTranquilizerRecipeVisibility();
         getLogger().at(Level.INFO).log(
                 "Tamework item configs loaded: spawners="
@@ -1507,6 +1517,7 @@ public class Tamework extends JavaPlugin {
 
     @Override
     protected void shutdown() {
+        spawnBeaconVisualizationService.close();
         if (patchworkRuntime != null) {
             try {
                 patchworkRuntime.close();
@@ -1619,8 +1630,13 @@ public class Tamework extends JavaPlugin {
 
     private void onWorldRemovedForProgressionTiming(@Nonnull RemoveWorldEvent event) {
         if (event != null) {
-            World world = event.getWorld();
             TameworkProgressionTimeScales.clearWorldScale(event.getWorld());
+        }
+    }
+
+    private void onWorldRemovedForSpawnBeaconVisualization(@Nonnull RemoveWorldEvent event) {
+        if (event != null && event.getWorld() != null) {
+            spawnBeaconVisualizationService.removeWorld(event.getWorld());
         }
     }
 
@@ -2030,7 +2046,10 @@ public class Tamework extends JavaPlugin {
                             bondedCompanionComposition.diagnostics()
                     );
             getCommandRegistry().registerCommand(new TameworkCommandRoot(
-                    null, exporter, bondedCompanionComposition.diagnostics()
+                    null,
+                    exporter,
+                    bondedCompanionComposition.diagnostics(),
+                    spawnBeaconVisualizationService
             ));
         }
         getLogger().at(Level.SEVERE).withCause(failure).log(
