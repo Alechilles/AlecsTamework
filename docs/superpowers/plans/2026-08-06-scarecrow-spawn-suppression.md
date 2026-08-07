@@ -99,11 +99,11 @@
 **Files:**
 - Modify only files required by a concrete verification or review finding.
 
-- [ ] Run the focused behavior tests.
-- [ ] Run `bash ./gradlew test --no-daemon`.
-- [ ] Run `bash ./gradlew assemble --no-daemon`.
-- [ ] Run `git diff --check` and inspect `git status --short` for accidental or generated changes.
-- [ ] Run the required ECS/thread-affinity scan: `rg "PlayerRef\\.getComponent\\(Player|getComponent\\(Player\\.getComponentType\\(\\)\\)|Universe\\.get\\(\\).*getPlayers" -n src/main/java` and confirm this feature introduced no unsafe runtime access.
-- [ ] Ask an independent reviewer to inspect native suppression lifecycle, item-loss recovery, target validation, persistence, and public asset compatibility. Apply and verify only concrete findings.
-- [ ] Ask a test runner to independently repeat the final build/test checks after edit custody returns.
-- [ ] Commit any review fixes separately, leaving the isolated worktree clean and ready for integration.
+- [x] Run the focused behavior tests.
+- [x] Run `bash ./gradlew test --no-daemon`.
+- [x] Run `bash ./gradlew assemble --no-daemon`.
+- [x] Run `git diff --check` and inspect `git status --short` for accidental or generated changes.
+- [x] Run the required ECS/thread-affinity scan: `rg "PlayerRef\\.getComponent\\(Player|getComponent\\(Player\\.getComponentType\\(\\)\\)|Universe\\.get\\(\\).*getPlayers" -n src/main/java` and confirm this feature introduced no unsafe runtime access.
+- [x] Ask an independent reviewer to inspect native suppression lifecycle, item-loss recovery, target validation, persistence, and public asset compatibility. Apply and verify only concrete findings.
+- [x] Ask a test runner to independently repeat the final build/test checks after edit custody returns.
+- [x] Commit any review fixes separately, leaving the isolated worktree clean and ready for integration.
