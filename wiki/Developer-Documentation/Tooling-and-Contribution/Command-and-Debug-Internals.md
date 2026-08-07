@@ -28,8 +28,14 @@ The `commands/` package contains the public `/tw` command surface, with `Tamewor
 Additional diagnostics that are command-driven (not startup-toggle defaults) include:
 
 - `/tw showhitboxes`
+- `/tw showspawnbeacons [radius|off]`
 - `/tw debugcrashtelemetry`
 - `/tw debugdb [status|health|integrity|detail|export]`
+
+`TameworkShowSpawnBeaconsCommand` maintains per-player radius sessions while
+`SpawnBeaconVisualizationService` owns one non-persistent visual proxy per
+covered natural beacon. Proxies deliberately omit every beacon and gameplay
+component, so they cannot enter Hytale's spawning systems.
 
 `TameworkDebugDbCommand` reads bounded status, metrics, and detail snapshots
 from the replacement `PersistenceBootstrap`. Status and detail actions are

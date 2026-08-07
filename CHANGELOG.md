@@ -3,6 +3,9 @@
 ## 3.0.2 - Linked Patchwork Asset-Pack Hotfix - Unreleased
 
 ### Added
+- Added `/tw showspawnbeacons [radius|off]` to reveal nearby loaded natural
+  spawn beacons with their configured model and nameplate without changing
+  beacon spawning behavior.
 - Added a placeable scarecrow with a 32-block automatic spawn-marker radius
   and native chunk-granular world-spawn suppression. Manual marker triggers,
   explicit mod spawns, and existing NPCs remain unaffected.

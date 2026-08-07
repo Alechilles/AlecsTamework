@@ -38,7 +38,7 @@ restarted.
 Player UI, held-item, gaze-only, player-overlay, and live API fixture commands remain
 player-scoped. In particular, `/tw config`, `/tw settings`, `/tw news`,
 `/tw api test prepare|reset|run|status`, `/tw spawntamed`, `/tw showhitboxes`,
-and `/tw showspawnmarkers` need a live player.
+`/tw showspawnbeacons`, and `/tw showspawnmarkers` need a live player.
 
 ## Interaction troubleshooting
 - Verify matching enabled `TwInteractionConfig` with expected `RoleIds` and `Priority`.

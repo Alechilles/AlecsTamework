@@ -259,6 +259,7 @@ never set; the component's `Set: false` gate then remains open.
 - `/tw debugplayermodel unsafe [ModelId] [scale] | reset | status`
 - `/tw debugplayerinput [on|off|status]`
 - `/tw debuglag [on|off]`
+- `/tw showspawnbeacons [radius|off]`
 - `/tw showspawnmarkers [radius|off]`
 - `/tw deletespawnmarker [range]`
 
