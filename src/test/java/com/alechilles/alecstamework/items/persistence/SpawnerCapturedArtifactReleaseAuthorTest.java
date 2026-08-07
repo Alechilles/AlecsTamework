@@ -65,6 +65,12 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
     private static final SnapshotId SNAPSHOT = SnapshotId.parse(
             "82000000-0000-0000-0000-000000000003"
     );
+    private static final NpcAlias NEWER_SOURCE = NpcAlias.parse(
+            "82000000-0000-0000-0000-000000000009"
+    );
+    private static final SnapshotId NEWER_SNAPSHOT = SnapshotId.parse(
+            "82000000-0000-0000-0000-000000000010"
+    );
     private static final OwnerId CANONICAL_OWNER = OwnerId.parse(
             "82000000-0000-0000-0000-000000000004"
     );
@@ -253,6 +259,58 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
     }
 
     @Test
+    void alreadyMigratedUnloadedItemUsesCaptureHistoryRecovery() {
+        CompanionProfileReadModel migrated = alreadyMigratedProfile();
+        CompanionSnapshot historical = new CompanionSnapshot(
+                SNAPSHOT,
+                PROFILE,
+                CompanionCaptureRequest.SNAPSHOT_KIND,
+                LegacyCaptureV1Payload.VERSION,
+                releasedPublicProfile().currentSnapshots().getFirst()
+                        .payloadJson(),
+                releasedPublicProfile().currentSnapshots().getFirst()
+                        .payloadHash(),
+                LifecycleRevision.INITIAL,
+                false,
+                -900L
+        );
+        FakePersistence persistence = new FakePersistence(
+                migrated,
+                List.of(historical)
+        );
+
+        SpawnerPersistenceAuthorResult result = author(persistence).release(
+                releasedPublicIntent(),
+                ignored -> placement()
+        ).toCompletableFuture().join();
+
+        assertTrue(result.published());
+        assertEquals(1, persistence.historyReads);
+        assertEquals(historical, persistence.request.legacyRecovery()
+                .historicalSnapshot());
+        assertEquals(SOURCE.value(), projection(persistence.request).npcUuid());
+    }
+
+    @Test
+    void newerSameProfileItemSupersedesOlderCanonicalCapture() {
+        FakePersistence persistence = new FakePersistence(
+                releasedPublicProfile()
+        );
+
+        SpawnerPersistenceAuthorResult result = author(persistence).release(
+                modernSupersededIntent(),
+                ignored -> placement()
+        ).toCompletableFuture().join();
+
+        assertTrue(result.published());
+        assertEquals(NEWER_SOURCE, persistence.request.sourceAlias());
+        assertEquals(NEWER_SNAPSHOT, persistence.request.sourceSnapshot()
+                .snapshotId());
+        assertEquals(SNAPSHOT, persistence.request.modernRecovery()
+                .supersededSnapshot().snapshotId());
+    }
+
+    @Test
     void releasedPublicItemRejectsTamingWhenProfileExplicitlyRecordsFalse() {
         FakePersistence persistence = new FakePersistence(
                 releasedPublicProfile(
@@ -402,6 +460,38 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
                 stack("capture-device-empty", new BsonDocument()),
                 ownerAssignment,
                 ownerName,
+                null
+        );
+    }
+
+    private SpawnerCapturedArtifactReleaseIntent modernSupersededIntent() {
+        BsonDocument sourceMetadata = new BsonDocument()
+                .append(
+                        TameworkMetadataKeys.COMPANION_PROFILE_ID,
+                        new BsonString(PROFILE.toString())
+                )
+                .append(
+                        TameworkMetadataKeys.TARGET_UUID,
+                        new BsonString(NEWER_SOURCE.toString())
+                )
+                .append(
+                        TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID,
+                        new BsonString(NEWER_SNAPSHOT.toString())
+                )
+                .append(
+                        TameworkMetadataKeys.OWNER_UUID,
+                        new BsonString(CANONICAL_OWNER.toString())
+                )
+                .append(TameworkMetadataKeys.TAMED, BsonBoolean.TRUE);
+        return new SpawnerCapturedArtifactReleaseIntent(
+                "release-click-superseded",
+                ACTOR,
+                "world",
+                2,
+                stack("capture-device-filled", sourceMetadata),
+                stack("capture-device-empty", new BsonDocument()),
+                null,
+                null,
                 null
         );
     }
@@ -596,6 +686,29 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
         );
     }
 
+    private CompanionProfileReadModel alreadyMigratedProfile() {
+        CompanionProfileReadModel captured = releasedPublicProfile();
+        return new CompanionProfileReadModel(
+                captured.identity(),
+                captured.currentAlias(),
+                new CompanionLifecycle(
+                        PROFILE,
+                        CANONICAL_OWNER,
+                        LifecycleState.UNLOADED,
+                        LifecycleLocation.none(),
+                        new LifecycleRevision(1),
+                        null,
+                        -500L,
+                        new ReconciliationGeneration(1),
+                        null,
+                        null
+                ),
+                captured.toolLinks(),
+                List.of(),
+                null
+        );
+    }
+
     private CompanionSnapshot sourceSnapshot() {
         SnapshotCodecRegistry.EncodedSnapshot encoded =
                 snapshots.encodeCapture(rawState());
@@ -713,11 +826,21 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
             implements SpawnerCapturedArtifactReleaseAuthor.PersistencePort {
         private final CompanionProfileReadModel profile;
         private CompanionCaptureReleaseRequest request;
+        private final List<CompanionSnapshot> history;
         private int profileReads;
         private int aliasReads;
+        private int historyReads;
 
         private FakePersistence(CompanionProfileReadModel profile) {
+            this(profile, List.of());
+        }
+
+        private FakePersistence(
+                CompanionProfileReadModel profile,
+                List<CompanionSnapshot> history
+        ) {
             this.profile = profile;
+            this.history = List.copyOf(history);
         }
 
         @Override
@@ -734,7 +857,22 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
         findProfile(NpcAlias alias) {
             aliasReads++;
             return CompletableFuture.completedFuture(
-                    PersistenceReadResult.found(profile, 1L)
+                    profile.currentAlias() != null
+                            && profile.currentAlias().alias().equals(alias)
+                            ? PersistenceReadResult.found(profile, 1L)
+                            : PersistenceReadResult.absent()
+            );
+        }
+
+        @Override
+        public CompletionStage<PersistenceReadResult<List<CompanionSnapshot>>>
+        findSnapshotHistory(
+                ProfileId profileId,
+                com.alechilles.alecstamework.companion.snapshot.SnapshotKind kind
+        ) {
+            historyReads++;
+            return CompletableFuture.completedFuture(
+                    PersistenceReadResult.found(history, history.size())
             );
         }
 

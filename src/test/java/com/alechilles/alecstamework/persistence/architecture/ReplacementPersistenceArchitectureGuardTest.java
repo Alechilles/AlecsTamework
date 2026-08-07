@@ -339,6 +339,7 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "findOperation",
                         "findProfile",
                         "findProvisioning",
+                        "findSnapshotHistory",
                         "findStalePopulationGroupProfiles",
                         "findTimedSummonLease",
                         "projectedCommandRosterActions",

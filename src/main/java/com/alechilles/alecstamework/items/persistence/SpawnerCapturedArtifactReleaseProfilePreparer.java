@@ -76,6 +76,146 @@ final class SpawnerCapturedArtifactReleaseProfilePreparer {
         );
     }
 
+    Result prepareLegacyRecovery(
+            CompanionProfileReadModel profile,
+            CompanionSnapshot historicalSnapshot,
+            CapturedArtifact sourceArtifact,
+            @Nullable OwnerId ownerAssignment,
+            @Nullable String ownerAssignmentName
+    ) {
+        if (historicalSnapshot == null || historicalSnapshot.current()
+                || historicalSnapshot.payloadVersion()
+                != LegacyCaptureV1Payload.VERSION) {
+            return Rejected.profileConflict();
+        }
+        final CoopResidentStateSnapshot decoded;
+        try {
+            decoded = legacy.map(
+                    profile,
+                    LegacyCaptureV1Payload.decode(historicalSnapshot),
+                    sourceArtifact
+            );
+        } catch (RuntimeException failure) {
+            return Rejected.decodeFailed(
+                    "capture_snapshot_decode_failed",
+                    failure
+            );
+        }
+        CompanionSnapshot liveSource = new CompanionSnapshot(
+                historicalSnapshot.snapshotId(),
+                historicalSnapshot.profileId(),
+                historicalSnapshot.kind(),
+                historicalSnapshot.payloadVersion(),
+                historicalSnapshot.payloadJson(),
+                historicalSnapshot.payloadHash(),
+                historicalSnapshot.sourceLifecycleRevision(),
+                true,
+                historicalSnapshot.createdAtMs()
+        );
+        return prepareProjection(
+                profile,
+                liveSource,
+                decoded,
+                ownerAssignment,
+                ownerAssignmentName
+        );
+    }
+
+    Result prepareModernRecovery(
+            CompanionProfileReadModel profile,
+            Claim claim,
+            CompanionSnapshot canonicalSnapshot,
+            CapturedArtifact sourceArtifact,
+            @Nullable OwnerId ownerAssignment,
+            @Nullable String ownerAssignmentName
+    ) {
+        if (claim == null || claim.releasedPublic()
+                || claim.snapshotId() == null
+                || canonicalSnapshot == null
+                || (canonicalSnapshot.payloadVersion()
+                != LegacyCaptureV1Payload.VERSION
+                && canonicalSnapshot.payloadVersion()
+                != CompanionCaptureRequest.SNAPSHOT_VERSION)) {
+            return Rejected.profileConflict();
+        }
+        final CoopResidentStateSnapshot reconstructed;
+        try {
+            LegacyCaptureV1Payload seed = canonicalSnapshot.payloadVersion()
+                    == LegacyCaptureV1Payload.VERSION
+                    ? LegacyCaptureV1Payload.decode(canonicalSnapshot)
+                    : legacySeed(profile, canonicalSnapshot);
+            reconstructed = legacy.map(profile, seed, sourceArtifact);
+        } catch (RuntimeException failure) {
+            return Rejected.decodeFailed(
+                    "capture_snapshot_decode_failed",
+                    failure
+            );
+        }
+        SnapshotCodecRegistry.EncodedSnapshot encoded =
+                snapshots.encodeCapture(reconstructed);
+        CompanionSnapshot liveSource = new CompanionSnapshot(
+                claim.snapshotId(),
+                profile.identity().profileId(),
+                CompanionCaptureRequest.SNAPSHOT_KIND,
+                encoded.payloadVersion(),
+                encoded.payloadJson(),
+                encoded.payloadHash(),
+                profile.lifecycle().revision(),
+                true,
+                canonicalSnapshot.createdAtMs()
+        );
+        Result result = prepareProjection(
+                profile,
+                liveSource,
+                reconstructed,
+                ownerAssignment,
+                ownerAssignmentName
+        );
+        if (!(result instanceof Prepared ready)) {
+            return result;
+        }
+        return new Prepared(
+                ready.sourceSnapshot(),
+                ready.projection(),
+                new ResolvedIdentity(
+                        profile.identity().profileId(),
+                        claim.sourceAlias(),
+                        claim.snapshotId()
+                ),
+                ready.ownerAssignment(),
+                ready.ownerAssignmentName()
+        );
+    }
+
+    private LegacyCaptureV1Payload legacySeed(
+            CompanionProfileReadModel profile,
+            CompanionSnapshot canonicalSnapshot
+    ) {
+        SnapshotDecodeResult<CoopResidentStateSnapshot> decoded =
+                snapshots.decodeCapture(canonicalSnapshot);
+        if (!(decoded instanceof SnapshotDecodeResult.Decoded<
+                CoopResidentStateSnapshot> found)) {
+            throw new IllegalArgumentException(decodeDetail(decoded));
+        }
+        CoopResidentStateSnapshot state = found.value();
+        org.joml.Vector3d home = state.commandLinks() == null
+                ? null
+                : state.commandLinks().getHomePosition();
+        return new LegacyCaptureV1Payload(
+                null,
+                home == null ? null : new SnapshotVector3(
+                        home.x,
+                        home.y,
+                        home.z
+                ),
+                state.capturedAtMs(),
+                state.roleId(),
+                state.npcName() == null
+                        ? profile.identity().displayName()
+                        : state.npcName().getName()
+        );
+    }
+
     private CoopResidentStateSnapshot decode(
             CompanionProfileReadModel profile,
             Claim claim,

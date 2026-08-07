@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.capture.CaptureReleaseSourceEvidence;
+import com.alechilles.alecstamework.companion.capture.CaptureReleaseLegacyRecoveryEvidence;
+import com.alechilles.alecstamework.companion.capture.CaptureReleaseModernRecoveryEvidence;
 import com.alechilles.alecstamework.companion.capture.CapturedArtifact;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseDefinition;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseEventCodec;
@@ -72,6 +74,8 @@ class SqliteCompanionCaptureReleaseOperationsTest {
             NpcAlias.parse("20000000-0000-0000-0000-000000000001");
     private static final NpcAlias TARGET_ALIAS =
             NpcAlias.parse("20000000-0000-0000-0000-000000000002");
+    private static final NpcAlias NEWER_SOURCE_ALIAS =
+            NpcAlias.parse("20000000-0000-0000-0000-000000000003");
     private static final OwnerId OWNER =
             OwnerId.parse("30000000-0000-0000-0000-000000000001");
     private static final OwnerId ASSIGNED_OWNER =
@@ -536,6 +540,69 @@ class SqliteCompanionCaptureReleaseOperationsTest {
     }
 
     @Test
+    void alreadyMigratedUnloadedHistoryReleasesOnceWithoutLegacyDatabase()
+            throws Exception {
+        seedAlreadyMigratedStrandedShape();
+        CompanionCaptureReleaseRequest recovery = legacyRecoveryRequest();
+        AtomicInteger liveCalls = new AtomicInteger();
+        CompanionCaptureReleaseLiveBoundary boundary = (request, operation) -> {
+            liveCalls.incrementAndGet();
+            assertEquals(LifecycleState.UNLOADED, lifecycle().state());
+            assertTrue(!snapshot().current());
+            return LiveOperationResult.confirmed(
+                    "capture_release_both_receipts_confirmed"
+            ).completed();
+        };
+
+        OperationWorkflowResult first = submit(13, recovery, boundary);
+        OperationWorkflowResult replay = submit(13, recovery, boundary);
+
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, first.status());
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, replay.status());
+        assertEquals(1, liveCalls.get());
+        assertEquals(LifecycleState.ACTIVE, lifecycle().state());
+        assertEquals(
+                LifecycleLocation.liveEntity(
+                        TARGET_ALIAS.toString(),
+                        "world-two"
+                ),
+                lifecycle().location()
+        );
+        assertEquals(CompanionAlias.State.CURRENT, alias(TARGET_ALIAS).state());
+        assertEquals(CompanionAlias.State.RETIRED, alias(SOURCE_ALIAS).state());
+        assertTrue(!snapshot().current());
+    }
+
+    @Test
+    void newerSameProfileCaptureItemSupersedesOlderCapturedAuthority()
+            throws Exception {
+        CompanionCaptureReleaseRequest recovery = modernRecoveryRequest();
+        AtomicInteger liveCalls = new AtomicInteger();
+        CompanionCaptureReleaseLiveBoundary boundary = (request, operation) -> {
+            liveCalls.incrementAndGet();
+            assertEquals(LifecycleState.CAPTURED, lifecycle().state());
+            assertEquals(CompanionAlias.State.RETIRED,
+                    alias(NEWER_SOURCE_ALIAS).state());
+            return LiveOperationResult.confirmed(
+                    "capture_release_both_receipts_confirmed"
+            ).completed();
+        };
+
+        OperationWorkflowResult first = submit(14, recovery, boundary);
+        OperationWorkflowResult replay = submit(14, recovery, boundary);
+
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, first.status());
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, replay.status());
+        assertEquals(1, liveCalls.get());
+        assertEquals(LifecycleState.ACTIVE, lifecycle().state());
+        assertEquals(CompanionAlias.State.CURRENT, alias(TARGET_ALIAS).state());
+        assertEquals(CompanionAlias.State.RETIRED, alias(SOURCE_ALIAS).state());
+        assertEquals(CompanionAlias.State.RETIRED,
+                alias(NEWER_SOURCE_ALIAS).state());
+        assertTrue(!snapshot().current());
+    }
+
+    @Test
     void ownerAssignmentAppliesOnlyToAnUnownedCapturedProfile()
             throws Exception {
         setCapturedOwner(null);
@@ -713,6 +780,133 @@ class SqliteCompanionCaptureReleaseOperationsTest {
         return request(expectedRevision, null);
     }
 
+    private CompanionCaptureReleaseRequest legacyRecoveryRequest() {
+        CompanionSnapshot historical = snapshotValue(false);
+        CompanionCaptureReleaseRequest ordinary = request(
+                new LifecycleRevision(1)
+        );
+        return new CompanionCaptureReleaseRequest(
+                ordinary.profileId(),
+                ordinary.expectedLifecycleRevision(),
+                snapshotValue(true),
+                ordinary.sourceAlias(),
+                ordinary.projection(),
+                new CaptureReleaseSourceEvidence(
+                        ACTOR,
+                        "world-two",
+                        2,
+                        legacySourceArtifact(),
+                        receiptArtifact()
+                ),
+                ordinary.targetAlias(),
+                ordinary.ownerAssignment(),
+                ordinary.placement(),
+                ordinary.inventoryReceiptKey(),
+                ordinary.spawnReceiptKey(),
+                ordinary.requestedAtMs(),
+                new CaptureReleaseLegacyRecoveryEvidence(
+                        historical,
+                        new ReconciliationGeneration(1),
+                        0,
+                        -9_000
+                )
+        );
+    }
+
+    private CompanionCaptureReleaseRequest modernRecoveryRequest() {
+        CompanionSnapshot canonical = snapshotValue(true);
+        CompanionSnapshot itemSource = modernSnapshot(
+                OTHER_SNAPSHOT,
+                true
+        );
+        String projection = "{\"state\":\"newer-item\"}";
+        return new CompanionCaptureReleaseRequest(
+                PROFILE,
+                new LifecycleRevision(1),
+                itemSource,
+                NEWER_SOURCE_ALIAS,
+                new SnapshotCodecRegistry.EncodedSnapshot(
+                        CompanionFullStateProjection.KIND,
+                        CompanionFullStateProjection.VERSION,
+                        projection,
+                        Sha256Hash.ofUtf8(projection)
+                ),
+                new CaptureReleaseSourceEvidence(
+                        ACTOR,
+                        "world-two",
+                        2,
+                        modernSourceArtifact(),
+                        receiptArtifact()
+                ),
+                TARGET_ALIAS,
+                null,
+                new CompanionSpawnPlacement(
+                        "world-two", -12.5, -63.05, -4.5,
+                        -0.25f, -1.5f, -0.5f
+                ),
+                "inventory-receipt",
+                "spawn-receipt",
+                -600,
+                null,
+                new CaptureReleaseModernRecoveryEvidence(
+                        canonical,
+                        SOURCE_ALIAS,
+                        ReconciliationGeneration.INITIAL,
+                        0,
+                        -10_000
+                )
+        );
+    }
+
+    private CompanionSnapshot modernSnapshot(
+            SnapshotId snapshotId,
+            boolean current
+    ) {
+        String payload = "{\"capture\":\"replacement\"}";
+        return new CompanionSnapshot(
+                snapshotId,
+                PROFILE,
+                CompanionCaptureRequest.SNAPSHOT_KIND,
+                CompanionCaptureRequest.SNAPSHOT_VERSION,
+                payload,
+                Sha256Hash.ofUtf8(payload),
+                new LifecycleRevision(1),
+                current,
+                -9_500
+        );
+    }
+
+    private void seedAlreadyMigratedStrandedShape() throws Exception {
+        try (Connection connection = connections.openWriterConnection();
+             PreparedStatement lifecycle = connection.prepareStatement("""
+                     UPDATE companion_lifecycle
+                     SET lifecycle_state = 'UNLOADED',
+                         location_kind = 'NONE', location_key = NULL,
+                         world_key = NULL, owner_world_key = NULL,
+                         last_reconciled_generation = 1
+                     WHERE profile_id = ?
+                     """);
+             PreparedStatement snapshot = connection.prepareStatement("""
+                     UPDATE companion_snapshot
+                     SET is_current = 0
+                     WHERE snapshot_id = ?
+                     """)) {
+            lifecycle.setString(1, PROFILE.toString());
+            snapshot.setString(1, SNAPSHOT.toString());
+            assertEquals(1, lifecycle.executeUpdate());
+            assertEquals(1, snapshot.executeUpdate());
+        }
+        try (Connection connection = connections.openWriterConnection();
+             PreparedStatement alias = connection.prepareStatement("""
+                     UPDATE companion_alias
+                     SET mapped_at_ms = -9000
+                     WHERE npc_uuid = ?
+                     """)) {
+            alias.setString(1, SOURCE_ALIAS.toString());
+            assertEquals(1, alias.executeUpdate());
+        }
+    }
+
     private CompanionCaptureReleaseRequest request(
             LifecycleRevision expectedRevision,
             OwnerId ownerAssignment
@@ -866,6 +1060,26 @@ class SqliteCompanionCaptureReleaseOperationsTest {
                         + "\":\"" + PROFILE + "\","
                         + "\"" + TameworkMetadataKeys.TARGET_UUID
                         + "\":\"" + SOURCE_ALIAS + "\""
+        );
+    }
+
+    private CapturedArtifact legacySourceArtifact() {
+        return artifact(
+                "capture-device-filled",
+                "\"" + TameworkMetadataKeys.TARGET_UUID
+                        + "\":\"" + SOURCE_ALIAS + "\""
+        );
+    }
+
+    private CapturedArtifact modernSourceArtifact() {
+        return artifact(
+                "capture-device-filled",
+                "\"" + TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID
+                        + "\":\"" + OTHER_SNAPSHOT + "\","
+                        + "\"" + TameworkMetadataKeys.COMPANION_PROFILE_ID
+                        + "\":\"" + PROFILE + "\","
+                        + "\"" + TameworkMetadataKeys.TARGET_UUID
+                        + "\":\"" + NEWER_SOURCE_ALIAS + "\""
         );
     }
 

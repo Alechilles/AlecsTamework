@@ -24,6 +24,8 @@ import com.alechilles.alecstamework.companion.population.group.PopulationGroupBu
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupCounts;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
+import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningOrigin;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningRecord;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicPersistenceAdapter;
@@ -59,6 +61,16 @@ public final class PublicPersistenceQueries {
     public CompletionStage<PersistenceReadResult<CompanionProfileReadModel>>
     findProfile(@Nonnull NpcAlias alias) {
         return adapter.profileReader().findByAlias(alias);
+    }
+
+    /** Returns canonical snapshot history for one exact profile and kind. */
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<List<CompanionSnapshot>>>
+    findSnapshotHistory(
+            @Nonnull ProfileId profileId,
+            @Nonnull SnapshotKind kind
+    ) {
+        return adapter.snapshotReader().findHistory(profileId, kind);
     }
 
     @Nonnull

@@ -131,6 +131,20 @@ release succeeds. Ordinary use follows that shared release path. A supported
 managed-coop interaction can instead admit an eligible canonical filled item
 directly; it retires the item only after durable coop residency publishes.
 
+An exact v2.16.1 filled item can also repair the known 3.0.0-3.0.2 migration
+case where its canonical profile was left `UNLOADED` while the capture-v1
+snapshot survived only as history. Recovery runs when that item is used; it
+reads the existing schema-1 target directly and does not rerun import. It is
+refused if the source UUID is loaded, ownership or role conflicts, capture
+history is ambiguous, or the profile has moved beyond the initial imported
+state.
+
+The same operation also handles a complete newer 3.x filled item when a
+restored database still holds an older exact `CAPTURED` snapshot for that same
+profile. Both the item-claimed UUID and the older canonical UUID must be absent
+from loaded worlds; conflicting profiles or non-captured lifecycle states are
+left unchanged.
+
 Configured capture/spawn particles and sounds are success feedback. Tamework
 freezes their asset IDs and position with the operation intent, then emits them
 only after the canonical operation publishes. A rejected, retryable, or failed

@@ -27,8 +27,77 @@ public record CompanionCaptureReleaseRequest(
         @Nonnull CompanionSpawnPlacement placement,
         @Nonnull String inventoryReceiptKey,
         @Nonnull String spawnReceiptKey,
-        long requestedAtMs
+        long requestedAtMs,
+        @Nullable CaptureReleaseLegacyRecoveryEvidence legacyRecovery,
+        @Nullable CaptureReleaseModernRecoveryEvidence modernRecovery
 ) {
+    /** Creates an ordinary captured-artifact release without recovery evidence. */
+    public CompanionCaptureReleaseRequest(
+            ProfileId profileId,
+            LifecycleRevision expectedLifecycleRevision,
+            CompanionSnapshot sourceSnapshot,
+            NpcAlias sourceAlias,
+            SnapshotCodecRegistry.EncodedSnapshot projection,
+            CaptureReleaseSourceEvidence source,
+            NpcAlias targetAlias,
+            OwnerId ownerAssignment,
+            CompanionSpawnPlacement placement,
+            String inventoryReceiptKey,
+            String spawnReceiptKey,
+            long requestedAtMs
+    ) {
+        this(
+                profileId,
+                expectedLifecycleRevision,
+                sourceSnapshot,
+                sourceAlias,
+                projection,
+                source,
+                targetAlias,
+                ownerAssignment,
+                placement,
+                inventoryReceiptKey,
+                spawnReceiptKey,
+                requestedAtMs,
+                null,
+                null
+        );
+    }
+
+    /** Creates a release carrying exact legacy-import recovery evidence. */
+    public CompanionCaptureReleaseRequest(
+            ProfileId profileId,
+            LifecycleRevision expectedLifecycleRevision,
+            CompanionSnapshot sourceSnapshot,
+            NpcAlias sourceAlias,
+            SnapshotCodecRegistry.EncodedSnapshot projection,
+            CaptureReleaseSourceEvidence source,
+            NpcAlias targetAlias,
+            OwnerId ownerAssignment,
+            CompanionSpawnPlacement placement,
+            String inventoryReceiptKey,
+            String spawnReceiptKey,
+            long requestedAtMs,
+            CaptureReleaseLegacyRecoveryEvidence legacyRecovery
+    ) {
+        this(
+                profileId,
+                expectedLifecycleRevision,
+                sourceSnapshot,
+                sourceAlias,
+                projection,
+                source,
+                targetAlias,
+                ownerAssignment,
+                placement,
+                inventoryReceiptKey,
+                spawnReceiptKey,
+                requestedAtMs,
+                legacyRecovery,
+                null
+        );
+    }
+
     public CompanionCaptureReleaseRequest {
         if (profileId == null || expectedLifecycleRevision == null
                 || sourceSnapshot == null || sourceAlias == null
@@ -57,6 +126,33 @@ public record CompanionCaptureReleaseRequest(
         )) {
             throw new IllegalArgumentException(
                     "Captured-artifact release must reference the exact current capture snapshot"
+            );
+        }
+        if (legacyRecovery != null
+                && (!profileId.equals(
+                legacyRecovery.historicalSnapshot().profileId()
+        )
+                || !sourceSnapshot.snapshotId().equals(
+                legacyRecovery.historicalSnapshot().snapshotId()
+        ))) {
+            throw new IllegalArgumentException(
+                    "Legacy recovery must reference the release source snapshot"
+            );
+        }
+        if (legacyRecovery != null && modernRecovery != null) {
+            throw new IllegalArgumentException(
+                    "Captured-artifact release has multiple recovery modes"
+            );
+        }
+        if (modernRecovery != null
+                && (!profileId.equals(
+                modernRecovery.supersededSnapshot().profileId()
+        )
+                || sourceSnapshot.snapshotId().equals(
+                modernRecovery.supersededSnapshot().snapshotId()
+        ))) {
+            throw new IllegalArgumentException(
+                    "Modern recovery must supersede an older same-profile snapshot"
             );
         }
         if (!CompanionFullStateProjection.KIND.equals(projection.kind())

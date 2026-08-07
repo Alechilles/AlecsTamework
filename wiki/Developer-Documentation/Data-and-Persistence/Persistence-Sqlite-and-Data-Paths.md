@@ -38,6 +38,14 @@ coop-capture operation for live and item sources, and shared restoration
 machinery. Feature variants add typed participants and frozen evidence rather
 than their own transaction/recovery protocols.
 
+The filled-item release operation also has a narrow backward-compatible
+recovery variant for already-migrated v2.16.1 artifacts. On exact item use it
+can correlate one non-current capture-v1 history row with an initial imported
+`UNLOADED/NONE` profile, recheck that evidence transactionally, and complete
+through the ordinary receipt-first release boundary. It operates only on the
+existing schema-1 target and never consults the legacy database, import
+manifest, or transient `targetOrigin`.
+
 The canonical lifecycle vocabulary is `ACTIVE`, `UNLOADED`, `CAPTURED`,
 `COOP`, `ROSTER_STORED`, `PROVISIONED_DORMANT`, `DEAD_REVIVABLE`, `LOST`,
 `RELEASED`, and `UNRESOLVED`. Command presentation, restoration, capture,

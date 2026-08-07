@@ -88,6 +88,7 @@ final class TameworkPersistenceAuthors {
                         artifacts,
                         completions,
                         System::currentTimeMillis,
+                        identityIndex,
                         feedback
                 ),
                 restorationAuthor(facades, completions),

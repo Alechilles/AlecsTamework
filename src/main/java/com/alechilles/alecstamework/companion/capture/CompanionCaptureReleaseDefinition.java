@@ -73,6 +73,18 @@ public final class CompanionCaptureReleaseDefinition
         );
         json.addProperty("spawnReceiptKey", payload.spawnReceiptKey());
         json.addProperty("requestedAtMs", payload.requestedAtMs());
+        if (payload.legacyRecovery() != null) {
+            json.add(
+                    "legacyRecovery",
+                    encodeLegacyRecovery(payload.legacyRecovery())
+            );
+        }
+        if (payload.modernRecovery() != null) {
+            json.add(
+                    "modernRecovery",
+                    encodeModernRecovery(payload.modernRecovery())
+            );
+        }
         return json.toString();
     }
 
@@ -102,7 +114,108 @@ public final class CompanionCaptureReleaseDefinition
                 ),
                 json.get("inventoryReceiptKey").getAsString(),
                 json.get("spawnReceiptKey").getAsString(),
-                json.get("requestedAtMs").getAsLong()
+                json.get("requestedAtMs").getAsLong(),
+                json.has("legacyRecovery")
+                        && !json.get("legacyRecovery").isJsonNull()
+                        ? decodeLegacyRecovery(
+                                json.getAsJsonObject("legacyRecovery")
+                        )
+                        : null,
+                json.has("modernRecovery")
+                        && !json.get("modernRecovery").isJsonNull()
+                        ? decodeModernRecovery(
+                                json.getAsJsonObject("modernRecovery")
+                        )
+                        : null
+        );
+    }
+
+    private JsonObject encodeLegacyRecovery(
+            CaptureReleaseLegacyRecoveryEvidence evidence
+    ) {
+        JsonObject json = new JsonObject();
+        json.add(
+                "historicalSnapshot",
+                CompanionSnapshotJsonCodec.encode(
+                        evidence.historicalSnapshot()
+                )
+        );
+        json.addProperty(
+                "reconciliationGeneration",
+                evidence.reconciliationGeneration().value()
+        );
+        json.addProperty(
+                "sourceAliasGeneration",
+                evidence.sourceAliasGeneration()
+        );
+        json.addProperty(
+                "sourceAliasMappedAtMs",
+                evidence.sourceAliasMappedAtMs()
+        );
+        return json;
+    }
+
+    private CaptureReleaseLegacyRecoveryEvidence decodeLegacyRecovery(
+            JsonObject json
+    ) {
+        return new CaptureReleaseLegacyRecoveryEvidence(
+                CompanionSnapshotJsonCodec.decode(
+                        json.getAsJsonObject("historicalSnapshot")
+                ),
+                new com.alechilles.alecstamework.companion.lifecycle
+                        .ReconciliationGeneration(
+                        json.get("reconciliationGeneration").getAsLong()
+                ),
+                json.get("sourceAliasGeneration").getAsLong(),
+                json.get("sourceAliasMappedAtMs").getAsLong()
+        );
+    }
+
+    private JsonObject encodeModernRecovery(
+            CaptureReleaseModernRecoveryEvidence evidence
+    ) {
+        JsonObject json = new JsonObject();
+        json.add(
+                "supersededSnapshot",
+                CompanionSnapshotJsonCodec.encode(
+                        evidence.supersededSnapshot()
+                )
+        );
+        json.addProperty(
+                "canonicalSourceAlias",
+                evidence.canonicalSourceAlias().toString()
+        );
+        json.addProperty(
+                "reconciliationGeneration",
+                evidence.reconciliationGeneration().value()
+        );
+        json.addProperty(
+                "canonicalAliasGeneration",
+                evidence.canonicalAliasGeneration()
+        );
+        json.addProperty(
+                "canonicalAliasMappedAtMs",
+                evidence.canonicalAliasMappedAtMs()
+        );
+        return json;
+    }
+
+    private CaptureReleaseModernRecoveryEvidence decodeModernRecovery(
+            JsonObject json
+    ) {
+        return new CaptureReleaseModernRecoveryEvidence(
+                CompanionSnapshotJsonCodec.decode(
+                        json.getAsJsonObject("supersededSnapshot")
+                ),
+                NpcAlias.parse(
+                        json.get("canonicalSourceAlias").getAsString()
+                ),
+                new com.alechilles.alecstamework.companion.lifecycle
+                        .ReconciliationGeneration(
+                        json.get("reconciliationGeneration").getAsLong()
+                ),
+                json.get("canonicalAliasGeneration").getAsLong(),
+                json.get("canonicalAliasMappedAtMs").getAsLong()
         );
     }
 

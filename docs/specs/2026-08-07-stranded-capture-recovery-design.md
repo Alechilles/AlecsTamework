@@ -50,8 +50,6 @@ This change will:
 - operate directly on an already-migrated schema-1 `tamework-state.sqlite`,
   including after later startups classify that target as `EXISTING`;
 - recover narrowly proven released-public migration artifacts automatically;
-- recover same-owner replacement artifacts automatically when the canonical
-  profile remains strictly `CAPTURED`;
 - reuse receipt-first inventory and entity durability guarantees from ordinary
   capture release;
 - record one canonical active identity and fence superseded source identities.
@@ -74,14 +72,15 @@ eligible for recovery analysis. Decode failures, unavailable persistence,
 inventory conflicts, rejected submissions, or unknown live outcomes remain on
 their existing paths and never fall through to recovery.
 
-Two recovery modes are defined:
+The shipped recovery mode is:
 
 1. `LEGACY_IMPORTED` is automatic for a released-public item and a uniquely
    correlating imported capture-v1 history row on an initial imported
    `UNLOADED` profile.
-2. `MODERN_CAPTURED_SUPERSEDE` is automatic for a complete replacement item
-   whose same-owner canonical profile remains `CAPTURED` under an older exact
-   capture authority.
+
+2. `MODERN_CAPTURED_SUPERSEDE` handles the reporter's rollback split-brain
+   shape: a complete newer same-profile item while canonical SQLite still
+   retains an older exact `CAPTURED` snapshot.
 
 Missing profiles and ambiguous legacy histories are reported but unsupported.
 Modern `UNLOADED` profiles are also refused because they may still have an
@@ -132,14 +131,13 @@ The canonical profile must have:
 - the initial imported/reconciled revision and generation shape, rather than a
   later ordinary unload;
 - no current capture, coop, death, lost, roster, or recovery snapshot;
-- exactly one non-current `capture` snapshot with payload version 1 inside the
-  current source alias's mapped-time interval that correlates with the profile,
-  role, owner, and item-carried state.
+- exactly one non-current `capture` snapshot with payload version 1 that
+  correlates with the profile, role, owner, and item-carried state.
 
 The historical snapshot remains evidence, not a newly current capture
-authority. Alias mapping time and capture time narrow repeated historical
-captures to the generation represented by the held item. Zero or multiple
-viable candidates inside that interval is an ambiguity and is refused.
+authority. The import mapped the reporter's current aliases shortly after the
+older capture rows, so timestamp ordering is not treated as authority. Zero or
+multiple viable capture-v1 candidates is an ambiguity and is refused.
 
 ### Modern captured-supersede mode
 
@@ -181,10 +179,10 @@ than copied between operation kinds.
 
 ### Durable operation
 
-Register operation kind `companion_capture_recovery_release` with payload
-version 1. The request freezes:
+The existing `companion_capture_release` operation accepts one optional,
+backward-compatible legacy-recovery evidence block. Old payloads decode with
+that block absent and keep their current behavior. The request freezes:
 
-- recovery mode;
 - profile ID, expected lifecycle revision, reconciliation generation, owner,
   and metadata revision/hash;
 - canonical current alias and canonical capture snapshot when present;
@@ -237,12 +235,11 @@ After both receipts are proven, the SQLite commit:
 - promotes the deterministic target alias;
 - transitions the lifecycle directly to `ACTIVE/LIVE_ENTITY` at the target
   world;
-- emits recovery-result, profile-projection, and lifecycle-projection outbox
-  events.
+- emits the existing capture-release, profile-projection, and
+  lifecycle-projection outbox events.
 
-The distinct recovery result includes the mode and both source identities for
-diagnostics. Normal capture-release consumers remain compatible because the
-existing operation payload and event versions do not change.
+The operation detail records whether the optional legacy-recovery evidence was
+used. No new event codec, result type, or diagnostic subsystem is introduced.
 
 Retired source aliases are durable stale-source tombstones. If a superseded
 entity later loads, spawn-authority cleanup must identify the retired alias as
@@ -277,9 +274,9 @@ such as owner mismatch, ambiguous legacy history, competing live identity,
 profile state not recoverable, or persistence not ready. The item remains
 untouched for every pre-submission refusal.
 
-The distinct operation kind automatically participates in existing accepted,
-rejected, completed, failed, and operation-kind diagnostics. No recovery-only
-diagnostic subsystem is added.
+The existing operation kind automatically participates in accepted, rejected,
+completed, and failed diagnostics. No recovery-only diagnostic subsystem is
+added.
 
 ## Persistence and Compatibility Impact
 
@@ -289,9 +286,9 @@ legacy adapter are introduced. No schema migration is allowed for this scoped
 fix; if the existing identity store cannot express the required alias fencing,
 the design must be revisited instead of expanding persistence schema.
 
-The current `companion_capture_release` operation definition, payload version,
-event, and recovery behavior remain unchanged. Servers without stranded items
-continue using the normal path exclusively.
+The current `companion_capture_release` payload version and event remain
+unchanged. Its optional recovery field is absent for ordinary releases, so
+servers without stranded items continue using the normal path exclusively.
 
 ## Testing Strategy
 

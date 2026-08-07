@@ -56,6 +56,11 @@ method.
 - A supported managed-coop interaction can place an eligible canonical filled
   capture item directly into an available coop slot. Other filled items still
   use their normal release interaction.
+- If a v2.16.1 filled item became stranded after upgrading to Tamework
+  3.0.0-3.0.2, use that exact item again after the fixed build reports
+  `MUTATION_READY`. Tamework can recover its preserved imported capture state
+  directly; you do not need to rerun migration. Keep a complete save backup
+  before upgrading.
 - Restoring a command-linked dead or `LOST` companion may be free or may
   require the exact item recipe shown by the confirmation. The configured
   policy or cooldown can still delay or disable the action.

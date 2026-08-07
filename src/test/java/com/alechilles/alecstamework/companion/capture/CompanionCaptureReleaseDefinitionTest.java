@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
+import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /** Durable codec and invariant tests for captured-artifact release evidence. */
@@ -81,6 +83,121 @@ class CompanionCaptureReleaseDefinitionTest {
                 );
 
         assertNull(decoded.ownerAssignment());
+        assertNull(decoded.legacyRecovery());
+    }
+
+    @Test
+    void roundTripPreservesLegacyRecoveryEvidence() {
+        CompanionSnapshot historical = new CompanionSnapshot(
+                SNAPSHOT,
+                PROFILE,
+                CompanionCaptureRequest.SNAPSHOT_KIND,
+                1,
+                sourceSnapshot().payloadJson(),
+                sourceSnapshot().payloadHash(),
+                new LifecycleRevision(1),
+                false,
+                -900
+        );
+        CompanionCaptureReleaseRequest ordinary = request(
+                projection(
+                        CompanionFullStateProjection.KIND,
+                        CompanionFullStateProjection.VERSION
+                ),
+                "inventory-receipt",
+                "spawn-receipt"
+        );
+        CompanionCaptureReleaseRequest recovery =
+                new CompanionCaptureReleaseRequest(
+                        ordinary.profileId(),
+                        ordinary.expectedLifecycleRevision(),
+                        ordinary.sourceSnapshot(),
+                        ordinary.sourceAlias(),
+                        ordinary.projection(),
+                        ordinary.source(),
+                        ordinary.targetAlias(),
+                        ordinary.ownerAssignment(),
+                        ordinary.placement(),
+                        ordinary.inventoryReceiptKey(),
+                        ordinary.spawnReceiptKey(),
+                        ordinary.requestedAtMs(),
+                        new CaptureReleaseLegacyRecoveryEvidence(
+                                historical,
+                                new ReconciliationGeneration(1),
+                                3,
+                                -1_000
+                        )
+                );
+
+        CompanionCaptureReleaseRequest decoded =
+                CompanionCaptureReleaseDefinition.INSTANCE.decode(
+                        CompanionCaptureReleaseDefinition.INSTANCE.encode(
+                                recovery
+                        )
+                );
+
+        assertEquals(recovery, decoded);
+        assertNotNull(decoded.legacyRecovery());
+    }
+
+    @Test
+    void roundTripPreservesModernRecoveryEvidenceForRestart() {
+        CompanionCaptureReleaseRequest ordinary = request(
+                projection(
+                        CompanionFullStateProjection.KIND,
+                        CompanionFullStateProjection.VERSION
+                ),
+                "inventory-receipt",
+                "spawn-receipt"
+        );
+        CompanionSnapshot superseded = new CompanionSnapshot(
+                SnapshotId.parse(
+                        "50000000-0000-0000-0000-000000000002"
+                ),
+                PROFILE,
+                CompanionCaptureRequest.SNAPSHOT_KIND,
+                1,
+                sourceSnapshot().payloadJson(),
+                sourceSnapshot().payloadHash(),
+                LifecycleRevision.INITIAL,
+                true,
+                -1_000
+        );
+        CompanionCaptureReleaseRequest recovery =
+                new CompanionCaptureReleaseRequest(
+                        ordinary.profileId(),
+                        ordinary.expectedLifecycleRevision(),
+                        ordinary.sourceSnapshot(),
+                        ordinary.sourceAlias(),
+                        ordinary.projection(),
+                        ordinary.source(),
+                        ordinary.targetAlias(),
+                        ordinary.ownerAssignment(),
+                        ordinary.placement(),
+                        ordinary.inventoryReceiptKey(),
+                        ordinary.spawnReceiptKey(),
+                        ordinary.requestedAtMs(),
+                        null,
+                        new CaptureReleaseModernRecoveryEvidence(
+                                superseded,
+                                NpcAlias.parse(
+                                        "20000000-0000-0000-0000-000000000003"
+                                ),
+                                ReconciliationGeneration.INITIAL,
+                                0,
+                                -1_100
+                        )
+                );
+
+        CompanionCaptureReleaseRequest decoded =
+                CompanionCaptureReleaseDefinition.INSTANCE.decode(
+                        CompanionCaptureReleaseDefinition.INSTANCE.encode(
+                                recovery
+                        )
+                );
+
+        assertEquals(recovery, decoded);
+        assertNotNull(decoded.modernRecovery());
     }
 
     @Test

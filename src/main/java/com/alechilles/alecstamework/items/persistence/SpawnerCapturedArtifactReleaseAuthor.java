@@ -1,13 +1,17 @@
 package com.alechilles.alecstamework.items.persistence;
 
 import com.alechilles.alecstamework.companion.capture.CaptureReleaseSourceEvidence;
+import com.alechilles.alecstamework.companion.capture.CaptureReleaseLegacyRecoveryEvidence;
+import com.alechilles.alecstamework.companion.capture.CaptureReleaseModernRecoveryEvidence;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseRequest;
+import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
+import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex;
 import com.alechilles.alecstamework.items.persistence.SpawnerCaptureReleaseEvidenceFreezer.FrozenRelease;
 import com.alechilles.alecstamework.items.persistence.SpawnerCaptureReleaseEvidenceFreezer.PendingRelease;
 import com.alechilles.alecstamework.items.persistence.SpawnerCapturedArtifactIdentity.Claim;
@@ -22,6 +26,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResul
 import com.alechilles.alecstamework.persistence.operation.PublicOperationSubmission;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
 import java.util.Objects;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.LongSupplier;
@@ -39,6 +44,8 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
     private final SpawnerCaptureReleaseEvidenceFreezer evidence;
     private final SpawnerCapturedArtifactReleaseProfilePreparer
             profilePreparer;
+    private final SpawnerCapturedArtifactRecoveryPreparer recoveryPreparer;
+    private final SourceAliasProbe sourceAliases;
     private final ResultDispatcher dispatcher;
 
     /** Creates the production author over replacement facades and UUID-safe feedback. */
@@ -47,6 +54,7 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
             @Nonnull HytaleCapturedArtifactAdapter artifacts,
             @Nonnull HytaleUuidCompletionDispatcher completions,
             @Nonnull LongSupplier clock,
+            @Nonnull LoadedNpcIdentityIndex identityIndex,
             @Nonnull SpawnerPersistenceCompletionListener listener
     ) {
         this(
@@ -55,6 +63,8 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
                         artifacts, clock
                 ),
                 new SpawnerCaptureSnapshotMapper(),
+                alias -> identityIndex.probe(alias.value()).status()
+                        == LoadedNpcIdentityIndex.ProbeStatus.ABSENT,
                 (worldKey, actorUuid, publishedEffect, result) ->
                         completions.dispatch(
                                 worldKey,
@@ -78,12 +88,34 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
             SpawnerCaptureSnapshotMapper snapshots,
             ResultDispatcher dispatcher
     ) {
+        this(
+                persistence,
+                evidence,
+                snapshots,
+                alias -> true,
+                dispatcher
+        );
+    }
+
+    SpawnerCapturedArtifactReleaseAuthor(
+            PersistencePort persistence,
+            SpawnerCaptureReleaseEvidenceFreezer evidence,
+            SpawnerCaptureSnapshotMapper snapshots,
+            SourceAliasProbe sourceAliases,
+            ResultDispatcher dispatcher
+    ) {
         this.persistence = Objects.requireNonNull(persistence, "persistence");
         this.evidence = Objects.requireNonNull(evidence, "evidence");
         this.profilePreparer =
                 new SpawnerCapturedArtifactReleaseProfilePreparer(
                         snapshots
                 );
+        this.recoveryPreparer =
+                new SpawnerCapturedArtifactRecoveryPreparer(profilePreparer);
+        this.sourceAliases = Objects.requireNonNull(
+                sourceAliases,
+                "sourceAliases"
+        );
         this.dispatcher = Objects.requireNonNull(dispatcher, "dispatcher");
     }
 
@@ -195,6 +227,23 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
                         frozenSource.ownerAssignmentName()
                 );
         if (prepared instanceof Rejected rejected) {
+            if (rejected.status()
+                    == SpawnerPersistenceAuthorResult.Status.PROFILE_CONFLICT
+                    && "capture_release_profile_not_exact_captured".equals(
+                    rejected.detail()
+            )) {
+                return frozenSource.claim().releasedPublic()
+                        ? recoverAndSubmit(
+                                frozenSource,
+                                profile,
+                                placement
+                        )
+                        : recoverModernAndSubmit(
+                                frozenSource,
+                                profile,
+                                placement
+                        );
+            }
             return completed(result(
                     rejected.status(), null, null,
                     rejected.detail(), rejected.failure()
@@ -220,8 +269,153 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
         }
         return submit(
                 frozen, profile, release.sourceSnapshot(),
-                release.projection(), placement
+                release.projection(), placement, null, null
         );
+    }
+
+    private CompletionStage<SpawnerPersistenceAuthorResult>
+    recoverModernAndSubmit(
+            PendingRelease frozenSource,
+            CompanionProfileReadModel profile,
+            CompanionSpawnPlacement placement
+    ) {
+        return persistence.findProfile(frozenSource.claim().sourceAlias())
+                .thenCompose(aliasRead -> {
+                    if (!(aliasRead instanceof PersistenceReadResult.Absent<?>)) {
+                        return profileConflict(null);
+                    }
+                    var recovery = recoveryPreparer.prepareModern(
+                            profile,
+                            frozenSource.claim(),
+                            frozenSource.sourceArtifact(),
+                            frozenSource.ownerAssignment(),
+                            frozenSource.ownerAssignmentName(),
+                            sourceAliases.absent(
+                                    profile.currentAlias().alias()
+                            ),
+                            sourceAliases.absent(
+                                    frozenSource.claim().sourceAlias()
+                            )
+                    );
+                    if (!(recovery instanceof
+                            SpawnerCapturedArtifactRecoveryPreparer
+                                    .ModernPrepared ready)) {
+                        return profileConflict(null);
+                    }
+                    try {
+                        var release = ready.release();
+                        FrozenRelease frozen = evidence.freeze(
+                                frozenSource,
+                                release.resolvedIdentity(),
+                                release.ownerAssignment(),
+                                release.ownerAssignmentName()
+                        );
+                        return submit(
+                                frozen,
+                                profile,
+                                release.sourceSnapshot(),
+                                release.projection(),
+                                placement,
+                                null,
+                                ready.evidence()
+                        );
+                    } catch (RuntimeException | LinkageError failure) {
+                        return completed(result(
+                                SpawnerPersistenceAuthorResult.Status
+                                        .INVALID_CONTEXT,
+                                null,
+                                null,
+                                contextDetail(failure),
+                                failure
+                        ));
+                    }
+                }).exceptionally(failure -> result(
+                        SpawnerPersistenceAuthorResult.Status.PROFILE_READ_FAILED,
+                        null,
+                        null,
+                        "capture_release_alias_read_failed",
+                        failure
+                ));
+    }
+
+    private CompletionStage<SpawnerPersistenceAuthorResult> recoverAndSubmit(
+            PendingRelease frozenSource,
+            CompanionProfileReadModel profile,
+            CompanionSpawnPlacement placement
+    ) {
+        CompletionStage<PersistenceReadResult<List<CompanionSnapshot>>> stage;
+        try {
+            stage = persistence.findSnapshotHistory(
+                    profile.identity().profileId(),
+                    CompanionCaptureRequest.SNAPSHOT_KIND
+            );
+        } catch (RuntimeException | LinkageError failure) {
+            return completed(result(
+                    SpawnerPersistenceAuthorResult.Status.PROFILE_READ_FAILED,
+                    null,
+                    null,
+                    "capture_release_history_read_failed",
+                    failure
+            ));
+        }
+        if (stage == null) {
+            return profileConflict(null);
+        }
+        return stage.thenCompose(read -> {
+            if (!(read instanceof PersistenceReadResult.Found<
+                    List<CompanionSnapshot>> found)) {
+                return profileConflict(null);
+            }
+            SpawnerCapturedArtifactRecoveryPreparer.Result recovery =
+                    recoveryPreparer.prepare(
+                            profile,
+                            frozenSource.claim(),
+                            frozenSource.sourceArtifact(),
+                            frozenSource.ownerAssignment(),
+                            frozenSource.ownerAssignmentName(),
+                            found.value(),
+                            sourceAliases.absent(
+                                    frozenSource.claim().sourceAlias()
+                            )
+                    );
+            if (!(recovery instanceof
+                    SpawnerCapturedArtifactRecoveryPreparer.Prepared ready)) {
+                return profileConflict(null);
+            }
+            final FrozenRelease frozen;
+            try {
+                var release = ready.release();
+                frozen = evidence.freeze(
+                        frozenSource,
+                        release.resolvedIdentity(),
+                        release.ownerAssignment(),
+                        release.ownerAssignmentName()
+                );
+                return submit(
+                        frozen,
+                        profile,
+                        release.sourceSnapshot(),
+                        release.projection(),
+                        placement,
+                        ready.evidence(),
+                        null
+                );
+            } catch (RuntimeException | LinkageError failure) {
+                return completed(result(
+                        SpawnerPersistenceAuthorResult.Status.INVALID_CONTEXT,
+                        null,
+                        null,
+                        contextDetail(failure),
+                        failure
+                ));
+            }
+        }).exceptionally(failure -> result(
+                SpawnerPersistenceAuthorResult.Status.PROFILE_READ_FAILED,
+                null,
+                null,
+                "capture_release_history_read_failed",
+                failure
+        ));
     }
 
     private CompletionStage<SpawnerPersistenceAuthorResult> submit(
@@ -229,7 +423,9 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
             CompanionProfileReadModel profile,
             CompanionSnapshot sourceSnapshot,
             SnapshotCodecRegistry.EncodedSnapshot projection,
-            CompanionSpawnPlacement placement
+            CompanionSpawnPlacement placement,
+            @Nullable CaptureReleaseLegacyRecoveryEvidence legacyRecovery,
+            @Nullable CaptureReleaseModernRecoveryEvidence modernRecovery
     ) {
         CompanionCaptureReleaseRequest request;
         try {
@@ -251,7 +447,9 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
                     placement,
                     frozen.inventoryReceipt(),
                     frozen.spawnReceipt(),
-                    frozen.requestedAt()
+                    frozen.requestedAt(),
+                    legacyRecovery,
+                    modernRecovery
             );
         } catch (RuntimeException failure) {
             return profileConflict(frozen.operationId());
@@ -417,6 +615,16 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
         CompletionStage<PersistenceReadResult<CompanionProfileReadModel>>
         findProfile(NpcAlias alias);
 
+        default CompletionStage<PersistenceReadResult<List<CompanionSnapshot>>>
+        findSnapshotHistory(
+                ProfileId profileId,
+                com.alechilles.alecstamework.companion.snapshot.SnapshotKind kind
+        ) {
+            return CompletableFuture.completedFuture(
+                    PersistenceReadResult.found(List.of(), 0L)
+            );
+        }
+
         PublicOperationSubmission release(
                 OperationId operationId,
                 IdempotencyKey idempotencyKey,
@@ -432,6 +640,11 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
                 SpawnerPublishedEffect publishedEffect,
                 SpawnerPersistenceAuthorResult result
         );
+    }
+
+    @FunctionalInterface
+    interface SourceAliasProbe {
+        boolean absent(NpcAlias alias);
     }
 
     private static final class FacadePersistencePort
@@ -454,6 +667,15 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
         public CompletionStage<PersistenceReadResult<
                 CompanionProfileReadModel>> findProfile(NpcAlias alias) {
             return persistence.queries().findProfile(alias);
+        }
+
+        @Override
+        public CompletionStage<PersistenceReadResult<List<CompanionSnapshot>>>
+        findSnapshotHistory(
+                ProfileId profileId,
+                com.alechilles.alecstamework.companion.snapshot.SnapshotKind kind
+        ) {
+            return persistence.queries().findSnapshotHistory(profileId, kind);
         }
 
         @Override

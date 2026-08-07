@@ -41,6 +41,7 @@ public final class SqlitePublicPersistenceAdapter {
     private final SqlitePublicDiagnosticsReader diagnostics;
     private final SqliteCompanionProfileReader profiles;
     private final SqliteCompanionLifecycleReader lifecycles;
+    private final SqliteCompanionSnapshotReader snapshots;
     private final SqliteCompanionCoopReader coops;
     private final SqliteProfileExtensionReader extensions;
     private final SqlitePopulationGroupReader populationGroups;
@@ -131,6 +132,7 @@ public final class SqlitePublicPersistenceAdapter {
         );
         profiles = new SqliteCompanionProfileReader(kernel.reads());
         lifecycles = new SqliteCompanionLifecycleReader(kernel.reads());
+        snapshots = new SqliteCompanionSnapshotReader(kernel.reads());
         coops = new SqliteCompanionCoopReader(kernel.reads());
         extensions = new SqliteProfileExtensionReader(kernel.reads());
         populationGroups = new SqlitePopulationGroupReader(kernel.reads());
@@ -275,6 +277,11 @@ public final class SqlitePublicPersistenceAdapter {
     @Nonnull
     public SqliteCompanionLifecycleReader lifecycleReader() {
         return lifecycles;
+    }
+
+    @Nonnull
+    public SqliteCompanionSnapshotReader snapshotReader() {
+        return snapshots;
     }
 
     @Nonnull

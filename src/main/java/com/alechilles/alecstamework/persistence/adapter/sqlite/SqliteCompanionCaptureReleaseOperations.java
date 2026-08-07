@@ -9,10 +9,12 @@ import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChangeCodec;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChange;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
+import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
@@ -194,7 +196,10 @@ public final class SqliteCompanionCaptureReleaseOperations {
         );
         requireApplied(
                 transaction.snapshots().retireCurrent(
-                        release.sourceSnapshot().snapshotId()
+                        release.modernRecovery() == null
+                                ? release.sourceSnapshot().snapshotId()
+                                : release.modernRecovery()
+                                .supersededSnapshot().snapshotId()
                 ),
                 "capture_release_snapshot_retirement"
         );
@@ -343,25 +348,54 @@ public final class SqliteCompanionCaptureReleaseOperations {
                 .orElseThrow(() -> new IllegalStateException(
                         "capture_release_lifecycle_missing"
                 ));
+        boolean sourceStateMatches = release.legacyRecovery() != null
+                ? lifecycle.state() == LifecycleState.UNLOADED
+                && lifecycle.location().equals(LifecycleLocation.none())
+                && lifecycle.lastReconciledGeneration().equals(
+                release.legacyRecovery().reconciliationGeneration()
+        )
+                : lifecycle.state() == LifecycleState.CAPTURED
+                && lifecycle.location().equals(LifecycleLocation.keyed(
+                LifecycleLocationKind.CAPTURE_ITEM,
+                (release.modernRecovery() == null
+                        ? release.sourceSnapshot()
+                        : release.modernRecovery().supersededSnapshot())
+                        .snapshotId().toString()
+        ));
+        CompanionSnapshot durableSource = release.modernRecovery() == null
+                ? release.sourceSnapshot()
+                : release.modernRecovery().supersededSnapshot();
+        boolean snapshotMatches = release.legacyRecovery() == null
+                ? transaction.snapshots()
+                .findById(durableSource.snapshotId())
+                .filter(durableSource::equals)
+                .filter(snapshot -> transaction.snapshots()
+                        .findCurrent(
+                                release.profileId(),
+                                durableSource.kind()
+                        )
+                        .filter(snapshot::equals)
+                        .isPresent())
+                .isPresent()
+                : transaction.snapshots()
+                .findById(
+                        release.legacyRecovery()
+                                .historicalSnapshot().snapshotId()
+                )
+                .filter(release.legacyRecovery()
+                        .historicalSnapshot()::equals)
+                .isPresent()
+                && transaction.snapshots()
+                .findCurrentByProfile(release.profileId()).isEmpty();
         if (!lifecycle.revision().equals(
                 release.expectedLifecycleRevision().next()
         )
-                || lifecycle.state() != LifecycleState.CAPTURED
+                || !sourceStateMatches
                 || !operation.operationId().equals(
                 lifecycle.activeOperationId()
         )
                 || lifecycle.quarantined()
-                || transaction.snapshots()
-                .findById(release.sourceSnapshot().snapshotId())
-                .filter(release.sourceSnapshot()::equals)
-                .filter(snapshot -> transaction.snapshots()
-                        .findCurrent(
-                                release.profileId(),
-                                release.sourceSnapshot().kind()
-                        )
-                        .filter(snapshot::equals)
-                        .isPresent())
-                .isEmpty()) {
+                || !snapshotMatches) {
             throw new IllegalStateException(
                     "capture_release_lifecycle_fence_mismatch"
             );
