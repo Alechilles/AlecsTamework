@@ -83,14 +83,14 @@
 - Modify: the nearest `docs/` and `wiki/` navigation indexes
 - Mirror: `C:/Users/22ale/AppData/Roaming/Hytale/My Mod Docs/AlecsTamework.wiki/Player-Guides/Systems/Scarecrow-Spawn-Suppression.md`
 
-- [ ] Define a suppression asset with radius `32`, an empty suppressed-groups list (all normal groups), and automatic marker suppression enabled.
-- [ ] Define `Tamework_Scarecrow` with parent `Deco_Scarecrow`, inheriting the vanilla model, texture, icon, hitbox, and rotation as the temporary visual. Override only Tamework identity, text, and placement interaction.
-- [ ] Define a `Use` root interaction for collecting the spawned prop and add concise placement-failure and item text keys to every shipped locale.
-- [ ] Document the exact scope: ordinary world spawns and automatic marker spawns are blocked; manual marker triggers, deliberate mod spawns, and existing NPCs are not removed.
-- [ ] Add a player-facing changelog entry and mirror the wiki page into the external wiki source.
-- [ ] Validate changed assets with the Hytale asset tools exact-runtime profile. If the ignored local profile is absent, initialize it against the installed 0.5.7 runtime before running profile check, inspect/options, validate, and changed-asset checks.
-- [ ] Run `pwsh -NoProfile -File ./scripts/tools/build-agent-index.ps1` and `pwsh -NoProfile -File ./scripts/tools/check-agent-docs.ps1` from Git Bash.
-- [ ] Commit as `Feat: add scarecrow assets and documentation`.
+- [x] Define a suppression asset with radius `32`, an empty suppressed-groups list (all normal groups), and automatic marker suppression enabled.
+- [x] Define `Tamework_Scarecrow` with parent `Deco_Scarecrow`, inheriting the vanilla model, texture, icon, hitbox, and rotation as the temporary visual. Override only Tamework identity, text, and placement interaction.
+- [x] Define a `Use` root interaction for collecting the spawned prop and add concise placement-failure and item text keys to every shipped locale.
+- [x] Document the exact scope: ordinary world spawns and automatic marker spawns are blocked; manual marker triggers, deliberate mod spawns, and existing NPCs are not removed.
+- [x] Add a player-facing changelog entry and mirror the wiki page into an isolated external-wiki worktree.
+- [x] Attempt exact-profile asset validation and fail closed: the installed tool has no trustworthy 0.5.7 project profile, so exact 0.5.7 Workshop resolution/reference checks, JSON parsing, and Gradle resource processing are used without mislabeling the available snapshot.
+- [x] Regenerate and check `docs/agents/generated-index.md`. The aggregate checker reaches its expected isolated-worktree precondition failure because the workspace-local, untracked `AGENTS.md` is not present in Git worktrees.
+- [x] Commit as `Feat: add scarecrow assets and documentation`.
 
 ---
 
