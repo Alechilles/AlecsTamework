@@ -54,8 +54,8 @@ public final class SpawnBeaconVisualizationService implements AutoCloseable {
     private final Map<UUID, TrackingSession> activeSessions = new ConcurrentHashMap<>();
     private final Map<SpawnBeaconVisualizationWorldState.Key, SpawnBeaconVisualizationWorldState>
             worldStates = new ConcurrentHashMap<>();
-    private final Set<SpawnBeaconVisualizationWorldState.Key> removedWorlds =
-            ConcurrentHashMap.newKeySet();
+    private final SpawnBeaconVisualizationRemovedWorlds removedWorlds =
+            new SpawnBeaconVisualizationRemovedWorlds();
     private volatile boolean closed;
 
     synchronized EnableResult enable(@Nonnull World world,
@@ -64,7 +64,7 @@ public final class SpawnBeaconVisualizationService implements AutoCloseable {
                                      double radius) {
         UUID playerUuid = playerRef.getUuid();
         var worldKey = new SpawnBeaconVisualizationWorldState.Key(world);
-        if (closed || removedWorlds.contains(worldKey) || playerUuid == null) {
+        if (closed || removedWorlds.contains(world) || playerUuid == null) {
             return new EnableResult(0, 0, radius, List.of());
         }
 
@@ -105,7 +105,7 @@ public final class SpawnBeaconVisualizationService implements AutoCloseable {
     /** Drops all tracking and owned references for a world that is being removed. */
     public synchronized void removeWorld(@Nonnull World world) {
         var worldKey = new SpawnBeaconVisualizationWorldState.Key(world);
-        removedWorlds.add(worldKey);
+        removedWorlds.add(world);
         activeSessions.entrySet().removeIf(entry -> entry.getValue().world() == world);
         SpawnBeaconVisualizationWorldState state = worldStates.remove(worldKey);
         if (state != null) {
