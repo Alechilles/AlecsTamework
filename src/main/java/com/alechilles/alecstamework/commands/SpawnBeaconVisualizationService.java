@@ -54,14 +54,17 @@ public final class SpawnBeaconVisualizationService implements AutoCloseable {
     private final Map<UUID, TrackingSession> activeSessions = new ConcurrentHashMap<>();
     private final Map<SpawnBeaconVisualizationWorldState.Key, SpawnBeaconVisualizationWorldState>
             worldStates = new ConcurrentHashMap<>();
+    private final Set<SpawnBeaconVisualizationWorldState.Key> removedWorlds =
+            ConcurrentHashMap.newKeySet();
     private volatile boolean closed;
 
-    EnableResult enable(@Nonnull World world,
-                        @Nonnull Store<EntityStore> store,
-                        @Nonnull PlayerRef playerRef,
-                        double radius) {
+    synchronized EnableResult enable(@Nonnull World world,
+                                     @Nonnull Store<EntityStore> store,
+                                     @Nonnull PlayerRef playerRef,
+                                     double radius) {
         UUID playerUuid = playerRef.getUuid();
-        if (closed || playerUuid == null) {
+        var worldKey = new SpawnBeaconVisualizationWorldState.Key(world);
+        if (closed || removedWorlds.contains(worldKey) || playerUuid == null) {
             return new EnableResult(0, 0, radius, List.of());
         }
 
@@ -79,9 +82,9 @@ public final class SpawnBeaconVisualizationService implements AutoCloseable {
         return buildEnableResult(refresh.loadedBeacons(), state, playerRef, store, radius);
     }
 
-    DisableResult disable(@Nonnull UUID playerUuid,
-                          @Nonnull World currentWorld,
-                          @Nonnull Store<EntityStore> currentStore) {
+    synchronized DisableResult disable(@Nonnull UUID playerUuid,
+                                       @Nonnull World currentWorld,
+                                       @Nonnull Store<EntityStore> currentStore) {
         TrackingSession removed = activeSessions.remove(playerUuid);
         if (removed == null) {
             return new DisableResult(false);
@@ -100,11 +103,11 @@ public final class SpawnBeaconVisualizationService implements AutoCloseable {
     }
 
     /** Drops all tracking and owned references for a world that is being removed. */
-    public void removeWorld(@Nonnull World world) {
+    public synchronized void removeWorld(@Nonnull World world) {
+        var worldKey = new SpawnBeaconVisualizationWorldState.Key(world);
+        removedWorlds.add(worldKey);
         activeSessions.entrySet().removeIf(entry -> entry.getValue().world() == world);
-        SpawnBeaconVisualizationWorldState state = worldStates.remove(
-                new SpawnBeaconVisualizationWorldState.Key(world)
-        );
+        SpawnBeaconVisualizationWorldState state = worldStates.remove(worldKey);
         if (state != null) {
             state.deactivate();
             state.clearOwnership();
@@ -113,12 +116,13 @@ public final class SpawnBeaconVisualizationService implements AutoCloseable {
 
     /** Stops future refreshes and removes proxies from worlds that still accept work. */
     @Override
-    public void close() {
+    public synchronized void close() {
         if (closed) {
             return;
         }
         closed = true;
         activeSessions.clear();
+        removedWorlds.clear();
         List<SpawnBeaconVisualizationWorldState> states = List.copyOf(worldStates.values());
         worldStates.clear();
         for (SpawnBeaconVisualizationWorldState state : states) {
@@ -162,7 +166,8 @@ public final class SpawnBeaconVisualizationService implements AutoCloseable {
         }
     }
 
-    private void runWorldTick(@Nonnull SpawnBeaconVisualizationWorldState state) {
+    private synchronized void runWorldTick(
+            @Nonnull SpawnBeaconVisualizationWorldState state) {
         if (!isCurrent(state)) {
             return;
         }
@@ -186,13 +191,16 @@ public final class SpawnBeaconVisualizationService implements AutoCloseable {
             return;
         }
         try {
-            world.execute(() -> {
-                if (isCurrent(state)) {
-                    refreshWorld(state);
-                }
-            });
+            world.execute(() -> runRequestedRefresh(state));
         } catch (RuntimeException ignored) {
             removeWorld(world);
+        }
+    }
+
+    private synchronized void runRequestedRefresh(
+            @Nonnull SpawnBeaconVisualizationWorldState state) {
+        if (isCurrent(state)) {
+            refreshWorld(state);
         }
     }
 
