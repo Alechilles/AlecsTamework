@@ -64,6 +64,17 @@ The canonical write target is `tamework-state.sqlite` in Tamework's
 universe-scoped data directory. If that target already exists, Tamework verifies
 and opens it.
 
+That existing-target precedence is deliberate: Tamework never merges later
+changes from `tamework.sqlite` into an established replacement target. When
+retesting migration from a recovered pre-upgrade database, stop the server and
+back up the complete data directory first. Restore the complete pre-upgrade
+directory, or move the existing `tamework-state.sqlite` target and its WAL/SHM
+sidecars, `persistence-engine.json`, and prior `persistence-import-*.json` report
+out of the active directory before starting the migration candidate. Restoring
+only `tamework.sqlite` does not create a fresh migration. On the first successful
+startup, `/tw debugdb status` reports target origin `IMPORTED_PUBLIC`; `EXISTING`
+means a replacement target was reused and no import ran during that startup.
+
 When no replacement target exists, startup discovers at most one immutable
 source across the current, legacy, and historical Tamework data directories:
 

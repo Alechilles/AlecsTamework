@@ -79,6 +79,13 @@ and `/tw showspawnmarkers` need a live player.
   `tamework-state.sqlite` without modifying the source. A v5-v9 source is a
   deliberate refusal: restore a public backup or create a new world instead of
   trying to repair or migrate that tester-only database.
+- A migration retest must begin without an existing replacement target. Stop
+  the server, back up the complete data directory, and restore the complete
+  pre-upgrade directory (or move `tamework-state.sqlite` with its WAL/SHM
+  sidecars, `persistence-engine.json`, and the prior import report out of the
+  active directory). Restoring only `tamework.sqlite` leaves the previous target
+  authoritative. The first clean import reports `IMPORTED_PUBLIC`; `EXISTING`
+  means no import ran during that startup.
 - Use `/tw debugdb status` for engine, target-origin, schema, startup, operation,
   validation, and checkpoint state. `health` and `integrity` are aliases for
   the same bounded summary.
