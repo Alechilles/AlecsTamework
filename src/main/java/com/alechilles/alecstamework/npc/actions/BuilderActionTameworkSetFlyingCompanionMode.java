@@ -40,7 +40,7 @@ public final class BuilderActionTameworkSetFlyingCompanionMode extends TameworkA
                 mode,
                 StringNotEmptyValidator.get(),
                 BuilderDescriptorState.Stable,
-                "Flying companion mode to apply: Follow or Hold.",
+                "Flying companion mode to apply: Follow, Hold, or Fall. Fall immediately activates the Walk controller so gravity takes over.",
                 null
         );
         getString(
@@ -170,10 +170,10 @@ public final class BuilderActionTameworkSetFlyingCompanionMode extends TameworkA
     }
 
     public String getShortDescription() {
-        return "Stores high-level flying companion mode for Tamework-managed settling.";
+        return "Sets high-level flying companion follow, hold, or gravity-driven fall behavior.";
     }
 
     public String getLongDescription() {
-        return "Custom action that switches a flying companion between Follow and Hold behavior and configures landing settle thresholds and targets.";
+        return "Custom action that switches a flying companion between Follow and Hold behavior, or immediately activates its Walk controller for a gravity-driven Fall.";
     }
 }

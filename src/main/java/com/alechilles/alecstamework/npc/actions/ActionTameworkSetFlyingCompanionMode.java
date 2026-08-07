@@ -7,6 +7,7 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.movement.controllers.MotionController;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.IPositionProvider;
@@ -61,6 +62,15 @@ public final class ActionTameworkSetFlyingCompanionMode extends TameworkActionBa
         if (!canExecute(npcRef, role, infoProvider, dt, store)) {
             return false;
         }
+        if (TameworkFlyingCompanionComponent.MODE_FALL.equalsIgnoreCase(mode)) {
+            NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+            if (role == null || npc == null
+                    || !role.setActiveMotionController(npcRef, npc, "Walk", store)) {
+                return false;
+            }
+            disableLandingControl(npcRef, store);
+            return true;
+        }
         ComponentType<EntityStore, TameworkFlyingCompanionComponent> type =
                 TameworkFlyingCompanionComponent.getComponentType();
         if (type == null) {
@@ -100,6 +110,23 @@ public final class ActionTameworkSetFlyingCompanionMode extends TameworkActionBa
         }
         store.putComponent(npcRef, type, updated);
         return true;
+    }
+
+    private static void disableLandingControl(Ref<EntityStore> npcRef,
+                                              Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkFlyingCompanionComponent> type =
+                TameworkFlyingCompanionComponent.getComponentType();
+        if (type == null) {
+            return;
+        }
+        TameworkFlyingCompanionComponent existing = store.getComponent(npcRef, type);
+        if (existing == null) {
+            return;
+        }
+        TameworkFlyingCompanionComponent updated = existing.clone();
+        updated.setMode(TameworkFlyingCompanionComponent.MODE_FOLLOW);
+        updated.enterFollowingPhase();
+        store.putComponent(npcRef, type, updated);
     }
 
     @Nullable

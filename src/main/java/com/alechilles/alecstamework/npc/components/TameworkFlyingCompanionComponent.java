@@ -37,6 +37,7 @@ public final class TameworkFlyingCompanionComponent implements Component<EntityS
 
     public static final String MODE_FOLLOW = "Follow";
     public static final String MODE_HOLD = "Hold";
+    public static final String MODE_FALL = "Fall";
     public static final String MODE_SETTLED = "Settled";
     public static final String PHASE_FOLLOWING = "Following";
     public static final String PHASE_LANDING = "Landing";
