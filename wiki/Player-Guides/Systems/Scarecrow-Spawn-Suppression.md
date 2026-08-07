@@ -12,7 +12,7 @@ Place a Tamework scarecrow on a solid surface to pause automatic NPC spawn marke
 
 Use the placed scarecrow again to collect it. If your inventory is full, it stays in the world. Overlapping scarecrows each remain active until collected.
 
-Scarecrows are interactable world props rather than blocks. Any nearby player can collect one unless the server's permissions cover custom entity interactions.
+Scarecrows are interactable world props rather than blocks. Block-only claim rules do not automatically gate placement or collection; servers need permissions that cover custom entity interactions to protect them.
 
 The scarecrow does not remove NPCs that already exist. It also does not block:
 

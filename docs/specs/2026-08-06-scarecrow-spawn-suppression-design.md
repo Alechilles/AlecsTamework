@@ -62,7 +62,7 @@ Overlapping scarecrows require no special Tamework cache. Hytale tracks each sup
 
 ### Collection
 
-Interacting with a scarecrow collects it after normal entity-interaction reach validation. Collection verifies that the target carries the exact Tamework suppression asset ID before acting. The first release does not add a separate ownership or claim-provider bridge, so block-only claim integrations do not automatically protect this entity interaction.
+Interacting with a scarecrow collects it after normal entity-interaction reach validation. Collection verifies that the target carries the exact Tamework suppression asset ID before acting. The first release does not add a separate ownership or claim-provider bridge, so block-only claim integrations do not automatically gate placement or collection of the entity prop.
 
 The entity is removed through the current ECS command boundary. Hytale then releases its UUID from the suppression controller and nearby spawn markers. One scarecrow item is returned to the player's inventory; if the inventory cannot accept it, the scarecrow remains in place. No separate scarecrow ownership system is introduced.
 

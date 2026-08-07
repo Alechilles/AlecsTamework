@@ -8,7 +8,7 @@
 - Use the placed scarecrow to return it to your inventory. If the inventory cannot accept it, the scarecrow remains in place.
 - Multiple scarecrows may overlap. Removing one does not disable another suppressor covering the same area.
 - Existing NPCs are not despawned or otherwise changed.
-- The scarecrow is an interactable world prop rather than a block. Any nearby player can collect it unless the server's permissions cover custom entity interactions.
+- The scarecrow is an interactable world prop rather than a block. Block-only claim rules do not automatically gate its placement or collection; servers need permissions that cover custom entity interactions to protect it.
 
 The scarecrow does not block manual spawn-marker triggers or deliberate spawns such as commands, Tamework spawner items, breeding, recalls, or scripted integrations.
 
