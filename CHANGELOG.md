@@ -113,6 +113,8 @@
   private forks, and server-specific adaptations.
 
 ### Changed
+- Updated the embedded Creditor library to 1.1.0 for improved version election
+  when multiple installed mods bundle Creditor, plus clearer credits-page tags.
 - Companion capture/release, configured-coop capture/release, death/Lost
   restoration, profile extensions, population, rosters, timed summons,
   provisioning, and revival now share one persistence lifecycle and operation
