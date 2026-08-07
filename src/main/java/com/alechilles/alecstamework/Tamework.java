@@ -89,6 +89,7 @@ import com.alechilles.alecstamework.damage.TameworkLingeringHazardSystem;
 import com.alechilles.alecstamework.damage.TameworkProjectileImpactEffectComponent;
 import com.alechilles.alecstamework.damage.TameworkProjectileImpactEffectSystem;
 import com.alechilles.alecstamework.damage.TraitDamageModifierSystem;
+import com.alechilles.alecstamework.damage.TranquilizedSleepAnimationRestoreSystem;
 import com.alechilles.alecstamework.debug.CompanionXpEventDebugLogService;
 import com.alechilles.alecstamework.debug.PlayerInputDebugProbe;
 import com.alechilles.alecstamework.debug.PlayerInputDebugSystem;
@@ -1142,6 +1143,7 @@ public class Tamework extends JavaPlugin {
 
         // Register damage filter system (configurable owner protection).
         getEntityStoreRegistry().registerSystem(new DamageTargetMemorySystem());
+        getEntityStoreRegistry().registerSystem(new TranquilizedSleepAnimationRestoreSystem());
         getEntityStoreRegistry().registerSystem(new RespawnFallDamageGraceSystem());
         getEntityStoreRegistry().registerSystem(
                 new ExpiryDismountFallDamageProtectionSystem());
