@@ -164,6 +164,9 @@
   separate written permission.
 
 ### Fixed
+- Fixed tranquilized creatures leaving their sleep animation when struck by a
+  zero-damage tranquilizer arrow. Tranquilized dragons and Animal Husbandry
+  predators now remain visibly asleep through repeat tranquilizer hits.
 - Fixed the bonded-roster flight/ground button intermittently ignoring clicks
   after live health, level, XP, or other card updates.
 - Fixed settings announcements replaying after every Tamework update; they now
