@@ -4,7 +4,7 @@ Date: 2026-08-06
 
 ## Objective
 
-Add a placeable scarecrow item that prevents new automatic NPC spawns within a 32-block three-dimensional radius. It must suppress ordinary world spawning and automatic spawn-marker spawning and respawning while leaving existing NPCs and deliberate Tamework spawn paths unchanged.
+Add a placeable scarecrow item using Hytale's native 32-block suppression setting. It must suppress ordinary world spawning and automatic spawn-marker spawning and respawning while leaving existing NPCs and deliberate Tamework spawn paths unchanged. Native marker checks use the exact three-dimensional radius; native world-spawn checks suppress whole intersecting spawn chunks horizontally.
 
 Deliberate Tamework spawn paths include filled spawner-item release, breeding, commands, companion recall, revival, and other explicit projection spawns. Manually triggered Hytale spawn markers are also outside the first version because Hytale 0.5.7 does not apply its native marker-suppression gate inside `SpawnMarkerEntity.trigger(...)`.
 
@@ -52,8 +52,8 @@ The entity carries `SpawnSuppressionComponent("Tamework_Scarecrow")`. The suppre
 
 The result is:
 
-- new ordinary world NPC spawns are rejected within the native three-dimensional radius;
-- automatic spawn-marker initial spawns and respawns pause within the radius;
+- new ordinary world NPC spawns are rejected in every native spawn chunk intersecting the radius horizontally, with the configured numeric span retained vertically;
+- automatic spawn-marker initial spawns and respawns pause within the exact three-dimensional radius;
 - existing NPCs remain alive and are not moved or despawned;
 - scheduled marker spawning resumes after all overlapping suppressors are removed;
 - deliberate Tamework spawns and manually triggered markers remain available.
@@ -62,9 +62,9 @@ Overlapping scarecrows require no special Tamework cache. Hytale tracks each sup
 
 ### Collection
 
-Interacting with a scarecrow collects it, subject to the world's normal interaction and claim permissions. Collection verifies that the target carries the exact Tamework suppression asset ID before acting.
+Interacting with a scarecrow collects it after normal entity-interaction reach validation. Collection verifies that the target carries the exact Tamework suppression asset ID before acting. The first release does not add a separate ownership or claim-provider bridge, so block-only claim integrations do not automatically gate placement or collection of the entity prop.
 
-The entity is removed through the current ECS command boundary. Hytale then releases its UUID from the suppression controller and nearby spawn markers. One scarecrow item is returned to the player's inventory; if the inventory cannot accept it, the item is dropped at the player's position. No separate scarecrow ownership system is introduced.
+The entity is removed through the current ECS command boundary. Hytale then releases its UUID from the suppression controller and nearby spawn markers. One scarecrow item is returned to the player's inventory; if the inventory cannot accept it, the scarecrow remains in place. No separate scarecrow ownership system is introduced.
 
 ## Architecture
 

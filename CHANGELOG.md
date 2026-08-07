@@ -3,6 +3,9 @@
 ## 3.0.2 - Linked Patchwork Asset-Pack Hotfix - Unreleased
 
 ### Added
+- Added a placeable scarecrow with a 32-block automatic spawn-marker radius
+  and native chunk-granular world-spawn suppression. Manual marker triggers,
+  explicit mod spawns, and existing NPCs remain unaffected.
 - Added a shared attitude target for tamed companions, letting dependent mods
   opt their companion groups into retaliation from player-hostile creatures
   without replacing base-game attitude assets.

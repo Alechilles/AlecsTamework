@@ -6,6 +6,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.InventoryComponent.Hotbar;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
+import com.hypixel.hytale.server.core.inventory.transaction.ItemStackSlotTransaction;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import javax.annotation.Nullable;
@@ -31,6 +32,17 @@ public final class PlayerInventoryAccess {
         return getHotbar(getHotbarComponent(player));
     }
 
+    /**
+     * Removes an exact quantity only when the player's live active item still matches the expected item.
+     */
+    public static boolean removeActiveHotbarItem(
+            @Nullable Player player,
+            @Nullable String expectedItemId,
+            int quantity
+    ) {
+        return removeActiveHotbarItem(getHotbarComponent(player), expectedItemId, quantity);
+    }
+
     static byte getActiveHotbarSlot(@Nullable Hotbar hotbar) {
         return hotbar != null ? hotbar.getActiveSlot() : -1;
     }
@@ -43,6 +55,30 @@ public final class PlayerInventoryAccess {
     @Nullable
     static ItemContainer getHotbar(@Nullable Hotbar hotbar) {
         return hotbar != null ? hotbar.getInventory() : null;
+    }
+
+    static boolean removeActiveHotbarItem(
+            @Nullable Hotbar hotbar,
+            @Nullable String expectedItemId,
+            int quantity
+    ) {
+        if (hotbar == null || expectedItemId == null || expectedItemId.isBlank() || quantity <= 0) {
+            return false;
+        }
+        byte slot = hotbar.getActiveSlot();
+        ItemContainer container = hotbar.getInventory();
+        if (slot < 0 || container == null) {
+            return false;
+        }
+        ItemStack active = container.getItemStack(slot);
+        if (active == null
+                || active.isEmpty()
+                || !expectedItemId.equals(active.getItemId())
+                || active.getQuantity() < quantity) {
+            return false;
+        }
+        ItemStackSlotTransaction transaction = container.removeItemStackFromSlot((short) slot, quantity);
+        return transaction != null && transaction.succeeded();
     }
 
     @Nullable

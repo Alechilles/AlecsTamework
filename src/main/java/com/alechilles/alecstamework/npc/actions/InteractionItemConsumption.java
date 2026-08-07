@@ -21,25 +21,16 @@ final class InteractionItemConsumption {
 
     // Removes a quantity only when the live active item still matches the interaction input.
     static boolean removeHeldItemQuantity(Player player, String expectedItemId, int quantity) {
-        if (player == null) {
-            return false;
-        }
-        if (expectedItemId == null || expectedItemId.isBlank()) {
-            return false;
-        }
-        if (quantity <= 0) {
+        if (player == null || expectedItemId == null || expectedItemId.isBlank() || quantity <= 0) {
             return false;
         }
         byte slot = PlayerInventoryAccess.getActiveHotbarSlot(player);
-        if (slot < 0) {
-            return false;
-        }
         ItemContainer hotbar = PlayerInventoryAccess.getHotbar(player);
-        ItemStack stack = hotbar != null ? hotbar.getItemStack(slot) : null;
-        if (stack == null || stack.isEmpty()) {
+        if (slot < 0 || hotbar == null) {
             return false;
         }
-        if (!expectedItemId.equals(stack.getItemId())) {
+        ItemStack stack = hotbar.getItemStack(slot);
+        if (stack == null || stack.isEmpty() || !expectedItemId.equals(stack.getItemId())) {
             return false;
         }
         int removeCount = Math.min(quantity, stack.getQuantity());

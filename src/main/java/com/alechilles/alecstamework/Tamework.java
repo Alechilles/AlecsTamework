@@ -133,6 +133,8 @@ import com.alechilles.alecstamework.items.NamingFeatureHandler;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
 import com.alechilles.alecstamework.items.TranquilizerRecipeVisibilityService;
+import com.alechilles.alecstamework.items.scarecrow.TameworkCollectScarecrowInteraction;
+import com.alechilles.alecstamework.items.scarecrow.TameworkPlaceScarecrowInteraction;
 import com.alechilles.alecstamework.items.persistence.ImportedCompanionRecallRecovery;
 import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
 import com.alechilles.alecstamework.localization.ModLanguageDiscovery;
@@ -594,6 +596,16 @@ public class Tamework extends JavaPlugin {
                 "TameworkLaunchHomingVisualProjectile",
                 TameworkLaunchHomingVisualProjectileInteraction.class,
                 TameworkLaunchHomingVisualProjectileInteraction.CODEC
+        );
+        Interaction.CODEC.register(
+                TameworkPlaceScarecrowInteraction.TYPE_ID,
+                TameworkPlaceScarecrowInteraction.class,
+                TameworkPlaceScarecrowInteraction.CODEC
+        );
+        Interaction.CODEC.register(
+                TameworkCollectScarecrowInteraction.TYPE_ID,
+                TameworkCollectScarecrowInteraction.class,
+                TameworkCollectScarecrowInteraction.CODEC
         );
         itemFeatureRegistry.registerDefaults();
         registerGlobalConfigAssets();

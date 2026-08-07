@@ -1,0 +1,17 @@
+{
+  "$Comment": "Uses Deco_Scarecrow visuals as a replaceable stock placeholder.",
+  "Parent": "Deco_Scarecrow",
+  "TranslationProperties": {
+    "Name": "server.items.Tamework_Scarecrow.name",
+    "Description": "server.items.Tamework_Scarecrow.description"
+  },
+  "Interactions": {
+    "Primary": {
+      "Interactions": [
+        {
+          "Type": "TameworkPlaceScarecrow"
+        }
+      ]
+    }
+  }
+}
