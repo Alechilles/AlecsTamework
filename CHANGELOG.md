@@ -3,6 +3,9 @@
 ## 3.0.2 - Linked Patchwork Asset-Pack Hotfix - Unreleased
 
 ### Added
+- Added a placeable scarecrow with a 32-block automatic spawn-marker radius
+  and native chunk-granular world-spawn suppression. Manual marker triggers,
+  explicit mod spawns, and existing NPCs remain unaffected.
 - Added a shared attitude target for tamed companions, letting dependent mods
   opt their companion groups into retaliation from player-hostile creatures
   without replacing base-game attitude assets.
@@ -164,6 +167,9 @@
   separate written permission.
 
 ### Fixed
+- Fixed tranquilized creatures leaving their sleep animation when struck by a
+  zero-damage tranquilizer arrow. Tranquilized dragons and Animal Husbandry
+  predators now remain visibly asleep through repeat tranquilizer hits.
 - Fixed the bonded-roster flight/ground button intermittently ignoring clicks
   after live health, level, XP, or other card updates.
 - Fixed settings announcements replaying after every Tamework update; they now

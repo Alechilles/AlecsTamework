@@ -89,6 +89,7 @@ import com.alechilles.alecstamework.damage.TameworkLingeringHazardSystem;
 import com.alechilles.alecstamework.damage.TameworkProjectileImpactEffectComponent;
 import com.alechilles.alecstamework.damage.TameworkProjectileImpactEffectSystem;
 import com.alechilles.alecstamework.damage.TraitDamageModifierSystem;
+import com.alechilles.alecstamework.damage.TranquilizedSleepAnimationRestoreSystem;
 import com.alechilles.alecstamework.debug.CompanionXpEventDebugLogService;
 import com.alechilles.alecstamework.debug.PlayerInputDebugProbe;
 import com.alechilles.alecstamework.debug.PlayerInputDebugSystem;
@@ -132,6 +133,8 @@ import com.alechilles.alecstamework.items.NamingFeatureHandler;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
 import com.alechilles.alecstamework.items.TranquilizerRecipeVisibilityService;
+import com.alechilles.alecstamework.items.scarecrow.TameworkCollectScarecrowInteraction;
+import com.alechilles.alecstamework.items.scarecrow.TameworkPlaceScarecrowInteraction;
 import com.alechilles.alecstamework.items.persistence.ImportedCompanionRecallRecovery;
 import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
 import com.alechilles.alecstamework.localization.ModLanguageDiscovery;
@@ -593,6 +596,16 @@ public class Tamework extends JavaPlugin {
                 "TameworkLaunchHomingVisualProjectile",
                 TameworkLaunchHomingVisualProjectileInteraction.class,
                 TameworkLaunchHomingVisualProjectileInteraction.CODEC
+        );
+        Interaction.CODEC.register(
+                TameworkPlaceScarecrowInteraction.TYPE_ID,
+                TameworkPlaceScarecrowInteraction.class,
+                TameworkPlaceScarecrowInteraction.CODEC
+        );
+        Interaction.CODEC.register(
+                TameworkCollectScarecrowInteraction.TYPE_ID,
+                TameworkCollectScarecrowInteraction.class,
+                TameworkCollectScarecrowInteraction.CODEC
         );
         itemFeatureRegistry.registerDefaults();
         registerGlobalConfigAssets();
@@ -1142,6 +1155,7 @@ public class Tamework extends JavaPlugin {
 
         // Register damage filter system (configurable owner protection).
         getEntityStoreRegistry().registerSystem(new DamageTargetMemorySystem());
+        getEntityStoreRegistry().registerSystem(new TranquilizedSleepAnimationRestoreSystem());
         getEntityStoreRegistry().registerSystem(new RespawnFallDamageGraceSystem());
         getEntityStoreRegistry().registerSystem(
                 new ExpiryDismountFallDamageProtectionSystem());
