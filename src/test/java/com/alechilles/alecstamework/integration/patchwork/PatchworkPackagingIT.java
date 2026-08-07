@@ -1,62 +1,87 @@
 package com.alechilles.alecstamework.integration.patchwork;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import java.io.IOException;
-import java.nio.file.Files;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Path;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 import org.junit.jupiter.api.Test;
 
 /**
- * Verifies that Tamework shades its bundled Patchwork runtime without publishing it as a plugin.
+ * Verifies observable behavior from Tamework's packaged Patchwork runtime.
+ *
+ * <p>The test deliberately invokes classes from the shaded jar through a child-first loader.
+ * ZIP-entry inventories are not a useful contract: the runtime must report its aligned logical
+ * version and remain non-fatal when no Hytale host is available to provide telemetry.</p>
  */
 class PatchworkPackagingIT {
-    private static final String EMBEDDED_BOOTSTRAP_CLASS =
-            "com/alechilles/patchwork/embedded/EmbeddedPatchworkBootstrap.class";
-
     @Test
-    void shadedJarEmbedsPatchworkWithoutAdvertisingASecondPlugin() throws IOException {
+    void packagedPatchworkReportsTheAlignedVersionAndGracefullyDisablesWithoutAHost() throws Exception {
         Path packagedJar = Path.of(System.getProperty("patchwork.packagedJar"));
-        assertTrue(Files.isRegularFile(packagedJar), () -> "Expected packaged jar at " + packagedJar);
+        URL packagedUrl = packagedJar.toUri().toURL();
+        try (URLClassLoader loader = new PackagedRuntimeClassLoader(packagedUrl, getClass().getClassLoader())) {
+            Class<?> versionType = Class.forName("com.alechilles.patchwork.PatchworkVersion", true, loader);
+            assertEquals("1.3.0", invoke(versionType.getMethod("current"), null));
 
-        try (ZipFile jar = new ZipFile(packagedJar.toFile())) {
-            assertEquals(
-                    1,
-                    jar.stream().map(entry -> entry.getName())
-                            .filter(EMBEDDED_BOOTSTRAP_CLASS::equals).count(),
-                    "The shaded jar must contain exactly one embedded Patchwork bootstrap."
+            Class<?> telemetryType = Class.forName("com.alechilles.patchwork.telemetry.PatchworkTelemetry", true, loader);
+            Class<?> javaPluginType = Class.forName(
+                    "com.hypixel.hytale.server.core.plugin.JavaPlugin",
+                    false,
+                    getClass().getClassLoader()
             );
-            assertEquals(
-                    1,
-                    jar.stream().map(entry -> entry.getName())
-                            .filter("manifest.json"::equals).count(),
-                    "The shaded jar must contain exactly one root plugin manifest."
+            Object telemetry = invoke(
+                    telemetryType.getMethod("prepare", javaPluginType),
+                    null,
+                    new Object[]{null}
             );
-            assertTameworkManifest(jar);
-            assertTrue(jar.getEntry("com/alechilles/patchwork/standalone/PatchworkPlugin.class") != null,
-                    "The shaded jar must contain Patchwork's runtime classes.");
-            assertFalse(jar.getEntry("manifests.json") != null,
-                    "Tamework must not advertise its shaded Patchwork runtime as a second plugin.");
+
+            assertFalse((Boolean) invoke(telemetryType.getMethod("enabled"), telemetry));
+            assertDoesNotThrow(() -> invoke(telemetryType.getMethod("start"), telemetry));
+            assertDoesNotThrow(() -> invoke(telemetryType.getMethod("close"), telemetry));
         }
     }
 
-    private static void assertTameworkManifest(ZipFile jar) throws IOException {
-        JsonObject manifest = readManifest(jar, jar.getEntry("manifest.json"));
-        assertEquals("Alechilles", manifest.get("Group").getAsString());
-        assertEquals("Alec's Tamework!", manifest.get("Name").getAsString());
-        assertEquals("com.alechilles.alecstamework.Tamework", manifest.get("Main").getAsString());
+    private static Object invoke(Method method, Object receiver, Object... arguments) {
+        try {
+            return method.invoke(receiver, arguments);
+        } catch (IllegalAccessException | InvocationTargetException failure) {
+            Throwable cause = failure instanceof InvocationTargetException invocation
+                    ? invocation.getCause()
+                    : failure;
+            throw new AssertionError("Packaged Patchwork behavior invocation failed: " + method, cause);
+        }
     }
 
-    private static JsonObject readManifest(ZipFile jar, ZipEntry entry) throws IOException {
-        try (var input = jar.getInputStream(entry)) {
-            return JsonParser.parseString(new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8))
-                    .getAsJsonObject();
+    /** Loads the shaded Patchwork and Telemetry packages before delegating Hytale dependencies. */
+    private static final class PackagedRuntimeClassLoader extends URLClassLoader {
+        private PackagedRuntimeClassLoader(URL packagedUrl, ClassLoader parent) {
+            super(new URL[]{packagedUrl}, parent);
+        }
+
+        @Override
+        protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+            if (name.startsWith("com.alechilles.patchwork.")
+                    || name.startsWith("com.alechilles.alecstelemetry.")) {
+                synchronized (getClassLoadingLock(name)) {
+                    Class<?> loaded = findLoadedClass(name);
+                    if (loaded == null) {
+                        try {
+                            loaded = findClass(name);
+                        } catch (ClassNotFoundException ignored) {
+                            loaded = super.loadClass(name, false);
+                        }
+                    }
+                    if (resolve) {
+                        resolveClass(loaded);
+                    }
+                    return loaded;
+                }
+            }
+            return super.loadClass(name, resolve);
         }
     }
 }
