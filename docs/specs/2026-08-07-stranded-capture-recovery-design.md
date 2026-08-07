@@ -6,6 +6,8 @@ Date: 2026-08-07
 
 Recover companions stranded in filled capture items after a public Tamework
 2.16.1 to replacement-persistence 3.x migration or a later partial rollback.
+The primary compatibility target is a server that already completed migration
+under Tamework 3.0.0, 3.0.1, or 3.0.2 and then upgrades to the fixed build.
 Recovery must preserve the companion carried by the item, create at most one
 live companion, and leave ambiguous evidence unchanged.
 
@@ -45,6 +47,8 @@ decodable item therefore proves reconstructable state, not uniqueness.
 
 This change will:
 
+- operate directly on an already-migrated schema-1 `tamework-state.sqlite`,
+  including after later startups classify that target as `EXISTING`;
 - recover narrowly proven released-public migration artifacts automatically;
 - recover same-owner replacement artifacts automatically when the canonical
   profile remains strictly `CAPTURED`;
@@ -84,6 +88,10 @@ Modern `UNLOADED` profiles are also refused because they may still have an
 unloaded world entity. None of these cases becomes implicit profile creation,
 best-guess snapshot selection, or a general repair command.
 
+Recovery eligibility uses the persisted `import_manifest` and canonical rows,
+not the transient startup `targetOrigin`. The legacy database, original import
+archive, and a second import run are neither required nor consulted.
+
 ## Eligibility Fences
 
 ### Common fences
@@ -112,6 +120,10 @@ The item must have the released-public identity shape: source alias present,
 with both replacement profile ID and capture snapshot ID absent. Mixed modern
 metadata is invalid rather than legacy-compatible.
 
+The item source alias must be the profile's current imported alias. A
+retired-only alias match represents an item from before a later release and is
+not automatically recoverable.
+
 The canonical profile must have:
 
 - a persisted public-import manifest lineage;
@@ -119,12 +131,14 @@ The canonical profile must have:
 - the initial imported/reconciled revision and generation shape, rather than a
   later ordinary unload;
 - no current capture, coop, death, lost, roster, or recovery snapshot;
-- exactly one non-current `capture` snapshot with payload version 1 that
-  correlates with the profile, item source alias history, role, owner, and
-  item-carried state.
+- exactly one non-current `capture` snapshot with payload version 1 inside the
+  current source alias's mapped-time interval that correlates with the profile,
+  role, owner, and item-carried state.
 
 The historical snapshot remains evidence, not a newly current capture
-authority. More than one viable candidate is an ambiguity and is refused.
+authority. Alias mapping time and capture time narrow repeated historical
+captures to the generation represented by the held item. Zero or multiple
+viable candidates inside that interval is an ambiguity and is refused.
 
 ### Modern captured-supersede mode
 
@@ -285,10 +299,11 @@ source-shape, registration-presence, or raw-SQL-text guards.
 
 Required regressions are deliberately limited:
 
-1. Import a minimal public 2.16.1 fixture whose inactive capture becomes
-   `UNLOADED`, then release its exact legacy item. Assert one entity projection,
-   exact item consumption, lifecycle `ACTIVE`, target alias promotion, and
-   preserved owner/full state.
+1. Open a minimal already-migrated schema-1 fixture matching the stranded rows
+   produced by 3.0.0-3.0.2, with runtime origin effectively `EXISTING` and no
+   legacy database present. Release its exact legacy item and assert one entity
+   projection, exact item consumption, lifecycle `ACTIVE`, target alias
+   promotion, and preserved owner/full state.
 2. Give a modern item a newer same-profile claim than an older canonical
    `CAPTURED` snapshot. Assert automatic supersession and one active target.
 3. Replay a copied source artifact after success. Assert no second projection.
