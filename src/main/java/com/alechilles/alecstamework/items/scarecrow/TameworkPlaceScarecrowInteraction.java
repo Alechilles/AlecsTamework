@@ -6,6 +6,7 @@ import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.protocol.GameMode;
 import com.hypixel.hytale.protocol.InteractionState;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.protocol.WaitForDataFrom;
@@ -78,18 +79,18 @@ public final class TameworkPlaceScarecrowInteraction extends SimpleBlockInteract
             fail(context, commandBuffer, actorRef, messageFor(preparation.status()));
             return;
         }
-        placePrepared(context, commandBuffer, actorRef, actorTransform, player, preparation.holder());
+        placePrepared(context, commandBuffer, actorRef, player, preparation.holder());
     }
 
     private static void placePrepared(
             InteractionContext context,
             CommandBuffer<EntityStore> commandBuffer,
             Ref<EntityStore> actorRef,
-            TransformComponent actorTransform,
             Player player,
             Holder<EntityStore> holder
     ) {
-        if (!PlayerInventoryAccess.removeActiveHotbarItem(player, ScarecrowIds.ITEM_ID, 1)) {
+        boolean consumed = player.getGameMode() != GameMode.Creative;
+        if (consumed && !PlayerInventoryAccess.removeActiveHotbarItem(player, ScarecrowIds.ITEM_ID, 1)) {
             fail(context, commandBuffer, actorRef, "server.tamework.scarecrow.itemChanged");
             return;
         }
@@ -99,13 +100,22 @@ public final class TameworkPlaceScarecrowInteraction extends SimpleBlockInteract
                 throw new IllegalStateException("Scarecrow holder was not accepted");
             }
         } catch (RuntimeException exception) {
-            ItemUtils.interactivelyPickupItem(
-                    actorRef,
-                    new ItemStack(ScarecrowIds.ITEM_ID, 1),
-                    actorTransform.getPosition(),
-                    commandBuffer
-            );
+            if (consumed) {
+                returnConsumedItem(actorRef, commandBuffer);
+            }
             fail(context, commandBuffer, actorRef, "server.tamework.scarecrow.placeUnavailable");
+        }
+    }
+
+    private static void returnConsumedItem(
+            Ref<EntityStore> actorRef,
+            CommandBuffer<EntityStore> commandBuffer
+    ) {
+        ItemStack returnedItem = new ItemStack(ScarecrowIds.ITEM_ID, 1);
+        var transaction = Player.giveItem(returnedItem, actorRef, commandBuffer);
+        ItemStack remainder = transaction.getRemainder();
+        if (!ItemStack.isEmpty(remainder)) {
+            ItemUtils.dropItem(actorRef, remainder, commandBuffer);
         }
     }
 

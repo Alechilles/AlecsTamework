@@ -15,7 +15,7 @@
 - Add no tick system, NPC scan, custom spawn hook, model, texture, or icon.
 - Create the suppression component before adding the entity and remove the entity with `RemoveReason.REMOVE` so native marker suppression is released.
 - Consume the exact active hotbar item only after placement validation succeeds.
-- Respect Hytale's existing interaction/claim validation; do not add a parallel permission model.
+- Use Hytale's existing interaction reach validation. Do not add a parallel ownership model; document that block-only claim integrations do not automatically cover the entity prop.
 - Add only behavior-level tests that catch a production regression. Do not add source-shape, JSON-text, asset-presence, or registration-presence tests.
 - Keep deliberate Tamework spawns, manual marker triggers, existing NPCs, and unrelated spawn groups unchanged.
 
@@ -60,7 +60,7 @@
 - Create: `src/main/java/com/alechilles/alecstamework/items/scarecrow/TameworkCollectScarecrowInteraction.java`
 - Modify: `src/main/java/com/alechilles/alecstamework/Tamework.java`
 
-- [x] Implement placement as a `SimpleBlockInteraction`, allowing the framework to enforce normal block-interaction and claim rules. Prepare the holder, atomically remove one live active `Tamework_Scarecrow`, then add it with `AddReason.SPAWN`.
+- [x] Implement placement as a `SimpleBlockInteraction`, allowing the framework to enforce normal block-interaction reach. Prepare the holder, atomically remove one live active `Tamework_Scarecrow`, then add it with `AddReason.SPAWN`.
 - [x] If entity addition throws after consumption, return one scarecrow through `ItemUtils.interactivelyPickupItem` and report failure rather than silently losing the item.
 - [x] Implement collection as a targeted instant interaction. Verify the target is this scarecrow, return one item only when inventory accepts it, and remove with `RemoveReason.REMOVE` to unregister native suppression.
 - [x] Register only the two interaction codecs in `Tamework.java`.

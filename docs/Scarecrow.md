@@ -1,6 +1,6 @@
 # Scarecrow Spawn Suppression
 
-`Tamework_Scarecrow` is a placeable entity that uses Hytale's native spawn-suppression system. While it remains in the world, ordinary world NPC spawning and automatic spawn-marker spawning are blocked within 32 blocks.
+`Tamework_Scarecrow` is a placeable entity that uses Hytale's native spawn-suppression system. Automatic spawn-marker spawning is blocked within an exact 32-block three-dimensional radius. Ordinary world spawning is blocked in the native spawn chunks intersecting that area, so its horizontal edge can extend to the boundary of an affected chunk.
 
 ## Player behavior
 
@@ -8,6 +8,7 @@
 - Use the placed scarecrow to return it to your inventory. If the inventory cannot accept it, the scarecrow remains in place.
 - Multiple scarecrows may overlap. Removing one does not disable another suppressor covering the same area.
 - Existing NPCs are not despawned or otherwise changed.
+- The scarecrow is an interactable world prop rather than a block. Any nearby player can collect it unless the server's permissions cover custom entity interactions.
 
 The scarecrow does not block manual spawn-marker triggers or deliberate spawns such as commands, Tamework spawner items, breeding, recalls, or scripted integrations.
 

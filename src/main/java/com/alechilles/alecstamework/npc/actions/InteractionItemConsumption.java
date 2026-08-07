@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
+import com.hypixel.hytale.server.core.inventory.transaction.ItemStackSlotTransaction;
 
 /** Handles removing consumed items from a player's held slot. */
 final class InteractionItemConsumption {
@@ -19,6 +21,23 @@ final class InteractionItemConsumption {
 
     // Removes a quantity only when the live active item still matches the interaction input.
     static boolean removeHeldItemQuantity(Player player, String expectedItemId, int quantity) {
-        return PlayerInventoryAccess.removeActiveHotbarItem(player, expectedItemId, quantity);
+        if (player == null || expectedItemId == null || expectedItemId.isBlank() || quantity <= 0) {
+            return false;
+        }
+        byte slot = PlayerInventoryAccess.getActiveHotbarSlot(player);
+        ItemContainer hotbar = PlayerInventoryAccess.getHotbar(player);
+        if (slot < 0 || hotbar == null) {
+            return false;
+        }
+        ItemStack stack = hotbar.getItemStack(slot);
+        if (stack == null || stack.isEmpty() || !expectedItemId.equals(stack.getItemId())) {
+            return false;
+        }
+        int removeCount = Math.min(quantity, stack.getQuantity());
+        if (removeCount <= 0) {
+            return false;
+        }
+        ItemStackSlotTransaction transaction = hotbar.removeItemStackFromSlot((short) slot, removeCount);
+        return transaction != null && transaction.succeeded();
     }
 }

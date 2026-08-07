@@ -1,6 +1,10 @@
 package com.alechilles.alecstamework.items.scarecrow;
 
+import com.hypixel.hytale.component.ArchetypeChunk;
+import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Holder;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.protocol.InteractionType;
@@ -62,6 +66,9 @@ public final class ScarecrowPlacementService {
             return new Preparation(Status.OCCUPIED, null);
         }
         Placement placement = plan(blockX, blockY, blockZ, actorPosition);
+        if (hasScarecrowAt(world, placement.position())) {
+            return new Preparation(Status.OCCUPIED, null);
+        }
         return new Preparation(Status.SUCCESS, createHolder(placement));
     }
 
@@ -138,6 +145,38 @@ public final class ScarecrowPlacementService {
         return blockType != null
                 && blockType != BlockType.UNKNOWN
                 && WorldUtil.isSolidOnlyBlock(blockType, chunk.getFluidId(blockX, blockY, blockZ));
+    }
+
+    private static boolean hasScarecrowAt(@Nonnull World world, @Nonnull Vector3d position) {
+        if (world.getEntityStore() == null) {
+            return false;
+        }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        if (store == null) {
+            return false;
+        }
+        boolean[] found = {false};
+        store.forEachChunk(
+                Query.and(TransformComponent.getComponentType(), SpawnSuppressionComponent.getComponentType()),
+                (ArchetypeChunk<EntityStore> archetypeChunk, CommandBuffer<EntityStore> ignored) -> {
+                    for (int index = 0; index < archetypeChunk.size() && !found[0]; index++) {
+                        SpawnSuppressionComponent suppression = archetypeChunk.getComponent(
+                                index,
+                                SpawnSuppressionComponent.getComponentType()
+                        );
+                        if (suppression == null
+                                || !ScarecrowIds.SUPPRESSION_ID.equals(suppression.getSpawnSuppression())) {
+                            continue;
+                        }
+                        TransformComponent transform = archetypeChunk.getComponent(
+                                index,
+                                TransformComponent.getComponentType()
+                        );
+                        found[0] = transform != null && transform.getPosition().distanceSquared(position) < 0.01;
+                    }
+                }
+        );
+        return found[0];
     }
 
     /** Placement transform for a centered scarecrow facing its placer. */
