@@ -86,6 +86,12 @@ and `/tw showspawnmarkers` need a live player.
   active directory). Restoring only `tamework.sqlite` leaves the previous target
   authoritative. The first clean import reports `IMPORTED_PUBLIC`; `EXISTING`
   means no import ran during that startup.
+- After a clean import, wait for `/tw debugdb status` to report storage mode
+  `READ_WRITE` and startup readiness `MUTATION_READY` before testing capture,
+  release, or recovery. `STARTING` with `RECONCILE_WORLD` running is a transient
+  safety gate: an attempted mutation is rejected with `world_evidence_pending`,
+  the source item remains untouched, and the player should retry after startup
+  becomes mutation-ready.
 - Use `/tw debugdb status` for engine, target-origin, schema, startup, operation,
   validation, and checkpoint state. `health` and `integrity` are aliases for
   the same bounded summary.

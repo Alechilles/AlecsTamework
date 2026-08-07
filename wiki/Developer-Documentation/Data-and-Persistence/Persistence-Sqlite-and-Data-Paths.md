@@ -75,6 +75,13 @@ only `tamework.sqlite` does not create a fresh migration. On the first successfu
 startup, `/tw debugdb status` reports target origin `IMPORTED_PUBLIC`; `EXISTING`
 means a replacement target was reused and no import ran during that startup.
 
+Do not test capture, filled-item release, or recovery until that status also
+reports storage mode `READ_WRITE` and startup readiness `MUTATION_READY`. During
+a direct import, `STARTING` with `RECONCILE_WORLD` running is expected while
+Tamework seals world evidence. A click in that window is rejected with
+`world_evidence_pending` and leaves the source item unchanged; retry the action
+after mutation readiness is published.
+
 When no replacement target exists, startup discovers at most one immutable
 source across the current, legacy, and historical Tamework data directories:
 
