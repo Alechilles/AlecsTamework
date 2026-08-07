@@ -2,6 +2,10 @@
 
 ## 3.0.2 - Linked Patchwork Asset-Pack Hotfix - Unreleased
 
+### Fixed
+- Fixed `/tw showspawnbeacons` visualization proxies being hidden from players
+  in Adventure mode.
+
 ### Added
 - Added `/tw showspawnbeacons [radius|off]` to reveal nearby loaded natural
   spawn beacons with their configured model and nameplate without changing

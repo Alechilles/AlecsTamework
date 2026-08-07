@@ -18,7 +18,6 @@ import com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.nameplate.Nameplate;
 import com.hypixel.hytale.server.core.modules.entity.component.DisplayNameComponent;
-import com.hypixel.hytale.server.core.modules.entity.component.HiddenFromAdventurePlayers;
 import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystems;
@@ -378,7 +377,6 @@ public final class SpawnBeaconVisualizationService implements AutoCloseable {
                     DisplayNameComponent.getComponentType(), new DisplayNameComponent(displayName)
             );
             holder.addComponent(Nameplate.getComponentType(), new Nameplate(configId));
-            holder.ensureComponent(HiddenFromAdventurePlayers.getComponentType());
             holder.ensureComponent(EntityTrackerSystems.Visible.getComponentType());
             return store.addEntity(holder, AddReason.SPAWN);
         } catch (RuntimeException failure) {
