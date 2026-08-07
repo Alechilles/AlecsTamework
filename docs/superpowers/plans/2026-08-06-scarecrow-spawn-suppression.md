@@ -60,12 +60,12 @@
 - Create: `src/main/java/com/alechilles/alecstamework/items/scarecrow/TameworkCollectScarecrowInteraction.java`
 - Modify: `src/main/java/com/alechilles/alecstamework/Tamework.java`
 
-- [ ] Implement placement as a `SimpleBlockInteraction`, allowing the framework to enforce normal block-interaction and claim rules. Prepare the holder, atomically remove one live active `Tamework_Scarecrow`, then add it with `AddReason.SPAWN`.
-- [ ] If entity addition throws after consumption, return one scarecrow through `ItemUtils.interactivelyPickupItem` and report failure rather than silently losing the item.
-- [ ] Implement collection as a targeted instant interaction. Verify the target is this scarecrow, return one item through `ItemUtils.interactivelyPickupItem`, and remove with `RemoveReason.REMOVE` to unregister native suppression.
-- [ ] Register only the two interaction codecs in `Tamework.java`.
-- [ ] Run focused inventory and placement-service tests plus `bash ./gradlew compileJava --no-daemon`. Do not substitute source-inspection tests for interaction behavior that requires the game runtime.
-- [ ] Commit as `Feat: add scarecrow placement and collection interactions`.
+- [x] Implement placement as a `SimpleBlockInteraction`, allowing the framework to enforce normal block-interaction and claim rules. Prepare the holder, atomically remove one live active `Tamework_Scarecrow`, then add it with `AddReason.SPAWN`.
+- [x] If entity addition throws after consumption, return one scarecrow through `ItemUtils.interactivelyPickupItem` and report failure rather than silently losing the item.
+- [x] Implement collection as a targeted instant interaction. Verify the target is this scarecrow, return one item only when inventory accepts it, and remove with `RemoveReason.REMOVE` to unregister native suppression.
+- [x] Register only the two interaction codecs in `Tamework.java`.
+- [x] Run focused inventory and placement-service tests plus `bash ./gradlew compileJava --no-daemon`. Do not substitute source-inspection tests for interaction behavior that requires the game runtime.
+- [x] Commit as `Feat: add scarecrow placement and collection interactions`.
 
 ---
 
