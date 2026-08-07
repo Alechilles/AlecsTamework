@@ -8,8 +8,10 @@ import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PlayerInventoryAccessTest {
     @Test
@@ -29,6 +31,27 @@ class PlayerInventoryAccessTest {
         assertEquals(-1, PlayerInventoryAccess.getActiveHotbarSlot((Hotbar) null));
         assertNull(PlayerInventoryAccess.getActiveHotbarItem((Hotbar) null));
         assertNull(PlayerInventoryAccess.getHotbar((Hotbar) null));
+    }
+
+    @Test
+    void removesOneMatchingItemFromTheLiveActiveSlot() throws ReflectiveOperationException {
+        SimpleItemContainer container = new SimpleItemContainer((short) 2);
+        container.setItemStackForSlot((short) 1, itemStack("Tamework_Scarecrow", 1));
+        Hotbar hotbar = new Hotbar(container, (byte) 1);
+
+        assertTrue(PlayerInventoryAccess.removeActiveHotbarItem(hotbar, "Tamework_Scarecrow", 1));
+        assertTrue(ItemStack.isEmpty(container.getItemStack((short) 1)));
+    }
+
+    @Test
+    void leavesLiveActiveSlotUnchangedWhenItemNoLongerMatches() throws ReflectiveOperationException {
+        SimpleItemContainer container = new SimpleItemContainer((short) 2);
+        container.setItemStackForSlot((short) 1, itemStack("Different_Item", 2));
+        Hotbar hotbar = new Hotbar(container, (byte) 1);
+
+        assertFalse(PlayerInventoryAccess.removeActiveHotbarItem(hotbar, "Tamework_Scarecrow", 1));
+        assertEquals("Different_Item", container.getItemStack((short) 1).getItemId());
+        assertEquals(2, container.getItemStack((short) 1).getQuantity());
     }
 
     private static ItemStack itemStack(String itemId, int quantity) throws ReflectiveOperationException {

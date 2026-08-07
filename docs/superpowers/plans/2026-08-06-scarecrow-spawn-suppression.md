@@ -28,11 +28,11 @@
 - Modify: `src/main/java/com/alechilles/alecstamework/inventory/PlayerInventoryAccess.java`
 - Modify: `src/main/java/com/alechilles/alecstamework/npc/actions/InteractionItemConsumption.java`
 
-- [ ] Add a focused test proving a matching active stack loses exactly one item and a mismatched active stack remains unchanged. This protects against consuming a newly selected item if the player changes selection between validation and execution.
-- [ ] Run `bash ./gradlew test --tests com.alechilles.alecstamework.inventory.PlayerInventoryAccessTest --no-daemon` and confirm the new API test fails for the expected missing behavior.
-- [ ] Add `PlayerInventoryAccess.removeActiveHotbarItem(...)` overloads for `Player` and `Hotbar`, with an expected item ID and amount. Return `false` without mutation when the live slot is empty, mismatched, or insufficient.
-- [ ] Make `InteractionItemConsumption` delegate to the shared helper so existing NPC interactions retain the same exact-slot behavior.
-- [ ] Re-run the focused test and commit as `Refactor: centralize active hotbar consumption`.
+- [x] Add a focused test proving a matching active stack loses exactly one item and a mismatched active stack remains unchanged. This protects against consuming a newly selected item if the player changes selection between validation and execution.
+- [x] Run `bash ./gradlew test --tests com.alechilles.alecstamework.inventory.PlayerInventoryAccessTest --no-daemon` and confirm the new API test fails for the expected missing behavior.
+- [x] Add `PlayerInventoryAccess.removeActiveHotbarItem(...)` overloads for `Player` and `Hotbar`, with an expected item ID and amount. Return `false` without mutation when the live slot is empty, mismatched, or insufficient.
+- [x] Make `InteractionItemConsumption` delegate to the shared helper so existing NPC interactions retain the same exact-slot behavior.
+- [x] Re-run the focused test and commit as `Refactor: centralize active hotbar consumption`.
 
 ---
 
