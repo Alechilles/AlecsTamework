@@ -66,6 +66,7 @@ class TameworkCommandExecutionScopeTest {
                 TameworkApiTestResetCommand.class,
                 TameworkNpcSpawnTamedCommand.class,
                 TameworkShowHitboxesCommand.class,
+                TameworkShowSpawnBeaconsCommand.class,
                 TameworkShowSpawnMarkersCommand.class
         };
 
