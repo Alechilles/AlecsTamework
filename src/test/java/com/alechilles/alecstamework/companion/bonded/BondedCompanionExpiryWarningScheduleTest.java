@@ -37,21 +37,26 @@ class BondedCompanionExpiryWarningScheduleTest {
     }
 
     @Test
-    void selects_a_configured_model_effect_only_for_the_thirty_second_warning() {
+    void selects_a_configured_model_effect_only_for_the_five_second_warning() {
         BondedCompanionExpiryWarningSchedule.Warning thirtySeconds =
                 BondedCompanionExpiryWarningSchedule.warning(130_000L, 100_000L)
+                        .orElseThrow();
+        BondedCompanionExpiryWarningSchedule.Warning fiveSeconds =
+                BondedCompanionExpiryWarningSchedule.warning(105_000L, 100_000L)
                         .orElseThrow();
         BondedCompanionExpiryWarningSchedule.Warning tenSeconds =
                 BondedCompanionExpiryWarningSchedule.warning(110_000L, 100_000L)
                         .orElseThrow();
 
         assertEquals("HyDragon_Dragon_Desummon", BondedCompanionExpiryWarningSchedule
-                .modelEffectId(thirtySeconds, " HyDragon_Dragon_Desummon ")
+                .modelEffectId(fiveSeconds, " HyDragon_Dragon_Desummon ")
                 .orElseThrow());
+        assertTrue(BondedCompanionExpiryWarningSchedule
+                .modelEffectId(thirtySeconds, "HyDragon_Dragon_Desummon").isEmpty());
         assertTrue(BondedCompanionExpiryWarningSchedule
                 .modelEffectId(tenSeconds, "HyDragon_Dragon_Desummon").isEmpty());
         assertTrue(BondedCompanionExpiryWarningSchedule
-                .modelEffectId(thirtySeconds, " ").isEmpty());
+                .modelEffectId(fiveSeconds, " ").isEmpty());
     }
 
     @Test
