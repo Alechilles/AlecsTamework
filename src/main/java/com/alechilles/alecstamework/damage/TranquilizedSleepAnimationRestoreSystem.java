@@ -96,7 +96,7 @@ public final class TranquilizedSleepAnimationRestoreSystem extends DamageEventSy
             CommandBuffer<EntityStore> commandBuffer,
             Damage damage
     ) {
-        if (damage == null || damage.isCancelled() || damage.getAmount() <= 0.0f) {
+        if (damage == null || damage.isCancelled()) {
             return;
         }
         EffectControllerComponent effects = chunk.getComponent(index, effectType);

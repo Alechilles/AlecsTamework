@@ -29,6 +29,20 @@ class TranquilizedSleepAnimationRestoreSystemTest {
 
         runDamage(
                 "Sleep",
+                5.0f,
+                (ref, animationId, componentAccessor) -> replayedAnimation.set(animationId)
+        );
+
+        assertEquals("Sleep", replayedAnimation.get());
+    }
+
+    @Test
+    void zeroDamageToTranquilizedSleepingNpcReplaysTrackedSleepAnimation() {
+        AtomicReference<String> replayedAnimation = new AtomicReference<>();
+
+        runDamage(
+                "Sleep",
+                0.0f,
                 (ref, animationId, componentAccessor) -> replayedAnimation.set(animationId)
         );
 
@@ -41,6 +55,7 @@ class TranquilizedSleepAnimationRestoreSystemTest {
 
         runDamage(
                 "Idle",
+                5.0f,
                 (ref, animationId, componentAccessor) -> replayedAnimation.set(animationId)
         );
 
@@ -49,6 +64,7 @@ class TranquilizedSleepAnimationRestoreSystemTest {
 
     private static void runDamage(
             String trackedStatusAnimation,
+            float damageAmount,
             TranquilizedSleepAnimationRestoreSystem.AnimationEmitter emitter
     ) {
         ComponentType<EntityStore, NPCEntity> npcType = new ComponentType<>();
@@ -84,7 +100,7 @@ class TranquilizedSleepAnimationRestoreSystemTest {
             Damage damage = new Damage(
                     new Damage.EnvironmentSource("test"),
                     0,
-                    5.0f
+                    damageAmount
             );
             store.forEachChunk(
                     Query.any(),
