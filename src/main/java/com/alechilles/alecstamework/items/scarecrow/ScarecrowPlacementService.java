@@ -1,0 +1,177 @@
+package com.alechilles.alecstamework.items.scarecrow;
+
+import com.hypixel.hytale.component.Holder;
+import com.hypixel.hytale.math.util.ChunkUtil;
+import com.hypixel.hytale.math.vector.Rotation3f;
+import com.hypixel.hytale.protocol.InteractionType;
+import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
+import com.hypixel.hytale.server.core.entity.entities.BlockEntity;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.modules.collision.WorldUtil;
+import com.hypixel.hytale.server.core.modules.entity.component.EntityScaleComponent;
+import com.hypixel.hytale.server.core.modules.entity.component.PropComponent;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.modules.entity.item.ItemComponent;
+import com.hypixel.hytale.server.core.modules.entity.item.PreventItemMerging;
+import com.hypixel.hytale.server.core.modules.entity.item.PreventPickup;
+import com.hypixel.hytale.server.core.modules.interaction.Interactions;
+import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.spawning.assets.spawnsuppression.SpawnSuppression;
+import com.hypixel.hytale.server.spawning.suppression.component.SpawnSuppressionComponent;
+import java.util.Map;
+import java.util.Objects;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import org.joml.Vector3d;
+
+/** Validates scarecrow placement and assembles the complete native suppressor entity. */
+public final class ScarecrowPlacementService {
+    private static final double SURFACE_OFFSET = 1.01;
+    private static final float BLOCK_ENTITY_SCALE = 2.0f;
+
+    private ScarecrowPlacementService() {
+    }
+
+    /** Prepares a holder only after the item, suppression asset, surface, and placement cell are valid. */
+    @Nonnull
+    public static Preparation prepare(
+            @Nullable World world,
+            int blockX,
+            int blockY,
+            int blockZ,
+            @Nonnull Vector3d actorPosition
+    ) {
+        Objects.requireNonNull(actorPosition, "actorPosition");
+        if (!hasValidAssets()) {
+            return new Preparation(Status.INVALID_ASSET, null);
+        }
+        WorldChunk chunk = world != null
+                ? world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(blockX, blockZ))
+                : null;
+        if (chunk == null) {
+            return new Preparation(Status.UNAVAILABLE, null);
+        }
+        if (!isSolid(chunk, blockX, blockY, blockZ)) {
+            return new Preparation(Status.INVALID_SURFACE, null);
+        }
+        if (!isOpen(chunk, blockX, blockY + 1, blockZ)) {
+            return new Preparation(Status.OCCUPIED, null);
+        }
+        Placement placement = plan(blockX, blockY, blockZ, actorPosition);
+        return new Preparation(Status.SUCCESS, createHolder(placement));
+    }
+
+    @Nonnull
+    static Placement plan(int blockX, int blockY, int blockZ, @Nonnull Vector3d actorPosition) {
+        Vector3d position = new Vector3d(blockX + 0.5, blockY + SURFACE_OFFSET, blockZ + 0.5);
+        Vector3d relative = new Vector3d(actorPosition).sub(position);
+        relative.y = 0.0;
+        Rotation3f rotation = relative.lengthSquared() > 0.000001
+                ? Rotation3f.lookAt(relative)
+                : new Rotation3f();
+        return new Placement(position, rotation);
+    }
+
+    @Nonnull
+    static EntityComponents buildComponents(@Nonnull Placement placement, @Nonnull ItemStack itemStack) {
+        Objects.requireNonNull(placement, "placement");
+        Objects.requireNonNull(itemStack, "itemStack");
+        return new EntityComponents(
+                new BlockEntity(ScarecrowIds.ITEM_ID),
+                new TransformComponent(placement.position(), placement.rotation()),
+                new EntityScaleComponent(BLOCK_ENTITY_SCALE),
+                new ItemComponent(itemStack),
+                PreventPickup.INSTANCE,
+                PreventItemMerging.INSTANCE,
+                PropComponent.get(),
+                new Interactions(Map.of(InteractionType.Use, ScarecrowIds.COLLECT_ROOT_INTERACTION_ID)),
+                new SpawnSuppressionComponent(ScarecrowIds.SUPPRESSION_ID),
+                UUIDComponent.randomUUID()
+        );
+    }
+
+    @Nonnull
+    private static Holder<EntityStore> createHolder(@Nonnull Placement placement) {
+        ItemStack itemStack = new ItemStack(ScarecrowIds.ITEM_ID, 1);
+        itemStack.setOverrideDroppedItemAnimation(true);
+        EntityComponents components = buildComponents(placement, itemStack);
+        Holder<EntityStore> holder = EntityStore.REGISTRY.newHolder();
+        holder.addComponent(BlockEntity.getComponentType(), components.blockEntity());
+        holder.addComponent(TransformComponent.getComponentType(), components.transform());
+        holder.addComponent(EntityScaleComponent.getComponentType(), components.scale());
+        holder.addComponent(ItemComponent.getComponentType(), components.item());
+        holder.addComponent(PreventPickup.getComponentType(), components.preventPickup());
+        holder.addComponent(PreventItemMerging.getComponentType(), components.preventMerging());
+        holder.addComponent(PropComponent.getComponentType(), components.prop());
+        holder.addComponent(Interactions.getComponentType(), components.interactions());
+        holder.addComponent(SpawnSuppressionComponent.getComponentType(), components.suppression());
+        holder.addComponent(UUIDComponent.getComponentType(), components.uuid());
+        return holder;
+    }
+
+    private static boolean hasValidAssets() {
+        Item item = Item.getAssetMap().getAsset(ScarecrowIds.ITEM_ID);
+        if (item == null || !item.hasBlockType() || item.getBlockId() == null) {
+            return false;
+        }
+        BlockType blockType = BlockType.getAssetMap().getAsset(item.getBlockId());
+        return blockType != null
+                && blockType != BlockType.UNKNOWN
+                && SpawnSuppression.getAssetMap().getAsset(ScarecrowIds.SUPPRESSION_ID) != null;
+    }
+
+    private static boolean isOpen(WorldChunk chunk, int blockX, int blockY, int blockZ) {
+        return chunk.getBlock(blockX, blockY, blockZ) == 0
+                && chunk.getFluidId(blockX, blockY, blockZ) == 0;
+    }
+
+    private static boolean isSolid(WorldChunk chunk, int blockX, int blockY, int blockZ) {
+        int blockId = chunk.getBlock(blockX, blockY, blockZ);
+        if (blockId == 0) {
+            return false;
+        }
+        BlockType blockType = BlockType.getAssetMap().getAsset(blockId);
+        return blockType != null
+                && blockType != BlockType.UNKNOWN
+                && WorldUtil.isSolidOnlyBlock(blockType, chunk.getFluidId(blockX, blockY, blockZ));
+    }
+
+    /** Placement transform for a centered scarecrow facing its placer. */
+    record Placement(Vector3d position, Rotation3f rotation) {
+    }
+
+    /** Component bundle applied to the entity holder before it enters the world. */
+    record EntityComponents(
+            BlockEntity blockEntity,
+            TransformComponent transform,
+            EntityScaleComponent scale,
+            ItemComponent item,
+            PreventPickup preventPickup,
+            PreventItemMerging preventMerging,
+            PropComponent prop,
+            Interactions interactions,
+            SpawnSuppressionComponent suppression,
+            UUIDComponent uuid
+    ) {
+    }
+
+    /** Result of validating and preparing one placement. */
+    public record Preparation(@Nonnull Status status, @Nullable Holder<EntityStore> holder) {
+        public boolean succeeded() {
+            return status == Status.SUCCESS && holder != null;
+        }
+    }
+
+    /** Player-relevant placement outcomes. */
+    public enum Status {
+        SUCCESS,
+        INVALID_ASSET,
+        INVALID_SURFACE,
+        OCCUPIED,
+        UNAVAILABLE
+    }
+}

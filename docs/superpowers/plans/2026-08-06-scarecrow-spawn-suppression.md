@@ -43,13 +43,13 @@
 - Create: `src/main/java/com/alechilles/alecstamework/items/scarecrow/ScarecrowPlacementService.java`
 - Create: `src/test/java/com/alechilles/alecstamework/items/scarecrow/ScarecrowPlacementServiceTest.java`
 
-- [ ] Add a placement-plan test proving the entity is centered immediately above the clicked block and faces the actor. This catches visibly offset or backward props.
-- [ ] Add a holder-factory test proving the produced holder carries the custom `BlockEntity`, one-item `ItemComponent`, UUID, prop/network prerequisites, collection interaction, and `SpawnSuppressionComponent` with the scarecrow suppression asset. Missing any of these changes observable placement, persistence, collection, or suppression behavior.
-- [ ] Run the focused test class and confirm it fails before production classes exist.
-- [ ] Implement constants for `Tamework_Scarecrow`, `Tamework_Scarecrow`, and `Root_Tamework_Scarecrow_Collect` in `ScarecrowIds`.
-- [ ] Implement a small placement service that validates the inherited block asset, a solid support block, the open placement cell, and the native suppression asset. Build the complete holder with transform, stock block rendering/hitbox components, persistent item identity, collection interaction, UUID, and suppression component before returning it.
-- [ ] Keep preparation results explicit (`SUCCESS`, invalid asset, invalid surface, occupied, or unavailable) so the interaction can provide useful player feedback without embedding validation logic.
-- [ ] Re-run the focused tests and compile; commit as `Feat: prepare scarecrow suppressor entities`.
+- [x] Add a placement-plan test proving the entity is centered immediately above the clicked block and faces the actor. This catches visibly offset or backward props.
+- [x] Add a component-factory test proving the produced holder input carries the custom `BlockEntity`, one-item `ItemComponent`, UUID, prop/network prerequisites, collection interaction, and `SpawnSuppressionComponent` with the scarecrow suppression asset. Missing any of these changes observable placement, persistence, collection, or suppression behavior.
+- [x] Run the focused test class and confirm it fails before production classes exist.
+- [x] Implement constants for `Tamework_Scarecrow`, `Tamework_Scarecrow`, and `Root_Tamework_Scarecrow_Collect` in `ScarecrowIds`.
+- [x] Implement a small placement service that validates the inherited block asset, a solid support block, the open placement cell, and the native suppression asset. Build the complete holder with transform, stock block rendering/hitbox components, persistent item identity, collection interaction, UUID, and suppression component before returning it.
+- [x] Keep preparation results explicit (`SUCCESS`, invalid asset, invalid surface, occupied, or unavailable) so the interaction can provide useful player feedback without embedding validation logic.
+- [x] Re-run the focused tests and compile; commit as `Feat: prepare scarecrow suppressor entities`.
 
 ---
 
