@@ -6,7 +6,7 @@
     "Description": "server.items.Tamework_Scarecrow.description"
   },
   "Interactions": {
-    "Primary": {
+    "Secondary": {
       "Interactions": [
         {
           "Type": "TameworkPlaceScarecrow"

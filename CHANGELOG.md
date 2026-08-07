@@ -5,6 +5,9 @@
 ### Fixed
 - Fixed `/tw showspawnbeacons` visualization proxies being hidden from players
   in Adventure mode.
+- Fixed the scarecrow's normal place action creating an ordinary decorative
+  block instead of the spawn-suppressing entity. Scarecrows placed by the
+  broken build must be broken and placed again after updating.
 
 ### Added
 - Added `/tw showspawnbeacons [radius|off]` to reveal nearby loaded natural
