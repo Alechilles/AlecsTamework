@@ -57,6 +57,8 @@ configurations.named('testImplementation') {
     extendsFrom(configurations.compileOnly)
 }
 
+sourceSets.main.resources.setSrcDirs([embeddedAssetPackDirectory])
+
 hytaleTools {
     hytaleVersion = property('hytale_version')
     patchline = property('hytale_patchline')
@@ -90,6 +92,10 @@ tasks.register('prepareEmbeddedAssetPack', Sync) {
 }
 
 tasks.named('classes') {
+    dependsOn(tasks.named('prepareEmbeddedAssetPack'))
+}
+
+tasks.named('processResources') {
     dependsOn(tasks.named('prepareEmbeddedAssetPack'))
 }
 
