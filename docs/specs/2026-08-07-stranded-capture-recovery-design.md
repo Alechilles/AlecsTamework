@@ -88,9 +88,11 @@ Modern `UNLOADED` profiles are also refused because they may still have an
 unloaded world entity. None of these cases becomes implicit profile creation,
 best-guess snapshot selection, or a general repair command.
 
-Recovery eligibility uses the persisted `import_manifest` and canonical rows,
-not the transient startup `targetOrigin`. The legacy database, original import
-archive, and a second import run are neither required nor consulted.
+Recovery eligibility uses the canonical non-current capture-v1 row as the
+profile's migration lineage; replacement captures use capture-v2. It does not
+depend on the transient startup `targetOrigin`. The legacy database, import
+manifest lookup, original archive, and a second import run are neither required
+nor consulted.
 
 ## Eligibility Fences
 
@@ -126,7 +128,6 @@ not automatically recoverable.
 
 The canonical profile must have:
 
-- a persisted public-import manifest lineage;
 - lifecycle `UNLOADED` with `NONE` location;
 - the initial imported/reconciled revision and generation shape, rather than a
   later ordinary unload;
