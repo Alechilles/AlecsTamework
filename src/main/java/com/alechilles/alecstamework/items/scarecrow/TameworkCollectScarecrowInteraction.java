@@ -17,6 +17,7 @@ import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Sim
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.spawning.suppression.component.SpawnSuppressionComponent;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /** Returns a placed Tamework scarecrow to the player and unregisters its suppression. */
 public final class TameworkCollectScarecrowInteraction extends SimpleInstantInteraction {
@@ -85,8 +86,15 @@ public final class TameworkCollectScarecrowInteraction extends SimpleInstantInte
                 targetRef,
                 SpawnSuppressionComponent.getComponentType()
         );
+        return isScarecrow(blockEntity, transform, suppression);
+    }
+
+    static boolean isScarecrow(
+            @Nullable BlockEntity blockEntity,
+            @Nullable TransformComponent transform,
+            @Nullable SpawnSuppressionComponent suppression
+    ) {
         return blockEntity != null
-                && ScarecrowIds.ITEM_ID.equals(blockEntity.getBlockTypeKey())
                 && transform != null
                 && suppression != null
                 && ScarecrowIds.SUPPRESSION_ID.equals(suppression.getSpawnSuppression());
