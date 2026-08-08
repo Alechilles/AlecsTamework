@@ -354,6 +354,12 @@ final class CommandSelectionPageService {
                 context.refreshSignals()
         );
         page.configureShoulderRideCallback(shoulderRideCallback(context));
+        page.configureHotswapAssignments(
+                () -> toolInventoryService.findToolStack(context.player(), context.toolId()),
+                (slot, commandId) -> toolInventoryService.mutateToolStack(
+                        context.player(), context.toolId(), stack ->
+                                new CommandHotswapAssignmentStore().write(stack, slot, commandId))
+        );
         return page;
     }
 

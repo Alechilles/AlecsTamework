@@ -370,6 +370,14 @@ final class TwCommandItemCodecs {
             .documentation("Icon asset path shown for this entry.")
             .add()
             .<Boolean>append(
+                    new KeyedCodec<>("ShowInRadial", Codec.BOOLEAN),
+                    (entry, value) -> entry.showInRadial = value == null || value,
+                    entry -> entry.showInRadial
+            )
+            .documentation("Whether this command consumes one of the eight radial-menu slots. "
+                    + "Omission defaults true; false keeps it available for hotswaps only.")
+            .add()
+            .<Boolean>append(
                     new KeyedCodec<>("Default", Codec.BOOLEAN),
                     (entry, value) ->
                             entry.defaultCommand = value != null && value,

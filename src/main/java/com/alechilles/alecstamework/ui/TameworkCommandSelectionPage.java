@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
+import com.alechilles.alecstamework.items.CommandHotswapAssignmentStore;
+import com.alechilles.alecstamework.items.CommandHotswapAssignmentStore.Slot;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
@@ -11,6 +13,7 @@ import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
+import com.hypixel.hytale.server.core.ui.LocalizableString;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
@@ -52,6 +55,7 @@ public final class TameworkCommandSelectionPage
     private static final AtomicLong NEXT_LINKED_PANEL_GENERATION = new AtomicLong();
     private static final ConcurrentHashMap<UUID, Long> ACTIVE_LINKED_PANEL_GENERATIONS = new ConcurrentHashMap<>();
     private final CommandSelectionOptionSource.Option[] options;
+    private final TwCommandItemConfig config;
     private final LinkedNpcPanelCardBinder.CardBindingConfig cardBindingConfig;
     private final CommandSelectionRosterEventBoundary rosterEventBoundary;
     private final boolean requireUnlinkConfirm;
@@ -80,6 +84,9 @@ public final class TameworkCommandSelectionPage
     private UUID pendingUnlinkNpcUuid;
     private final String selectedCommandId;
     private final Consumer<String> selectionCallback;
+    private Supplier<com.hypixel.hytale.server.core.inventory.ItemStack> hotswapStackSupplier;
+    private BiConsumer<Slot, String> hotswapAssignmentCallback;
+    private final CommandHotswapAssignmentStore hotswapAssignments = new CommandHotswapAssignmentStore();
     private final Consumer<UUID> linkCallback;
     private final Consumer<UUID> unlinkCallback;
     private final Consumer<UUID> toggleActiveCallback;
@@ -275,11 +282,13 @@ public final class TameworkCommandSelectionPage
                                         @Nonnull LinkedPanelRefreshSignalSource refreshSignalSource) {
         super(playerRef, CustomPageLifetime.CanDismiss, CommandSelectionEventData.CODEC);
         this.playerUuid = playerRef.getUuid();
+        this.config = config;
         this.linkedPanelGeneration = NEXT_LINKED_PANEL_GENERATION.incrementAndGet();
         markLinkedPanelOwner();
         this.options = CommandSelectionOptionSource.build(
                 config,
-                commandOptionPredicate,
+                entry -> entry.isShowInRadial()
+                        && (commandOptionPredicate == null || commandOptionPredicate.test(entry)),
                 resolveLanguage(),
                 MAX_COMMAND_BUTTONS
         );
@@ -376,6 +385,7 @@ public final class TameworkCommandSelectionPage
                             options, selectedCommandId, resolveLanguage()
                     )
             );
+            buildHotswapControls(commandBuilder);
             commandBuilder.set("#TameworkLinkedPanelRoot.Visible", true);
             commandBuilder.set("#TameworkLinkedPanelTitle.Text", LinkedNpcPanelPresentationSupport.title(panelModeValueSupplier, linkedNpcEntries, resolveLanguage()));
             commandBuilder.set("#TameworkLinkedPanelGroupSelectorDropdown.Entries", LinkedNpcPanelPresentationSupport.entries(panelGroupActivationEntriesSupplier));
@@ -400,6 +410,7 @@ public final class TameworkCommandSelectionPage
                     eventBuilder, featureController
             );
             CommandSelectionPageEventBinder.bindClose(eventBuilder);
+            CommandSelectionPageEventBinder.bindHotswapControls(eventBuilder);
             seedRefreshValues();
             refreshTransaction.seedOverlayRevisions(groupAssignOverlay.revision(), featureController.reviveOverlayRevision());
             refreshLifecycle.start(true, shortestVisibleCountdownRemainingMs(),
@@ -426,6 +437,18 @@ public final class TameworkCommandSelectionPage
     public void handleDataEvent(@Nonnull Ref<EntityStore> ref,
                                 @Nonnull Store<EntityStore> store,
                                 @Nonnull CommandSelectionEventData data) {
+        if (data.hotswapQValue != null) {
+            applyHotswapAssignment(Slot.Q, data.hotswapQValue);
+            return;
+        }
+        if (data.hotswapEValue != null) {
+            applyHotswapAssignment(Slot.E, data.hotswapEValue);
+            return;
+        }
+        if (data.hotswapRValue != null) {
+            applyHotswapAssignment(Slot.R, data.hotswapRValue);
+            return;
+        }
         String receivedCommandId = data.commandId == null ? "" : data.commandId.trim();
         if (dismissed && !navigationPending) {
             return;
@@ -785,6 +808,43 @@ public final class TameworkCommandSelectionPage
         pendingUnlinkNpcUuid = null;
         closePage();
         selectionCallback.accept(commandId);
+    }
+
+    /** Supplies the physical flute snapshot and mutation authority after page construction. */
+    public void configureHotswapAssignments(
+            @Nonnull Supplier<com.hypixel.hytale.server.core.inventory.ItemStack> stackSupplier,
+            @Nonnull BiConsumer<Slot, String> assignmentCallback) {
+        hotswapStackSupplier = stackSupplier;
+        hotswapAssignmentCallback = assignmentCallback;
+    }
+
+    private void buildHotswapControls(UICommandBuilder commands) {
+        List<DropdownEntryInfo> entries = new ArrayList<>();
+        entries.add(new DropdownEntryInfo(LocalizableString.fromString("Unassigned"), ""));
+        for (CommandSelectionOptionSource.Option option : CommandSelectionOptionSource.build(
+                config, null, resolveLanguage(), Integer.MAX_VALUE)) {
+            entries.add(new DropdownEntryInfo(LocalizableString.fromString(option.label()), option.id()));
+        }
+        commands.set("#TameworkCommandHotswapQ.Entries", entries);
+        commands.set("#TameworkCommandHotswapE.Entries", entries);
+        commands.set("#TameworkCommandHotswapR.Entries", entries);
+        com.hypixel.hytale.server.core.inventory.ItemStack stack = hotswapStackSupplier == null
+                ? null : hotswapStackSupplier.get();
+        commands.set("#TameworkCommandHotswapQ.Value", valueFor(stack, Slot.Q));
+        commands.set("#TameworkCommandHotswapE.Value", valueFor(stack, Slot.E));
+        commands.set("#TameworkCommandHotswapR.Value", valueFor(stack, Slot.R));
+    }
+
+    private String valueFor(com.hypixel.hytale.server.core.inventory.ItemStack stack, Slot slot) {
+        String value = hotswapAssignments.read(stack, slot);
+        return value == null ? "" : value;
+    }
+
+    private void applyHotswapAssignment(Slot slot, String commandId) {
+        if (hotswapAssignmentCallback == null) return;
+        String value = commandId == null ? "" : commandId.trim();
+        if (!value.isEmpty() && config.findCommandById(value) == null) return;
+        hotswapAssignmentCallback.accept(slot, value);
     }
 
     private boolean handleBondedFlightToggle(

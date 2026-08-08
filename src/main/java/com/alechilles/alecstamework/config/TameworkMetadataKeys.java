@@ -83,6 +83,9 @@ public final class TameworkMetadataKeys {
     public static final String NAME_COOLDOWN_UNTIL = "Tamework.NameCooldownUntil";
     public static final String COMMAND_TOOL_ID = "Tamework.Command.ToolId";
     public static final String COMMAND_SELECTED_ID = "Tamework.Command.SelectedId";
+    public static final String COMMAND_HOTSWAP_Q_ID = "Tamework.Command.HotswapQ";
+    public static final String COMMAND_HOTSWAP_E_ID = "Tamework.Command.HotswapE";
+    public static final String COMMAND_HOTSWAP_R_ID = "Tamework.Command.HotswapR";
     public static final String COMMAND_COOLDOWN_UNTIL = "Tamework.Command.CooldownUntil";
     public static final String COMMAND_LINKED_NPCS = "Tamework.Command.LinkedNpcs";
     public static final String COMMAND_PANEL_SCHEMA_VERSION = "Tamework.Command.PanelSchemaVersion";

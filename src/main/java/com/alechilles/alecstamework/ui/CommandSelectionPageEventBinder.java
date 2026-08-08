@@ -22,6 +22,9 @@ final class CommandSelectionPageEventBinder {
             "@PanelGroupActiveValue";
     static final String KEY_PANEL_GROUP_ASSIGN_VALUE =
             "@PanelGroupAssignValue";
+    static final String KEY_HOTSWAP_Q_VALUE = "@HotswapQValue";
+    static final String KEY_HOTSWAP_E_VALUE = "@HotswapEValue";
+    static final String KEY_HOTSWAP_R_VALUE = "@HotswapRValue";
     static final String CLOSE_COMMAND_ID = "__close__";
     static final String LINK_COMMAND_PREFIX = "__link__:";
     static final String UNLINK_COMMAND_PREFIX = "__unlink__:";
@@ -156,6 +159,12 @@ final class CommandSelectionPageEventBinder {
         bindAction(
                 events, "#CommandMenuCloseButton", CLOSE_COMMAND_ID
         );
+    }
+
+    static void bindHotswapControls(@Nonnull UIEventBuilder events) {
+        bindValue(events, "#TameworkCommandHotswapQ", KEY_HOTSWAP_Q_VALUE);
+        bindValue(events, "#TameworkCommandHotswapE", KEY_HOTSWAP_E_VALUE);
+        bindValue(events, "#TameworkCommandHotswapR", KEY_HOTSWAP_R_VALUE);
     }
 
     private static void bindAction(

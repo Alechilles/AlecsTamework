@@ -469,6 +469,14 @@ public final class CommandItemFeatureHandler {
                 player, itemStack, targetRef, configIdOverride, commandIdOverride
         );
     }
+
+    /** Resolves one fixed Q/E/R assignment from the active flute before dispatching it. */
+    public boolean handleHotswapUse(Player player, ItemStack itemStack,
+                                    Ref<EntityStore> targetRef,
+                                    CommandHotswapAssignmentStore.Slot slot) {
+        String commandId = new CommandHotswapAssignmentStore().read(itemStack, slot);
+        return commandId != null && handleUse(player, itemStack, targetRef, null, commandId);
+    }
     /** Clears only presentation snapshots when the owner disconnects. */
     public void onPlayerDisconnect(@Nullable UUID ownerUuid) {
         bondedPanelLifecycle.evictOwner(ownerUuid);

@@ -153,6 +153,24 @@ $C.@PageOverlay {
       );
     }
 
+    Group #TameworkCommandHotswapColumn {
+      Anchor: (Top: 210, Left: 780, Width: 190, Height: 250);
+      LayoutMode: Top;
+
+      Label {
+        Anchor: (Height: 28);
+        Text: "Hotswaps";
+        Style: (FontSize: 17, RenderBold: true, TextColor: #d6e0ec, HorizontalAlignment: Center, VerticalAlignment: Center);
+      }
+
+      Label { Anchor: (Top: 6, Height: 20); Text: "Q"; Style: (FontSize: 15, RenderBold: true, TextColor: #d6e0ec); }
+      DropdownBox #TameworkCommandHotswapQ { Anchor: (Top: 2, Height: 38, Width: 180); Style: $C.@DefaultDropdownBoxStyle; }
+      Label { Anchor: (Top: 8, Height: 20); Text: "E"; Style: (FontSize: 15, RenderBold: true, TextColor: #d6e0ec); }
+      DropdownBox #TameworkCommandHotswapE { Anchor: (Top: 2, Height: 38, Width: 180); Style: $C.@DefaultDropdownBoxStyle; }
+      Label { Anchor: (Top: 8, Height: 20); Text: "R"; Style: (FontSize: 15, RenderBold: true, TextColor: #d6e0ec); }
+      DropdownBox #TameworkCommandHotswapR { Anchor: (Top: 2, Height: 38, Width: 180); Style: $C.@DefaultDropdownBoxStyle; }
+    }
+
     TextButton #CommandButton0 {
       Anchor: (Top: 100, Left: 461, Width: 224, Height: 207);
       Style: @Slice0ButtonStyle;
