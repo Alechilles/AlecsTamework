@@ -4,6 +4,7 @@ tamework.scarecrow.itemChanged=The held scarecrow changed before it could be pla
 tamework.scarecrow.placeUnavailable=The scarecrow could not be placed here.
 items.Tamework_Scarecrow.name=Scarecrow
 items.Tamework_Scarecrow.description=Pauses automatic markers within 32 blocks and ordinary mob spawns in intersecting chunks. Look at it and hold the prompted key for one second to remove it.
+interactionHints.removeScarecrow=Mantén pulsado [{key}] para quitar el espantapájaros.
 tamework.ui.linkedPanel.bonded.state.inWorld=EN EL MUNDO
 tamework.ui.linkedPanel.bonded.state.stored=ALMACENADO
 tamework.ui.linkedPanel.bonded.state.dead=MUERTO

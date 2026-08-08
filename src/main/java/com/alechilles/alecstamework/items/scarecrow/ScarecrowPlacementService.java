@@ -12,14 +12,10 @@ import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.BlockEntity;
-import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.collision.WorldUtil;
 import com.hypixel.hytale.server.core.modules.entity.component.EntityScaleComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.PropComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
-import com.hypixel.hytale.server.core.modules.entity.item.ItemComponent;
-import com.hypixel.hytale.server.core.modules.entity.item.PreventItemMerging;
-import com.hypixel.hytale.server.core.modules.entity.item.PreventPickup;
 import com.hypixel.hytale.server.core.modules.interaction.Interactions;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
@@ -84,18 +80,18 @@ public final class ScarecrowPlacementService {
     }
 
     @Nonnull
-    static EntityComponents buildComponents(@Nonnull Placement placement, @Nonnull ItemStack itemStack) {
+    static EntityComponents buildComponents(@Nonnull Placement placement) {
         Objects.requireNonNull(placement, "placement");
-        Objects.requireNonNull(itemStack, "itemStack");
+        Interactions interactions = new Interactions(
+                Map.of(InteractionType.Use, ScarecrowIds.COLLECT_ROOT_INTERACTION_ID)
+        );
+        interactions.setInteractionHint(ScarecrowIds.REMOVE_INTERACTION_HINT);
         return new EntityComponents(
                 new BlockEntity(ScarecrowIds.ITEM_ID),
                 new TransformComponent(placement.position(), placement.rotation()),
                 new EntityScaleComponent(BLOCK_ENTITY_SCALE),
-                new ItemComponent(itemStack),
-                PreventPickup.INSTANCE,
-                PreventItemMerging.INSTANCE,
                 PropComponent.get(),
-                new Interactions(Map.of(InteractionType.Use, ScarecrowIds.COLLECT_ROOT_INTERACTION_ID)),
+                interactions,
                 new SpawnSuppressionComponent(ScarecrowIds.SUPPRESSION_ID),
                 UUIDComponent.randomUUID()
         );
@@ -103,16 +99,11 @@ public final class ScarecrowPlacementService {
 
     @Nonnull
     private static Holder<EntityStore> createHolder(@Nonnull Placement placement) {
-        ItemStack itemStack = new ItemStack(ScarecrowIds.ITEM_ID, 1);
-        itemStack.setOverrideDroppedItemAnimation(true);
-        EntityComponents components = buildComponents(placement, itemStack);
+        EntityComponents components = buildComponents(placement);
         Holder<EntityStore> holder = EntityStore.REGISTRY.newHolder();
         holder.addComponent(BlockEntity.getComponentType(), components.blockEntity());
         holder.addComponent(TransformComponent.getComponentType(), components.transform());
         holder.addComponent(EntityScaleComponent.getComponentType(), components.scale());
-        holder.addComponent(ItemComponent.getComponentType(), components.item());
-        holder.addComponent(PreventPickup.getComponentType(), components.preventPickup());
-        holder.addComponent(PreventItemMerging.getComponentType(), components.preventMerging());
         holder.addComponent(PropComponent.getComponentType(), components.prop());
         holder.addComponent(Interactions.getComponentType(), components.interactions());
         holder.addComponent(SpawnSuppressionComponent.getComponentType(), components.suppression());
@@ -188,9 +179,6 @@ public final class ScarecrowPlacementService {
             BlockEntity blockEntity,
             TransformComponent transform,
             EntityScaleComponent scale,
-            ItemComponent item,
-            PreventPickup preventPickup,
-            PreventItemMerging preventMerging,
             PropComponent prop,
             Interactions interactions,
             SpawnSuppressionComponent suppression,

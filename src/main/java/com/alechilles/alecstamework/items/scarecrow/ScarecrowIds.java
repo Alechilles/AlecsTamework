@@ -5,6 +5,7 @@ public final class ScarecrowIds {
     public static final String ITEM_ID = "Tamework_Scarecrow";
     public static final String SUPPRESSION_ID = "Tamework_Scarecrow";
     public static final String COLLECT_ROOT_INTERACTION_ID = "Root_Tamework_Scarecrow_Collect";
+    public static final String REMOVE_INTERACTION_HINT = "server.interactionHints.removeScarecrow";
 
     private ScarecrowIds() {
     }

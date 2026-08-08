@@ -30,6 +30,7 @@ interactionHints.harvest=Pressione [{key}] para coletar
 interactionHints.harvestContext=Use o item para coletar
 interactionHints.emptyTrough=Segure [{key}] para esvaziar o cocho
 interactionHints.openTrough=Pressione [{key}] para abrir o cocho
+interactionHints.removeScarecrow=Segure [{key}] para remover o espantalho.
 
 # === Tamework Tranquilizer ===
 items.Weapon_Shortbow_Tranquilizer.name=Arco Curto Tranquilizante

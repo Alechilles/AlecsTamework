@@ -30,6 +30,7 @@ interactionHints.harvest=Drücke [{key}] zum Ernten
 interactionHints.harvestContext=Benutze ein Item zum Ernten
 interactionHints.emptyTrough=Halte [{key}], um den Trog zu leeren
 interactionHints.openTrough=Drücke [{key}] zum Öffnen des Trogs
+interactionHints.removeScarecrow=Halte [{key}], um die Vogelscheuche zu entfernen.
 
 # === Tamework Betäubung ===
 items.Weapon_Shortbow_Tranquilizer.name=Betäubungs-Kurzbogen
