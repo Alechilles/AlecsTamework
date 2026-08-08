@@ -76,6 +76,21 @@ class CommandGroupActivationServiceTest {
         assertTrue(updated.getFirst().active);
     }
 
+    @Test
+    void manualActiveMixResolvesToCustomSelection() {
+        UUID blueNpc = UUID.randomUUID();
+        UUID redNpc = UUID.randomUUID();
+        UUID ungroupedNpc = UUID.randomUUID();
+        List<LinkedNpcRecord> mixed = List.of(
+                record(blueNpc, "blue", true),
+                record(redNpc, "red", true),
+                record(ungroupedNpc, null, false)
+        );
+
+        assertEquals(CommandGroupActivationService.CUSTOM_VALUE,
+                activationService.resolveSelectionValue(mixed, GROUPS));
+    }
+
     private List<LinkedNpcRecord> records(UUID blueNpc, UUID redNpc, UUID ungroupedNpc) {
         return List.of(
                 record(blueNpc, "blue", false),

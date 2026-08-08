@@ -17,6 +17,7 @@ import javax.annotation.Nullable;
 final class CommandGroupActivationService {
     static final String ALL_VALUE = "__all__";
     static final String NONE_VALUE = "__none__";
+    static final String CUSTOM_VALUE = "__custom__";
 
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
     private final CommandGroupService groupService;
@@ -72,7 +73,7 @@ final class CommandGroupActivationService {
             return ALL_VALUE;
         }
         String matchingGroupId = resolveExactActiveGroup(groups, records);
-        return matchingGroupId != null ? matchingGroupId : ALL_VALUE;
+        return matchingGroupId != null ? matchingGroupId : CUSTOM_VALUE;
     }
 
     ItemStack applySelection(@Nullable ItemStack stack, @Nullable String selectorValue) {
