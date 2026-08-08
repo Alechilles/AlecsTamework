@@ -10,7 +10,7 @@ Parent: [Systems](/mod/alecs-tamework/systems) | [Player Guides](/mod/alecs-tame
 
 Place a Tamework scarecrow on a solid surface to pause automatic NPC spawn markers within an exact 32-block radius. Ordinary world spawning is suppressed in the native spawn chunks that intersect that area, so the horizontal edge can extend to a chunk boundary.
 
-The placement preview shows the scarecrow's exact final angle. To collect a placed scarecrow, look at it and hold the prompted key for one second. If your inventory is full, it stays in the world. Overlapping scarecrows each remain active until collected.
+The scarecrow is placed on the selected solid surface facing its placer. To collect a placed scarecrow, look at it and hold the prompted key for one second. If your inventory is full, it stays in the world. Overlapping scarecrows each remain active until collected.
 
 Scarecrows are interactable world props rather than blocks. Block-only claim rules do not automatically gate placement or collection; servers need permissions that cover custom entity interactions to protect them.
 

@@ -10,15 +10,16 @@ import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
-import com.hypixel.hytale.server.core.asset.type.model.config.Model;
-import com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.BlockEntity;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.collision.WorldUtil;
-import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
-import com.hypixel.hytale.server.core.modules.entity.component.PersistentModel;
+import com.hypixel.hytale.server.core.modules.entity.component.EntityScaleComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.PropComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.modules.entity.item.ItemComponent;
+import com.hypixel.hytale.server.core.modules.entity.item.PreventItemMerging;
+import com.hypixel.hytale.server.core.modules.entity.item.PreventPickup;
 import com.hypixel.hytale.server.core.modules.interaction.Interactions;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
@@ -33,7 +34,8 @@ import org.joml.Vector3d;
 
 /** Validates scarecrow placement and assembles the complete native suppressor entity. */
 public final class ScarecrowPlacementService {
-    private static final double SURFACE_LOOK_BELOW = 0.01;
+    private static final double SURFACE_OFFSET = 1.01;
+    private static final float BLOCK_ENTITY_SCALE = 2.0f;
 
     private ScarecrowPlacementService() {
     }
@@ -42,16 +44,15 @@ public final class ScarecrowPlacementService {
     @Nonnull
     public static Preparation prepare(
             @Nullable World world,
-            @Nonnull Vector3d previewPosition,
-            float previewYaw
+            int blockX,
+            int blockY,
+            int blockZ,
+            @Nonnull Vector3d actorPosition
     ) {
-        Objects.requireNonNull(previewPosition, "previewPosition");
+        Objects.requireNonNull(actorPosition, "actorPosition");
         if (!hasValidAssets()) {
             return new Preparation(Status.INVALID_ASSET, null);
         }
-        int blockX = (int) Math.floor(previewPosition.x);
-        int blockY = (int) Math.floor(previewPosition.y - SURFACE_LOOK_BELOW);
-        int blockZ = (int) Math.floor(previewPosition.z);
         WorldChunk chunk = world != null
                 ? world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(blockX, blockZ))
                 : null;
@@ -64,7 +65,7 @@ public final class ScarecrowPlacementService {
         if (!isOpen(chunk, blockX, blockY + 1, blockZ)) {
             return new Preparation(Status.OCCUPIED, null);
         }
-        Placement placement = plan(previewPosition, previewYaw);
+        Placement placement = plan(blockX, blockY, blockZ, actorPosition);
         if (hasScarecrowAt(world, placement.position())) {
             return new Preparation(Status.OCCUPIED, null);
         }
@@ -72,25 +73,29 @@ public final class ScarecrowPlacementService {
     }
 
     @Nonnull
-    static Placement plan(@Nonnull Vector3d previewPosition, float previewYaw) {
-        return new Placement(
-                new Vector3d(previewPosition),
-                new Rotation3f(0.0f, previewYaw, 0.0f)
-        );
+    static Placement plan(int blockX, int blockY, int blockZ, @Nonnull Vector3d actorPosition) {
+        Vector3d position = new Vector3d(blockX + 0.5, blockY + SURFACE_OFFSET, blockZ + 0.5);
+        Vector3d relative = new Vector3d(actorPosition).sub(position);
+        relative.y = 0.0;
+        Rotation3f rotation = relative.lengthSquared() > 0.000001
+                ? Rotation3f.lookAt(relative)
+                : new Rotation3f();
+        return new Placement(position, rotation);
     }
 
     @Nonnull
-    static EntityComponents buildComponents(@Nonnull Placement placement) {
+    static EntityComponents buildComponents(@Nonnull Placement placement, @Nonnull ItemStack itemStack) {
         Objects.requireNonNull(placement, "placement");
-        Interactions interactions = new Interactions(
-                Map.of(InteractionType.Use, ScarecrowIds.COLLECT_ROOT_INTERACTION_ID)
-        );
-        interactions.setInteractionHint(ScarecrowIds.REMOVE_INTERACTION_HINT);
+        Objects.requireNonNull(itemStack, "itemStack");
         return new EntityComponents(
                 new BlockEntity(ScarecrowIds.ITEM_ID),
                 new TransformComponent(placement.position(), placement.rotation()),
+                new EntityScaleComponent(BLOCK_ENTITY_SCALE),
+                new ItemComponent(itemStack),
+                PreventPickup.INSTANCE,
+                PreventItemMerging.INSTANCE,
                 PropComponent.get(),
-                interactions,
+                new Interactions(Map.of(InteractionType.Use, ScarecrowIds.COLLECT_ROOT_INTERACTION_ID)),
                 new SpawnSuppressionComponent(ScarecrowIds.SUPPRESSION_ID),
                 UUIDComponent.randomUUID()
         );
@@ -98,17 +103,17 @@ public final class ScarecrowPlacementService {
 
     @Nonnull
     private static Holder<EntityStore> createHolder(@Nonnull Placement placement) {
-        Model model = createModel();
-        if (model == null) {
-            throw new IllegalStateException("Scarecrow model asset is unavailable");
-        }
-        EntityComponents components = buildComponents(placement);
+        ItemStack itemStack = new ItemStack(ScarecrowIds.ITEM_ID, 1);
+        itemStack.setOverrideDroppedItemAnimation(true);
+        EntityComponents components = buildComponents(placement, itemStack);
         Holder<EntityStore> holder = EntityStore.REGISTRY.newHolder();
         holder.addComponent(BlockEntity.getComponentType(), components.blockEntity());
         holder.addComponent(TransformComponent.getComponentType(), components.transform());
+        holder.addComponent(EntityScaleComponent.getComponentType(), components.scale());
+        holder.addComponent(ItemComponent.getComponentType(), components.item());
+        holder.addComponent(PreventPickup.getComponentType(), components.preventPickup());
+        holder.addComponent(PreventItemMerging.getComponentType(), components.preventMerging());
         holder.addComponent(PropComponent.getComponentType(), components.prop());
-        holder.addComponent(ModelComponent.getComponentType(), new ModelComponent(model));
-        holder.addComponent(PersistentModel.getComponentType(), new PersistentModel(model.toReference()));
         holder.addComponent(Interactions.getComponentType(), components.interactions());
         holder.addComponent(SpawnSuppressionComponent.getComponentType(), components.suppression());
         holder.addComponent(UUIDComponent.getComponentType(), components.uuid());
@@ -123,14 +128,7 @@ public final class ScarecrowPlacementService {
         BlockType blockType = BlockType.getAssetMap().getAsset(item.getBlockId());
         return blockType != null
                 && blockType != BlockType.UNKNOWN
-                && ModelAsset.getAssetMap().getAsset(ScarecrowIds.MODEL_ID) != null
                 && SpawnSuppression.getAssetMap().getAsset(ScarecrowIds.SUPPRESSION_ID) != null;
-    }
-
-    @Nullable
-    static Model createModel() {
-        ModelAsset modelAsset = ModelAsset.getAssetMap().getAsset(ScarecrowIds.MODEL_ID);
-        return modelAsset != null ? Model.createUnitScaleModel(modelAsset) : null;
     }
 
     private static boolean isOpen(WorldChunk chunk, int blockX, int blockY, int blockZ) {
@@ -181,7 +179,7 @@ public final class ScarecrowPlacementService {
         return found[0];
     }
 
-    /** Placement transform copied from the client's deployable preview. */
+    /** Placement transform for a centered scarecrow facing its placer. */
     record Placement(Vector3d position, Rotation3f rotation) {
     }
 
@@ -189,6 +187,10 @@ public final class ScarecrowPlacementService {
     record EntityComponents(
             BlockEntity blockEntity,
             TransformComponent transform,
+            EntityScaleComponent scale,
+            ItemComponent item,
+            PreventPickup preventPickup,
+            PreventItemMerging preventMerging,
             PropComponent prop,
             Interactions interactions,
             SpawnSuppressionComponent suppression,

@@ -27,7 +27,7 @@ Hytale includes the same asset pattern in `Server/NPC/Spawn/Suppression/Spawn_Ca
 
 ### Placement
 
-The player uses `Tamework_Scarecrow` on the top of a loaded solid surface. A native deployable preview shows the stock placeholder model at its exact final position and continuous yaw, and placement preserves that preview transform.
+The player uses `Tamework_Scarecrow` on the top of a loaded solid surface. Placement centers the scarecrow on that surface and rotates it to face the player.
 
 Before consuming the item, placement validates all of the following:
 

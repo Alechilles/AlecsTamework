@@ -11,32 +11,27 @@ import com.hypixel.hytale.protocol.InteractionState;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.protocol.WaitForDataFrom;
 import com.hypixel.hytale.server.core.Message;
-import com.hypixel.hytale.server.core.asset.type.model.config.Model;
 import com.hypixel.hytale.server.core.entity.InteractionContext;
-import com.hypixel.hytale.server.core.entity.InteractionManager;
 import com.hypixel.hytale.server.core.entity.ItemUtils;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.CooldownHandler;
-import com.hypixel.hytale.server.core.modules.interaction.interaction.config.SimpleInstantInteraction;
+import com.hypixel.hytale.server.core.modules.interaction.interaction.config.client.SimpleBlockInteraction;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.joml.Vector3d;
+import org.joml.Vector3i;
 
-/** Places a persistent scarecrow entity using Hytale's exact-angle deployable preview. */
-public final class TameworkPlaceScarecrowInteraction extends SimpleInstantInteraction {
-    private static final float MAX_PLACEMENT_DISTANCE = (float) InteractionManager.MAX_REACH_DISTANCE;
-    private static final float TOP_FACE_TOLERANCE = 0.01f;
-
+/** Places a persistent scarecrow entity after server-side surface and inventory validation. */
+public final class TameworkPlaceScarecrowInteraction extends SimpleBlockInteraction {
     public static final String TYPE_ID = "TameworkPlaceScarecrow";
     public static final BuilderCodec<TameworkPlaceScarecrowInteraction> CODEC = BuilderCodec.builder(
             TameworkPlaceScarecrowInteraction.class,
             TameworkPlaceScarecrowInteraction::new,
-            SimpleInstantInteraction.CODEC
+            SimpleBlockInteraction.CODEC
     ).documentation("Places a Tamework scarecrow spawn suppressor.").build();
 
     protected TameworkPlaceScarecrowInteraction() {
@@ -54,67 +49,37 @@ public final class TameworkPlaceScarecrowInteraction extends SimpleInstantIntera
     }
 
     @Override
-    protected void firstRun(
+    protected void interactWithBlock(
+            @Nonnull World world,
+            @Nonnull CommandBuffer<EntityStore> commandBuffer,
             @Nonnull InteractionType type,
             @Nonnull InteractionContext context,
+            @Nullable ItemStack itemInHand,
+            @Nonnull Vector3i targetBlock,
             @Nonnull CooldownHandler cooldownHandler
     ) {
-        CommandBuffer<EntityStore> commandBuffer = context.getCommandBuffer();
-        if (commandBuffer == null) {
-            context.getState().state = InteractionState.Failed;
-            return;
-        }
         Ref<EntityStore> actorRef = context.getEntity();
-        if (actorRef == null) {
-            context.getState().state = InteractionState.Failed;
-            return;
-        }
         TransformComponent actorTransform = commandBuffer.getComponent(
                 actorRef,
                 TransformComponent.getComponentType()
         );
         Player player = commandBuffer.getComponent(actorRef, Player.getComponentType());
-        ItemStack itemInHand = context.getHeldItem();
-        var clientState = context.getClientState();
-        if (!isScarecrowItem(itemInHand)
-                || actorTransform == null
-                || player == null
-                || clientState == null
-                || clientState.raycastHit == null
-                || clientState.raycastNormal == null
-                || clientState.raycastDistance <= 0
-                || clientState.raycastDistance > MAX_PLACEMENT_DISTANCE
-                || !isTopSurface(
-                        clientState.raycastNormal.x(),
-                        clientState.raycastNormal.y(),
-                        clientState.raycastNormal.z()
-                )) {
+        if (!isScarecrowItem(itemInHand) || actorTransform == null || player == null) {
             fail(context, commandBuffer, actorRef, "server.tamework.scarecrow.placeUnavailable");
             return;
         }
-        Vector3d previewPosition = new Vector3d(
-                clientState.raycastHit.x,
-                clientState.raycastHit.y,
-                clientState.raycastHit.z
-        );
-        float previewYaw = clientState.attackerRot != null ? clientState.attackerRot.yaw : 0.0f;
-        World world = commandBuffer.getExternalData().getWorld();
         ScarecrowPlacementService.Preparation preparation = ScarecrowPlacementService.prepare(
                 world,
-                previewPosition,
-                previewYaw
+                targetBlock.x,
+                targetBlock.y,
+                targetBlock.z,
+                actorTransform.getPosition()
         );
         if (!preparation.succeeded()) {
             fail(context, commandBuffer, actorRef, messageFor(preparation.status()));
             return;
         }
         placePrepared(context, commandBuffer, actorRef, player, preparation.holder());
-    }
-
-    private static boolean isTopSurface(float normalX, float normalY, float normalZ) {
-        return Math.abs(normalX) <= TOP_FACE_TOLERANCE
-                && normalY >= 1.0f - TOP_FACE_TOLERANCE
-                && Math.abs(normalZ) <= TOP_FACE_TOLERANCE;
     }
 
     private static void placePrepared(
@@ -155,41 +120,17 @@ public final class TameworkPlaceScarecrowInteraction extends SimpleInstantIntera
     }
 
     @Override
-    protected void simulateFirstRun(
+    protected void simulateInteractWithBlock(
             @Nonnull InteractionType type,
             @Nonnull InteractionContext context,
-            @Nonnull CooldownHandler cooldownHandler
+            @Nullable ItemStack itemInHand,
+            @Nonnull World world,
+            @Nonnull Vector3i targetBlock
     ) {
         if (context.getServerState() != null
                 && context.getServerState().state == InteractionState.Failed) {
             context.getState().state = InteractionState.Failed;
         }
-    }
-
-    @Override
-    public boolean needsRemoteSync() {
-        return true;
-    }
-
-    @Nonnull
-    @Override
-    protected com.hypixel.hytale.protocol.Interaction generatePacket() {
-        return new com.hypixel.hytale.protocol.SpawnDeployableFromRaycastInteraction();
-    }
-
-    @Override
-    protected void configurePacket(com.hypixel.hytale.protocol.Interaction packet) {
-        super.configurePacket(packet);
-        var deployablePacket = (com.hypixel.hytale.protocol.SpawnDeployableFromRaycastInteraction) packet;
-        Model model = ScarecrowPlacementService.createModel();
-        if (model != null) {
-            var previewConfig = new com.hypixel.hytale.protocol.DeployableConfig();
-            previewConfig.model = model.toPacket();
-            previewConfig.modelPreview = model.toPacket();
-            previewConfig.allowPlaceOnWalls = false;
-            deployablePacket.deployableConfig = previewConfig;
-        }
-        deployablePacket.maxDistance = MAX_PLACEMENT_DISTANCE;
     }
 
     private static boolean isScarecrowItem(@Nullable ItemStack stack) {

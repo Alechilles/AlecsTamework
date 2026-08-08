@@ -30,7 +30,6 @@ interactionHints.harvest=Press [{key}] to harvest
 interactionHints.harvestContext=Use item to harvest
 interactionHints.emptyTrough=Hold [{key}] to empty the trough
 interactionHints.openTrough=Press [{key}] to open Trough | [RMB] with Water Bucket to fill
-interactionHints.removeScarecrow=Hold [{key}] to remove.
 
 # === Tamework Tranquilizer ===
 items.Weapon_Shortbow_Tranquilizer.name=Tranquilizer Shortbow
