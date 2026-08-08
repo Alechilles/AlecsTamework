@@ -1,37 +1,42 @@
 # Changelog
 
-## 3.0.2 - Linked Patchwork Asset-Pack Hotfix - Unreleased
-
-### Fixed
-- Fixed `/tw showspawnbeacons` visualization proxies being hidden from players
-  in Adventure mode.
-- Fixed the generic command-flute `Cycle Group` hotswap so it persists its
-  newly selected group, made each hotswap selector clickable across its full
-  visible control, and centered the command HUD glyphs inside their frames.
-- Fixed the linked-companion panel overlapping the command radial at common
-  smaller screen widths.
+## 3.1.0 - Command Hotswaps, Spawn Controls, and Recovery - Unreleased
 
 ### Added
-- Added a lower-right command-flute action HUD with vanilla-aligned Link,
-  Command Menu, and Q/E/R frames, key badges, and command-specific glyphs.
-  The left-click slot shows its selected command until a linkable NPC is under
-  the reticle, then switches to Link.
-  Only assigned Q/E/R hotswaps are shown while the flute is equipped.
-- Centered every command-flute glyph consistently and added a flight-toggle
-  glyph for hotswap-only companion commands.
-- Added the assignable `Cycle Group` command-flute hotswap for generic command
-  rosters, plus a colored HUD plaque that shows the active group, All
-  Companions, Custom Selection, or No Active Companions.
-- Added `/tw showspawnbeacons [radius|off]` to reveal nearby loaded natural
-  spawn beacons with their configured model and nameplate without changing
-  beacon spawning behavior.
-- Added a full-size placeable scarecrow with a one-second hold-to-remove
-  interaction, a 32-block automatic spawn-marker
-  radius, and native chunk-granular world-spawn suppression. Manual marker
-  triggers, explicit mod spawns, and existing NPCs remain unaffected.
+- Added a lower-right command-flute HUD with Link, Command Menu, and assignable
+  Q/E/R hotswaps, including command-specific glyphs and active-group feedback.
+- Added an assignable `Cycle Group` hotswap for generic command rosters.
+- Added `/tw showspawnbeacons [radius|off]` to visualize nearby loaded natural
+  spawn beacons without changing their spawning behavior.
+- Added a placeable scarecrow that suppresses automatic world spawns within 32
+  blocks while leaving manual markers, explicit mod spawns, and existing NPCs
+  unaffected.
+- Added a shared attitude target that lets dependent mods make player-hostile
+  creatures, including Void Grubs, retaliate against supported companions.
+
+### Changed
+- Updated the embedded Creditor library to 1.1.0 for improved version election
+  and clearer credits-page tags.
+
+### Fixed
+- Fixed command-hotswap assignment, input, selection hitboxes, group cycling,
+  glyph alignment, and persistence, and prevented the linked-companion panel
+  from overlapping the command radial at smaller screen widths.
+- Fixed scarecrow placement, presentation, collection, removal prompts, player
+  animation, and spawn-suppression registration.
+- Fixed spawn-beacon visualization lifecycle issues, including hidden proxies
+  in Adventure mode and late publication after a world or session was removed.
+- Fixed recovery of stranded public-migration captures, including item-only
+  histories and removed-world tombstones, without rerunning the migration.
+- Fixed embedded telemetry UI assets not being exposed from the merged runtime
+  and delayed companion-expiry effects so warnings begin at the intended time.
+
+## 3.0.2 - Linked Patchwork Asset-Pack Hotfix - Unreleased
+
+### Added
 - Added a shared attitude target for tamed companions, letting dependent mods
   opt their companion groups into retaliation from player-hostile creatures
-  (including Void Grubs) without replacing base-game attitude assets.
+  without replacing base-game attitude assets.
 - Added reusable autonomous-aerial Hold, favorite-item follow, and native
   airborne-mode transition components for downstream companion mods.
 - Added reusable large-ground and autonomous-flying NPC follow components so
@@ -136,8 +141,6 @@
   private forks, and server-specific adaptations.
 
 ### Changed
-- Updated the embedded Creditor library to 1.1.0 for improved version election
-  when multiple installed mods bundle Creditor, plus clearer credits-page tags.
 - Companion capture/release, configured-coop capture/release, death/Lost
   restoration, profile extensions, population, rosters, timed summons,
   provisioning, and revival now share one persistence lifecycle and operation
@@ -212,13 +215,7 @@
   only accept literals, which caused downstream flying NPC roles to fail
   validation.
 - Fixed public v2.16.1 captured companions and filled spawners failing to
-  restore after import, including servers that already migrated to Tamework
-  3.0.0-3.0.2 and records without an optional tamed-state field. Using the
-  exact stranded filled item now recovers its preserved capture history or a
-  missing initial companion row without rerunning migration, including newer
-  same-profile item metadata paired with an older restored `CAPTURED` database
-  snapshot. Recordless recovery is limited to worlds with verified public
-  migration history.
+  restore after import, including records without an optional tamed-state field.
 - Fixed imported worlds remaining read-only when companions continued loading
   during startup reconciliation; mutation readiness now retries from sealed
   live-world evidence.
