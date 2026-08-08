@@ -65,11 +65,14 @@ Command flutes must define all three ability interactions above. The command-men
 hotswap assignment is stored per item stack, but the item asset owns the physical
 Q/E/R ability bindings.
 
-When a command flute is equipped, assigned Q/E/R slots appear in the lower-right
-ability HUD. Each slot uses the shared vanilla-aligned frame and key badge; an
-unassigned slot is hidden. Set a command entry's optional `Icon` to a texture
-path when it needs custom HUD artwork. Standard command IDs use Tamework's
-bundled command glyphs when `Icon` is omitted.
+When a command flute is equipped, its left-click command, right-click Command
+Menu action, plus assigned Q/E/R slots, appear in the lower-right ability HUD.
+The left-click slot switches to Link while the player is aiming at an NPC that
+can be linked to that flute.
+Each slot uses the shared vanilla-aligned frame and key badge; an unassigned
+Q/E/R slot is hidden. Set a command entry's optional `Icon` to a texture path
+when it needs custom HUD artwork. Standard command IDs use Tamework's bundled
+command glyphs when `Icon` is omitted.
 
 ### Bundled example and acquisition boundary
 

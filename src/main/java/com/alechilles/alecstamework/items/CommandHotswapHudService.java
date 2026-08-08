@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.CommandItemRegistry;
+import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
@@ -9,6 +10,7 @@ import com.alechilles.alecstamework.ui.TameworkCommandHotswapHud;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.TickingSystem;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -28,6 +30,7 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
 
     private final CommandItemRegistry registry;
     private final CommandHotswapAssignmentStore assignments = new CommandHotswapAssignmentStore();
+    private final CommandTargetInspector targetInspector = new CommandTargetInspector();
     private final Map<UUID, HudState> statesByPlayer = new HashMap<>();
     private final Map<Store<EntityStore>, Long> nextRefreshByStore = new IdentityHashMap<>();
 
@@ -94,9 +97,41 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
             return hiddenModel();
         }
         return new CommandHotswapHudViewModel(
+                resolvePrimarySlot(player, stack, config),
+                new CommandHotswapHudViewModel.Slot(
+                        true, "RMB", "Tamework/CommandHotswaps/OpenMenu.png", ""
+                ),
                 resolveSlot(stack, config, Slot.Q, "Q"),
                 resolveSlot(stack, config, Slot.E, "E"),
                 resolveSlot(stack, config, Slot.R, "R")
+        );
+    }
+
+    @Nonnull
+    private CommandHotswapHudViewModel.Slot resolvePrimarySlot(
+            @Nonnull Player player,
+            @Nonnull ItemStack stack,
+            @Nonnull TwCommandItemConfig config) {
+        if (targetInspector.isLinkable(player, player.getReference(), config,
+                player.getWorld() != null ? player.getWorld().getEntityStore().getStore() : null)) {
+            return new CommandHotswapHudViewModel.Slot(
+                    true, "LMB", "Tamework/CommandHotswaps/Link.png", ""
+            );
+        }
+        String selectedId = stack.getFromMetadataOrNull(
+                TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING);
+        CommandEntry selected = config.findCommandById(selectedId);
+        if (selected == null) {
+            selected = config.findDefaultCommand();
+        }
+        if (selected == null) {
+            return CommandHotswapHudViewModel.Slot.hidden("LMB");
+        }
+        return new CommandHotswapHudViewModel.Slot(
+                true,
+                "LMB",
+                CommandHotswapHudIconResolver.resolve(selected.getIcon(), selected.getId()),
+                CommandHotswapHudIconResolver.fallbackGlyph(selected.getId())
         );
     }
 
@@ -122,6 +157,8 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
     @Nonnull
     private static CommandHotswapHudViewModel hiddenModel() {
         return new CommandHotswapHudViewModel(
+                CommandHotswapHudViewModel.Slot.hidden("LMB"),
+                CommandHotswapHudViewModel.Slot.hidden("RMB"),
                 CommandHotswapHudViewModel.Slot.hidden("Q"),
                 CommandHotswapHudViewModel.Slot.hidden("E"),
                 CommandHotswapHudViewModel.Slot.hidden("R")

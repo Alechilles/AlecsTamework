@@ -12,6 +12,8 @@ final class CommandHotswapHudBinder {
     static void bind(@Nonnull UICommandBuilder commandBuilder,
                      @Nonnull CommandHotswapHudViewModel model) {
         commandBuilder.set("#TameworkCommandHotswapControls.Visible", model.visible());
+        bindSlot(commandBuilder, "Primary", model.primary());
+        bindSlot(commandBuilder, "Secondary", model.secondary());
         bindSlot(commandBuilder, "Q", model.q());
         bindSlot(commandBuilder, "E", model.e());
         bindSlot(commandBuilder, "R", model.r());

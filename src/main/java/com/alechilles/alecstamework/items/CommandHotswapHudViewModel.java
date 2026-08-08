@@ -3,17 +3,21 @@ package com.alechilles.alecstamework.items;
 import javax.annotation.Nonnull;
 
 /** Immutable presentation state for the three equipped command-flute hotswaps. */
-public record CommandHotswapHudViewModel(@Nonnull Slot q,
+public record CommandHotswapHudViewModel(@Nonnull Slot primary,
+                                         @Nonnull Slot secondary,
+                                         @Nonnull Slot q,
                                          @Nonnull Slot e,
                                          @Nonnull Slot r) {
     public CommandHotswapHudViewModel {
+        primary = primary == null ? Slot.hidden("LMB") : primary;
+        secondary = secondary == null ? Slot.hidden("RMB") : secondary;
         q = q == null ? Slot.hidden("Q") : q;
         e = e == null ? Slot.hidden("E") : e;
         r = r == null ? Slot.hidden("R") : r;
     }
 
     public boolean visible() {
-        return q.visible() || e.visible() || r.visible();
+        return primary.visible() || secondary.visible() || q.visible() || e.visible() || r.visible();
     }
 
     /** Presentation for one fixed game binding. */

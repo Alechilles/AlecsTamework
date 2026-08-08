@@ -26,7 +26,6 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.core.util.TargetUtil;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -47,7 +46,6 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     private static final long REFRESH_INTERVAL_MS = 5_000L;
     private static final long STATIC_DISPLAY_CACHE_MS = 30_000L;
     private static final int MAX_CANDIDATES_PER_PASS = 4;
-    private static final float TARGET_DISTANCE = 15.0f;
 
     private final CommandItemRegistry registry;
     private final CommandLinkPolicyService linkPolicyService;
@@ -57,6 +55,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     private final CommandTargetHudAttachmentResolver attachmentResolver;
     private final CommandTargetHudTameRequirementResolver tameRequirementResolver;
     private final CommandTargetHudActivationTracker activationTracker;
+    private final CommandTargetInspector targetInspector = new CommandTargetInspector();
     private final Map<UUID, HudState> stateByPlayer = new HashMap<>();
     private final Map<StaticTargetCacheKey, StaticTargetDisplay> staticTargetCache = new HashMap<>();
     private final Map<UUID, DebugLogState> debugLogStateByPlayer = new HashMap<>();
@@ -261,11 +260,12 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             return null;
         }
 
-        Ref<EntityStore> npcRef = TargetUtil.getTargetEntity(playerRef, TARGET_DISTANCE, store);
-        if (npcRef == null || !npcRef.isValid() || npcRef.equals(playerRef)) {
+        CommandTargetInspector.Target target = targetInspector.resolveTarget(playerRef, store);
+        if (target == null) {
             return null;
         }
-        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+        Ref<EntityStore> npcRef = target.reference();
+        NPCEntity npc = target.npc();
         if (npc == null || npc.getUuid() == null || !isSupportedTarget(npcRef, npc, player, config, store)) {
             return null;
         }
@@ -703,7 +703,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     }
 
     static float targetDistanceForTests() {
-        return TARGET_DISTANCE;
+        return CommandTargetInspector.TARGET_DISTANCE;
     }
 
     static long refreshIntervalMsForTests() {

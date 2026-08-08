@@ -22,11 +22,29 @@
 // Uses the talisman's native-aligned ability frame and binding badge so a flute
 // hotswap visually joins the regular weapon ability strip.
 Group #TameworkCommandHotswapControls {
-    Anchor: (Right: 220, Bottom: 40, Width: 186, Height: @CommandHotswapSlotHeight);
+    Anchor: (Right: 220, Bottom: 40, Width: 314, Height: @CommandHotswapSlotHeight);
     Visible: false;
 
-    Group #CommandHotswapQControl {
+    Group #CommandHotswapPrimaryControl {
         Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotHeight);
+        Visible: false;
+        Group #Frame { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/AvatarFlightControls/ControlFrame.png"; }
+        Group #Icon { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/CommandHotswaps/Link.png"; Visible: false; }
+        Label #FallbackGlyph { Anchor: (Top: 17, Left: 3, Width: 52, Height: 22); Text: ""; Style: @CommandHotswapFallbackStyle; Visible: false; }
+        Label #Binding { Anchor: (Top: 50, Left: 12, Width: 34, Height: 19); Background: @CommandHotswapBindingBackground; Text: "LMB"; Style: @CommandHotswapBindingStyle; }
+    }
+
+    Group #CommandHotswapSecondaryControl {
+        Anchor: (Top: 0, Left: 64, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotHeight);
+        Visible: false;
+        Group #Frame { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/AvatarFlightControls/ControlFrame.png"; }
+        Group #Icon { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/CommandHotswaps/OpenMenu.png"; Visible: false; }
+        Label #FallbackGlyph { Anchor: (Top: 17, Left: 3, Width: 52, Height: 22); Text: ""; Style: @CommandHotswapFallbackStyle; Visible: false; }
+        Label #Binding { Anchor: (Top: 50, Left: 12, Width: 34, Height: 19); Background: @CommandHotswapBindingBackground; Text: "RMB"; Style: @CommandHotswapBindingStyle; }
+    }
+
+    Group #CommandHotswapQControl {
+        Anchor: (Top: 0, Left: 128, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotHeight);
         Visible: false;
         Group #Frame { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/AvatarFlightControls/ControlFrame.png"; }
         Group #Icon { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/CommandHotswaps/Follow.png"; Visible: false; }
@@ -35,7 +53,7 @@ Group #TameworkCommandHotswapControls {
     }
 
     Group #CommandHotswapEControl {
-        Anchor: (Top: 0, Left: 64, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotHeight);
+        Anchor: (Top: 0, Left: 192, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotHeight);
         Visible: false;
         Group #Frame { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/AvatarFlightControls/ControlFrame.png"; }
         Group #Icon { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/CommandHotswaps/Follow.png"; Visible: false; }
@@ -44,7 +62,7 @@ Group #TameworkCommandHotswapControls {
     }
 
     Group #CommandHotswapRControl {
-        Anchor: (Top: 0, Left: 128, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotHeight);
+        Anchor: (Top: 0, Left: 256, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotHeight);
         Visible: false;
         Group #Frame { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/AvatarFlightControls/ControlFrame.png"; }
         Group #Icon { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/CommandHotswaps/Follow.png"; Visible: false; }
