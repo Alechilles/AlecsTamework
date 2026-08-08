@@ -74,6 +74,9 @@ Q/E/R slot is hidden. Set a command entry's optional `Icon` to a texture path
 when it needs custom HUD artwork. Standard command IDs use Tamework's bundled
 command glyphs when `Icon` is omitted.
 
+Set `ShowInRadial: false` on a command entry to offer it through the hotswap
+selectors without consuming one of the radial menu's eight slots.
+
 ### Bundled example and acquisition boundary
 
 Tamework ships `Tamework_Command_Whistle_Example` with the

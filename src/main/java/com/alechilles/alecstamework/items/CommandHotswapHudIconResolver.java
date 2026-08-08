@@ -27,6 +27,8 @@ final class CommandHotswapHudIconResolver {
             case "ATTACKTARGET" -> ICON_ROOT + "AttackTarget.png";
             case "IDLE" -> ICON_ROOT + "Idle.png";
             case "SETHOME", "RETURNHOME" -> ICON_ROOT + "Home.png";
+            case "TOGGLEAIRBORNEMODE", "TOGGLEFROSTDRAGONAIRBORNEMODE" ->
+                    ICON_ROOT + "FlightToggle.png";
             default -> "";
         };
     }

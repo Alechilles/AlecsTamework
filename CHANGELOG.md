@@ -12,6 +12,8 @@
   The left-click slot shows its selected command until a linkable NPC is under
   the reticle, then switches to Link.
   Only assigned Q/E/R hotswaps are shown while the flute is equipped.
+- Centered every command-flute glyph consistently and added a flight-toggle
+  glyph for hotswap-only companion commands.
 - Added `/tw showspawnbeacons [radius|off]` to reveal nearby loaded natural
   spawn beacons with their configured model and nameplate without changing
   beacon spawning behavior.
