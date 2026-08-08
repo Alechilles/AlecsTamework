@@ -167,6 +167,7 @@ $C.@PageOverlay {
       DropdownBox #TameworkCommandHotswapQ {
         Anchor: (Top: 2, Left: 0, Width: 190, Height: 28);
         Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
+        HitTestVisible: true;
         MaxSelection: 1;
         NoItemsText: "No commands";
       }
@@ -174,6 +175,7 @@ $C.@PageOverlay {
       DropdownBox #TameworkCommandHotswapE {
         Anchor: (Top: 2, Left: 0, Width: 190, Height: 28);
         Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
+        HitTestVisible: true;
         MaxSelection: 1;
         NoItemsText: "No commands";
       }
@@ -181,6 +183,7 @@ $C.@PageOverlay {
       DropdownBox #TameworkCommandHotswapR {
         Anchor: (Top: 2, Left: 0, Width: 190, Height: 28);
         Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
+        HitTestVisible: true;
         MaxSelection: 1;
         NoItemsText: "No commands";
       }

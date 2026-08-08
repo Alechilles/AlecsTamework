@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEnt
 import com.alechilles.alecstamework.localization.LocalizedText;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Predicate;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -37,17 +38,23 @@ final class CommandSelectionOptionSource {
             }
             result.add(new Option(
                     entry.getId(),
-                    LocalizedText.resolveConfigValue(
-                            language,
-                            entry.getDisplayName(),
-                            entry.getId()
-                    )
+                    displayName(entry, language)
             ));
             if (result.size() >= maximum) {
                 break;
             }
         }
         return result.toArray(new Option[0]);
+    }
+
+    @Nonnull
+    private static String displayName(@Nonnull CommandEntry entry, @Nullable String language) {
+        String commandId = entry.getId().trim().toUpperCase(Locale.ROOT);
+        if ("TOGGLEAIRBORNEMODE".equals(commandId)
+                || "TOGGLEFROSTDRAGONAIRBORNEMODE".equals(commandId)) {
+            return "Flight Toggle";
+        }
+        return LocalizedText.resolveConfigValue(language, entry.getDisplayName(), entry.getId());
     }
 
     static boolean contains(Option[] options, String commandId) {

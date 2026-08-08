@@ -32,4 +32,23 @@ class CommandSelectionOptionSourceTest {
 
         assertEquals(2, options.length);
     }
+
+    @Test
+    void flightToggleUsesTheShortConsistentCommandLabel() throws Exception {
+        TwCommandItemConfig config = TwCommandItemConfig.CODEC.decode(
+                BsonDocument.parse("""
+                        {
+                          "CommandList": [
+                            { "Id": "ToggleAirborneMode", "DisplayName": "Flight / Ground Toggle" }
+                          ]
+                        }
+                        """),
+                new ExtraInfo()
+        );
+
+        CommandSelectionOptionSource.Option[] options = CommandSelectionOptionSource.build(
+                config, null, null, Integer.MAX_VALUE);
+
+        assertEquals("Flight Toggle", options[0].label());
+    }
 }

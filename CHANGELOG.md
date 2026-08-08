@@ -5,6 +5,9 @@
 ### Fixed
 - Fixed `/tw showspawnbeacons` visualization proxies being hidden from players
   in Adventure mode.
+- Fixed the generic command-flute `Cycle Group` hotswap so it persists its
+  newly selected group, made each hotswap selector clickable across its full
+  visible control, and centered the command HUD glyphs inside their frames.
 
 ### Added
 - Added a lower-right command-flute action HUD with vanilla-aligned Link,

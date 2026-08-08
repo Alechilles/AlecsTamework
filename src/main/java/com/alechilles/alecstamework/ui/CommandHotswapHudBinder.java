@@ -26,7 +26,7 @@ final class CommandHotswapHudBinder {
         String root = "#CommandHotswap" + slotId + "Control";
         commandBuilder.set(root + ".Visible", slot.visible());
         commandBuilder.set(root + " #Icon.Visible", slot.visible() && slot.hasIconTexturePath());
-        commandBuilder.set(root + " #Icon.Background", slot.iconTexturePath());
+        commandBuilder.set(root + " #Icon #Glyph.Background", slot.iconTexturePath());
         commandBuilder.set(root + " #FallbackGlyph.Visible", slot.visible() && !slot.hasIconTexturePath());
         commandBuilder.set(root + " #FallbackGlyph.Text", slot.fallbackGlyph());
         commandBuilder.set(root + " #Binding.Text", slot.bindingLabel());

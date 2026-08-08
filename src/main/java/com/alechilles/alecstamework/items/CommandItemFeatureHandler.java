@@ -484,15 +484,23 @@ public final class CommandItemFeatureHandler {
                                        CommandHotswapAssignmentStore.Slot slot) {
         String commandId = new CommandHotswapAssignmentStore().read(itemStack, slot);
         if (CommandHotswapAction.isCycleGroup(commandId)) {
-            TwCommandItemConfig config = itemStack == null || itemStack.isEmpty() || registry == null
-                    ? null : registry.get(itemStack.getItemId());
-            return config == null || !config.isEnabled() || config.usesBondedCompanionRoster()
-                    ? itemStack : groupCycleService.applyNext(itemStack);
+            return cycleHotswapGroup(itemStack);
         }
         if (commandId != null) {
             handleUse(player, itemStack, targetRef, null, commandId);
         }
         return itemStack;
+    }
+
+    /**
+     * Advances a generic flute's active companion group without dispatching an NPC command.
+     * The interaction persists this returned stack in the held inventory slot immediately.
+     */
+    public ItemStack cycleHotswapGroup(ItemStack itemStack) {
+        TwCommandItemConfig config = itemStack == null || itemStack.isEmpty() || registry == null
+                ? null : registry.get(itemStack.getItemId());
+        return config == null || !config.isEnabled() || config.usesBondedCompanionRoster()
+                ? itemStack : groupCycleService.applyNext(itemStack);
     }
     /** Clears only presentation snapshots when the owner disconnects. */
     public void onPlayerDisconnect(@Nullable UUID ownerUuid) {
