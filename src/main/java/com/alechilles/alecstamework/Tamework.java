@@ -120,6 +120,7 @@ import com.alechilles.alecstamework.items.CommandWorldChangeTravelEventHandler;
 import com.alechilles.alecstamework.items.CommandLinkedNpcInventoryCanonicalizationSystem;
 import com.alechilles.alecstamework.items.CommandDirectLiveCoopSystem;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
+import com.alechilles.alecstamework.items.CommandHotswapHudService;
 import com.alechilles.alecstamework.items.CommandNpcRelocationService;
 import com.alechilles.alecstamework.items.CommandTargetHudActivationTracker;
 import com.alechilles.alecstamework.items.CommandTargetHudActiveSlotSystem;
@@ -1267,6 +1268,9 @@ public class Tamework extends JavaPlugin {
         );
         getEntityStoreRegistry().registerSystem(
                 new CommandTargetHudService(commandItemRegistry, commandTargetHudActivationTracker)
+        );
+        getEntityStoreRegistry().registerSystem(
+                new CommandHotswapHudService(commandItemRegistry)
         );
 
         // Register /tw commands if the server supports it.

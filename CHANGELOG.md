@@ -7,6 +7,9 @@
   in Adventure mode.
 
 ### Added
+- Added a lower-right command-flute hotswap HUD with vanilla-aligned Q/E/R
+  frames, key badges, and command-specific glyphs. Only assigned hotswaps are
+  shown while the flute is equipped.
 - Added `/tw showspawnbeacons [radius|off]` to reveal nearby loaded natural
   spawn beacons with their configured model and nameplate without changing
   beacon spawning behavior.

@@ -65,6 +65,12 @@ Command flutes must define all three ability interactions above. The command-men
 hotswap assignment is stored per item stack, but the item asset owns the physical
 Q/E/R ability bindings.
 
+When a command flute is equipped, assigned Q/E/R slots appear in the lower-right
+ability HUD. Each slot uses the shared vanilla-aligned frame and key badge; an
+unassigned slot is hidden. Set a command entry's optional `Icon` to a texture
+path when it needs custom HUD artwork. Standard command IDs use Tamework's
+bundled command glyphs when `Icon` is omitted.
+
 ### Bundled example and acquisition boundary
 
 Tamework ships `Tamework_Command_Whistle_Example` with the

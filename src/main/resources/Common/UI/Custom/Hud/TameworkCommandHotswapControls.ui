@@ -1,0 +1,54 @@
+@CommandHotswapSlotSize = 58;
+@CommandHotswapSlotHeight = 74;
+@CommandHotswapBindingStyle = (
+    FontName: "Secondary",
+    FontSize: 10,
+    RenderBold: true,
+    TextColor: #eaf7fb,
+    Alignment: Center
+);
+@CommandHotswapBindingBackground = PatchStyle(
+    TexturePath: "../Tamework/AvatarFlightControls/InputBadge.png",
+    Border: 8
+);
+@CommandHotswapFallbackStyle = (
+    FontName: "Secondary",
+    FontSize: 22,
+    RenderBold: true,
+    TextColor: #edf5ff,
+    Alignment: Center
+);
+
+// Uses the talisman's native-aligned ability frame and binding badge so a flute
+// hotswap visually joins the regular weapon ability strip.
+Group #TameworkCommandHotswapControls {
+    Anchor: (Right: 220, Bottom: 40, Width: 186, Height: @CommandHotswapSlotHeight);
+    Visible: false;
+
+    Group #CommandHotswapQControl {
+        Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotHeight);
+        Visible: false;
+        Group #Frame { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/AvatarFlightControls/ControlFrame.png"; }
+        Group #Icon { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/CommandHotswaps/Follow.png"; Visible: false; }
+        Label #FallbackGlyph { Anchor: (Top: 17, Left: 3, Width: 52, Height: 22); Text: ""; Style: @CommandHotswapFallbackStyle; Visible: false; }
+        Label #Binding { Anchor: (Top: 50, Left: 16, Width: 26, Height: 19); Background: @CommandHotswapBindingBackground; Text: "Q"; Style: @CommandHotswapBindingStyle; }
+    }
+
+    Group #CommandHotswapEControl {
+        Anchor: (Top: 0, Left: 64, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotHeight);
+        Visible: false;
+        Group #Frame { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/AvatarFlightControls/ControlFrame.png"; }
+        Group #Icon { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/CommandHotswaps/Follow.png"; Visible: false; }
+        Label #FallbackGlyph { Anchor: (Top: 17, Left: 3, Width: 52, Height: 22); Text: ""; Style: @CommandHotswapFallbackStyle; Visible: false; }
+        Label #Binding { Anchor: (Top: 50, Left: 16, Width: 26, Height: 19); Background: @CommandHotswapBindingBackground; Text: "E"; Style: @CommandHotswapBindingStyle; }
+    }
+
+    Group #CommandHotswapRControl {
+        Anchor: (Top: 0, Left: 128, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotHeight);
+        Visible: false;
+        Group #Frame { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/AvatarFlightControls/ControlFrame.png"; }
+        Group #Icon { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/CommandHotswaps/Follow.png"; Visible: false; }
+        Label #FallbackGlyph { Anchor: (Top: 17, Left: 3, Width: 52, Height: 22); Text: ""; Style: @CommandHotswapFallbackStyle; Visible: false; }
+        Label #Binding { Anchor: (Top: 50, Left: 16, Width: 26, Height: 19); Background: @CommandHotswapBindingBackground; Text: "R"; Style: @CommandHotswapBindingStyle; }
+    }
+}
