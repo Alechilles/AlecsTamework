@@ -26,7 +26,9 @@ final class CommandSelectionOptionSource {
                 || maximum <= 0) {
             return new Option[0];
         }
-        List<Option> result = new ArrayList<>(maximum);
+        List<Option> result = new ArrayList<>(
+                Math.min(config.getCommandList().length, maximum)
+        );
         for (CommandEntry entry : config.getCommandList()) {
             if (entry == null || entry.getId() == null
                     || entry.getId().isBlank()
