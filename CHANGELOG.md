@@ -14,6 +14,9 @@
   Only assigned Q/E/R hotswaps are shown while the flute is equipped.
 - Centered every command-flute glyph consistently and added a flight-toggle
   glyph for hotswap-only companion commands.
+- Added the assignable `Cycle Group` command-flute hotswap for generic command
+  rosters, plus a colored HUD plaque that shows the active group, All
+  Companions, Custom Selection, or No Active Companions.
 - Added `/tw showspawnbeacons [radius|off]` to reveal nearby loaded natural
   spawn beacons with their configured model and nameplate without changing
   beacon spawning behavior.

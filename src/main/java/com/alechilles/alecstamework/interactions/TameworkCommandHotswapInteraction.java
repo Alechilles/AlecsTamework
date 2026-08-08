@@ -17,6 +17,7 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.CooldownHandler;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.SimpleInteraction;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nonnull;
 
 /** Dispatches the command assigned to one fixed command-item ability slot. */
@@ -70,8 +71,11 @@ public final class TameworkCommandHotswapInteraction extends SimpleInteraction {
         if (buffer == null || playerRef == null || held == null || held.isEmpty() || handler == null) return false;
         Player player = buffer.getComponent(playerRef, Player.getComponentType());
         if (player == null) return false;
-        buffer.run(store -> handler.handleHotswapUse(player, held, context.getTargetEntity(), slot));
-        context.setHeldItem(held);
+        AtomicReference<ItemStack> updated = new AtomicReference<>(held);
+        buffer.run(store -> updated.set(
+                handler.handleHotswapUse(player, held, context.getTargetEntity(), slot)
+        ));
+        context.setHeldItem(updated.get());
         return true;
     }
 

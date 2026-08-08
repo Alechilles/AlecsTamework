@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
 import com.alechilles.alecstamework.items.CommandHotswapAssignmentStore;
 import com.alechilles.alecstamework.items.CommandHotswapAssignmentStore.Slot;
+import com.alechilles.alecstamework.items.CommandHotswapAction;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
@@ -821,6 +822,12 @@ public final class TameworkCommandSelectionPage
     private void buildHotswapControls(UICommandBuilder commands) {
         List<DropdownEntryInfo> entries = new ArrayList<>();
         entries.add(new DropdownEntryInfo(LocalizableString.fromString("Unassigned"), ""));
+        if (!config.usesBondedCompanionRoster()) {
+            entries.add(new DropdownEntryInfo(
+                    LocalizableString.fromString("Cycle Group"),
+                    CommandHotswapAction.CYCLE_GROUP
+            ));
+        }
         for (CommandSelectionOptionSource.Option option : CommandSelectionOptionSource.build(
                 config, null, resolveLanguage(), Integer.MAX_VALUE)) {
             entries.add(new DropdownEntryInfo(LocalizableString.fromString(option.label()), option.id()));
@@ -843,7 +850,8 @@ public final class TameworkCommandSelectionPage
     private void applyHotswapAssignment(Slot slot, String commandId) {
         if (hotswapAssignmentCallback == null) return;
         String value = commandId == null ? "" : commandId.trim();
-        if (!value.isEmpty() && config.findCommandById(value) == null) return;
+        if (!value.isEmpty() && !CommandHotswapAction.isCycleGroup(value)
+                && config.findCommandById(value) == null) return;
         hotswapAssignmentCallback.accept(slot, value);
     }
 

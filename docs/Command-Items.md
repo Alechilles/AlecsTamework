@@ -77,6 +77,15 @@ command glyphs when `Icon` is omitted.
 Set `ShowInRadial: false` on a command entry to offer it through the hotswap
 selectors without consuming one of the radial menu's eight slots.
 
+Generic command rosters also offer a `Cycle Group` hotswap action. Assign it to
+Q, E, or R to cycle `All Companions`, then each non-empty named group in its
+saved display order, and back to `All Companions`. The flute HUD shows the
+current recipient scope above its ability icons: a named group uses its saved
+color, while All, Custom Selection, and No Active Companions use neutral,
+gold, and subdued-gray states respectively. This action is not offered by
+bonded-companion rosters, whose active profiles are stored outside generic
+command-group metadata.
+
 ### Bundled example and acquisition boundary
 
 Tamework ships `Tamework_Command_Whistle_Example` with the

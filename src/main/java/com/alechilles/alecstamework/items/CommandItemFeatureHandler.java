@@ -94,6 +94,7 @@ public final class CommandItemFeatureHandler {
     private final CommandGroupManagerPageService groupManagerPageService;
     private final CommandGroupAssignPageService groupAssignPageService;
     private final CommandGroupActivationService groupActivationService;
+    private final CommandGroupCycleService groupCycleService;
     private final CommandTalentPageService talentPageService;
     private final BondedCompanionTalentPageService bondedTalentPageService;
     private final CommandSelectionPageService selectionPageService;
@@ -376,6 +377,11 @@ public final class CommandItemFeatureHandler {
                 linkedNpcRecordStore,
                 this.groupService
         );
+        this.groupCycleService = new CommandGroupCycleService(
+                linkedNpcRecordStore,
+                this.groupService,
+                groupActivationService
+        );
         this.groupAssignPageService = new CommandGroupAssignPageService(
                 panelActionService,
                 toolInventoryService,
@@ -473,11 +479,20 @@ public final class CommandItemFeatureHandler {
     }
 
     /** Resolves one fixed Q/E/R assignment from the active flute before dispatching it. */
-    public boolean handleHotswapUse(Player player, ItemStack itemStack,
-                                    Ref<EntityStore> targetRef,
-                                    CommandHotswapAssignmentStore.Slot slot) {
+    public ItemStack handleHotswapUse(Player player, ItemStack itemStack,
+                                       Ref<EntityStore> targetRef,
+                                       CommandHotswapAssignmentStore.Slot slot) {
         String commandId = new CommandHotswapAssignmentStore().read(itemStack, slot);
-        return commandId != null && handleUse(player, itemStack, targetRef, null, commandId);
+        if (CommandHotswapAction.isCycleGroup(commandId)) {
+            TwCommandItemConfig config = itemStack == null || itemStack.isEmpty() || registry == null
+                    ? null : registry.get(itemStack.getItemId());
+            return config == null || !config.isEnabled() || config.usesBondedCompanionRoster()
+                    ? itemStack : groupCycleService.applyNext(itemStack);
+        }
+        if (commandId != null) {
+            handleUse(player, itemStack, targetRef, null, commandId);
+        }
+        return itemStack;
     }
     /** Clears only presentation snapshots when the owner disconnects. */
     public void onPlayerDisconnect(@Nullable UUID ownerUuid) {

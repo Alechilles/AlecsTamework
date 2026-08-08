@@ -29,6 +29,7 @@ final class CommandHotswapHudIconResolver {
             case "SETHOME", "RETURNHOME" -> ICON_ROOT + "Home.png";
             case "TOGGLEAIRBORNEMODE", "TOGGLEFROSTDRAGONAIRBORNEMODE" ->
                     ICON_ROOT + "FlightToggle.png";
+            case "__CYCLE_GROUP__" -> ICON_ROOT + "CycleGroup.png";
             default -> "";
         };
     }

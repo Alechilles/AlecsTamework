@@ -17,6 +17,7 @@ final class CommandHotswapHudBinder {
         bindSlot(commandBuilder, "Q", model.q());
         bindSlot(commandBuilder, "E", model.e());
         bindSlot(commandBuilder, "R", model.r());
+        bindGroupStatus(commandBuilder, model.groupStatus());
     }
 
     private static void bindSlot(@Nonnull UICommandBuilder commandBuilder,
@@ -29,5 +30,13 @@ final class CommandHotswapHudBinder {
         commandBuilder.set(root + " #FallbackGlyph.Visible", slot.visible() && !slot.hasIconTexturePath());
         commandBuilder.set(root + " #FallbackGlyph.Text", slot.fallbackGlyph());
         commandBuilder.set(root + " #Binding.Text", slot.bindingLabel());
+    }
+
+    private static void bindGroupStatus(@Nonnull UICommandBuilder commandBuilder,
+                                        @Nonnull CommandHotswapHudViewModel.GroupStatus status) {
+        commandBuilder.set("#CommandHotswapGroupStatus.Visible", status.visible());
+        commandBuilder.set("#CommandHotswapGroupStatus #Label.Text", status.label());
+        commandBuilder.set("#CommandHotswapGroupStatus #Dot.Background", status.colorHex());
+        commandBuilder.set("#CommandHotswapGroupStatus #Accent.Background", status.colorHex());
     }
 }

@@ -31,6 +31,8 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
     private final CommandItemRegistry registry;
     private final CommandHotswapAssignmentStore assignments = new CommandHotswapAssignmentStore();
     private final CommandTargetInspector targetInspector = new CommandTargetInspector();
+    private final CommandHotswapHudGroupStatusResolver groupStatusResolver =
+            new CommandHotswapHudGroupStatusResolver(null, null, null);
     private final Map<UUID, HudState> statesByPlayer = new HashMap<>();
     private final Map<Store<EntityStore>, Long> nextRefreshByStore = new IdentityHashMap<>();
 
@@ -103,7 +105,10 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
                 ),
                 resolveSlot(stack, config, Slot.Q, "Q"),
                 resolveSlot(stack, config, Slot.E, "E"),
-                resolveSlot(stack, config, Slot.R, "R")
+                resolveSlot(stack, config, Slot.R, "R"),
+                config.usesBondedCompanionRoster()
+                        ? CommandHotswapHudViewModel.GroupStatus.hidden()
+                        : groupStatusResolver.resolve(stack)
         );
     }
 
@@ -141,6 +146,15 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
                                                         @Nonnull Slot slot,
                                                         @Nonnull String bindingLabel) {
         String commandId = assignments.read(stack, slot);
+        if (CommandHotswapAction.isCycleGroup(commandId)
+                && !config.usesBondedCompanionRoster()) {
+            return new CommandHotswapHudViewModel.Slot(
+                    true,
+                    bindingLabel,
+                    CommandHotswapHudIconResolver.resolve(null, commandId),
+                    ""
+            );
+        }
         CommandEntry command = config.findCommandById(commandId);
         if (command == null) {
             return CommandHotswapHudViewModel.Slot.hidden(bindingLabel);
@@ -161,7 +175,8 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
                 CommandHotswapHudViewModel.Slot.hidden("RMB"),
                 CommandHotswapHudViewModel.Slot.hidden("Q"),
                 CommandHotswapHudViewModel.Slot.hidden("E"),
-                CommandHotswapHudViewModel.Slot.hidden("R")
+                CommandHotswapHudViewModel.Slot.hidden("R"),
+                CommandHotswapHudViewModel.GroupStatus.hidden()
         );
     }
 

@@ -22,11 +22,24 @@
 // Uses the talisman's native-aligned ability frame and binding badge so a flute
 // hotswap visually joins the regular weapon ability strip.
 Group #TameworkCommandHotswapControls {
-    Anchor: (Right: 220, Bottom: 40, Width: 314, Height: @CommandHotswapSlotHeight);
+    Anchor: (Right: 220, Bottom: 40, Width: 314, Height: 100);
     Visible: false;
 
+    Group #CommandHotswapGroupStatus {
+        Anchor: (Top: 0, Left: 55, Width: 204, Height: 22);
+        Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
+        Visible: false;
+        Group #Accent { Anchor: (Top: 3, Left: 3, Width: 3, Height: 16); Background: #c8d1db; }
+        Group #Dot { Anchor: (Top: 7, Left: 12, Width: 8, Height: 8); Background: #c8d1db; }
+        Label #Label {
+            Anchor: (Top: 1, Left: 28, Right: 6, Height: 20);
+            Text: "";
+            Style: (FontName: "Secondary", FontSize: 11, RenderBold: true, TextColor: #eff6fb, Alignment: Center);
+        }
+    }
+
     Group #CommandHotswapPrimaryControl {
-        Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotHeight);
+        Anchor: (Top: 26, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotHeight);
         Visible: false;
         Group #Frame { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/AvatarFlightControls/ControlFrame.png"; }
         Group #Icon { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/CommandHotswaps/Link.png"; Visible: false; }
@@ -35,7 +48,7 @@ Group #TameworkCommandHotswapControls {
     }
 
     Group #CommandHotswapSecondaryControl {
-        Anchor: (Top: 0, Left: 64, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotHeight);
+        Anchor: (Top: 26, Left: 64, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotHeight);
         Visible: false;
         Group #Frame { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/AvatarFlightControls/ControlFrame.png"; }
         Group #Icon { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/CommandHotswaps/OpenMenu.png"; Visible: false; }
@@ -44,7 +57,7 @@ Group #TameworkCommandHotswapControls {
     }
 
     Group #CommandHotswapQControl {
-        Anchor: (Top: 0, Left: 128, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotHeight);
+        Anchor: (Top: 26, Left: 128, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotHeight);
         Visible: false;
         Group #Frame { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/AvatarFlightControls/ControlFrame.png"; }
         Group #Icon { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/CommandHotswaps/Follow.png"; Visible: false; }
@@ -53,7 +66,7 @@ Group #TameworkCommandHotswapControls {
     }
 
     Group #CommandHotswapEControl {
-        Anchor: (Top: 0, Left: 192, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotHeight);
+        Anchor: (Top: 26, Left: 192, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotHeight);
         Visible: false;
         Group #Frame { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/AvatarFlightControls/ControlFrame.png"; }
         Group #Icon { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/CommandHotswaps/Follow.png"; Visible: false; }
@@ -62,7 +75,7 @@ Group #TameworkCommandHotswapControls {
     }
 
     Group #CommandHotswapRControl {
-        Anchor: (Top: 0, Left: 256, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotHeight);
+        Anchor: (Top: 26, Left: 256, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotHeight);
         Visible: false;
         Group #Frame { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/AvatarFlightControls/ControlFrame.png"; }
         Group #Icon { Anchor: (Top: 0, Left: 0, Width: @CommandHotswapSlotSize, Height: @CommandHotswapSlotSize); Background: "../Tamework/CommandHotswaps/Follow.png"; Visible: false; }
