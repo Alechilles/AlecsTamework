@@ -93,11 +93,11 @@ $C.@PageOverlay {
   LayoutMode: Middle;
 
   Group #TameworkCommandMenuWheel {
-    Anchor: (Width: 920, Height: 832);
+    Anchor: (Width: 1020, Height: 832);
     Visible: false;
 
     Group #TameworkCommandMenuContent {
-      Anchor: (Top: 36, Width: 920, Height: 760);
+      Anchor: (Top: 36, Left: 50, Width: 1020, Height: 760);
 
     Label #TameworkCommandMenuTitle {
       Anchor: (Top: 18, Width: 620, Height: 42, Left: 150);

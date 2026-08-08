@@ -74,6 +74,19 @@ final class CommandItemUseOrchestrator {
                       Ref<EntityStore> targetRef,
                       String configIdOverride,
                       String commandIdOverride) {
+        return handleUse(player, itemStack, targetRef, configIdOverride, commandIdOverride, true);
+    }
+
+    /**
+     * Dispatches an item command, optionally bypassing the primary-click link/unlink interception.
+     * Fixed hotswap abilities still receive their aimed target, but must never change link membership.
+     */
+    boolean handleUse(Player player,
+                      ItemStack itemStack,
+                      Ref<EntityStore> targetRef,
+                      String configIdOverride,
+                      String commandIdOverride,
+                      boolean allowLinkToggle) {
         CommandPreparedUse use = prepareUse(player, itemStack, configIdOverride);
         if (use == null) {
             return false;
@@ -82,7 +95,9 @@ final class CommandItemUseOrchestrator {
         if (selection.handled()) {
             return selection.result();
         }
-        Interception link = interceptLinkToggle(use, targetRef);
+        Interception link = allowLinkToggle
+                ? interceptLinkToggle(use, targetRef)
+                : Interception.unhandled();
         if (link.handled()) {
             return link.result();
         }

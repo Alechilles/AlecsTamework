@@ -487,7 +487,9 @@ public final class CommandItemFeatureHandler {
             return cycleHotswapGroup(itemStack);
         }
         if (commandId != null) {
-            handleUse(player, itemStack, targetRef, null, commandId);
+            itemUseOrchestrator.handleUse(
+                    player, itemStack, targetRef, null, commandId, false
+            );
         }
         return itemStack;
     }
