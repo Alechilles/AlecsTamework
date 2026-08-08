@@ -25,8 +25,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -55,7 +53,6 @@ public final class TameworkCommandGroupManagerPage
     private static final String ACTION_DELETE_PREFIX = "__delete__:";
     private static final String DEFAULT_GROUP_COLOR = "#4B657F";
     private static final String DEFAULT_SUBTITLE_KEY = "tamework.ui.groupManager.subtitle.default";
-    private static final Logger LOGGER = Logger.getLogger(TameworkCommandGroupManagerPage.class.getName());
 
     private final Supplier<List<GroupEntry>> groupsSupplier;
     private final BiConsumer<String, String> createCallback;
@@ -192,17 +189,7 @@ public final class TameworkCommandGroupManagerPage
             draftColor = normalizeDraftColor(colorInput);
         }
         String normalizedAction = action != null ? action.trim() : "";
-        LOGGER.log(
-                Level.INFO,
-                "Group manager event: commandId={0} name={1} color={2}",
-                new Object[] {
-                        safeForLog(normalizedAction),
-                        safeForLog(draftName),
-                        safeForLog(draftColor)
-                }
-        );
         if (ACTION_CLOSE.equals(normalizedAction)) {
-            LOGGER.log(Level.INFO, "Group manager close requested.");
             handled = true;
             close();
             if (closeCallback != null) {
@@ -211,7 +198,6 @@ public final class TameworkCommandGroupManagerPage
             return;
         }
         if (ACTION_BACK.equals(normalizedAction)) {
-            LOGGER.log(Level.INFO, "Group manager back requested.");
             if (navigationPending) {
                 return;
             }
@@ -229,17 +215,11 @@ public final class TameworkCommandGroupManagerPage
             return;
         }
         if (ACTION_CREATE.equals(normalizedAction)) {
-            LOGGER.log(Level.INFO, "Group manager create requested for name={0} color={1}",
-                    new Object[] {
-                            safeForLog(draftName),
-                            safeForLog(draftColor)
-                    });
             applyCreate();
             refreshAndSend();
             return;
         }
         if (normalizedAction.isBlank()) {
-            LOGGER.log(Level.INFO, "Group manager event ignored because no action payload was provided.");
             return;
         }
         if (normalizedAction.startsWith(ACTION_EDIT_PREFIX)) {
@@ -257,8 +237,6 @@ public final class TameworkCommandGroupManagerPage
         if (normalizedAction.startsWith(ACTION_DELETE_PREFIX)) {
             String groupId = normalizedAction.substring(ACTION_DELETE_PREFIX.length()).trim();
             if (!groupId.isBlank() && deleteCallback != null) {
-                LOGGER.log(Level.INFO, "Group manager delete requested for groupId={0}",
-                        new Object[] { safeForLog(groupId) });
                 deleteCallback.accept(groupId);
             }
             if (!groupId.isBlank() && groupId.equalsIgnoreCase(editingGroupId)) {
@@ -267,7 +245,6 @@ public final class TameworkCommandGroupManagerPage
             refreshAndSend();
             return;
         }
-        LOGGER.log(Level.INFO, "Group manager ignored unknown action payload: {0}", safeForLog(normalizedAction));
     }
 
     @Override
@@ -419,14 +396,10 @@ public final class TameworkCommandGroupManagerPage
             nextName = target.name;
         }
         if (!target.name.equals(nextName) && renameCallback != null) {
-            LOGGER.log(Level.INFO, "Group manager rename requested for groupId={0} newName={1}",
-                    new Object[] { safeForLog(target.groupId), safeForLog(nextName) });
             renameCallback.accept(target.groupId, nextName);
         }
         String nextColor = resolveRowColorInput(rowColorInput, target.colorHex);
         if (!target.colorHex.equalsIgnoreCase(nextColor) && recolorCallback != null) {
-            LOGGER.log(Level.INFO, "Group manager recolor requested for groupId={0} color={1}",
-                    new Object[] { safeForLog(target.groupId), safeForLog(nextColor) });
             recolorCallback.accept(target.groupId, nextColor);
         }
         clearRowEdit();
@@ -622,20 +595,6 @@ public final class TameworkCommandGroupManagerPage
             return DEFAULT_GROUP_COLOR;
         }
         return "#" + normalized.substring(1).toUpperCase(Locale.ROOT);
-    }
-
-    private static String safeForLog(String value) {
-        if (value == null) {
-            return "<null>";
-        }
-        String trimmed = value.trim();
-        if (trimmed.isEmpty()) {
-            return "<empty>";
-        }
-        if (trimmed.length() <= 48) {
-            return trimmed;
-        }
-        return trimmed.substring(0, 45) + "...";
     }
 
     /**

@@ -184,6 +184,10 @@ final class CommandGroupService {
         return null;
     }
 
+    String normalizeDisplayName(String value) {
+        return normalizeName(value);
+    }
+
     private GroupRecord parse(String raw) {
         if (raw == null || raw.isBlank()) {
             return null;
