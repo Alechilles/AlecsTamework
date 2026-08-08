@@ -212,9 +212,11 @@
 - Fixed public v2.16.1 captured companions and filled spawners failing to
   restore after import, including servers that already migrated to Tamework
   3.0.0-3.0.2 and records without an optional tamed-state field. Using the
-  exact stranded filled item now recovers its preserved capture history
-  without rerunning migration, including newer same-profile item metadata
-  paired with an older restored `CAPTURED` database snapshot.
+  exact stranded filled item now recovers its preserved capture history or a
+  missing initial companion row without rerunning migration, including newer
+  same-profile item metadata paired with an older restored `CAPTURED` database
+  snapshot. Recordless recovery is limited to worlds with verified public
+  migration history.
 - Fixed imported worlds remaining read-only when companions continued loading
   during startup reconciliation; mutation readiness now retries from sealed
   live-world evidence.

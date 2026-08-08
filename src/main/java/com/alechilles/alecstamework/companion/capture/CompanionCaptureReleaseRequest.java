@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
+import java.util.Objects;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.bson.BsonDocument;
@@ -29,7 +30,8 @@ public record CompanionCaptureReleaseRequest(
         @Nonnull String spawnReceiptKey,
         long requestedAtMs,
         @Nullable CaptureReleaseLegacyRecoveryEvidence legacyRecovery,
-        @Nullable CaptureReleaseModernRecoveryEvidence modernRecovery
+        @Nullable CaptureReleaseModernRecoveryEvidence modernRecovery,
+        @Nullable CaptureReleaseOrphanRecoveryEvidence orphanRecovery
 ) {
     /** Creates an ordinary captured-artifact release without recovery evidence. */
     public CompanionCaptureReleaseRequest(
@@ -59,6 +61,7 @@ public record CompanionCaptureReleaseRequest(
                 inventoryReceiptKey,
                 spawnReceiptKey,
                 requestedAtMs,
+                null,
                 null,
                 null
         );
@@ -94,6 +97,43 @@ public record CompanionCaptureReleaseRequest(
                 spawnReceiptKey,
                 requestedAtMs,
                 legacyRecovery,
+                null,
+                null
+        );
+    }
+
+    /** Compatibility constructor for releases without item-only recovery. */
+    public CompanionCaptureReleaseRequest(
+            ProfileId profileId,
+            LifecycleRevision expectedLifecycleRevision,
+            CompanionSnapshot sourceSnapshot,
+            NpcAlias sourceAlias,
+            SnapshotCodecRegistry.EncodedSnapshot projection,
+            CaptureReleaseSourceEvidence source,
+            NpcAlias targetAlias,
+            OwnerId ownerAssignment,
+            CompanionSpawnPlacement placement,
+            String inventoryReceiptKey,
+            String spawnReceiptKey,
+            long requestedAtMs,
+            CaptureReleaseLegacyRecoveryEvidence legacyRecovery,
+            CaptureReleaseModernRecoveryEvidence modernRecovery
+    ) {
+        this(
+                profileId,
+                expectedLifecycleRevision,
+                sourceSnapshot,
+                sourceAlias,
+                projection,
+                source,
+                targetAlias,
+                ownerAssignment,
+                placement,
+                inventoryReceiptKey,
+                spawnReceiptKey,
+                requestedAtMs,
+                legacyRecovery,
+                modernRecovery,
                 null
         );
     }
@@ -139,7 +179,10 @@ public record CompanionCaptureReleaseRequest(
                     "Legacy recovery must reference the release source snapshot"
             );
         }
-        if (legacyRecovery != null && modernRecovery != null) {
+        int recoveryModes = (legacyRecovery == null ? 0 : 1)
+                + (modernRecovery == null ? 0 : 1)
+                + (orphanRecovery == null ? 0 : 1);
+        if (recoveryModes > 1) {
             throw new IllegalArgumentException(
                     "Captured-artifact release has multiple recovery modes"
             );
@@ -153,6 +196,23 @@ public record CompanionCaptureReleaseRequest(
         ))) {
             throw new IllegalArgumentException(
                     "Modern recovery must supersede an older same-profile snapshot"
+            );
+        }
+        if (orphanRecovery != null
+                && (!profileId.equals(
+                orphanRecovery.initialIdentity().profileId()
+        )
+                || !profileId.equals(new ProfileId(sourceAlias.value()))
+                || !sourceSnapshot.snapshotId().toString().equals(
+                sourceAlias.toString()
+        )
+                || !expectedLifecycleRevision.equals(
+                LifecycleRevision.INITIAL
+        )
+                || orphanRecovery.initialOwner() != null
+                && ownerAssignment != null)) {
+            throw new IllegalArgumentException(
+                    "Item-only recovery must create one exact initial captured profile"
             );
         }
         if (!CompanionFullStateProjection.KIND.equals(projection.kind())
@@ -178,6 +238,14 @@ public record CompanionCaptureReleaseRequest(
                 sourceAlias,
                 sourceSnapshot.snapshotId().toString()
         );
+        if (orphanRecovery != null
+                && !isReleasedPublicCapture(
+                source.sourceArtifact(), orphanRecovery
+        )) {
+            throw new IllegalArgumentException(
+                    "Item-only recovery requires an exact released-public capture"
+            );
+        }
         requireReleaseReceipt(
                 source.receiptArtifact(),
                 inventoryReceiptKey
@@ -187,6 +255,41 @@ public record CompanionCaptureReleaseRequest(
                     "Captured-artifact inventory and spawn receipts must be distinct"
             );
         }
+    }
+
+    private static boolean isReleasedPublicCapture(
+            CapturedArtifact artifact,
+            CaptureReleaseOrphanRecoveryEvidence recovery
+    ) {
+        BsonDocument metadata = BsonDocument.parse(
+                artifact.metadataExtendedJson()
+        );
+        BsonValue captured = metadata.get(TameworkMetadataKeys.CAPTURED);
+        BsonValue role = metadata.get(TameworkMetadataKeys.CAPTURE_ROLE_ID);
+        BsonValue owner = metadata.get(TameworkMetadataKeys.OWNER_UUID);
+        OwnerId itemOwner;
+        try {
+            itemOwner = owner == null || owner.isNull()
+                    ? null
+                    : OwnerId.parse(owner.asString().getValue());
+        } catch (RuntimeException invalidOwner) {
+            return false;
+        }
+        return !metadata.containsKey(
+                TameworkMetadataKeys.COMPANION_PROFILE_ID
+        )
+                && !metadata.containsKey(
+                TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID
+        )
+                && captured != null
+                && captured.isBoolean()
+                && captured.asBoolean().getValue()
+                && role != null
+                && role.isString()
+                && role.asString().getValue().equalsIgnoreCase(
+                recovery.initialIdentity().roleId()
+        )
+                && Objects.equals(itemOwner, recovery.initialOwner());
     }
 
     private static boolean compatibleSourceRevision(

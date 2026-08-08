@@ -31,7 +31,10 @@ final class SqliteCompanionCaptureReleasePreparation
             OperationEnvelope operation
     ) {
         CompanionLifecycle current;
-        if (release.legacyRecovery() != null) {
+        if (release.orphanRecovery() != null) {
+            current = SqliteCompanionCaptureReleaseOrphanPreparation
+                    .materialize(transaction, operation, release);
+        } else if (release.legacyRecovery() != null) {
             current = requireExactLegacyRecoverySource(transaction);
         } else if (release.modernRecovery() != null) {
             current = requireExactModernRecoverySource(transaction);

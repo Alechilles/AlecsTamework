@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.companion.capture;
 
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
@@ -198,6 +199,88 @@ class CompanionCaptureReleaseDefinitionTest {
 
         assertEquals(recovery, decoded);
         assertNotNull(decoded.modernRecovery());
+    }
+
+    @Test
+    void roundTripPreservesItemOnlyRecoveryForRestart() {
+        ProfileId profileId = new ProfileId(SOURCE.value());
+        SnapshotId snapshotId = SnapshotId.parse(SOURCE.toString());
+        String payload = "{\"capture\":\"item-only\"}";
+        String metadata = "{\"tamed\":true}";
+        CompanionIdentity identity = new CompanionIdentity(
+                profileId,
+                "Migrated sheep",
+                "tamework_sheep",
+                metadata,
+                Sha256Hash.ofUtf8(metadata),
+                null,
+                -800,
+                -800,
+                -800,
+                0
+        );
+        CompanionCaptureReleaseRequest recovery =
+                new CompanionCaptureReleaseRequest(
+                        profileId,
+                        LifecycleRevision.INITIAL,
+                        new CompanionSnapshot(
+                                snapshotId,
+                                profileId,
+                                CompanionCaptureRequest.SNAPSHOT_KIND,
+                                CompanionCaptureRequest.SNAPSHOT_VERSION,
+                                payload,
+                                Sha256Hash.ofUtf8(payload),
+                                LifecycleRevision.INITIAL,
+                                true,
+                                -800
+                        ),
+                        SOURCE,
+                        projection(
+                                CompanionFullStateProjection.KIND,
+                                CompanionFullStateProjection.VERSION
+                        ),
+                        new CaptureReleaseSourceEvidence(
+                                UUID.fromString(
+                                        "40000000-0000-0000-0000-000000000001"
+                                ),
+                                "world",
+                                2,
+                                artifact(
+                                        "filled",
+                                        "\"" + TameworkMetadataKeys.TARGET_UUID
+                                                + "\":\"" + SOURCE + "\","
+                                                + "\"" + TameworkMetadataKeys.CAPTURED
+                                                + "\":true,"
+                                                + "\"" + TameworkMetadataKeys.CAPTURE_ROLE_ID
+                                                + "\":\"tamework_sheep\""
+                                ),
+                                receiptArtifact("inventory-receipt")
+                        ),
+                        TARGET,
+                        null,
+                        new CompanionSpawnPlacement(
+                                "world", 1, 2, 3, 0, 0, 0
+                        ),
+                        "inventory-receipt",
+                        "spawn-receipt",
+                        -800,
+                        null,
+                        null,
+                        new CaptureReleaseOrphanRecoveryEvidence(
+                                identity,
+                                null
+                        )
+                );
+
+        CompanionCaptureReleaseRequest decoded =
+                CompanionCaptureReleaseDefinition.INSTANCE.decode(
+                        CompanionCaptureReleaseDefinition.INSTANCE.encode(
+                                recovery
+                        )
+                );
+
+        assertEquals(recovery, decoded);
+        assertNotNull(decoded.orphanRecovery());
     }
 
     @Test

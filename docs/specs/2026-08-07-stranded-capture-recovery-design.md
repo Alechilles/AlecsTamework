@@ -152,6 +152,17 @@ tamed identity. The item-claimed alias and snapshot must not currently belong
 to another profile or another authoritative location. Recovery supersedes both
 the canonical capture source and the orphaned item source in one operation.
 
+### Item-only public-import mode
+
+Some v2.16.1 saves completed import with zero companion rows even though the
+player still held the exact filled item. This mode is admitted only when the
+replacement database retains a supported public `import_manifest`, the item
+has the released-public source UUID and captured role, and that UUID has no
+loaded entity, profile, alias, lifecycle, or snapshot authority. Preparation
+atomically creates the initial `CAPTURED/CAPTURE_ITEM` profile from the frozen
+item and continues through the existing receipt-first release. A native 3.x
+database without public-import history cannot enter this mode.
+
 ## Architecture
 
 ### Recovery analyzer

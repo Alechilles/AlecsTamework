@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 import com.alechilles.alecstamework.companion.capture.CaptureReleaseSourceEvidence;
 import com.alechilles.alecstamework.companion.capture.CaptureReleaseLegacyRecoveryEvidence;
 import com.alechilles.alecstamework.companion.capture.CaptureReleaseModernRecoveryEvidence;
+import com.alechilles.alecstamework.companion.capture.CaptureReleaseOrphanRecoveryEvidence;
 import com.alechilles.alecstamework.companion.capture.CapturedArtifact;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseDefinition;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseEventCodec;
@@ -602,6 +603,94 @@ class SqliteCompanionCaptureReleaseOperationsTest {
         assertTrue(!snapshot().current());
     }
 
+    /**
+     * Protects the zero-row v2.16.1 migration where the filled item is the
+     * only surviving capture authority.
+     */
+    @Test
+    void itemOnlyPublicCaptureCreatesOneProfileAndReleasesOnce()
+            throws Exception {
+        clearCompanionState();
+        seedPublicImportManifest();
+        CompanionCaptureReleaseRequest orphan = orphanRecoveryRequest();
+        AtomicInteger liveCalls = new AtomicInteger();
+        CompanionCaptureReleaseLiveBoundary boundary = (request, operation) -> {
+            liveCalls.incrementAndGet();
+            try (Connection connection = connections.openReadConnection()) {
+                SqlitePersistenceTransactionContext transaction =
+                        new SqlitePersistenceTransactionContext(connection);
+                CompanionLifecycle fenced = transaction.lifecycles()
+                        .findByProfile(orphan.profileId()).orElseThrow();
+                assertEquals(LifecycleState.CAPTURED, fenced.state());
+                assertEquals(new LifecycleRevision(1), fenced.revision());
+                assertEquals(operation.operationId(),
+                        fenced.activeOperationId());
+                assertTrue(transaction.snapshots()
+                        .findById(orphan.sourceSnapshot().snapshotId())
+                        .orElseThrow().current());
+            }
+            return LiveOperationResult.confirmed(
+                    "capture_release_both_receipts_confirmed"
+            ).completed();
+        };
+
+        OperationWorkflowResult first = submit(15, orphan, boundary);
+        OperationWorkflowResult replay = submit(15, orphan, boundary);
+
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, first.status(),
+                String.valueOf(first.failure()));
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, replay.status());
+        assertEquals(1, liveCalls.get());
+        try (Connection connection = connections.openReadConnection()) {
+            SqlitePersistenceTransactionContext transaction =
+                    new SqlitePersistenceTransactionContext(connection);
+            assertEquals(orphan.orphanRecovery().initialIdentity(),
+                    transaction.identities().findProfile(orphan.profileId())
+                            .orElseThrow());
+            CompanionLifecycle active = transaction.lifecycles()
+                    .findByProfile(orphan.profileId()).orElseThrow();
+            assertEquals(LifecycleState.ACTIVE, active.state());
+            assertEquals(ASSIGNED_OWNER, active.ownerId());
+            assertEquals(CompanionAlias.State.RETIRED,
+                    transaction.identities()
+                            .resolveAlias(orphan.sourceAlias())
+                            .orElseThrow().state());
+            assertEquals(CompanionAlias.State.CURRENT,
+                    transaction.identities()
+                            .resolveAlias(orphan.targetAlias())
+                            .orElseThrow().state());
+            assertTrue(!transaction.snapshots()
+                    .findById(orphan.sourceSnapshot().snapshotId())
+                    .orElseThrow().current());
+        }
+    }
+
+    @Test
+    void itemOnlyCaptureCannotCreateAProfileWithoutPublicImportHistory()
+            throws Exception {
+        clearCompanionState();
+        CompanionCaptureReleaseRequest orphan = orphanRecoveryRequest();
+        AtomicBoolean liveCalled = new AtomicBoolean();
+
+        OperationWorkflowResult result = submit(
+                16,
+                orphan,
+                (request, operation) -> {
+                    liveCalled.set(true);
+                    return LiveOperationResult.confirmed("unexpected")
+                            .completed();
+                }
+        );
+
+        assertEquals(OperationWorkflowResult.Status.PREPARE_FAILED,
+                result.status());
+        assertTrue(!liveCalled.get());
+        try (Connection connection = connections.openReadConnection()) {
+            assertTrue(new SqliteCompanionIdentityStore(connection)
+                    .findProfile(orphan.profileId()).isEmpty());
+        }
+    }
+
     @Test
     void ownerAssignmentAppliesOnlyToAnUnownedCapturedProfile()
             throws Exception {
@@ -858,6 +947,108 @@ class SqliteCompanionCaptureReleaseOperationsTest {
         );
     }
 
+    private CompanionCaptureReleaseRequest orphanRecoveryRequest() {
+        ProfileId profileId = new ProfileId(SOURCE_ALIAS.value());
+        SnapshotId snapshotId = SnapshotId.parse(SOURCE_ALIAS.toString());
+        String capture = "{\"capture\":\"item-only\"}";
+        String projection = "{\"state\":\"item-only\"}";
+        String metadata = "{\"tamed\":true}";
+        CompanionIdentity identity = new CompanionIdentity(
+                profileId,
+                "Migrated sheep",
+                "role",
+                metadata,
+                Sha256Hash.ofUtf8(metadata),
+                null,
+                -600,
+                -600,
+                -600,
+                0
+        );
+        CompanionSnapshot source = new CompanionSnapshot(
+                snapshotId,
+                profileId,
+                CompanionCaptureRequest.SNAPSHOT_KIND,
+                CompanionCaptureRequest.SNAPSHOT_VERSION,
+                capture,
+                Sha256Hash.ofUtf8(capture),
+                LifecycleRevision.INITIAL,
+                true,
+                -600
+        );
+        return new CompanionCaptureReleaseRequest(
+                profileId,
+                LifecycleRevision.INITIAL,
+                source,
+                SOURCE_ALIAS,
+                new SnapshotCodecRegistry.EncodedSnapshot(
+                        CompanionFullStateProjection.KIND,
+                        CompanionFullStateProjection.VERSION,
+                        projection,
+                        Sha256Hash.ofUtf8(projection)
+                ),
+                new CaptureReleaseSourceEvidence(
+                        ACTOR,
+                        "world-two",
+                        2,
+                        legacySourceArtifact(),
+                        receiptArtifact()
+                ),
+                TARGET_ALIAS,
+                ASSIGNED_OWNER,
+                new CompanionSpawnPlacement(
+                        "world-two", -12.5, -63.05, -4.5,
+                        -0.25f, -1.5f, -0.5f
+                ),
+                "inventory-receipt",
+                "spawn-receipt",
+                -600,
+                null,
+                null,
+                new CaptureReleaseOrphanRecoveryEvidence(identity, null)
+        );
+    }
+
+    private void clearCompanionState() throws Exception {
+        try (Connection connection = connections.openWriterConnection()) {
+            connection.setAutoCommit(false);
+            try (PreparedStatement snapshots = connection.prepareStatement(
+                    "DELETE FROM companion_snapshot");
+                 PreparedStatement lifecycles = connection.prepareStatement(
+                         "DELETE FROM companion_lifecycle");
+                 PreparedStatement aliases = connection.prepareStatement(
+                         "DELETE FROM companion_alias");
+                 PreparedStatement profiles = connection.prepareStatement(
+                         "DELETE FROM companion_profile")) {
+                snapshots.executeUpdate();
+                lifecycles.executeUpdate();
+                aliases.executeUpdate();
+                profiles.executeUpdate();
+            }
+            connection.commit();
+        }
+    }
+
+    private void seedPublicImportManifest() throws Exception {
+        try (Connection connection = connections.openWriterConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     INSERT INTO import_manifest(
+                         import_id, source_sha256, source_schema_version,
+                         importer_version, source_snapshot_name, counts_json,
+                         completed_at_ms
+                     ) VALUES (?, ?, 4, 1, ?, ?, ?)
+                     """)) {
+            statement.setString(1,
+                    "a50e9bd4-ce5c-31e4-a010-8f4c19a8235c");
+            statement.setString(2, "0".repeat(64));
+            statement.setString(3, "tamework.sqlite");
+            statement.setString(4,
+                    "{\"profiles\":0,\"snapshots\":0}");
+            statement.setLong(5, -700);
+            assertEquals(1, statement.executeUpdate());
+        }
+    }
+
     private CompanionSnapshot modernSnapshot(
             SnapshotId snapshotId,
             boolean current
@@ -1067,7 +1258,11 @@ class SqliteCompanionCaptureReleaseOperationsTest {
         return artifact(
                 "capture-device-filled",
                 "\"" + TameworkMetadataKeys.TARGET_UUID
-                        + "\":\"" + SOURCE_ALIAS + "\""
+                        + "\":\"" + SOURCE_ALIAS + "\","
+                        + "\"" + TameworkMetadataKeys.CAPTURED
+                        + "\":true,"
+                        + "\"" + TameworkMetadataKeys.CAPTURE_ROLE_ID
+                        + "\":\"role\""
         );
     }
 

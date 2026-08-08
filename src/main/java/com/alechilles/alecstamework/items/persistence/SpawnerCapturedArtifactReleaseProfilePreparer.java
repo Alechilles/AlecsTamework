@@ -244,7 +244,7 @@ final class SpawnerCapturedArtifactReleaseProfilePreparer {
         throw new IllegalArgumentException(decodeDetail(decoded));
     }
 
-    private Result prepareProjection(
+    Result prepareProjection(
             CompanionProfileReadModel profile,
             CompanionSnapshot sourceSnapshot,
             CoopResidentStateSnapshot decoded,

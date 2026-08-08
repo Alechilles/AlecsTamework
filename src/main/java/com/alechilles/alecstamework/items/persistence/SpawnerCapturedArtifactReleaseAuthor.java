@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items.persistence;
 import com.alechilles.alecstamework.companion.capture.CaptureReleaseSourceEvidence;
 import com.alechilles.alecstamework.companion.capture.CaptureReleaseLegacyRecoveryEvidence;
 import com.alechilles.alecstamework.companion.capture.CaptureReleaseModernRecoveryEvidence;
+import com.alechilles.alecstamework.companion.capture.CaptureReleaseOrphanRecoveryEvidence;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseRequest;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
@@ -45,6 +46,8 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
     private final SpawnerCapturedArtifactReleaseProfilePreparer
             profilePreparer;
     private final SpawnerCapturedArtifactRecoveryPreparer recoveryPreparer;
+    private final SpawnerCapturedArtifactOrphanRecoveryPreparer
+            orphanRecoveryPreparer;
     private final SourceAliasProbe sourceAliases;
     private final ResultDispatcher dispatcher;
 
@@ -112,6 +115,11 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
                 );
         this.recoveryPreparer =
                 new SpawnerCapturedArtifactRecoveryPreparer(profilePreparer);
+        this.orphanRecoveryPreparer =
+                new SpawnerCapturedArtifactOrphanRecoveryPreparer(
+                        snapshots,
+                        profilePreparer
+                );
         this.sourceAliases = Objects.requireNonNull(
                 sourceAliases,
                 "sourceAliases"
@@ -203,7 +211,9 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
             }
             if (!(read instanceof PersistenceReadResult.Found<
                     CompanionProfileReadModel> found)) {
-                return profileConflict(null);
+                return frozen.claim().releasedPublic()
+                        ? recoverOrphanAndSubmit(frozen, placement)
+                        : profileConflict(null);
             }
             return decodeAndSubmit(
                     frozen,
@@ -269,8 +279,91 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
         }
         return submit(
                 frozen, profile, release.sourceSnapshot(),
-                release.projection(), placement, null, null
+                release.projection(), placement, null, null, null
         );
+    }
+
+    private CompletionStage<SpawnerPersistenceAuthorResult>
+    recoverOrphanAndSubmit(
+            PendingRelease frozenSource,
+            CompanionSpawnPlacement placement
+    ) {
+        ProfileId profileId = new ProfileId(
+                frozenSource.claim().sourceAlias().value()
+        );
+        return persistence.findProfile(profileId).thenCompose(read -> {
+            if (read instanceof PersistenceReadResult.Failed<?>) {
+                return completed(result(
+                        SpawnerPersistenceAuthorResult.Status
+                                .PROFILE_READ_FAILED,
+                        null,
+                        null,
+                        "capture_release_profile_read_failed",
+                        null
+                ));
+            }
+            if (!(read instanceof PersistenceReadResult.Absent<?>)) {
+                return profileConflict(null);
+            }
+            final SpawnerCapturedArtifactOrphanRecoveryPreparer.Prepared ready;
+            try {
+                ready = orphanRecoveryPreparer.prepare(
+                        frozenSource.claim(),
+                        frozenSource.sourceArtifact(),
+                        frozenSource.ownerAssignment(),
+                        frozenSource.ownerAssignmentName(),
+                        frozenSource.requestedAt(),
+                        sourceAliases.absent(
+                                frozenSource.claim().sourceAlias()
+                        )
+                );
+            } catch (RuntimeException failure) {
+                return completed(result(
+                        SpawnerPersistenceAuthorResult.Status
+                                .SNAPSHOT_DECODE_FAILED,
+                        null,
+                        null,
+                        "capture_snapshot_decode_failed",
+                        failure
+                ));
+            }
+            if (ready == null) {
+                return profileConflict(null);
+            }
+            try {
+                var release = ready.release();
+                FrozenRelease frozen = evidence.freeze(
+                        frozenSource,
+                        release.resolvedIdentity(),
+                        release.ownerAssignment(),
+                        release.ownerAssignmentName()
+                );
+                return submit(
+                        frozen,
+                        ready.profile(),
+                        release.sourceSnapshot(),
+                        release.projection(),
+                        placement,
+                        null,
+                        null,
+                        ready.evidence()
+                );
+            } catch (RuntimeException | LinkageError failure) {
+                return completed(result(
+                        SpawnerPersistenceAuthorResult.Status.INVALID_CONTEXT,
+                        null,
+                        null,
+                        contextDetail(failure),
+                        failure
+                ));
+            }
+        }).exceptionally(failure -> result(
+                SpawnerPersistenceAuthorResult.Status.PROFILE_READ_FAILED,
+                null,
+                null,
+                "capture_release_profile_read_failed",
+                failure
+        ));
     }
 
     private CompletionStage<SpawnerPersistenceAuthorResult>
@@ -317,7 +410,8 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
                                 release.projection(),
                                 placement,
                                 null,
-                                ready.evidence()
+                                ready.evidence(),
+                                null
                         );
                     } catch (RuntimeException | LinkageError failure) {
                         return completed(result(
@@ -398,6 +492,7 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
                         release.projection(),
                         placement,
                         ready.evidence(),
+                        null,
                         null
                 );
             } catch (RuntimeException | LinkageError failure) {
@@ -425,7 +520,8 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
             SnapshotCodecRegistry.EncodedSnapshot projection,
             CompanionSpawnPlacement placement,
             @Nullable CaptureReleaseLegacyRecoveryEvidence legacyRecovery,
-            @Nullable CaptureReleaseModernRecoveryEvidence modernRecovery
+            @Nullable CaptureReleaseModernRecoveryEvidence modernRecovery,
+            @Nullable CaptureReleaseOrphanRecoveryEvidence orphanRecovery
     ) {
         CompanionCaptureReleaseRequest request;
         try {
@@ -449,7 +545,8 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
                     frozen.spawnReceipt(),
                     frozen.requestedAt(),
                     legacyRecovery,
-                    modernRecovery
+                    modernRecovery,
+                    orphanRecovery
             );
         } catch (RuntimeException failure) {
             return profileConflict(frozen.operationId());

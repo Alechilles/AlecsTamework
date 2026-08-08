@@ -139,6 +139,16 @@ refused if the source UUID is loaded, ownership or role conflicts, capture
 history is ambiguous, or the profile has moved beyond the initial imported
 state.
 
+The same migration-only fallback covers the rarer v2.16.1 case where import
+created no companion row at all and the filled item is the only surviving
+capture record. It requires a durable supported-public-import manifest, an
+exact released-public item with its source UUID and captured role, no matching
+profile, alias, or snapshot, and authoritative absence of the source UUID from
+loaded worlds. The release transaction creates the missing initial captured
+profile and immediately releases it. The import manifest persists when later
+startups report `targetOrigin=EXISTING`; a native 3.x world without that
+manifest cannot create a companion through this fallback.
+
 The same operation also handles a complete newer 3.x filled item when a
 restored database still holds an older exact `CAPTURED` snapshot for that same
 profile. Both the item-claimed UUID and the older canonical UUID must be absent

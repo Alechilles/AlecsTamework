@@ -240,6 +240,30 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
     }
 
     /**
+     * Protects the 2026-08-08 fresh v2.16.1 migration where both public and
+     * replacement databases contained zero profiles after capture.
+     */
+    @Test
+    void releasedPublicItemWithoutImportedProfileMaterializesAndReleases() {
+        FakePersistence persistence = new FakePersistence(null);
+
+        SpawnerPersistenceAuthorResult result = author(persistence).release(
+                orphanedReleasedPublicIntent(),
+                ignored -> placement()
+        ).toCompletableFuture().join();
+
+        assertTrue(result.published());
+        assertEquals(new ProfileId(SOURCE.value()),
+                persistence.request.profileId());
+        assertEquals(SOURCE, persistence.request.sourceAlias());
+        assertEquals(SnapshotId.parse(SOURCE.toString()),
+                persistence.request.sourceSnapshot().snapshotId());
+        assertEquals(ASSIGNED_OWNER, persistence.request.ownerAssignment());
+        assertEquals("tamework_test", projection(persistence.request).roleId());
+        assertTrue(projection(persistence.request).tamed().isTamed());
+    }
+
+    /**
      * Protects v2.16.1 captured items whose public profile omitted the optional tamed field.
      * The filled item remains the only retained evidence that the companion was tamed.
      */
@@ -498,6 +522,36 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
 
     private SpawnerCapturedArtifactReleaseIntent releasedPublicIntent() {
         return releasedPublicIntent(null, null, true);
+    }
+
+    private SpawnerCapturedArtifactReleaseIntent
+    orphanedReleasedPublicIntent() {
+        BsonDocument sourceMetadata = new BsonDocument()
+                .append(
+                        TameworkMetadataKeys.TARGET_UUID,
+                        new BsonString(SOURCE.toString())
+                )
+                .append(
+                        TameworkMetadataKeys.CAPTURE_ROLE_ID,
+                        new BsonString("tamework_test")
+                )
+                .append(TameworkMetadataKeys.CAPTURED, BsonBoolean.TRUE)
+                .append(TameworkMetadataKeys.TAMED, BsonBoolean.TRUE)
+                .append(
+                        TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID,
+                        new BsonString(ASSIGNED_OWNER.toString())
+                );
+        return new SpawnerCapturedArtifactReleaseIntent(
+                "release-click-orphan",
+                ACTOR,
+                "world",
+                2,
+                stack("capture-device-filled", sourceMetadata),
+                stack("capture-device-empty", new BsonDocument()),
+                ASSIGNED_OWNER,
+                "Assigned owner",
+                null
+        );
     }
 
     private SpawnerCapturedArtifactReleaseIntent releasedPublicIntent(
@@ -848,7 +902,9 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
         findProfile(ProfileId profileId) {
             profileReads++;
             return CompletableFuture.completedFuture(
-                    PersistenceReadResult.found(profile, 1L)
+                    profile == null
+                            ? PersistenceReadResult.absent()
+                            : PersistenceReadResult.found(profile, 1L)
             );
         }
 
@@ -857,7 +913,7 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
         findProfile(NpcAlias alias) {
             aliasReads++;
             return CompletableFuture.completedFuture(
-                    profile.currentAlias() != null
+                    profile != null && profile.currentAlias() != null
                             && profile.currentAlias().alias().equals(alias)
                             ? PersistenceReadResult.found(profile, 1L)
                             : PersistenceReadResult.absent()

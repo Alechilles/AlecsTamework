@@ -42,6 +42,7 @@ public final class SqlitePersistenceTransactionContext {
     private final CommandRosterPort commandRosters;
     private final TimedSummonLeasePort timedSummons;
     private final ProvisioningPort provisioning;
+    private final SqlitePublicImportEvidenceReader publicImports;
 
     public SqlitePersistenceTransactionContext(@Nonnull Connection connection) {
         if (connection == null) {
@@ -63,6 +64,7 @@ public final class SqlitePersistenceTransactionContext {
         commandRosters = new SqliteCommandRosterStore(connection);
         timedSummons = new SqliteTimedSummonLeaseStore(connection);
         provisioning = new SqliteProvisioningStore(connection);
+        publicImports = new SqlitePublicImportEvidenceReader(connection);
     }
 
     @Nonnull
@@ -147,6 +149,10 @@ public final class SqlitePersistenceTransactionContext {
     @Nonnull
     ProvisioningPort provisioning() {
         return provisioning;
+    }
+
+    boolean hasSupportedPublicImport() {
+        return publicImports.hasSupportedImport();
     }
 
 }

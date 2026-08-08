@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.capture;
 
+import com.alechilles.alecstamework.companion.identity.CompanionIdentityJsonCodec;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
@@ -85,6 +86,12 @@ public final class CompanionCaptureReleaseDefinition
                     encodeModernRecovery(payload.modernRecovery())
             );
         }
+        if (payload.orphanRecovery() != null) {
+            json.add(
+                    "orphanRecovery",
+                    encodeOrphanRecovery(payload.orphanRecovery())
+            );
+        }
         return json.toString();
     }
 
@@ -126,6 +133,42 @@ public final class CompanionCaptureReleaseDefinition
                         ? decodeModernRecovery(
                                 json.getAsJsonObject("modernRecovery")
                         )
+                        : null,
+                json.has("orphanRecovery")
+                        && !json.get("orphanRecovery").isJsonNull()
+                        ? decodeOrphanRecovery(
+                                json.getAsJsonObject("orphanRecovery")
+                        )
+                        : null
+        );
+    }
+
+    private JsonObject encodeOrphanRecovery(
+            CaptureReleaseOrphanRecoveryEvidence evidence
+    ) {
+        JsonObject json = new JsonObject();
+        json.add(
+                "initialIdentity",
+                CompanionIdentityJsonCodec.encode(evidence.initialIdentity())
+        );
+        if (evidence.initialOwner() != null) {
+            json.addProperty(
+                    "initialOwner", evidence.initialOwner().toString()
+            );
+        }
+        return json;
+    }
+
+    private CaptureReleaseOrphanRecoveryEvidence decodeOrphanRecovery(
+            JsonObject json
+    ) {
+        return new CaptureReleaseOrphanRecoveryEvidence(
+                CompanionIdentityJsonCodec.decode(
+                        json.getAsJsonObject("initialIdentity")
+                ),
+                json.has("initialOwner")
+                        && !json.get("initialOwner").isJsonNull()
+                        ? OwnerId.parse(json.get("initialOwner").getAsString())
                         : null
         );
     }
