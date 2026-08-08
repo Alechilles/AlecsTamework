@@ -1,7 +1,7 @@
 $C = "Common.ui";
 
 Group #TameworkLinkedPanelRoot {
-    Anchor: (Top: 290, Left: 96, Width: 562, Height: 640);
+    Anchor: (Top: 290, Left: 0, Width: 562, Height: 640);
     Visible: false;
 
     $C.@DecoratedContainer #TameworkLinkedPanelContainer {

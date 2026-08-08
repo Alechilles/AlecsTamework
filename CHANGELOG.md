@@ -8,6 +8,8 @@
 - Fixed the generic command-flute `Cycle Group` hotswap so it persists its
   newly selected group, made each hotswap selector clickable across its full
   visible control, and centered the command HUD glyphs inside their frames.
+- Fixed the linked-companion panel overlapping the command radial at common
+  smaller screen widths.
 
 ### Added
 - Added a lower-right command-flute action HUD with vanilla-aligned Link,
