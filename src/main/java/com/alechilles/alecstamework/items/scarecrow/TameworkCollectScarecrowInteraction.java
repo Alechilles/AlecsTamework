@@ -12,7 +12,6 @@ import com.hypixel.hytale.server.core.entity.entities.BlockEntity;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
-import com.hypixel.hytale.server.core.modules.entity.item.ItemComponent;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.CooldownHandler;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.SimpleInstantInteraction;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -72,8 +71,6 @@ public final class TameworkCollectScarecrowInteraction extends SimpleInstantInte
             return;
         }
 
-        ItemComponent itemComponent = commandBuffer.getComponent(targetRef, ItemComponent.getComponentType());
-        itemComponent.setRemovedByPlayerPickup(true);
         commandBuffer.removeEntity(targetRef, RemoveReason.REMOVE);
         Player.notifyPickupItem(actorRef, returnedItem, targetTransform.getPosition(), commandBuffer);
     }
@@ -83,17 +80,13 @@ public final class TameworkCollectScarecrowInteraction extends SimpleInstantInte
             CommandBuffer<EntityStore> commandBuffer
     ) {
         BlockEntity blockEntity = commandBuffer.getComponent(targetRef, BlockEntity.getComponentType());
-        ItemComponent itemComponent = commandBuffer.getComponent(targetRef, ItemComponent.getComponentType());
         TransformComponent transform = commandBuffer.getComponent(targetRef, TransformComponent.getComponentType());
         SpawnSuppressionComponent suppression = commandBuffer.getComponent(
                 targetRef,
                 SpawnSuppressionComponent.getComponentType()
         );
-        ItemStack itemStack = itemComponent != null ? itemComponent.getItemStack() : null;
         return blockEntity != null
                 && ScarecrowIds.ITEM_ID.equals(blockEntity.getBlockTypeKey())
-                && itemStack != null
-                && ScarecrowIds.ITEM_ID.equals(itemStack.getItemId())
                 && transform != null
                 && suppression != null
                 && ScarecrowIds.SUPPRESSION_ID.equals(suppression.getSpawnSuppression());

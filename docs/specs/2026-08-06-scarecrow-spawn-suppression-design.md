@@ -27,7 +27,7 @@ Hytale includes the same asset pattern in `Server/NPC/Spawn/Suppression/Spawn_Ca
 
 ### Placement
 
-The player uses `Tamework_Scarecrow` on the top of a loaded solid surface. Placement centers the scarecrow on that surface and rotates it to face the player.
+The player uses `Tamework_Scarecrow` on the top of a loaded solid surface. A native deployable preview shows the stock placeholder model at its exact final position and continuous yaw, and placement preserves that preview transform.
 
 Before consuming the item, placement validates all of the following:
 
@@ -62,7 +62,7 @@ Overlapping scarecrows require no special Tamework cache. Hytale tracks each sup
 
 ### Collection
 
-Interacting with a scarecrow collects it after normal entity-interaction reach validation. Collection verifies that the target carries the exact Tamework suppression asset ID before acting. The first release does not add a separate ownership or claim-provider bridge, so block-only claim integrations do not automatically gate placement or collection of the entity prop.
+Looking at a scarecrow shows a localized hold-to-remove prompt. Holding the interaction for one second completes collection after normal entity-interaction reach validation. Collection verifies that the target carries the exact Tamework suppression asset ID before acting. The first release does not add a separate ownership or claim-provider bridge, so block-only claim integrations do not automatically gate placement or collection of the entity prop.
 
 The entity is removed through the current ECS command boundary. Hytale then releases its UUID from the suppression controller and nearby spawn markers. One scarecrow item is returned to the player's inventory; if the inventory cannot accept it, the scarecrow remains in place. No separate scarecrow ownership system is introduced.
 
