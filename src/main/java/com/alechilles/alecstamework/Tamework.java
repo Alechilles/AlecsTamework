@@ -227,6 +227,7 @@ import com.alechilles.alecstamework.npc.network.MountedRidePacketHandler;
 import com.alechilles.alecstamework.npc.systems.MountedRideRiderCleanupSystem;
 import com.alechilles.alecstamework.npc.systems.MountedRideRiderFollowSystem;
 import com.alechilles.alecstamework.npc.systems.ShoulderRideNpcFollowSystem;
+import com.alechilles.alecstamework.npc.systems.ShoulderRidePlayerTeleportSystem;
 import com.alechilles.alecstamework.npc.systems.ShoulderRideNpcStateSystem;
 import com.alechilles.alecstamework.npc.systems.NpcDebugDisplayResumeOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.NpcMountedNameplateVisibilitySystem;
@@ -235,6 +236,7 @@ import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
 import com.hypixel.hytale.assetstore.event.RemovedAssetsEvent;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
+import com.hypixel.hytale.builtin.mounts.MountedByComponent;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
@@ -892,6 +894,14 @@ public class Tamework extends JavaPlugin {
                             Invulnerable.getComponentType(),
                             Frozen.getComponentType(),
                             MovementStatesComponent.getComponentType())
+            );
+            getEntityStoreRegistry().registerSystem(
+                    new ShoulderRidePlayerTeleportSystem(
+                            Player.getComponentType(),
+                            Teleport.getComponentType(),
+                            MountedByComponent.getComponentType(),
+                            mountedComponentType,
+                            shoulderRideComponentType)
             );
         }
         getEntityStoreRegistry().registerSystem(
