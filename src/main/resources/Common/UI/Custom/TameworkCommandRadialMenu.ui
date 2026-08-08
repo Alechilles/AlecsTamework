@@ -164,11 +164,26 @@ $C.@PageOverlay {
       }
 
       Label { Anchor: (Top: 6, Height: 20); Text: "Q"; Style: (FontSize: 15, RenderBold: true, TextColor: #d6e0ec); }
-      DropdownBox #TameworkCommandHotswapQ { Anchor: (Top: 2, Height: 38, Width: 180); Style: $C.@DefaultDropdownBoxStyle; }
+      DropdownBox #TameworkCommandHotswapQ {
+        Anchor: (Top: 2, Height: 28, Width: 180);
+        Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
+        MaxSelection: 1;
+        NoItemsText: "No commands";
+      }
       Label { Anchor: (Top: 8, Height: 20); Text: "E"; Style: (FontSize: 15, RenderBold: true, TextColor: #d6e0ec); }
-      DropdownBox #TameworkCommandHotswapE { Anchor: (Top: 2, Height: 38, Width: 180); Style: $C.@DefaultDropdownBoxStyle; }
+      DropdownBox #TameworkCommandHotswapE {
+        Anchor: (Top: 2, Height: 28, Width: 180);
+        Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
+        MaxSelection: 1;
+        NoItemsText: "No commands";
+      }
       Label { Anchor: (Top: 8, Height: 20); Text: "R"; Style: (FontSize: 15, RenderBold: true, TextColor: #d6e0ec); }
-      DropdownBox #TameworkCommandHotswapR { Anchor: (Top: 2, Height: 38, Width: 180); Style: $C.@DefaultDropdownBoxStyle; }
+      DropdownBox #TameworkCommandHotswapR {
+        Anchor: (Top: 2, Height: 28, Width: 180);
+        Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
+        MaxSelection: 1;
+        NoItemsText: "No commands";
+      }
     }
 
     TextButton #CommandButton0 {

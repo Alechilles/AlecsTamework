@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.config.assets;
 
+import com.hypixel.hytale.codec.ExtraInfo;
 import java.lang.reflect.Field;
+import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -56,12 +58,20 @@ class TwCommandItemConfigSelectionTest {
 
     @Test
     void commandEntriesRemainRadialVisibleUnlessExplicitlyHidden() throws Exception {
-        TwCommandItemConfig.CommandEntry defaultEntry = commandWithId("Follow");
-        TwCommandItemConfig.CommandEntry hiddenEntry = commandWithId("Hold");
-        setField(hiddenEntry, "showInRadial", false);
+        TwCommandItemConfig config = TwCommandItemConfig.CODEC.decode(
+                BsonDocument.parse("""
+                        {
+                          "CommandList": [
+                            { "Id": "Follow" },
+                            { "Id": "Hold", "ShowInRadial": false }
+                          ]
+                        }
+                        """),
+                new ExtraInfo()
+        );
 
-        assertEquals(true, defaultEntry.isShowInRadial());
-        assertEquals(false, hiddenEntry.isShowInRadial());
+        assertEquals(true, config.findCommandById("Follow").isShowInRadial());
+        assertEquals(false, config.findCommandById("Hold").isShowInRadial());
     }
 
     private TwCommandItemConfig configWithCommands(String... ids) throws Exception {
