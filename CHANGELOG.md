@@ -5,17 +5,15 @@
 ### Fixed
 - Fixed `/tw showspawnbeacons` visualization proxies being hidden from players
   in Adventure mode.
-- Fixed the scarecrow's normal place action creating an ordinary decorative
-  block instead of the spawn-suppressing entity. Scarecrows placed by the
-  broken build must be broken and placed again after updating.
 
 ### Added
 - Added `/tw showspawnbeacons [radius|off]` to reveal nearby loaded natural
   spawn beacons with their configured model and nameplate without changing
   beacon spawning behavior.
-- Added a placeable scarecrow with a 32-block automatic spawn-marker radius
-  and native chunk-granular world-spawn suppression. Manual marker triggers,
-  explicit mod spawns, and existing NPCs remain unaffected.
+- Added a full-size placeable scarecrow with an exact-angle placement preview,
+  a one-second hold-to-remove interaction, a 32-block automatic spawn-marker
+  radius, and native chunk-granular world-spawn suppression. Manual marker
+  triggers, explicit mod spawns, and existing NPCs remain unaffected.
 - Added a shared attitude target for tamed companions, letting dependent mods
   opt their companion groups into retaliation from player-hostile creatures
   without replacing base-game attitude assets.

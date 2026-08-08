@@ -10,7 +10,7 @@ items.Tamework_Command_Whistle_Example.description=Verknüpft Haustiere und erte
 items.Tamework_Flightmasters_Talisman.name=Flightmaster's Talisman
 items.Tamework_Flightmasters_Talisman.description=Channels a transformed dragon's upward flaps, forward boosts, and airbraking.
 items.Tamework_Scarecrow.name=Scarecrow
-items.Tamework_Scarecrow.description=Pauses automatic markers within 32 blocks and ordinary mob spawns in intersecting chunks. Use it again to collect it.
+items.Tamework_Scarecrow.description=Pauses automatic markers within 32 blocks and ordinary mob spawns in intersecting chunks. Look at it and hold the prompted key for one second to remove it.
 tamework.scarecrow.invalidSurface=The scarecrow needs a solid surface.
 tamework.scarecrow.occupied=There is not enough room for the scarecrow.
 tamework.scarecrow.itemChanged=The held scarecrow changed before it could be placed.
@@ -30,6 +30,7 @@ interactionHints.harvest=Drücke [{key}] zum Ernten
 interactionHints.harvestContext=Benutze ein Item zum Ernten
 interactionHints.emptyTrough=Halte [{key}], um den Trog zu leeren
 interactionHints.openTrough=Drücke [{key}] zum Öffnen des Trogs
+interactionHints.removeScarecrow=Halte [{key}], um die Vogelscheuche zu entfernen.
 
 # === Tamework Betäubung ===
 items.Weapon_Shortbow_Tranquilizer.name=Betäubungs-Kurzbogen

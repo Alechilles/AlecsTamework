@@ -1,3 +1,9 @@
 {
-  "Type": "TameworkCollectScarecrow"
+  "Type": "Charging",
+  "DisplayProgress": true,
+  "Next": {
+    "1.0": {
+      "Type": "TameworkCollectScarecrow"
+    }
+  }
 }
