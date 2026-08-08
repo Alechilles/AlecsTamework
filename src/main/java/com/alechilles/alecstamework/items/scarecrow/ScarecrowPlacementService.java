@@ -46,7 +46,8 @@ public final class ScarecrowPlacementService {
             @Nonnull Vector3d actorPosition
     ) {
         Objects.requireNonNull(actorPosition, "actorPosition");
-        if (!hasValidAssets()) {
+        String blockTypeKey = resolveBlockTypeKey();
+        if (blockTypeKey == null) {
             return new Preparation(Status.INVALID_ASSET, null);
         }
         WorldChunk chunk = world != null
@@ -65,7 +66,7 @@ public final class ScarecrowPlacementService {
         if (hasScarecrowAt(world, placement.position())) {
             return new Preparation(Status.OCCUPIED, null);
         }
-        return new Preparation(Status.SUCCESS, createHolder(placement));
+        return new Preparation(Status.SUCCESS, createHolder(placement, blockTypeKey));
     }
 
     @Nonnull
@@ -80,14 +81,15 @@ public final class ScarecrowPlacementService {
     }
 
     @Nonnull
-    static EntityComponents buildComponents(@Nonnull Placement placement) {
+    static EntityComponents buildComponents(@Nonnull Placement placement, @Nonnull String blockTypeKey) {
         Objects.requireNonNull(placement, "placement");
+        Objects.requireNonNull(blockTypeKey, "blockTypeKey");
         Interactions interactions = new Interactions(
                 Map.of(InteractionType.Use, ScarecrowIds.COLLECT_ROOT_INTERACTION_ID)
         );
         interactions.setInteractionHint(ScarecrowIds.REMOVE_INTERACTION_HINT);
         return new EntityComponents(
-                new BlockEntity(ScarecrowIds.ITEM_ID),
+                new BlockEntity(blockTypeKey),
                 new TransformComponent(placement.position(), placement.rotation()),
                 new EntityScaleComponent(BLOCK_ENTITY_SCALE),
                 PropComponent.get(),
@@ -98,8 +100,11 @@ public final class ScarecrowPlacementService {
     }
 
     @Nonnull
-    private static Holder<EntityStore> createHolder(@Nonnull Placement placement) {
-        EntityComponents components = buildComponents(placement);
+    private static Holder<EntityStore> createHolder(
+            @Nonnull Placement placement,
+            @Nonnull String blockTypeKey
+    ) {
+        EntityComponents components = buildComponents(placement, blockTypeKey);
         Holder<EntityStore> holder = EntityStore.REGISTRY.newHolder();
         holder.addComponent(BlockEntity.getComponentType(), components.blockEntity());
         holder.addComponent(TransformComponent.getComponentType(), components.transform());
@@ -111,15 +116,20 @@ public final class ScarecrowPlacementService {
         return holder;
     }
 
-    private static boolean hasValidAssets() {
+    /** Resolves the inherited block key that the block-entity tracker can send to clients. */
+    @Nullable
+    private static String resolveBlockTypeKey() {
         Item item = Item.getAssetMap().getAsset(ScarecrowIds.ITEM_ID);
         if (item == null || !item.hasBlockType() || item.getBlockId() == null) {
-            return false;
+            return null;
         }
-        BlockType blockType = BlockType.getAssetMap().getAsset(item.getBlockId());
+        String blockTypeKey = item.getBlockId();
+        BlockType blockType = BlockType.getAssetMap().getAsset(blockTypeKey);
         return blockType != null
                 && blockType != BlockType.UNKNOWN
-                && SpawnSuppression.getAssetMap().getAsset(ScarecrowIds.SUPPRESSION_ID) != null;
+                && SpawnSuppression.getAssetMap().getAsset(ScarecrowIds.SUPPRESSION_ID) != null
+                ? blockTypeKey
+                : null;
     }
 
     private static boolean isOpen(WorldChunk chunk, int blockX, int blockY, int blockZ) {
