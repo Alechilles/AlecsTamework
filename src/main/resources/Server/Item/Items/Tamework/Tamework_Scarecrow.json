@@ -5,6 +5,12 @@
     "Name": "server.items.Tamework_Scarecrow.name",
     "Description": "server.items.Tamework_Scarecrow.description"
   },
+  "BlockType": {
+    "Interactions": {
+      "Use": "Root_Tamework_Scarecrow_Collect"
+    },
+    "InteractionHint": "server.interactionHints.removeScarecrow"
+  },
   "Interactions": {
     "Secondary": {
       "Interactions": [
