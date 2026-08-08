@@ -44,6 +44,15 @@ Typical item wiring:
     "Interactions": [
       { "Type": "TameworkCommand", "CommandId": "OpenSelectionMenu" }
     ]
+  },
+  "Ability1": {
+    "Interactions": [ { "Type": "TameworkCommandHotswap", "Slot": "Q" } ]
+  },
+  "Ability2": {
+    "Interactions": [ { "Type": "TameworkCommandHotswap", "Slot": "E" } ]
+  },
+  "Ability3": {
+    "Interactions": [ { "Type": "TameworkCommandHotswap", "Slot": "R" } ]
   }
 }
 ```
@@ -51,6 +60,10 @@ Typical item wiring:
 Overrides:
 - `OpenSelectionMenu`
 - `CycleSelection`
+
+Command flutes must define all three ability interactions above. The command-menu
+hotswap assignment is stored per item stack, but the item asset owns the physical
+Q/E/R ability bindings.
 
 ### Bundled example and acquisition boundary
 

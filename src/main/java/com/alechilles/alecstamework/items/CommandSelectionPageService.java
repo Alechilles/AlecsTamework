@@ -364,8 +364,8 @@ final class CommandSelectionPageService {
         );
         page.configureShoulderRideCallback(shoulderRideCallback(context));
         page.configureHotswapAssignments(
-                () -> toolInventoryService.findToolStack(context.player(), context.toolId()),
-                (slot, commandId) -> toolInventoryService.mutateToolStack(
+                () -> toolInventoryService.findActiveToolStack(context.player(), context.toolId()),
+                (slot, commandId) -> toolInventoryService.mutateActiveToolStack(
                         context.player(), context.toolId(), stack ->
                                 new CommandHotswapAssignmentStore().write(stack, slot, commandId))
         );

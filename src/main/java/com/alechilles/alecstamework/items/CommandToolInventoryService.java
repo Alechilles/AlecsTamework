@@ -253,10 +253,52 @@ final class CommandToolInventoryService {
             if (updated == null || updated == stack) {
                 return false;
             }
-            hotbar.setItemStackForSlot(slot, updated);
-            return true;
+            ItemStackSlotTransaction transaction = hotbar.setItemStackForSlot(slot, updated);
+            return transaction != null && transaction.succeeded();
         }
         return false;
+    }
+
+    /**
+     * Returns the currently equipped command flute when it is the same physical
+     * item that opened the command menu.
+     */
+    ItemStack findActiveToolStack(Player player, String toolId) {
+        if (player == null || toolId == null || toolId.isBlank()) {
+            return null;
+        }
+        ItemContainer hotbar = PlayerInventoryAccess.getHotbar(player);
+        if (hotbar == null) {
+            return null;
+        }
+        byte slot = PlayerInventoryAccess.getActiveHotbarSlot(player);
+        if (slot < 0) {
+            return null;
+        }
+        ItemStack stack = hotbar.getItemStack(slot);
+        if (stack == null || stack.isEmpty()) {
+            return null;
+        }
+        String stackToolId = stack.getFromMetadataOrNull(
+                TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING
+        );
+        return toolId.equals(stackToolId) ? stack : null;
+    }
+
+    /**
+     * Persists a menu setting to the equipped flute rather than the first
+     * matching stack found elsewhere in the hotbar.
+     */
+    boolean mutateActiveToolStack(Player player, String toolId, UnaryOperator<ItemStack> mutator) {
+        if (mutator == null) {
+            return false;
+        }
+        ItemStack stack = findActiveToolStack(player, toolId);
+        if (stack == null) {
+            return false;
+        }
+        ItemStack updated = mutator.apply(stack);
+        return updated != null && updated != stack && updateHeldItem(player, updated);
     }
 
     String resolvePanelModeValueForTool(Player player,
