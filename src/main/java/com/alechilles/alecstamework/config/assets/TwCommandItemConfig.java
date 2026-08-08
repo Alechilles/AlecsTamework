@@ -666,6 +666,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         String id;
         String displayName;
         String icon;
+        boolean showInRadial = true;
         boolean defaultCommand;
         CommandFeedback feedback;
         ModeMapping modeMapping;
@@ -681,6 +682,11 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public String getIcon() {
             return icon;
+        }
+
+        /** Whether this command is rendered in the bounded command radial. */
+        public boolean isShowInRadial() {
+            return showInRadial;
         }
 
         public boolean isDefaultCommand() {

@@ -95,6 +95,7 @@ import com.alechilles.alecstamework.debug.CompanionXpEventDebugLogService;
 import com.alechilles.alecstamework.debug.PlayerInputDebugProbe;
 import com.alechilles.alecstamework.debug.PlayerInputDebugSystem;
 import com.alechilles.alecstamework.interactions.TameworkCommandInteraction;
+import com.alechilles.alecstamework.interactions.TameworkCommandHotswapInteraction;
 import com.alechilles.alecstamework.interactions.TameworkCaptureChannelInteraction;
 import com.alechilles.alecstamework.interactions.TameworkClearFeedTroughWaterInteraction;
 import com.alechilles.alecstamework.interactions.TameworkFlightAirbrakeInteraction;
@@ -564,6 +565,8 @@ public class Tamework extends JavaPlugin {
         Interaction.CODEC.register("TameworkNameNpc", TameworkNameNpcInteraction.class, TameworkNameNpcInteraction.CODEC);
         // Register the custom item interaction used by command items.
         Interaction.CODEC.register("TameworkCommand", TameworkCommandInteraction.class, TameworkCommandInteraction.CODEC);
+        Interaction.CODEC.register("TameworkCommandHotswap", TameworkCommandHotswapInteraction.class,
+                TameworkCommandHotswapInteraction.CODEC);
         // Register the custom item interactions used by Flightmaster's Talisman controls.
         Interaction.CODEC.register(
                 "TameworkFlightFlap",

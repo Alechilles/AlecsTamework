@@ -54,6 +54,16 @@ class TwCommandItemConfigSelectionTest {
         assertEquals("Hold", found.getId());
     }
 
+    @Test
+    void commandEntriesRemainRadialVisibleUnlessExplicitlyHidden() throws Exception {
+        TwCommandItemConfig.CommandEntry defaultEntry = commandWithId("Follow");
+        TwCommandItemConfig.CommandEntry hiddenEntry = commandWithId("Hold");
+        setField(hiddenEntry, "showInRadial", false);
+
+        assertEquals(true, defaultEntry.isShowInRadial());
+        assertEquals(false, hiddenEntry.isShowInRadial());
+    }
+
     private TwCommandItemConfig configWithCommands(String... ids) throws Exception {
         TwCommandItemConfig config = new TwCommandItemConfig();
         TwCommandItemConfig.CommandEntry[] commands = new TwCommandItemConfig.CommandEntry[ids.length];

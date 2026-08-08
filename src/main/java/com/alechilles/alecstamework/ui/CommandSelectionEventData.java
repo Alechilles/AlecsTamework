@@ -8,6 +8,9 @@ import static com.alechilles.alecstamework.ui.CommandSelectionPageEventBinder.KE
 import static com.alechilles.alecstamework.ui.CommandSelectionPageEventBinder.KEY_PANEL_GROUP_ASSIGN_VALUE;
 import static com.alechilles.alecstamework.ui.CommandSelectionPageEventBinder.KEY_PANEL_MODE_VALUE;
 import static com.alechilles.alecstamework.ui.CommandSelectionPageEventBinder.KEY_PANEL_SORT_VALUE;
+import static com.alechilles.alecstamework.ui.CommandSelectionPageEventBinder.KEY_HOTSWAP_Q_VALUE;
+import static com.alechilles.alecstamework.ui.CommandSelectionPageEventBinder.KEY_HOTSWAP_E_VALUE;
+import static com.alechilles.alecstamework.ui.CommandSelectionPageEventBinder.KEY_HOTSWAP_R_VALUE;
 
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -59,6 +62,12 @@ public final class CommandSelectionEventData {
                     (event, value) -> event.panelGroupAssignValue = value,
                     event -> event.panelGroupAssignValue)
             .add()
+            .append(new KeyedCodec<>(KEY_HOTSWAP_Q_VALUE, Codec.STRING),
+                    (event, value) -> event.hotswapQValue = value, event -> event.hotswapQValue).add()
+            .append(new KeyedCodec<>(KEY_HOTSWAP_E_VALUE, Codec.STRING),
+                    (event, value) -> event.hotswapEValue = value, event -> event.hotswapEValue).add()
+            .append(new KeyedCodec<>(KEY_HOTSWAP_R_VALUE, Codec.STRING),
+                    (event, value) -> event.hotswapRValue = value, event -> event.hotswapRValue).add()
             .build();
 
     String commandId;
@@ -69,4 +78,7 @@ public final class CommandSelectionEventData {
     String panelFilterTextInput;
     String panelGroupActiveValue;
     String panelGroupAssignValue;
+    String hotswapQValue;
+    String hotswapEValue;
+    String hotswapRValue;
 }
