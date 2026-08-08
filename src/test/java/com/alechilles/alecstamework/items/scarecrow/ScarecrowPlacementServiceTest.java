@@ -34,9 +34,9 @@ class ScarecrowPlacementServiceTest {
         );
 
         ScarecrowPlacementService.EntityComponents components =
-                ScarecrowPlacementService.buildComponents(placement);
+                ScarecrowPlacementService.buildComponents(placement, "Deco_Scarecrow");
 
-        assertEquals(ScarecrowIds.ITEM_ID, components.blockEntity().getBlockTypeKey());
+        assertEquals("Deco_Scarecrow", components.blockEntity().getBlockTypeKey());
         assertEquals(placement.position(), components.transform().getPosition());
         assertEquals(2.0f, components.scale().getScale());
         assertSame(PropComponent.get(), components.prop());
