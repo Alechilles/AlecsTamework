@@ -20,11 +20,14 @@ import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Builds and opens the command selection page from focused panel services and bound actions.
  */
 final class CommandSelectionPageService {
+    private static final Logger LOGGER = Logger.getLogger(CommandSelectionPageService.class.getName());
     private final CommandToolInventoryService toolInventoryService;
     private final CommandGroupAssignPageService groupAssignPageService;
     private final CommandResolutionService resolutionService;
@@ -204,12 +207,18 @@ final class CommandSelectionPageService {
                  BooleanSupplier genericCallbackAuthority,
                  BondedLifecycleAuthority bondedLifecycleAuthority) {
         if (!canOpen(player, store, config, toolId, actions)) {
+            LOGGER.warning("[tw-command-menu] selection page prerequisites failed: config="
+                    + (config == null ? "null" : config.getId())
+                    + " commands=" + commandCount(config)
+                    + " toolId=" + toolId);
             return false;
         }
         Ref<EntityStore> playerRef = player.getReference();
         PlayerRef uiPlayerRef = player.getPlayerRef();
         if (playerRef == null || !playerRef.isValid()
                 || uiPlayerRef == null || !uiPlayerRef.isValid()) {
+            LOGGER.warning("[tw-command-menu] selection page player references are invalid: toolId="
+                    + toolId);
             return false;
         }
         TameworkCommandSelectionPage page = createPage(
@@ -661,6 +670,8 @@ final class CommandSelectionPageService {
             player.getPageManager().openCustomPage(playerRef, store, page);
             return true;
         } catch (Throwable throwable) {
+            LOGGER.log(Level.WARNING,
+                    "[tw-command-menu] selection page open failed", throwable);
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "ui_page_open_failed",
                     throwable,
@@ -673,6 +684,13 @@ final class CommandSelectionPageService {
             );
             return false;
         }
+    }
+
+    private static int commandCount(TwCommandItemConfig config) {
+        if (config == null || config.getCommandList() == null) {
+            return 0;
+        }
+        return config.getCommandList().length;
     }
 
     record Actions(Consumer<UUID> unlink,

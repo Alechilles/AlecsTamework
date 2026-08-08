@@ -42,6 +42,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.List;
 import java.util.UUID;
+import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import java.util.function.Supplier;
 
@@ -49,6 +50,7 @@ import java.util.function.Supplier;
  * Handles command-item linking and command dispatch.
  */
 public final class CommandItemFeatureHandler {
+    private static final Logger LOGGER = Logger.getLogger(CommandItemFeatureHandler.class.getName());
     private static final double DEFAULT_RAYCAST_DISTANCE = 64.0;
     private static final double HYBRID_TELEPORT_DISTANCE_THRESHOLD = 96.0;
     private static final double HYBRID_PATH_DISTANCE_BEFORE_TELEPORT = 24.0;
@@ -503,6 +505,11 @@ public final class CommandItemFeatureHandler {
                 callbackAuthority.bindGeneric(working, config);
         if (CommandRosterStorageBoundary.allowsGenericRosterActions(config)
                 && genericBinding == null) {
+            LOGGER.warning("[tw-command-menu] denied generic menu open: item="
+                    + (working == null ? "null" : working.getItemId())
+                    + " config=" + config.getId()
+                    + " toolId=" + toolId
+                    + " registryRevision=" + callbackAuthority.revision());
             return false;
         }
         long openedRegistryRevision = callbackAuthority.revision();
