@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.1.0 - Command Hotswaps, Spawn Controls, and Recovery - Unreleased
+## 3.1.0 - Command Hotswaps, Spawn Controls, and Recovery - 2026-08-08
 
 ### Added
 - Added a lower-right command-flute HUD with Link, Command Menu, and assignable
