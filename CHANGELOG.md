@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.1.1 - NPC Startup Ordering Hotfix - 2026-08-09
+
+### Fixed
+- Fixed a startup ordering failure where Tamework could initialize before
+  Hytale's NPC plugin had registered the NPC component type.
+
 ## 3.1.0 - Command Hotswaps, Spawn Controls, and Recovery - 2026-08-08
 
 ### Added
@@ -22,8 +28,6 @@
   while keeping mouse look and charge release available.
 
 ### Fixed
-- Fixed a startup ordering failure where Tamework could initialize before
-  Hytale's NPC plugin had registered the NPC component type.
 - Prevented runtime bonded-companion database failures from crashing worlds;
   bonded features now fail closed for the session and emit one privacy-safe
   telemetry diagnostic comparing startup and failure-time storage state.
