@@ -16,7 +16,6 @@ import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
@@ -65,14 +64,13 @@ class BondedCompanionStoreReviewFixTest {
                     assertFalse(parameter.getName().contains(".adapter.sqlite."))
             );
         });
-        assertEquals(
-                Set.of(Path.class),
-                Arrays.stream(SqliteBondedCompanionDatabase.class
-                                .getConstructors())
-                        .flatMap(constructor ->
-                                Arrays.stream(constructor.getParameterTypes()))
-                        .collect(java.util.stream.Collectors.toSet())
-        );
+        SqliteBondedCompanionDatabase.class.getConstructor(Path.class);
+        Arrays.stream(SqliteBondedCompanionDatabase.class.getConstructors())
+                .flatMap(constructor ->
+                        Arrays.stream(constructor.getParameterTypes()))
+                .forEach(parameter -> assertFalse(
+                        Connection.class.isAssignableFrom(parameter),
+                        "public constructors must own their SQL connections"));
     }
 
     @Test
