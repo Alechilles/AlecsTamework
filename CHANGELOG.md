@@ -10,10 +10,10 @@
 - Added `/tw showspawnbeacons [radius|off]` to reveal nearby loaded natural
   spawn beacons with their configured model and nameplate without changing
   beacon spawning behavior.
-- Added a full-size placeable scarecrow with a one-second hold-to-remove
-  interaction, a 32-block automatic spawn-marker
-  radius, and native chunk-granular world-spawn suppression. Manual marker
-  triggers, explicit mod spawns, and existing NPCs remain unaffected.
+- Added a purple-hatted scarecrow that uses native block placement and
+  breaking, suppresses automatic spawn markers within 32 blocks, and applies
+  native chunk-granular world-spawn suppression. Manual marker triggers,
+  explicit mod spawns, and existing NPCs remain unaffected.
 - Added a shared attitude target for tamed companions, letting dependent mods
   opt their companion groups into retaliation from player-hostile creatures
   without replacing base-game attitude assets.
