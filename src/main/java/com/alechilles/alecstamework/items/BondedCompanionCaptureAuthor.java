@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import java.util.Objects;
+import java.util.function.BiConsumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -12,6 +13,7 @@ public final class BondedCompanionCaptureAuthor {
     private final Cleanup cleanup;
     private final BondedCompanionCaptureFeedbackDispatcher feedback;
     private final Diagnostics diagnostics;
+    private final BiConsumer<String, Throwable> storageFailures;
 
     public BondedCompanionCaptureAuthor(
             @Nonnull Policy policy,
@@ -20,7 +22,8 @@ public final class BondedCompanionCaptureAuthor {
             @Nonnull BondedCompanionCaptureFeedbackDispatcher feedback
     ) {
         this(BondedCompanionCaptureReplayGateway.unavailable(), policy,
-                persistence, cleanup, feedback, (intent, failure) -> {});
+                persistence, cleanup, feedback, (intent, failure) -> {},
+                (operation, failure) -> { });
     }
 
     public BondedCompanionCaptureAuthor(
@@ -31,7 +34,8 @@ public final class BondedCompanionCaptureAuthor {
             @Nonnull Diagnostics diagnostics
     ) {
         this(BondedCompanionCaptureReplayGateway.unavailable(), policy,
-                persistence, cleanup, feedback, diagnostics);
+                persistence, cleanup, feedback, diagnostics,
+                (operation, failure) -> { });
     }
 
     /** Creates the production author with durable pre-policy replay evidence. */
@@ -43,12 +47,28 @@ public final class BondedCompanionCaptureAuthor {
             @Nonnull BondedCompanionCaptureFeedbackDispatcher feedback,
             @Nonnull Diagnostics diagnostics
     ) {
+        this(replays, policy, persistence, cleanup, feedback, diagnostics,
+                (operation, failure) -> { });
+    }
+
+    /** Creates the production author with runtime storage-failure observation. */
+    public BondedCompanionCaptureAuthor(
+            @Nonnull BondedCompanionCaptureReplayGateway replays,
+            @Nonnull Policy policy,
+            @Nonnull Persistence persistence,
+            @Nonnull Cleanup cleanup,
+            @Nonnull BondedCompanionCaptureFeedbackDispatcher feedback,
+            @Nonnull Diagnostics diagnostics,
+            @Nonnull BiConsumer<String, Throwable> storageFailures
+    ) {
         this.replays = Objects.requireNonNull(replays, "replays");
         this.policy = Objects.requireNonNull(policy, "policy");
         this.persistence = Objects.requireNonNull(persistence, "persistence");
         this.cleanup = Objects.requireNonNull(cleanup, "cleanup");
         this.feedback = Objects.requireNonNull(feedback, "feedback");
         this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
+        this.storageFailures = Objects.requireNonNull(
+                storageFailures, "storageFailures");
     }
 
     /** Authors one capture without touching generic persistence or roster APIs. */
@@ -124,6 +144,7 @@ public final class BondedCompanionCaptureAuthor {
                     ? BondedCompanionCaptureReplayGateway.LookupResult.failed()
                     : value;
         } catch (RuntimeException failure) {
+            storageFailures.accept("capture_replay_read", failure);
             return BondedCompanionCaptureReplayGateway.LookupResult.failed();
         }
     }
@@ -161,6 +182,7 @@ public final class BondedCompanionCaptureAuthor {
                     null
             );
         } catch (RuntimeException failure) {
+            storageFailures.accept("capture_policy_read", failure);
             return new PolicyCheck(PolicyDecision.REJECTED, failure);
         }
     }
@@ -178,6 +200,7 @@ public final class BondedCompanionCaptureAuthor {
                     ? BondedCompanionCaptureReplayGateway.ExactResult.failed()
                     : value;
         } catch (RuntimeException failure) {
+            storageFailures.accept("capture_replay_read", failure);
             return BondedCompanionCaptureReplayGateway.ExactResult.failed();
         }
     }
@@ -187,6 +210,7 @@ public final class BondedCompanionCaptureAuthor {
             PersistenceOutcome value = persistence.store(intent);
             return value == null ? PersistenceOutcome.FAILED : value;
         } catch (RuntimeException failure) {
+            storageFailures.accept("capture_write", failure);
             return PersistenceOutcome.FAILED;
         }
     }
@@ -196,6 +220,7 @@ public final class BondedCompanionCaptureAuthor {
             CleanupOutcome value = cleanup.initiate(intent);
             return value == null ? CleanupOutcome.RETRY_PENDING : value;
         } catch (RuntimeException failure) {
+            storageFailures.accept("capture_cleanup", failure);
             return CleanupOutcome.RETRY_PENDING;
         }
     }

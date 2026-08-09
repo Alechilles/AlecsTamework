@@ -180,6 +180,28 @@
             "reason": { "type": "string", "maxLength": 120 }
           }
         },
+        "bonded_persistence_runtime_failed": {
+          "allowedFields": {
+            "service": { "type": "enum", "values": ["bonded"] },
+            "operation": { "type": "enum", "values": ["maintenance", "active_lease_read", "world_load", "player_transfer", "player_logout", "confirmed_death", "display_name_read", "expiry_effect_read", "api_read", "api_capture_read", "api_operation", "world_lease_read", "owner_lease_read", "owner_world_lease_read", "exact_lease_read", "projection_write", "operation_read", "operation_write", "capture_policy_read", "capture_replay_read", "capture_write", "capture_cleanup", "capture_event_publish"] },
+            "reason": { "type": "string", "maxLength": 120 },
+            "failureClass": { "type": "string", "maxLength": 120 },
+            "failureReason": { "type": "enum", "values": ["missing_table", "locked", "busy", "disk_io", "read_only", "storage_full", "corrupt", "cannot_open", "constraint", "unknown"] },
+            "baselineFileState": { "type": "enum", "values": ["missing", "empty", "present", "not_regular", "unreadable"] },
+            "baselineSizeBucket": { "type": "enum", "values": ["0", "1-4k", "4-64k", "64k-1m", "1m+", "unavailable"] },
+            "failureFileState": { "type": "enum", "values": ["missing", "empty", "present", "not_regular", "unreadable"] },
+            "failureSizeBucket": { "type": "enum", "values": ["0", "1-4k", "4-64k", "64k-1m", "1m+", "unavailable"] },
+            "identityComparison": { "type": "enum", "values": ["same", "changed", "unavailable"] },
+            "sizeComparison": { "type": "enum", "values": ["same", "decreased", "increased", "unavailable"] },
+            "modifiedComparison": { "type": "enum", "values": ["same", "decreased", "increased", "unavailable"] },
+            "walPresent": { "type": "boolean" },
+            "shmPresent": { "type": "boolean" },
+            "schemaStatus": { "type": "enum", "values": ["ready", "failed"] },
+            "schemaDiagnostic": { "type": "string", "maxLength": 120 },
+            "sqlErrorCode": { "type": "number" },
+            "sqlState": { "type": "string", "maxLength": 40 }
+          }
+        },
         "persistence_legacy_import_failed": {
           "allowedFields": {
             "service": { "type": "enum", "values": ["runtime"] },

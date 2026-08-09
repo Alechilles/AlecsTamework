@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import javax.annotation.Nonnull;
 
 /** Public connection-owning SQLite implementation of the bonded domain store. */
@@ -36,9 +37,19 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
 
     /** Creates a safe store that owns every connection and transaction. */
     public SqliteBondedCompanionDatabase(@Nonnull Path databasePath) {
+        this(databasePath, (operation, failure) -> { });
+    }
+
+    /** Creates a store that reports operation failures before result conversion. */
+    public SqliteBondedCompanionDatabase(
+            @Nonnull Path databasePath,
+            @Nonnull BiConsumer<String, Throwable> storageFailures
+    ) {
         connections = new SqliteConnectionFactory(
                 Objects.requireNonNull(databasePath, "databasePath"));
-        operations = new SqliteBondedCompanionOperationExecutor(connections);
+        operations = new SqliteBondedCompanionOperationExecutor(
+                connections, Objects.requireNonNull(
+                        storageFailures, "storageFailures"));
         captureEvents = new SqliteBondedCompanionCaptureEvidenceAccess(
                 connections);
         deletions = new SqliteBondedCompanionProfileDeletion(connections, mapper);

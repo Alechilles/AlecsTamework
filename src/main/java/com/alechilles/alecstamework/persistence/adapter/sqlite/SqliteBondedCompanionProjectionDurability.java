@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -44,18 +45,30 @@ public final class SqliteBondedCompanionProjectionDurability implements
             new BondedCompanionSnapshotCodec();
     private final SqliteBondedCompanionSummonWriter summons =
             new SqliteBondedCompanionSummonWriter();
+    private final BiConsumer<String, Throwable> storageFailures;
 
     public SqliteBondedCompanionProjectionDurability(
             @Nonnull Path databasePath
     ) {
+        this(databasePath, (operation, failure) -> { });
+    }
+
+    /** Creates durability that reports transaction failures before returning false. */
+    public SqliteBondedCompanionProjectionDurability(
+            @Nonnull Path databasePath,
+            @Nonnull BiConsumer<String, Throwable> storageFailures
+    ) {
         connections = new SqliteConnectionFactory(
                 Objects.requireNonNull(databasePath, "databasePath")
         );
+        this.storageFailures = Objects.requireNonNull(
+                storageFailures, "storageFailures");
         leaseReader = new SqliteBondedCompanionLeaseReader(connections);
         cleanupReplay = new SqliteBondedCompanionCleanupReplay(connections);
         startupSettlement = new SqliteBondedCompanionStartupSettlement(
                 connections);
-        operations = new SqliteBondedCompanionOperationExecutor(connections);
+        operations = new SqliteBondedCompanionOperationExecutor(
+                connections, storageFailures);
     }
 
     @Override
@@ -454,6 +467,7 @@ public final class SqliteBondedCompanionProjectionDurability implements
             if (applied) connection.commit(); else connection.rollback();
             return applied;
         } catch (Exception failure) {
+            storageFailures.accept("projection_write", failure);
             if (connection != null) {
                 try { connection.rollback(); } catch (Exception ignored) { }
             }

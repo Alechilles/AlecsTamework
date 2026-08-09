@@ -144,6 +144,7 @@ import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
 import com.alechilles.alecstamework.localization.ModLanguageDiscovery;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.metrics.CrashTelemetryService;
+import com.alechilles.alecstamework.metrics.BondedCompanionPersistenceTelemetry;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.metrics.TameworkHStatsIntegration;
 import com.alechilles.alecstamework.persistence.runtime.player.TameworkInventoryOperationReceiptsComponent;
@@ -992,7 +993,8 @@ public class Tamework extends JavaPlugin {
                 bondedCompanionRosterRegistry,
                 getLogger(),
                 System::currentTimeMillis,
-                apiEventBus::publishPersistenceEvent
+                apiEventBus::publishPersistenceEvent,
+                BondedCompanionPersistenceTelemetry::recordRuntimeFailure
         );
         getEntityStoreRegistry().registerSystem(
                 new BondedCompanionMaintenanceSystem(

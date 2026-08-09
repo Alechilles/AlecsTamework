@@ -28,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -56,6 +57,7 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter
             new BondedCompanionCaptureRequestIdentity();
     private final SqliteBondedCompanionMapper mapper =
             new SqliteBondedCompanionMapper();
+    private final BiConsumer<String, Throwable> storageFailures;
 
     public SqliteBondedCompanionCapturePersistenceAdapter(
             @Nonnull BondedCompanionRosterRegistry rosters,
@@ -67,7 +69,7 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter
     ) {
         this(
                 rosters, transitions, profiles, database, durability, cleanup,
-                null
+                null, (operation, failure) -> { }
         );
     }
 
@@ -80,6 +82,21 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter
             @Nonnull BondedCompanionProjectionCleanupService cleanup,
             @Nullable BondedCompanionCaptureEventPublisher captureEvents
     ) {
+        this(rosters, transitions, profiles, database, durability, cleanup,
+                captureEvents, (operation, failure) -> { });
+    }
+
+    /** Creates an adapter that reports storage exceptions before fallback results. */
+    public SqliteBondedCompanionCapturePersistenceAdapter(
+            @Nonnull BondedCompanionRosterRegistry rosters,
+            @Nonnull BondedCompanionTransitionService transitions,
+            @Nonnull BondedCompanionStore profiles,
+            @Nonnull SqliteBondedCompanionDatabase database,
+            @Nonnull SqliteBondedCompanionProjectionDurability durability,
+            @Nonnull BondedCompanionProjectionCleanupService cleanup,
+            @Nullable BondedCompanionCaptureEventPublisher captureEvents,
+            @Nonnull BiConsumer<String, Throwable> storageFailures
+    ) {
         this.rosters = Objects.requireNonNull(rosters, "rosters");
         this.transitions = Objects.requireNonNull(transitions, "transitions");
         this.profiles = Objects.requireNonNull(profiles, "profiles");
@@ -87,6 +104,8 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter
         this.durability = Objects.requireNonNull(durability, "durability");
         this.cleanup = Objects.requireNonNull(cleanup, "cleanup");
         this.captureEvents = captureEvents;
+        this.storageFailures = Objects.requireNonNull(
+                storageFailures, "storageFailures");
     }
 
     /** Validates current policy and capacity without mutating durable state. */
@@ -173,6 +192,7 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter
                     attemptEvidence(evidence), evidence.roleId(),
                     evidence.familyId(), evidence.sourceWorldKey(), snapshot));
         } catch (RuntimeException failure) {
+            storageFailures.accept("capture_replay_read", failure);
             return LookupResult.failed();
         }
     }
@@ -206,6 +226,7 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter
             }
             return ExactResult.failed();
         } catch (RuntimeException failure) {
+            storageFailures.accept("capture_replay_read", failure);
             return ExactResult.failed();
         }
     }
@@ -277,7 +298,8 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter
         if (captureEvents == null) return;
         try {
             captureEvents.publishPending(64);
-        } catch (RuntimeException | LinkageError ignored) {
+        } catch (RuntimeException | LinkageError failure) {
+            storageFailures.accept("capture_event_publish", failure);
             // The committed capture authority remains pending for replay.
         }
     }

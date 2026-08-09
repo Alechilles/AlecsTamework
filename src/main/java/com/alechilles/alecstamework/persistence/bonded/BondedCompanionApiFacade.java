@@ -27,6 +27,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
@@ -42,6 +43,7 @@ public final class BondedCompanionApiFacade
     private final BondedCompanionChangePublisher changes;
     private final BondedCompanionDiagnosticContributor diagnostics;
     private final BondedCompanionCoreApiOperations operations;
+    private final BiConsumer<String, Throwable> storageFailures;
     private final AtomicBoolean closed = new AtomicBoolean();
 
     public BondedCompanionApiFacade(
@@ -54,7 +56,8 @@ public final class BondedCompanionApiFacade
         this(
                 readiness, store, changes, diagnostics, operations,
                 store instanceof BondedCompanionCaptureEvidenceStore evidence
-                        ? evidence : null
+                        ? evidence : null,
+                (operation, failure) -> { }
         );
     }
 
@@ -66,6 +69,20 @@ public final class BondedCompanionApiFacade
             @Nonnull BondedCompanionCoreApiOperations operations,
             BondedCompanionCaptureEvidenceStore captureEvidence
     ) {
+        this(readiness, store, changes, diagnostics, operations,
+                captureEvidence, (operation, failure) -> { });
+    }
+
+    /** Creates a facade that reports runtime storage exceptions before converting them. */
+    public BondedCompanionApiFacade(
+            @Nonnull Supplier<BondedCompanionPersistenceReadiness> readiness,
+            @Nonnull BondedCompanionStore store,
+            @Nonnull BondedCompanionChangePublisher changes,
+            @Nonnull BondedCompanionDiagnosticContributor diagnostics,
+            @Nonnull BondedCompanionCoreApiOperations operations,
+            BondedCompanionCaptureEvidenceStore captureEvidence,
+            @Nonnull BiConsumer<String, Throwable> storageFailures
+    ) {
         this.readiness = Objects.requireNonNull(readiness, "readiness");
         this.rosterReader = new BondedCompanionRosterReader(
                 Objects.requireNonNull(store, "store"));
@@ -73,6 +90,8 @@ public final class BondedCompanionApiFacade
         this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
         this.operations = Objects.requireNonNull(operations, "operations");
         this.captureEvidence = captureEvidence;
+        this.storageFailures = Objects.requireNonNull(
+                storageFailures, "storageFailures");
     }
 
     @Override
@@ -109,6 +128,7 @@ public final class BondedCompanionApiFacade
                     .toList();
             return completed(profileViews);
         } catch (RuntimeException failure) {
+            storageFailures.accept("api_read", failure);
             diagnostics.recordFailure(
                     BondedCompanionDiagnosticSnapshot.FailureCategory.STORAGE
             );
@@ -146,6 +166,7 @@ public final class BondedCompanionApiFacade
                             BondedCompanionResultCode.NOT_FOUND,
                             "bonded-capture-evidence-not-found"));
         } catch (RuntimeException failure) {
+            storageFailures.accept("api_capture_read", failure);
             diagnostics.recordFailure(
                     BondedCompanionDiagnosticSnapshot.FailureCategory.STORAGE
             );
@@ -238,6 +259,7 @@ public final class BondedCompanionApiFacade
             return failed(BondedCompanionResultCode.VALIDATION_FAILED,
                     "bonded-request-invalid");
         } catch (RuntimeException failure) {
+            storageFailures.accept("api_operation", failure);
             diagnostics.recordFailure(
                     BondedCompanionDiagnosticSnapshot.FailureCategory.STORAGE
             );
@@ -267,6 +289,9 @@ public final class BondedCompanionApiFacade
                     completion.complete(result);
                     return;
                 }
+                if (failure != null) {
+                    storageFailures.accept("api_operation", failure);
+                }
                 diagnostics.recordFailure(
                         BondedCompanionDiagnosticSnapshot.FailureCategory.STORAGE
                 );
@@ -279,6 +304,7 @@ public final class BondedCompanionApiFacade
             return failed(BondedCompanionResultCode.VALIDATION_FAILED,
                     "bonded-request-invalid");
         } catch (RuntimeException | LinkageError failure) {
+            storageFailures.accept("api_operation", failure);
             diagnostics.recordFailure(
                     BondedCompanionDiagnosticSnapshot.FailureCategory.STORAGE
             );

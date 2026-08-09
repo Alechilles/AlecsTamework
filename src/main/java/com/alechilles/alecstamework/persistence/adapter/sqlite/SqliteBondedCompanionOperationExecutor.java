@@ -14,6 +14,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Optional;
+import java.util.Objects;
+import java.util.function.BiConsumer;
 
 /** Owns idempotency claims, domain translation, and terminal operation proof. */
 final class SqliteBondedCompanionOperationExecutor {
@@ -21,11 +23,21 @@ final class SqliteBondedCompanionOperationExecutor {
     private final SqliteConnectionFactory connections;
     private final SqliteBondedCompanionOperationClaims claims =
             new SqliteBondedCompanionOperationClaims();
+    private final BiConsumer<String, Throwable> storageFailures;
 
     SqliteBondedCompanionOperationExecutor(
             SqliteConnectionFactory connections
     ) {
-        this.connections = connections;
+        this(connections, (operation, failure) -> { });
+    }
+
+    SqliteBondedCompanionOperationExecutor(
+            SqliteConnectionFactory connections,
+            BiConsumer<String, Throwable> storageFailures
+    ) {
+        this.connections = Objects.requireNonNull(connections, "connections");
+        this.storageFailures = Objects.requireNonNull(
+                storageFailures, "storageFailures");
     }
 
     <R, D> Optional<BondedCompanionStoreResult<D>> find(
@@ -38,6 +50,7 @@ final class SqliteBondedCompanionOperationExecutor {
             return existing.map(claim -> replay(
                     claim, storedType, translation));
         } catch (SQLException failure) {
+            storageFailures.accept("operation_read", failure);
             throw new IllegalStateException("bonded-operation-read-failed", failure);
         }
     }
@@ -52,6 +65,7 @@ final class SqliteBondedCompanionOperationExecutor {
             return existing.map(claim -> replay(
                     claim, storedType, translation));
         } catch (SQLException failure) {
+            storageFailures.accept("operation_read", failure);
             throw new IllegalStateException("bonded-operation-read-failed", failure);
         }
     }
@@ -132,6 +146,9 @@ final class SqliteBondedCompanionOperationExecutor {
                     lowLevel, translation);
             if (result.code()
                     == BondedCompanionStoreResult.Code.STORAGE_FAILURE) {
+                storageFailures.accept("operation_write", new SQLException(
+                        result.reason() == null
+                                ? "bonded-storage-failure" : result.reason()));
                 connection.rollback();
                 return result;
             }
@@ -140,6 +157,7 @@ final class SqliteBondedCompanionOperationExecutor {
             connection.commit();
             return result;
         } catch (Exception failure) {
+            storageFailures.accept("operation_write", failure);
             rollback(connection, failure);
             return new BondedCompanionStoreResult<>(
                     BondedCompanionStoreResult.Code.STORAGE_FAILURE, null,

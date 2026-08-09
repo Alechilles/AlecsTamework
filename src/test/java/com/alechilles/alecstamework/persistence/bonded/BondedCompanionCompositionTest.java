@@ -17,9 +17,11 @@ import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 import com.alechilles.alecstamework.config.assets.TwBondedCompanionRosterConfig;
 import com.hypixel.hytale.codec.ExtraInfo;
 import java.lang.reflect.Field;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.ArrayList;
 import org.bson.BsonDocument;
 import com.alechilles.alecstamework.npc.components
         .TameworkProjectionIdentityComponent;
@@ -35,6 +37,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -119,6 +122,171 @@ class BondedCompanionCompositionTest {
             assertEquals(0L, operationCount(
                     database, "expired-operation"));
             assertEquals(1L, operationCount(database, "pinned-payment"));
+        } finally {
+            composition.close();
+        }
+    }
+
+    /** Regression: a replaced bonded database must not escape a world tick. */
+    @Test
+    void maintenanceFailsClosedAndReportsReplacedDatabaseOnce() throws Exception {
+        ArrayList<BondedCompanionStorageFailureEvidence> failures =
+                new ArrayList<>();
+        TameworkBondedCompanionComposition composition =
+                TameworkBondedCompanionComposition.open(
+                        temporaryDirectory,
+                        new BondedCompanionRosterRegistry(),
+                        null,
+                        () -> 10_000L,
+                        null,
+                        failures::add
+                );
+        Path database = temporaryDirectory.resolve(
+                BondedCompanionDataPath.FILE_NAME);
+        try {
+            replaceDatabase(database);
+
+            assertDoesNotThrow(() -> composition.maintenanceTick());
+            assertDoesNotThrow(() -> composition.maintenanceTick());
+
+            assertFalse(composition.api().availability().available());
+            assertEquals("bonded-runtime-storage-failed",
+                    composition.api().availability().reason());
+            assertEquals(1, failures.size());
+            assertEquals("maintenance", failures.getFirst().operation());
+            assertEquals("present", failures.getFirst().baselineFileState());
+            assertEquals("present", failures.getFirst().failureFileState());
+            assertEquals("decreased", failures.getFirst().sizeComparison());
+        } finally {
+            composition.close();
+        }
+    }
+
+    /** Regression: expiry-warning lease reads must fail closed on schema loss. */
+    @Test
+    void activeLeaseReadFailsClosedAndReportsReplacedDatabaseOnce()
+            throws Exception {
+        ArrayList<BondedCompanionStorageFailureEvidence> failures =
+                new ArrayList<>();
+        TameworkBondedCompanionComposition composition =
+                TameworkBondedCompanionComposition.open(
+                        temporaryDirectory,
+                        new BondedCompanionRosterRegistry(),
+                        null,
+                        () -> 10_000L,
+                        null,
+                        failures::add
+                );
+        Path database = temporaryDirectory.resolve(
+                BondedCompanionDataPath.FILE_NAME);
+        try {
+            replaceDatabase(database);
+
+            assertDoesNotThrow(() -> assertTrue(composition
+                    .activeLeasesInWorld("world-a", 64).isEmpty()));
+            assertDoesNotThrow(() -> composition.maintenanceTick());
+
+            assertFalse(composition.api().availability().available());
+            assertEquals(1, failures.size());
+            assertEquals("active_lease_read",
+                    failures.getFirst().operation());
+        } finally {
+            composition.close();
+        }
+    }
+
+    /** Regression: public API reads must disable a replaced database session. */
+    @Test
+    void apiReadFailsClosedAndReportsReplacedDatabaseOnce() throws Exception {
+        ArrayList<BondedCompanionStorageFailureEvidence> failures =
+                new ArrayList<>();
+        TameworkBondedCompanionComposition composition =
+                TameworkBondedCompanionComposition.open(
+                        temporaryDirectory,
+                        new BondedCompanionRosterRegistry(),
+                        null,
+                        () -> 10_000L,
+                        null,
+                        failures::add
+                );
+        Path database = temporaryDirectory.resolve(
+                BondedCompanionDataPath.FILE_NAME);
+        try {
+            replaceDatabase(database);
+
+            composition.api().list(UUID.randomUUID(), "default").join();
+
+            assertFalse(composition.api().availability().available());
+            assertEquals(1, failures.size());
+            assertEquals("api_read", failures.getFirst().operation());
+        } finally {
+            composition.close();
+        }
+    }
+
+    /** Regression: swallowed logout lease-read failures must disable persistence. */
+    @Test
+    void logoutFailsClosedWhenLeaseReaderSwallowsDatabaseFailure()
+            throws Exception {
+        ArrayList<BondedCompanionStorageFailureEvidence> failures =
+                new ArrayList<>();
+        TameworkBondedCompanionComposition composition =
+                TameworkBondedCompanionComposition.open(
+                        temporaryDirectory,
+                        new BondedCompanionRosterRegistry(),
+                        null,
+                        () -> 10_000L,
+                        null,
+                        failures::add
+                );
+        Path database = temporaryDirectory.resolve(
+                BondedCompanionDataPath.FILE_NAME);
+        UUID owner = UUID.randomUUID();
+        try {
+            composition.onPlayerAdded(owner, "world-a");
+            replaceDatabase(database);
+
+            assertDoesNotThrow(() -> composition.onPlayerLogout(owner));
+
+            assertFalse(composition.api().availability().available());
+            assertEquals(1, failures.size());
+            assertEquals("owner_world_lease_read",
+                    failures.getFirst().operation());
+        } finally {
+            composition.close();
+        }
+    }
+
+    /** Regression: converted SQLite write failures must still close the session. */
+    @Test
+    void apiMutationFailsClosedWhenStoreConvertsSqlExceptionToResult()
+            throws Exception {
+        ArrayList<BondedCompanionStorageFailureEvidence> failures =
+                new ArrayList<>();
+        TameworkBondedCompanionComposition composition =
+                TameworkBondedCompanionComposition.open(
+                        temporaryDirectory, rosterRegistry(), null,
+                        () -> 10_000L, null, failures::add
+                );
+        Path database = temporaryDirectory.resolve(
+                BondedCompanionDataPath.FILE_NAME);
+        try {
+            try (Connection blocker = new SqliteConnectionFactory(database)
+                    .openWriterConnection();
+                 var statement = blocker.createStatement()) {
+                statement.execute("BEGIN EXCLUSIVE");
+                composition.api().provision(
+                        new BondedCompanionProvisionRequest(
+                                "test", "failed-write", OWNER,
+                                "hydragon:dragons", "Tamed_Dragon_Fire",
+                                "Ember", "Dragon", "Female", Map.of()
+                        )).join();
+                statement.execute("ROLLBACK");
+            }
+
+            assertFalse(composition.api().availability().available());
+            assertEquals(1, failures.size());
+            assertEquals("operation_write", failures.getFirst().operation());
         } finally {
             composition.close();
         }
@@ -358,6 +526,11 @@ class BondedCompanionCompositionTest {
                 return row.getLong(1);
             }
         }
+    }
+
+    private void replaceDatabase(Path database) throws Exception {
+        Files.move(database, database.resolveSibling("bonded-backup.sqlite"));
+        Files.createFile(database);
     }
 
     private void rewriteOperationHash(

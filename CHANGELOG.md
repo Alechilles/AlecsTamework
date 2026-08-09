@@ -22,6 +22,9 @@
   while keeping mouse look and charge release available.
 
 ### Fixed
+- Prevented runtime bonded-companion database failures from crashing worlds;
+  bonded features now fail closed for the session and emit one privacy-safe
+  telemetry diagnostic comparing startup and failure-time storage state.
 - Fixed upgraded legacy scarecrow suppressors remaining active after the
   overlapping native scarecrow block was broken.
 - Fixed command-hotswap assignment, input, selection hitboxes, group cycling,

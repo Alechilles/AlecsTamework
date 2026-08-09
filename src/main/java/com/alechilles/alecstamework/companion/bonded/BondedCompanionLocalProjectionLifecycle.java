@@ -11,6 +11,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -31,6 +32,7 @@ public final class BondedCompanionLocalProjectionLifecycle {
     private final int maximumLeases;
     private final int maximumObservations;
     private final long inspectionTimeoutMs;
+    private final BiConsumer<String, Throwable> storageFailures;
 
     public BondedCompanionLocalProjectionLifecycle(
             @Nonnull BondedCompanionWorldLifecycleObserver observer,
@@ -40,7 +42,8 @@ public final class BondedCompanionLocalProjectionLifecycle {
             int maximumObservations
     ) {
         this(observer, leases, observations, maximumLeases,
-                maximumObservations, DEFAULT_INSPECTION_TIMEOUT);
+                maximumObservations, DEFAULT_INSPECTION_TIMEOUT,
+                (operation, failure) -> { });
     }
 
     public BondedCompanionLocalProjectionLifecycle(
@@ -50,6 +53,35 @@ public final class BondedCompanionLocalProjectionLifecycle {
             int maximumLeases,
             int maximumObservations,
             @Nonnull Duration inspectionTimeout
+    ) {
+        this(observer, leases, observations, maximumLeases,
+                maximumObservations, inspectionTimeout,
+                (operation, failure) -> { });
+    }
+
+    /** Creates a lifecycle that reports storage exceptions before safe fallbacks. */
+    public BondedCompanionLocalProjectionLifecycle(
+            @Nonnull BondedCompanionWorldLifecycleObserver observer,
+            @Nonnull LeaseSource leases,
+            @Nonnull ObservationSource observations,
+            int maximumLeases,
+            int maximumObservations,
+            @Nonnull BiConsumer<String, Throwable> storageFailures
+    ) {
+        this(observer, leases, observations, maximumLeases,
+                maximumObservations, DEFAULT_INSPECTION_TIMEOUT,
+                storageFailures);
+    }
+
+    /** Creates a lifecycle that reports storage exceptions before safe fallbacks. */
+    public BondedCompanionLocalProjectionLifecycle(
+            @Nonnull BondedCompanionWorldLifecycleObserver observer,
+            @Nonnull LeaseSource leases,
+            @Nonnull ObservationSource observations,
+            int maximumLeases,
+            int maximumObservations,
+            @Nonnull Duration inspectionTimeout,
+            @Nonnull BiConsumer<String, Throwable> storageFailures
     ) {
         this.observer = Objects.requireNonNull(observer, "observer");
         this.leases = Objects.requireNonNull(leases, "leases");
@@ -66,6 +98,8 @@ public final class BondedCompanionLocalProjectionLifecycle {
                     "inspection timeout must be positive");
         }
         this.inspectionTimeoutMs = Math.max(1L, timeout.toMillis());
+        this.storageFailures = Objects.requireNonNull(
+                storageFailures, "storageFailures");
     }
 
     /** Submits one conclusive-only inspection for leases owned by this world. */
@@ -250,6 +284,7 @@ public final class BondedCompanionLocalProjectionLifecycle {
                             worldKey, afterProfileId, maximumLeases),
                     "world leases").stream().filter(Objects::nonNull).toList());
         } catch (RuntimeException | LinkageError failure) {
+            storageFailures.accept("world_lease_read", failure);
             return List.of();
         }
     }
@@ -263,6 +298,7 @@ public final class BondedCompanionLocalProjectionLifecycle {
                             cursor == null ? null : cursor.profileId(), maximumLeases),
                     "owner leases").stream().filter(Objects::nonNull).toList());
         } catch (RuntimeException | LinkageError failure) {
+            storageFailures.accept("owner_lease_read", failure);
             return List.of();
         }
     }
@@ -277,6 +313,7 @@ public final class BondedCompanionLocalProjectionLifecycle {
                             afterProfileId, maximumLeases),
                     "owner world leases").stream().filter(Objects::nonNull).toList());
         } catch (RuntimeException | LinkageError failure) {
+            storageFailures.accept("owner_world_lease_read", failure);
             return List.of();
         }
     }
@@ -306,6 +343,7 @@ public final class BondedCompanionLocalProjectionLifecycle {
             return Objects.requireNonNull(
                     leases.exact(profileId, leaseToken), "exact lease");
         } catch (RuntimeException | LinkageError failure) {
+            storageFailures.accept("exact_lease_read", failure);
             return Optional.empty();
         }
     }
