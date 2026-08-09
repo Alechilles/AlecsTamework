@@ -1,24 +1,16 @@
 {
-  "$Comment": "Uses Deco_Scarecrow visuals as a replaceable stock placeholder.",
+  "$Comment": "Inherits the stock scarecrow model with a Tamework purple-hat texture.",
   "Parent": "Deco_Scarecrow",
   "TranslationProperties": {
     "Name": "server.items.Tamework_Scarecrow.name",
     "Description": "server.items.Tamework_Scarecrow.description"
   },
   "BlockType": {
-    "Interactions": {
-      "Use": "Root_Tamework_Scarecrow_Collect"
-    },
-    "InteractionHint": "server.interactionHints.removeScarecrow"
-  },
-  "Interactions": {
-    "Secondary": {
-      "Interactions": [
-        {
-          "Type": "TameworkPlaceScarecrow"
-        }
-      ]
-    }
-  },
-  "PlayerAnimationsId": "Item"
+    "CustomModelTexture": [
+      {
+        "Weight": 1,
+        "Texture": "Blocks/Tamework/Scarecrow_Texture.png"
+      }
+    ]
+  }
 }

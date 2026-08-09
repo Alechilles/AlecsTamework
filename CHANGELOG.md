@@ -8,9 +8,10 @@
 - Added an assignable `Cycle Group` hotswap for generic command rosters.
 - Added `/tw showspawnbeacons [radius|off]` to visualize nearby loaded natural
   spawn beacons without changing their spawning behavior.
-- Added a placeable scarecrow that suppresses automatic world spawns within 32
-  blocks while leaving manual markers, explicit mod spawns, and existing NPCs
-  unaffected.
+- Added a purple-hatted scarecrow that uses native block placement and breaking,
+  suppresses automatic spawn markers within 32 blocks, and applies native
+  chunk-granular world-spawn suppression. Manual markers, explicit mod spawns,
+  and existing NPCs remain unaffected.
 - Added a shared attitude target that lets dependent mods make player-hostile
   creatures, including Void Grubs, retaliate against supported companions.
 
@@ -22,8 +23,6 @@
 - Fixed command-hotswap assignment, input, selection hitboxes, group cycling,
   glyph alignment, and persistence, and prevented the linked-companion panel
   from overlapping the command radial at smaller screen widths.
-- Fixed scarecrow placement, presentation, collection, removal prompts, player
-  animation, and spawn-suppression registration.
 - Fixed spawn-beacon visualization lifecycle issues, including hidden proxies
   in Adventure mode and late publication after a world or session was removed.
 - Fixed recovery of stranded public-migration captures, including item-only
