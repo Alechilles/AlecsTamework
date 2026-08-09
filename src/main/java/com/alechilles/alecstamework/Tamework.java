@@ -135,6 +135,7 @@ import com.alechilles.alecstamework.items.NamingFeatureHandler;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
 import com.alechilles.alecstamework.items.TranquilizerRecipeVisibilityService;
+import com.alechilles.alecstamework.items.scarecrow.ScarecrowBlockEventSystems;
 import com.alechilles.alecstamework.items.scarecrow.TameworkCollectScarecrowInteraction;
 import com.alechilles.alecstamework.items.scarecrow.TameworkPlaceScarecrowInteraction;
 import com.alechilles.alecstamework.items.persistence.ImportedCompanionRecallRecovery;
@@ -1098,6 +1099,8 @@ public class Tamework extends JavaPlugin {
         );
         getEntityStoreRegistry().registerSystem(new CaptureChannelVfxSystem());
         getEntityStoreRegistry().registerSystem(new CaptureChannelSessionCleanupSystem());
+        getEntityStoreRegistry().registerSystem(new ScarecrowBlockEventSystems.Placed());
+        getEntityStoreRegistry().registerSystem(new ScarecrowBlockEventSystems.Broken());
         getEntityStoreRegistry().registerSystem(
                 new AvatarFlightSourceRecoverySystem(
                         avatarFlightSourceComponentType,
