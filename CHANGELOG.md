@@ -22,6 +22,8 @@
   while keeping mouse look and charge release available.
 
 ### Fixed
+- Fixed a startup ordering failure where Tamework could initialize before
+  Hytale's NPC plugin had registered the NPC component type.
 - Prevented runtime bonded-companion database failures from crashing worlds;
   bonded features now fail closed for the session and emit one privacy-safe
   telemetry diagnostic comparing startup and failure-time storage state.
