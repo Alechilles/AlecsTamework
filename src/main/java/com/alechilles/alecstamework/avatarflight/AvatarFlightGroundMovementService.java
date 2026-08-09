@@ -17,7 +17,8 @@ final class AvatarFlightGroundMovementService {
               @Nonnull CommandBuffer<EntityStore> commandBuffer,
               @Nonnull AvatarFlightComponent flight,
               double groundedMoveSpeed,
-              boolean grounded) {
+              boolean grounded,
+              boolean movementLocked) {
         MovementManager current = commandBuffer.getComponent(ref, MovementManager.getComponentType());
         PlayerRef playerRef = commandBuffer.getComponent(ref, PlayerRef.getComponentType());
         if (current == null || current.getSettings() == null || playerRef == null) {
@@ -33,7 +34,7 @@ final class AvatarFlightGroundMovementService {
         if (!flight.isGroundedMoveSpeedApplied()) {
             flight.captureGroundedBaseSpeed(settings.baseSpeed);
         }
-        float target = positiveFloat(groundedMoveSpeed, 8.0f);
+        float target = movementLocked ? 0.0f : positiveFloat(groundedMoveSpeed, 8.0f);
         if (approximately(settings.baseSpeed, target)) {
             return;
         }

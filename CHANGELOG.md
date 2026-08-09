@@ -18,6 +18,8 @@
 ### Changed
 - Updated the embedded Creditor library to 1.1.0 for improved version election
   and clearer credits-page tags.
+- Locked grounded directional movement while charging an avatar-flight launch,
+  while keeping mouse look and charge release available.
 
 ### Fixed
 - Fixed command-hotswap assignment, input, selection hitboxes, group cycling,

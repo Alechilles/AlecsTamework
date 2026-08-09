@@ -133,7 +133,8 @@ public final class AvatarFlightMovementSystem
                 config.getMovement().getGroundedMoveSpeed(),
                 output.mode() == AvatarFlightMode.GROUNDED
                         && controllerInput.onGround()
-                        && !controllerInput.inFluid()
+                        && !controllerInput.inFluid(),
+                input != null && input.isLaunchCharging()
         );
         spendAppliedVigour(flight, config, tuning, output, now);
         TransformComponent transform = commandBuffer.getComponent(ref, transformType);

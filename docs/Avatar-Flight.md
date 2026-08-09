@@ -23,6 +23,7 @@ On a clean disconnect, Tamework queues that cleanup on the player's world thread
 - Forward movement starts or resumes glide.
 - Mouse look controls heading and pitch.
 - Holding crouch on the ground charges a launch. Releasing after the minimum charge starts avatar flight with upward and forward launch impulse.
+- Grounded directional movement is locked while a launch is charging. Mouse look and charge release remain available.
 - Avatar flight starts only from a charged launch release, left-click flap, or Q boost from Flightmaster's Talisman. Normal jumps, double jumps, and walking off short ledges remain native grounded/falling movement until the player explicitly enters flight with those controls.
 - Left-click with Flightmaster's Talisman performs an upward flap. If avatar flight is not already active, the flap starts avatar flight first.
 - Right-click with Flightmaster's Talisman applies the airbrake.
@@ -86,6 +87,8 @@ Purchased companion talents can also tune the active avatar flight. These effect
 ## Launch
 
 Charged launch is the default takeoff path for avatar flight. With `Launch.PreferredInput` set to `CrouchHold`, holding crouch while grounded starts charging instead of feeding crouch into descent. Releasing before `Launch.MinChargeMs` cancels the launch, while releasing after the minimum applies a charge-scaled upward and forward impulse. If the player leaves the ground during the hold, the release can still apply the launch that began on the ground. Airborne crouch without an active grounded launch charge remains direct downward movement.
+
+While the avatar remains grounded during that charge, Tamework temporarily locks native directional movement so the player cannot scoot away from the charge position. Mouse look and charge release are unaffected, and Tamework does not cancel knockback or other physics-driven motion.
 
 Default charge timing is `500ms` to `3000ms` with a `0.65` exponent. That front-loads some launch strength after the minimum hold, while still rewarding longer charge time. Partial launches cost `1` Vigour by default, and launches at or above `Launch.FullChargeCostThreshold` cost `2`.
 
