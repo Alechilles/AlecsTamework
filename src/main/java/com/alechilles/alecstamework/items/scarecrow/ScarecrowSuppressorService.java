@@ -27,8 +27,6 @@ import org.joml.Vector3i;
 
 /** Maintains the invisible native spawn suppressor paired with each real scarecrow block. */
 public final class ScarecrowSuppressorService {
-    private static final double POSITION_EPSILON_SQUARED = 0.0001;
-
     private final ComponentType<EntityStore, TransformComponent> transformType;
     private final ComponentType<EntityStore, SpawnSuppressionComponent> suppressionType;
     private final ComponentType<EntityStore, UUIDComponent> uuidType;
@@ -97,7 +95,7 @@ public final class ScarecrowSuppressorService {
                     for (int index = 0; index < chunk.size(); index++) {
                         TransformComponent transform = chunk.getComponent(index, transformType);
                         SpawnSuppressionComponent suppression = chunk.getComponent(index, suppressionType);
-                        if (matches(transform, suppression, position)) {
+                        if (matchesBlockCell(transform, suppression, position)) {
                             Ref<EntityStore> reference = chunk.getReferenceTo(index);
                             commandBuffer.removeEntity(reference, RemoveReason.REMOVE);
                         }
@@ -112,7 +110,7 @@ public final class ScarecrowSuppressorService {
                 suppressorQuery,
                 (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> ignored) -> {
                     for (int index = 0; index < chunk.size() && !found[0]; index++) {
-                        found[0] = matches(
+                        found[0] = matchesBlockCell(
                                 chunk.getComponent(index, transformType),
                                 chunk.getComponent(index, suppressionType),
                                 position
@@ -123,7 +121,7 @@ public final class ScarecrowSuppressorService {
         return found[0];
     }
 
-    private static boolean matches(
+    private static boolean matchesBlockCell(
             TransformComponent transform,
             SpawnSuppressionComponent suppression,
             Vector3dc position
@@ -131,7 +129,9 @@ public final class ScarecrowSuppressorService {
         return transform != null
                 && suppression != null
                 && ScarecrowIds.SUPPRESSION_ID.equals(suppression.getSpawnSuppression())
-                && transform.getPosition().distanceSquared(position) < POSITION_EPSILON_SQUARED;
+                && Math.floor(transform.getPosition().x()) == Math.floor(position.x())
+                && Math.floor(transform.getPosition().y()) == Math.floor(position.y())
+                && Math.floor(transform.getPosition().z()) == Math.floor(position.z());
     }
 
     private static Vector3d suppressorPosition(Vector3i blockPosition) {

@@ -79,6 +79,20 @@ class ScarecrowSuppressorServiceTest {
         assertTrue(unrelated.isValid());
     }
 
+    /** Protects removal of pre-native-block suppressors stored just above the block floor. */
+    @Test
+    void removeAtDeletesLegacySuppressorInSameBlockCell() {
+        ScarecrowSuppressorService service = service();
+        Ref<EntityStore> legacy = addSuppressor(
+                new Vector3d(10.5, 21.01, 30.5),
+                ScarecrowIds.SUPPRESSION_ID
+        );
+
+        service.removeAt(store, new Vector3d(10.5, 21.5, 30.5));
+
+        assertFalse(legacy.isValid());
+    }
+
     private ScarecrowSuppressorService service() {
         return new ScarecrowSuppressorService(transformType, suppressionType, uuidType);
     }

@@ -20,6 +20,8 @@
   and clearer credits-page tags.
 
 ### Fixed
+- Fixed upgraded legacy scarecrow suppressors remaining active after the
+  overlapping native scarecrow block was broken.
 - Fixed command-hotswap assignment, input, selection hitboxes, group cycling,
   glyph alignment, and persistence, and prevented the linked-companion panel
   from overlapping the command radial at smaller screen widths.
