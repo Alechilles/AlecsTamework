@@ -100,6 +100,7 @@ This keeps the interaction authoring simple while preserving full custom behavio
 
 ## Related Pages
 - [TwInteractionConfig Reference](/mod/alecs-tamework/twinteractionconfig-reference)
+- [AvatarFlight NPC Integration Guide](/mod/alecs-tamework/avatarflight-npc-integration-guide)
 - [Projectile Combat and Hazard Interactions Guide](/mod/alecs-tamework/projectile-combat-and-hazard-interactions-guide)
 - [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference)
 - [Hooks, Bridges, and Optional Integrations](/mod/alecs-tamework/hooks-bridges-and-optional-integrations)
