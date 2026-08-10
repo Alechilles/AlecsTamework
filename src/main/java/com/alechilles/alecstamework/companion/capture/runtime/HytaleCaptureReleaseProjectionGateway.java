@@ -16,6 +16,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystems;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
@@ -102,7 +103,30 @@ final class HytaleCaptureReleaseProjectionGateway {
         }
         ComponentType<EntityStore, NonTicking<EntityStore>> nonTicking =
                 EntityStore.REGISTRY.getNonTickingComponentType();
-        store.tryRemoveComponent(target, nonTicking);
+        releaseRuntimeHold(
+                store,
+                target,
+                EntityTrackerSystems.Visible.getComponentType(),
+                nonTicking
+        );
+    }
+
+    static void releaseRuntimeHold(
+            Store<EntityStore> store,
+            Ref<EntityStore> target,
+            ComponentType<EntityStore, EntityTrackerSystems.Visible>
+                    visibleType,
+            ComponentType<EntityStore, NonTicking<EntityStore>> nonTickingType
+    ) {
+        if (store.getComponent(target, nonTickingType) == null) {
+            return;
+        }
+        // While held, viewer-side tracking can advance even though this
+        // entity's ticking update systems cannot send their initial state.
+        // Reset visibility before resuming so the tracker treats every
+        // current viewer as newly visible and sends the full component set.
+        store.tryRemoveComponent(target, visibleType);
+        store.tryRemoveComponent(target, nonTickingType);
     }
 
     private boolean hasExactMarker(Ref<EntityStore> target) {

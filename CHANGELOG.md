@@ -5,6 +5,8 @@
 ### Fixed
 - Fixed a startup ordering failure where Tamework could initialize before
   Hytale's NPC plugin had registered the NPC component type.
+- Fixed floating mode-switch text disappearing after a captured companion was
+  placed back into the world.
 
 ## 3.1.0 - Command Hotswaps, Spawn Controls, and Recovery - 2026-08-08
 
