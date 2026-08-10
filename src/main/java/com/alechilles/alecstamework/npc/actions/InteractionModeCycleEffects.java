@@ -57,24 +57,13 @@ final class InteractionModeCycleEffects {
         role.getStateSupport().setState(npcRef, next.state, resolveSetSubState(next.subState, defaultSub), store);
         if (next.message != null && !next.message.isBlank()) {
             String message = resolveMessage(next.message, player);
-            boolean emitted = InteractionModeMessageDelivery.deliver(
-                    message,
-                    showFloatingText,
-                    showUiMessage,
-                    new InteractionModeMessageDelivery.Channels() {
-                        @Override
-                        public boolean showFloatingText(String text) {
-                            return presentationEffects.showFloatingTextMessage(
-                                    text, npcRef, store, player
-                            );
-                        }
-
-                        @Override
-                        public boolean showUiMessage(String text) {
-                            return presentationEffects.applyUiMessage(text, player);
-                        }
-                    }
-            );
+            boolean emitted = false;
+            if (showFloatingText) {
+                emitted |= presentationEffects.showFloatingTextMessage(message, npcRef, store, player);
+            }
+            if (showUiMessage) {
+                emitted |= presentationEffects.applyUiMessage(message, player);
+            }
             if (emitted) {
                 owner.logDebug("ModeToggle: message=" + message);
             }
