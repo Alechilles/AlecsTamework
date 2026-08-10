@@ -43,7 +43,6 @@ dependencies {
     implementation telemetryCoordinates
     telemetryAssetPack telemetryCoordinates
     implementation "com.alechilles:patchwork-runtime:${patchworkVersion}"
-    implementation "com.alechilles:patchwork-standalone:${patchworkVersion}"
     implementation "curse.maven:creditor-1560961:${property('creditor_file_id')}"
     implementation "org.xerial:sqlite-jdbc:${property('sqlite_jdbc_version')}"
     implementation "org.slf4j:slf4j-api:${property('slf4j_version')}"
