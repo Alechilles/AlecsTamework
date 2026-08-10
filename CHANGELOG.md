@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.1.1 - NPC Startup Ordering Hotfix - 2026-08-09
+## 3.1.1 - NPC Startup Ordering Hotfix - 2026-08-10
 
 ### Fixed
 - Fixed a startup ordering failure where Tamework could initialize before
