@@ -20,6 +20,7 @@ public final class PublicPersistenceTargetOpener {
     private final PublicPersistenceImporter importer;
     private final LegacyDatPersistenceImporter datImporter;
     private final FreshReplacementTargetCreator fresh;
+    private final ExistingPublicImportQuarantineRepair quarantineRepair;
     private final PublicPersistenceSourceDiscovery sources =
             new PublicPersistenceSourceDiscovery();
 
@@ -34,6 +35,7 @@ public final class PublicPersistenceTargetOpener {
         importer = new PublicPersistenceImporter(clock);
         datImporter = new LegacyDatPersistenceImporter(clock);
         fresh = new FreshReplacementTargetCreator(clock);
+        quarantineRepair = new ExistingPublicImportQuarantineRepair(clock);
     }
 
     /**
@@ -81,6 +83,10 @@ public final class PublicPersistenceTargetOpener {
                         "replacement_target_not_regular_file"
                 );
             }
+            ArrayList<Path> candidates = new ArrayList<>();
+            candidates.add(targetDirectory);
+            candidates.addAll(sourceDirectories);
+            quarantineRepair.repair(target, candidates);
             return new PublicPersistenceTarget(
                     target,
                     PublicPersistenceTarget.Origin.EXISTING

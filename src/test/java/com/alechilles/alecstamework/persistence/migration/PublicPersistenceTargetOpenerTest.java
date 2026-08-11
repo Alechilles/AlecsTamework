@@ -313,6 +313,352 @@ class PublicPersistenceTargetOpenerTest {
         assertEquals(sourceBefore, evidence(legacyDirectory));
     }
 
+    @Test
+    void repairsLegacyFlagQuarantineInPlaceWithoutRollback()
+            throws Exception {
+        Path targetDirectory = Files.createDirectory(
+                tempDir.resolve("current")
+        );
+        Path historicalDirectory = Files.createDirectory(
+                tempDir.resolve("historical")
+        );
+        Path source = PersistenceFiles.legacyDatabase(historicalDirectory);
+        PersistenceConsolidationFixtureDatabase.materialize(
+                "public-v4-conflicting-flags.sql",
+                source
+        );
+        PublicPersistenceTargetOpener opener =
+                new PublicPersistenceTargetOpener(() -> -100);
+        PublicPersistenceTarget imported = opener.open(
+                targetDirectory,
+                List.of(targetDirectory, historicalDirectory)
+        );
+        simulateOlderQuarantinedImport(imported.databasePath());
+        Map<String, FileEvidence> sourceBefore = evidence(
+                historicalDirectory
+        );
+
+        PublicPersistenceTarget reopened = opener.open(
+                targetDirectory,
+                List.of(targetDirectory, historicalDirectory)
+        );
+
+        assertEquals(PublicPersistenceTarget.Origin.EXISTING, reopened.origin());
+        assertEquals(imported.databasePath(), reopened.databasePath());
+        assertEquals("DEAD_REVIVABLE", queryString(
+                reopened.databasePath(),
+                "SELECT lifecycle_state FROM companion_lifecycle"
+        ));
+        assertEquals(1, queryInt(reopened.databasePath(), """
+                SELECT revision FROM companion_lifecycle
+                """));
+        assertEquals("death", queryString(reopened.databasePath(), """
+                SELECT snapshot_kind FROM companion_snapshot
+                WHERE is_current = 1
+                """));
+        assertEquals("RELEASED", queryString(reopened.databasePath(), """
+                SELECT state FROM persistence_quarantine
+                """));
+        assertEquals("RESOLVED", queryString(reopened.databasePath(), """
+                SELECT state FROM persistence_incident
+                """));
+        assertEquals(sourceBefore, evidence(historicalDirectory));
+    }
+
+    @Test
+    void changedTargetProfileCannotReleaseAnExistingQuarantine()
+            throws Exception {
+        Path targetDirectory = Files.createDirectory(
+                tempDir.resolve("current")
+        );
+        Path historicalDirectory = Files.createDirectory(
+                tempDir.resolve("historical")
+        );
+        Path source = PersistenceFiles.legacyDatabase(historicalDirectory);
+        PersistenceConsolidationFixtureDatabase.materialize(
+                "public-v4-conflicting-flags.sql",
+                source
+        );
+        PublicPersistenceTargetOpener opener =
+                new PublicPersistenceTargetOpener(() -> -100);
+        PublicPersistenceTarget imported = opener.open(
+                targetDirectory,
+                List.of(targetDirectory, historicalDirectory)
+        );
+        simulateOlderQuarantinedImport(imported.databasePath());
+        try (var connection = DriverManager.getConnection(
+                "jdbc:sqlite:" + imported.databasePath()
+        ); var statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    UPDATE companion_profile
+                    SET metadata_revision = 1
+                    """);
+        }
+
+        opener.open(
+                targetDirectory,
+                List.of(targetDirectory, historicalDirectory)
+        );
+
+        assertEquals("UNRESOLVED", queryString(
+                imported.databasePath(),
+                "SELECT lifecycle_state FROM companion_lifecycle"
+        ));
+        assertEquals("ACTIVE", queryString(imported.databasePath(), """
+                SELECT state FROM persistence_quarantine
+                """));
+        assertEquals(0, queryInt(imported.databasePath(), """
+                SELECT COUNT(*) FROM companion_snapshot WHERE is_current = 1
+                """));
+    }
+
+    @Test
+    void exactSourceCanRestoreAnImportedCoopRelation() throws Exception {
+        String profileId = "20000000-0000-0000-0000-000000000005";
+        Path targetDirectory = Files.createDirectory(
+                tempDir.resolve("current")
+        );
+        Path historicalDirectory = Files.createDirectory(
+                tempDir.resolve("historical")
+        );
+        Path source = PersistenceFiles.legacyDatabase(historicalDirectory);
+        PersistenceConsolidationFixtureDatabase.materialize(
+                "public-v4-representative.sql",
+                source
+        );
+        addStaleCaptureFlagToCoopSource(source, profileId);
+        PublicPersistenceTargetOpener opener =
+                new PublicPersistenceTargetOpener(() -> -100);
+        PublicPersistenceTarget imported = opener.open(
+                targetDirectory,
+                List.of(targetDirectory, historicalDirectory)
+        );
+        simulateOlderCoopQuarantine(imported.databasePath(), profileId);
+
+        opener.open(
+                targetDirectory,
+                List.of(targetDirectory, historicalDirectory)
+        );
+
+        assertEquals("COOP", queryString(imported.databasePath(), """
+                SELECT lifecycle_state FROM companion_lifecycle
+                WHERE profile_id = '20000000-0000-0000-0000-000000000005'
+                """));
+        assertEquals(1, queryInt(imported.databasePath(), """
+                SELECT COUNT(*) FROM coop_residency
+                WHERE profile_id = '20000000-0000-0000-0000-000000000005'
+                """));
+        assertEquals("coop", queryString(imported.databasePath(), """
+                SELECT snapshot_kind FROM companion_snapshot
+                WHERE profile_id =
+                    '20000000-0000-0000-0000-000000000005'
+                  AND is_current = 1
+                """));
+        assertEquals("RELEASED", queryString(imported.databasePath(), """
+                SELECT state FROM persistence_quarantine
+                WHERE scope_key =
+                    '20000000-0000-0000-0000-000000000005'
+                """));
+    }
+
+    @Test
+    void inactiveNewerHistoryCannotReleaseAFlagQuarantine()
+            throws Exception {
+        Path targetDirectory = Files.createDirectory(
+                tempDir.resolve("current")
+        );
+        Path historicalDirectory = Files.createDirectory(
+                tempDir.resolve("historical")
+        );
+        Path source = PersistenceFiles.legacyDatabase(historicalDirectory);
+        PersistenceConsolidationFixtureDatabase.materialize(
+                "public-v4-conflicting-flags.sql",
+                source
+        );
+        try (var connection = DriverManager.getConnection(
+                "jdbc:sqlite:" + source
+        ); var statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    INSERT INTO npc_snapshots(
+                        profile_id, snapshot_type, snapshot_version,
+                        payload_json, is_active, created_at_ms
+                    ) VALUES (
+                        '21000000-0000-0000-0000-000000000001',
+                        'lost', 1, '{"lostAtMs":300}', 0, 300
+                    )
+                    """);
+            statement.executeUpdate("""
+                    UPDATE profile_states SET updated_at_ms = 300
+                    WHERE profile_id =
+                        '21000000-0000-0000-0000-000000000001'
+                    """);
+        }
+        PublicPersistenceTargetOpener opener =
+                new PublicPersistenceTargetOpener(() -> -100);
+        PublicPersistenceTarget imported = opener.open(
+                targetDirectory,
+                List.of(targetDirectory, historicalDirectory)
+        );
+
+        opener.open(
+                targetDirectory,
+                List.of(targetDirectory, historicalDirectory)
+        );
+
+        assertEquals("UNRESOLVED", queryString(
+                imported.databasePath(),
+                "SELECT lifecycle_state FROM companion_lifecycle"
+        ));
+        assertEquals("ACTIVE", queryString(imported.databasePath(), """
+                SELECT state FROM persistence_quarantine
+                """));
+        assertEquals(0, queryInt(imported.databasePath(), """
+                SELECT COUNT(*) FROM companion_snapshot WHERE is_current = 1
+                """));
+    }
+
+    private void addStaleCaptureFlagToCoopSource(
+            Path source,
+            String profileId
+    ) throws Exception {
+        try (var connection = DriverManager.getConnection(
+                "jdbc:sqlite:" + source
+        ); var snapshot = connection.prepareStatement("""
+                INSERT INTO npc_snapshots(
+                    profile_id, snapshot_type, snapshot_version,
+                    payload_json, is_active, created_at_ms
+                ) VALUES (?, 'capture', 1, '{"capturedAtMs":270}', 1, 270)
+                """); var state = connection.prepareStatement("""
+                UPDATE profile_states SET capture_active = 1
+                WHERE profile_id = ?
+                """)) {
+            snapshot.setString(1, profileId);
+            snapshot.executeUpdate();
+            state.setString(1, profileId);
+            state.executeUpdate();
+        }
+    }
+
+    private void simulateOlderCoopQuarantine(
+            Path database,
+            String profileId
+    ) throws Exception {
+        try (var connection = DriverManager.getConnection(
+                "jdbc:sqlite:" + database
+        )) {
+            connection.setAutoCommit(false);
+            try (var snapshots = connection.prepareStatement("""
+                    UPDATE companion_snapshot SET is_current = 0
+                    WHERE profile_id = ?
+                    """); var lifecycle = connection.prepareStatement("""
+                    UPDATE companion_lifecycle
+                    SET lifecycle_state = 'UNRESOLVED',
+                        location_kind = 'UNRESOLVED', location_key = NULL,
+                        revision = 0,
+                        quarantine_incident_id =
+                            '91000000-0000-0000-0000-000000000002'
+                    WHERE profile_id = ?
+                    """); var statement = connection.createStatement()) {
+                statement.executeUpdate("""
+                        INSERT INTO persistence_incident(
+                            incident_id, failure_kind, failure_code, state,
+                            summary, evidence_json, created_at_ms,
+                            resolved_at_ms
+                        ) VALUES (
+                            '91000000-0000-0000-0000-000000000002',
+                            'IMPORT_CONFLICT',
+                            'MUTUALLY_EXCLUSIVE_LIFECYCLE_FLAGS',
+                            'OPEN', 'Legacy coop import conflict', '{}',
+                            -100, NULL
+                        )
+                        """);
+                statement.executeUpdate("""
+                        DELETE FROM coop_residency
+                        WHERE profile_id =
+                            '20000000-0000-0000-0000-000000000005'
+                        """);
+                statement.executeUpdate("""
+                        UPDATE coop_slot SET residency_revision = 0
+                        WHERE coop_id = 'fixture-coop'
+                        """);
+                snapshots.setString(1, profileId);
+                snapshots.executeUpdate();
+                lifecycle.setString(1, profileId);
+                lifecycle.executeUpdate();
+                try (var quarantine = connection.prepareStatement("""
+                        INSERT INTO persistence_quarantine(
+                            scope_type, scope_key, incident_id, state,
+                            reason_code, created_at_ms, released_at_ms
+                        ) VALUES (
+                            'PROFILE', ?,
+                            '91000000-0000-0000-0000-000000000002',
+                            'ACTIVE',
+                            'MUTUALLY_EXCLUSIVE_LIFECYCLE_FLAGS',
+                            -100, NULL
+                        )
+                        """)) {
+                    quarantine.setString(1, profileId);
+                    quarantine.executeUpdate();
+                }
+                connection.commit();
+            } catch (Exception failure) {
+                connection.rollback();
+                throw failure;
+            }
+        }
+    }
+
+    private void simulateOlderQuarantinedImport(Path database)
+            throws Exception {
+        try (var connection = DriverManager.getConnection(
+                "jdbc:sqlite:" + database
+        ); var statement = connection.createStatement()) {
+            statement.executeUpdate(
+                    "UPDATE companion_snapshot SET is_current = 0"
+            );
+            statement.executeUpdate("""
+                    INSERT INTO persistence_incident(
+                        incident_id, failure_kind, failure_code, state,
+                        summary, evidence_json, created_at_ms, resolved_at_ms
+                    ) VALUES (
+                        '91000000-0000-0000-0000-000000000001',
+                        'IMPORT_CONFLICT',
+                        'MUTUALLY_EXCLUSIVE_LIFECYCLE_FLAGS',
+                        'OPEN',
+                        'Legacy import conflict',
+                        '{"conflicts":["MUTUALLY_EXCLUSIVE_LIFECYCLE_FLAGS"]}',
+                        -100,
+                        NULL
+                    )
+                    """);
+            statement.executeUpdate("""
+                    UPDATE companion_lifecycle
+                    SET lifecycle_state = 'UNRESOLVED',
+                        location_kind = 'UNRESOLVED',
+                        location_key = NULL,
+                        world_key = NULL,
+                        revision = 0,
+                        active_operation_id = NULL,
+                        last_reconciled_generation = 0,
+                        quarantine_incident_id =
+                            '91000000-0000-0000-0000-000000000001'
+                    """);
+            statement.executeUpdate("""
+                    INSERT INTO persistence_quarantine(
+                        scope_type, scope_key, incident_id, state,
+                        reason_code, created_at_ms, released_at_ms
+                    ) SELECT
+                        'PROFILE', profile_id,
+                        '91000000-0000-0000-0000-000000000001',
+                        'ACTIVE',
+                        'MUTUALLY_EXCLUSIVE_LIFECYCLE_FLAGS',
+                        -100,
+                        NULL
+                    FROM companion_profile
+                    """);
+        }
+    }
+
     private void executeFixture(Path database, String fixture)
             throws Exception {
         String sql;
@@ -354,6 +700,15 @@ class PublicPersistenceTargetOpenerTest {
         ); var statement = connection.createStatement();
              var rows = statement.executeQuery(sql)) {
             return rows.next() ? rows.getInt(1) : -1;
+        }
+    }
+
+    private String queryString(Path database, String sql) throws Exception {
+        try (var connection = DriverManager.getConnection(
+                "jdbc:sqlite:" + database
+        ); var statement = connection.createStatement();
+             var rows = statement.executeQuery(sql)) {
+            return rows.next() ? rows.getString(1) : null;
         }
     }
 

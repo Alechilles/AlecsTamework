@@ -18,6 +18,9 @@
 - New imports from older public Tamework databases now resolve stale lifecycle
   flags from the one newest complete evidence set. Tied or incomplete evidence
   remains quarantined.
+- Existing replacement databases now repair that same stale-flag quarantine in
+  place when the original, unchanged public database matches the committed
+  import fingerprint. No world or database rollback is required.
 - Quarantined roster entries now show as unavailable instead of unloaded and
   no longer offer a Recall or Dismiss control that cannot succeed.
 

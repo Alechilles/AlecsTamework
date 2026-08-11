@@ -322,6 +322,15 @@ Unloaded flow:
   one-use artifact and changes the entry to `LOST`, where normal Revive is
   available. Later lifecycle revisions, malformed or ownerless snapshots,
   Return Home, and unconfirmed physical transfers cannot use this recovery.
+- An older replacement database can contain profiles quarantined by stale
+  capture, death, Lost, or coop flags from the public database. On startup,
+  Tamework repairs each unchanged profile in place when the original public
+  database still matches the committed import fingerprint and the corrected
+  evidence has one unique newest complete state. The importer leaves that
+  source file untouched; it is read as evidence and is not restored over the
+  current database. No world or database rollback is required. Changed
+  profiles, missing or changed source evidence, tied timestamps, and incomplete
+  evidence remain quarantined.
 
 Lost flow:
 - A background timeout alone does not author durable `LOST`. A clean explicit
