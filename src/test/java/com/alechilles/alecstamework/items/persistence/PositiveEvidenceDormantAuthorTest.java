@@ -163,6 +163,25 @@ class PositiveEvidenceDormantAuthorTest {
     }
 
     @Test
+    void destructiveRemovalCapturesNpcLoadedBeforeStartupReconciliation() {
+        FakePersistence persistence = new FakePersistence(unloadedProfile());
+        PositiveEvidenceDormantAuthor author = author(
+                persistence,
+                reader(),
+                -450L
+        );
+
+        CompanionLifecycleAuthorResult result = author.makeDormant(intent(
+                DormantCompanionObservation.Evidence.DESTRUCTIVE_REMOVAL
+        )).toCompletableFuture().join();
+
+        assertTrue(result.published());
+        assertEquals(LifecycleState.LOST, persistence.request.targetState());
+        assertEquals(REVISION, persistence.request.expectedLifecycleRevision());
+        assertEquals(SOURCE, persistence.request.source().sourceAlias());
+    }
+
+    @Test
     void worldDeletionCorrectsAStaleCanonicalWorldForTheExactLiveAlias() {
         FakePersistence persistence = new FakePersistence(
                 profile("tamework_test", "old-world")
@@ -424,6 +443,30 @@ class PositiveEvidenceDormantAuthorTest {
         );
         return new CompanionProfileReadModel(
                 identity, alias, lifecycle, List.of(), List.of(), null
+        );
+    }
+
+    private CompanionProfileReadModel unloadedProfile() {
+        CompanionProfileReadModel active = profile();
+        CompanionLifecycle lifecycle = new CompanionLifecycle(
+                PROFILE,
+                null,
+                LifecycleState.UNLOADED,
+                LifecycleLocation.none(),
+                REVISION,
+                null,
+                -800L,
+                GENERATION,
+                null,
+                null
+        );
+        return new CompanionProfileReadModel(
+                active.identity(),
+                active.currentAlias(),
+                lifecycle,
+                List.of(),
+                List.of(),
+                null
         );
     }
 

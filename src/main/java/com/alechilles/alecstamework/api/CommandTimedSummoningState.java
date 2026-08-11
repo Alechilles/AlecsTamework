@@ -6,6 +6,7 @@ public enum CommandTimedSummoningState {
     RESTORING,
     ACTIVE,
     UNLOADED,
+    UNAVAILABLE,
     STORING,
     DEAD_REVIVABLE,
     LOST

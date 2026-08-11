@@ -457,6 +457,7 @@ tamework.ui.linkedPanel.revive.confirm=Revive
 tamework.ui.linkedPanel.roster.state=Roster state: {0}
 tamework.ui.linkedPanel.roster.state.active=Active
 tamework.ui.linkedPanel.roster.state.unloaded=Unloaded
+tamework.ui.linkedPanel.roster.state.unavailable=Unavailable - persistence repair required
 tamework.ui.linkedPanel.roster.state.restoring=Summoning
 tamework.ui.linkedPanel.roster.state.storing=Returning to roster
 tamework.ui.linkedPanel.roster.state.stored=Stored

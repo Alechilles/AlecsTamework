@@ -23,9 +23,11 @@ import com.alechilles.alecstamework.companion.provisioning.ProvisioningRecord;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
+import com.alechilles.alecstamework.persistence.kernel.TransactionReplayPolicy;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinitionRegistry;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.operation.PreparedOperation;
@@ -157,6 +159,58 @@ class SqliteCompanionDormantOperationsTest {
     }
 
     @Test
+    void explicitRecallExhaustionMakesExactUnloadedProfileRestorable()
+            throws Exception {
+        transitionToUnloaded();
+        CompanionDormantTransitionRequest request = request(
+                DormantSourceEvidence.Kind.EXPLICIT_RECALL_EXHAUSTED,
+                3
+        );
+
+        OperationWorkflowResult result = submit(6, request);
+
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
+        assertDormant(request, LifecycleState.LOST, 3, 2);
+    }
+
+    @Test
+    void explicitRecallRejectsMetadataChangedAfterSnapshotRead()
+            throws Exception {
+        transitionToUnloaded();
+        CompanionDormantTransitionRequest request = request(
+                DormantSourceEvidence.Kind.EXPLICIT_RECALL_EXHAUSTED,
+                3
+        );
+        updateMetadata("""
+                {"custom_name":"Renamed","tamed":false}
+                """.trim());
+
+        OperationWorkflowResult result = submit(8, request);
+
+        assertEquals(
+                OperationWorkflowResult.Status.PREPARE_FAILED,
+                result.status()
+        );
+        assertEquals(LifecycleState.UNLOADED, lifecycle().state());
+        assertEquals(CompanionAlias.State.CURRENT, alias().state());
+        assertTrue(snapshot(request).isEmpty());
+    }
+
+    @Test
+    void destructiveRemovalCommitsFullStateWhenLoadPrecedesReconciliation()
+            throws Exception {
+        transitionToUnloaded();
+        CompanionDormantTransitionRequest request = unloadedRequest(
+                DormantSourceEvidence.Kind.DESTRUCTIVE_REMOVAL
+        );
+
+        OperationWorkflowResult result = submit(7, request);
+
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
+        assertDormant(request, LifecycleState.LOST, 3, 2);
+    }
+
+    @Test
     void staleReconciliationEvidenceFailsBeforeOperationPersists()
             throws Exception {
         CompanionDormantTransitionRequest request =
@@ -227,10 +281,19 @@ class SqliteCompanionDormantOperationsTest {
             LifecycleState state,
             long generation
     ) throws Exception {
+        assertDormant(request, state, generation, 1);
+    }
+
+    private void assertDormant(
+            CompanionDormantTransitionRequest request,
+            LifecycleState state,
+            long generation,
+            long revision
+    ) throws Exception {
         CompanionLifecycle lifecycle = lifecycle();
         assertEquals(state, lifecycle.state());
         assertEquals(LifecycleLocation.none(), lifecycle.location());
-        assertEquals(new LifecycleRevision(1), lifecycle.revision());
+        assertEquals(new LifecycleRevision(revision), lifecycle.revision());
         assertEquals(OWNER, lifecycle.ownerId());
         assertNull(lifecycle.activeOperationId());
         assertEquals(
@@ -253,20 +316,29 @@ class SqliteCompanionDormantOperationsTest {
             long generation,
             String worldKey
     ) {
+        LifecycleRevision revision = kind
+                == DormantSourceEvidence.Kind.EXPLICIT_RECALL_EXHAUSTED
+                ? new LifecycleRevision(1)
+                : LifecycleRevision.INITIAL;
+        String payload = kind
+                == DormantSourceEvidence.Kind.EXPLICIT_RECALL_EXHAUSTED
+                ? explicitRecallSnapshotJson()
+                : SNAPSHOT_JSON;
         CompanionSnapshot snapshot = new CompanionSnapshot(
                 SnapshotId.parse("50000000-0000-0000-0000-000000000001"),
                 PROFILE,
                 kind.snapshotKind(),
-                1,
-                SNAPSHOT_JSON,
-                Sha256Hash.ofUtf8(SNAPSHOT_JSON),
-                LifecycleRevision.INITIAL,
+                kind == DormantSourceEvidence.Kind.EXPLICIT_RECALL_EXHAUSTED
+                        ? 2 : 1,
+                payload,
+                Sha256Hash.ofUtf8(payload),
+                revision,
                 true,
                 -500
         );
         return new CompanionDormantTransitionRequest(
                 PROFILE,
-                LifecycleRevision.INITIAL,
+                revision,
                 snapshot,
                 new DormantSourceEvidence(
                         ALIAS,
@@ -278,6 +350,100 @@ class SqliteCompanionDormantOperationsTest {
                 ),
                 -600
         );
+    }
+
+    private String explicitRecallSnapshotJson() {
+        return """
+                {"version":"1","npcUuid":"%s","residentSlot":-1,
+                "roleId":"role","capturedAtMs":-500,
+                "commandLinks":{"ownerId":"%s","toolIds":[]},
+                "owner":{"ownerId":"%s"},"tamed":{"tamed":true}}
+                """.formatted(ALIAS, OWNER, OWNER)
+                .replace("\n", "")
+                .trim();
+    }
+
+    private CompanionDormantTransitionRequest unloadedRequest(
+            DormantSourceEvidence.Kind kind
+    ) {
+        LifecycleRevision revision = new LifecycleRevision(1);
+        String payload = explicitRecallSnapshotJson();
+        CompanionSnapshot snapshot = new CompanionSnapshot(
+                SnapshotId.parse("50000000-0000-0000-0000-000000000002"),
+                PROFILE,
+                kind.snapshotKind(),
+                2,
+                payload,
+                Sha256Hash.ofUtf8(payload),
+                revision,
+                true,
+                -500
+        );
+        return new CompanionDormantTransitionRequest(
+                PROFILE,
+                revision,
+                snapshot,
+                new DormantSourceEvidence(
+                        ALIAS,
+                        "world",
+                        kind,
+                        new ReconciliationGeneration(3),
+                        "dormant-receipt-raced-removal",
+                        -500
+                ),
+                -600
+        );
+    }
+
+    private void transitionToUnloaded() throws Exception {
+        var submitted = writer.submit(new SqliteTransactionCommand<>(
+                operationId(95),
+                new OperationKind("test_seed_unloaded"),
+                TransactionReplayPolicy.NEVER,
+                connection -> {
+                    SqliteCompanionLifecycleStore lifecycles =
+                            new SqliteCompanionLifecycleStore(connection);
+                    CompanionLifecycle current = lifecycles.findByProfile(PROFILE)
+                            .orElseThrow();
+                    lifecycles.transition(new com.alechilles.alecstamework
+                            .companion.lifecycle.LifecycleTransition(
+                            current.revision(),
+                            null,
+                            new CompanionLifecycle(
+                                    PROFILE,
+                                    OWNER,
+                                    LifecycleState.UNLOADED,
+                                    LifecycleLocation.none(),
+                                    current.revision().next(),
+                                    null,
+                                    -700,
+                                    new ReconciliationGeneration(3),
+                                    null,
+                                    "world"
+                            )
+                    ));
+                    return null;
+                }
+        ));
+        assertTrue(submitted.completion().toCompletableFuture()
+                .get(10, TimeUnit.SECONDS)
+                instanceof com.alechilles.alecstamework.persistence.kernel
+                .PersistenceTransactionResult.Committed<?>);
+    }
+
+    private void updateMetadata(String metadata) throws Exception {
+        try (Connection connection = connections.openWriterConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     UPDATE companion_profile
+                     SET metadata_json = ?, metadata_hash = ?,
+                         metadata_revision = metadata_revision + 1
+                     WHERE profile_id = ?
+                     """)) {
+            statement.setString(1, metadata);
+            statement.setString(2, Sha256Hash.ofUtf8(metadata).toString());
+            statement.setString(3, PROFILE.toString());
+            assertEquals(1, statement.executeUpdate());
+        }
     }
 
     private void seedLiveProfile() throws Exception {

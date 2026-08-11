@@ -457,6 +457,7 @@ tamework.ui.linkedPanel.revive.confirm=Ressusciter
 tamework.ui.linkedPanel.roster.state=État de la liste : {0}
 tamework.ui.linkedPanel.roster.state.active=Actif
 tamework.ui.linkedPanel.roster.state.unloaded=Déchargé
+tamework.ui.linkedPanel.roster.state.unavailable=Indisponible - réparation de la persistance requise
 tamework.ui.linkedPanel.roster.state.restoring=Invocation en cours
 tamework.ui.linkedPanel.roster.state.storing=Retour dans la liste
 tamework.ui.linkedPanel.roster.state.stored=Stocké

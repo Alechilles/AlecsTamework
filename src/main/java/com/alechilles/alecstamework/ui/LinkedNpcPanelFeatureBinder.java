@@ -148,6 +148,7 @@ final class LinkedNpcPanelFeatureBinder {
         String stateKey = switch (roster.state()) {
             case ACTIVE -> "active";
             case UNLOADED -> "unloaded";
+            case UNAVAILABLE -> "unavailable";
             case RESTORING -> "restoring";
             case STORING -> "storing";
             case ROSTER_STORED -> "stored";

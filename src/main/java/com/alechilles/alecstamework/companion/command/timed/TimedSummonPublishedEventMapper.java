@@ -134,8 +134,9 @@ public final class TimedSummonPublishedEventMapper {
     ) {
         return switch (state) {
             case ACTIVE -> CommandTimedSummoningState.ACTIVE;
-            case UNLOADED, CAPTURED, COOP, RELEASED, UNRESOLVED ->
+            case UNLOADED, CAPTURED, COOP, RELEASED ->
                     CommandTimedSummoningState.UNLOADED;
+            case UNRESOLVED -> CommandTimedSummoningState.UNAVAILABLE;
             case ROSTER_STORED, PROVISIONED_DORMANT ->
                     CommandTimedSummoningState.ROSTER_STORED;
             case DEAD_REVIVABLE ->

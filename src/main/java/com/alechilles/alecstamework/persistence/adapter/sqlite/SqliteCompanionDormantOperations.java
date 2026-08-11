@@ -34,7 +34,7 @@ import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 
 /**
- * One database-only lifecycle transition shared by death and authoritative lost events.
+ * One database-only transition shared by death, lost, and explicit Recall repair.
  *
  * <p>The immutable snapshot and canonical lifecycle row are the whole durable state. There is no
  * death record, lost record, or feature-specific state machine.</p>
@@ -64,7 +64,7 @@ public final class SqliteCompanionDormantOperations {
         this.requiredConsumers = List.copyOf(requiredConsumers);
     }
 
-    /** Starts or resumes one exact positive-evidence death or lost transition. */
+    /** Starts or resumes one exact dormant transition. */
     @Nonnull
     public Submission submit(
             @Nonnull OperationId operationId,
@@ -101,7 +101,7 @@ public final class SqliteCompanionDormantOperations {
             OperationEnvelope operation,
             CompanionDormantTransitionRequest dormant
     ) {
-        CompanionLifecycle current = requireExactLive(
+        CompanionLifecycle current = requireExactSource(
                 transaction, dormant
         );
         CompanionProfileProjectionState before =
@@ -192,7 +192,7 @@ public final class SqliteCompanionDormantOperations {
         return List.copyOf(events);
     }
 
-    private static CompanionLifecycle requireExactLive(
+    private static CompanionLifecycle requireExactSource(
             SqlitePersistenceTransactionContext transaction,
             CompanionDormantTransitionRequest dormant
     ) {
@@ -214,11 +214,26 @@ public final class SqliteCompanionDormantOperations {
         boolean deletionMayCorrectWorld =
                 dormant.source().kind()
                         == DormantSourceEvidence.Kind.WORLD_DELETION;
+        boolean explicitRecallRepair = dormant.source().kind()
+                == DormantSourceEvidence.Kind.EXPLICIT_RECALL_EXHAUSTED;
+        boolean exactUnloadedRepair = explicitRecallRepair
+                && current.state() == LifecycleState.UNLOADED
+                && current.location().equals(LifecycleLocation.none())
+                && SqliteRecallRecoverySnapshotFence.matches(
+                transaction, dormant, current
+        );
+        boolean removalBeforeReconciliation = dormant.source().kind()
+                == DormantSourceEvidence.Kind.DESTRUCTIVE_REMOVAL
+                && current.state() == LifecycleState.UNLOADED
+                && current.location().equals(LifecycleLocation.none());
         if (!current.revision().equals(
                 dormant.expectedLifecycleRevision()
         ) || current.activeOperationId() != null || current.quarantined()
-                || !exactAliasLocation
-                || (!exactWorld && !deletionMayCorrectWorld)
+                || (!exactUnloadedRepair
+                && !removalBeforeReconciliation && !exactAliasLocation)
+                || (!explicitRecallRepair
+                && !removalBeforeReconciliation
+                && !exactWorld && !deletionMayCorrectWorld)
                 || alias == null
                 || !alias.profileId().equals(dormant.profileId())
                 || alias.state() != CompanionAlias.State.CURRENT
@@ -226,7 +241,7 @@ public final class SqliteCompanionDormantOperations {
                 current.lastReconciledGeneration()
         ) < 0) {
             throw new IllegalStateException(
-                    "dormant_transition_not_exact_positive_live_profile"
+                    "dormant_transition_not_exact_source_profile"
             );
         }
         return current;
@@ -309,7 +324,7 @@ public final class SqliteCompanionDormantOperations {
                 return true;
             }
             try {
-                requireExactLive(transaction, dormant);
+                requireExactSource(transaction, dormant);
                 return operation.phase() == OperationPhase.PREPARED;
             } catch (IllegalStateException invalid) {
                 return false;

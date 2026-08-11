@@ -91,8 +91,9 @@ public final class CommandRosterMembershipPublishedEventMapper {
     ) {
         return switch (state) {
             case ACTIVE -> CommandFamilyRosterMemberState.ACTIVE;
-            case UNLOADED, CAPTURED, COOP, RELEASED, UNRESOLVED ->
+            case UNLOADED, CAPTURED, COOP, RELEASED ->
                     CommandFamilyRosterMemberState.UNLOADED;
+            case UNRESOLVED -> CommandFamilyRosterMemberState.UNAVAILABLE;
             case ROSTER_STORED, PROVISIONED_DORMANT ->
                     CommandFamilyRosterMemberState.ROSTER_STORED;
             case DEAD_REVIVABLE ->

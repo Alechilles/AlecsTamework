@@ -39,6 +39,7 @@ final class PublicImportPlanningModel {
         private String lifecycleState = "UNRESOLVED";
         private String locationKind = "UNRESOLVED";
         private String locationKey;
+        private String authoritativeSnapshotId;
         private long changedAtMs;
 
         ProfileDraft(LegacyPublicData.Profile source) {
@@ -84,6 +85,15 @@ final class PublicImportPlanningModel {
             locationKind = location;
             locationKey = key;
             changedAtMs = changedAt;
+        }
+
+        void authoritativeSnapshot(@Nullable String snapshotId) {
+            authoritativeSnapshotId = snapshotId;
+        }
+
+        @Nullable
+        String authoritativeSnapshotId() {
+            return authoritativeSnapshotId;
         }
 
         String lifecycleState() {

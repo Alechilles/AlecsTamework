@@ -63,14 +63,14 @@ class PublicImportSqlWriterTest {
     }
 
     @Test
-    void writesBoundedConflictAsUnresolvedProfileQuarantine() throws Exception {
+    void writesNewestCompleteLegacyLifecycleEvidence() throws Exception {
         Path target = write("public-v4-conflicting-flags.sql", 4);
 
-        assertEquals(1, count(target, "persistence_incident"));
-        assertEquals(1, count(target, "persistence_quarantine"));
-        assertEquals("UNRESOLVED", queryString(target,
+        assertEquals(0, count(target, "persistence_incident"));
+        assertEquals(0, count(target, "persistence_quarantine"));
+        assertEquals("DEAD_REVIVABLE", queryString(target,
                 "SELECT lifecycle_state FROM companion_lifecycle"));
-        assertEquals(0, queryLong(target,
+        assertEquals(1, queryLong(target,
                 "SELECT SUM(is_current) FROM companion_snapshot"));
     }
 

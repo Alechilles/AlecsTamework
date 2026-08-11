@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.dormant.DormantSourceEvidence;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
@@ -31,7 +32,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Authors a dormant transition only from positive death or destructive-removal evidence.
+ * Authors a dormant transition only from positive death or removal evidence.
  *
  * <p>The complete live state and all durable identities are frozen before the profile read.
  * Unload, absence, and timeout observations return without reading or mutating persistence.</p>
@@ -236,7 +237,14 @@ public final class PositiveEvidenceDormantAuthor {
                 || alias.state() != CompanionAlias.State.CURRENT) {
             return "dormant_source_alias_conflict";
         }
-        if (lifecycle.state() != LifecycleState.ACTIVE) {
+        boolean removalBeforeReconciliation =
+                observation.evidence()
+                        == DormantCompanionObservation.Evidence
+                        .DESTRUCTIVE_REMOVAL
+                        && lifecycle.state() == LifecycleState.UNLOADED
+                        && lifecycle.location().equals(LifecycleLocation.none());
+        if (lifecycle.state() != LifecycleState.ACTIVE
+                && !removalBeforeReconciliation) {
             return "dormant_lifecycle_not_active";
         }
         boolean exactAliasLocation =
@@ -250,7 +258,9 @@ public final class PositiveEvidenceDormantAuthor {
         boolean deletionMayCorrectWorld =
                 observation.evidence()
                         == DormantCompanionObservation.Evidence.WORLD_DELETION;
-        if (!exactAliasLocation || (!exactWorld && !deletionMayCorrectWorld)) {
+        if (!removalBeforeReconciliation
+                && (!exactAliasLocation
+                || (!exactWorld && !deletionMayCorrectWorld))) {
             return "dormant_live_location_conflict";
         }
         if (lifecycle.activeOperationId() != null) {

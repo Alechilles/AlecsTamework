@@ -7,10 +7,11 @@ import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
 import javax.annotation.Nonnull;
 
 /**
- * Positive source evidence that one formerly live companion entered a dormant state.
+ * Source evidence that one companion entered a dormant state.
  *
- * <p>The vocabulary intentionally has no absence or timeout value. Death is proven by the saved
- * death component; lost state is proven only by an authoritative destructive-removal event.</p>
+ * <p>Death and removal values are positive world observations. Explicit recall
+ * exhaustion is a separate player-authorized repair value. It is valid only
+ * for an exact unloaded profile after all non-mutating relocation probes end.</p>
  */
 public record DormantSourceEvidence(
         @Nonnull NpcAlias sourceAlias,
@@ -35,11 +36,12 @@ public record DormantSourceEvidence(
         return value.trim();
     }
 
-    /** Authoritative positive event classes accepted by the dormant transition protocol. */
+    /** Authoritative event or explicit repair classes accepted by the protocol. */
     public enum Kind {
         DEATH_COMPONENT(LifecycleState.DEAD_REVIVABLE, new SnapshotKind("death")),
         DESTRUCTIVE_REMOVAL(LifecycleState.LOST, new SnapshotKind("lost")),
-        WORLD_DELETION(LifecycleState.LOST, new SnapshotKind("lost"));
+        WORLD_DELETION(LifecycleState.LOST, new SnapshotKind("lost")),
+        EXPLICIT_RECALL_EXHAUSTED(LifecycleState.LOST, new SnapshotKind("lost"));
 
         private final LifecycleState targetState;
         private final SnapshotKind snapshotKind;

@@ -107,7 +107,7 @@ class CommandRosterPanelRecordSourceTest {
     }
 
     @Test
-    void recordCarriesCanonicalProfileRoleAndHomeWithoutCommandStateOverload() {
+    void recordCarriesCanonicalProfileRoleAndWorldQualifiedHome() {
         ProfileId profileId = profile(5);
         CommandRosterPanelRecordSource source =
                 new CommandRosterPanelRecordSource(() -> Map.of(
@@ -132,6 +132,7 @@ class CommandRosterPanelRecordSourceTest {
         assertEquals(10.5, record.homePosition.x);
         assertEquals(-20.25, record.homePosition.y);
         assertEquals(30.75, record.homePosition.z);
+        assertEquals("world-a", record.lastKnownWorldName);
         assertNull(record.cachedCommandState);
     }
 
@@ -234,6 +235,49 @@ class CommandRosterPanelRecordSourceTest {
         );
     }
 
+    /**
+     * Protects quarantined profiles from appearing recallable when their
+     * lifecycle evidence cannot identify a safe live action target.
+     */
+    @Test
+    void unresolvedProfileIsUnavailableWithoutDismissControl()
+            throws Exception {
+        ProfileId profileId = profile(8);
+        CommandRosterPanelRecordSource roster =
+                new CommandRosterPanelRecordSource(() -> Map.of(
+                        profileId,
+                        action(
+                                profileId,
+                                OWNER_UUID,
+                                FAMILY_ID,
+                                null,
+                                true,
+                                null,
+                                LifecycleState.UNRESOLVED
+                        )
+                ));
+        CommandPanelFeaturePresentationSource presentations =
+                new CommandPanelFeaturePresentationSource(
+                        roster,
+                        CommandTimedSummoningApi::unavailable,
+                        PaidCommandRevivalApi::unavailable,
+                        PopulationGroupApi::unavailable,
+                        () -> 1_000L
+                );
+
+        CommandPanelFeaturePresentation row = presentations.snapshot(
+                OWNER_UUID,
+                "world-a",
+                ownerFamilyConfig(FAMILY_ID)
+        ).values().iterator().next();
+
+        assertEquals(
+                CommandTimedSummoningState.UNAVAILABLE,
+                row.roster().state()
+        );
+        assertFalse(row.roster().dismissVisible());
+    }
+
     private static CommandRosterActionView action(
             ProfileId profileId,
             UUID ownerUuid,
@@ -291,15 +335,16 @@ class CommandRosterPanelRecordSourceTest {
             CommandRosterMembership membership,
             LifecycleState lifecycleState
     ) {
-        LifecycleLocation location =
-                lifecycleState == LifecycleState.ACTIVE
-                        ? LifecycleLocation.liveEntity(
-                                "entity-" + profileId, "world-a"
-                        )
-                        : LifecycleLocation.keyed(
-                                LifecycleLocationKind.COMMAND_ROSTER,
-                                membership.slotId().toString()
-                        );
+        LifecycleLocation location = switch (lifecycleState) {
+            case ACTIVE -> LifecycleLocation.liveEntity(
+                    "entity-" + profileId, "world-a"
+            );
+            case UNRESOLVED -> LifecycleLocation.unresolved();
+            default -> LifecycleLocation.keyed(
+                    LifecycleLocationKind.COMMAND_ROSTER,
+                    membership.slotId().toString()
+            );
+        };
         CompanionLifecycle lifecycle = new CompanionLifecycle(
                 profileId,
                 ownerId,

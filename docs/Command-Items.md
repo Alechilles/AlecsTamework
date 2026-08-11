@@ -291,10 +291,14 @@ Loaded flow:
 
 Unloaded flow:
 - Relocation commands enqueue pending relocations by NPC uuid.
-- Source/destination chunks are requested asynchronously.
+- Destination chunks and exact cubic source entity sections are requested
+  asynchronously. Source probes do not generate a missing section.
 - Every loaded source or destination chunk is retained for the lifetime of the pending relocation and released on success, timeout, replacement, cancellation, or shutdown.
 - The source NPC is resolved after its chunk loads and checked against its
   canonical profile and current alias before any move is applied.
+- Canonical roster entries retain the world-qualified home as a durable source
+  hint, so restart does not make Recall request home coordinates in the
+  destination world.
 - Repeated clicks for the same command reuse that pending request, even if the player moved, while a command targeting another world or state remains distinct.
 - Retries run on bounded interval/time windows, and one click is sufficient while the attempting-recall status is shown.
 - A persistence preflight denial reports its status-specific availability
@@ -303,9 +307,14 @@ Unloaded flow:
   the saved source entity becomes available.
 - A relocation that attempted its physical move but remains temporarily
   unobservable stays `UNLOADED`, not `LOST`. Observing the destination
-  projection restores normal loaded status. A failed or exhausted transfer
-  stops retrying without manufacturing a durable lifecycle transition.
-- One migration-only exception applies to a public `v2.16.1` companion whose
+  projection restores normal loaded status.
+- If an explicit Recall exhausts every read-only source probe before any
+  physical move, Tamework creates a fenced Lost snapshot from the current
+  durable profile and retires the missing alias. The entry then offers normal
+  Respawn. Role, owner, name, tame state, home, and command links are retained;
+  live-only state that was never persisted uses normal defaults.
+- When available, a public `v2.16.1` recovery snapshot is preferred because it
+  retains more complete state. The importer
   released coop row retained a complete owner-bound snapshot. The importer
   normalizes that snapshot to the released current alias. If the companion was
   absent during its first startup reconciliation and an explicit Recall later
@@ -315,15 +324,14 @@ Unloaded flow:
   Return Home, and unconfirmed physical transfers cannot use this recovery.
 
 Lost flow:
-- If relocation retry windows are exhausted, the request stops and may retain
-  process-local presentation detail; timeout alone does not author durable
-  `LOST`. The shipped default wait budget is 10 seconds.
+- A background timeout alone does not author durable `LOST`. A clean explicit
+  Recall exhaustion can authorize the fenced repair described above. The
+  shipped default wait budget is 10 seconds.
 - A durable Lost transition requires positive evidence. An external destructive
   command using Hytale's `REMOVE` reason qualifies; ordinary unload, absence,
   and timeout observations do not.
-- The bounded public-import recovery artifact described above is also positive
-  evidence, but only for the exact initial imported-unloaded lineage and only
-  after a clean explicit Recall exhaustion.
+- A destructive removal that races startup reconciliation can also author Lost
+  from the exact current alias while its full live state is still available.
 - A delete-on-remove world can also provide terminal Lost evidence while the
   companion's complete live state is still available.
 - `Recall`/`Return Home` are blocked while `LOST`.

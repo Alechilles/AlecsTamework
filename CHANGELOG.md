@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Prevented marker-owned tamed companions from losing their marker-side
+  reference while the NPC is unloaded. This stops Hytale's lost-marker cleanup
+  from deleting the NPC when its chunk loads later.
+- Canonical command-roster entries now retain the world paired with their home
+  coordinates, and Recall now loads the exact Update 6 entity section instead
+  of only the horizontal chunk.
+- An explicit Recall that exhausts every safe lookup can now convert an exact
+  missing unloaded companion into a restorable Lost entry. Recovery preserves
+  the durable profile, owner, role, name, tame state, home, and command links,
+  then retires the missing alias before Respawn creates a replacement.
+- Destructive removal during the NPC-load/startup-reconciliation race now
+  captures the complete live state before the NPC is deleted.
+- New imports from older public Tamework databases now resolve stale lifecycle
+  flags from the one newest complete evidence set. Tied or incomplete evidence
+  remains quarantined.
+- Quarantined roster entries now show as unavailable instead of unloaded and
+  no longer offer a Recall or Dismiss control that cannot succeed.
+
 ## 3.1.1 - NPC Startup Ordering Hotfix - 2026-08-10
 
 ### Fixed

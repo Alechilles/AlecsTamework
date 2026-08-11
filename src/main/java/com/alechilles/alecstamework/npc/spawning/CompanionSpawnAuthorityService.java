@@ -22,7 +22,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.function.Predicate;
 import javax.annotation.Nullable;
 
 /**
@@ -58,19 +57,17 @@ public final class CompanionSpawnAuthorityService {
     }
 
     /**
-     * Repairs reverse marker references when marker and NPC load ordering made
-     * the NPC-side cleanup unable to resolve its marker.
+     * Repairs reverse marker references for tamed NPCs live with the marker.
+     * Unloaded members keep both reference sides until their NPC loads.
      */
     public static int detachLoadedTamedMembers(
             Ref<EntityStore> markerRef,
             Store<EntityStore> store,
             ComponentType<EntityStore, SpawnMarkerEntity> markerType,
-            ComponentType<EntityStore, TameworkTamedComponent> tamedType,
-            Predicate<UUID> projectedTamedLookup
+            ComponentType<EntityStore, TameworkTamedComponent> tamedType
     ) {
         if (markerRef == null || !markerRef.isValid() || store == null
-                || markerType == null || tamedType == null
-                || projectedTamedLookup == null) {
+                || markerType == null || tamedType == null) {
             return 0;
         }
         SpawnMarkerEntity marker = store.getComponent(markerRef, markerType);
@@ -88,12 +85,13 @@ public final class CompanionSpawnAuthorityService {
             }
             UUID memberUuid = member.getUuid();
             Ref<EntityStore> npcRef = member.getEntity(store);
-            TameworkTamedComponent tamed = npcRef == null || !npcRef.isValid()
-                    ? null
-                    : store.getComponent(npcRef, tamedType);
-            boolean loadedTamed = tamed != null && tamed.isTamed();
-            if (!loadedTamed
-                    && !isProjectedTamed(memberUuid, projectedTamedLookup)) {
+            if (npcRef == null || !npcRef.isValid()) {
+                continue;
+            }
+            TameworkTamedComponent tamed = store.getComponent(
+                    npcRef, tamedType
+            );
+            if (tamed == null || !tamed.isTamed()) {
                 continue;
             }
             tamedMembers.add(new MarkerMember(npcRef, memberUuid));
@@ -116,20 +114,6 @@ public final class CompanionSpawnAuthorityService {
             prepareRespawnIfEmpty(marker, store);
         }
         return detached;
-    }
-
-    private static boolean isProjectedTamed(
-            @Nullable UUID npcUuid,
-            Predicate<UUID> projectedTamedLookup
-    ) {
-        if (npcUuid == null) {
-            return false;
-        }
-        try {
-            return projectedTamedLookup.test(npcUuid);
-        } catch (RuntimeException failure) {
-            return false;
-        }
     }
 
     static int removeMarkerMember(SpawnMarkerEntity marker, UUID npcUuid) {
@@ -163,7 +147,7 @@ public final class CompanionSpawnAuthorityService {
         return removed;
     }
 
-    private static boolean detachMarker(
+    static boolean detachMarker(
             Ref<EntityStore> npcRef,
             @Nullable UUID npcUuid,
             Store<EntityStore> store,
@@ -180,21 +164,28 @@ public final class CompanionSpawnAuthorityService {
         if (reference == null) {
             return false;
         }
-        if (markerType != null) {
-            Ref<EntityStore> markerRef = reference.getReference().getEntity(store);
+        if (markerType != null && npcUuid != null) {
+            Ref<EntityStore> markerRef = reference.getReference()
+                    .getEntity(store);
             SpawnMarkerEntity marker = markerRef == null
+                    || !markerRef.isValid()
                     ? null
                     : store.getComponent(markerRef, markerType);
-            if (marker != null && npcUuid != null) {
+            if (marker != null) {
                 int removed = removeMarkerMember(marker, npcUuid);
                 if (removed == 0) {
-                    marker.setSpawnCount(Math.max(0, marker.getSpawnCount() - 1));
+                    marker.setSpawnCount(Math.max(
+                            0, marker.getSpawnCount() - 1
+                    ));
                 }
                 prepareRespawnIfEmpty(marker, store);
                 markMarkerDirty(markerRef, store);
             }
         }
-        store.tryRemoveComponent(npcRef, referenceType);
+        // A loaded tamed NPC must not remain under the lost-marker timeout.
+        // If the marker is absent, its durable reverse UUID is left intact for
+        // the marker-side load audit.
+        store.removeComponent(npcRef, referenceType);
         return true;
     }
 
@@ -361,7 +352,7 @@ public final class CompanionSpawnAuthorityService {
     }
 
     private record MarkerMember(
-            @Nullable Ref<EntityStore> reference,
+            Ref<EntityStore> reference,
             UUID uuid
     ) {
     }

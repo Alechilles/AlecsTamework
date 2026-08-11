@@ -13,9 +13,6 @@ import com.hypixel.hytale.component.system.RefSystem;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.spawning.spawnmarkers.SpawnMarkerEntity;
-import java.util.Objects;
-import java.util.UUID;
-import java.util.function.Predicate;
 import javax.annotation.Nonnull;
 
 /** Load-time repair systems for both sides of companion spawn authority. */
@@ -85,19 +82,14 @@ public final class CompanionSpawnAuthorityCleanupSystems {
     public static final class Marker extends RefSystem<EntityStore> {
         private final ComponentType<EntityStore, SpawnMarkerEntity> markerType;
         private final ComponentType<EntityStore, TameworkTamedComponent> tamedType;
-        private final Predicate<UUID> projectedTamedLookup;
         private final Query<EntityStore> query;
 
         public Marker(
                 ComponentType<EntityStore, SpawnMarkerEntity> markerType,
-                ComponentType<EntityStore, TameworkTamedComponent> tamedType,
-                Predicate<UUID> projectedTamedLookup
+                ComponentType<EntityStore, TameworkTamedComponent> tamedType
         ) {
             this.markerType = markerType;
             this.tamedType = tamedType;
-            this.projectedTamedLookup = Objects.requireNonNull(
-                    projectedTamedLookup, "projectedTamedLookup"
-            );
             this.query = Query.and(markerType);
         }
 
@@ -114,8 +106,7 @@ public final class CompanionSpawnAuthorityCleanupSystems {
                             reference,
                             bufferStore,
                             markerType,
-                            tamedType,
-                            projectedTamedLookup
+                            tamedType
                     );
                 }
             });

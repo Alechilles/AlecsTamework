@@ -158,7 +158,7 @@ final class CommandRosterPanelRecordSource {
                 presentationUuid(view),
                 membership.profileId().toString(),
                 null,
-                null,
+                home == null ? null : home.worldKey(),
                 home == null ? null : new Vector3d(
                         home.x(), home.y(), home.z()
                 ),

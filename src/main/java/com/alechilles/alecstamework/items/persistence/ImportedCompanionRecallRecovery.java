@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.items.persistence;
 
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransitionDefinition;
+import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransitionRequest;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
@@ -22,11 +24,12 @@ import java.util.logging.Level;
 import javax.annotation.Nonnull;
 
 /**
- * Converts the exact public released-coop backup after an explicit recall fails.
+ * Makes an exact missing unloaded companion restorable after Recall fails.
  *
- * <p>Normal missing or unloaded companions are ignored. Eligibility requires
- * the importer-only snapshot kind plus matching canonical owner, role, alias,
- * lifecycle revision, payload hash, and a successfully decoded full state.</p>
+ * <p>An importer-authored complete backup remains the preferred source. When
+ * none exists, the fallback writes a complete Lost snapshot from fenced
+ * durable profile facts. The dormant operation retires the old alias before
+ * normal restoration creates a distinct replacement alias.</p>
  */
 public final class ImportedCompanionRecallRecovery
         implements ImportedRecallRecoverySink {
@@ -37,6 +40,8 @@ public final class ImportedCompanionRecallRecovery
     private final HytaleLogger logger;
     private final ImportedRecallRecoveryAuthor author =
             new ImportedRecallRecoveryAuthor();
+    private final MissingUnloadedRecallRecoveryAuthor missingAuthor =
+            new MissingUnloadedRecallRecoveryAuthor();
 
     public ImportedCompanionRecallRecovery(
             @Nonnull PersistenceDomainFacades persistence,
@@ -63,7 +68,7 @@ public final class ImportedCompanionRecallRecovery
                 warn(failure, problem);
             } else if (Boolean.TRUE.equals(recovered)) {
                 logger.at(Level.INFO).log(
-                        "Recovered imported companion %s to Lost after its "
+                        "Recovered companion %s to Lost after its "
                                 + "explicit recall exhausted relocation.",
                         failure.npcUuid()
                 );
@@ -81,36 +86,79 @@ public final class ImportedCompanionRecallRecovery
             }
             CompanionProfileMutation.RecoverImportedMissing recovery =
                     author.author(found.value(), failure);
-            if (recovery == null) {
-                return CompletableFuture.completedFuture(false);
+            if (recovery != null) {
+                return submitImported(recovery);
             }
-            OperationIdentity identity = operationIdentity(recovery);
-            PublicOperationSubmission submission =
-                    persistence.operations().mutateProfile(
-                            identity.operationId(),
-                            identity.idempotencyKey(),
-                            recovery
-                    );
-            if (!submission.accepted()) {
-                return CompletableFuture.failedFuture(
-                        new IllegalStateException(
-                                "imported_recall_recovery_submission_"
-                                        + submission.admission().name()
-                                        .toLowerCase()
-                        )
+            CompanionDormantTransitionRequest missing = missingAuthor.author(
+                    found.value(), failure
+            );
+            return missing == null
+                    ? CompletableFuture.completedFuture(false)
+                    : submitMissing(missing);
+        });
+    }
+
+    private CompletionStage<Boolean> submitImported(
+            CompanionProfileMutation.RecoverImportedMissing recovery
+    ) {
+        OperationIdentity identity = operationIdentity(recovery);
+        PublicOperationSubmission submission =
+                persistence.operations().mutateProfile(
+                        identity.operationId(),
+                        identity.idempotencyKey(),
+                        recovery
+                );
+        return completion(submission, "imported_recall_recovery");
+    }
+
+    private CompletionStage<Boolean> submitMissing(
+            CompanionDormantTransitionRequest recovery
+    ) {
+        String payload = CompanionDormantTransitionDefinition.INSTANCE.encode(
+                recovery
+        );
+        String material = "missing-unloaded-recall-operation:v1:" + payload;
+        OperationIdentity identity = new OperationIdentity(
+                new OperationId(UUID.nameUUIDFromBytes(
+                        material.getBytes(StandardCharsets.UTF_8)
+                )),
+                new IdempotencyKey(
+                        "missing-unloaded-recall-operation:v1:"
+                                + Sha256Hash.ofUtf8(material)
+                )
+        );
+        PublicOperationSubmission submission =
+                persistence.operations().makeDormant(
+                        identity.operationId(),
+                        identity.idempotencyKey(),
+                        recovery
+                );
+        return completion(submission, "missing_unloaded_recall_recovery");
+    }
+
+    private CompletionStage<Boolean> completion(
+            PublicOperationSubmission submission,
+            String code
+    ) {
+        if (!submission.accepted()) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException(
+                            code + "_submission_"
+                                    + submission.admission().name()
+                                    .toLowerCase()
+                    )
+            );
+        }
+        return submission.completion().thenApply(result -> {
+            if (result.status()
+                    != OperationWorkflowResult.Status.PUBLISHED) {
+                throw new IllegalStateException(
+                        code + "_"
+                                + result.status().name().toLowerCase(),
+                        result.failure()
                 );
             }
-            return submission.completion().thenApply(result -> {
-                if (result.status()
-                        != OperationWorkflowResult.Status.PUBLISHED) {
-                    throw new IllegalStateException(
-                            "imported_recall_recovery_"
-                                    + result.status().name().toLowerCase(),
-                            result.failure()
-                    );
-                }
-                return true;
-            });
+            return true;
         });
     }
 
@@ -133,7 +181,7 @@ public final class ImportedCompanionRecallRecovery
 
     private void warn(RecallFailure failure, Throwable problem) {
         logger.at(Level.WARNING).withCause(problem).log(
-                "Imported companion recovery failed after recall for npc=%s",
+                "Companion recovery failed after recall for npc=%s",
                 failure.npcUuid()
         );
     }

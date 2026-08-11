@@ -71,7 +71,8 @@ class PublicPersistenceImporterTest {
     }
 
     @Test
-    void boundedV4ConflictPublishesOnlyUnresolvedQuarantinedEvidence() throws Exception {
+    void staleLegacyFlagPublishesNewestCompleteLifecycleEvidence()
+            throws Exception {
         ImportCase testCase = importCase("public-v4-conflicting-flags.sql");
 
         PublicImportResult.Imported result = assertInstanceOf(
@@ -80,15 +81,16 @@ class PublicPersistenceImporterTest {
         );
 
         assertTrue(result.reportPath().isPresent());
-        assertEquals(1, count(testCase.target(), "persistence_incident"));
-        assertEquals(1, count(testCase.target(), "persistence_quarantine"));
-        assertEquals("UNRESOLVED", queryString(
+        assertEquals(0, count(testCase.target(), "persistence_incident"));
+        assertEquals(0, count(testCase.target(), "persistence_quarantine"));
+        assertEquals("DEAD_REVIVABLE", queryString(
                 testCase.target(), "SELECT lifecycle_state FROM companion_lifecycle"));
-        assertEquals(0, queryLong(
+        assertEquals(1, queryLong(
                 testCase.target(), "SELECT SUM(is_current) FROM companion_snapshot"));
-        assertTrue(queryString(testCase.target(),
-                "SELECT evidence_json FROM persistence_incident")
-                .contains("MUTUALLY_EXCLUSIVE_LIFECYCLE_FLAGS"));
+        assertEquals("death", queryString(testCase.target(), """
+                SELECT snapshot_kind FROM companion_snapshot
+                WHERE is_current = 1
+                """));
     }
 
     @Test

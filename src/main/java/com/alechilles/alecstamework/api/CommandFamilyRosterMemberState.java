@@ -6,6 +6,7 @@ public enum CommandFamilyRosterMemberState {
     RESTORING,
     ACTIVE,
     UNLOADED,
+    UNAVAILABLE,
     STORING,
     DEAD_REVIVABLE,
     LOST

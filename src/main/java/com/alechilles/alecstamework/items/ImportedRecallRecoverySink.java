@@ -4,10 +4,11 @@ import java.util.UUID;
 import javax.annotation.Nonnull;
 
 /**
- * Receives one terminal failure from an explicitly requested unloaded recall.
+ * Receives one terminal failure from an explicitly requested unloaded Recall.
  *
- * <p>Implementations may recover only importer-authored, single-use evidence;
- * a normal relocation failure must remain non-authoritative.</p>
+ * <p>The terminal service supplies this only after clean retry exhaustion and
+ * before any physical mutation. Implementations must recheck the exact
+ * profile, alias, owner, lifecycle, and snapshot fences.</p>
  */
 @FunctionalInterface
 public interface ImportedRecallRecoverySink {

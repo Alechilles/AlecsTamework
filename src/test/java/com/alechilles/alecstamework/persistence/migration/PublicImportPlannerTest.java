@@ -143,20 +143,89 @@ class PublicImportPlannerTest {
     }
 
     @Test
-    void mutuallyExclusiveFlagsPreserveEvidenceButCreateNoAuthoritativeSnapshot() throws Exception {
+    void legacyStaleFlagSelectsNewestCompleteLifecycleEvidence()
+            throws Exception {
         PublicImportPlan plan = plan("public-v4-conflicting-flags.sql", 4);
+
+        assertTrue(plan.incidents().isEmpty());
+        assertEquals("DEAD_REVIVABLE", plan.lifecycles().getFirst().state());
+        assertEquals("NONE", plan.lifecycles().getFirst().locationKind());
+        assertEquals(2, plan.snapshots().size());
+        assertEquals(1, plan.snapshots().stream()
+                .filter(PublicImportPlan.Snapshot::current)
+                .count());
+        assertTrue(plan.snapshots().stream()
+                .anyMatch(snapshot -> snapshot.current()
+                        && "death".equals(snapshot.kind())));
+    }
+
+    @Test
+    void equalTimestampLifecycleFlagsRemainQuarantined() throws Exception {
+        LegacyPublicData source = read(
+                "public-v4-conflicting-flags.sql", 4
+        );
+        List<LegacyPublicData.Snapshot> tied = source.snapshots().stream()
+                .map(snapshot -> "capture".equals(snapshot.kind())
+                        ? new LegacyPublicData.Snapshot(
+                        snapshot.sourceSnapshotId(),
+                        snapshot.profileId(),
+                        snapshot.kind(),
+                        snapshot.sourceRevision(),
+                        snapshot.payloadJson(),
+                        snapshot.active(),
+                        220
+                ) : snapshot)
+                .toList();
+        LegacyPublicData ambiguous = new LegacyPublicData(
+                source.profiles(), source.aliases(), source.toolLinks(), tied,
+                source.coopSlots(), source.profileStates(),
+                source.extensionData()
+        );
+
+        PublicImportPlan plan = new PublicImportPlanner().plan(
+                ambiguous, FINGERPRINT, -500
+        );
 
         assertEquals(1, plan.incidents().size());
         assertEquals("MUTUALLY_EXCLUSIVE_LIFECYCLE_FLAGS",
                 plan.incidents().getFirst().reasonCode());
         assertEquals("UNRESOLVED", plan.lifecycles().getFirst().state());
-        assertEquals("UNRESOLVED", plan.lifecycles().getFirst().locationKind());
-        assertEquals(plan.incidents().getFirst().incidentId(),
-                plan.lifecycles().getFirst().incidentId());
-        assertEquals(2, plan.snapshots().size());
-        assertFalse(plan.snapshots().stream().anyMatch(PublicImportPlan.Snapshot::current));
+        assertFalse(plan.snapshots().stream()
+                .anyMatch(PublicImportPlan.Snapshot::current));
         assertTrue(plan.incidents().getFirst().evidenceJson()
                 .contains("MUTUALLY_EXCLUSIVE_LIFECYCLE_FLAGS"));
+    }
+
+    @Test
+    void newestFlagCannotOverrideAnotherFlagWithMissingEvidence()
+            throws Exception {
+        LegacyPublicData source = read(
+                "public-v4-conflicting-flags.sql", 4
+        );
+        List<LegacyPublicData.Snapshot> incomplete = source.snapshots().stream()
+                .filter(snapshot -> !"capture".equals(snapshot.kind()))
+                .toList();
+        LegacyPublicData ambiguous = new LegacyPublicData(
+                source.profiles(),
+                source.aliases(),
+                source.toolLinks(),
+                incomplete,
+                source.coopSlots(),
+                source.profileStates(),
+                source.extensionData()
+        );
+
+        PublicImportPlan plan = new PublicImportPlanner().plan(
+                ambiguous, FINGERPRINT, -500
+        );
+
+        assertEquals("UNRESOLVED", plan.lifecycles().getFirst().state());
+        assertEquals(
+                "MUTUALLY_EXCLUSIVE_LIFECYCLE_FLAGS",
+                plan.incidents().getFirst().reasonCode()
+        );
+        assertFalse(plan.snapshots().stream()
+                .anyMatch(PublicImportPlan.Snapshot::current));
     }
 
     @Test

@@ -40,6 +40,14 @@ One positive, internally complete evidence set maps to one canonical state:
 | coop flag, matching slot/key, and valid coop snapshot | `COOP` / `COOP_SLOT` |
 | no positive dormant flag | `UNRESOLVED` / `UNRESOLVED` |
 
+Released public writers updated each dormant flag independently. A later
+capture, death, Lost, or coop transition could therefore leave an older flag
+positive. When more than one flag is positive, the importer accepts one state
+only if all positive flags have one complete active evidence set, one set has a
+strictly newer evidence timestamp, and that timestamp equals the profile-state
+update time. The winner becomes current and the older sets remain non-current
+history. Equal timestamps or incomplete evidence remain unresolved.
+
 `UNRESOLVED` is deliberately non-mutating. After Hytale reports all startup
 worlds loaded, startup reconciliation scans every active entity store. One
 matching observation resolves the profile to `ACTIVE`; sealed absence resolves
@@ -48,8 +56,9 @@ offline importer may not guess either state.
 
 ## Bounded conflict policy
 
-When stable profile identity is intact but mutually exclusive flags, current aliases, required
-snapshots, coop evidence, or JSON payloads conflict, the importer:
+When stable profile identity is intact but lifecycle evidence is tied or
+incomplete, or current aliases, required snapshots, coop evidence, or JSON
+payloads conflict, the importer:
 
 1. retains the profile and all validly attributable evidence;
 2. writes canonical lifecycle as `UNRESOLVED`;
@@ -58,7 +67,8 @@ snapshots, coop evidence, or JSON payloads conflict, the importer:
 5. creates no active coop residency or authoritative current snapshot from disputed evidence.
 
 Unbounded corruption, invalid stable identity, unreadable schema, failed integrity checks, and
-cross-profile references refuse the entire import. No arbitrary priority order chooses a winner.
+cross-profile references refuse the entire import. No fixed lifecycle priority
+chooses a winner.
 
 ## Publication and idempotency
 

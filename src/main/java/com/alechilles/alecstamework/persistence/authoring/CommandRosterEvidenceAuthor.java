@@ -373,6 +373,7 @@ public final class CommandRosterEvidenceAuthor
             case DEAD_REVIVABLE ->
                     CommandFamilyRosterMemberState.DEAD_REVIVABLE;
             case LOST -> CommandFamilyRosterMemberState.LOST;
+            case UNRESOLVED -> CommandFamilyRosterMemberState.UNAVAILABLE;
             default -> CommandFamilyRosterMemberState.UNLOADED;
         };
     }

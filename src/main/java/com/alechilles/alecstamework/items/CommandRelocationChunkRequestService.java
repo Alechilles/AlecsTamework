@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
+import com.hypixel.hytale.server.core.universe.world.storage.GetChunkFlags;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -104,8 +105,61 @@ final class CommandRelocationChunkRequestService implements AutoCloseable {
         if (position == null) {
             return;
         }
-        requestChunk(sourceWorld, destinationWorld, pending,
-                worldAccess.toChunk(position.x), worldAccess.toChunk(position.z));
+        requestEntitySection(
+                sourceWorld, destinationWorld, pending, position
+        );
+    }
+
+    /**
+     * Loads the exact cubic entity section. A UUID lookup alone checks only
+     * live memory, and loading the horizontal chunk does not hydrate Update 6
+     * entity-section rows.
+     */
+    private void requestEntitySection(
+            World sourceWorld,
+            World destinationWorld,
+            PendingRelocation pending,
+            Vector3d position
+    ) {
+        int blockX = (int) Math.floor(position.x);
+        int blockY = (int) Math.floor(position.y);
+        int blockZ = (int) Math.floor(position.z);
+        int chunkX = worldAccess.toChunk(position.x);
+        int chunkY = worldAccess.toChunk(position.y);
+        int chunkZ = worldAccess.toChunk(position.z);
+        String requestKey = sourceWorld.getName()
+                + "#entity-section:" + chunkY;
+        long now = System.currentTimeMillis();
+        if (!pending.shouldRequestChunk(
+                requestKey,
+                chunkX,
+                chunkZ,
+                now,
+                CHUNK_REQUEST_COOLDOWN_MS
+        )) {
+            return;
+        }
+        int flags = GetChunkFlags.SET_TICKING | GetChunkFlags.NO_GENERATE;
+        sourceWorld.getChunkStore()
+                .getChunkSectionReferenceAtBlockAsync(
+                        blockX, blockY, blockZ, flags
+                )
+                .whenComplete((section, failure) -> {
+                    if (pendingByNpc.get(pending.npcUuid) != pending) {
+                        return;
+                    }
+                    if (failure == null && section != null) {
+                        applyScheduler.schedule(
+                                destinationWorld,
+                                pending.npcUuid,
+                                APPLY_AFTER_LOAD_DELAY_MS
+                        );
+                        return;
+                    }
+                    diagnostics.chunkRequestFailed(
+                            pending.npcUuid, chunkX, chunkZ, failure
+                    );
+                });
     }
 
     private void requestChunk(World chunkWorld,

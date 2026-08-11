@@ -6,6 +6,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.TestEntityComponentStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.entity.reference.InvalidatablePersistentRef;
+import com.hypixel.hytale.server.npc.components.SpawnMarkerReference;
 import com.hypixel.hytale.server.spawning.spawnmarkers.SpawnMarkerEntity;
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
@@ -13,10 +14,13 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompanionSpawnAuthorityServiceTest {
+    /** Protects the reported lost-marker despawn during unloaded Recall. */
     @Test
-    void projectedCompanionDetachesWhenNpcIsNotLoadedWithMarker()
+    void unloadedCompanionRetainsMarkerAuthorityUntilNpcLoads()
             throws Exception {
         UUID companionId = UUID.fromString(
                 "00000000-0000-0000-0000-000000000033"
@@ -45,14 +49,14 @@ class CompanionSpawnAuthorityServiceTest {
                             markerRef,
                             store,
                             markerType,
-                            tamedType,
-                            companionId::equals
+                            tamedType
                     );
 
-            assertEquals(1, detached);
-            assertEquals(1, marker.getSpawnCount());
-            assertEquals(1, marker.getNpcReferences().length);
-            assertEquals(wildNpcId, marker.getNpcReferences()[0].getUuid());
+            assertEquals(0, detached);
+            assertEquals(2, marker.getSpawnCount());
+            assertEquals(2, marker.getNpcReferences().length);
+            assertEquals(companionId, marker.getNpcReferences()[0].getUuid());
+            assertEquals(wildNpcId, marker.getNpcReferences()[1].getUuid());
         }
     }
 
@@ -77,6 +81,37 @@ class CompanionSpawnAuthorityServiceTest {
         assertEquals(1, marker.getSpawnCount());
         assertEquals(1, marker.getNpcReferences().length);
         assertEquals(wildNpcId, marker.getNpcReferences()[0].getUuid());
+    }
+
+    @Test
+    void loadedCompanionDropsNpcMarkerReferenceWhenMarkerIsUnavailable() {
+        ComponentType<EntityStore, SpawnMarkerReference> referenceType =
+                new ComponentType<>();
+        ComponentType<EntityStore, SpawnMarkerEntity> markerType =
+                new ComponentType<>();
+        SpawnMarkerReference reference = new SpawnMarkerReference();
+        reference.getReference().setUuid(UUID.fromString(
+                "00000000-0000-0000-0000-000000000055"
+        ));
+
+        try (TestEntityComponentStore store =
+                     new TestEntityComponentStore(new UnloadedEntityStore())) {
+            Ref<EntityStore> npcRef = store.createReference();
+            store.put(npcRef, referenceType, reference);
+
+            boolean detached = CompanionSpawnAuthorityService.detachMarker(
+                    npcRef,
+                    UUID.fromString(
+                            "00000000-0000-0000-0000-000000000066"
+                    ),
+                    store,
+                    referenceType,
+                    markerType
+            );
+
+            assertTrue(detached);
+            assertNull(store.getComponent(npcRef, referenceType));
+        }
     }
 
     private static InvalidatablePersistentRef reference(UUID uuid) {

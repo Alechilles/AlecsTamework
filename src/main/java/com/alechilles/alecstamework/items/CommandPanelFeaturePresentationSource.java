@@ -387,6 +387,7 @@ final class CommandPanelFeaturePresentationSource {
             case DEAD_REVIVABLE ->
                     CommandTimedSummoningState.DEAD_REVIVABLE;
             case LOST -> CommandTimedSummoningState.LOST;
+            case UNRESOLVED -> CommandTimedSummoningState.UNAVAILABLE;
             default -> CommandTimedSummoningState.UNLOADED;
         };
     }

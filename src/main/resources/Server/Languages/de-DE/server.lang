@@ -457,6 +457,7 @@ tamework.ui.linkedPanel.revive.confirm=Wiederbeleben
 tamework.ui.linkedPanel.roster.state=Kaderstatus: {0}
 tamework.ui.linkedPanel.roster.state.active=Aktiv
 tamework.ui.linkedPanel.roster.state.unloaded=Nicht geladen
+tamework.ui.linkedPanel.roster.state.unavailable=Nicht verfügbar - Persistenzreparatur erforderlich
 tamework.ui.linkedPanel.roster.state.restoring=Wird beschworen
 tamework.ui.linkedPanel.roster.state.storing=Kehrt in den Kader zurück
 tamework.ui.linkedPanel.roster.state.stored=Gespeichert

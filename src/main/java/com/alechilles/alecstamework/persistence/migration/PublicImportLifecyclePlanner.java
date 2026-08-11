@@ -260,11 +260,14 @@ final class PublicImportLifecyclePlanner {
     ) {
         int positive = state.captureActive() + state.deathActive()
                 + state.lostActive() + state.inCoop();
-        if (positive > 1) {
-            profile.conflict("MUTUALLY_EXCLUSIVE_LIFECYCLE_FLAGS");
-        }
         if (state.inCoop() == 0 && !coopRows.isEmpty()) {
             profile.conflict("COOP_RESIDENCY_STATE_CONFLICT");
+        }
+        if (positive > 1) {
+            resolveLegacyFlagConflict(
+                    profile, state, snapshots, coopRows, positive
+            );
+            return;
         }
         if (profile.hasConflicts() || positive == 0) {
             profile.lifecycle("UNRESOLVED", "UNRESOLVED", null, state.updatedAtMs());
@@ -279,6 +282,124 @@ final class PublicImportLifecyclePlanner {
         } else {
             resolveCoopLifecycle(profile, state, coopRows);
         }
+    }
+
+    private void resolveLegacyFlagConflict(
+            PublicImportPlanningModel.ProfileDraft profile,
+            LegacyPublicData.ProfileState state,
+            List<PublicImportPlanningModel.SnapshotDraft> snapshots,
+            List<PublicImportPlanningModel.CoopDraft> coopRows,
+            int positive
+    ) {
+        ArrayList<LifecycleCandidate> candidates = new ArrayList<>();
+        if (state.captureActive() == 1) {
+            addSnapshotCandidate(
+                    candidates, profile, snapshots, "capture",
+                    "CAPTURED", "CAPTURE_ITEM"
+            );
+        }
+        if (state.deathActive() == 1) {
+            addSnapshotCandidate(
+                    candidates, profile, snapshots, "death",
+                    "DEAD_REVIVABLE", "NONE"
+            );
+        }
+        if (state.lostActive() == 1) {
+            addSnapshotCandidate(
+                    candidates, profile, snapshots, "lost",
+                    "LOST", "NONE"
+            );
+        }
+        if (state.inCoop() == 1) {
+            addCoopCandidate(candidates, state, coopRows);
+        }
+        LifecycleCandidate winner = newestUnambiguous(
+                candidates, positive, state.updatedAtMs()
+        );
+        if (profile.hasConflicts() || winner == null) {
+            profile.conflict("MUTUALLY_EXCLUSIVE_LIFECYCLE_FLAGS");
+            profile.lifecycle(
+                    "UNRESOLVED", "UNRESOLVED", null,
+                    state.updatedAtMs()
+            );
+            return;
+        }
+        profile.lifecycle(
+                winner.lifecycleState(), winner.locationKind(),
+                winner.locationKey(), state.updatedAtMs()
+        );
+        profile.authoritativeSnapshot(winner.snapshotId());
+    }
+
+    private void addSnapshotCandidate(
+            List<LifecycleCandidate> candidates,
+            PublicImportPlanningModel.ProfileDraft profile,
+            List<PublicImportPlanningModel.SnapshotDraft> snapshots,
+            String kind,
+            String lifecycleState,
+            String locationKind
+    ) {
+        List<PublicImportPlanningModel.SnapshotDraft> active = snapshots.stream()
+                .filter(snapshot -> snapshot.profileId().equals(
+                        profile.source().profileId()
+                ) && snapshot.kind().equals(kind)
+                        && snapshot.sourceActive())
+                .toList();
+        if (active.size() != 1) {
+            return;
+        }
+        PublicImportPlanningModel.SnapshotDraft snapshot = active.getFirst();
+        candidates.add(new LifecycleCandidate(
+                lifecycleState,
+                locationKind,
+                "NONE".equals(locationKind) ? null : snapshot.snapshotId(),
+                snapshot.snapshotId(),
+                snapshot.createdAtMs()
+        ));
+    }
+
+    private void addCoopCandidate(
+            List<LifecycleCandidate> candidates,
+            LegacyPublicData.ProfileState state,
+            List<PublicImportPlanningModel.CoopDraft> coopRows
+    ) {
+        boolean complete = coopRows.size() == 1
+                && state.coopKey() != null
+                && state.coopKey().equals(
+                legacyProfileStateKey(coopRows.getFirst().slot())
+        ) && coopRows.getFirst().snapshot() != null;
+        if (!complete) {
+            return;
+        }
+        PublicImportPlanningModel.CoopDraft coop = coopRows.getFirst();
+        candidates.add(new LifecycleCandidate(
+                "COOP",
+                "COOP_SLOT",
+                targetCoopKey(coop.slot()).toString(),
+                coop.snapshot().snapshotId(),
+                coop.slot().updatedAtMs()
+        ));
+    }
+
+    @Nullable
+    private LifecycleCandidate newestUnambiguous(
+            List<LifecycleCandidate> candidates,
+            int expectedCandidates,
+            long stateUpdatedAtMs
+    ) {
+        if (candidates.size() != expectedCandidates) {
+            return null;
+        }
+        long newestAt = candidates.stream()
+                .mapToLong(LifecycleCandidate::evidenceAtMs)
+                .max()
+                .orElse(Long.MIN_VALUE);
+        List<LifecycleCandidate> newest = candidates.stream()
+                .filter(candidate -> candidate.evidenceAtMs() == newestAt)
+                .toList();
+        return newest.size() == 1 && newestAt == stateUpdatedAtMs
+                ? newest.getFirst()
+                : null;
     }
 
     private void resolveSnapshotLifecycle(
@@ -299,6 +420,7 @@ final class PublicImportLifecyclePlanner {
         } else {
             String locationKey = "NONE".equals(location) ? null : active.getFirst().snapshotId();
             profile.lifecycle(lifecycle, location, locationKey, state.updatedAtMs());
+            profile.authoritativeSnapshot(active.getFirst().snapshotId());
         }
     }
 
@@ -323,6 +445,9 @@ final class PublicImportLifecyclePlanner {
                     targetCoopKey(coopRows.getFirst().slot()).toString(),
                     state.updatedAtMs()
             );
+            profile.authoritativeSnapshot(
+                    coopRows.getFirst().snapshot().snapshotId()
+            );
         }
     }
 
@@ -331,10 +456,18 @@ final class PublicImportLifecyclePlanner {
             Map<String, PublicImportPlanningModel.ProfileDraft> profiles
     ) {
         return snapshots.stream()
-                .map(snapshot -> snapshot.target(
-                        snapshot.sourceActive()
-                                && !profiles.get(snapshot.profileId()).hasConflicts()
-                ))
+                .map(snapshot -> {
+                    PublicImportPlanningModel.ProfileDraft profile =
+                            profiles.get(snapshot.profileId());
+                    String authoritative = profile.authoritativeSnapshotId();
+                    boolean selected = authoritative == null
+                            || authoritative.equals(snapshot.snapshotId());
+                    return snapshot.target(
+                            snapshot.sourceActive()
+                                    && !profile.hasConflicts()
+                                    && selected
+                    );
+                })
                 .toList();
     }
 
@@ -416,5 +549,14 @@ final class PublicImportLifecyclePlanner {
                 profile.changedAtMs(),
                 incidentId
         );
+    }
+
+    private record LifecycleCandidate(
+            String lifecycleState,
+            String locationKind,
+            @Nullable String locationKey,
+            String snapshotId,
+            long evidenceAtMs
+    ) {
     }
 }
