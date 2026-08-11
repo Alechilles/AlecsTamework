@@ -17,15 +17,6 @@
     <a href="https://www.modstats.io/stats/alecs-tamework" target="_blank" rel="nofollow"><img src="https://www.modstats.io/api/v1/stats/projects/alecs-tamework/embed/card.svg?layout=live&amp;theme=curseforge" alt="Alec's Tamework! ModStats"></a>
 </p>
 
-## Includes Patchwork
-- Add, merge, and insert JSON into Hytale server assets without replacing the source asset
-- Apply one patch file across multiple target assets
-- Gate optional integrations on installed mods, versions, assets, targets, or registered mod data
-- Install Patchwork separately or use the copy embedded in Tamework; the newest compatible runtime wins
-- The embedded Patchwork runtime is version `1.3.0`; it contributes its own hosted-only telemetry project when Alec's Telemetry `1.1.0` is available
-- Alternative to Hytalor, Patchly, and Zima
-- [Learn More](https://wiki.hytalemodding.dev/mod/alecs-tamework/asset-patches)
-
 # Alec's Tamework!
 Alec's Tamework is a modular NPC framework for Hytale built to let modders add rich NPC features through assets, templates, and config-driven systems instead of writing custom Java code. It embeds Patchwork for non-destructive asset patching, so artists, designers, and less technical modders can build advanced optional integrations without first creating their own plugin.
 
@@ -110,7 +101,5 @@ https://discord.gg/E8n8RgTTdq
 <p><a href="https://www.curseforge.com/hytale/mods/alecs-tamework">Alec's Tamework</a> uses <a href="https://www.curseforge.com/hytale/mods/alecs-telemetry">Alec's Telemetry</a> for its own crash, error, performance, and usage telemetry. The Patchwork runtime embedded in Tamework reports Patchwork operations through a separate hosted-only project.</p>
 <p>Automatic aggregate Tamework and Patchwork telemetry does not include personally identifiable information and is used to diagnose issues and improve the mods. Reports you submit manually can include the contact text and server-log attachments you choose to send; review those fields and files before submitting.</p>
 <p>Tamework and Patchwork have independent consent entries, so disabling Tamework telemetry does not implicitly disable Patchwork telemetry. You may change either entry at any time in the `/telemetry consent` menu.</p>
-<p>The packaged dependency line is Tamework with Patchwork `1.3.0` and Alec's Telemetry `1.1.0`. Patchwork contributions use the hosted Alec endpoint in this release; custom contributed endpoints and live same-ID replacement/failover are not part of this compatibility line. Restart the server after retiring or replacing the elected Patchwork project.</p>
 <p>Alec's Tamework also reports anonymized active user numbers to <a href="https://hstats.dev/">HStats</a> to track active user count summaries.</p>
 <br />
-
