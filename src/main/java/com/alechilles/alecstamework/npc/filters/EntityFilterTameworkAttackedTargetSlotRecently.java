@@ -7,14 +7,15 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
-import com.hypixel.hytale.server.npc.corecomponents.EntityFilterBase;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.support.MarkedEntitySupport;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import javax.annotation.Nonnull;
 
 /**
  * Entity filter that matches when the candidate has recently damaged the entity in a target slot.
  */
-public final class EntityFilterTameworkAttackedTargetSlotRecently extends EntityFilterBase {
+public final class EntityFilterTameworkAttackedTargetSlotRecently extends TameworkEntityFilterBase {
     public static final String TYPE = "TameworkAttackedTargetSlotRecently";
 
     private final int sourceTargetSlot;
@@ -40,7 +41,7 @@ public final class EntityFilterTameworkAttackedTargetSlotRecently extends Entity
         if (targetRef == null || !targetRef.isValid()) {
             return false;
         }
-        Ref<EntityStore> sourceRef = resolveSourceRef(ref, role);
+        Ref<EntityStore> sourceRef = resolveSourceRef(ref, role, store);
         long maxAgeMs = maxAgeSeconds < 0.0 ? -1L : Math.round(maxAgeSeconds * 1000.0);
         long nowMs = resolveCurrentTimeMs(store);
         if (sourceRef != null && sourceRef.isValid()
@@ -55,9 +56,12 @@ public final class EntityFilterTameworkAttackedTargetSlotRecently extends Entity
         return 0;
     }
 
-    private Ref<EntityStore> resolveSourceRef(@Nonnull Ref<EntityStore> selfRef, @Nonnull Role role) {
-        if (sourceTargetSlot != Integer.MIN_VALUE && role.getMarkedEntitySupport() != null) {
-            Ref<EntityStore> sourceRef = role.getMarkedEntitySupport().getMarkedEntityRef(sourceTargetSlot);
+    private Ref<EntityStore> resolveSourceRef(@Nonnull Ref<EntityStore> selfRef,
+                                              @Nonnull Role role,
+                                              @Nonnull Store<EntityStore> store) {
+        MarkedEntitySupport markedEntitySupport = NpcSupportAccess.markedEntity(role, selfRef, store);
+        if (sourceTargetSlot != Integer.MIN_VALUE && markedEntitySupport != null) {
+            Ref<EntityStore> sourceRef = markedEntitySupport.getMarkedEntityRef(sourceTargetSlot);
             if (sourceRef != null && sourceRef.isValid()) {
                 return sourceRef;
             }

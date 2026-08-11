@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.selftest;
 
+import com.alechilles.alecstamework.npc.compat.NpcDisplayNameAccess;
 import com.alechilles.alecstamework.config.TameworkIds;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.items.ApiSelfTestCommandToolFactory;
@@ -28,7 +29,6 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import it.unimi.dsi.fastutil.Pair;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -475,7 +475,7 @@ public final class ApiSelfTestFixtureManager {
                     )
             );
         }
-        EntitySupport.setDisplayName(npcRef, displayName, store);
+        NpcDisplayNameAccess.set(npcRef, displayName, store);
 
         TransformComponent transform = store.getComponent(npcRef, TransformComponent.getComponentType());
         Vector3d actualPosition = transform != null ? new Vector3d(transform.getPosition()) : new Vector3d(spawnPosition);

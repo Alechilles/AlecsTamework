@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.ownership.LegacyTamedOwnershipBridge;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -55,7 +56,7 @@ final class InteractionLegacyAdoptionService {
         ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
         NPCEntity npc = npcType == null ? null : context.store().getComponent(context.npcRef(), npcType);
         Role liveRole = npc != null && npc.getRole() != null ? npc.getRole() : fallbackRole;
-        if (liveRole == null || liveRole.getStateSupport() == null) {
+        if (liveRole == null || NpcSupportAccess.state(liveRole, context.npcRef(), context.store()) == null) {
             return;
         }
         debugLogger.accept("TameworkInteract: applied legacy ownership; resuming interaction.");

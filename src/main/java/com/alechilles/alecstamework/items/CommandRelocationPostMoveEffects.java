@@ -1,11 +1,13 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.support.MarkedEntitySupport;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
@@ -27,20 +29,23 @@ final class CommandRelocationPostMoveEffects {
             report(failed, "role-resolution");
             return;
         }
-        applyLockedTargetClear(role, pending, failed);
-        applyOwnerTarget(world, role, pending, failed);
+        applyLockedTargetClear(role, npcRef, store, pending, failed);
+        applyOwnerTarget(world, role, npcRef, store, pending, failed);
         applyState(role, npcRef, store, pending, failed);
     }
 
     private static void applyLockedTargetClear(@Nullable Role role,
+                                               Ref<EntityStore> npcRef,
+                                               Store<EntityStore> store,
                                                PendingRelocation pending,
                                                Consumer<String> failed) {
         if (!pending.clearLockedTarget || role == null) {
             return;
         }
         try {
-            if (role.getMarkedEntitySupport() != null) {
-                role.getMarkedEntitySupport().setMarkedEntity("LockedTarget", null);
+            MarkedEntitySupport markedEntity = NpcSupportAccess.markedEntity(role, npcRef, store);
+            if (markedEntity != null) {
+                markedEntity.setMarkedEntity("LockedTarget", null);
             }
         } catch (RuntimeException | LinkageError exception) {
             report(failed, "locked-target-clear");
@@ -49,6 +54,8 @@ final class CommandRelocationPostMoveEffects {
 
     private static void applyOwnerTarget(World world,
                                          @Nullable Role role,
+                                         Ref<EntityStore> npcRef,
+                                         Store<EntityStore> store,
                                          PendingRelocation pending,
                                          Consumer<String> failed) {
         if (!pending.assignOwnerAsMasterTarget || pending.ownerUuid == null || role == null) {
@@ -56,8 +63,9 @@ final class CommandRelocationPostMoveEffects {
         }
         try {
             Ref<EntityStore> ownerRef = world.getEntityRef(pending.ownerUuid);
-            if (ownerRef != null && ownerRef.isValid() && role.getMarkedEntitySupport() != null) {
-                role.getMarkedEntitySupport().setMarkedEntity(MASTER_TARGET_SLOT, ownerRef);
+            MarkedEntitySupport markedEntity = NpcSupportAccess.markedEntity(role, npcRef, store);
+            if (ownerRef != null && ownerRef.isValid() && markedEntity != null) {
+                markedEntity.setMarkedEntity(MASTER_TARGET_SLOT, ownerRef);
             }
         } catch (RuntimeException | LinkageError exception) {
             report(failed, "owner-target-assign");
@@ -73,7 +81,7 @@ final class CommandRelocationPostMoveEffects {
             return;
         }
         try {
-            StateSupport support = role.getStateSupport();
+            StateSupport support = NpcSupportAccess.state(role, npcRef, store);
             if (support == null) {
                 return;
             }

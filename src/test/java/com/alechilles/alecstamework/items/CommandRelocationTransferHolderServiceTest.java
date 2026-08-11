@@ -41,11 +41,13 @@ class CommandRelocationTransferHolderServiceTest {
         assertNotSame(original, destination);
         assertEquals(new Vector3d(-128.0, 85.0, 224.0), destination.getPosition());
         assertEquals(original.getRotation(), destination.getRotation());
-        assertNull(destination.getChunkRef(), "A destination holder must not retain a source-world chunk ref.");
+        assertNull(destination.getSectionRef(),
+                "A destination holder must not retain a source-world section ref.");
         assertTrue(service.restoreSource(holder, snapshot));
         TransformComponent restored = holder.getComponent(transformType);
         assertEquals(new Vector3d(32.0, 70.0, -48.0), restored.getPosition());
         assertEquals(original.getRotation(), restored.getRotation());
-        assertNull(restored.getChunkRef(), "Rollback must let the source store bind its own chunk.");
+        assertNull(restored.getSectionRef(),
+                "Rollback must let the source store bind its own section.");
     }
 }

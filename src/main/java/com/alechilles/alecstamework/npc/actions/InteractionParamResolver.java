@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.params.StdScopeLookupCache;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
@@ -34,7 +35,7 @@ final class InteractionParamResolver {
         if (role == null) {
             return null;
         }
-        EntitySupport support = role.getEntitySupport();
+        EntitySupport support = NpcSupportAccess.entity(role, null, null);
         return support != null ? support.getSensorScope() : null;
     }
 

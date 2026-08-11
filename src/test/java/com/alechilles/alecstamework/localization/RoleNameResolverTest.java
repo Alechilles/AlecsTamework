@@ -4,14 +4,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.alechilles.alecstamework.npc.compat.NpcSupportTestFixture;
 import com.hypixel.hytale.server.npc.role.Role;
-import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
-import java.lang.reflect.Field;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import sun.misc.Unsafe;
 
 class RoleNameResolverTest {
+
+    @AfterEach
+    void clearNpcSupport() {
+        NpcSupportTestFixture.clear();
+    }
 
     @Test
     void serverPluralRoleKeyAlsoChecksUnprefixedPluralLanguageKey() {
@@ -79,23 +83,6 @@ class RoleNameResolverTest {
     }
 
     private static Role roleWithSensorScope(StdScope scope) throws ReflectiveOperationException {
-        Unsafe unsafe = unsafe();
-        Role role = (Role) unsafe.allocateInstance(Role.class);
-        EntitySupport entitySupport = (EntitySupport) unsafe.allocateInstance(EntitySupport.class);
-        setField(entitySupport, "sensorScope", scope);
-        setField(role, "entitySupport", entitySupport);
-        return role;
-    }
-
-    private static void setField(Object target, String fieldName, Object value) throws ReflectiveOperationException {
-        Field field = target.getClass().getDeclaredField(fieldName);
-        field.setAccessible(true);
-        field.set(target, value);
-    }
-
-    private static Unsafe unsafe() throws ReflectiveOperationException {
-        Field unsafe = Unsafe.class.getDeclaredField("theUnsafe");
-        unsafe.setAccessible(true);
-        return (Unsafe) unsafe.get(null);
+        return NpcSupportTestFixture.bindRoleWithSensorScope(scope);
     }
 }

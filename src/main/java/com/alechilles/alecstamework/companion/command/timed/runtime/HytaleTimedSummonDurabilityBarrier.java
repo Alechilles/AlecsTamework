@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.command.timed.runtime;
 
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.runtime.chunk
         .HytaleChunkSaveSupport;
@@ -51,10 +52,10 @@ final class HytaleTimedSummonDurabilityBarrier {
                         HytaleChunkSaveSupport.Outcome.retryable(null)
                 );
             }
-            CompletableFuture<Void> save = saver.saveHolder(
-                    chunk.getX(),
-                    chunk.getZ(),
-                    chunk.toHolder()
+            CompletableFuture<Void> save = HytaleChunkAccess.saveColumn(
+                    saver,
+                    chunk,
+                    world
             );
             return HytaleChunkSaveSupport.saveAndFlush(
                     save,

@@ -10,7 +10,6 @@ import com.hypixel.hytale.protocol.AnimationSlot;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.physics.util.PhysicsMath;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.npc.corecomponents.BodyMotionBase;
 import com.hypixel.hytale.server.npc.corecomponents.builders.BuilderBodyMotionBase;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.movement.Steering;
@@ -25,7 +24,7 @@ import org.joml.Vector3d;
 /**
  * Suppresses normal AI body motion while mounted and steers from the latest rider input snapshot.
  */
-public final class BodyMotionTameworkRide extends BodyMotionBase {
+public final class BodyMotionTameworkRide extends TameworkBodyMotionBase {
     private static final double INPUT_DEAD_ZONE = 0.025;
     private static final double GROUNDED_FLIGHT_ASSIST = 0.35;
     private long lastDebugMs;

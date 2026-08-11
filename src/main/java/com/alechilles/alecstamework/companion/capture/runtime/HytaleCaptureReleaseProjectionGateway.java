@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.companion.capture.runtime;
 
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseRequest;
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.alechilles.alecstamework.companion.capture.runtime.CaptureReleaseWorldAttempt.ProjectionProbe;
 import com.alechilles.alecstamework.companion.capture.runtime.CaptureReleaseWorldAttempt.ProjectionStatus;
 import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
@@ -247,20 +248,7 @@ final class HytaleCaptureReleaseProjectionGateway {
     private WorldChunk currentChunk(
             @Nullable TransformComponent transform
     ) {
-        Ref<ChunkStore> chunkRef =
-                transform == null ? null : transform.getChunkRef();
-        ChunkStore chunks = world.getChunkStore();
-        Store<ChunkStore> chunkComponents =
-                chunks == null ? null : chunks.getStore();
-        if (chunkRef == null || !chunkRef.isValid()
-                || chunkComponents == null) {
-            return null;
-        }
-        WorldChunk chunk = chunkComponents.getComponent(
-                chunkRef,
-                WorldChunk.getComponentType()
-        );
-        return chunk != null && chunk.getWorld() == world ? chunk : null;
+        return HytaleChunkAccess.currentWorldChunk(transform, world);
     }
 
     private boolean exact(

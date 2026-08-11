@@ -8,7 +8,6 @@ import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 
@@ -58,8 +57,7 @@ public final class TameworkFeedTroughWaterChargesComponent implements Component<
         if (componentType == null) {
             return null;
         }
-        int blockIndex = ChunkUtil.indexBlockInColumn(x, y, z);
-        Ref<ChunkStore> blockRef = chunk.getBlockComponentChunk().getEntityReference(blockIndex);
+        Ref<ChunkStore> blockRef = chunk.getBlockComponentEntity(x, y, z);
         if (blockRef == null || !blockRef.isValid()) {
             return null;
         }

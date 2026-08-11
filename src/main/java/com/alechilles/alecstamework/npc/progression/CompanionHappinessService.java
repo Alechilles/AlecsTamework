@@ -5,10 +5,10 @@ import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.params.StdScopeLookupCache;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Component;
@@ -772,11 +772,7 @@ public final class CompanionHappinessService {
             return null;
         }
         NPCEntity npc = store.getComponent(npcRef, npcType);
-        if (npc == null || npc.getRole() == null || npc.getRole().getEntitySupport() == null) {
-            return null;
-        }
-        EntitySupport support = npc.getRole().getEntitySupport();
-        return support.getSensorScope();
+        return npc == null ? null : NpcSupportAccess.sensorScope(npc.getRole(), npcRef, store);
     }
 
     @Nonnull

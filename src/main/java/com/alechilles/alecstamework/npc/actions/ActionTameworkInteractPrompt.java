@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.CustomInte
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.HarvestInteraction;
 import com.alechilles.alecstamework.npc.alarms.TameworkAlarmService;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.InteractionEntry;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModeCycleInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MountInteraction;
@@ -25,6 +26,7 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 
 /**
@@ -57,7 +59,8 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
                            InfoProvider infoProvider,
                            double dt,
                            Store<EntityStore> store) {
-        if (npcRef == null || !npcRef.isValid() || role == null || role.getStateSupport() == null) {
+        StateSupport stateSupport = NpcSupportAccess.state(role, npcRef, store);
+        if (npcRef == null || !npcRef.isValid() || role == null || stateSupport == null) {
             maybeLogEarlyPromptDebug("invalid_npc_or_role", role, infoProvider);
             return false;
         }
@@ -133,9 +136,9 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         }
         if (changed) {
             // Force a refresh when the prompt changes so the hint updates on the client.
-            role.getStateSupport().setInteractable(npcRef, interactionTarget, false, null, false, store);
+            stateSupport.setInteractable(npcRef, interactionTarget, false, null, false, store);
         }
-        role.getStateSupport().setInteractable(
+        stateSupport.setInteractable(
                 npcRef,
                 interactionTarget,
                 interactable,
@@ -163,8 +166,9 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         ItemStack activeItem = PlayerInventoryAccess.getActiveHotbarItem(player);
         String activeItemId = activeItem != null && !activeItem.isEmpty() ? activeItem.getItemId() : null;
         int activeQuantity = activeItem != null && !activeItem.isEmpty() ? activeItem.getQuantity() : 0;
-        int stateIndex = role != null && role.getStateSupport() != null ? role.getStateSupport().getStateIndex() : -1;
-        int subStateIndex = role != null && role.getStateSupport() != null ? role.getStateSupport().getSubStateIndex() : -1;
+        StateSupport stateSupport = NpcSupportAccess.state(role, null, null);
+        int stateIndex = stateSupport != null ? stateSupport.getStateIndex() : -1;
+        int subStateIndex = stateSupport != null ? stateSupport.getSubStateIndex() : -1;
         return new PromptSelectionFingerprint(activeItemId, activeQuantity, stateIndex, subStateIndex);
     }
 
@@ -375,10 +379,10 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         }
         lastEarlyDebugMs = now;
         String roleName = role != null ? role.getRoleName() : "<null>";
-        boolean hasStateTarget = role != null
-                && role.getStateSupport() != null
-                && role.getStateSupport().getInteractionIterationTarget() != null
-                && role.getStateSupport().getInteractionIterationTarget().isValid();
+        StateSupport stateSupport = NpcSupportAccess.state(role, null, null);
+        boolean hasStateTarget = stateSupport != null
+                && stateSupport.getInteractionIterationTarget() != null
+                && stateSupport.getInteractionIterationTarget().isValid();
         boolean hasPosition = infoProvider != null && infoProvider.hasPosition();
         String positionProvider = "<none>";
         if (hasPosition && infoProvider.getPositionProvider() != null) {

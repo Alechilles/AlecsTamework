@@ -1,14 +1,16 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
+import com.alechilles.alecstamework.npc.compat.NpcSupportTestFixture;
 import com.alechilles.alecstamework.npc.sensors.SensorTameworkEffectActive;
+import com.hypixel.hytale.server.npc.instructions.ExecutionSupport;
 import com.hypixel.hytale.server.npc.role.Role;
-import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.util.ComponentInfo;
 import com.hypixel.hytale.server.npc.util.IAnnotatedComponent;
 import com.hypixel.hytale.server.npc.util.IAnnotatedComponentCollection;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.lang.reflect.Field;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
@@ -16,6 +18,11 @@ import sun.misc.Unsafe;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 class TameworkTameFoodDisplayResolverTest {
+    @AfterEach
+    void clearNpcSupport() {
+        NpcSupportTestFixture.clear();
+    }
+
     @Test
     void tameItemsParamBeatsExplicitAndLovedItems() throws Exception {
         StdScope scope = new StdScope(null);
@@ -262,19 +269,7 @@ class TameworkTameFoodDisplayResolverTest {
     }
 
     private static Role newRoleWithScope(StdScope scope) throws Exception {
-        Unsafe unsafe = getUnsafe();
-        Role role = (Role) unsafe.allocateInstance(Role.class);
-        EntitySupport entitySupport = (EntitySupport) unsafe.allocateInstance(EntitySupport.class);
-
-        Field sensorScopeField = EntitySupport.class.getDeclaredField("sensorScope");
-        sensorScopeField.setAccessible(true);
-        sensorScopeField.set(entitySupport, scope);
-
-        Field entitySupportField = Role.class.getDeclaredField("entitySupport");
-        entitySupportField.setAccessible(true);
-        entitySupportField.set(role, entitySupport);
-
-        return role;
+        return NpcSupportTestFixture.bindRoleWithSensorScope(scope);
     }
 
     private static SensorTameworkEffectActive newTranquilizerSensorWithThreshold(double thresholdSeconds)
@@ -317,7 +312,7 @@ class TameworkTameFoodDisplayResolverTest {
         }
 
         @Override
-        public void getInfo(Role role, ComponentInfo componentInfo) {
+        public void getInfo(ExecutionSupport support, ComponentInfo componentInfo) {
         }
 
         @Override

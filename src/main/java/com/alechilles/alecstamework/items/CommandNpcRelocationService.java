@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.hypixel.hytale.component.AddReason;
@@ -12,6 +13,7 @@ import com.hypixel.hytale.server.core.modules.entity.component.TransformComponen
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -332,7 +334,7 @@ public final class CommandNpcRelocationService {
                 return false;
             }
             knownWorldByNpc.put(npcUuid, world);
-            String currentState = resolveCurrentStateName(npc);
+            String currentState = resolveCurrentStateName(ref, npc, store);
             if (!pending.physicalMutationAttempted() && !pending.isStateAllowed(currentState)) {
                 logTravelDiagnostic(
                         Level.INFO,
@@ -595,7 +597,7 @@ public final class CommandNpcRelocationService {
             retryPendingFromWorld(destinationWorld, npcUuid, pending);
             return;
         }
-        String sourceState = resolveCurrentStateName(sourceNpc);
+        String sourceState = resolveCurrentStateName(sourceRef, sourceNpc, sourceStore);
         if (!pending.isStateAllowed(sourceState)) {
             logTravelDiagnostic(
                     Level.INFO,
@@ -999,11 +1001,17 @@ public final class CommandNpcRelocationService {
     }
 
     @Nullable
-    private String resolveCurrentStateName(@Nullable NPCEntity npc) {
-        if (npc == null || npc.getRole() == null || npc.getRole().getStateSupport() == null) {
+    private String resolveCurrentStateName(@Nullable Ref<EntityStore> npcRef,
+                                           @Nullable NPCEntity npc,
+                                           @Nullable Store<EntityStore> store) {
+        if (npc == null || npc.getRole() == null || npcRef == null || store == null) {
             return null;
         }
-        String state = npc.getRole().getStateSupport().getStateName();
+        StateSupport stateSupport = NpcSupportAccess.state(npc.getRole(), npcRef, store);
+        if (stateSupport == null) {
+            return null;
+        }
+        String state = stateSupport.getStateName();
         return state != null && !state.isBlank() ? state : null;
     }
 

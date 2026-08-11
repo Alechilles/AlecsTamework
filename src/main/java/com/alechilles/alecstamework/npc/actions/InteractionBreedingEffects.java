@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
@@ -162,10 +163,10 @@ final class InteractionBreedingEffects {
 
     @Nullable
     private String resolveCurrentStateName(@Nullable Role role) {
-        if (role == null || role.getStateSupport() == null || role.getStateSupport().getStateHelper() == null) {
+        StateSupport stateSupport = NpcSupportAccess.state(role, null, null);
+        if (role == null || stateSupport == null || stateSupport.getStateHelper() == null) {
             return null;
         }
-        StateSupport stateSupport = role.getStateSupport();
         int currentState = stateSupport.getStateIndex();
         if (currentState == StateSupport.NO_STATE) {
             return null;

@@ -1,11 +1,15 @@
 package com.alechilles.alecstamework.localization;
 
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.asset.builder.Builder;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderParameters;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,6 +46,16 @@ public final class RoleNameResolver {
 
     @Nullable
     public static String resolveRoleNameKey(@Nullable Role role) {
+        return resolveRoleNameKey(role, null, null);
+    }
+
+    /**
+     * Resolves a role name key with the live NPC context available to Update 6 ECS support access.
+     */
+    @Nullable
+    public static String resolveRoleNameKey(@Nullable Role role,
+                                            @Nullable Ref<EntityStore> npcRef,
+                                            @Nullable Store<EntityStore> store) {
         if (role == null) {
             return null;
         }
@@ -49,11 +63,14 @@ public final class RoleNameResolver {
         if (nameTranslationKey != null && !nameTranslationKey.isBlank()) {
             return nameTranslationKey;
         }
-        EntitySupport entitySupport = role.getEntitySupport();
-        if (entitySupport == null) {
-            return null;
+        EntitySupport entitySupport = NpcSupportAccess.entity(role, npcRef, store);
+        if (entitySupport != null) {
+            String scopedKey = readScopeStringParam(entitySupport.getSensorScope(), ROLE_NAME_PARAM_KEYS);
+            if (scopedKey != null && !scopedKey.isBlank()) {
+                return scopedKey;
+            }
         }
-        return readScopeStringParam(entitySupport.getSensorScope(), ROLE_NAME_PARAM_KEYS);
+        return resolveRoleNameKey(role.getRoleName());
     }
 
     @Nullable

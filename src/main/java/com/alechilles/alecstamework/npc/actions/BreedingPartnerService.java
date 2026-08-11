@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
@@ -79,7 +80,7 @@ final class BreedingPartnerService {
                 ? CompanionGenderService.resolveGender(sourceRef, store, sourceRoleId, config)
                 : null;
 
-        if (requireWander && !isInWanderState(sourceNpc.getRole())) {
+        if (requireWander && !isInWanderState(sourceRef, sourceNpc.getRole(), store)) {
             return null;
         }
         if (requireAdult && !CompanionLifeStageService.isAdult(sourceRef, store, sourceRoleId)) {
@@ -140,7 +141,7 @@ final class BreedingPartnerService {
                 if (requireAdult && !CompanionLifeStageService.isAdult(candidateRef, store, candidateRoleId)) {
                     continue;
                 }
-                if (requireWander && !isInWanderState(candidateNpc.getRole())) {
+                if (requireWander && !isInWanderState(candidateRef, candidateNpc.getRole(), store)) {
                     continue;
                 }
                 TameworkOwnerComponent candidateOwner = ownerType != null
@@ -275,11 +276,13 @@ final class BreedingPartnerService {
         return null;
     }
 
-    private static boolean isInWanderState(@Nullable Role role) {
-        if (role == null || role.getStateSupport() == null || role.getStateSupport().getStateHelper() == null) {
+    private static boolean isInWanderState(@Nullable Ref<EntityStore> npcRef,
+                                           @Nullable Role role,
+                                           @Nullable Store<EntityStore> store) {
+        StateSupport stateSupport = NpcSupportAccess.state(role, npcRef, store);
+        if (role == null || stateSupport == null || stateSupport.getStateHelper() == null) {
             return false;
         }
-        StateSupport stateSupport = role.getStateSupport();
         int stateIndex = stateSupport.getStateIndex();
         if (stateIndex == StateSupport.NO_STATE) {
             return false;

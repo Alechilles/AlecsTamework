@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.companion.command.timed.runtime
         .TimedSummonWorldAttempt.SourceProbe;
 import com.alechilles.alecstamework.companion.command.timed.runtime
         .TimedSummonWorldAttempt.StoreProbe;
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.alechilles.alecstamework.companion.snapshot
         .SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot
@@ -252,18 +253,7 @@ final class HytaleTimedSummonStoreGateway {
     private WorldChunk currentChunk(
             @Nullable TransformComponent transform
     ) {
-        Ref<ChunkStore> chunkRef =
-                transform == null ? null : transform.getChunkRef();
-        ChunkStore chunkStore = world.getChunkStore();
-        Store<ChunkStore> chunks =
-                chunkStore == null ? null : chunkStore.getStore();
-        if (chunkRef == null || !chunkRef.isValid() || chunks == null) {
-            return null;
-        }
-        WorldChunk chunk = chunks.getComponent(
-                chunkRef, WorldChunk.getComponentType()
-        );
-        return chunk != null && chunk.getWorld() == world ? chunk : null;
+        return HytaleChunkAccess.currentWorldChunk(transform, world);
     }
 
     private boolean exactPair(StoreProbe probe) {

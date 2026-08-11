@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.NpcHealthP
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.StringRequirement;
 import com.alechilles.alecstamework.npc.alarms.TameworkAlarmService;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -23,6 +24,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import com.hypixel.hytale.server.npc.util.expression.ExecutionContext;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
@@ -172,10 +174,11 @@ public class ActionTameworkInteract extends TameworkActionBase {
         if (npcRef == null || !npcRef.isValid()) {
             return false;
         }
-        if (role == null || role.getStateSupport() == null) {
+        StateSupport stateSupport = NpcSupportAccess.state(role, npcRef, store);
+        if (role == null || stateSupport == null) {
             return false;
         }
-        Ref<EntityStore> interactionTarget = role.getStateSupport().getInteractionIterationTarget();
+        Ref<EntityStore> interactionTarget = stateSupport.getInteractionIterationTarget();
         if (interactionTarget == null || !interactionTarget.isValid()) {
             selection.logDebug("TameworkInteract: no interaction target recorded.");
             return false;
@@ -397,7 +400,8 @@ public class ActionTameworkInteract extends TameworkActionBase {
     }
 
     boolean matchesNpcState(StringRequirement requirement, Role role) {
-        if (requirement == null || role == null || role.getStateSupport() == null) {
+        StateSupport stateSupport = NpcSupportAccess.state(role, null, null);
+        if (requirement == null || role == null || stateSupport == null) {
             return false;
         }
         String state = requirement.getState();
@@ -411,16 +415,16 @@ public class ActionTameworkInteract extends TameworkActionBase {
         }
         if (state != null && !state.isBlank()) {
             if (subState == null || subState.isBlank()) {
-                return role.getStateSupport().inState(state, "");
+                return stateSupport.inState(state, "");
             }
-            return role.getStateSupport().inState(state, subState);
+            return stateSupport.inState(state, subState);
         }
         if (subState == null || subState.isBlank()) {
             return false;
         }
-        int currentState = role.getStateSupport().getStateIndex();
-        int currentSubState = role.getStateSupport().getSubStateIndex();
-        String currentSubName = role.getStateSupport()
+        int currentState = stateSupport.getStateIndex();
+        int currentSubState = stateSupport.getSubStateIndex();
+        String currentSubName = stateSupport
                 .getStateHelper()
                 .getSubStateName(currentState, currentSubState);
         return currentSubName != null && currentSubName.equalsIgnoreCase(subState);

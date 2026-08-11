@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
@@ -60,7 +61,7 @@ final class CommandRelocationTransferHolderService {
          * UNLOAD preserves the holder but does not dirty Hytale's source chunk. Marking it
          * first makes the transferred entity's absence durable without authoring removal.
          */
-        sourceTransform.markChunkDirty(sourceStore);
+        HytaleChunkAccess.markNeedsSaving(sourceTransform, sourceStore);
         Holder<EntityStore> holder = sourceStore.removeEntity(sourceRef, RemoveReason.UNLOAD);
         if (holder == null) {
             return DrainResult.failure("empty-holder");

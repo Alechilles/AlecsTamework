@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideRiderComponent;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.hypixel.hytale.builtin.mounts.MountPlugin;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
@@ -212,10 +213,10 @@ public final class MountedGlideCleanupSystem extends EntityTickingSystem<EntityS
                             @Nonnull Store<EntityStore> store,
                             @Nonnull String state,
                             @Nonnull String subState) {
-        if (state.isBlank() || role.getStateSupport() == null) {
+        StateSupport support = NpcSupportAccess.state(role, mountRef, store);
+        if (state.isBlank() || support == null) {
             return;
         }
-        StateSupport support = role.getStateSupport();
         if (support.getStateHelper() != null && support.getStateHelper().getStateIndex(state) == StateSupport.NO_STATE) {
             return;
         }

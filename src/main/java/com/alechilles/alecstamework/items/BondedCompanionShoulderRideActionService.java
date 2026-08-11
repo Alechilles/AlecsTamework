@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes;
 import com.alechilles.alecstamework.api.BondedCompanionProfileView;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
+import com.alechilles.alecstamework.compat.HytaleMountedComponentAccess;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionShoulderRideSettings;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
@@ -13,7 +14,6 @@ import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.protocol.AnimationSlot;
 import com.hypixel.hytale.protocol.MountController;
 import com.hypixel.hytale.protocol.MovementStates;
@@ -286,10 +286,13 @@ final class BondedCompanionShoulderRideActionService {
             double offsetY = settings.getOffsetY()
                     + (isCrouching(playerRef, store)
                     ? settings.getCrouchOffsetY() : 0D);
-            store.putComponent(npcRef, mountedType, new MountedComponent(
-                    playerRef, new Rotation3f((float) settings.getOffsetX(),
-                    (float) offsetY,
-                    (float) settings.getOffsetZ()), MountController.Minecart));
+            store.putComponent(npcRef, mountedType,
+                    HytaleMountedComponentAccess.createEntityMount(
+                            playerRef,
+                            (float) settings.getOffsetX(),
+                            (float) offsetY,
+                            (float) settings.getOffsetZ(),
+                            MountController.Minecart));
         }
 
         private boolean isCrouching(Ref<EntityStore> playerRef,

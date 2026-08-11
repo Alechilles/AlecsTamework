@@ -24,7 +24,7 @@ public class SensorTameworkIsOwner extends TameworkSensorBase {
         if (!super.matches(ref, role, dt, store)) {
             return false;
         }
-        Player player = resolveInteractionPlayer(role, store);
+        Player player = resolveInteractionPlayer(ref, role, store);
         if (player == null) {
             return false;
         }

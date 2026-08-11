@@ -61,7 +61,7 @@ sourceSets.main.resources.setSrcDirs([embeddedAssetPackDirectory])
 hytaleTools {
     hytaleVersion = property('hytale_version')
     patchline = property('hytale_patchline')
-    manifestServerVersion = '0.5.x'
+    manifestServerVersion = property('hytale_server_version_range')
     manifestGroup = 'Alechilles'
     modId = "Alec's Tamework!"
     modDescription = 'A modular mob taming, behavior, and mechanics framework for Hytale!'

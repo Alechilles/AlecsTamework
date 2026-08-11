@@ -2,18 +2,23 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamRequirement;
+import com.alechilles.alecstamework.npc.compat.NpcSupportTestFixture;
 import com.hypixel.hytale.server.npc.role.Role;
-import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.lang.reflect.Field;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import sun.misc.Unsafe;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Tests for Interaction parameter matching. */
 class InteractionParamMatcherTest {
+
+    @AfterEach
+    void clearNpcSupport() {
+        NpcSupportTestFixture.clear();
+    }
 
     @Test
     void paramMatcherSupportsNumericOperators() throws Exception {
@@ -74,30 +79,12 @@ class InteractionParamMatcherTest {
     }
 
     private static Role newRoleWithScope(StdScope scope) throws Exception {
-        Unsafe unsafe = getUnsafe();
-        Role role = (Role) unsafe.allocateInstance(Role.class);
-        EntitySupport entitySupport = (EntitySupport) unsafe.allocateInstance(EntitySupport.class);
-
-        Field sensorScopeField = EntitySupport.class.getDeclaredField("sensorScope");
-        sensorScopeField.setAccessible(true);
-        sensorScopeField.set(entitySupport, scope);
-
-        Field entitySupportField = Role.class.getDeclaredField("entitySupport");
-        entitySupportField.setAccessible(true);
-        entitySupportField.set(role, entitySupport);
-
-        return role;
+        return NpcSupportTestFixture.bindRoleWithSensorScope(scope);
     }
 
     private static void setField(Object target, String fieldName, Object value) throws Exception {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
         field.set(target, value);
-    }
-
-    private static Unsafe getUnsafe() throws Exception {
-        Field field = Unsafe.class.getDeclaredField("theUnsafe");
-        field.setAccessible(true);
-        return (Unsafe) field.get(null);
     }
 }

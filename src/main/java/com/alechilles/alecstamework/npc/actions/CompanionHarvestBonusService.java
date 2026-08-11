@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.params.StdScopeLookupCache;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.hypixel.hytale.component.Ref;
@@ -141,7 +142,7 @@ final class CompanionHarvestBonusService {
         if (role == null) {
             return null;
         }
-        EntitySupport support = role.getEntitySupport();
+        EntitySupport support = NpcSupportAccess.entity(role, null, null);
         StdScope scope = support != null ? support.getSensorScope() : null;
         return SCOPE_LOOKUP.getString(scope, HARVEST_BONUS_MODE_PARAM);
     }

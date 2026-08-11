@@ -9,7 +9,6 @@ import com.hypixel.hytale.server.core.modules.entity.component.TransformComponen
 import com.hypixel.hytale.server.core.modules.physics.util.PhysicsMath;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
-import com.hypixel.hytale.server.npc.corecomponents.BodyMotionBase;
 import com.hypixel.hytale.server.npc.movement.Steering;
 import com.hypixel.hytale.server.npc.movement.controllers.MotionController;
 import com.hypixel.hytale.server.npc.movement.controllers.MotionControllerFly;
@@ -22,7 +21,7 @@ import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
 /** Target-relative orbit, approach, facing, loose waypoint, and pass-through flight steering. */
-public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
+public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase {
     private static final double MIN_DIRECTION_LENGTH = 1.0E-6;
     private static final double MIN_APPROACH_SPEED_FACTOR = 0.2;
     private static final double RADIAL_CORRECTION_WEIGHT = 0.85;

@@ -4,6 +4,8 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.debug.CompanionXpEventDebugLogService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService.AwardResult;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
+import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.ItemUtils;
@@ -13,6 +15,7 @@ import com.hypixel.hytale.server.core.modules.item.ItemModule;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.corecomponents.items.ActionDropItem;
+import com.hypixel.hytale.server.npc.instructions.ExecutionSupport;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import com.hypixel.hytale.server.npc.util.InventoryHelper;
@@ -32,7 +35,6 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
         super(builder, support);
     }
 
-    @Override
     public boolean execute(@Nonnull Ref<EntityStore> ref,
                            @Nonnull Role role,
                            InfoProvider sensorInfo,
@@ -40,7 +42,8 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
                            @Nonnull Store<EntityStore> store) {
         setOnce();
         prepareDelay();
-        startDelay(role.getEntitySupport());
+        EntitySupport entitySupport = NpcSupportAccess.entity(role, ref, store);
+        startDelay(entitySupport);
 
         List<ItemStack> baseDrops = resolveDrops();
         if (baseDrops.isEmpty()) {
@@ -76,6 +79,21 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
                     + " dropList=" + valueOrNull(this.dropList));
         }
         return true;
+    }
+
+    /** Bridges the Update 6 callback while retaining the Update 5 Role overload above. */
+    @Override
+    public boolean execute(@Nonnull Ref<EntityStore> ref,
+                           @Nonnull ExecutionSupport support,
+                           InfoProvider sensorInfo,
+                           double dt,
+                           @Nonnull Store<EntityStore> store) {
+        ExecutionSupport previous = NpcSupportAccess.push(support);
+        try {
+            return execute(ref, support.getRole(), sensorInfo, dt, store);
+        } finally {
+            NpcSupportAccess.restore(previous);
+        }
     }
 
     private List<ItemStack> resolveDrops() {

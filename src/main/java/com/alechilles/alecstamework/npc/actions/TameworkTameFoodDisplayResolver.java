@@ -4,11 +4,15 @@ import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.progression.TranquilizerStackDisplayService;
 import com.alechilles.alecstamework.npc.sensors.SensorTameworkEffectActive;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.asset.builder.Builder;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderParameters;
@@ -56,17 +60,35 @@ public final class TameworkTameFoodDisplayResolver {
 
     @Nonnull
     public FoodDisplay resolveFoodDisplayItemIds(@Nullable String roleId, @Nullable Role role, boolean tamed) {
+        return resolveFoodDisplayItemIds(roleId, role, null, null, tamed);
+    }
+
+    @Nonnull
+    public FoodDisplay resolveFoodDisplayItemIds(@Nullable String roleId,
+                                                 @Nullable Role role,
+                                                 @Nullable Ref<EntityStore> npcRef,
+                                                 @Nullable Store<EntityStore> store,
+                                                 boolean tamed) {
         TwFoodConfig.ResolvedFoodProfile foodProfile = TwFoodConfig.resolveProfileForRole(roleId);
         if (foodProfile != null && foodProfile.hasAnyFood()) {
             return fromFoodProfile(foodProfile, tamed);
         }
         TwInteractionConfig config = TwInteractionConfig.resolveForRole(roleId);
-        return resolveFoodDisplayItemIds(config, role, tamed);
+        StdScope sensorScope = NpcSupportAccess.sensorScope(role, npcRef, store);
+        return resolveFoodDisplayItemIds(config, role, tamed, sensorScope);
     }
 
     @Nonnull
     FoodDisplay resolveFoodDisplayItemIds(@Nullable TwInteractionConfig config, @Nullable Role role, boolean tamed) {
-        InteractionParamResolver paramResolver = new InteractionParamResolver(null, null, null);
+        return resolveFoodDisplayItemIds(config, role, tamed, null);
+    }
+
+    @Nonnull
+    private FoodDisplay resolveFoodDisplayItemIds(@Nullable TwInteractionConfig config,
+                                                  @Nullable Role role,
+                                                  boolean tamed,
+                                                  @Nullable StdScope sensorScope) {
+        InteractionParamResolver paramResolver = new InteractionParamResolver(null, null, sensorScope);
         InteractionContextSnapshot ctx = InteractionContextSnapshot.from(null, paramResolver.resolveRoleScopes(role, null));
         InteractionItemIdResolver itemIdResolver = new InteractionItemIdResolver(paramResolver);
         String[] lovedItems = resolveLovedItems(paramResolver, role, ctx);

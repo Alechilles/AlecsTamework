@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModifyStatsEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.OwnerSource;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetOwnerEffect;
@@ -84,11 +85,12 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
 
     // Starts the harvest state using the default substate if available.
     boolean applyStartHarvest(Ref<EntityStore> npcRef, Role role, Store<EntityStore> store) {
-        if (role == null || role.getStateSupport() == null) {
+        StateSupport stateSupport = NpcSupportAccess.state(role, npcRef, store);
+        if (role == null || stateSupport == null) {
             return false;
         }
         String subState = resolveDefaultSubState(role);
-        role.getStateSupport().setState(npcRef, "$Harvest", subState, store);
+        stateSupport.setState(npcRef, "$Harvest", subState, store);
         return true;
     }
 
@@ -286,7 +288,8 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
 
     // Sets the role state and substate from the config.
     boolean applySetState(SetStateEffect effect, Ref<EntityStore> npcRef, Role role, Store<EntityStore> store) {
-        if (effect == null || role == null || role.getStateSupport() == null) {
+        StateSupport stateSupport = NpcSupportAccess.state(role, npcRef, store);
+        if (effect == null || role == null || stateSupport == null) {
             return false;
         }
         String state = effect.getState();
@@ -300,7 +303,6 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
             if (subState == null || subState.isBlank()) {
                 return false;
             }
-            StateSupport stateSupport = role.getStateSupport();
             if (stateSupport.getStateHelper() == null) {
                 return false;
             }
@@ -313,7 +315,7 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
         if (subState == null || subState.isBlank()) {
             subState = resolveDefaultSubState(role);
         }
-        role.getStateSupport().setState(npcRef, state, subState == null ? "" : subState, store);
+        stateSupport.setState(npcRef, state, subState == null ? "" : subState, store);
         return true;
     }
 
@@ -408,10 +410,11 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
 
     // Resolves the default substate for a role.
     String resolveDefaultSubState(Role role) {
-        if (role == null || role.getStateSupport() == null || role.getStateSupport().getStateHelper() == null) {
+        StateSupport stateSupport = NpcSupportAccess.state(role, null, null);
+        if (role == null || stateSupport == null || stateSupport.getStateHelper() == null) {
             return "";
         }
-        String sub = role.getStateSupport().getStateHelper().getDefaultSubState();
+        String sub = stateSupport.getStateHelper().getDefaultSubState();
         return sub == null ? "" : sub;
     }
 

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -15,6 +16,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -74,14 +76,15 @@ final class SetOwnerAppliedEffects {
     }
 
     private void applyState(Ref<EntityStore> npcRef, Store<EntityStore> store, @Nullable Role role) {
-        if (state == null || role == null || role.getStateSupport() == null) {
+        StateSupport stateSupport = NpcSupportAccess.state(role, npcRef, store);
+        if (state == null || role == null || stateSupport == null) {
             return;
         }
         String[] parts = state.split("\\.", 2);
         String stateName = parts[0];
         String subState = parts.length > 1 ? parts[1] : "";
         if (!stateName.isBlank()) {
-            role.getStateSupport().setState(npcRef, stateName, subState, store);
+            stateSupport.setState(npcRef, stateName, subState, store);
         }
     }
 

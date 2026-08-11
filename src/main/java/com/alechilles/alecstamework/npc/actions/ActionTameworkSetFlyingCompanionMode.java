@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.npc.components.TameworkFlyingCompanionComponent;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
+import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -10,6 +12,8 @@ import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.movement.controllers.MotionController;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.support.MarkedEntitySupport;
+import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import com.hypixel.hytale.server.npc.sensorinfo.IPositionProvider;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import org.joml.Vector3d;
@@ -29,9 +33,17 @@ public final class ActionTameworkSetFlyingCompanionMode extends TameworkActionBa
     private final double verticalMovementEpsilon;
     private final int landingTargetSlotIndex;
     private final boolean landingUseInfoProviderPosition;
+    private final MotionControllerSwitcher motionControllerSwitcher;
 
     public ActionTameworkSetFlyingCompanionMode(BuilderActionTameworkSetFlyingCompanionMode builder,
                                                 BuilderSupport support) {
+        this(builder, support, (role, ref, npc, controller, accessor) ->
+                role.setActiveMotionController(ref, npc, controller, accessor));
+    }
+
+    ActionTameworkSetFlyingCompanionMode(BuilderActionTameworkSetFlyingCompanionMode builder,
+                                         BuilderSupport support,
+                                         MotionControllerSwitcher motionControllerSwitcher) {
         super(builder);
         this.mode = builder.getMode(support);
         this.landingState = builder.getLandingState(support);
@@ -42,6 +54,7 @@ public final class ActionTameworkSetFlyingCompanionMode extends TameworkActionBa
         this.verticalMovementEpsilon = builder.getVerticalMovementEpsilon(support);
         this.landingTargetSlotIndex = builder.getLandingTargetSlotIndex(support);
         this.landingUseInfoProviderPosition = builder.getLandingUseInfoProviderPosition(support);
+        this.motionControllerSwitcher = motionControllerSwitcher;
     }
 
     @Override
@@ -65,7 +78,7 @@ public final class ActionTameworkSetFlyingCompanionMode extends TameworkActionBa
         if (TameworkFlyingCompanionComponent.MODE_FALL.equalsIgnoreCase(mode)) {
             NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
             if (role == null || npc == null
-                    || !role.setActiveMotionController(npcRef, npc, "Walk", store)) {
+                    || !motionControllerSwitcher.activate(role, npcRef, npc, "Walk", store)) {
                 return false;
             }
             disableLandingControl(npcRef, store);
@@ -83,7 +96,7 @@ public final class ActionTameworkSetFlyingCompanionMode extends TameworkActionBa
         String previousMode = updated.getMode();
         Vector3d landingPosition = landingUseInfoProviderPosition ? resolveLandingPosition(infoProvider) : null;
         if (landingPosition == null && landingTargetSlotIndex >= 0) {
-            landingPosition = resolveMarkedTargetPosition(role, store, landingTargetSlotIndex);
+            landingPosition = resolveMarkedTargetPosition(npcRef, role, store, landingTargetSlotIndex);
         }
         updated.configure(
                 mode,
@@ -98,7 +111,7 @@ public final class ActionTameworkSetFlyingCompanionMode extends TameworkActionBa
         );
         boolean modeChanged = previousMode == null || !previousMode.equalsIgnoreCase(updated.getMode());
         if (TameworkFlyingCompanionComponent.MODE_HOLD.equals(updated.getMode())) {
-            if (isGroundedByController(role) && isGroundedState(role, updated.getGroundedState())) {
+            if (isGroundedByController(role) && isGroundedState(npcRef, role, store, updated.getGroundedState())) {
                 if (modeChanged || !updated.isGroundedPhase()) {
                     updated.enterGroundedPhase(updated.getLastObservedY());
                 }
@@ -130,13 +143,15 @@ public final class ActionTameworkSetFlyingCompanionMode extends TameworkActionBa
     }
 
     @Nullable
-    private static Vector3d resolveMarkedTargetPosition(@Nullable Role role,
+    private static Vector3d resolveMarkedTargetPosition(@Nullable Ref<EntityStore> npcRef,
+                                                        @Nullable Role role,
                                                         @Nullable Store<EntityStore> store,
                                                         int targetSlotIndex) {
-        if (role == null || store == null || targetSlotIndex < 0 || role.getMarkedEntitySupport() == null) {
+        MarkedEntitySupport markedEntitySupport = NpcSupportAccess.markedEntity(role, npcRef, store);
+        if (role == null || store == null || targetSlotIndex < 0 || markedEntitySupport == null) {
             return null;
         }
-        Ref<EntityStore> targetRef = role.getMarkedEntitySupport().getMarkedEntityRef(targetSlotIndex);
+        Ref<EntityStore> targetRef = markedEntitySupport.getMarkedEntityRef(targetSlotIndex);
         if (targetRef == null || !targetRef.isValid()) {
             return null;
         }
@@ -174,8 +189,12 @@ public final class ActionTameworkSetFlyingCompanionMode extends TameworkActionBa
         return controller != null && controller.onGround();
     }
 
-    private boolean isGroundedState(Role role, String groundedState) {
-        if (role == null || role.getStateSupport() == null || groundedState == null || groundedState.isBlank()) {
+    private boolean isGroundedState(@Nullable Ref<EntityStore> npcRef,
+                                    Role role,
+                                    Store<EntityStore> store,
+                                    String groundedState) {
+        StateSupport stateSupport = NpcSupportAccess.state(role, npcRef, store);
+        if (role == null || stateSupport == null || groundedState == null || groundedState.isBlank()) {
             return false;
         }
         String state = groundedState;
@@ -186,8 +205,17 @@ public final class ActionTameworkSetFlyingCompanionMode extends TameworkActionBa
             subState = parts[1];
         }
         if (subState == null || subState.isBlank()) {
-            return role.getStateSupport().inState(state, "");
+            return stateSupport.inState(state, "");
         }
-        return role.getStateSupport().inState(state, subState);
+        return stateSupport.inState(state, subState);
+    }
+
+    @FunctionalInterface
+    interface MotionControllerSwitcher {
+        boolean activate(Role role,
+                         Ref<EntityStore> ref,
+                         NPCEntity npc,
+                         String controller,
+                         ComponentAccessor<EntityStore> accessor);
     }
 }

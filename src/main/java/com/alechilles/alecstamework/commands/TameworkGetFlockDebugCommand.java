@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.commands;
 
+import com.alechilles.alecstamework.npc.compat.NpcAlarmAccess;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
@@ -19,7 +21,8 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.flock.FlockMembership;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
-import com.hypixel.hytale.server.npc.storage.AlarmStore;
+import com.hypixel.hytale.server.npc.role.support.EntitySupport;
+import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import com.hypixel.hytale.server.npc.util.Alarm;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.lang.reflect.Field;
@@ -64,10 +67,10 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
         String roleId = CompanionRoleIdResolver.resolveRoleId(candidate.ref, store);
         String stage = CompanionLifeStageService.resolveCurrentStage(candidate.ref, store, roleId);
         StageGateSnapshot stageGate = resolveStageGate(candidate.ref, store, roleId, stage);
-        String currentState = resolveStateName(npc);
+        String currentState = resolveStateName(candidate.ref, npc, store);
 
-        AlarmSnapshot alarm = resolveAlarmSnapshot(npc, store, DIRECT_FOLLOW_ALARM);
-        Boolean flag = readDirectFollowFlag(npc);
+        AlarmSnapshot alarm = resolveAlarmSnapshot(candidate.ref, store, DIRECT_FOLLOW_ALARM);
+        Boolean flag = readDirectFollowFlag(candidate.ref, npc, store);
         boolean derivedFlag = deriveDirectFollowFlag(stage, alarm);
         boolean usingDerivedFlag = flag == null;
         FlockSnapshot flock = resolveFlockSnapshot(candidate.ref, store);
@@ -156,14 +159,10 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
     }
 
     @Nonnull
-    private static AlarmSnapshot resolveAlarmSnapshot(@Nonnull NPCEntity npc,
+    private static AlarmSnapshot resolveAlarmSnapshot(@Nonnull Ref<EntityStore> npcRef,
                                                       @Nonnull Store<EntityStore> store,
                                                       @Nonnull String alarmName) {
-        AlarmStore alarmStore = npc.getAlarmStore();
-        if (alarmStore == null) {
-            return new AlarmSnapshot("unavailable", null);
-        }
-        Alarm alarm = alarmStore.get(npc, alarmName);
+        Alarm alarm = NpcAlarmAccess.resolveAlarm(npcRef, store, alarmName);
         if (alarm == null || !alarm.isSet()) {
             return new AlarmSnapshot("unset", null);
         }
@@ -193,9 +192,10 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
                                                            @Nonnull StageGateSnapshot stageGate,
                                                            @Nonnull String currentState) {
         Role role = npc.getRole();
-        StdScope scope = (role != null && role.getEntitySupport() != null)
-                ? role.getEntitySupport().getSensorScope()
+        EntitySupport entitySupport = role != null
+                ? NpcSupportAccess.entity(role, npcRef, store)
                 : null;
+        StdScope scope = entitySupport != null ? entitySupport.getSensorScope() : null;
 
         Boolean leashEnabledValue = getBooleanFromScope(scope, "LeashEnabled");
         Double leashRadiusValue = getNumberFromScope(scope, "FlockFollowerWanderRadius");
@@ -308,22 +308,28 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
     }
 
     @Nonnull
-    private static String resolveStateName(@Nonnull NPCEntity npc) {
+    private static String resolveStateName(@Nonnull Ref<EntityStore> npcRef,
+                                           @Nonnull NPCEntity npc,
+                                           @Nonnull Store<EntityStore> store) {
         Role role = npc.getRole();
-        if (role == null || role.getStateSupport() == null) {
+        StateSupport stateSupport = role != null ? NpcSupportAccess.state(role, npcRef, store) : null;
+        if (stateSupport == null) {
             return "<unknown>";
         }
-        String state = role.getStateSupport().getStateName();
+        String state = stateSupport.getStateName();
         return state != null && !state.isBlank() ? state : "<unknown>";
     }
 
     @Nullable
-    private static Boolean readDirectFollowFlag(@Nonnull NPCEntity npc) {
+    private static Boolean readDirectFollowFlag(@Nonnull Ref<EntityStore> npcRef,
+                                                @Nonnull NPCEntity npc,
+                                                @Nonnull Store<EntityStore> store) {
         Role role = npc.getRole();
-        if (role == null || role.getEntitySupport() == null) {
+        EntitySupport entitySupport = role != null ? NpcSupportAccess.entity(role, npcRef, store) : null;
+        if (entitySupport == null) {
             return null;
         }
-        StdScope sensorScope = role.getEntitySupport().getSensorScope();
+        StdScope sensorScope = entitySupport.getSensorScope();
         if (sensorScope == null) {
             return null;
         }

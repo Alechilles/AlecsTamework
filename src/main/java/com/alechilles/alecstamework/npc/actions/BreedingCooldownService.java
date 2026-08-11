@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.compat.NpcAlarmAccess;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
@@ -11,7 +12,6 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import com.hypixel.hytale.server.npc.storage.AlarmStore;
 import com.hypixel.hytale.server.npc.util.Alarm;
 import java.time.Instant;
 import java.util.UUID;
@@ -162,10 +162,7 @@ final class BreedingCooldownService {
         if (npc == null || cooldownUntilMs == 0L) {
             return;
         }
-        AlarmStore alarmStore = npc.getAlarmStore();
-        Alarm alarm = alarmStore != null
-                ? alarmStore.get(npc, BREEDING_COOLDOWN_ALARM_NAME)
-                : null;
+        Alarm alarm = NpcAlarmAccess.resolveAlarm(npcRef, store, BREEDING_COOLDOWN_ALARM_NAME);
         if (alarm != null) {
             alarm.set(npcRef, Instant.ofEpochMilli(cooldownUntilMs), store);
         }

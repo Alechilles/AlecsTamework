@@ -7,6 +7,8 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
+import com.alechilles.alecstamework.npc.compat.NpcMarkedTargetAccess;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
@@ -28,6 +30,7 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -225,7 +228,13 @@ public final class NpcSpawnCommandService {
         }
         Ref<EntityStore> masterRef = playerRef;
         if (npc.getRole() != null) {
-            npc.getRole().setMarkedTarget("MasterTarget", masterRef);
+            NpcMarkedTargetAccess.set(
+                    npc.getRole(),
+                    npcRef,
+                    store,
+                    "MasterTarget",
+                    masterRef
+            );
         }
     }
 
@@ -329,7 +338,7 @@ public final class NpcSpawnCommandService {
                 npcNameResolver.resolveNpcNameKey(npc),
                 roleId,
                 activate,
-                resolveCachedCommandState(npc)
+                resolveCachedCommandState(npc, npcRef, store)
         );
         context.changed = true;
         return true;
@@ -366,11 +375,17 @@ public final class NpcSpawnCommandService {
     }
 
     @Nullable
-    private String resolveCachedCommandState(NPCEntity npc) {
-        if (npc == null || npc.getRole() == null || npc.getRole().getStateSupport() == null) {
+    private String resolveCachedCommandState(NPCEntity npc,
+                                             Ref<EntityStore> npcRef,
+                                             Store<EntityStore> store) {
+        if (npc == null || npc.getRole() == null || npcRef == null || store == null) {
             return null;
         }
-        String stateName = npc.getRole().getStateSupport().getStateName();
+        StateSupport stateSupport = NpcSupportAccess.state(npc.getRole(), npcRef, store);
+        if (stateSupport == null) {
+            return null;
+        }
+        String stateName = stateSupport.getStateName();
         return (stateName != null && !stateName.isBlank()) ? stateName : null;
     }
 

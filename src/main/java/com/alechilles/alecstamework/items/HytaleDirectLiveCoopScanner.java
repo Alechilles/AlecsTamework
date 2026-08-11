@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.companion.coop.CoopSlotKey;
+import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.hypixel.hytale.builtin.adventure.farming.component.CoopResidentComponent;
@@ -211,25 +212,15 @@ final class HytaleDirectLiveCoopScanner {
             Store<ChunkStore> store,
             @Nullable Object info
     ) {
-        Object rawReference = invoke(info, "getChunkRef");
-        if (!(rawReference instanceof Ref<?> raw)) {
+        HytaleBlockStateAccess.BlockLocation resolved =
+                HytaleBlockStateAccess.resolve(store, info);
+        if (resolved == null) {
             return null;
         }
-        @SuppressWarnings("unchecked")
-        Ref<ChunkStore> reference = (Ref<ChunkStore>) raw;
-        WorldChunk chunk = safeChunkComponent(
-                store, reference, WorldChunk.getComponentType()
-        );
-        Object rawIndex = invoke(info, "getIndex");
-        if (chunk == null || !(rawIndex instanceof Number number)) {
-            return null;
-        }
-        int index = number.intValue();
-        int localX = ChunkUtil.xFromBlockInColumn(index);
-        int y = ChunkUtil.yFromBlockInColumn(index);
-        int localZ = ChunkUtil.zFromBlockInColumn(index);
-        int x = ChunkUtil.worldCoordFromLocalCoord(chunk.getX(), localX);
-        int z = ChunkUtil.worldCoordFromLocalCoord(chunk.getZ(), localZ);
+        WorldChunk chunk = resolved.chunk();
+        int x = resolved.x();
+        int y = resolved.y();
+        int z = resolved.z();
         BlockType block = chunk.getBlockType(x, y, z);
         return new CoopLocation(
                 new Vector3i(x, y, z),

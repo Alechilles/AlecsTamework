@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModeStep;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.component.Ref;
@@ -38,23 +39,24 @@ final class InteractionModeCycleEffects {
                             Role role,
                             Store<EntityStore> store,
                             Player player) {
-        if (role == null || role.getStateSupport() == null) {
+        StateSupport stateSupport = NpcSupportAccess.state(role, npcRef, store);
+        if (role == null || stateSupport == null) {
             return false;
         }
         String defaultSub = stateEffects.resolveDefaultSubState(role);
         ModeStep[] resolvedCycle = (cycle == null || cycle.length == 0) ? DEFAULT_MODE_CYCLE : cycle;
-        ResolvedModeStep[] resolved = resolveValidModeSteps(resolvedCycle, role, defaultSub);
+        ResolvedModeStep[] resolved = resolveValidModeSteps(resolvedCycle, stateSupport, defaultSub);
         if (resolved.length == 0) {
             owner.logDebug("ModeToggle: no valid mode cycle states found for role " + role.getRoleName());
             return false;
         }
-        int currentIndex = findCurrentModeIndex(resolved, role);
+        int currentIndex = findCurrentModeIndex(resolved, stateSupport);
         int nextIndex = (currentIndex + 1) % resolved.length;
         if (currentIndex < 0) {
             nextIndex = 0;
         }
         ResolvedModeStep next = resolved[nextIndex];
-        role.getStateSupport().setState(npcRef, next.state, resolveSetSubState(next.subState, defaultSub), store);
+        stateSupport.setState(npcRef, next.state, resolveSetSubState(next.subState, defaultSub), store);
         if (next.message != null && !next.message.isBlank()) {
             String message = resolveMessage(next.message, player);
             boolean emitted = false;
@@ -72,11 +74,12 @@ final class InteractionModeCycleEffects {
     }
 
     // Filters and resolves mode steps against the role's valid states and substates.
-    private ResolvedModeStep[] resolveValidModeSteps(ModeStep[] cycle, Role role, String defaultSub) {
-        if (cycle == null || cycle.length == 0 || role == null || role.getStateSupport() == null) {
+    private ResolvedModeStep[] resolveValidModeSteps(ModeStep[] cycle,
+                                                     StateSupport stateSupport,
+                                                     String defaultSub) {
+        if (cycle == null || cycle.length == 0 || stateSupport == null) {
             return new ResolvedModeStep[0];
         }
-        StateSupport stateSupport = role.getStateSupport();
         if (stateSupport.getStateHelper() == null) {
             return new ResolvedModeStep[0];
         }
@@ -104,11 +107,10 @@ final class InteractionModeCycleEffects {
     }
 
     // Finds the index of the active mode step within the resolved cycle.
-    private int findCurrentModeIndex(ResolvedModeStep[] steps, Role role) {
-        if (steps == null || steps.length == 0 || role == null || role.getStateSupport() == null) {
+    private int findCurrentModeIndex(ResolvedModeStep[] steps, StateSupport stateSupport) {
+        if (steps == null || steps.length == 0 || stateSupport == null) {
             return -1;
         }
-        StateSupport stateSupport = role.getStateSupport();
         String currentStateName = resolveCurrentStateName(stateSupport);
         for (int i = 0; i < steps.length; i++) {
             ResolvedModeStep step = steps[i];

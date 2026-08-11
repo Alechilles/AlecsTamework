@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.ownership.LegacyTamedOwnershipBridge;
 import com.hypixel.hytale.component.Ref;
@@ -15,6 +16,7 @@ import com.hypixel.hytale.server.core.modules.entity.component.TransformComponen
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -151,7 +153,7 @@ final class CommandLinkMutationService {
                         npcNameResolver.resolveNpcNameKey(npc),
                         resolveCachedRoleId(npc),
                         active,
-                        resolveCachedCommandState(npc)
+                        resolveCachedCommandState(targetRef, npc, store)
                 );
             } else {
                 updatedItem = linkedNpcRecordStore.remove(updatedItem, npcUuid);
@@ -253,7 +255,9 @@ final class CommandLinkMutationService {
                     npcNameResolver.resolveNpcNameKey(candidate.npc),
                     resolveCachedRoleId(candidate.npc),
                     null,
-                    commandState != null ? commandState : resolveCachedCommandState(candidate.npc)
+                    commandState != null
+                            ? commandState
+                            : resolveCachedCommandState(candidate.ref, candidate.npc, store)
             );
             if (stateSnapshotService != null) {
                 stateSnapshotService.refreshFromEntity(candidate.ref, store);
@@ -280,11 +284,17 @@ final class CommandLinkMutationService {
         return npcNameResolver.resolveNpcRoleId(npc);
     }
 
-    private String resolveCachedCommandState(NPCEntity npc) {
-        if (npc == null || npc.getRole() == null || npc.getRole().getStateSupport() == null) {
+    private String resolveCachedCommandState(Ref<EntityStore> npcRef,
+                                             NPCEntity npc,
+                                             Store<EntityStore> store) {
+        if (npc == null || npc.getRole() == null) {
             return null;
         }
-        String stateName = npc.getRole().getStateSupport().getStateName();
+        StateSupport stateSupport = NpcSupportAccess.state(npc.getRole(), npcRef, store);
+        if (stateSupport == null) {
+            return null;
+        }
+        String stateName = stateSupport.getStateName();
         return (stateName != null && !stateName.isBlank()) ? stateName : null;
     }
 

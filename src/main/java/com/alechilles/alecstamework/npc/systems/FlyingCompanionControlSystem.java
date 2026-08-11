@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkFlyingCompanionComponent;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.util.StoreScopedState;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -124,7 +125,7 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
 
         Vector3d currentPosition = transform.getPosition();
         double currentY = currentPosition.y;
-        String currentState = resolveCurrentStateSpec(npc);
+        String currentState = resolveCurrentStateSpec(ref, store, npc);
         Vector3d standPosition = resolveLandingTarget(ref, store, tickState, npc, component, currentPosition);
         double horizontalDistanceToStand = standPosition == null
                 ? Double.MAX_VALUE
@@ -212,7 +213,8 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
                             Ref<EntityStore> npcRef,
                             Store<EntityStore> store,
                             String stateSpec) {
-        if (role == null || role.getStateSupport() == null || stateSpec == null || stateSpec.isBlank()) {
+        StateSupport support = NpcSupportAccess.state(role, npcRef, store);
+        if (role == null || support == null || stateSpec == null || stateSpec.isBlank()) {
             return;
         }
         String state = stateSpec;
@@ -222,7 +224,6 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
             state = parts[0];
             subState = parts[1];
         }
-        StateSupport support = role.getStateSupport();
         if (support.getStateHelper() != null) {
             int stateIndex = support.getStateHelper().getStateIndex(state);
             if (stateIndex == StateSupport.NO_STATE) {
@@ -338,7 +339,7 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
                                           @Nonnull NPCEntity npc,
                                           @Nonnull TameworkFlyingCompanionComponent component,
                                           @Nonnull Vector3d currentPosition) {
-        Vector3d configuredOrigin = resolveConfiguredLandingOrigin(store, npc, component);
+        Vector3d configuredOrigin = resolveConfiguredLandingOrigin(ref, store, npc, component);
         if (configuredOrigin != null) {
             Vector3d configuredTarget = resolveNearestSafeStandPosition(store, configuredOrigin);
             if (configuredTarget != null) {
@@ -361,7 +362,8 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
     }
 
     @Nullable
-    private Vector3d resolveConfiguredLandingOrigin(@Nonnull Store<EntityStore> store,
+    private Vector3d resolveConfiguredLandingOrigin(@Nonnull Ref<EntityStore> npcRef,
+                                                    @Nonnull Store<EntityStore> store,
                                                     @Nonnull NPCEntity npc,
                                                     @Nonnull TameworkFlyingCompanionComponent component) {
         Vector3d fixedPosition = component.getLandingTargetPosition();
@@ -372,10 +374,15 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
             return null;
         }
         Role role = npc.getRole();
-        if (role == null || role.getMarkedEntitySupport() == null) {
+        if (role == null) {
             return null;
         }
-        Ref<EntityStore> targetRef = role.getMarkedEntitySupport().getMarkedEntityRef(
+        com.hypixel.hytale.server.npc.role.support.MarkedEntitySupport markedEntitySupport =
+                NpcSupportAccess.markedEntity(role, npcRef, store);
+        if (markedEntitySupport == null) {
+            return null;
+        }
+        Ref<EntityStore> targetRef = markedEntitySupport.getMarkedEntityRef(
                 (int) component.getLandingTargetSlotIndex()
         );
         if (targetRef == null || !targetRef.isValid()) {
@@ -385,11 +392,16 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
         return targetTransform != null ? targetTransform.getPosition() : null;
     }
 
-    private String resolveCurrentStateSpec(NPCEntity npc) {
-        if (npc == null || npc.getRole() == null || npc.getRole().getStateSupport() == null) {
+    private String resolveCurrentStateSpec(@Nonnull Ref<EntityStore> npcRef,
+                                           @Nonnull Store<EntityStore> store,
+                                           NPCEntity npc) {
+        if (npc == null || npc.getRole() == null) {
             return null;
         }
-        StateSupport support = npc.getRole().getStateSupport();
+        StateSupport support = NpcSupportAccess.state(npc.getRole(), npcRef, store);
+        if (support == null) {
+            return null;
+        }
         String stateName = support.getStateName();
         if (stateName == null || stateName.isBlank()) {
             return null;

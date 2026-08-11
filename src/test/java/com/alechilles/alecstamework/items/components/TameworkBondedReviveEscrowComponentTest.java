@@ -5,7 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.api.BondedCompanionReviveCost;
+import com.hypixel.hytale.assetstore.TestItemAssetStore;
+import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.codec.ExtraInfo;
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer;
@@ -174,13 +177,22 @@ class TameworkBondedReviveEscrowComponentTest {
         assertEquals(-9_001L, decoded.createdAtMs());
     }
 
-    private void ensureSimpleContainerCodec() {
+    private void ensureSimpleContainerCodec() throws ReflectiveOperationException {
         synchronized (ItemContainer.CODEC) {
             if (ItemContainer.CODEC.getIdFor(
                     SimpleItemContainer.class) == null) {
-                ItemContainer.CODEC.register(
-                        "TameworkTestSimple", SimpleItemContainer.class,
-                        SimpleItemContainer.CODEC);
+                Field assetStoreField = Item.class.getDeclaredField("ASSET_STORE");
+                assetStoreField.setAccessible(true);
+                Object previous = assetStoreField.get(null);
+                try {
+                    assetStoreField.set(null,
+                            new TestItemAssetStore(new DefaultAssetMap<>()));
+                    ItemContainer.CODEC.register(
+                            "TameworkTestSimple", SimpleItemContainer.class,
+                            SimpleItemContainer.CODEC);
+                } finally {
+                    assetStoreField.set(null, previous);
+                }
             }
         }
     }

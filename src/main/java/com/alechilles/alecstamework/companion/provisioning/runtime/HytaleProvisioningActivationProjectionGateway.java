@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.companion.provisioning.runtime;
 
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationRequest;
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.alechilles.alecstamework.companion.provisioning.runtime.ProvisioningActivationWorldAttempt.ProjectionAttempt;
 import com.alechilles.alecstamework.companion.provisioning.runtime.ProvisioningActivationWorldAttempt.ProjectionProbe;
 import com.alechilles.alecstamework.companion.provisioning.runtime.ProvisioningActivationWorldAttempt.ProjectionStatus;
@@ -207,18 +208,7 @@ final class HytaleProvisioningActivationProjectionGateway {
     private WorldChunk currentChunk(
             @Nullable TransformComponent transform
     ) {
-        Ref<ChunkStore> chunkRef =
-                transform == null ? null : transform.getChunkRef();
-        ChunkStore chunkStore = world.getChunkStore();
-        Store<ChunkStore> chunks =
-                chunkStore == null ? null : chunkStore.getStore();
-        if (chunkRef == null || !chunkRef.isValid() || chunks == null) {
-            return null;
-        }
-        WorldChunk chunk = chunks.getComponent(
-                chunkRef, WorldChunk.getComponentType()
-        );
-        return chunk != null && chunk.getWorld() == world ? chunk : null;
+        return HytaleChunkAccess.currentWorldChunk(transform, world);
     }
 
     private record Components(

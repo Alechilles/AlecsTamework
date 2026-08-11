@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.compat.HytaleMovementSettingsAccess;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwMountedGlideConfig;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
@@ -600,10 +602,10 @@ final class InteractionMountEffects {
         if (!mount.getPreviousMotionController().isBlank()) {
             role.setActiveMotionController(mountRef, npc, mount.getPreviousMotionController(), store);
         }
-        if (mount.getPreviousState().isBlank() || role.getStateSupport() == null) {
+        StateSupport support = NpcSupportAccess.state(role, mountRef, store);
+        if (mount.getPreviousState().isBlank() || support == null) {
             return;
         }
-        StateSupport support = role.getStateSupport();
         if (support.getStateHelper() != null
                 && support.getStateHelper().getStateIndex(mount.getPreviousState()) == StateSupport.NO_STATE) {
             return;
@@ -640,18 +642,19 @@ final class InteractionMountEffects {
     }
 
     private String resolveCurrentState(Role role) {
-        if (role == null || role.getStateSupport() == null) {
+        StateSupport support = NpcSupportAccess.state(role, null, null);
+        if (role == null || support == null) {
             return "";
         }
-        String state = role.getStateSupport().getStateName();
+        String state = support.getStateName();
         return state == null ? "" : state;
     }
 
     private String resolveCurrentSubState(Role role) {
-        if (role == null || role.getStateSupport() == null || role.getStateSupport().getStateHelper() == null) {
+        StateSupport support = NpcSupportAccess.state(role, null, null);
+        if (role == null || support == null || support.getStateHelper() == null) {
             return "";
         }
-        StateSupport support = role.getStateSupport();
         int stateIndex = support.getStateIndex();
         int subStateIndex = support.getSubStateIndex();
         if (stateIndex < 0 || subStateIndex < 0) {
@@ -673,10 +676,10 @@ final class InteractionMountEffects {
                                 Role role,
                                 Store<EntityStore> store,
                                 String rideState) {
-        if (role == null || role.getStateSupport() == null || rideState == null || rideState.isBlank()) {
+        StateSupport support = NpcSupportAccess.state(role, npcRef, store);
+        if (role == null || support == null || rideState == null || rideState.isBlank()) {
             return;
         }
-        StateSupport support = role.getStateSupport();
         if (support.getStateHelper() != null
                 && support.getStateHelper().getStateIndex(rideState) == StateSupport.NO_STATE) {
             return;
@@ -718,7 +721,10 @@ final class InteractionMountEffects {
         if (movementManager == null) {
             return false;
         }
-        movementManager.setDefaultSettings(movementConfig.toPacket(), playerPhysicsValues, playerComponent.getGameMode());
+        if (!HytaleMovementSettingsAccess.setDefaultProfile(
+                movementManager, movementConfig, playerPhysicsValues, playerComponent.getGameMode())) {
+            return false;
+        }
         movementManager.applyDefaultSettings();
         movementManager.update(playerRefComponent.getPacketHandler());
         return true;

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideRiderComponent;
@@ -126,10 +127,10 @@ final class MountedGlideStaleStateCleanup {
         if (!mount.getPreviousMotionController().isBlank()) {
             role.setActiveMotionController(mountRef, npc, mount.getPreviousMotionController(), store);
         }
-        if (mount.getPreviousState().isBlank() || role.getStateSupport() == null) {
+        StateSupport support = NpcSupportAccess.state(role, mountRef, store);
+        if (mount.getPreviousState().isBlank() || support == null) {
             return;
         }
-        StateSupport support = role.getStateSupport();
         if (support.getStateHelper() != null
                 && support.getStateHelper().getStateIndex(mount.getPreviousState()) == StateSupport.NO_STATE) {
             return;

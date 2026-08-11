@@ -1,11 +1,12 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.InteractionContextRequirement;
+import com.alechilles.alecstamework.npc.compat.NpcSupportTestFixture;
 import com.hypixel.hytale.server.npc.role.Role;
-import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
 
@@ -15,6 +16,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Tests for Interaction context matching. */
 class InteractionContextMatchTest {
+
+    @AfterEach
+    void clearNpcSupport() {
+        NpcSupportTestFixture.clear();
+    }
 
     @Test
     void contextParamOverridesContextValue() throws Exception {
@@ -74,19 +80,7 @@ class InteractionContextMatchTest {
     }
 
     private static Role newRoleWithScope(StdScope scope) throws Exception {
-        Unsafe unsafe = getUnsafe();
-        Role role = (Role) unsafe.allocateInstance(Role.class);
-        EntitySupport entitySupport = (EntitySupport) unsafe.allocateInstance(EntitySupport.class);
-
-        Field sensorScopeField = EntitySupport.class.getDeclaredField("sensorScope");
-        sensorScopeField.setAccessible(true);
-        sensorScopeField.set(entitySupport, scope);
-
-        Field entitySupportField = Role.class.getDeclaredField("entitySupport");
-        entitySupportField.setAccessible(true);
-        entitySupportField.set(role, entitySupport);
-
-        return role;
+        return NpcSupportTestFixture.bindRoleWithSensorScope(scope);
     }
 
     private static void setField(Object target, String fieldName, Object value) throws Exception {

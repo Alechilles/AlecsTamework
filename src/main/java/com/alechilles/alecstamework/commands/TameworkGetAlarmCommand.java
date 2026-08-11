@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.commands;
 
+import com.alechilles.alecstamework.npc.compat.NpcAlarmAccess;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -9,7 +10,6 @@ import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import com.hypixel.hytale.server.npc.storage.AlarmStore;
 import com.hypixel.hytale.server.npc.util.Alarm;
 import java.lang.reflect.Field;
 import java.time.Duration;
@@ -48,16 +48,14 @@ public final class TameworkGetAlarmCommand extends AbstractWorldCommand {
             return;
         }
 
-        AlarmStore alarmStore = npc.getAlarmStore();
-        if (alarmStore == null) {
-            commandContext.sender().sendMessage(Message.raw("NPC has no alarm store."));
-            return;
-        }
-
         String alarmName = args.alarmName != null && !args.alarmName.isBlank()
                 ? args.alarmName
                 : DEFAULT_ALARM_NAME;
-        Alarm alarm = alarmStore.get(npc, alarmName);
+        Alarm alarm = NpcAlarmAccess.resolveAlarm(npcRef, store, alarmName);
+        if (alarm == null) {
+            commandContext.sender().sendMessage(Message.raw("NPC has no alarm store."));
+            return;
+        }
         Instant now = resolveGameTime(store);
         String status;
         if (!alarm.isSet()) {

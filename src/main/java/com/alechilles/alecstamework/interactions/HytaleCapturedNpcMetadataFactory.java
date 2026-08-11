@@ -1,7 +1,11 @@
 package com.alechilles.alecstamework.interactions;
 
+import com.alechilles.alecstamework.npc.compat.NpcAlarmAccess;
+import com.hypixel.hytale.component.ComponentAccessor;
+import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset;
 import com.hypixel.hytale.server.core.modules.entity.component.PersistentModel;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.metadata.CapturedNPCMetadata;
@@ -12,6 +16,8 @@ import javax.annotation.Nullable;
 final class HytaleCapturedNpcMetadataFactory {
     @Nullable
     CapturedNPCMetadata create(@Nonnull NPCEntity npc,
+                               @Nonnull Ref<EntityStore> npcRef,
+                               @Nonnull ComponentAccessor<EntityStore> accessor,
                                @Nonnull PersistentModel persistentModel,
                                @Nullable String fallbackFullIcon) {
         if (npc.getRole() == null) {
@@ -33,7 +39,7 @@ final class HytaleCapturedNpcMetadataFactory {
                 npc.getRole().getAppearanceName());
         String appearanceIcon = appearance != null ? appearance.getIcon() : null;
         metadata.setFullItemIcon(appearanceIcon != null ? appearanceIcon : fallbackFullIcon);
-        metadata.setAlarmStore(npc.getAlarmStore());
+        metadata.setAlarmStore(NpcAlarmAccess.getStore(npcRef, accessor));
         return metadata;
     }
 }

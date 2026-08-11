@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
@@ -204,7 +205,8 @@ public final class PassiveBreedingSweepService {
         if (eligibility.isRequireAdult() && !CompanionLifeStageService.isAdult(candidate.ref(), store, candidate.roleId())) {
             return false;
         }
-        String currentState = resolveCurrentStateName(candidate.npc().getRole());
+        String currentState = resolveCurrentStateName(
+                candidate.ref(), candidate.npc().getRole(), store);
         return !BreedingEligibilityService.isBlockedByState(
                 currentState,
                 eligibility.isRequireNotSleeping(),
@@ -288,11 +290,13 @@ public final class PassiveBreedingSweepService {
     }
 
     @Nullable
-    private static String resolveCurrentStateName(@Nullable Role role) {
-        if (role == null || role.getStateSupport() == null || role.getStateSupport().getStateHelper() == null) {
+    private static String resolveCurrentStateName(@Nullable Ref<EntityStore> npcRef,
+                                                  @Nullable Role role,
+                                                  @Nullable Store<EntityStore> store) {
+        StateSupport stateSupport = NpcSupportAccess.state(role, npcRef, store);
+        if (role == null || stateSupport == null || stateSupport.getStateHelper() == null) {
             return null;
         }
-        StateSupport stateSupport = role.getStateSupport();
         int currentState = stateSupport.getStateIndex();
         if (currentState == StateSupport.NO_STATE) {
             return null;

@@ -384,7 +384,8 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                                                          @Nonnull Store<EntityStore> store,
                                                          long nowMs) {
         TameworkTameFoodDisplayResolver.FoodDisplay foodDisplay =
-                tameFoodDisplayResolver.resolveFoodDisplayItemIds(roleId, npc.getRole(), tamed);
+                tameFoodDisplayResolver.resolveFoodDisplayItemIds(
+                        roleId, npc.getRole(), npcRef, store, tamed);
         List<CommandTargetHudViewModel.FoodRow> foodRows =
                 foodResolver.resolveFoodEntries(player, foodDisplay.entries());
         return new StaticTargetDisplay(

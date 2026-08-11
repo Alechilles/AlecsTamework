@@ -4,8 +4,8 @@ import com.alechilles.alecstamework.damage.SimpleClaimsDamageHytaleFixture;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.TestEntityComponentStore;
-import com.hypixel.hytale.protocol.MovementSettings;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementConfig;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
@@ -25,33 +25,27 @@ class NativeMountMovementSettingsServiceTest {
 
     @Test
     void copiedSettingsScaleOnlyBaseSpeedOnce() {
-        MovementSettings source = new MovementSettings();
-        source.baseSpeed = 6.0F;
-        source.acceleration = 0.35F;
-        source.jumpForce = 13.0F;
-        source.canFly = true;
+        MovementConfig source = new TestMovementConfig(6.0F, 0.35F, 13.0F);
 
-        MovementSettings scaled = NativeMountMovementSettingsService.copyWithScaledBaseSpeed(source, 1.25);
+        MovementConfig scaled = NativeMountMovementSettingsService.copyWithScaledBaseSpeed(source, 1.25);
 
         assertNotSame(source, scaled);
-        assertEquals(6.0F, source.baseSpeed);
-        assertEquals(7.5F, scaled.baseSpeed);
-        assertEquals(source.acceleration, scaled.acceleration);
-        assertEquals(source.jumpForce, scaled.jumpForce);
-        assertEquals(source.canFly, scaled.canFly);
+        assertEquals(6.0F, source.getBaseSpeed());
+        assertEquals(7.5F, scaled.getBaseSpeed());
+        assertEquals(source.getAcceleration(), scaled.getAcceleration());
+        assertEquals(source.getJumpForce(), scaled.getJumpForce());
     }
 
     @Test
     void invalidInputsUseNeutralMultiplier() {
-        MovementSettings source = new MovementSettings();
-        source.baseSpeed = 6.0F;
+        MovementConfig source = new TestMovementConfig(6.0F, 0.0F, 0.0F);
 
         assertEquals(6.0F,
-                NativeMountMovementSettingsService.copyWithScaledBaseSpeed(source, Double.NaN).baseSpeed);
+                NativeMountMovementSettingsService.copyWithScaledBaseSpeed(source, Double.NaN).getBaseSpeed());
         assertEquals(6.0F,
-                NativeMountMovementSettingsService.copyWithScaledBaseSpeed(source, 0.0).baseSpeed);
+                NativeMountMovementSettingsService.copyWithScaledBaseSpeed(source, 0.0).getBaseSpeed());
         assertEquals(0.0F,
-                NativeMountMovementSettingsService.copyWithScaledBaseSpeed(null, 1.25).baseSpeed);
+                NativeMountMovementSettingsService.copyWithScaledBaseSpeed(null, 1.25).getBaseSpeed());
     }
 
     @Test
@@ -148,6 +142,15 @@ class NativeMountMovementSettingsServiceTest {
         public String getName(int originalRoleIndex) {
             requestedIndex = originalRoleIndex;
             return roleName;
+        }
+    }
+
+    private static final class TestMovementConfig extends MovementConfig {
+        private TestMovementConfig(float baseSpeed, float acceleration, float jumpForce) {
+            super();
+            this.baseSpeed = baseSpeed;
+            this.acceleration = acceleration;
+            this.jumpForce = jumpForce;
         }
     }
 

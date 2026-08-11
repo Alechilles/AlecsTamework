@@ -1,11 +1,11 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.compat.NpcAlarmAccess;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import com.hypixel.hytale.server.npc.storage.AlarmStore;
 import com.hypixel.hytale.server.npc.util.Alarm;
 import java.time.Instant;
 import java.util.Locale;
@@ -94,11 +94,7 @@ final class InteractionAlarmHelper {
         if (npc == null) {
             return AlarmSnapshot.missingNpc(alarmName);
         }
-        AlarmStore alarmStore = npc.getAlarmStore();
-        if (alarmStore == null) {
-            return AlarmSnapshot.missingStore(alarmName);
-        }
-        Alarm alarm = alarmStore.get(npc, alarmName);
+        Alarm alarm = NpcAlarmAccess.resolveAlarm(npcRef, store, alarmName);
         if (alarm == null) {
             return AlarmSnapshot.missingAlarm(alarmName);
         }
@@ -120,11 +116,7 @@ final class InteractionAlarmHelper {
         if (npc == null) {
             return null;
         }
-        AlarmStore alarmStore = npc.getAlarmStore();
-        if (alarmStore == null) {
-            return null;
-        }
-        return alarmStore.get(npc, alarmName);
+        return NpcAlarmAccess.resolveAlarm(npcRef, store, alarmName);
     }
 
     // Uses world time if available; returns null when unavailable.

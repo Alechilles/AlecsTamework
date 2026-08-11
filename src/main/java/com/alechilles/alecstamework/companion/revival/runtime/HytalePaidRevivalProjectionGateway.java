@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.companion.revival.runtime.PaidRevivalWorldEv
 import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotDecodeResult;
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
 import com.alechilles.alecstamework.items.HytaleCompanionProjectionSpawnExecutor;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
@@ -209,18 +210,7 @@ final class HytalePaidRevivalProjectionGateway {
     private WorldChunk currentChunk(
             @Nullable TransformComponent transform
     ) {
-        Ref<ChunkStore> chunkRef =
-                transform == null ? null : transform.getChunkRef();
-        ChunkStore chunkStore = world.getChunkStore();
-        Store<ChunkStore> chunks =
-                chunkStore == null ? null : chunkStore.getStore();
-        if (chunkRef == null || !chunkRef.isValid() || chunks == null) {
-            return null;
-        }
-        WorldChunk chunk = chunks.getComponent(
-                chunkRef, WorldChunk.getComponentType()
-        );
-        return chunk != null && chunk.getWorld() == world ? chunk : null;
+        return HytaleChunkAccess.currentWorldChunk(transform, world);
     }
 
     private record Components(

@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -10,6 +11,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.role.support.MarkedEntitySupport;
 
 /**
  * Applies capture-side entity cleanup after a successful spawner capture.
@@ -56,7 +58,9 @@ public final class SpawnerCaptureFinalizerService {
         if (type != null) {
             store.putComponent(targetRef, type, new TameworkOwnerComponent(null, null));
         }
-        npc.getRole().getMarkedEntitySupport().setMarkedEntity(MASTER_TARGET_SLOT, null);
+        MarkedEntitySupport markedEntity = NpcSupportAccess.markedEntity(npc.getRole(), targetRef, store);
+        if (markedEntity != null) {
+            markedEntity.setMarkedEntity(MASTER_TARGET_SLOT, null);
+        }
     }
 }
-

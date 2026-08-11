@@ -13,6 +13,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderManager;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.RoleStats;
 import com.hypixel.hytale.server.npc.util.expression.ExecutionContext;
 import org.junit.jupiter.api.Test;
@@ -68,8 +69,8 @@ class SensorTameworkHasTalentTest {
             );
             SensorTameworkHasTalent sensor = new SensorTameworkHasTalent(builder, support, talentType);
 
-            assertFalse(sensor.matches(talentlessNpc, null, 0.0, store));
-            assertTrue(sensor.matches(anotherNpc, null, 0.0, store));
+            assertFalse(sensor.matches(talentlessNpc, (Role) null, 0.0, store));
+            assertTrue(sensor.matches(anotherNpc, (Role) null, 0.0, store));
         } finally {
             registry.removeStore(store);
             registry.shutdown();

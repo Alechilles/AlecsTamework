@@ -1,10 +1,11 @@
 package com.alechilles.alecstamework.avatarflight;
 
+import com.alechilles.alecstamework.compat.HytaleMountedComponentAccess;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.protocol.AnimationSlot;
 import com.hypixel.hytale.protocol.MountController;
 import com.hypixel.hytale.server.core.entity.Frozen;
@@ -38,7 +39,7 @@ public final class AvatarFlightNpcParkingService {
         }
         AvatarFlightSourceComponent source = new AvatarFlightSourceComponent(
                 riderUuid, role.getRoleName(), originalRoleIndex);
-        StateSupport state = role.getStateSupport();
+        StateSupport state = NpcSupportAccess.state(role, npcRef, store);
         source.setPreviousState(state == null ? "" : state.getStateName());
         source.setPreviousSubState(resolveSubState(state));
         MotionController controller = role.getActiveMotionController();
@@ -79,7 +80,8 @@ public final class AvatarFlightNpcParkingService {
         removeIfPresent(store, npcRef, Interactable.getComponentType());
         removeIfPresent(store, npcRef, EntityTrackerSystems.Visible.getComponentType());
         store.putComponent(npcRef, MountedComponent.getComponentType(),
-                new MountedComponent(riderRef, new Rotation3f(), MountController.Minecart));
+                HytaleMountedComponentAccess.createEntityMount(
+                        riderRef, 0.0F, 0.0F, 0.0F, MountController.Minecart));
         source.setPhase(AvatarFlightMountPhase.ACTIVE);
         return true;
     }

@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.companion.coop.runtime.CompanionCoopCaptureW
 import com.alechilles.alecstamework.companion.coop.runtime.CompanionCoopCaptureWorldExecutor.ReceiptProbe;
 import com.alechilles.alecstamework.companion.coop.runtime.CompanionCoopCaptureWorldExecutor.RetirementAttempt;
 import com.alechilles.alecstamework.companion.coop.runtime.CompanionCoopCaptureWorldExecutor.SourceProbe;
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.npc.components.TameworkPersistenceRetirementComponent;
@@ -167,10 +168,10 @@ final class HytaleCompanionCoopCaptureAttemptGateway implements AttemptGateway {
             if (saver == null) {
                 return completed(ReceiptPersistence.retryable(null));
             }
-            CompletableFuture<Void> save = saver.saveHolder(
-                    context.chunk().getX(),
-                    context.chunk().getZ(),
-                    context.chunk().toHolder()
+            CompletableFuture<Void> save = HytaleChunkAccess.saveColumn(
+                    saver,
+                    context.chunk(),
+                    world
             );
             if (save == null) {
                 return completed(ReceiptPersistence.retryable(null));

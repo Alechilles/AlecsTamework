@@ -1,11 +1,11 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
+import com.alechilles.alecstamework.npc.compat.NpcSupportTestFixture;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsInHandRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.NpcHealthPercentRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamRequirement;
 import com.hypixel.hytale.server.npc.role.Role;
-import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import com.hypixel.hytale.codec.ExtraInfo;
@@ -14,6 +14,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 import org.bson.BsonDocument;
 import sun.misc.Unsafe;
 
@@ -23,6 +24,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Tests for Interaction behavior. */
 class InteractionBehaviorTest {
+
+    @AfterEach
+    void clearNpcSupport() {
+        NpcSupportTestFixture.clear();
+    }
     @Test
     void roleParamResolutionUsesFirstScopeWithValue() throws Exception {
         ActionTameworkInteract interact = newInteract();
@@ -292,19 +298,7 @@ class InteractionBehaviorTest {
     }
 
     private static Role newRoleWithScope(StdScope scope) throws Exception {
-        Unsafe unsafe = getUnsafe();
-        Role role = (Role) unsafe.allocateInstance(Role.class);
-        EntitySupport entitySupport = (EntitySupport) unsafe.allocateInstance(EntitySupport.class);
-
-        Field sensorScopeField = EntitySupport.class.getDeclaredField("sensorScope");
-        sensorScopeField.setAccessible(true);
-        sensorScopeField.set(entitySupport, scope);
-
-        Field entitySupportField = Role.class.getDeclaredField("entitySupport");
-        entitySupportField.setAccessible(true);
-        entitySupportField.set(role, entitySupport);
-
-        return role;
+        return NpcSupportTestFixture.bindRoleWithSensorScope(scope);
     }
 
     private static InteractionContextSnapshot newContextSnapshotWithHeldItemId(String heldItemId) throws Exception {

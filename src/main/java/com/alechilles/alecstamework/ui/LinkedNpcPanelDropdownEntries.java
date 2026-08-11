@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
+import com.hypixel.hytale.codec.Codec;
+import com.hypixel.hytale.codec.EmptyExtraInfo;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,8 +37,31 @@ final class LinkedNpcPanelDropdownEntries implements Supplier<List<DropdownEntry
     private static List<org.bson.BsonValue> signature(List<DropdownEntryInfo> entries) {
         ArrayList<org.bson.BsonValue> values = new ArrayList<>(entries.size());
         for (DropdownEntryInfo entry : entries) {
-            values.add(entry == null ? org.bson.BsonNull.VALUE : DropdownEntryInfo.CODEC.encode(entry));
+            values.add(entry == null
+                    ? org.bson.BsonNull.VALUE
+                    : CodecHolder.CODEC.encode(entry, EmptyExtraInfo.EMPTY));
         }
         return List.copyOf(values);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Codec<DropdownEntryInfo> resolveCodec() {
+        try {
+            Object codec = DropdownEntryInfo.class.getField("CODEC").get(null);
+            if (codec instanceof Codec<?> stableCodec) {
+                return (Codec<DropdownEntryInfo>) stableCodec;
+            }
+            throw new IllegalStateException("DropdownEntryInfo.CODEC does not implement Codec");
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Could not resolve DropdownEntryInfo.CODEC", exception);
+        }
+    }
+
+    /** Defers codec field resolution until a dropdown signature is required. */
+    private static final class CodecHolder {
+        private static final Codec<DropdownEntryInfo> CODEC = resolveCodec();
+
+        private CodecHolder() {
+        }
     }
 }

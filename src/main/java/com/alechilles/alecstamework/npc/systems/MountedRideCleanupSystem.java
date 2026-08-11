@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.systems;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.network.MountedRidePacketHandler;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
@@ -202,10 +203,10 @@ public final class MountedRideCleanupSystem extends EntityTickingSystem<EntitySt
                             @Nonnull Store<EntityStore> store,
                             @Nonnull String state,
                             @Nonnull String subState) {
-        if (state.isBlank() || role.getStateSupport() == null) {
+        StateSupport support = NpcSupportAccess.state(role, mountRef, store);
+        if (state.isBlank() || support == null) {
             return;
         }
-        StateSupport support = role.getStateSupport();
         if (support.getStateHelper() != null && support.getStateHelper().getStateIndex(state) == StateSupport.NO_STATE) {
             return;
         }

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.movement.BodyMotionTameworkMountedGlide;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -71,14 +72,14 @@ public final class MountedGlideStateSystem extends EntityTickingSystem<EntitySto
                 role.getBodySteering(),
                 commandBuffer
         );
-        logDebug(role, controllerBefore);
+        logDebug(role, mountRef, commandBuffer, controllerBefore);
     }
 
     private void ensureGlideState(@Nonnull Ref<EntityStore> mountRef,
                                   @Nonnull Role role,
                                   @Nonnull String state,
                                   @Nonnull CommandBuffer<EntityStore> commandBuffer) {
-        StateSupport support = role.getStateSupport();
+        StateSupport support = NpcSupportAccess.state(role, mountRef, commandBuffer);
         if (support == null || state.isBlank() || isMissingState(support, state) || inState(support, state)) {
             return;
         }
@@ -116,7 +117,10 @@ public final class MountedGlideStateSystem extends EntityTickingSystem<EntitySto
         return active != null && !controller.isBlank() && controller.equals(active.getType());
     }
 
-    private void logDebug(@Nonnull Role role, @Nonnull String controllerBefore) {
+    private void logDebug(@Nonnull Role role,
+                          @Nonnull Ref<EntityStore> mountRef,
+                          @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                          @Nonnull String controllerBefore) {
         Tamework instance = Tamework.getInstance();
         if (instance == null || !instance.isDebugRideEnabled() || instance.getLogger() == null) {
             return;
@@ -128,7 +132,7 @@ public final class MountedGlideStateSystem extends EntityTickingSystem<EntitySto
         lastDebugMs = now;
         instance.getLogger().at(Level.INFO).log(
                 "TameworkGlide debug: stateSystem state=%s controllerBefore=%s controllerAfter=%s bodyMotion=%s steering=%s/%s/%s",
-                role.getStateSupport() == null ? "<none>" : role.getStateSupport().getStateName(),
+                stateName(role, mountRef, commandBuffer),
                 controllerBefore,
                 controllerName(role),
                 role.getSteeringMotionName() == null ? "<none>" : role.getSteeringMotionName(),
@@ -142,6 +146,14 @@ public final class MountedGlideStateSystem extends EntityTickingSystem<EntitySto
     private String controllerName(@Nonnull Role role) {
         MotionController active = role.getActiveMotionController();
         return active == null ? "<none>" : active.getType();
+    }
+
+    @Nonnull
+    private String stateName(@Nonnull Role role,
+                             @Nonnull Ref<EntityStore> mountRef,
+                             @Nonnull CommandBuffer<EntityStore> commandBuffer) {
+        StateSupport support = NpcSupportAccess.state(role, mountRef, commandBuffer);
+        return support == null ? "<none>" : support.getStateName();
     }
 
     @Nonnull

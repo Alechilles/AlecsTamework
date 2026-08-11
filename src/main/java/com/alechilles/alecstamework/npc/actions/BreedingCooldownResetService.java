@@ -1,11 +1,11 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.compat.NpcAlarmAccess;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import com.hypixel.hytale.server.npc.storage.AlarmStore;
 import com.hypixel.hytale.server.npc.util.Alarm;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -53,10 +53,11 @@ public final class BreedingCooldownResetService {
         if (npc == null) {
             return true;
         }
-        AlarmStore alarmStore = npc.getAlarmStore();
-        Alarm alarm = alarmStore != null
-                ? alarmStore.get(npc, BreedingCooldownService.BREEDING_COOLDOWN_ALARM_NAME)
-                : null;
+        Alarm alarm = NpcAlarmAccess.resolveAlarm(
+                npcRef,
+                store,
+                BreedingCooldownService.BREEDING_COOLDOWN_ALARM_NAME
+        );
         if (alarm == null || !alarm.isSet()) {
             return true;
         }

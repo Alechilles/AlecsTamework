@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.interactions;
 
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileComponent;
 import com.alechilles.alecstamework.damage.TameworkProjectileImpactEffectComponent;
 import com.hypixel.hytale.codec.Codec;
@@ -33,6 +34,7 @@ import com.hypixel.hytale.server.core.modules.time.TimeResource;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.util.TargetUtil;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.role.support.MarkedEntitySupport;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
@@ -343,8 +345,13 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
                                               @Nonnull Ref<EntityStore> sourceRef,
                                               @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         if (this.targetSlot != null) {
-            if (EntityUtils.getEntity(sourceRef, commandBuffer) instanceof NPCEntity npcEntity && npcEntity.getRole() != null) {
-                Ref<EntityStore> markedTarget = npcEntity.getRole().getMarkedEntitySupport().getMarkedEntityRef(this.targetSlot);
+            if (EntityUtils.getEntity(sourceRef, commandBuffer) instanceof NPCEntity npcEntity
+                    && npcEntity.getRole() != null) {
+                MarkedEntitySupport markedEntity = NpcSupportAccess.markedEntity(
+                        npcEntity.getRole(), sourceRef, commandBuffer);
+                Ref<EntityStore> markedTarget = markedEntity != null
+                        ? markedEntity.getMarkedEntityRef(this.targetSlot)
+                        : null;
                 if (markedTarget != null && markedTarget.isValid()) {
                     return markedTarget;
                 }

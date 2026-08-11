@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.items.CommandNpcRelocationService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
@@ -100,12 +101,14 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
         if (role == null) {
             return;
         }
-        sanitizeMarkedEntitySupport(role, store);
-        sanitizeStateSupport(role, store);
+        sanitizeMarkedEntitySupport(reference, role, store);
+        sanitizeStateSupport(reference, role, store);
     }
 
-    private void sanitizeMarkedEntitySupport(@Nonnull Role role, @Nonnull Store<EntityStore> store) {
-        MarkedEntitySupport markedEntitySupport = role.getMarkedEntitySupport();
+    private void sanitizeMarkedEntitySupport(@Nonnull Ref<EntityStore> reference,
+                                             @Nonnull Role role,
+                                             @Nonnull Store<EntityStore> store) {
+        MarkedEntitySupport markedEntitySupport = NpcSupportAccess.markedEntity(role, reference, store);
         if (markedEntitySupport == null) {
             return;
         }
@@ -123,8 +126,10 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private void sanitizeStateSupport(@Nonnull Role role, @Nonnull Store<EntityStore> store) {
-        StateSupport stateSupport = role.getStateSupport();
+    private void sanitizeStateSupport(@Nonnull Ref<EntityStore> reference,
+                                      @Nonnull Role role,
+                                      @Nonnull Store<EntityStore> store) {
+        StateSupport stateSupport = NpcSupportAccess.state(role, reference, store);
         if (stateSupport == null) {
             return;
         }

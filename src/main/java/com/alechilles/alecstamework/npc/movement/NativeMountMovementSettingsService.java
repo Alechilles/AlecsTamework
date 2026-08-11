@@ -1,10 +1,10 @@
 package com.alechilles.alecstamework.npc.movement;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.compat.HytaleMovementSettingsAccess;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.protocol.MovementSettings;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementConfig;
 import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementManager;
@@ -18,6 +18,7 @@ import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import com.alechilles.alecstamework.npc.params.StdScopeLookupCache;
 import java.util.UUID;
 import java.util.logging.Level;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
@@ -66,12 +67,15 @@ public final class NativeMountMovementSettingsService {
         if (physics == null || manager == null || profile == null) {
             return false;
         }
-        MovementSettings profileSettings = profile.toPacket();
-        MovementSettings settings = copyWithScaledBaseSpeed(profileSettings, quantizedMultiplier);
-        manager.setDefaultSettings(settings, physics, rider.getGameMode());
+        MovementConfig settings = copyWithScaledBaseSpeed(profile, quantizedMultiplier);
+        if (!HytaleMovementSettingsAccess.setDefaultProfile(
+                manager, settings, physics, rider.getGameMode())) {
+            return false;
+        }
         manager.applyDefaultSettings();
         manager.update(riderPlayerRef.getPacketHandler());
-        logAppliedSettings(sourceRoleId, movementConfigId, profileSettings.baseSpeed, settings.baseSpeed);
+        logAppliedSettings(
+                sourceRoleId, movementConfigId, profile.getBaseSpeed(), settings.getBaseSpeed());
         return true;
     }
 
@@ -118,11 +122,11 @@ public final class NativeMountMovementSettingsService {
         return currentRoleId == null || currentRoleId.isBlank() ? null : currentRoleId;
     }
 
-    static MovementSettings copyWithScaledBaseSpeed(@Nullable MovementSettings source, double multiplier) {
-        MovementSettings copy = new MovementSettings(source == null ? new MovementSettings() : source);
+    static MovementConfig copyWithScaledBaseSpeed(@Nullable MovementConfig source, double multiplier) {
         double effectiveMultiplier = Double.isFinite(multiplier) && multiplier > 0.0 ? multiplier : 1.0;
-        copy.baseSpeed = (float) (copy.baseSpeed * effectiveMultiplier);
-        return copy;
+        return source == null
+                ? new ScaledMovementConfig()
+                : new ScaledMovementConfig(source, effectiveMultiplier);
     }
 
     private String resolveMovementConfigId(@Nullable String sourceRoleId, @Nullable StdScope[] sourceRoleScopes) {
@@ -155,5 +159,16 @@ public final class NativeMountMovementSettingsService {
                         + "profileBaseSpeed=%s appliedBaseSpeed=%s",
                 sourceRoleId, movementConfigId, profileBaseSpeed, appliedBaseSpeed
         );
+    }
+
+    private static final class ScaledMovementConfig extends MovementConfig {
+        private ScaledMovementConfig() {
+            super();
+        }
+
+        private ScaledMovementConfig(@Nonnull MovementConfig source, double multiplier) {
+            super(source);
+            baseSpeed = (float) (baseSpeed * multiplier);
+        }
     }
 }

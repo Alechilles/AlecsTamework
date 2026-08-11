@@ -15,6 +15,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.StoreSourc
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TargetSource;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TriggerHookStep;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
@@ -29,8 +30,8 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.support.MarkedEntitySupport;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
-import java.lang.reflect.Method;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
@@ -120,13 +121,16 @@ final class CommandStepExecutionService {
                        Store<EntityStore> store,
                        String state,
                        String subState) {
-        if (npc == null || npc.getRole() == null || npc.getRole().getStateSupport() == null) {
+        if (npc == null || npc.getRole() == null) {
             return false;
         }
         if (state == null || state.isBlank()) {
             return false;
         }
-        StateSupport support = npc.getRole().getStateSupport();
+        StateSupport support = NpcSupportAccess.state(npc.getRole(), npcRef, store);
+        if (support == null) {
+            return false;
+        }
         String resolvedSub = subState;
         if (support.getStateHelper() != null) {
             int stateIndex = support.getStateHelper().getStateIndex(state);
@@ -203,10 +207,13 @@ final class CommandStepExecutionService {
                 slot = MASTER_TARGET_SLOT;
             }
             Role role = candidate.npc.getRole();
-            if (role == null || role.getMarkedEntitySupport() == null) {
+            MarkedEntitySupport markedEntity = role != null
+                    ? NpcSupportAccess.markedEntity(role, candidate.ref, context.store)
+                    : null;
+            if (markedEntity == null) {
                 return false;
             }
-            role.getMarkedEntitySupport().setMarkedEntity(slot, null);
+            markedEntity.setMarkedEntity(slot, null);
             return true;
         }
         if (step instanceof ClearCombatStep clearCombatStep) {
@@ -229,7 +236,10 @@ final class CommandStepExecutionService {
                                    Candidate candidate,
                                    TwCompanionConfig.EffectiveSettings companionSettings) {
         Role role = candidate.npc.getRole();
-        if (role == null || role.getMarkedEntitySupport() == null) {
+        MarkedEntitySupport markedEntity = role != null
+                ? NpcSupportAccess.markedEntity(role, candidate.ref, context.store)
+                : null;
+        if (markedEntity == null) {
             return false;
         }
         String slot = targetStep.getTargetSlot();
@@ -239,7 +249,7 @@ final class CommandStepExecutionService {
         TargetSource source = targetStep.getSource() != null ? targetStep.getSource() : TargetSource.CrosshairTarget;
         Ref<EntityStore> target = switch (source) {
             case OwnerPlayer -> context.playerRef;
-            case StoredTarget -> readMarkedEntity(role, slot);
+            case StoredTarget -> readMarkedEntity(markedEntity, slot);
             case LastAttackTarget, CrosshairTarget -> context.commandTarget;
         };
         if (target == null || !target.isValid()) {
@@ -249,7 +259,7 @@ final class CommandStepExecutionService {
                 && !isHostileTargetAllowed(target, context, candidate, companionSettings)) {
             return false;
         }
-        role.getMarkedEntitySupport().setMarkedEntity(slot, target);
+        markedEntity.setMarkedEntity(slot, target);
         return true;
     }
 
@@ -290,21 +300,11 @@ final class CommandStepExecutionService {
         return world.getWorldConfig().isPvpEnabled();
     }
 
-    @SuppressWarnings("unchecked")
-    private Ref<EntityStore> readMarkedEntity(Role role, String slot) {
-        if (role == null || role.getMarkedEntitySupport() == null) {
+    private Ref<EntityStore> readMarkedEntity(MarkedEntitySupport markedEntity, String slot) {
+        if (markedEntity == null) {
             return null;
         }
-        try {
-            Method method = role.getMarkedEntitySupport().getClass().getMethod("getMarkedEntity", String.class);
-            Object value = method.invoke(role.getMarkedEntitySupport(), slot);
-            if (value instanceof Ref<?>) {
-                return (Ref<EntityStore>) value;
-            }
-        } catch (Exception ignored) {
-            return null;
-        }
-        return null;
+        return markedEntity.getMarkedEntityRef(slot);
     }
 
     private boolean applyMove(MoveToPositionStep moveStep,
@@ -324,10 +324,13 @@ final class CommandStepExecutionService {
                 return false;
             }
         } else if (source == MoveSource.OwnerPosition && candidate.npc.getRole() != null
-                && candidate.npc.getRole().getMarkedEntitySupport() != null
                 && context.playerRef != null
                 && context.playerRef.isValid()) {
-            candidate.npc.getRole().getMarkedEntitySupport().setMarkedEntity(MASTER_TARGET_SLOT, context.playerRef);
+            MarkedEntitySupport markedEntity = NpcSupportAccess.markedEntity(
+                    candidate.npc.getRole(), candidate.ref, context.store);
+            if (markedEntity != null) {
+                markedEntity.setMarkedEntity(MASTER_TARGET_SLOT, context.playerRef);
+            }
         }
         if (source == MoveSource.StoredHome && targetPosition != null) {
             TransformComponent npcTransform = context.store.getComponent(candidate.ref, TransformComponent.getComponentType());
@@ -455,7 +458,10 @@ final class CommandStepExecutionService {
         }
         boolean applied = false;
         Role role = candidate.npc.getRole();
-        if (role != null && role.getMarkedEntitySupport() != null) {
+        MarkedEntitySupport markedEntity = role != null
+                ? NpcSupportAccess.markedEntity(role, candidate.ref, context.store)
+                : null;
+        if (markedEntity != null) {
             String[] slots = step.getTargetSlots();
             if (slots == null || slots.length == 0) {
                 slots = new String[] { "LockedTarget" };
@@ -464,13 +470,13 @@ final class CommandStepExecutionService {
                 if (slot == null || slot.isBlank()) {
                     continue;
                 }
-                role.getMarkedEntitySupport().setMarkedEntity(slot, null);
+                markedEntity.setMarkedEntity(slot, null);
                 applied = true;
             }
             if (step.isAssignOwnerAsMasterTarget()
                     && context.playerRef != null
                     && context.playerRef.isValid()) {
-                role.getMarkedEntitySupport().setMarkedEntity(MASTER_TARGET_SLOT, context.playerRef);
+                markedEntity.setMarkedEntity(MASTER_TARGET_SLOT, context.playerRef);
                 applied = true;
             }
         }

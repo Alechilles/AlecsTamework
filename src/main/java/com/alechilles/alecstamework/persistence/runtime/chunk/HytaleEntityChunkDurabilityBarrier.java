@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.runtime.chunk;
 
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -43,10 +44,10 @@ public final class HytaleEntityChunkDurabilityBarrier {
                         HytaleChunkSaveSupport.Outcome.retryable(null)
                 );
             }
-            CompletableFuture<Void> save = context.saver().saveHolder(
-                    context.chunk().getX(),
-                    context.chunk().getZ(),
-                    context.chunk().toHolder()
+            CompletableFuture<Void> save = HytaleChunkAccess.saveColumn(
+                    context.saver(),
+                    context.chunk(),
+                    world
             );
             return HytaleChunkSaveSupport.saveAndFlush(
                     save,
@@ -69,17 +70,8 @@ public final class HytaleEntityChunkDurabilityBarrier {
         }
         TransformComponent transform =
                 store.getComponent(target, transformType);
-        Ref<ChunkStore> chunkRef =
-                transform == null ? null : transform.getChunkRef();
         ChunkStore chunkStore = world.getChunkStore();
-        Store<ChunkStore> chunks =
-                chunkStore == null ? null : chunkStore.getStore();
-        WorldChunk chunk = chunkRef == null || !chunkRef.isValid()
-                || chunks == null
-                ? null
-                : chunks.getComponent(
-                        chunkRef, WorldChunk.getComponentType()
-                );
+        WorldChunk chunk = HytaleChunkAccess.currentWorldChunk(transform, world);
         IChunkSaver saver =
                 chunkStore == null ? null : chunkStore.getSaver();
         return chunk == null || chunk.getWorld() != world || saver == null

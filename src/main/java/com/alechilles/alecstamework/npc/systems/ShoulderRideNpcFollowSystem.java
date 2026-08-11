@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.systems;
 
+import com.alechilles.alecstamework.compat.HytaleMountedComponentAccess;
 import com.alechilles.alecstamework.npc.components.TameworkShoulderRideComponent;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
@@ -12,7 +13,6 @@ import com.hypixel.hytale.component.dependency.Order;
 import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
-import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.protocol.MovementStates;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -26,6 +26,7 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.systems.ComputeVelocitySystem;
 import java.util.Set;
 import javax.annotation.Nonnull;
+import org.joml.Vector3f;
 
 /** Pins a shoulder-mounted NPC's authoritative pose to its player mount. */
 public final class ShoulderRideNpcFollowSystem
@@ -108,14 +109,18 @@ public final class ShoulderRideNpcFollowSystem
                 && (states.crouching || states.forcedCrouching);
         float desiredY = (float) (marker.getOffsetY()
                 + (crouching ? marker.getCrouchOffsetY() : 0D));
-        Rotation3f current = mounted.getAttachmentOffset();
+        Vector3f current = HytaleMountedComponentAccess.attachmentOffset(mounted);
         if (current == null
                 || Math.abs(current.y() - desiredY) < 0.0001F) {
             return;
         }
-        commands.putComponent(npcRef, mountedType, new MountedComponent(
-                playerRef, new Rotation3f(current.x(), desiredY, current.z()),
-                mounted.getControllerType()));
+        commands.putComponent(npcRef, mountedType,
+                HytaleMountedComponentAccess.createEntityMount(
+                        playerRef,
+                        current.x(),
+                        desiredY,
+                        current.z(),
+                        mounted.getControllerType()));
     }
 
     private boolean isValidTarget(TameworkShoulderRideComponent marker,

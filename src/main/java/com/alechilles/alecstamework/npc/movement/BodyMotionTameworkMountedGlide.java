@@ -8,7 +8,6 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.npc.corecomponents.BodyMotionBase;
 import com.hypixel.hytale.server.npc.corecomponents.builders.BuilderBodyMotionBase;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.movement.Steering;
@@ -22,7 +21,7 @@ import org.joml.Vector3d;
 /**
  * Suppresses normal AI body motion while an NPC is controlled by mounted glide input.
  */
-public final class BodyMotionTameworkMountedGlide extends BodyMotionBase {
+public final class BodyMotionTameworkMountedGlide extends TameworkBodyMotionBase {
     private static final double INPUT_DEAD_ZONE = 0.025;
 
     public BodyMotionTameworkMountedGlide(@Nonnull BuilderBodyMotionBase builderMotionBase) {

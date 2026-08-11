@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -9,6 +10,7 @@ import com.hypixel.hytale.server.flock.FlockMembershipSystems;
 import com.hypixel.hytale.server.flock.FlockPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.support.MarkedEntitySupport;
 import java.util.concurrent.ThreadLocalRandom;
 import javax.annotation.Nullable;
 
@@ -157,10 +159,11 @@ final class BreedingFamilyFlockService {
             return true;
         }
         Role role = followerNpc.getRole();
-        if (role == null || role.getMarkedEntitySupport() == null) {
+        MarkedEntitySupport markedEntitySupport = NpcSupportAccess.markedEntity(role, followerRef, store);
+        if (role == null || markedEntitySupport == null) {
             return true;
         }
-        role.getMarkedEntitySupport().setMarkedEntity(MASTER_TARGET_SLOT, leaderRef);
+        markedEntitySupport.setMarkedEntity(MASTER_TARGET_SLOT, leaderRef);
         return true;
     }
 

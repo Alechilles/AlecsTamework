@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.command.timed.runtime
         .TimedSummonWorldAttempt.MutationAttempt;
 import com.alechilles.alecstamework.companion.command.timed.runtime
         .TimedSummonWorldAttempt.ProjectionProbe;
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.alechilles.alecstamework.companion.snapshot
         .SnapshotCodecRegistry;
 import com.alechilles.alecstamework.items
@@ -233,18 +234,7 @@ final class HytaleTimedSummonProjectionGateway {
     private WorldChunk currentChunk(
             @Nullable TransformComponent transform
     ) {
-        Ref<ChunkStore> chunkRef =
-                transform == null ? null : transform.getChunkRef();
-        ChunkStore chunkStore = world.getChunkStore();
-        Store<ChunkStore> chunks =
-                chunkStore == null ? null : chunkStore.getStore();
-        if (chunkRef == null || !chunkRef.isValid() || chunks == null) {
-            return null;
-        }
-        WorldChunk chunk = chunks.getComponent(
-                chunkRef, WorldChunk.getComponentType()
-        );
-        return chunk != null && chunk.getWorld() == world ? chunk : null;
+        return HytaleChunkAccess.currentWorldChunk(transform, world);
     }
 
     private record Components(

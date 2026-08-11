@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.npc.compat.NpcDisplayNameAccess;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
@@ -11,7 +13,7 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
-import com.hypixel.hytale.server.npc.role.support.EntitySupport;
+import com.hypixel.hytale.server.npc.role.support.MarkedEntitySupport;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -31,7 +33,7 @@ final class PlannedNpcProjectionPostAddService {
         }
         applyOwnerTarget(world, reference, npc, store);
         if (work.hasDisplayNameWork()) {
-            EntitySupport.setDisplayName(reference, work.displayName(), store);
+            NpcDisplayNameAccess.set(reference, work.displayName(), store);
         }
         if (work.hasHealthWork()) {
             CompanionStatModifierService.applyTraitModifiers(reference, store);
@@ -56,7 +58,10 @@ final class PlannedNpcProjectionPostAddService {
             Store<EntityStore> store
     ) {
         Role role = npc.getRole();
-        if (role == null || role.getMarkedEntitySupport() == null) {
+        MarkedEntitySupport markedEntity = role != null
+                ? NpcSupportAccess.markedEntity(role, reference, store)
+                : null;
+        if (markedEntity == null) {
             return;
         }
         assignOwnerTarget(
@@ -64,8 +69,7 @@ final class PlannedNpcProjectionPostAddService {
                 store,
                 TameworkOwnerComponent.getComponentType(),
                 world::getEntityRef,
-                ownerRef -> role.getMarkedEntitySupport()
-                        .setMarkedEntity("MasterTarget", ownerRef)
+                ownerRef -> markedEntity.setMarkedEntity("MasterTarget", ownerRef)
         );
     }
 

@@ -4,6 +4,8 @@ import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.compat.NpcDisplayNameAccess;
+import com.alechilles.alecstamework.npc.compat.NpcMarkedTargetAccess;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
@@ -19,7 +21,6 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
-import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import java.util.UUID;
 
 /**
@@ -76,7 +77,8 @@ final class SpawnerNpcStateService {
             }
         }
         if (ownerRef != null) {
-            role.setMarkedTarget("MasterTarget", ownerRef);
+            NpcMarkedTargetAccess.set(role, npcRef, world.getEntityStore().getStore(),
+                    "MasterTarget", ownerRef);
         }
     }
 
@@ -115,7 +117,7 @@ final class SpawnerNpcStateService {
         if (nameType != null) {
             store.putComponent(npcRef, nameType, new TameworkNpcNameComponent(name, ownerId, resolvedUpdatedMs, source));
         }
-        EntitySupport.setDisplayName(npcRef, name, store);
+        NpcDisplayNameAccess.set(npcRef, name, store);
     }
 
     boolean resolveTamedState(Ref<EntityStore> targetRef, World world) {

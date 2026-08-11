@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.localization.RoleNameResolver;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -16,7 +17,9 @@ import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.corecomponents.ActionBase;
 import com.hypixel.hytale.server.npc.corecomponents.builders.BuilderActionBase;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.instructions.ExecutionSupport;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import com.hypixel.hytale.server.npc.sensorinfo.EntityPositionProvider;
 import com.hypixel.hytale.server.npc.sensorinfo.IPositionProvider;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
@@ -28,6 +31,87 @@ import java.util.UUID;
 public abstract class TameworkActionBase extends ActionBase {
     protected TameworkActionBase(BuilderActionBase builder) {
         super(builder);
+    }
+
+    /**
+     * Update 5 callback retained for one JAR that can run on both supported API generations.
+     */
+    public boolean canExecute(Ref<EntityStore> ref,
+                              Role role,
+                              InfoProvider infoProvider,
+                              double dt,
+                              Store<EntityStore> store) {
+        return !once || !triggered;
+    }
+
+    @Override
+    public final boolean canExecute(Ref<EntityStore> ref,
+                                    ExecutionSupport support,
+                                    InfoProvider infoProvider,
+                                    double dt,
+                                    Store<EntityStore> store) {
+        ExecutionSupport previous = NpcSupportAccess.push(support);
+        try {
+            return canExecute(ref, support.getRole(), infoProvider, dt, store);
+        } finally {
+            NpcSupportAccess.restore(previous);
+        }
+    }
+
+    /**
+     * Update 5 callback retained for one JAR that can run on both supported API generations.
+     */
+    public boolean execute(Ref<EntityStore> ref,
+                           Role role,
+                           InfoProvider infoProvider,
+                           double dt,
+                           Store<EntityStore> store) {
+        setOnce();
+        return true;
+    }
+
+    @Override
+    public final boolean execute(Ref<EntityStore> ref,
+                                 ExecutionSupport support,
+                                 InfoProvider infoProvider,
+                                 double dt,
+                                 Store<EntityStore> store) {
+        ExecutionSupport previous = NpcSupportAccess.push(support);
+        try {
+            return execute(ref, support.getRole(), infoProvider, dt, store);
+        } finally {
+            NpcSupportAccess.restore(previous);
+        }
+    }
+
+    /** Update 5 lifecycle callback. */
+    public void activate(Role role, InfoProvider infoProvider) {
+        active = true;
+    }
+
+    @Override
+    public final void activate(ExecutionSupport support, InfoProvider infoProvider) {
+        ExecutionSupport previous = NpcSupportAccess.push(support);
+        try {
+            activate(support.getRole(), infoProvider);
+        } finally {
+            NpcSupportAccess.restore(previous);
+        }
+    }
+
+    /** Update 5 lifecycle callback. */
+    public void deactivate(Role role, InfoProvider infoProvider) {
+        active = false;
+    }
+
+    @Override
+    public final void deactivate(ExecutionSupport support, InfoProvider infoProvider) {
+        ExecutionSupport previous = NpcSupportAccess.push(support);
+        try {
+            deactivate(support.getRole(), infoProvider);
+        } finally {
+            NpcSupportAccess.restore(previous);
+        }
     }
 
     // Prefer the role's interaction target, then fall back to the info provider.
@@ -44,8 +128,9 @@ public abstract class TameworkActionBase extends ActionBase {
 
     // Resolves the current interaction target ref from role state or sensor info.
     protected Ref<EntityStore> resolveInteractionTarget(Role role, InfoProvider infoProvider) {
-        if (role != null && role.getStateSupport() != null) {
-            Ref<EntityStore> target = role.getStateSupport().getInteractionIterationTarget();
+        StateSupport stateSupport = NpcSupportAccess.state(role);
+        if (stateSupport != null) {
+            Ref<EntityStore> target = stateSupport.getInteractionIterationTarget();
             if (target != null && target.isValid()) {
                 return target;
             }

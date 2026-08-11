@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AlarmRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.InteractionContextRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MovementStateRequirement;
@@ -21,6 +22,7 @@ import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.interactions.ContextualUseNPCInteraction;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.lang.reflect.Field;
 import java.util.HashMap;
@@ -83,14 +85,15 @@ final class InteractionMatchHelpers {
         if (context == null || context.isBlank()) {
             return allowBlank;
         }
-        if (role == null || role.getStateSupport() == null) {
+        StateSupport stateSupport = NpcSupportAccess.state(role, null, null);
+        if (role == null || stateSupport == null) {
             return false;
         }
         Ref<EntityStore> playerRef = owner.resolveInteractionTarget(role, infoProvider);
         if (playerRef == null || !playerRef.isValid()) {
             return false;
         }
-        return role.getStateSupport().hasContextualInteraction(playerRef, context);
+        return stateSupport.hasContextualInteraction(playerRef, context);
     }
 
     // Checks whether a context string matches for prompt display.
@@ -361,7 +364,8 @@ final class InteractionMatchHelpers {
                                                   Role role,
                                                   InfoProvider infoProvider,
                                                   InteractionContextSnapshot ctx) {
-        if (role == null || role.getStateSupport() == null) {
+        StateSupport stateSupport = NpcSupportAccess.state(role, null, null);
+        if (role == null || stateSupport == null) {
             return false;
         }
         Ref<EntityStore> playerRef = ctx != null && ctx.playerRef != null
@@ -370,7 +374,7 @@ final class InteractionMatchHelpers {
         if (playerRef == null || !playerRef.isValid()) {
             return false;
         }
-        return role.getStateSupport().hasContextualInteraction(playerRef, context);
+        return stateSupport.hasContextualInteraction(playerRef, context);
     }
 
     private MovementStates statesForPlayer(Role role,

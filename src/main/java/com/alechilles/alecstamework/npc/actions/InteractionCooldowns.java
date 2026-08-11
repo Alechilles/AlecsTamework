@@ -1,12 +1,12 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.compat.NpcAlarmAccess;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.InteractionEntry;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import com.hypixel.hytale.server.npc.storage.AlarmStore;
 import com.hypixel.hytale.server.npc.util.Alarm;
 import java.time.Instant;
 
@@ -55,11 +55,7 @@ final class InteractionCooldowns {
         if (npc == null) {
             return;
         }
-        AlarmStore alarmStore = npc.getAlarmStore();
-        if (alarmStore == null) {
-            return;
-        }
-        Alarm alarm = alarmStore.get(npc, interaction.cooldownAlarmName);
+        Alarm alarm = NpcAlarmAccess.resolveAlarm(npcRef, store, interaction.cooldownAlarmName);
         if (alarm == null) {
             return;
         }
@@ -72,11 +68,7 @@ final class InteractionCooldowns {
         if (npc == null || alarmName == null || alarmName.isBlank()) {
             return false;
         }
-        AlarmStore alarmStore = npc.getAlarmStore();
-        if (alarmStore == null) {
-            return false;
-        }
-        Alarm alarm = alarmStore.get(npc, alarmName);
+        Alarm alarm = NpcAlarmAccess.resolveAlarm(npcRef, store, alarmName);
         if (alarm == null) {
             return true;
         }

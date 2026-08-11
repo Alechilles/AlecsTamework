@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.compat.NpcAlarmAccess;
 import com.alechilles.alecstamework.items.CommandAutoLinkService;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
@@ -29,7 +30,6 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import com.hypixel.hytale.server.npc.storage.AlarmStore;
 import com.hypixel.hytale.server.npc.util.Alarm;
 import java.time.Instant;
 import java.util.Map;
@@ -407,11 +407,7 @@ final class BreedingOffspringProgressionService {
         if (npcRef == null || !npcRef.isValid() || npc == null || store == null || cooldownUntilMs == 0L) {
             return;
         }
-        AlarmStore alarmStore = npc.getAlarmStore();
-        if (alarmStore == null) {
-            return;
-        }
-        Alarm alarm = alarmStore.get(npc, BREEDING_COOLDOWN_ALARM_NAME);
+        Alarm alarm = NpcAlarmAccess.resolveAlarm(npcRef, store, BREEDING_COOLDOWN_ALARM_NAME);
         if (alarm == null) {
             return;
         }

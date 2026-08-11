@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.compat.NpcBuilderAccess;
 import com.hypixel.hytale.server.npc.asset.builder.Builder;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderParameters;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
@@ -17,7 +18,7 @@ final class InteractionRoleParameterScope {
             return null;
         }
         try {
-            Builder<?> roleBuilder = support.getParentSpawnable();
+            Builder<?> roleBuilder = NpcBuilderAccess.getRoleRoot(support);
             BuilderParameters parameters = roleBuilder != null ? roleBuilder.getBuilderParameters() : null;
             return parameters != null ? parameters.createScope() : null;
         } catch (RuntimeException | LinkageError ignored) {

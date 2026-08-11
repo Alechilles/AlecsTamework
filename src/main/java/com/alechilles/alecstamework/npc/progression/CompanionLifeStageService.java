@@ -8,19 +8,16 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.flock.FlockMembership;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.systems.RoleChangeSystem;
-import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BooleanSupplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -333,8 +330,8 @@ public final class CompanionLifeStageService {
             stage.setStage(resolvedStage);
             changed = true;
         }
-        if (enteredAdultStage(previousStage, resolvedStage) && shouldRemoveFromFlockOnAdult(npc)) {
-            changed |= leaveFlockMembership(npcRef, store);
+        if (enteredAdultStage(previousStage, resolvedStage)) {
+            changed |= CompanionAdultFlockService.removeIfConfigured(npcRef, npc, store);
         }
 
         if (stage.isGrowthScalingEnabled()) {
@@ -1216,45 +1213,6 @@ public final class CompanionLifeStageService {
         return STAGE_ADULT.equals(resolvedStage)
                 && previousStage != null
                 && !STAGE_ADULT.equals(previousStage);
-    }
-
-    /**
-     * Returns whether flock membership should be cleared when this NPC enters adult stage.
-     *
-     * <p>This is controlled by the role/template sensor-scope parameter {@code FlockRemoveOnAdult}.
-     * Missing/invalid values default to {@code false}.
-     */
-    private static boolean shouldRemoveFromFlockOnAdult(@Nullable NPCEntity npc) {
-        if (npc == null) {
-            return false;
-        }
-        Role role = npc.getRole();
-        if (role == null || role.getEntitySupport() == null) {
-            return false;
-        }
-        StdScope scope = role.getEntitySupport().getSensorScope();
-        if (scope == null) {
-            return false;
-        }
-        try {
-            BooleanSupplier supplier = scope.getBooleanSupplier("FlockRemoveOnAdult");
-            return supplier != null && supplier.getAsBoolean();
-        } catch (IllegalStateException ignored) {
-            return false;
-        }
-    }
-
-    private static boolean leaveFlockMembership(@Nullable Ref<EntityStore> npcRef,
-                                                @Nullable Store<EntityStore> store) {
-        if (npcRef == null || !npcRef.isValid() || store == null) {
-            return false;
-        }
-        ComponentType<EntityStore, FlockMembership> flockType = FlockMembership.getComponentType();
-        if (flockType == null || store.getComponent(npcRef, flockType) == null) {
-            return false;
-        }
-        store.tryRemoveComponent(npcRef, flockType);
-        return true;
     }
 
     private static double lerp(double start, double end, double progress) {

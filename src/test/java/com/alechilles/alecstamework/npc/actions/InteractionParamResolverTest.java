@@ -1,18 +1,22 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.compat.NpcSupportTestFixture;
 import com.hypixel.hytale.server.npc.role.Role;
-import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
-import java.lang.reflect.Field;
 import java.util.function.Supplier;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import sun.misc.Unsafe;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 /** Tests for Interaction parameter resolution order. */
 class InteractionParamResolverTest {
+
+    @AfterEach
+    void clearNpcSupport() {
+        NpcSupportTestFixture.clear();
+    }
 
     @Test
     void paramResolverUsesExpectedScopeOrder() throws Exception {
@@ -75,25 +79,7 @@ class InteractionParamResolverTest {
     }
 
     private static Role newRoleWithScope(StdScope scope) throws Exception {
-        Unsafe unsafe = getUnsafe();
-        Role role = (Role) unsafe.allocateInstance(Role.class);
-        EntitySupport entitySupport = (EntitySupport) unsafe.allocateInstance(EntitySupport.class);
-
-        Field sensorScopeField = EntitySupport.class.getDeclaredField("sensorScope");
-        sensorScopeField.setAccessible(true);
-        sensorScopeField.set(entitySupport, scope);
-
-        Field entitySupportField = Role.class.getDeclaredField("entitySupport");
-        entitySupportField.setAccessible(true);
-        entitySupportField.set(role, entitySupport);
-
-        return role;
-    }
-
-    private static Unsafe getUnsafe() throws Exception {
-        Field field = Unsafe.class.getDeclaredField("theUnsafe");
-        field.setAccessible(true);
-        return (Unsafe) field.get(null);
+        return NpcSupportTestFixture.bindRoleWithSensorScope(scope);
     }
 
     private static final class CountingStringFallbackScope extends StdScope {

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
@@ -12,6 +13,7 @@ import com.hypixel.hytale.server.core.modules.entity.component.TransformComponen
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.support.MarkedEntitySupport;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
@@ -51,16 +53,20 @@ final class BreedingPairEffectsService {
             return;
         }
         PairingTargets targets = pairingTargets(sourceTransform, partnerTransform);
-        setLookTarget(context.sourceNpc(), context.partnerRef());
-        setLookTarget(context.partnerNpc(), context.sourceRef());
+        setLookTarget(context.sourceNpc(), context.sourceRef(), context.partnerRef(), context.store());
+        setLookTarget(context.partnerNpc(), context.partnerRef(), context.sourceRef(), context.store());
         moveParent(context.sourceNpc(), context.sourceRef(), targets.source(), context);
         moveParent(context.partnerNpc(), context.partnerRef(), targets.partner(), context);
     }
 
-    private void setLookTarget(NPCEntity npc, Ref<EntityStore> target) {
+    private void setLookTarget(NPCEntity npc,
+                               Ref<EntityStore> npcRef,
+                               Ref<EntityStore> target,
+                               Store<EntityStore> store) {
         Role role = npc.getRole();
-        if (role != null && role.getMarkedEntitySupport() != null) {
-            role.getMarkedEntitySupport().setMarkedEntity(LOCKED_TARGET_SLOT, target);
+        MarkedEntitySupport markedEntitySupport = NpcSupportAccess.markedEntity(role, npcRef, store);
+        if (role != null && markedEntitySupport != null) {
+            markedEntitySupport.setMarkedEntity(LOCKED_TARGET_SLOT, target);
         }
     }
 
@@ -78,8 +84,9 @@ final class BreedingPairEffectsService {
                                   Vector3d target,
                                   EffectContext context) {
         Role role = npc.getRole();
-        if (role == null || role.getStateSupport() == null || role.getStateSupport().getStateHelper() == null
-                || role.getStateSupport().getStateHelper().getStateIndex(PAIR_STATE) == StateSupport.NO_STATE) {
+        StateSupport stateSupport = NpcSupportAccess.state(role, ref, context.store());
+        if (role == null || stateSupport == null || stateSupport.getStateHelper() == null
+                || stateSupport.getStateHelper().getStateIndex(PAIR_STATE) == StateSupport.NO_STATE) {
             return false;
         }
         ComponentType<EntityStore, TameworkHookComponent> type = TameworkHookComponent.getComponentType();

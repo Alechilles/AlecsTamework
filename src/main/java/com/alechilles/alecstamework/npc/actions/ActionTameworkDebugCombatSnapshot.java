@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import org.joml.Vector3d;
@@ -11,6 +12,9 @@ import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.movement.controllers.MotionController;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.support.EntitySupport;
+import com.hypixel.hytale.server.npc.role.support.MarkedEntitySupport;
+import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import com.hypixel.hytale.server.npc.sensorinfo.EntityPositionProvider;
 import com.hypixel.hytale.server.npc.sensorinfo.IPositionProvider;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
@@ -99,8 +103,9 @@ public final class ActionTameworkDebugCombatSnapshot extends TameworkActionBase 
         }
 
         Vector3d npcPosition = resolvePosition(npcRef, store);
-        Ref<EntityStore> interactionTarget = role != null && role.getStateSupport() != null
-                ? role.getStateSupport().getInteractionIterationTarget()
+        StateSupport stateSupport = NpcSupportAccess.state(role, npcRef, store);
+        Ref<EntityStore> interactionTarget = stateSupport != null
+                ? stateSupport.getInteractionIterationTarget()
                 : null;
         Ref<EntityStore> infoProviderTarget = resolveInfoProviderTarget(infoProvider);
 
@@ -108,12 +113,12 @@ public final class ActionTameworkDebugCombatSnapshot extends TameworkActionBase 
         line.append("Debug combat snapshot: npc=").append(resolveNpcId(npcRef, store))
                 .append(" message=").append(formatProbe(message))
                 .append(" role=").append(role != null ? role.getRoleName() : "<null>")
-                .append(" state=").append(describeState(role))
+                .append(" state=").append(describeState(npcRef, role, store))
                 .append(" motion=").append(describeMotion(role))
                 .append(" interactionTarget=").append(describeRef(interactionTarget, store, npcPosition))
                 .append(" infoTarget=").append(describeRef(infoProviderTarget, store, npcPosition))
-                .append(" markedTargets=").append(describeMarkedTargets(role, store, npcPosition))
-                .append(" params=").append(describeNumberParams(role))
+                .append(" markedTargets=").append(describeMarkedTargets(npcRef, role, store, npcPosition))
+                .append(" params=").append(describeNumberParams(npcRef, role, store))
                 .append(" info=").append(describeInfoProvider(infoProvider));
 
         Tamework instance = Tamework.getInstance();
@@ -126,16 +131,19 @@ public final class ActionTameworkDebugCombatSnapshot extends TameworkActionBase 
     }
 
     @Nonnull
-    private String describeState(@Nullable Role role) {
-        if (role == null || role.getStateSupport() == null) {
+    private String describeState(@Nullable Ref<EntityStore> npcRef,
+                                 @Nullable Role role,
+                                 @Nonnull Store<EntityStore> store) {
+        StateSupport stateSupport = NpcSupportAccess.state(role, npcRef, store);
+        if (role == null || stateSupport == null) {
             return "<none>";
         }
-        int stateIndex = role.getStateSupport().getStateIndex();
-        int subStateIndex = role.getStateSupport().getSubStateIndex();
-        String stateName = role.getStateSupport().getStateName();
+        int stateIndex = stateSupport.getStateIndex();
+        int subStateIndex = stateSupport.getSubStateIndex();
+        String stateName = stateSupport.getStateName();
         String subStateName = null;
-        if (role.getStateSupport().getStateHelper() != null && stateIndex >= 0 && subStateIndex >= 0) {
-            subStateName = role.getStateSupport().getStateHelper().getSubStateName(stateIndex, subStateIndex);
+        if (stateSupport.getStateHelper() != null && stateIndex >= 0 && subStateIndex >= 0) {
+            subStateName = stateSupport.getStateHelper().getSubStateName(stateIndex, subStateIndex);
         }
         if (stateName == null || stateName.isBlank()) {
             stateName = "<unknown>";
@@ -161,10 +169,12 @@ public final class ActionTameworkDebugCombatSnapshot extends TameworkActionBase 
     }
 
     @Nonnull
-    private String describeMarkedTargets(@Nullable Role role,
+    private String describeMarkedTargets(@Nullable Ref<EntityStore> npcRef,
+                                         @Nullable Role role,
                                          @Nonnull Store<EntityStore> store,
                                          @Nullable Vector3d npcPosition) {
-        if (role == null || role.getMarkedEntitySupport() == null) {
+        MarkedEntitySupport markedEntitySupport = NpcSupportAccess.markedEntity(role, npcRef, store);
+        if (role == null || markedEntitySupport == null) {
             return "<none>";
         }
         StringBuilder out = new StringBuilder("[");
@@ -174,7 +184,7 @@ public final class ActionTameworkDebugCombatSnapshot extends TameworkActionBase 
             }
             String slotName = targetSlots[i];
             int slotIndex = i < targetSlotIndices.length ? targetSlotIndices[i] : Integer.MIN_VALUE;
-            Ref<EntityStore> target = readMarkedEntity(role, slotName, slotIndex);
+            Ref<EntityStore> target = readMarkedEntity(markedEntitySupport, slotName, slotIndex);
             out.append(slotName)
                     .append("[")
                     .append(slotIndex == Integer.MIN_VALUE ? "?" : slotIndex)
@@ -186,11 +196,13 @@ public final class ActionTameworkDebugCombatSnapshot extends TameworkActionBase 
     }
 
     @Nonnull
-    private String describeNumberParams(@Nullable Role role) {
+    private String describeNumberParams(@Nullable Ref<EntityStore> npcRef,
+                                         @Nullable Role role,
+                                         @Nonnull Store<EntityStore> store) {
         if (role == null) {
             return "<none>";
         }
-        List<StdScope> scopes = collectCandidateScopes(role);
+        List<StdScope> scopes = collectCandidateScopes(npcRef, role, store);
         StringBuilder out = new StringBuilder("[");
         for (int i = 0; i < numberParams.length; i++) {
             if (i > 0) {
@@ -235,15 +247,11 @@ public final class ActionTameworkDebugCombatSnapshot extends TameworkActionBase 
     }
 
     @Nullable
-    private Ref<EntityStore> readMarkedEntity(@Nonnull Role role,
+    private Ref<EntityStore> readMarkedEntity(@Nonnull MarkedEntitySupport markedEntitySupport,
                                               @Nonnull String slotName,
                                               int slotIndex) {
-        if (role.getMarkedEntitySupport() == null) {
-            return null;
-        }
-
         if (slotIndex != Integer.MIN_VALUE) {
-            Ref<EntityStore> byIndex = role.getMarkedEntitySupport().getMarkedEntityRef(slotIndex);
+            Ref<EntityStore> byIndex = markedEntitySupport.getMarkedEntityRef(slotIndex);
             if (byIndex != null) {
                 return byIndex;
             }
@@ -251,10 +259,10 @@ public final class ActionTameworkDebugCombatSnapshot extends TameworkActionBase 
 
         if (!slotName.isBlank()) {
             try {
-                Method getterByName = role.getMarkedEntitySupport()
+                Method getterByName = markedEntitySupport
                         .getClass()
                         .getMethod("getMarkedEntity", String.class);
-                Object value = getterByName.invoke(role.getMarkedEntitySupport(), slotName);
+                Object value = getterByName.invoke(markedEntitySupport, slotName);
                 Ref<EntityStore> resolved = extractEntityRef(value);
                 if (resolved != null) {
                     return resolved;
@@ -292,14 +300,17 @@ public final class ActionTameworkDebugCombatSnapshot extends TameworkActionBase 
     }
 
     @Nonnull
-    private List<StdScope> collectCandidateScopes(@Nonnull Role role) {
+    private List<StdScope> collectCandidateScopes(@Nullable Ref<EntityStore> npcRef,
+                                                  @Nonnull Role role,
+                                                  @Nonnull Store<EntityStore> store) {
         List<StdScope> scopes = new ArrayList<>(8);
 
-        if (role.getEntitySupport() != null) {
-            addScope(scopes, snapshotScope(role.getEntitySupport().getSensorScope()));
-            addScope(scopes, readScopeReflective(role.getEntitySupport(), "getExecutionScope"));
-            addScope(scopes, readScopeReflective(role.getEntitySupport(), "getGlobalScope"));
-            addScope(scopes, readScopeReflective(role.getEntitySupport(), "getScope"));
+        EntitySupport entitySupport = NpcSupportAccess.entity(role, npcRef, store);
+        if (entitySupport != null) {
+            addScope(scopes, snapshotScope(entitySupport.getSensorScope()));
+            addScope(scopes, readScopeReflective(entitySupport, "getExecutionScope"));
+            addScope(scopes, readScopeReflective(entitySupport, "getGlobalScope"));
+            addScope(scopes, readScopeReflective(entitySupport, "getScope"));
         }
 
         addScope(scopes, sensorScopeSnapshot);

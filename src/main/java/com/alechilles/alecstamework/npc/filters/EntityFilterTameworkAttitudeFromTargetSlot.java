@@ -6,15 +6,17 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.asset.type.attitude.Attitude;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
-import com.hypixel.hytale.server.npc.corecomponents.EntityFilterBase;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.support.MarkedEntitySupport;
+import com.hypixel.hytale.server.npc.role.support.WorldSupport;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import java.util.EnumSet;
 import javax.annotation.Nonnull;
 
 /**
  * Entity filter that checks attitude from a marked target slot toward the candidate target.
  */
-public final class EntityFilterTameworkAttitudeFromTargetSlot extends EntityFilterBase {
+public final class EntityFilterTameworkAttitudeFromTargetSlot extends TameworkEntityFilterBase {
     public static final String TYPE = "TameworkAttitudeFromTargetSlot";
 
     private final int sourceTargetSlot;
@@ -37,11 +39,15 @@ public final class EntityFilterTameworkAttitudeFromTargetSlot extends EntityFilt
         if (targetRef == null || !targetRef.isValid()) {
             return false;
         }
-        Ref<EntityStore> sourceRef = resolveSourceRef(ref, role);
+        Ref<EntityStore> sourceRef = resolveSourceRef(ref, role, store);
         if (sourceRef == null || !sourceRef.isValid()) {
             return false;
         }
-        Attitude attitude = role.getWorldSupport().getAttitude(sourceRef, targetRef, store);
+        WorldSupport worldSupport = NpcSupportAccess.world(role, ref, store);
+        if (worldSupport == null) {
+            return false;
+        }
+        Attitude attitude = worldSupport.getAttitude(sourceRef, targetRef, store);
         return attitude != null && attitudes.contains(attitude);
     }
 
@@ -52,12 +58,18 @@ public final class EntityFilterTameworkAttitudeFromTargetSlot extends EntityFilt
 
     @Override
     public void registerWithSupport(@Nonnull Role role) {
-        role.getWorldSupport().requireAttitudeCache();
+        WorldSupport worldSupport = NpcSupportAccess.world(role);
+        if (worldSupport != null) {
+            worldSupport.requireAttitudeCache();
+        }
     }
 
-    private Ref<EntityStore> resolveSourceRef(@Nonnull Ref<EntityStore> selfRef, @Nonnull Role role) {
-        if (sourceTargetSlot != Integer.MIN_VALUE && role.getMarkedEntitySupport() != null) {
-            Ref<EntityStore> sourceRef = role.getMarkedEntitySupport().getMarkedEntityRef(sourceTargetSlot);
+    private Ref<EntityStore> resolveSourceRef(@Nonnull Ref<EntityStore> selfRef,
+                                              @Nonnull Role role,
+                                              @Nonnull Store<EntityStore> store) {
+        MarkedEntitySupport markedEntitySupport = NpcSupportAccess.markedEntity(role, selfRef, store);
+        if (sourceTargetSlot != Integer.MIN_VALUE && markedEntitySupport != null) {
+            Ref<EntityStore> sourceRef = markedEntitySupport.getMarkedEntityRef(sourceTargetSlot);
             if (sourceRef != null && sourceRef.isValid()) {
                 return sourceRef;
             }

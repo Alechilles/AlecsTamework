@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.compat.HytaleBlockStateAccess;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Component;
@@ -19,7 +20,6 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
-import com.hypixel.hytale.math.util.ChunkUtil;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -422,26 +422,13 @@ public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
         if (info == null) {
             return null;
         }
-        Object chunkRefObject = invokeNoArg(info, "getChunkRef");
-        if (!(chunkRefObject instanceof Ref<?> rawChunkRef)) {
+        HytaleBlockStateAccess.BlockLocation resolved =
+                HytaleBlockStateAccess.resolve(store, info);
+        if (resolved == null) {
             return null;
         }
-        @SuppressWarnings("unchecked")
-        Ref<ChunkStore> chunkRef = (Ref<ChunkStore>) rawChunkRef;
-        WorldChunk chunk = store.getComponent(chunkRef, WorldChunk.getComponentType());
-        if (chunk == null) {
-            return null;
-        }
-        Integer indexValue = invokeIntMethod(info, "getIndex");
-        if (indexValue == null) {
-            return null;
-        }
-        int localX = ChunkUtil.xFromBlockInColumn(indexValue);
-        int y = ChunkUtil.yFromBlockInColumn(indexValue);
-        int localZ = ChunkUtil.zFromBlockInColumn(indexValue);
-        int x = ChunkUtil.worldCoordFromLocalCoord(chunk.getX(), localX);
-        int z = ChunkUtil.worldCoordFromLocalCoord(chunk.getZ(), localZ);
-        return new BlockLocation(chunk, x, y, z);
+        return new BlockLocation(
+                resolved.chunk(), resolved.x(), resolved.y(), resolved.z());
     }
 
     @Nullable
@@ -452,15 +439,6 @@ public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
         } catch (ReflectiveOperationException ignored) {
             return null;
         }
-    }
-
-    @Nullable
-    private Integer invokeIntMethod(@Nonnull Object target, @Nonnull String methodName) {
-        Object value = invokeNoArg(target, methodName);
-        if (value instanceof Number number) {
-            return number.intValue();
-        }
-        return null;
     }
 
     @SuppressWarnings("unchecked")

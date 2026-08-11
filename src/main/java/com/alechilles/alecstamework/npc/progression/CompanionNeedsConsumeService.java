@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.params.StdScopeLookupCache;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -405,10 +406,13 @@ public final class CompanionNeedsConsumeService {
             return new String[0];
         }
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
-        if (npc == null || npc.getRole() == null || npc.getRole().getEntitySupport() == null) {
+        if (npc == null || npc.getRole() == null) {
             return new String[0];
         }
-        EntitySupport entitySupport = npc.getRole().getEntitySupport();
+        EntitySupport entitySupport = NpcSupportAccess.entity(npc.getRole(), npcRef, store);
+        if (entitySupport == null) {
+            return new String[0];
+        }
         StdScope sensorScope = entitySupport.getSensorScope();
         if (sensorScope == null) {
             return new String[0];

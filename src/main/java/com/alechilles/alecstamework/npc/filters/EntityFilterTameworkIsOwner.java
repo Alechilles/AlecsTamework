@@ -8,14 +8,13 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
-import com.hypixel.hytale.server.npc.corecomponents.EntityFilterBase;
 import com.hypixel.hytale.server.npc.role.Role;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /** Entity filter that matches when the candidate entity is the NPC's owner. */
-public final class EntityFilterTameworkIsOwner extends EntityFilterBase {
+public final class EntityFilterTameworkIsOwner extends TameworkEntityFilterBase {
     public static final String TYPE = "TameworkIsOwner";
 
     @Nullable

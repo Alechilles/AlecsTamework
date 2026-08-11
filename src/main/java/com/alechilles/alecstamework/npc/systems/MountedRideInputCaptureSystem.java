@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.systems;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.movement.TameworkRideVelocityIntent;
 import com.alechilles.alecstamework.npc.network.MountedRidePacketHandler;
 import com.hypixel.hytale.builtin.mounts.MountSystems;
@@ -281,7 +282,7 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
             return;
         }
         Role role = npc.getRole();
-        StateSupport support = role.getStateSupport();
+        StateSupport support = NpcSupportAccess.state(role, mountRef, commandBuffer);
         String rideState = mount.getRideState();
         if (support == null || rideState == null || rideState.isBlank()) {
             return;
@@ -353,10 +354,10 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
                             @Nonnull Store<EntityStore> store,
                             @Nonnull String state,
                             @Nonnull String subState) {
-        if (state.isBlank() || role.getStateSupport() == null) {
+        StateSupport support = NpcSupportAccess.state(role, mountRef, store);
+        if (state.isBlank() || support == null) {
             return;
         }
-        StateSupport support = role.getStateSupport();
         if (support.getStateHelper() != null && support.getStateHelper().getStateIndex(state) == StateSupport.NO_STATE) {
             return;
         }
@@ -636,7 +637,8 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
         NPCEntity npc = commandBuffer.getComponent(mountRef, NPCEntity.getComponentType());
         if (npc != null && npc.getRole() != null) {
             Role role = npc.getRole();
-            state = role.getStateSupport() == null ? "<none>" : role.getStateSupport().getStateName();
+            StateSupport stateSupport = NpcSupportAccess.state(role, mountRef, commandBuffer);
+            state = stateSupport == null ? "<none>" : stateSupport.getStateName();
             controller = role.getActiveMotionController() == null
                     ? "<none>"
                     : role.getActiveMotionController().getType();

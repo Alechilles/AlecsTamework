@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.MembershipMode;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.hypixel.hytale.component.Ref;
@@ -10,7 +11,8 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import java.lang.reflect.Method;
+import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.support.MarkedEntitySupport;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -54,7 +56,7 @@ final class CommandLinkPolicyService {
         MembershipMode mode = membershipMode != null ? membershipMode : MembershipMode.LinkedOnly;
         boolean linked = isLinkedToTool(npcRef, playerUuid, toolId, store);
         boolean owner = isOwnedByPlayer(npcRef, playerUuid, store);
-        boolean master = isMasterTargetedToPlayer(npc, playerRef);
+        boolean master = isMasterTargetedToPlayer(npcRef, npc, playerRef, store);
         return switch (mode) {
             case LinkedOnly -> linked;
             case OwnerScope -> owner;
@@ -223,19 +225,18 @@ final class CommandLinkPolicyService {
         return false;
     }
 
-    private boolean isMasterTargetedToPlayer(NPCEntity npc, Ref<EntityStore> playerRef) {
-        if (npc == null || npc.getRole() == null || npc.getRole().getMarkedEntitySupport() == null) {
+    private boolean isMasterTargetedToPlayer(Ref<EntityStore> npcRef,
+                                             NPCEntity npc,
+                                             Ref<EntityStore> playerRef,
+                                             Store<EntityStore> store) {
+        Role role = npc != null ? npc.getRole() : null;
+        MarkedEntitySupport markedEntity = role != null
+                ? NpcSupportAccess.markedEntity(role, npcRef, store)
+                : null;
+        if (markedEntity == null) {
             return false;
         }
-        try {
-            Method method = npc.getRole().getMarkedEntitySupport().getClass().getMethod("getMarkedEntity", String.class);
-            Object value = method.invoke(npc.getRole().getMarkedEntitySupport(), "MasterTarget");
-            if (!(value instanceof Ref<?> marked)) {
-                return false;
-            }
-            return marked.isValid() && marked.equals(playerRef);
-        } catch (Exception ignored) {
-            return false;
-        }
+        Ref<EntityStore> marked = markedEntity.getMarkedEntityRef("MasterTarget");
+        return marked != null && marked.isValid() && marked.equals(playerRef);
     }
 }

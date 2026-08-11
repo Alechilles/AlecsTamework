@@ -13,7 +13,7 @@ import javax.annotation.Nonnull;
 /**
  * Sensor that matches when an NPC is tamed.
  */
-public final class SensorTameworkIsTamed extends com.hypixel.hytale.server.npc.corecomponents.SensorBase {
+public final class SensorTameworkIsTamed extends TameworkSensorBase {
     public SensorTameworkIsTamed(@Nonnull BuilderSensorTameworkIsTamed builder, @Nonnull BuilderSupport support) {
         super(builder);
     }

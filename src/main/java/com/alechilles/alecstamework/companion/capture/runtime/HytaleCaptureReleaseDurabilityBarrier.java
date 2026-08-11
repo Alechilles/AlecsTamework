@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.companion.capture.runtime;
 
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseRequest;
 import com.alechilles.alecstamework.companion.capture.runtime.CaptureReleaseWorldAttempt.ReceiptPersistence;
+import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.runtime.chunk
         .HytaleChunkSaveSupport;
@@ -74,17 +75,7 @@ final class HytaleCaptureReleaseDurabilityBarrier {
             }
             TransformComponent transform =
                     store.getComponent(target, transformType);
-            Ref<ChunkStore> chunkRef =
-                    transform == null ? null : transform.getChunkRef();
-            Store<ChunkStore> chunkComponents =
-                    chunkStore == null ? null : chunkStore.getStore();
-            WorldChunk chunk = chunkRef == null || !chunkRef.isValid()
-                    || chunkComponents == null
-                    ? null
-                    : chunkComponents.getComponent(
-                            chunkRef,
-                            WorldChunk.getComponentType()
-                    );
+            WorldChunk chunk = HytaleChunkAccess.currentWorldChunk(transform, world);
             if (chunk == null
                     || chunk.getWorld() != world) {
                 return completed(ReceiptPersistence.retryable(null));
@@ -96,10 +87,10 @@ final class HytaleCaptureReleaseDurabilityBarrier {
             if (saver == null) {
                 return completed(ReceiptPersistence.retryable(null));
             }
-            CompletableFuture<Void> save = saver.saveHolder(
-                    chunk.getX(),
-                    chunk.getZ(),
-                    chunk.toHolder()
+            CompletableFuture<Void> save = HytaleChunkAccess.saveColumn(
+                    saver,
+                    chunk,
+                    world
             );
             return mapChunkSave(
                     save,

@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.npc.alarms.TameworkAlarmService;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -352,7 +353,7 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         if (role == null) {
             return 0.0;
         }
-        EntitySupport support = role.getEntitySupport();
+        EntitySupport support = NpcSupportAccess.entity(role, null, null);
         StdScope scope = support != null ? support.getSensorScope() : null;
         return HarvestAlarmTimeBasis.resolveHarvestTimeoutSeconds(scope, HARVEST_TIMEOUT_PARAMETER, random);
     }
