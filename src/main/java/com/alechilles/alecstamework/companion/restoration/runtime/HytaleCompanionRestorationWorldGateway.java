@@ -2,10 +2,12 @@ package com.alechilles.alecstamework.companion.restoration.runtime;
 
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotDecodeResult;
 import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
+import com.alechilles.alecstamework.items.CompanionReturnStateNormalizer;
 import com.alechilles.alecstamework.items.HytaleCompanionProjectionSpawnExecutor;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
@@ -83,10 +85,30 @@ public final class HytaleCompanionRestorationWorldGateway
                     null
             );
         }
-        return snapshotCodecs.decode(
-                projection,
-                CoopResidentStateSnapshot.class
+        return normalizeProjection(
+                request.sourceState(),
+                snapshotCodecs.decode(
+                        projection,
+                        CoopResidentStateSnapshot.class
+                )
         );
+    }
+
+    @Nonnull
+    static SnapshotDecodeResult<CoopResidentStateSnapshot> normalizeProjection(
+            LifecycleState sourceState,
+            SnapshotDecodeResult<CoopResidentStateSnapshot> decoded
+    ) {
+        if (sourceState == LifecycleState.DEAD_REVIVABLE
+                && decoded instanceof SnapshotDecodeResult.Decoded<
+                CoopResidentStateSnapshot> found) {
+            return new SnapshotDecodeResult.Decoded<>(
+                    CompanionReturnStateNormalizer.forDeathRestoration(
+                            found.value()
+                    )
+            );
+        }
+        return decoded;
     }
 
     private boolean validOperation(

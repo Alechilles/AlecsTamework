@@ -20,6 +20,7 @@ import com.alechilles.alecstamework.companion.snapshot.SnapshotDecodeResult;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
+import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import java.nio.charset.StandardCharsets;
@@ -58,7 +59,7 @@ class TameworkRestorationSnapshotResolverTest {
             new TameworkRestorationSnapshotResolver(codecs);
 
     @Test
-    void deathV1MapsEveryPersistedComponentFactWithoutLiveDefaults() {
+    void deathV1MapsPersistedComponentsAndAppliesRecoveryHealth() {
         String attachments = encoded("head") + "," + encoded("crest");
         String raw = """
                 {
@@ -152,7 +153,7 @@ class TameworkRestorationSnapshotResolverTest {
                 state.attachments().getAttachmentIds().get("head")
         );
         assertNull(state.needs());
-        assertNull(state.healthPercent());
+        assertEquals(100.0D, state.healthPercent());
         assertEquals(1, projection.fullState().payloadVersion());
     }
 
@@ -275,6 +276,72 @@ class TameworkRestorationSnapshotResolverTest {
             );
             assertEquals(-77L, fullState(projection).capturedAtMs());
         }
+    }
+
+    /**
+     * Protects the 2026-08-12 flute report where revival replayed the lethal
+     * health and needs state from the death snapshot.
+     */
+    @Test
+    void modernDeathProjectionStartsAliveWithoutLethalNeedsState() {
+        TameworkNeedsComponent lethalNeeds = new TameworkNeedsComponent(
+                "needs", 0.0D, 0.0D, 25.0D, 40.0D,
+                1_000L, 2_000L
+        );
+        CoopResidentStateSnapshot deadState = new CoopResidentStateSnapshot(
+                SOURCE,
+                null,
+                -1,
+                "tamework_dead",
+                null,
+                null,
+                null,
+                null,
+                null,
+                lethalNeeds,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                0.0D,
+                40.0D,
+                0.0D,
+                -77L
+        );
+        SnapshotCodecRegistry.EncodedSnapshot encoded = codecs.encode(
+                TameworkSnapshotCodecs.DEATH,
+                2,
+                DeathSnapshotV2Payload.class,
+                DeathSnapshotV2Payload.capture(
+                        deadState,
+                        -260L,
+                        -1_000L,
+                        DeathSnapshotV2Payload.DeathCauseKind.ENVIRONMENT,
+                        "Starvation"
+                )
+        );
+        CompanionSnapshot source = snapshot(
+                encoded.kind(), encoded.payloadVersion(),
+                encoded.payloadJson(), -77L
+        );
+        CompanionProfileReadModel profile = profile(
+                source,
+                LifecycleState.DEAD_REVIVABLE,
+                "tamework_dead",
+                null,
+                List.of()
+        );
+
+        CoopResidentStateSnapshot restored = fullState(
+                resolved(resolver.resolve(profile, source))
+        );
+
+        assertEquals(40.0D, restored.currentHealth());
+        assertEquals(40.0D, restored.maximumHealth());
+        assertEquals(100.0D, restored.healthPercent());
+        assertNull(restored.needs());
     }
 
     @Test

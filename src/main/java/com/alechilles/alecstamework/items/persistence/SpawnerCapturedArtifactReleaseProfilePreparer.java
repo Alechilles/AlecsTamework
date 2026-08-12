@@ -14,6 +14,7 @@ import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotDecodeResult;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
+import com.alechilles.alecstamework.items.CompanionReturnStateNormalizer;
 import com.alechilles.alecstamework.items.persistence.SpawnerCaptureReleaseEvidenceFreezer.ResolvedIdentity;
 import com.alechilles.alecstamework.items.persistence.SpawnerCapturedArtifactIdentity.Claim;
 import java.util.Objects;
@@ -272,7 +273,9 @@ final class SpawnerCapturedArtifactReleaseProfilePreparer {
             return new Prepared(
                     sourceSnapshot,
                     snapshots.encodeProjection(ownership.normalize(
-                            decoded,
+                            CompanionReturnStateNormalizer.forCaptureRelease(
+                                    decoded
+                            ),
                             effectiveOwner,
                             effectiveOwnerName
                     )),

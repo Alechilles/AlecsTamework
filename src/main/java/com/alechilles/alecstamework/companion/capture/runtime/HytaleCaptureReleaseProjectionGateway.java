@@ -6,7 +6,9 @@ import com.alechilles.alecstamework.companion.capture.runtime.CaptureReleaseWorl
 import com.alechilles.alecstamework.companion.capture.runtime.CaptureReleaseWorldAttempt.ProjectionStatus;
 import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotDecodeResult;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
+import com.alechilles.alecstamework.items.CompanionReturnStateNormalizer;
 import com.alechilles.alecstamework.items.HytaleCompanionProjectionSpawnExecutor;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
@@ -67,14 +69,31 @@ final class HytaleCaptureReleaseProjectionGateway {
                 world,
                 store,
                 command(),
-                () -> snapshotCodecs.decode(
-                        request.projection(),
-                        CoopResidentStateSnapshot.class
-                )
+                () -> decodeProjection(snapshotCodecs, request.projection())
         );
         return result.status() == LiveOperationResult.Status.CONFIRMED
                 ? ensureHold(result)
                 : result;
+    }
+
+    static SnapshotDecodeResult<CoopResidentStateSnapshot> decodeProjection(
+            SnapshotCodecRegistry codecs,
+            SnapshotCodecRegistry.EncodedSnapshot projection
+    ) {
+        SnapshotDecodeResult<CoopResidentStateSnapshot> decoded =
+                codecs.decode(
+                        projection,
+                        CoopResidentStateSnapshot.class
+                );
+        if (decoded instanceof SnapshotDecodeResult.Decoded<
+                CoopResidentStateSnapshot> found) {
+            return new SnapshotDecodeResult.Decoded<>(
+                    CompanionReturnStateNormalizer.forCaptureRelease(
+                            found.value()
+                    )
+            );
+        }
+        return decoded;
     }
 
     ProjectionProbe probe() {

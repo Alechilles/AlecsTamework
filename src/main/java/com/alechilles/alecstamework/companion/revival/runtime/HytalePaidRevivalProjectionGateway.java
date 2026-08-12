@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotDecodeResult;
 import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
+import com.alechilles.alecstamework.items.CompanionReturnStateNormalizer;
 import com.alechilles.alecstamework.items.HytaleCompanionProjectionSpawnExecutor;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
@@ -107,9 +108,25 @@ final class HytalePaidRevivalProjectionGateway {
                     null
             );
         }
-        return snapshotCodecs.decode(
-                projection, CoopResidentStateSnapshot.class
+        return normalizeProjection(
+                snapshotCodecs.decode(
+                        projection, CoopResidentStateSnapshot.class
+                )
         );
+    }
+
+    static SnapshotDecodeResult<CoopResidentStateSnapshot> normalizeProjection(
+            SnapshotDecodeResult<CoopResidentStateSnapshot> decoded
+    ) {
+        if (decoded instanceof SnapshotDecodeResult.Decoded<
+                CoopResidentStateSnapshot> found) {
+            return new SnapshotDecodeResult.Decoded<>(
+                    CompanionReturnStateNormalizer.forDeathRestoration(
+                            found.value()
+                    )
+            );
+        }
+        return decoded;
     }
 
     private HytaleCompanionProjectionSpawnExecutor.ProjectionCommand

@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotDecodeResult;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
+import com.alechilles.alecstamework.items.CompanionReturnStateNormalizer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -191,7 +192,10 @@ public final class TameworkRestorationSnapshotResolver {
         CoopResidentStateSnapshot state = death.fullState();
         NpcAlias sourceAlias = evidence.modernSourceAlias(profile, state);
         evidence.validateComplete(profile, sourceAlias, state);
-        return encodeProjection(sourceAlias, state);
+        return encodeProjection(
+                sourceAlias,
+                CompanionReturnStateNormalizer.forDeathRestoration(state)
+        );
     }
 
     private Resolution resolveLegacyDeath(
@@ -213,7 +217,10 @@ public final class TameworkRestorationSnapshotResolver {
                 legacy,
                 source.createdAtMs()
         );
-        return encodeProjection(sourceAlias, state);
+        return encodeProjection(
+                sourceAlias,
+                CompanionReturnStateNormalizer.forDeathRestoration(state)
+        );
     }
 
     private Resolution resolveLegacyLost(

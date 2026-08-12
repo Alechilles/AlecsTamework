@@ -1,5 +1,11 @@
 package com.alechilles.alecstamework.companion.capture.runtime;
 
+import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotDecodeResult;
+import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
+import com.alechilles.alecstamework.items.persistence.FullStateSnapshotCodecAdapter;
+import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.ComponentRegistry;
 import com.hypixel.hytale.component.ComponentType;
@@ -14,15 +20,55 @@ import com.hypixel.hytale.server.core.modules.entityui.UIComponentSystems;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.lang.reflect.Field;
 import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Regression coverage for releasing capture projections back into entity tracking. */
 class HytaleCaptureReleaseProjectionGatewayTest {
+
+    /** Pre-fix durable release operations must also use paused needs state. */
+    @Test
+    void oldProjectionIsNormalizedBeforeRecoverySpawn() {
+        SnapshotCodecRegistry codecs = new SnapshotCodecRegistry(List.of(
+                new FullStateSnapshotCodecAdapter(
+                        CompanionFullStateProjection.KIND,
+                        CompanionFullStateProjection.VERSION
+                )
+        ));
+        TameworkNeedsComponent oldNeeds = new TameworkNeedsComponent(
+                "needs", 35.0D, 45.0D, 12.0D, 18.0D,
+                1_000L, 2_000L
+        );
+        SnapshotCodecRegistry.EncodedSnapshot projection = codecs.encode(
+                CompanionFullStateProjection.KIND,
+                CompanionFullStateProjection.VERSION,
+                CoopResidentStateSnapshot.class,
+                new CoopResidentStateSnapshot(
+                        UUID.randomUUID(), null, -1, "tamework_test",
+                        null, null, null, null, null, oldNeeds,
+                        null, null, null, null, null, null,
+                        25.0D, 50.0D, 50.0D, 3_000L
+                )
+        );
+
+        SnapshotDecodeResult.Decoded<CoopResidentStateSnapshot> decoded =
+                (SnapshotDecodeResult.Decoded<CoopResidentStateSnapshot>)
+                        HytaleCaptureReleaseProjectionGateway.decodeProjection(
+                                codecs, projection
+                        );
+        TameworkNeedsComponent needs = decoded.value().needs();
+
+        assertEquals(0.0D, needs.getPendingNeedsDamage());
+        assertEquals(0L, needs.getLastUpdateMs());
+        assertEquals(0L, needs.getLastPassiveSweepMs());
+    }
 
     @Test
     void releaseRestartsNewlyVisibleUiSynchronization() throws Exception {

@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Fixed
+- Soul Collector releases now pause needs timers while companions are stored,
+  and flute revival no longer restores lethal death health or needs state.
 - Tamed companions now cancel a marker-driven despawn that was already
   pending when spawn authority was detached. This prevents nearby companions
   from disappearing even while their chunk and player remain loaded.

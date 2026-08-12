@@ -25,6 +25,7 @@ import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService
         .CoopResidentStateSnapshot;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
@@ -121,6 +122,38 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
                 new String[]{"tool-a"},
                 projected.commandLinks().getToolIds()
         );
+    }
+
+    /**
+     * Protects the 2026-08-12 Soul Collector report where stored time was
+     * charged as needs damage after the companion was placed.
+     */
+    @Test
+    void captureReleasePausesNeedsTimersAndClearsPendingDamage() {
+        FakePersistence persistence = new FakePersistence(profile(
+                null,
+                "{\"owner_name\":null}"
+        ));
+
+        SpawnerPersistenceAuthorResult result = author(persistence).release(
+                intent(ASSIGNED_OWNER, "Assigned owner"),
+                ignored -> placement()
+        ).toCompletableFuture().join();
+
+        assertTrue(result.published());
+        TameworkNeedsComponent needs = projection(
+                persistence.request
+        ).needs();
+        assertEquals("needs", needs.getConfigId());
+        assertEquals(35.0D, needs.getHunger());
+        assertEquals(45.0D, needs.getThirst());
+        assertEquals(12.0D, needs.getAppliedHappinessPenalty());
+        assertEquals(0.0D, needs.getPendingNeedsDamage());
+        assertEquals(0L, needs.getLastUpdateMs());
+        assertEquals(0L, needs.getLastPassiveSweepMs());
+        assertEquals(-1.0D, needs.getRegenSuppressionBaselineHealth());
+        assertEquals(0.0D, needs.getRegenSuppressionAllowedHeal());
+        assertEquals(-1.0D, needs.getLastManagedHealth());
     }
 
     @Test
@@ -780,6 +813,13 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
     }
 
     private CoopResidentStateSnapshot rawState() {
+        TameworkNeedsComponent needs = new TameworkNeedsComponent(
+                "needs", 35.0D, 45.0D, 12.0D, 18.0D,
+                1_000L, 2_000L
+        );
+        needs.setRegenSuppressionBaselineHealth(20.0D);
+        needs.setRegenSuppressionAllowedHeal(5.0D);
+        needs.setLastManagedHealth(15.0D);
         return new CoopResidentStateSnapshot(
                 SOURCE.value(),
                 null,
@@ -797,7 +837,7 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
                 null,
                 null,
                 null,
-                null,
+                needs,
                 null,
                 null,
                 null,
