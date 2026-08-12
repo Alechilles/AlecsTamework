@@ -24,6 +24,10 @@ import com.alechilles.alecstamework.items.persistence.TameworkDormantSnapshotFac
 import com.alechilles.alecstamework.items.persistence.TameworkFullStateSnapshotReader;
 import com.alechilles.alecstamework.items.persistence.TameworkRestorationSnapshotResolver;
 import com.alechilles.alecstamework.items.persistence.checkpoint.ReplacementCompanionEntityCheckpointSink;
+import com.alechilles.alecstamework.items.persistence.checkpoint.ExactCheckpointCompanionRecallRecovery;
+import com.alechilles.alecstamework.npc.components.TameworkPersistenceRetirementComponent;
+import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.alechilles.alecstamework.items.coop.DirectLiveCoopAuthor;
 import com.alechilles.alecstamework.items.coop.DirectLiveCoopProjectionView;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
@@ -49,7 +53,11 @@ final class TameworkPersistenceAuthors {
             @Nonnull HytaleLogger logger,
             @Nonnull TameworkEventBus events,
             @Nonnull LoadedNpcIdentityIndex identityIndex,
-            @Nonnull PersistenceDomainFacades facades
+            @Nonnull PersistenceDomainFacades facades,
+            @Nonnull ComponentType<
+                    EntityStore,
+                    TameworkPersistenceRetirementComponent
+                    > retirementType
     ) {
         Objects.requireNonNull(logger, "logger");
         Objects.requireNonNull(events, "events");
@@ -58,13 +66,20 @@ final class TameworkPersistenceAuthors {
 
         CompanionProfileSnapshotSink profileSnapshots =
                 profileSnapshots(logger, facades);
+        ExactCheckpointCompanionRecallRecovery exactRecallRecovery =
+                new ExactCheckpointCompanionRecallRecovery(
+                        facades, identityIndex, retirementType, logger
+                );
         CommandLinkedNpcStateSnapshotService stateSnapshots =
                 new CommandLinkedNpcStateSnapshotService(
                         profileSnapshots,
                         identityIndex,
                         new ReplacementCompanionEntityCheckpointSink(
                                 facades,
-                                detail -> logger.at(Level.WARNING).log(detail)
+                                detail -> logger.at(Level.WARNING).log(detail),
+                                identityIndex,
+                                exactRecallRecovery::recoverReturnedOriginal,
+                                exactRecallRecovery::suppressesCheckpoint
                         )
                 );
         TameworkFullStateSnapshotReader snapshots =
@@ -99,7 +114,8 @@ final class TameworkPersistenceAuthors {
                 restorationAuthor(facades, completions),
                 dormantAuthor(logger, events, facades, snapshots),
                 new DirectLiveCoopAuthor(facades),
-                new DirectLiveCoopProjectionView(facades)
+                new DirectLiveCoopProjectionView(facades),
+                exactRecallRecovery
         );
     }
 
@@ -186,7 +202,8 @@ final class TameworkPersistenceAuthors {
             FreeCompanionRestorationAuthor restorationAuthor,
             PositiveEvidenceDormantAuthor dormantAuthor,
             DirectLiveCoopAuthor directLiveCoopAuthor,
-            DirectLiveCoopProjectionView directLiveCoopProjections
+            DirectLiveCoopProjectionView directLiveCoopProjections,
+            ExactCheckpointCompanionRecallRecovery exactRecallRecovery
     ) {
         Bundle {
             Objects.requireNonNull(snapshots, "snapshots");
@@ -199,6 +216,9 @@ final class TameworkPersistenceAuthors {
             );
             Objects.requireNonNull(
                     directLiveCoopProjections, "directLiveCoopProjections"
+            );
+            Objects.requireNonNull(
+                    exactRecallRecovery, "exactRecallRecovery"
             );
         }
     }

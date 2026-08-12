@@ -14,6 +14,7 @@ import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.universe.Universe;
@@ -25,6 +26,8 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -40,6 +43,10 @@ public final class ExactCheckpointCompanionRecallRecovery
     private final ExactCheckpointRecallRecoveryAuthor author =
             new ExactCheckpointRecallRecoveryAuthor();
     private final ExactCheckpointHolderFactory holders;
+    private final ReturnedOriginalTargetDrainer returnedTargets =
+            new ReturnedOriginalTargetDrainer();
+    private final Set<UUID> returnedReconciliations =
+            ConcurrentHashMap.newKeySet();
 
     public ExactCheckpointCompanionRecallRecovery(
             @Nonnull PersistenceDomainFacades persistence,
@@ -70,6 +77,84 @@ public final class ExactCheckpointCompanionRecallRecovery
                 );
             }
         });
+    }
+
+    /** Reconciles one exact returned original after its checkpoint commits. */
+    public void recoverReturnedOriginal(
+            CompanionEntityCheckpoint checkpoint
+    ) {
+        if (checkpoint == null || checkpoint.boundary()
+                != CompanionEntityCheckpoint.CaptureBoundary
+                .RETURNED_RETIRED_ORIGINAL) {
+            return;
+        }
+        UUID targetAlias = checkpoint.alias().value();
+        if (!returnedReconciliations.add(targetAlias)) {
+            return;
+        }
+        long failedAtMs = Math.max(
+                checkpoint.capturedAtMs(), System.currentTimeMillis()
+        );
+        RecallFailure failure = new RecallFailure(
+                checkpoint.alias().value(),
+                checkpoint.ownerId().value(),
+                checkpoint.capturedAtMs(),
+                failedAtMs,
+                checkpoint.worldKey(),
+                new RecallDestination(
+                        checkpoint.worldKey(),
+                        checkpoint.x(),
+                        checkpoint.y(),
+                        checkpoint.z()
+                ),
+                Set.of()
+        );
+        recoverCheckpoint(checkpoint, failure).whenComplete(
+                (outcome, problem) -> {
+                    if (problem != null) {
+                        logger.at(Level.WARNING).withCause(problem).log(
+                                "Returned original reconciliation failed for "
+                                        + "npc=%s",
+                                checkpoint.sourceAlias().value()
+                        );
+                    }
+                    returnedReconciliations.remove(targetAlias);
+                }
+        );
+    }
+
+    /** Returns whether an internal drain must not replace source authority. */
+    public boolean suppressesCheckpoint(NpcAlias alias) {
+        return alias != null
+                && returnedReconciliations.contains(alias.value());
+    }
+
+    private CompletionStage<RecoveryOutcome> recoverCheckpoint(
+            CompanionEntityCheckpoint checkpoint,
+            RecallFailure failure
+    ) {
+        return persistence.queries().findProfile(checkpoint.alias())
+                .thenCompose(read -> {
+                    if (read instanceof PersistenceReadResult.Failed<
+                            CompanionProfileReadModel> failed) {
+                        return readFailure(failed);
+                    }
+                    if (!(read instanceof PersistenceReadResult.Found<
+                            CompanionProfileReadModel> found)) {
+                        return CompletableFuture.completedFuture(
+                                RecoveryOutcome.NONE
+                        );
+                    }
+                    ExactCheckpointRecallRecoveryAuthor.RecoveryPlan plan =
+                            author.author(
+                                    found.value(), checkpoint, failure
+                            );
+                    return plan == null
+                            ? CompletableFuture.completedFuture(
+                                    RecoveryOutcome.NONE
+                            )
+                            : loadAndRestore(plan);
+                });
     }
 
     private CompletionStage<RecoveryOutcome> tryRecover(
@@ -155,13 +240,41 @@ public final class ExactCheckpointCompanionRecallRecovery
                         RecoveryOutcome.NONE
                 );
             }
-            if (probe.isKnownLive() || live(source, plan.checkpoint()
-                    .alias().value())) {
+            boolean returnedOriginal = returnedOriginal(plan.checkpoint());
+            if (!returnedOriginal && (probe.isKnownLive() || live(
+                            source,
+                            plan.checkpoint().sourceAlias().value()
+                    ))) {
                 return CompletableFuture.completedFuture(
                         RecoveryOutcome.RETRY_REQUIRED
                 );
             }
-            return restore(destination, plan);
+            if (!returnedOriginal) {
+                return restore(source, destination, plan);
+            }
+            return returnedTargets.drain(universe, plan, probe)
+                    .thenCompose(drained -> restore(
+                            source, destination, plan
+                    ).handle(RestoreAttempt::new).thenCompose(attempt -> {
+                        if (attempt.problem() == null && attempt.outcome()
+                                == RecoveryOutcome.RECOVERED) {
+                            return CompletableFuture.completedFuture(
+                                    attempt.outcome()
+                            );
+                        }
+                        return returnedTargets.rollback(drained)
+                                .thenCompose(ignored ->
+                                        attempt.problem() == null
+                                                ? CompletableFuture
+                                                .completedFuture(
+                                                        attempt.outcome()
+                                                )
+                                                : CompletableFuture
+                                                .failedFuture(
+                                                        attempt.problem()
+                                                )
+                                );
+                    }));
         });
     }
 
@@ -187,6 +300,7 @@ public final class ExactCheckpointCompanionRecallRecovery
     }
 
     private CompletionStage<RecoveryOutcome> restore(
+            World source,
             World destination,
             ExactCheckpointRecallRecoveryAuthor.RecoveryPlan plan
     ) {
@@ -194,13 +308,16 @@ public final class ExactCheckpointCompanionRecallRecovery
                 new CompletableFuture<>();
         LeaseBoundWorldDispatcher.execute(
                 destination,
-                () -> completeRestore(destination, plan, completion),
+                () -> completeRestore(
+                        source, destination, plan, completion
+                ),
                 () -> completion.complete(RecoveryOutcome.NONE)
         );
         return completion;
     }
 
     private void completeRestore(
+            World source,
             World destination,
             ExactCheckpointRecallRecoveryAuthor.RecoveryPlan plan,
             CompletableFuture<RecoveryOutcome> completion
@@ -232,6 +349,7 @@ public final class ExactCheckpointCompanionRecallRecovery
                 return;
             }
             CompanionSpawnAuthorityService.detach(restored, store);
+            removeReturnedSource(source, destination, plan.checkpoint());
             logger.at(Level.INFO).log(
                     "Restored the exact saved companion state after Recall "
                             + "confirmed its source body was absent: npc=%s",
@@ -241,6 +359,41 @@ public final class ExactCheckpointCompanionRecallRecovery
         } catch (RuntimeException | LinkageError failure) {
             completion.completeExceptionally(failure);
         }
+    }
+
+    private void removeReturnedSource(
+            World source,
+            World destination,
+            CompanionEntityCheckpoint checkpoint
+    ) {
+        if (!returnedOriginal(checkpoint)) {
+            return;
+        }
+        Runnable removal = () -> {
+            Ref<EntityStore> sourceRef = source.getEntityRef(
+                    checkpoint.sourceAlias().value()
+            );
+            EntityStore external = source.getEntityStore();
+            Store<EntityStore> store = external == null
+                    ? null : external.getStore();
+            if (sourceRef != null && sourceRef.isValid() && store != null) {
+                store.removeEntity(sourceRef, RemoveReason.REMOVE);
+            }
+        };
+        if (source == destination) {
+            removal.run();
+            return;
+        }
+        LeaseBoundWorldDispatcher.execute(source, removal);
+    }
+
+    private static boolean returnedOriginal(
+            CompanionEntityCheckpoint checkpoint
+    ) {
+        return !checkpoint.alias().equals(checkpoint.sourceAlias())
+                && checkpoint.boundary()
+                == CompanionEntityCheckpoint.CaptureBoundary
+                .RETURNED_RETIRED_ORIGINAL;
     }
 
     private static boolean live(World world, UUID alias) {
@@ -267,5 +420,11 @@ public final class ExactCheckpointCompanionRecallRecovery
         return CompletableFuture.failedFuture(new IllegalStateException(
                 failed.failure().code(), failed.failure().cause()
         ));
+    }
+
+    private record RestoreAttempt(
+            @Nullable RecoveryOutcome outcome,
+            @Nullable Throwable problem
+    ) {
     }
 }

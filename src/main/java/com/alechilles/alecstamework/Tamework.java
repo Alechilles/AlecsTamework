@@ -141,7 +141,6 @@ import com.alechilles.alecstamework.items.scarecrow.TameworkCollectScarecrowInte
 import com.alechilles.alecstamework.items.scarecrow.TameworkPlaceScarecrowInteraction;
 import com.alechilles.alecstamework.items.persistence.ImportedCompanionRecallRecovery;
 import com.alechilles.alecstamework.items.persistence.CompositeRecallRecoverySink;
-import com.alechilles.alecstamework.items.persistence.checkpoint.ExactCheckpointCompanionRecallRecovery;
 import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
 import com.alechilles.alecstamework.localization.ModLanguageDiscovery;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
@@ -1062,13 +1061,7 @@ public class Tamework extends JavaPlugin {
         commandNpcRelocationService = new CommandNpcRelocationService(
                 getLogger(),
                 new CompositeRecallRecoverySink(List.of(
-                        new ExactCheckpointCompanionRecallRecovery(
-                                persistenceComposition.facades(),
-                                persistenceComposition.snapshots()
-                                        .getLoadedNpcIdentityIndex(),
-                                components.persistenceRetirement(),
-                                getLogger()
-                        ),
+                        persistenceComposition.exactRecallRecovery(),
                         new ImportedCompanionRecallRecovery(
                                 persistenceComposition.facades(),
                                 getLogger()

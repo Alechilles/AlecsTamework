@@ -39,6 +39,7 @@ public final class CompanionEntityCheckpointCodec {
                 integer(json, "version"),
                 ProfileId.parse(text(json, "profileId")),
                 NpcAlias.parse(text(json, "alias")),
+                NpcAlias.parse(text(json, "sourceAlias")),
                 number(json, "aliasGeneration"),
                 OwnerId.parse(text(json, "ownerId")),
                 new LifecycleRevision(number(json, "lifecycleRevision")),
@@ -75,6 +76,9 @@ public final class CompanionEntityCheckpointCodec {
         json.addProperty("version", checkpoint.version());
         json.addProperty("profileId", checkpoint.profileId().toString());
         json.addProperty("alias", checkpoint.alias().toString());
+        json.addProperty(
+                "sourceAlias", checkpoint.sourceAlias().toString()
+        );
         json.addProperty("aliasGeneration", checkpoint.aliasGeneration());
         json.addProperty("ownerId", checkpoint.ownerId().toString());
         json.addProperty(

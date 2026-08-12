@@ -77,10 +77,19 @@ public final class ExactCheckpointRecallRecoveryAuthor {
                 && activeLocationMatches(profile, alias)
                 && checkpoint.boundary()
                         != CompanionEntityCheckpoint.CaptureBoundary.LOADED
-                && checkpoint.boundary()
-                        != CompanionEntityCheckpoint.CaptureBoundary
-                        .RETURNED_RETIRED_ORIGINAL
+                && sourceIdentityMatchesBoundary(checkpoint)
                 && checkpoint.capturedAtMs() <= failure.failedAtMs();
+    }
+
+    private static boolean sourceIdentityMatchesBoundary(
+            CompanionEntityCheckpoint checkpoint
+    ) {
+        boolean returned = checkpoint.boundary()
+                == CompanionEntityCheckpoint.CaptureBoundary
+                .RETURNED_RETIRED_ORIGINAL;
+        return returned
+                ? !checkpoint.alias().equals(checkpoint.sourceAlias())
+                : checkpoint.alias().equals(checkpoint.sourceAlias());
     }
 
     private static boolean activeLocationMatches(

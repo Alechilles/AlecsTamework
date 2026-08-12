@@ -324,6 +324,7 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "activeCaptureFailureCooldown",
                         "diagnoseCoopCapture",
                         "diagnoseCoopRelease",
+                        "findAlias",
                         "findAllCommandRosters",
                         "findAllLifecycles",
                         "findAllPopulationGroupAssignments",

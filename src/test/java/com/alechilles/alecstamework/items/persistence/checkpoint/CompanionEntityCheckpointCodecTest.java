@@ -35,6 +35,7 @@ class CompanionEntityCheckpointCodecTest {
 
         assertEquals(checkpoint.profileId(), decoded.profileId());
         assertEquals(checkpoint.alias(), decoded.alias());
+        assertEquals(checkpoint.sourceAlias(), decoded.sourceAlias());
         assertEquals(holder, decoded.holder());
         assertTrue(decoded.payloadHash().matchesUtf8(
                 codec.integrityMaterial(decoded)

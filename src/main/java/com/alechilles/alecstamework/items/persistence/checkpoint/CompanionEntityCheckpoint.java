@@ -20,6 +20,7 @@ public record CompanionEntityCheckpoint(
         int version,
         @Nonnull ProfileId profileId,
         @Nonnull NpcAlias alias,
+        @Nonnull NpcAlias sourceAlias,
         long aliasGeneration,
         @Nonnull OwnerId ownerId,
         @Nonnull LifecycleRevision lifecycleRevision,
@@ -37,6 +38,7 @@ public record CompanionEntityCheckpoint(
 
     public CompanionEntityCheckpoint {
         if (version != VERSION || profileId == null || alias == null
+                || sourceAlias == null
                 || ownerId == null || lifecycleRevision == null
                 || reconciliationGeneration == null || boundary == null
                 || holder == null || payloadHash == null
@@ -75,15 +77,51 @@ public record CompanionEntityCheckpoint(
     ) {
         Objects.requireNonNull(codec, "codec");
         CompanionEntityCheckpoint unsigned = new CompanionEntityCheckpoint(
-                VERSION, profileId, alias, aliasGeneration, ownerId,
+                VERSION, profileId, alias, alias, aliasGeneration, ownerId,
                 lifecycleRevision, reconciliationGeneration, worldKey,
                 x, y, z, boundary, capturedAtMs, holder,
                 Sha256Hash.ofUtf8("unsigned")
         );
         return new CompanionEntityCheckpoint(
-                VERSION, profileId, alias, aliasGeneration, ownerId,
+                VERSION, profileId, alias, alias, aliasGeneration, ownerId,
                 lifecycleRevision, reconciliationGeneration, worldKey,
                 x, y, z, boundary, capturedAtMs, holder,
+                Sha256Hash.ofUtf8(codec.integrityMaterial(unsigned))
+        );
+    }
+
+    /** Creates a returned-original checkpoint targeting the current alias. */
+    @Nonnull
+    public static CompanionEntityCheckpoint createReturnedOriginal(
+            @Nonnull ProfileId profileId,
+            @Nonnull NpcAlias targetAlias,
+            @Nonnull NpcAlias sourceAlias,
+            long aliasGeneration,
+            @Nonnull OwnerId ownerId,
+            @Nonnull LifecycleRevision lifecycleRevision,
+            @Nonnull ReconciliationGeneration reconciliationGeneration,
+            @Nonnull String worldKey,
+            double x,
+            double y,
+            double z,
+            long capturedAtMs,
+            @Nonnull BsonDocument holder,
+            @Nonnull CompanionEntityCheckpointCodec codec
+    ) {
+        Objects.requireNonNull(codec, "codec");
+        CompanionEntityCheckpoint unsigned = new CompanionEntityCheckpoint(
+                VERSION, profileId, targetAlias, sourceAlias,
+                aliasGeneration, ownerId, lifecycleRevision,
+                reconciliationGeneration, worldKey, x, y, z,
+                CaptureBoundary.RETURNED_RETIRED_ORIGINAL,
+                capturedAtMs, holder, Sha256Hash.ofUtf8("unsigned")
+        );
+        return new CompanionEntityCheckpoint(
+                VERSION, profileId, targetAlias, sourceAlias,
+                aliasGeneration, ownerId, lifecycleRevision,
+                reconciliationGeneration, worldKey, x, y, z,
+                CaptureBoundary.RETURNED_RETIRED_ORIGINAL,
+                capturedAtMs, holder,
                 Sha256Hash.ofUtf8(codec.integrityMaterial(unsigned))
         );
     }

@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Tamed companions now cancel a marker-driven despawn that was already
+  pending when spawn authority was detached. This prevents nearby companions
+  from disappearing even while their chunk and player remain loaded.
+- Recall no longer treats a timeout or a missing live UUID as proof that an
+  ordinary companion is Lost. This prevents partial, randomized replacements.
+- Tamework now saves exact, integrity-checked companion entity checkpoints and
+  restores the full serializable NPC state only after Hytale loads the exact
+  source section and confirms that the saved body is absent.
+- When a retired original companion returns after a generated replacement,
+  Tamework now keeps the original full state, safely replaces the current
+  command UUID, and removes the duplicate only after the restored entity is
+  live. Conflicting duplicate evidence remains unchanged for manual review.
+
 ## 3.1.3 - Stale Active Recall Hotfix - 2026-08-11
 
 ### Fixed

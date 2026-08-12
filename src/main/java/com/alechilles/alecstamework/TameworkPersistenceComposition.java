@@ -26,6 +26,7 @@ import com.alechilles.alecstamework.items.persistence
         .SpawnerTameAndLinkEvidenceSource;
 import com.alechilles.alecstamework.items.coop.DirectLiveCoopAuthor;
 import com.alechilles.alecstamework.items.coop.DirectLiveCoopProjectionView;
+import com.alechilles.alecstamework.items.persistence.checkpoint.ExactCheckpointCompanionRecallRecovery;
 import com.alechilles.alecstamework.npc.components
         .TameworkPersistenceRetirementComponent;
 import com.alechilles.alecstamework.lifecycle
@@ -93,6 +94,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
     private final PositiveEvidenceDormantAuthor dormantAuthor;
     private final DirectLiveCoopAuthor directLiveCoopAuthor;
     private final DirectLiveCoopProjectionView directLiveCoopProjections;
+    private final ExactCheckpointCompanionRecallRecovery exactRecallRecovery;
     private final TameworkRestoredFeatureComposition restoredFeatures;
     private final PersistenceStartupWorldEvidenceResumer startupResumer;
 
@@ -109,6 +111,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             PositiveEvidenceDormantAuthor dormantAuthor,
             DirectLiveCoopAuthor directLiveCoopAuthor,
             DirectLiveCoopProjectionView directLiveCoopProjections,
+            ExactCheckpointCompanionRecallRecovery exactRecallRecovery,
             TameworkRestoredFeatureComposition restoredFeatures
     ) {
         this.logger = logger;
@@ -123,6 +126,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
         this.dormantAuthor = dormantAuthor;
         this.directLiveCoopAuthor = directLiveCoopAuthor;
         this.directLiveCoopProjections = directLiveCoopProjections;
+        this.exactRecallRecovery = exactRecallRecovery;
         this.restoredFeatures = Objects.requireNonNull(
                 restoredFeatures, "restoredFeatures"
         );
@@ -263,7 +267,8 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                         logger,
                         events,
                         identityIndex,
-                        facades
+                        facades,
+                        retirement
                 );
         TameworkRestoredFeatureComposition restoredFeatures;
         try {
@@ -294,6 +299,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 authors.dormantAuthor(),
                 authors.directLiveCoopAuthor(),
                 authors.directLiveCoopProjections(),
+                authors.exactRecallRecovery(),
                 restoredFeatures
         );
         if (initial.complete()) {
@@ -430,6 +436,10 @@ final class TameworkPersistenceComposition implements AutoCloseable {
     @Nonnull
     CommandLinkedNpcStateSnapshotService snapshots() {
         return snapshots;
+    }
+
+    ExactCheckpointCompanionRecallRecovery exactRecallRecovery() {
+        return exactRecallRecovery;
     }
 
     @Nonnull

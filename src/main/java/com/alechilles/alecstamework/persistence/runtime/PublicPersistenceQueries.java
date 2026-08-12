@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.companion.extension.ProfileExtensionData;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionKey;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionProjectionValue;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationScope;
@@ -61,6 +62,13 @@ public final class PublicPersistenceQueries {
     public CompletionStage<PersistenceReadResult<CompanionProfileReadModel>>
     findProfile(@Nonnull NpcAlias alias) {
         return adapter.profileReader().findByAlias(alias);
+    }
+
+    /** Resolves one current or historical runtime alias. */
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<CompanionAlias>>
+    findAlias(@Nonnull NpcAlias alias) {
+        return adapter.profileReader().resolveAlias(alias);
     }
 
     /** Returns canonical snapshot history for one exact profile and kind. */

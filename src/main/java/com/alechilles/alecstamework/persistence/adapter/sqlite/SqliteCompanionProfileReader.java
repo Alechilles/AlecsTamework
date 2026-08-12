@@ -75,6 +75,27 @@ public final class SqliteCompanionProfileReader {
         ));
     }
 
+    /** Resolves one current or historical alias without changing its state. */
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<CompanionAlias>> resolveAlias(
+            @Nonnull NpcAlias alias
+    ) {
+        if (alias == null) {
+            throw new IllegalArgumentException("NPC alias is required");
+        }
+        return reads.execute(new SqliteReadCommand<>(
+                new PersistenceReadKind("companion_alias_resolve"),
+                PersistenceReadPriority.GAMEPLAY_CRITICAL,
+                connection -> new SqliteCompanionIdentityStore(connection)
+                        .resolveAlias(alias)
+                        .<PersistenceReadResult<CompanionAlias>>map(
+                                value -> PersistenceReadResult.found(
+                                        value, value.generation()
+                                )
+                        ).orElseGet(PersistenceReadResult::absent)
+        ));
+    }
+
     /** Reads every public projection state on one consistent connection. */
     @Nonnull
     public CompletionStage<PersistenceReadResult<
