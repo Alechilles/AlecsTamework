@@ -7,6 +7,7 @@ import com.hypixel.hytale.component.TestEntityComponentStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.entity.reference.InvalidatablePersistentRef;
 import com.hypixel.hytale.server.npc.components.SpawnMarkerReference;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.spawning.spawnmarkers.SpawnMarkerEntity;
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
@@ -14,10 +15,34 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompanionSpawnAuthorityServiceTest {
+    @Test
+    void detachingSpawnAuthorityCancelsPendingVanillaDespawn() {
+        ComponentType<EntityStore, NPCEntity> npcType = new ComponentType<>();
+        NPCEntity npc = new NPCEntity();
+        npc.setToDespawn();
+        npc.setPlayingDespawnAnim(true);
+
+        try (TestEntityComponentStore store =
+                     new TestEntityComponentStore(new UnloadedEntityStore())) {
+            Ref<EntityStore> npcRef = store.createReference();
+            store.put(npcRef, npcType, npc);
+
+            boolean changed =
+                    CompanionSpawnAuthorityService.disableNpcSpawnState(
+                            npcRef, store, npcType
+                    );
+
+            assertTrue(changed);
+            assertFalse(npc.isDespawning());
+            assertFalse(npc.isPlayingDespawnAnim());
+        }
+    }
+
     /** Protects the reported lost-marker despawn during unloaded Recall. */
     @Test
     void unloadedCompanionRetainsMarkerAuthorityUntilNpcLoads()

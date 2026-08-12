@@ -226,7 +226,7 @@ public final class CompanionSpawnAuthorityService {
         return true;
     }
 
-    private static boolean disableNpcSpawnState(
+    static boolean disableNpcSpawnState(
             Ref<EntityStore> npcRef,
             Store<EntityStore> store,
             @Nullable ComponentType<EntityStore, NPCEntity> npcType
@@ -237,7 +237,16 @@ public final class CompanionSpawnAuthorityService {
         if (npc == null) {
             return false;
         }
-        boolean changed = npc.updateSpawnTrackingState(false);
+        boolean changed = false;
+        if (npc.isDespawning()) {
+            npc.setDespawning(false);
+            changed = true;
+        }
+        if (npc.isPlayingDespawnAnim()) {
+            npc.setPlayingDespawnAnim(false);
+            changed = true;
+        }
+        changed |= npc.updateSpawnTrackingState(false);
         if (npc.getSpawnConfiguration() != AssetMapWithIndexes.NOT_FOUND) {
             npc.setSpawnConfiguration(AssetMapWithIndexes.NOT_FOUND);
             changed = true;
