@@ -111,9 +111,10 @@ public sealed interface CompanionProfileMutation
         }
     }
 
-    /** Revision-fenced startup resolution shared by loaded and unloaded evidence. */
+    /** Revision-fenced lifecycle reconciliation from exact runtime evidence. */
     sealed interface StartupReconciliation extends CompanionProfileMutation
-            permits ReconcileLoaded, ReconcileUnloaded {
+            permits ReconcileLoaded, ReconcileUnloaded,
+            ReconcileMissingActive {
         @Nonnull
         LifecycleRevision expectedLifecycleRevision();
 
@@ -224,6 +225,69 @@ public sealed interface CompanionProfileMutation
             )) {
                 throw new IllegalArgumentException(
                         "Unloaded-profile reconciliation lifecycle fence mismatch"
+                );
+            }
+            return new CompanionLifecycle(
+                    profileId,
+                    current.ownerId(),
+                    LifecycleState.UNLOADED,
+                    LifecycleLocation.none(),
+                    current.revision().next(),
+                    null,
+                    requestedAtMs,
+                    current.lastReconciledGeneration().next(),
+                    null,
+                    current.ownerWorldKey()
+            );
+        }
+    }
+
+    /**
+     * Converts one stale exact live-entity claim to unloaded after Recall
+     * probed that same world without finding the current alias.
+     *
+     * <p>This is the first phase of recovery. Recall must run a second normal
+     * relocation window before the unloaded profile can become Lost.</p>
+     */
+    record ReconcileMissingActive(
+            @Nonnull ProfileId profileId,
+            @Nonnull LifecycleRevision expectedLifecycleRevision,
+            @Nonnull ReconciliationGeneration expectedReconciliationGeneration,
+            @Nonnull NpcAlias expectedCurrentAlias,
+            @Nonnull OwnerId expectedOwnerId,
+            @Nonnull String expectedWorldKey,
+            long recallQueuedAtMs,
+            long requestedAtMs
+    ) implements StartupReconciliation {
+        public ReconcileMissingActive {
+            if (profileId == null || expectedLifecycleRevision == null
+                    || expectedReconciliationGeneration == null
+                    || expectedCurrentAlias == null
+                    || expectedOwnerId == null) {
+                throw new IllegalArgumentException(
+                        "Complete missing-active reconciliation evidence is required"
+                );
+            }
+            expectedWorldKey = normalizeWorldKey(expectedWorldKey);
+            if (recallQueuedAtMs > requestedAtMs) {
+                throw new IllegalArgumentException(
+                        "Missing-active reconciliation time ordering is invalid"
+                );
+            }
+        }
+
+        /** Returns the unloaded state that starts the second Recall window. */
+        @Nonnull
+        public CompanionLifecycle resolvedLifecycle(
+                @Nonnull CompanionLifecycle current
+        ) {
+            if (current == null || !profileId.equals(current.profileId())
+                    || !expectedLifecycleRevision.equals(current.revision())
+                    || !expectedReconciliationGeneration.equals(
+                    current.lastReconciledGeneration()
+            )) {
+                throw new IllegalArgumentException(
+                        "Missing-active reconciliation lifecycle fence mismatch"
                 );
             }
             return new CompanionLifecycle(

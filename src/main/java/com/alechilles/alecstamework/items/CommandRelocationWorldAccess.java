@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.AddReason;
@@ -13,6 +14,7 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.logging.Level;
@@ -86,6 +88,19 @@ final class CommandRelocationWorldAccess {
     @Nullable
     String normalizeWorldName(@Nullable String worldName) {
         return worldName == null || worldName.isBlank() ? null : worldName.trim();
+    }
+
+    boolean hasExpectedLiveOwner(
+            Store<EntityStore> store,
+            Ref<EntityStore> ref,
+            PendingRelocation pending
+    ) {
+        TameworkOwnerComponent owner = safeGetComponent(
+                store, ref, TameworkOwnerComponent.getComponentType()
+        );
+        return owner != null && Objects.equals(
+                owner.getOwnerId(), pending.ownerUuid
+        );
     }
 
     @Nullable

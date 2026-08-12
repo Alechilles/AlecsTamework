@@ -198,6 +198,45 @@ class CompanionProfileMutationCodecTest {
     }
 
     @Test
+    void missingActiveRecallRoundTripsForDurableOperationReplay() {
+        CompanionProfileMutation.ReconcileMissingActive reconciliation =
+                new CompanionProfileMutation.ReconcileMissingActive(
+                        PROFILE,
+                        new LifecycleRevision(3),
+                        new ReconciliationGeneration(5),
+                        ALIAS,
+                        OWNER,
+                        "live-world",
+                        -8_500,
+                        -8_000
+                );
+        CompanionProfileMutation.ReconcileMissingActive decoded =
+                (CompanionProfileMutation.ReconcileMissingActive) decode(
+                        encode(reconciliation)
+                );
+        CompanionLifecycle current = new CompanionLifecycle(
+                PROFILE,
+                OWNER,
+                LifecycleState.ACTIVE,
+                LifecycleLocation.liveEntity(ALIAS.toString(), "live-world"),
+                new LifecycleRevision(3),
+                null,
+                -9_000,
+                new ReconciliationGeneration(5),
+                null,
+                "owner-world"
+        );
+
+        assertEquals(reconciliation, decoded);
+        CompanionLifecycle resolved = decoded.resolvedLifecycle(current);
+        assertEquals(LifecycleState.UNLOADED, resolved.state());
+        assertEquals(LifecycleLocation.none(), resolved.location());
+        assertEquals(new LifecycleRevision(4), resolved.revision());
+        assertEquals(new ReconciliationGeneration(6),
+                resolved.lastReconciledGeneration());
+    }
+
+    @Test
     void importedRecallRecoveryRoundTripsExactSingleUseEvidence() {
         CompanionProfileMutation.RecoverImportedMissing recovery =
                 new CompanionProfileMutation.RecoverImportedMissing(

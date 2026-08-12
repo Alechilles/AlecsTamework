@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.items;
 
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import javax.annotation.Nonnull;
 
 /**
@@ -12,17 +14,26 @@ import javax.annotation.Nonnull;
  */
 @FunctionalInterface
 public interface ImportedRecallRecoverySink {
-    ImportedRecallRecoverySink NOOP = failure -> {
-    };
+    ImportedRecallRecoverySink NOOP = failure ->
+            CompletableFuture.completedFuture(RecoveryOutcome.NONE);
 
-    void recover(@Nonnull RecallFailure failure);
+    @Nonnull
+    CompletionStage<RecoveryOutcome> recover(@Nonnull RecallFailure failure);
+
+    /** Terminal action authorized by the durable recovery result. */
+    enum RecoveryOutcome {
+        NONE,
+        RECOVERED,
+        RETRY_REQUIRED
+    }
 
     /** Immutable player-intent and relocation timing evidence. */
     record RecallFailure(
             @Nonnull UUID npcUuid,
             @Nonnull UUID ownerUuid,
             long queuedAtMs,
-            long failedAtMs
+            long failedAtMs,
+            String probedWorldName
     ) {
         public RecallFailure {
             if (npcUuid == null || ownerUuid == null
@@ -31,6 +42,18 @@ public interface ImportedRecallRecoverySink {
                         "Complete ordered recall failure evidence is required"
                 );
             }
+            probedWorldName = probedWorldName == null
+                    || probedWorldName.isBlank()
+                    ? null : probedWorldName.trim();
+        }
+
+        public RecallFailure(
+                UUID npcUuid,
+                UUID ownerUuid,
+                long queuedAtMs,
+                long failedAtMs
+        ) {
+            this(npcUuid, ownerUuid, queuedAtMs, failedAtMs, null);
         }
     }
 }

@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
@@ -14,7 +15,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationId;
 import javax.annotation.Nonnull;
 
 /**
- * Applies one sealed startup-world resolution to imported canonical profile state.
+ * Applies one sealed world resolution to canonical profile state.
  *
  * <p>Any required alias rotation and the sole lifecycle revision advance occur in
  * the caller's shared operation transaction.</p>
@@ -161,6 +162,19 @@ final class SqliteStartupProfileReconciliation {
             return false;
         }
         if (reconciliation instanceof
+                CompanionProfileMutation.ReconcileMissingActive missing) {
+            return lifecycle.state() == LifecycleState.ACTIVE
+                    && missing.expectedOwnerId().equals(lifecycle.ownerId())
+                    && lifecycle.location().kind()
+                    == LifecycleLocationKind.LIVE_ENTITY
+                    && missing.expectedCurrentAlias().toString().equals(
+                    lifecycle.location().key()
+            )
+                    && missing.expectedWorldKey().equals(
+                    lifecycle.location().worldKey()
+            );
+        }
+        if (reconciliation instanceof
                 CompanionProfileMutation.ReconcileUnloaded) {
             return lifecycle.state() == LifecycleState.UNRESOLVED;
         }
@@ -229,6 +243,12 @@ final class SqliteStartupProfileReconciliation {
                 reconciliation.expectedReconciliationGeneration().next()
         )) {
             return false;
+        }
+        if (reconciliation instanceof
+                CompanionProfileMutation.ReconcileMissingActive missing) {
+            return lifecycle.state() == LifecycleState.UNLOADED
+                    && missing.expectedOwnerId().equals(lifecycle.ownerId())
+                    && alias.alias().equals(missing.expectedCurrentAlias());
         }
         if (reconciliation instanceof
                 CompanionProfileMutation.ReconcileUnloaded) {

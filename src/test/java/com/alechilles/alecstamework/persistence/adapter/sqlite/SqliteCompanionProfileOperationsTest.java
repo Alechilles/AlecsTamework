@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
+import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.CompanionToolLink;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
@@ -358,6 +359,84 @@ class SqliteCompanionProfileOperationsTest {
                 lifecycle.lastReconciledGeneration());
         assertEquals("owner-world", lifecycle.ownerWorldKey());
         assertEquals(ALIAS_A, storedAlias(ALIAS_A).alias());
+    }
+
+    @Test
+    void reconcilesExactMissingActiveRecallToUnloadedBeforeLostRecovery()
+            throws Exception {
+        CompanionProfileMutation.AdoptLive adoption = adoption(
+                PROFILE,
+                ALIAS_A,
+                OWNER_A,
+                "Companion",
+                List.of(link(PROFILE, TOOL_A, -9_000))
+        );
+        submit(1, "profile-adopt-active-recall", adoption);
+        CompanionProfileMutation.ReconcileMissingActive reconciliation =
+                new CompanionProfileMutation.ReconcileMissingActive(
+                        PROFILE,
+                        LifecycleRevision.INITIAL,
+                        ReconciliationGeneration.INITIAL,
+                        ALIAS_A,
+                        OWNER_A,
+                        "world",
+                        -8_000,
+                        -7_000
+                );
+
+        OperationWorkflowResult result = submitAsync(
+                2, "profile-reconcile-missing-active", reconciliation
+        ).get(10, TimeUnit.SECONDS);
+        CompanionProfileMutationOutcome outcome =
+                CompanionProfileMutationEventCodec.decode(
+                        result.events().getFirst().payloadVersion(),
+                        result.events().getFirst().payloadJson()
+                );
+
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
+        assertEquals(3, result.events().size());
+        assertEquals(CompanionProfileMutationOutcome.Status.UPDATED,
+                outcome.status());
+        CompanionLifecycle lifecycle = storedLifecycle(PROFILE);
+        assertEquals(LifecycleState.UNLOADED, lifecycle.state());
+        assertEquals(LifecycleLocation.none(), lifecycle.location());
+        assertEquals(new LifecycleRevision(1), lifecycle.revision());
+        assertEquals(new ReconciliationGeneration(1),
+                lifecycle.lastReconciledGeneration());
+        assertEquals(CompanionAlias.State.CURRENT,
+                storedAlias(ALIAS_A).state());
+    }
+
+    @Test
+    void missingActiveRecallDoesNotTrustAWorldThatWasNotProbed()
+            throws Exception {
+        CompanionProfileMutation.AdoptLive adoption = adoption(
+                PROFILE, ALIAS_A, OWNER_A, "Companion", List.of()
+        );
+        submit(1, "profile-adopt-active-world-fence", adoption);
+        CompanionProfileMutation.ReconcileMissingActive reconciliation =
+                new CompanionProfileMutation.ReconcileMissingActive(
+                        PROFILE,
+                        LifecycleRevision.INITIAL,
+                        ReconciliationGeneration.INITIAL,
+                        ALIAS_A,
+                        OWNER_A,
+                        "different-world",
+                        -8_000,
+                        -7_000
+                );
+
+        CompanionProfileMutationOutcome outcome = submit(
+                2, "profile-reconcile-missing-active-world-fence",
+                reconciliation
+        );
+
+        assertEquals(CompanionProfileMutationOutcome.Status.UNCHANGED,
+                outcome.status());
+        assertEquals(LifecycleState.ACTIVE,
+                storedLifecycle(PROFILE).state());
+        assertEquals(CompanionAlias.State.CURRENT,
+                storedAlias(ALIAS_A).state());
     }
 
     @Test

@@ -42,6 +42,8 @@ public final class ImportedCompanionRecallRecovery
             new ImportedRecallRecoveryAuthor();
     private final MissingUnloadedRecallRecoveryAuthor missingAuthor =
             new MissingUnloadedRecallRecoveryAuthor();
+    private final MissingActiveRecallReconciliationAuthor activeAuthor =
+            new MissingActiveRecallReconciliationAuthor();
 
     public ImportedCompanionRecallRecovery(
             @Nonnull PersistenceDomainFacades persistence,
@@ -55,46 +57,65 @@ public final class ImportedCompanionRecallRecovery
     }
 
     @Override
-    public void recover(RecallFailure failure) {
-        CompletionStage<Boolean> stage;
+    public CompletionStage<RecoveryOutcome> recover(RecallFailure failure) {
+        CompletionStage<RecoveryOutcome> stage;
         try {
             stage = tryRecover(failure);
         } catch (RuntimeException rejected) {
             warn(failure, rejected);
-            return;
+            return CompletableFuture.failedFuture(rejected);
         }
-        stage.whenComplete((recovered, problem) -> {
+        return stage.whenComplete((outcome, problem) -> {
             if (problem != null) {
                 warn(failure, problem);
-            } else if (Boolean.TRUE.equals(recovered)) {
+            } else if (outcome == RecoveryOutcome.RECOVERED) {
                 logger.at(Level.INFO).log(
                         "Recovered companion %s to Lost after its "
                                 + "explicit recall exhausted relocation.",
+                        failure.npcUuid()
+                );
+            } else if (outcome == RecoveryOutcome.RETRY_REQUIRED) {
+                logger.at(Level.INFO).log(
+                        "Reconciled stale active companion %s to Unloaded; "
+                                + "starting a second recall window.",
                         failure.npcUuid()
                 );
             }
         });
     }
 
-    CompletionStage<Boolean> tryRecover(RecallFailure failure) {
+    CompletionStage<RecoveryOutcome> tryRecover(RecallFailure failure) {
         Objects.requireNonNull(failure, "failure");
         NpcAlias alias = new NpcAlias(failure.npcUuid());
         return persistence.queries().findProfile(alias).thenCompose(read -> {
             if (!(read instanceof PersistenceReadResult.Found<
                     CompanionProfileReadModel> found)) {
-                return CompletableFuture.completedFuture(false);
+                return CompletableFuture.completedFuture(
+                        RecoveryOutcome.NONE
+                );
             }
             CompanionProfileMutation.RecoverImportedMissing recovery =
                     author.author(found.value(), failure);
             if (recovery != null) {
-                return submitImported(recovery);
+                return submitImported(recovery).thenApply(
+                        ignored -> RecoveryOutcome.RECOVERED
+                );
             }
             CompanionDormantTransitionRequest missing = missingAuthor.author(
                     found.value(), failure
             );
-            return missing == null
-                    ? CompletableFuture.completedFuture(false)
-                    : submitMissing(missing);
+            if (missing != null) {
+                return submitMissing(missing).thenApply(
+                        ignored -> RecoveryOutcome.RECOVERED
+                );
+            }
+            CompanionProfileMutation.ReconcileMissingActive active =
+                    activeAuthor.author(found.value(), failure);
+            return active == null
+                    ? CompletableFuture.completedFuture(RecoveryOutcome.NONE)
+                    : submitActive(active).thenApply(
+                            ignored -> RecoveryOutcome.RETRY_REQUIRED
+                    );
         });
     }
 
@@ -134,6 +155,31 @@ public final class ImportedCompanionRecallRecovery
                         recovery
                 );
         return completion(submission, "missing_unloaded_recall_recovery");
+    }
+
+    private CompletionStage<Boolean> submitActive(
+            CompanionProfileMutation.ReconcileMissingActive recovery
+    ) {
+        String payload = CompanionProfileMutationDefinition.INSTANCE.encode(
+                recovery
+        );
+        String material = "missing-active-recall-operation:v1:" + payload;
+        OperationIdentity identity = new OperationIdentity(
+                new OperationId(UUID.nameUUIDFromBytes(
+                        material.getBytes(StandardCharsets.UTF_8)
+                )),
+                new IdempotencyKey(
+                        "missing-active-recall-operation:v1:"
+                                + Sha256Hash.ofUtf8(material)
+                )
+        );
+        PublicOperationSubmission submission =
+                persistence.operations().mutateProfile(
+                        identity.operationId(),
+                        identity.idempotencyKey(),
+                        recovery
+                );
+        return completion(submission, "missing_active_recall_reconciliation");
     }
 
     private CompletionStage<Boolean> completion(

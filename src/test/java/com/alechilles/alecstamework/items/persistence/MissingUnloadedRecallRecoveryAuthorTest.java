@@ -110,8 +110,15 @@ class MissingUnloadedRecallRecoveryAuthorTest {
     }
 
     @Test
-    void rejectsLiveOrQuarantinedProfiles() {
-        assertNull(author.author(profile(LifecycleState.ACTIVE, false), failure()));
+    void rejectsActiveProfileBeforeAnUnloadedRetryWindow() {
+        assertNull(author.author(
+                profile(LifecycleState.ACTIVE, false),
+                failure()
+        ));
+    }
+
+    @Test
+    void rejectsQuarantinedProfile() {
         assertNull(author.author(profile(LifecycleState.UNLOADED, true), failure()));
     }
 

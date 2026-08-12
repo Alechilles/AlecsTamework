@@ -59,6 +59,9 @@ public final class CompanionProfileMutationDefinition
                 CompanionProfileMutation.ReconcileUnloaded reconciliation) {
             json = encodeUnloadedReconciliation(reconciliation);
         } else if (payload instanceof
+                CompanionProfileMutation.ReconcileMissingActive reconciliation) {
+            json = encodeMissingActiveReconciliation(reconciliation);
+        } else if (payload instanceof
                 CompanionProfileMutation.RecoverImportedMissing recovery) {
             json = encodeImportedRecovery(recovery);
         } else if (payload instanceof CompanionProfileMutation.Update update) {
@@ -81,6 +84,8 @@ public final class CompanionProfileMutationDefinition
                     decodeLoadedReconciliation(json, requestedAtMs);
             case "RECONCILE_UNLOADED" ->
                     decodeUnloadedReconciliation(json, requestedAtMs);
+            case "RECONCILE_MISSING_ACTIVE" ->
+                    decodeMissingActiveReconciliation(json, requestedAtMs);
             case "RECOVER_IMPORTED_MISSING" ->
                     decodeImportedRecovery(json, requestedAtMs);
             case "UPDATE" -> decodeUpdate(json, requestedAtMs);
@@ -134,6 +139,36 @@ public final class CompanionProfileMutationDefinition
     ) {
         JsonObject json = encodeReconciliationFence(reconciliation);
         json.addProperty("action", "RECONCILE_UNLOADED");
+        return json;
+    }
+
+    private JsonObject encodeMissingActiveReconciliation(
+            CompanionProfileMutation.ReconcileMissingActive reconciliation
+    ) {
+        JsonObject json = new JsonObject();
+        json.addProperty("action", "RECONCILE_MISSING_ACTIVE");
+        json.addProperty("profileId", reconciliation.profileId().toString());
+        json.addProperty(
+                "expectedLifecycleRevision",
+                reconciliation.expectedLifecycleRevision().value()
+        );
+        json.addProperty(
+                "expectedReconciliationGeneration",
+                reconciliation.expectedReconciliationGeneration().value()
+        );
+        json.addProperty(
+                "expectedCurrentAlias",
+                reconciliation.expectedCurrentAlias().toString()
+        );
+        json.addProperty(
+                "expectedOwnerId",
+                reconciliation.expectedOwnerId().toString()
+        );
+        json.addProperty(
+                "expectedWorldKey",
+                reconciliation.expectedWorldKey()
+        );
+        json.addProperty("recallQueuedAtMs", reconciliation.recallQueuedAtMs());
         return json;
     }
 
@@ -267,6 +302,28 @@ public final class CompanionProfileMutationDefinition
                         json.get("expectedReconciliationGeneration").getAsLong()
                 ),
                 NpcAlias.parse(json.get("expectedCurrentAlias").getAsString()),
+                requestedAtMs
+        );
+    }
+
+    private CompanionProfileMutation decodeMissingActiveReconciliation(
+            JsonObject json,
+            long requestedAtMs
+    ) {
+        return new CompanionProfileMutation.ReconcileMissingActive(
+                com.alechilles.alecstamework.companion.identity.ProfileId.parse(
+                        json.get("profileId").getAsString()
+                ),
+                new LifecycleRevision(
+                        json.get("expectedLifecycleRevision").getAsLong()
+                ),
+                new ReconciliationGeneration(
+                        json.get("expectedReconciliationGeneration").getAsLong()
+                ),
+                NpcAlias.parse(json.get("expectedCurrentAlias").getAsString()),
+                OwnerId.parse(json.get("expectedOwnerId").getAsString()),
+                json.get("expectedWorldKey").getAsString(),
+                json.get("recallQueuedAtMs").getAsLong(),
                 requestedAtMs
         );
     }

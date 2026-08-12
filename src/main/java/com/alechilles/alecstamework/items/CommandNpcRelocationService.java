@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
-import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
@@ -14,7 +13,6 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
@@ -88,13 +86,6 @@ public final class CommandNpcRelocationService {
                 diagnostics,
                 this::scheduleTryApply
         );
-        this.terminalService = new CommandRelocationTerminalService(
-                logger,
-                importedRecallRecovery,
-                pendingByNpc,
-                this::removePending,
-                this::logTravelDiagnostic
-        );
         this.queueCoordinator = new CommandRelocationQueueCoordinator(
                 pendingByNpc,
                 lastKnownByNpc,
@@ -103,6 +94,21 @@ public final class CommandNpcRelocationService {
                 applyScheduler,
                 this::dropUnconfirmedRelocation,
                 this::logTravelDiagnostic
+        );
+        CommandRelocationRecoveryRetryService recoveryRetries =
+                new CommandRelocationRecoveryRetryService(
+                        pendingByNpc,
+                        worldAccess,
+                        queueCoordinator,
+                        this::logTravelDiagnostic
+                );
+        this.terminalService = new CommandRelocationTerminalService(
+                logger,
+                importedRecallRecovery,
+                pendingByNpc,
+                this::removePending,
+                this::logTravelDiagnostic,
+                recoveryRetries::retry
         );
     }
 
@@ -358,7 +364,7 @@ public final class CommandNpcRelocationService {
                 return false;
             }
             if (!pending.relocationIssued) {
-                if (!hasExpectedLiveOwner(store, ref, pending)) {
+                if (!worldAccess.hasExpectedLiveOwner(store, ref, pending)) {
                     rejectRelocation(pending, "relocation-live-owner-changed");
                     return false;
                 }
@@ -406,15 +412,6 @@ public final class CommandNpcRelocationService {
         }
     }
 
-    private boolean hasExpectedLiveOwner(Store<EntityStore> store,
-                                         Ref<EntityStore> ref,
-                                         PendingRelocation pending) {
-        TameworkOwnerComponent owner = worldAccess.safeGetComponent(
-                store, ref, TameworkOwnerComponent.getComponentType()
-        );
-        return owner != null && Objects.equals(owner.getOwnerId(), pending.ownerUuid);
-    }
-
     private void finishRelocation(UUID npcUuid, PendingRelocation pending) {
         if (pendingByNpc.get(npcUuid) != pending) {
             return;
@@ -425,7 +422,7 @@ public final class CommandNpcRelocationService {
 
     void dropUnconfirmedRelocation(
             @Nullable World world, UUID npcUuid, PendingRelocation pending, long droppedAtMs) {
-        finishDroppedRelocation(npcUuid, pending, droppedAtMs, false);
+        terminalService.finish(npcUuid, pending, droppedAtMs, false);
     }
 
     void commitUnconfirmedRelocationAsUnloaded(
@@ -613,7 +610,9 @@ public final class CommandNpcRelocationService {
             cancelPendingForStateFilter(npcUuid, pending);
             return;
         }
-        if (!hasExpectedLiveOwner(sourceStore, sourceRef, pending)) {
+        if (!worldAccess.hasExpectedLiveOwner(
+                sourceStore, sourceRef, pending
+        )) {
             pending.markCrossWorldTransferFinished();
             rejectRelocation(pending, "relocation-live-owner-changed");
             return;
@@ -948,21 +947,7 @@ public final class CommandNpcRelocationService {
             PendingRelocation pending,
             long droppedAtMs
     ) {
-        finishDroppedRelocation(npcUuid, pending, droppedAtMs, true);
-    }
-
-    private void finishDroppedRelocation(
-            UUID npcUuid,
-            PendingRelocation pending,
-            long droppedAtMs,
-            boolean cleanRetryExhaustion
-    ) {
-        terminalService.finish(
-                npcUuid,
-                pending,
-                droppedAtMs,
-                cleanRetryExhaustion
-        );
+        terminalService.finish(npcUuid, pending, droppedAtMs, true);
     }
 
     void requestChunksForPending(World world, PendingRelocation pending) {

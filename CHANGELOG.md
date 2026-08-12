@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.1.3 - Stale Active Recall Hotfix - 2026-08-11
+
+### Fixed
+- Recall now repairs a missing companion whose command item reports Unloaded
+  while canonical persistence still claims the exact NPC is active. Tamework
+  first fences the exact alias, owner, and probed world to Unloaded, then runs
+  a second normal Recall window before it can create a restorable Lost entry.
+  This avoids replacing an NPC that loads late during recovery.
+
 ## 3.1.2 - NPC Recovery and Update 6 Hotfix - 2026-08-11
 
 ### Fixed
