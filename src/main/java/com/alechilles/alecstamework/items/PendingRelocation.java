@@ -31,6 +31,8 @@ final class PendingRelocation {
     private final ConcurrentHashMap<ChunkRequestKey, Long> lastChunkRequestAtMsByChunk =
             new ConcurrentHashMap<>();
     private final Set<ChunkRequestKey> readyChunks = ConcurrentHashMap.newKeySet();
+    private final Set<ImportedRecallRecoverySink.RecallSourceSection>
+            completedSourceSections = ConcurrentHashMap.newKeySet();
     long nextScheduledApplyAtMs = Long.MAX_VALUE;
     boolean relocationIssued;
     long relocationIssuedAtMs;
@@ -134,6 +136,24 @@ final class PendingRelocation {
 
     boolean isChunkReady(String worldName, int chunkX, int chunkZ) {
         return readyChunks.contains(new ChunkRequestKey(worldName, chunkX, chunkZ));
+    }
+
+    void markSourceSectionLoaded(
+            String worldName,
+            int chunkX,
+            int sectionY,
+            int chunkZ
+    ) {
+        completedSourceSections.add(
+                new ImportedRecallRecoverySink.RecallSourceSection(
+                        worldName, chunkX, sectionY, chunkZ
+                )
+        );
+    }
+
+    Set<ImportedRecallRecoverySink.RecallSourceSection>
+    completedSourceSections() {
+        return Set.copyOf(completedSourceSections);
     }
 
     synchronized boolean reserveScheduledApply(long dueAtMs) {

@@ -88,7 +88,14 @@ final class CommandRelocationTerminalService {
                             pending.ownerUuid,
                             pending.queuedAtMs,
                             droppedAtMs,
-                            pending.destinationWorldName
+                            pending.destinationWorldName,
+                            new ImportedRecallRecoverySink.RecallDestination(
+                                    pending.destinationWorldName,
+                                    pending.destination.x,
+                                    pending.destination.y,
+                                    pending.destination.z
+                            ),
+                            pending.completedSourceSections()
                     )
             ).whenComplete((outcome, problem) -> {
                 if (problem == null && outcome

@@ -149,6 +149,12 @@ final class CommandRelocationChunkRequestService implements AutoCloseable {
                         return;
                     }
                     if (failure == null && section != null) {
+                        pending.markSourceSectionLoaded(
+                                sourceWorld.getName(),
+                                chunkX,
+                                chunkY,
+                                chunkZ
+                        );
                         applyScheduler.schedule(
                                 destinationWorld,
                                 pending.npcUuid,
