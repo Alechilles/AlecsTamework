@@ -189,14 +189,14 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (settings, value) -> settings.minDelaySeconds = value,
             settings -> settings.minDelaySeconds
         )
-        .documentation("Minimum random delay in seconds before breeding resolves.")
+        .documentation("Minimum random seconds added to the parent breeding cooldown.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("MaxDelaySeconds", Codec.INTEGER),
             (settings, value) -> settings.maxDelaySeconds = value,
             settings -> settings.maxDelaySeconds
         )
-        .documentation("Maximum random delay in seconds before breeding resolves.")
+        .documentation("Maximum random seconds added to the parent breeding cooldown.")
         .add()
         .build();
 
@@ -885,14 +885,14 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (settings, value) -> settings.minDelaySeconds = value,
             settings -> settings.minDelaySeconds
         )
-        .documentation("Minimum random delay in seconds before breeding resolves.")
+        .documentation("Minimum random seconds added to the parent breeding cooldown.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("MaxDelaySeconds", Codec.INTEGER),
             (settings, value) -> settings.maxDelaySeconds = value,
             settings -> settings.maxDelaySeconds
         )
-        .documentation("Maximum random delay in seconds before breeding resolves.")
+        .documentation("Maximum random seconds added to the parent breeding cooldown.")
         .add()
         .build();
 

@@ -144,7 +144,10 @@ Behavior:
 - Manual breeding marks the interacted NPC for that player only. The same player must interact with both intended NPCs before `ManualSelectionSeconds` expires.
 - Manual breeding is independent from `TwBreedingConfig.PassiveBreeding.Enabled`, the `/tw settings` passive breeding toggle, and the per-NPC breeding enable toggle. Cooldowns and eligibility gates such as tame, adult, ownership, gender, and role compatibility still apply.
 - `MinHappiness` is ignored when the happiness system or breeding happiness requirement is disabled.
-- When a manually selected pair is found: applies parent cooldown, pair movement, hearts, delayed offspring spawn.
+- When a manually selected pair is found: applies the parent cooldown, moves the pair together,
+  shows hearts, then spawns offspring 2.2 seconds later. Pair movement can add up to five seconds.
+- `Cooldowns.MinDelaySeconds` and `MaxDelaySeconds` define random cooldown jitter.
+  They do not delay the current offspring spawn.
 - Fertility intentionally resolves a litter of zero through four offspring. Tamework multiplies the two resolved parent fertility factors, clamps the expected litter to four, guarantees the whole-number portion, and uses one fractional roll for at most one additional child. Similar-looking siblings from one admitted litter are not duplicate callbacks.
 - `Pairing.MaxNearbySameType` is checked against nearby live NPCs. Passive
   sweeps reserve the maximum possible litter, and delayed births recheck live
