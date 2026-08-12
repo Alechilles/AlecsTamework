@@ -107,6 +107,7 @@ public record CompanionEntityCheckpoint(
     public enum CaptureBoundary {
         LOADED,
         UNLOAD,
+        DESTRUCTIVE_REMOVE,
         RETURNED_RETIRED_ORIGINAL
     }
 }

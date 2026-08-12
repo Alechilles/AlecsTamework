@@ -1,5 +1,8 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.items.persistence.checkpoint.CompanionEntityCheckpoint;
+import com.alechilles.alecstamework.items.persistence.checkpoint.CompanionEntityCheckpointCaptureService;
+import com.alechilles.alecstamework.items.persistence.checkpoint.CompanionEntityCheckpointSink;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -29,25 +32,51 @@ public final class CommandLinkedNpcStateSnapshotService {
             new CommandLiveNpcSnapshotFactory();
     private final CompanionProfileSnapshotSink profileSnapshots;
     private final LoadedNpcIdentityIndex loadedNpcIdentityIndex;
+    private final CompanionEntityCheckpointCaptureService checkpointCaptures;
 
     public CommandLinkedNpcStateSnapshotService() {
-        this(CompanionProfileSnapshotSink.ignore(), new LoadedNpcIdentityIndex());
+        this(
+                CompanionProfileSnapshotSink.ignore(),
+                new LoadedNpcIdentityIndex(),
+                CompanionEntityCheckpointSink.IGNORE
+        );
     }
 
     public CommandLinkedNpcStateSnapshotService(
             @Nonnull CompanionProfileSnapshotSink profileSnapshots
     ) {
-        this(profileSnapshots, new LoadedNpcIdentityIndex());
+        this(
+                profileSnapshots,
+                new LoadedNpcIdentityIndex(),
+                CompanionEntityCheckpointSink.IGNORE
+        );
     }
 
     public CommandLinkedNpcStateSnapshotService(
             @Nonnull CompanionProfileSnapshotSink profileSnapshots,
             @Nonnull LoadedNpcIdentityIndex loadedNpcIdentityIndex
     ) {
+        this(
+                profileSnapshots,
+                loadedNpcIdentityIndex,
+                CompanionEntityCheckpointSink.IGNORE
+        );
+    }
+
+    public CommandLinkedNpcStateSnapshotService(
+            @Nonnull CompanionProfileSnapshotSink profileSnapshots,
+            @Nonnull LoadedNpcIdentityIndex loadedNpcIdentityIndex,
+            @Nonnull CompanionEntityCheckpointSink checkpointSink
+    ) {
         this.profileSnapshots = Objects.requireNonNull(
                 profileSnapshots, "profileSnapshots"
         );
         this.loadedNpcIdentityIndex = Objects.requireNonNull(loadedNpcIdentityIndex, "loadedNpcIdentityIndex");
+        this.checkpointCaptures =
+                new CompanionEntityCheckpointCaptureService(
+                        Objects.requireNonNull(checkpointSink, "checkpointSink"),
+                        System::currentTimeMillis
+                );
     }
 
     public void onNpcAdded(Ref<EntityStore> reference, Store<EntityStore> store) {
@@ -56,6 +85,11 @@ public final class CommandLinkedNpcStateSnapshotService {
         }
         indexNpcAdded(reference, store);
         refreshFromEntity(reference, store);
+        checkpointCaptures.capture(
+                reference,
+                store,
+                CompanionEntityCheckpoint.CaptureBoundary.LOADED
+        );
     }
 
     public void onNpcRemoved(Ref<EntityStore> reference,
@@ -78,6 +112,14 @@ public final class CommandLinkedNpcStateSnapshotService {
         }
         if (reason == RemoveReason.REMOVE || reason == RemoveReason.UNLOAD) {
             refreshFromEntity(reference, store);
+            checkpointCaptures.capture(
+                    reference,
+                    store,
+                    reason == RemoveReason.UNLOAD
+                            ? CompanionEntityCheckpoint.CaptureBoundary.UNLOAD
+                            : CompanionEntityCheckpoint.CaptureBoundary
+                            .DESTRUCTIVE_REMOVE
+            );
         }
         NPCEntity npc = store.getComponent(reference, NPCEntity.getComponentType());
         UUID componentUuid = resolveComponentUuid(reference, store);

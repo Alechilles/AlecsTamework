@@ -23,6 +23,7 @@ import com.alechilles.alecstamework.items.persistence.TameworkDormantCompanionEv
 import com.alechilles.alecstamework.items.persistence.TameworkDormantSnapshotFactsReader;
 import com.alechilles.alecstamework.items.persistence.TameworkFullStateSnapshotReader;
 import com.alechilles.alecstamework.items.persistence.TameworkRestorationSnapshotResolver;
+import com.alechilles.alecstamework.items.persistence.checkpoint.ReplacementCompanionEntityCheckpointSink;
 import com.alechilles.alecstamework.items.coop.DirectLiveCoopAuthor;
 import com.alechilles.alecstamework.items.coop.DirectLiveCoopProjectionView;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
@@ -60,7 +61,11 @@ final class TameworkPersistenceAuthors {
         CommandLinkedNpcStateSnapshotService stateSnapshots =
                 new CommandLinkedNpcStateSnapshotService(
                         profileSnapshots,
-                        identityIndex
+                        identityIndex,
+                        new ReplacementCompanionEntityCheckpointSink(
+                                facades,
+                                detail -> logger.at(Level.WARNING).log(detail)
+                        )
                 );
         TameworkFullStateSnapshotReader snapshots =
                 new TameworkFullStateSnapshotReader(
