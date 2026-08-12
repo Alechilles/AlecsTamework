@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.compat.HytaleParticleAccess;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.hypixel.hytale.component.ComponentType;
@@ -10,7 +11,6 @@ import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
-import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
@@ -98,7 +98,7 @@ final class SetOwnerAppliedEffects {
         }
         try {
             Vector3d position = new Vector3d(transform.getPosition()).add(0.0, DEFAULT_PARTICLE_HEIGHT, 0.0);
-            ParticleUtil.spawnParticleEffect(particleSystem, position, store);
+            HytaleParticleAccess.spawn(particleSystem, position, store);
         } catch (RuntimeException | LinkageError ignored) {
             // Presentation is best effort after the durable ownership/tame transition.
         }

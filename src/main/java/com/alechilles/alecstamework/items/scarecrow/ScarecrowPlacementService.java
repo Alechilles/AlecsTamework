@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items.scarecrow;
 
+import com.alechilles.alecstamework.math.TameworkRotationUtil;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Holder;
@@ -75,7 +76,7 @@ public final class ScarecrowPlacementService {
         Vector3d relative = new Vector3d(actorPosition).sub(position);
         relative.y = 0.0;
         Rotation3f rotation = relative.lengthSquared() > 0.000001
-                ? Rotation3f.lookAt(relative)
+                ? TameworkRotationUtil.lookAt(relative)
                 : new Rotation3f();
         return new Placement(position, rotation);
     }

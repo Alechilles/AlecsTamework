@@ -1,10 +1,10 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.compat.HytaleParticleAccess;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
-import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -57,7 +57,7 @@ final class BreedingPairingEffectsService {
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
         Vector3d position = new Vector3d(transform.getPosition());
         position.add(particleOffsetResolver.resolveOffset(npc));
-        ParticleUtil.spawnParticleEffect(HEARTS_PARTICLE, position, store);
+        HytaleParticleAccess.spawn(HEARTS_PARTICLE, position, store);
     }
 
     private void awaitProximity(@Nonnull ScheduledPairing pairing, long elapsedMs) {

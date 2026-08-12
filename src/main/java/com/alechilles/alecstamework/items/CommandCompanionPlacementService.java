@@ -307,7 +307,7 @@ public final class CommandCompanionPlacementService {
                 playerPosition.z - spawnPosition.z
         );
         return relative.lengthSquared() > 0.0001
-                ? Rotation3f.lookAt(relative)
+                ? TameworkRotationUtil.lookAt(relative)
                 : new Rotation3f(transform.getRotation());
     }
 

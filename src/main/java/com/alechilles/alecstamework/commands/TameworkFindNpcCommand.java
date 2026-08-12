@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.commands;
 
+import com.alechilles.alecstamework.compat.HytaleParticleAccess;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelScaleService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
@@ -10,7 +11,6 @@ import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractWorldCommand;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
-import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -94,7 +94,7 @@ public final class TameworkFindNpcCommand extends AbstractWorldCommand {
     private static void spawnMarker(Vector3d basePosition, Store<EntityStore> store) {
         Vector3d particlePos = new Vector3d(basePosition);
         particlePos.y += 1.2;
-        ParticleUtil.spawnParticleEffect(DEFAULT_MARKER_PARTICLE, particlePos, store);
+        HytaleParticleAccess.spawn(DEFAULT_MARKER_PARTICLE, particlePos, store);
     }
 
     private static double resolveDistance(TransformComponent targetTransform, TransformComponent playerTransform) {

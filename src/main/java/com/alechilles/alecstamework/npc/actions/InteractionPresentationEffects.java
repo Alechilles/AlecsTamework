@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.compat.HytaleParticleAccess;
+import com.alechilles.alecstamework.compat.HytaleSpatialAccess;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParticleAttachTarget;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FloatingTextEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.PlaySoundEffect;
@@ -175,7 +177,7 @@ final class InteractionPresentationEffects {
                             store
                     );
                 } else {
-                    ParticleUtil.spawnParticleEffect(
+                    HytaleParticleAccess.spawn(
                             particleSystem,
                             position,
                             0f,
@@ -189,7 +191,7 @@ final class InteractionPresentationEffects {
                 }
             } else {
                 if (attachToNpc) {
-                    ParticleUtil.spawnParticleEffect(
+                    HytaleParticleAccess.spawn(
                             particleSystem,
                             position,
                             npcRef,
@@ -197,7 +199,7 @@ final class InteractionPresentationEffects {
                             store
                     );
                 } else {
-                    ParticleUtil.spawnParticleEffect(
+                    HytaleParticleAccess.spawn(
                             particleSystem,
                             position,
                             Collections.singletonList(playerRef),
@@ -209,7 +211,7 @@ final class InteractionPresentationEffects {
             if (color != null) {
                 List<Ref<EntityStore>> viewers = resolveViewerRefs(player);
                 if (viewers.isEmpty()) {
-                    ParticleUtil.spawnParticleEffect(particleSystem, position, store);
+                    HytaleParticleAccess.spawn(particleSystem, position, store);
                 } else {
                     if (attachToNpc) {
                         ParticleUtil.spawnParticleEffect(
@@ -227,7 +229,7 @@ final class InteractionPresentationEffects {
                                 store
                         );
                     } else {
-                        ParticleUtil.spawnParticleEffect(
+                        HytaleParticleAccess.spawn(
                                 particleSystem,
                                 position,
                                 0f,
@@ -244,9 +246,9 @@ final class InteractionPresentationEffects {
                 if (attachToNpc) {
                     List<Ref<EntityStore>> viewers = resolveViewerRefs(player);
                     if (viewers.isEmpty()) {
-                        ParticleUtil.spawnParticleEffect(particleSystem, position, store);
+                        HytaleParticleAccess.spawn(particleSystem, position, store);
                     } else {
-                        ParticleUtil.spawnParticleEffect(
+                        HytaleParticleAccess.spawn(
                                 particleSystem,
                                 position,
                                 npcRef,
@@ -255,7 +257,7 @@ final class InteractionPresentationEffects {
                         );
                     }
                 } else {
-                    ParticleUtil.spawnParticleEffect(particleSystem, position, store);
+                    HytaleParticleAccess.spawn(particleSystem, position, store);
                 }
             }
         }
@@ -426,7 +428,12 @@ final class InteractionPresentationEffects {
         }
 
         List<Ref<EntityStore>> results = SpatialResource.getThreadLocalReferenceList();
-        playerSpatialResource.getSpatialStructure().collect(position, ParticleUtil.DEFAULT_PARTICLE_DISTANCE, results);
+        HytaleSpatialAccess.collect(
+                playerSpatialResource.getSpatialStructure(),
+                position,
+                ParticleUtil.DEFAULT_PARTICLE_DISTANCE,
+                results
+        );
         if (results.isEmpty()) {
             return List.of();
         }

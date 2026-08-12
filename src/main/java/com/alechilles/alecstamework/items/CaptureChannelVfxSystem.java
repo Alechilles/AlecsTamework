@@ -1,7 +1,9 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.compat.HytaleParticleAccess;
 import com.alechilles.alecstamework.effects.TameworkEntityEffectService;
+import com.alechilles.alecstamework.math.TameworkRotationUtil;
 import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileSessionRegistry;
 import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileSpawner;
 import com.hypixel.hytale.component.ArchetypeChunk;
@@ -15,7 +17,6 @@ import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Map;
@@ -286,7 +287,7 @@ public final class CaptureChannelVfxSystem extends EntityTickingSystem<EntitySto
         if (scale <= 0.0F || maxDuration <= 0.0F) {
             return;
         }
-        ParticleUtil.spawnParticleEffect(
+        HytaleParticleAccess.spawn(
                 session.particleSystem,
                 source,
                 rotation.yaw(),
@@ -357,7 +358,7 @@ public final class CaptureChannelVfxSystem extends EntityTickingSystem<EntitySto
     }
 
     static Rotation3f rotationForBeamPacket(@Nonnull Vector3d direction) {
-        Rotation3f look = Rotation3f.lookAt(direction);
+        Rotation3f look = TameworkRotationUtil.lookAt(direction);
         return look.mul(new Quaterniond().rotationY(-Math.PI / 2.0D));
     }
 

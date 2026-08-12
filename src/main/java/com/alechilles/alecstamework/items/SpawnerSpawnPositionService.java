@@ -176,7 +176,7 @@ final class SpawnerSpawnPositionService {
                     playerPos.z - spawnPosition.z
             );
             if (relative.lengthSquared() > 0.0001) {
-                return Rotation3f.lookAt(relative);
+                return TameworkRotationUtil.lookAt(relative);
             }
         }
         Rotation3f rotation = TameworkRotationUtil.copyOrDefault(transform.getRotation());

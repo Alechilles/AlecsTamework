@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.math.TameworkRotationUtil;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.hypixel.hytale.component.Ref;
@@ -404,7 +405,7 @@ final class BreedingOffspringBirthService {
         if (a != null && b != null) {
             Vector3d delta = new Vector3d(b.getPosition()).sub(a.getPosition());
             if (delta.lengthSquared() > 0.00001) {
-                return Rotation3f.lookAt(delta);
+                return TameworkRotationUtil.lookAt(delta);
             }
         }
         TransformComponent fallback = a != null ? a : b;

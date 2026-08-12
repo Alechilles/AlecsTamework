@@ -105,6 +105,22 @@ Tamework now uses cached adapters for mount construction, attachment-offset read
 flight permission, and default movement profiles. Update 5 keeps its rotation,
 boolean flight, and packet-settings path.
 
+### Relative look rotations
+
+Update 5 exposes `Rotation3f.lookAt(Vector3d)`. Pre.11 replaces that descriptor
+with `lookAt(Vector3dc)` and component-based overloads. A direct pre.11 call caused
+a `NoSuchMethodError` on the Update 5 world thread when a captured companion was
+released.
+
+Tamework now binds the active method shape once and routes captured release,
+companion placement, projection placement, capture VFX, breeding, and scarecrow
+placement through the same compatibility helper.
+
+The same Update 6 interface migration changed particle and spatial-query method
+descriptors from `Vector3d` to `Vector3dc`. Tamework now routes vector-based
+particle effects and spatial searches through cached compatibility bindings. Calls
+that use the unchanged coordinate overloads stay direct.
+
 ### Build and manifest
 
 The branch targets `0.6.0-pre.11` from the prerelease dependency line. The generated
@@ -131,6 +147,10 @@ exist.
   engine classes: passed.
 - Linked-NPC dropdown signature and cache reuse with the real Update 5 and Update 6
   codec implementations: passed.
+- Relative look-rotation results with the exact Update 5 and Update 6 server JARs:
+  passed.
+- Particle and spatial compatibility bindings initialized with the exact Update 5
+  and Update 6 server JARs: passed.
 - The four production Patchwork vanilla targets for fence sets, container buckets,
   decorative buckets, and capture crates are present in the pre.11 game-data index.
 - Tamework command gates use explicit `tamework.*` permission nodes, so the Update 6

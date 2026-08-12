@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.math.TameworkRotationUtil;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.util.ChunkUtil;
@@ -64,7 +65,7 @@ final class CompanionProjectionSpawnPositionService {
         Vector3d towardActor = new Vector3d(transform.getPosition()).sub(position);
         towardActor.y = 0.0D;
         return towardActor.lengthSquared() > 0.0001D
-                ? Rotation3f.lookAt(towardActor) : new Rotation3f();
+                ? TameworkRotationUtil.lookAt(towardActor) : new Rotation3f();
     }
 
     private static void log(

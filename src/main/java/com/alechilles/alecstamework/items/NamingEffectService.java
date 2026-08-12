@@ -1,12 +1,12 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.compat.HytaleParticleAccess;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import org.joml.Vector3d;
 import com.hypixel.hytale.protocol.SoundCategory;
 import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
-import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -34,7 +34,7 @@ public final class NamingEffectService {
         }
         Vector3d position = new Vector3d(transform.getPosition());
         if (particleSystem != null && !particleSystem.isBlank()) {
-            ParticleUtil.spawnParticleEffect(particleSystem, position, store);
+            HytaleParticleAccess.spawn(particleSystem, position, store);
         }
         if (soundEvent == null || soundEvent.isBlank()) {
             return;

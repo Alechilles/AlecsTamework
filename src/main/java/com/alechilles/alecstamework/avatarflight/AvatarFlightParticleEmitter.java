@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.avatarflight;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.compat.HytaleSpatialAccess;
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.spatial.SpatialResource;
@@ -75,7 +76,8 @@ public final class AvatarFlightParticleEmitter {
         SpatialResource<Ref<EntityStore>, EntityStore> playerSpatialResource =
                 componentAccessor.getResource(EntityModule.get().getPlayerSpatialResourceType());
         if (playerSpatialResource != null) {
-            playerSpatialResource.getSpatialStructure().collect(
+            HytaleSpatialAccess.collect(
+                    playerSpatialResource.getSpatialStructure(),
                     position,
                     ParticleUtil.DEFAULT_PARTICLE_DISTANCE,
                     recipients
