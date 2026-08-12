@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework;
 
 import java.util.Set;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.nio.file.Path;
@@ -139,6 +140,8 @@ import com.alechilles.alecstamework.items.scarecrow.ScarecrowBlockEventSystems;
 import com.alechilles.alecstamework.items.scarecrow.TameworkCollectScarecrowInteraction;
 import com.alechilles.alecstamework.items.scarecrow.TameworkPlaceScarecrowInteraction;
 import com.alechilles.alecstamework.items.persistence.ImportedCompanionRecallRecovery;
+import com.alechilles.alecstamework.items.persistence.CompositeRecallRecoverySink;
+import com.alechilles.alecstamework.items.persistence.checkpoint.ExactCheckpointCompanionRecallRecovery;
 import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
 import com.alechilles.alecstamework.localization.ModLanguageDiscovery;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
@@ -1058,10 +1061,19 @@ public class Tamework extends JavaPlugin {
         }
         commandNpcRelocationService = new CommandNpcRelocationService(
                 getLogger(),
-                new ImportedCompanionRecallRecovery(
-                        persistenceComposition.facades(),
-                        getLogger()
-                )
+                new CompositeRecallRecoverySink(List.of(
+                        new ExactCheckpointCompanionRecallRecovery(
+                                persistenceComposition.facades(),
+                                persistenceComposition.snapshots()
+                                        .getLoadedNpcIdentityIndex(),
+                                components.persistenceRetirement(),
+                                getLogger()
+                        ),
+                        new ImportedCompanionRecallRecovery(
+                                persistenceComposition.facades(),
+                                getLogger()
+                        )
+                ))
         );
         runtimeDataDirectory = persistenceComposition.dataDirectory();
         bondedDiagnosticRegistration =

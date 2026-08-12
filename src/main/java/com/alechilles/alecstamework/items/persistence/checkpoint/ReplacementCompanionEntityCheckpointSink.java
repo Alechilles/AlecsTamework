@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.items.persistence.checkpoint;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionKey;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutation;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutationAction;
+import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
@@ -140,10 +142,19 @@ public final class ReplacementCompanionEntityCheckpointSink
     public static ProfileExtensionKey key(
             @Nonnull CompanionEntityCheckpoint checkpoint
     ) {
+        return key(checkpoint.profileId(), checkpoint.alias());
+    }
+
+    /** Returns the stable extension key before a checkpoint is decoded. */
+    @Nonnull
+    public static ProfileExtensionKey key(
+            @Nonnull ProfileId profileId,
+            @Nonnull NpcAlias alias
+    ) {
         return new ProfileExtensionKey(
-                checkpoint.profileId(),
+                Objects.requireNonNull(profileId, "profileId"),
                 NAMESPACE,
-                KEY_PREFIX + checkpoint.alias()
+                KEY_PREFIX + Objects.requireNonNull(alias, "alias")
         );
     }
 }
