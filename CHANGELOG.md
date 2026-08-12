@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 3.1.2 - NPC Recovery and Update 6 Hotfix - 2026-08-11
 
 ### Fixed
 - Prevented marker-owned tamed companions from losing their marker-side
