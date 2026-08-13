@@ -152,7 +152,13 @@ public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<E
             return false;
         }
         TameworkNeedsComponent needs = store.getComponent(reference, needsType);
-        return needs == null || needs.getLastUpdateMs() <= 0L || needs.getLastPassiveSweepMs() <= 0L;
+        return needsTimestampsRequireBootstrap(needs);
+    }
+
+    static boolean needsTimestampsRequireBootstrap(@Nullable TameworkNeedsComponent needs) {
+        return needs == null
+                || needs.getLastUpdateMs() == 0L
+                || needs.getLastPassiveSweepMs() == 0L;
     }
 
     private boolean isHappinessBootstrapRequired(@Nonnull Ref<EntityStore> reference,

@@ -129,10 +129,18 @@ public final class CompanionNeedsService {
             existing.setPendingNeedsDamage(pendingNeedsDamage);
             changed = true;
         }
+        TwNeedsConfig.TimerBasis timerBasis = config.getTiming().getTimerBasis();
+        long resolvedLastUpdateMs = resolveNeedsTimestamp(
+                existing.getLastUpdateMs(), nowMs, timerBasis
+        );
+        long resolvedLastPassiveSweepMs = resolveNeedsTimestamp(
+                existing.getLastPassiveSweepMs(), nowMs, timerBasis
+        );
         double regenSuppressionBaseline = normalizeRegenSuppressionBaselineHealth(
                 existing.getRegenSuppressionBaselineHealth()
         );
-        boolean runtimeClockReset = existing.getLastUpdateMs() > nowMs || existing.getLastPassiveSweepMs() > nowMs;
+        boolean runtimeClockReset = existing.getLastUpdateMs() != resolvedLastUpdateMs
+                || existing.getLastPassiveSweepMs() != resolvedLastPassiveSweepMs;
         if (runtimeClockReset) {
             regenSuppressionBaseline = REGEN_SUPPRESSION_BASELINE_UNSET;
         }
@@ -158,12 +166,12 @@ public final class CompanionNeedsService {
             existing.setLastManagedHealth(lastManagedHealth);
             changed = true;
         }
-        if (existing.getLastUpdateMs() <= 0L || existing.getLastUpdateMs() > nowMs) {
-            existing.setLastUpdateMs(nowMs);
+        if (existing.getLastUpdateMs() != resolvedLastUpdateMs) {
+            existing.setLastUpdateMs(resolvedLastUpdateMs);
             changed = true;
         }
-        if (existing.getLastPassiveSweepMs() <= 0L || existing.getLastPassiveSweepMs() > nowMs) {
-            existing.setLastPassiveSweepMs(nowMs);
+        if (existing.getLastPassiveSweepMs() != resolvedLastPassiveSweepMs) {
+            existing.setLastPassiveSweepMs(resolvedLastPassiveSweepMs);
             changed = true;
         }
         if (changed) {
@@ -886,18 +894,38 @@ public final class CompanionNeedsService {
         return null;
     }
 
-    private static long resolveEffectiveElapsedMs(@Nonnull TwNeedsConfig config,
-                                                  @Nullable UUID ownerId,
-                                                  long lastUpdateMs,
-                                                  long nowMs) {
-        if (lastUpdateMs <= 0L || nowMs <= lastUpdateMs) {
+    static long resolveEffectiveElapsedMs(@Nonnull TwNeedsConfig config,
+                                          @Nullable UUID ownerId,
+                                          long lastUpdateMs,
+                                          long nowMs) {
+        if (lastUpdateMs == 0L || nowMs <= lastUpdateMs) {
             return 0L;
         }
         TwNeedsConfig.TickPolicySettings tickPolicy = CompanionNeedsRuntimePolicy.resolveTickPolicy(config);
+        // A signed world epoch cannot be compared with runtime presence transitions.
+        // Apply the current owner policy to this loaded tick instead.
+        if (config.getTiming().getTimerBasis() == TwNeedsConfig.TimerBasis.WORLD_TIME_SCALED) {
+            return OwnerPresenceTimelineService.get().resolveWorldTimeElapsedMs(
+                    ownerId,
+                    nowMs - lastUpdateMs,
+                    tickPolicy
+            );
+        }
         if (ownerId == null) {
             return nowMs - lastUpdateMs;
         }
         return OwnerPresenceTimelineService.get().resolveEffectiveElapsedMs(ownerId, lastUpdateMs, nowMs, tickPolicy);
+    }
+
+    static long resolveNeedsTimestamp(long storedTimestampMs,
+                                      long nowMs,
+                                      @Nullable TwNeedsConfig.TimerBasis timerBasis) {
+        boolean signedWorldTime = timerBasis == TwNeedsConfig.TimerBasis.WORLD_TIME_SCALED;
+        return storedTimestampMs == 0L
+                || storedTimestampMs > nowMs
+                || (!signedWorldTime && storedTimestampMs < 0L)
+                ? nowMs
+                : storedTimestampMs;
     }
 
     static long capLoadedTickElapsedMs(long effectiveElapsedMs) {

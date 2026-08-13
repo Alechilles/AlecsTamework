@@ -22,7 +22,7 @@ final class NeedsSweepScheduler {
         if (intervalMs <= 0L) {
             return true;
         }
-        if (lastSweepMs <= 0L || lastSweepMs > nowMs) {
+        if (lastSweepMs == 0L || lastSweepMs > nowMs) {
             return nowMs >= stableOffsetMs(npcId, intervalMs);
         }
         return nowMs - lastSweepMs >= intervalMs;

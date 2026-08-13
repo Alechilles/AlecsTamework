@@ -47,6 +47,16 @@ class NeedsSweepSchedulerTest {
     }
 
     @Test
+    void negativeWorldTimestampRunsSweepAfterInterval() {
+        assertTrue(NeedsSweepScheduler.shouldRunSweep(
+                new UUID(1L, 2L),
+                -120_000L,
+                -118_000L,
+                2_000L
+        ));
+    }
+
+    @Test
     void lowNeedsKeepBaseInterval() {
         assertEquals(2_000L, NeedsSweepIntervalPolicy.intervalMsForRatios(0.10, 0.90, 2_000L));
         assertEquals(2_000L, NeedsSweepIntervalPolicy.intervalMsForRatios(0.90, 0.10, 2_000L));

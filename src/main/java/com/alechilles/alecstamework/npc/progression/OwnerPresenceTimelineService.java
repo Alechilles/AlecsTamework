@@ -132,6 +132,36 @@ public final class OwnerPresenceTimelineService {
         return clampToWindow(onlineWindowMs + offlineEffectiveMs, totalWindowMs);
     }
 
+    /** Applies the current runtime owner policy to one loaded world-time tick. */
+    long resolveWorldTimeElapsedMs(@Nullable UUID ownerId,
+                                   long totalWindowMs,
+                                   @Nullable TwNeedsConfig.TickPolicySettings tickPolicy) {
+        if (totalWindowMs <= 0L) {
+            return 0L;
+        }
+        TwNeedsConfig.TickPolicyMode mode = tickPolicy != null
+                ? tickPolicy.getMode()
+                : TwNeedsConfig.TickPolicyMode.OWNER_ONLINE_GRACE_THEN_DECAY;
+        if (mode == TwNeedsConfig.TickPolicyMode.ANY_LOADED_PLAYER || ownerId == null) {
+            return totalWindowMs;
+        }
+
+        long nowMs = CompanionRuntimeClock.nowMs();
+        PresenceState state = resolveOwnerState(ownerId, nowMs);
+        if (state == null || state.online) {
+            return totalWindowMs;
+        }
+        double graceHours = tickPolicy != null ? tickPolicy.getOwnerOfflineGraceHours() : DEFAULT_GRACE_HOURS;
+        long graceEndMs = saturatingAdd(state.lastStatusChangeMs, resolveGraceDurationMs(graceHours));
+        if (nowMs < graceEndMs) {
+            return 0L;
+        }
+        double multiplier = tickPolicy != null
+                ? tickPolicy.getOwnerOfflineDecayMultiplier()
+                : DEFAULT_OFFLINE_MULTIPLIER;
+        return clampToWindow(scaleDurationMs(totalWindowMs, multiplier), totalWindowMs);
+    }
+
     void clearForTests() {
         presenceByOwner.clear();
         CompanionRuntimeClock.resetForTests();

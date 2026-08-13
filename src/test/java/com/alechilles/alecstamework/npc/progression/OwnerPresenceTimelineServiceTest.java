@@ -67,6 +67,22 @@ class OwnerPresenceTimelineServiceTest {
         assertEquals(HOUR_MS, effective);
     }
 
+    @Test
+    void worldTimeTickUsesCurrentOfflineMultiplier() {
+        UUID ownerId = UUID.randomUUID();
+        service.markOnlineForTests(ownerId, 0L);
+        service.markOfflineForTests(ownerId, 50_000L);
+        CompanionRuntimeClock.advanceByDeltaSeconds(60.0f);
+
+        long effective = service.resolveWorldTimeElapsedMs(
+                ownerId,
+                60_000L,
+                policy(0.0, 0.5)
+        );
+
+        assertEquals(30_000L, effective);
+    }
+
     private TwNeedsConfig.TickPolicySettings policy(double graceHours, double multiplier) {
         TwNeedsConfig.TickPolicySettings settings = new TwNeedsConfig.TickPolicySettings();
         try {

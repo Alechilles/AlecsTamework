@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.hypixel.hytale.component.AddReason;
 import java.lang.reflect.Field;
@@ -38,6 +39,20 @@ class CompanionProgressionBootstrapOnLoadSystemTest {
                 false,
                 true
         ));
+    }
+
+    @Test
+    void negativeNeedsTimestampsDoNotRequireBootstrap() {
+        TameworkNeedsComponent needs = new TameworkNeedsComponent(
+                "Needs_Config",
+                50.0,
+                50.0,
+                0.0,
+                -120_000L,
+                -119_000L
+        );
+
+        assertFalse(CompanionProgressionBootstrapOnLoadSystem.needsTimestampsRequireBootstrap(needs));
     }
 
     @Test

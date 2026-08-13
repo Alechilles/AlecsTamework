@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Fixed
+- `WORLD_TIME_SCALED` needs now preserve negative world timestamps, so hunger
+  and thirst resume normally after storage or reload.
 - Soul Collector releases now pause needs timers while companions are stored,
   and flute revival no longer restores lethal death health or needs state.
 - Tamed companions now cancel a marker-driven despawn that was already
