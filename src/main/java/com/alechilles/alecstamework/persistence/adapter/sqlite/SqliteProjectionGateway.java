@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.persistence.projection.ProjectionBatch;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCheckpoint;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumerId;
 import com.alechilles.alecstamework.persistence.projection.ProjectionSequence;
+import java.sql.Connection;
 import java.util.concurrent.CompletionStage;
 import javax.annotation.Nonnull;
 
@@ -30,14 +31,23 @@ public final class SqliteProjectionGateway {
 
     private final SqliteReadExecutor reads;
     private final SqliteUnitOfWorkRunner units;
+    private final Runnable afterHeadRead;
 
     public SqliteProjectionGateway(@Nonnull SqliteReadExecutor reads,
                                    @Nonnull SqliteUnitOfWorkRunner units) {
-        if (reads == null || units == null) {
+        this(reads, units, () -> { });
+    }
+
+    /** Test-only boundary injection for a concurrent outbox append. */
+    SqliteProjectionGateway(@Nonnull SqliteReadExecutor reads,
+                            @Nonnull SqliteUnitOfWorkRunner units,
+                            @Nonnull Runnable afterHeadRead) {
+        if (reads == null || units == null || afterHeadRead == null) {
             throw new IllegalArgumentException("Projection gateway dependencies are required");
         }
         this.reads = reads;
         this.units = units;
+        this.afterHeadRead = afterHeadRead;
     }
 
     /** Loads an ordered consumer batch from its durable checkpoint. */
@@ -52,24 +62,38 @@ public final class SqliteProjectionGateway {
         return reads.execute(new SqliteReadCommand<>(
                 BATCH_READ,
                 PersistenceReadPriority.GAMEPLAY_CRITICAL,
-                connection -> {
-                    SqliteProjectionOutboxStore store =
-                            new SqliteProjectionOutboxStore(connection);
-                    ProjectionCheckpoint checkpoint = store.findCheckpoint(consumerId)
-                            .orElse(new ProjectionCheckpoint(
-                                    consumerId, ProjectionSequence.ORIGIN, 0
-                            ));
-                    ProjectionSequence head = store.head();
-                    return PersistenceReadResult.found(
-                            new ProjectionBatch(
-                                    checkpoint,
-                                    head,
-                                    store.readAfter(checkpoint.acknowledgedSequence(), limit)
-                            ),
-                            head.value()
-                    );
-                }
+                connection -> loadBatch(connection, consumerId, limit)
         ));
+    }
+
+    private PersistenceReadResult<ProjectionBatch> loadBatch(
+            Connection connection,
+            ProjectionConsumerId consumerId,
+            int limit
+    ) throws Exception {
+        connection.setAutoCommit(false);
+        try {
+            SqliteProjectionOutboxStore store =
+                    new SqliteProjectionOutboxStore(connection);
+            ProjectionCheckpoint checkpoint = store.findCheckpoint(consumerId)
+                    .orElse(new ProjectionCheckpoint(
+                            consumerId, ProjectionSequence.ORIGIN, 0
+                    ));
+            ProjectionSequence head = store.head();
+            afterHeadRead.run();
+            return PersistenceReadResult.found(
+                    new ProjectionBatch(
+                            checkpoint,
+                            head,
+                            store.readAfter(
+                                    checkpoint.acknowledgedSequence(), limit
+                            )
+                    ),
+                    head.value()
+            );
+        } finally {
+            connection.rollback();
+        }
     }
 
     /** Durably acknowledges one delivered event through exact unknown-commit readback. */

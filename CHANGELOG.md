@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Fixed
+- Concurrent companion checkpoints during world load no longer make a valid
+  persistence database enter read-only mode. Capture, release, and exact NPC
+  state checkpoints remain available after large groups of companions load.
 - Capturing a retired original companion that reappears now waits for its
   exact-state identity reconciliation instead of treating it as a new NPC.
   This prevents duplicate companion identities and keeps the saved NPC state
