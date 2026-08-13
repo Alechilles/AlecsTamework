@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 3.1.4 - Companion Persistence and Return Hotfix - 2026-08-12
 
 ### Fixed
 - `WORLD_TIME_SCALED` needs now preserve negative world timestamps, so hunger
