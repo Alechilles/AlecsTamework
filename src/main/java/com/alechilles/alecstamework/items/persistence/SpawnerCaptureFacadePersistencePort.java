@@ -44,6 +44,12 @@ final class SpawnerCaptureFacadePersistencePort
     }
 
     @Override
+    public CompletionStage<PersistenceReadResult<CompanionProfileReadModel>>
+    findProfile(NpcAlias alias) {
+        return persistence.queries().findProfile(alias);
+    }
+
+    @Override
     public PublicOperationSubmission adopt(
             OperationId operationId,
             IdempotencyKey idempotencyKey,

@@ -204,6 +204,33 @@ class SpawnerCaptureAuthorTest {
     }
 
     @Test
+    void returnedRetiredAliasIsResolvedBeforeAdoption() {
+        FakePersistence persistence = new FakePersistence(
+                IMPORTED_PROFILE,
+                profileWithCurrentAlias(IMPORTED_PROFILE, OTHER_ALIAS),
+                null
+        );
+        persistence.profileByAlias = persistence.profile;
+
+        SpawnerPersistenceAuthorResult result = author(
+                persistence,
+                (profile, evidence) -> {
+                }
+        ).capture(intent(new ProfileId(ALIAS.value())))
+                .toCompletableFuture().join();
+
+        // Protects the 2026-08-13 returned-original report: a retired UUID
+        // must not start ADOPT_LIVE as a second profile.
+        assertEquals(
+                SpawnerPersistenceAuthorResult.Status.PROFILE_CONFLICT,
+                result.status()
+        );
+        assertEquals("capture_alias_not_current", result.detail());
+        assertEquals(0, persistence.adoptions);
+        assertEquals(null, persistence.capture);
+    }
+
+    @Test
     void activeOperationFailsClosedWithDistinctReason() {
         CompanionProfileReadModel base = profile(IMPORTED_PROFILE);
         CompanionLifecycle current = base.lifecycle();
@@ -666,6 +693,7 @@ class SpawnerCaptureAuthorTest {
         private int reconciliations;
         private CaptureMode captureMode = CaptureMode.PUBLISHED;
         private ProfileId lastReadProfile;
+        private CompanionProfileReadModel profileByAlias;
         private CompanionProfileMutation.AdoptLive adoption;
         private CompanionCaptureRequest capture;
 
@@ -702,6 +730,18 @@ class SpawnerCaptureAuthorTest {
             }
             return CompletableFuture.completedFuture(
                     PersistenceReadResult.found(profile, 1L)
+            );
+        }
+
+        @Override
+        public CompletionStage<PersistenceReadResult<CompanionProfileReadModel>>
+        findProfile(NpcAlias alias) {
+            return CompletableFuture.completedFuture(
+                    profileByAlias == null
+                            ? PersistenceReadResult.absent()
+                            : PersistenceReadResult.found(
+                                    profileByAlias, 1L
+                            )
             );
         }
 

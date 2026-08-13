@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Capturing a retired original companion that reappears now waits for its
+  exact-state identity reconciliation instead of treating it as a new NPC.
+  This prevents duplicate companion identities and keeps the saved NPC state
+  attached to the canonical companion.
+
 ## 3.1.4 - Companion Persistence and Return Hotfix - 2026-08-12
 
 ### Fixed

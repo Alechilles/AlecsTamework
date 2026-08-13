@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items.persistence;
 
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
+import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
@@ -28,7 +29,8 @@ import javax.annotation.Nullable;
  * Authors one receipt-first spawner capture after atomically adopting an absent live profile.
  *
  * <p>All mutable evidence is frozen before the first asynchronous read. Adoption must publish
- * before capture is submitted, keeping profile creation separate and restart-safe.</p>
+ * before capture is submitted, keeping profile creation separate and restart-safe. Durable alias
+ * history is checked before adoption so a returned retired body cannot become a second profile.</p>
  */
 public final class SpawnerCaptureAuthor {
     private static final String ADOPTION = "spawner-live-adoption:v1";
@@ -181,6 +183,44 @@ public final class SpawnerCaptureAuthor {
                                 .PROFILE_READ_FAILED,
                         frozen.operationId(), null,
                         "capture_profile_read_failed", null
+                ));
+            }
+            return resolveRegisteredAlias(context, frozen);
+        });
+    }
+
+    private CompletionStage<SpawnerPersistenceAuthorResult>
+    resolveRegisteredAlias(
+            SpawnerCaptureContext context,
+            FrozenCapture frozen
+    ) {
+        return findProfile(context.sourceAlias()).thenCompose(read -> {
+            if (read instanceof PersistenceReadResult.Found<
+                    CompanionProfileReadModel> found) {
+                CompanionProfileReadModel profile = found.value();
+                if (profile.identity().profileId().equals(
+                        context.profileId()
+                )) {
+                    return submitCapture(context, frozen, profile);
+                }
+                boolean sourceIsCurrent = profile.currentAlias() != null
+                        && profile.currentAlias().alias().equals(
+                        context.sourceAlias()
+                );
+                return profileConflict(
+                        frozen.operationId(),
+                        sourceIsCurrent
+                                ? "capture_profile_projection_lagging"
+                                : "capture_alias_not_current",
+                        null
+                );
+            }
+            if (read instanceof PersistenceReadResult.Failed<?>) {
+                return completed(result(
+                        SpawnerPersistenceAuthorResult.Status
+                                .PROFILE_READ_FAILED,
+                        frozen.operationId(), null,
+                        "capture_alias_profile_read_failed", null
                 ));
             }
             return adopt(context, frozen);
@@ -362,6 +402,19 @@ public final class SpawnerCaptureAuthor {
     }
 
     private CompletionStage<PersistenceReadResult<CompanionProfileReadModel>>
+    findProfile(NpcAlias alias) {
+        try {
+            CompletionStage<PersistenceReadResult<CompanionProfileReadModel>>
+                    stage = persistence.findProfile(alias);
+            return stage == null
+                    ? completedReadFailure(null)
+                    : stage.exceptionally(this::readFailure);
+        } catch (RuntimeException | LinkageError failure) {
+            return completedReadFailure(failure);
+        }
+    }
+
+    private CompletionStage<PersistenceReadResult<CompanionProfileReadModel>>
     completedReadFailure(Throwable failure) {
         return CompletableFuture.completedFuture(readFailure(failure));
     }
@@ -452,6 +505,9 @@ public final class SpawnerCaptureAuthor {
 
         CompletionStage<PersistenceReadResult<CompanionProfileReadModel>>
         findProfile(ProfileId profileId);
+
+        CompletionStage<PersistenceReadResult<CompanionProfileReadModel>>
+        findProfile(NpcAlias alias);
 
         PublicOperationSubmission adopt(
                 OperationId operationId,
