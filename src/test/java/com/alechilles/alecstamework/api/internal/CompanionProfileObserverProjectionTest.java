@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
 import com.alechilles.alecstamework.api.ProfileChangeType;
+import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
@@ -34,6 +35,8 @@ class CompanionProfileObserverProjectionTest {
             OwnerId.parse("20000000-0000-0000-0000-000000000001");
     private static final NpcAlias ALIAS =
             NpcAlias.parse("30000000-0000-0000-0000-000000000001");
+    private static final NpcAlias HISTORICAL_ALIAS =
+            NpcAlias.parse("30000000-0000-0000-0000-000000000003");
 
     @Test
     void mapsSelfContainedEvidenceAndKeepsRevisionDomainsIndependent() {
@@ -138,10 +141,22 @@ class CompanionProfileObserverProjectionTest {
                 });
         CompanionProfileProjectionState initial =
                 state(ALIAS, "First", -90);
-        projection.rebuild(List.of(initial));
+        projection.rebuild(List.of(initial), List.of(new CompanionAlias(
+                HISTORICAL_ALIAS,
+                PROFILE,
+                0,
+                CompanionAlias.State.RETIRED,
+                null,
+                -100,
+                -90L
+        )));
 
         assertEquals(initial, projection.find(PROFILE).orElseThrow());
         assertEquals(initial, projection.find(ALIAS).orElseThrow());
+        assertEquals(
+                initial,
+                projection.findKnownAlias(HISTORICAL_ALIAS).orElseThrow()
+        );
         assertEquals(initial, projection.snapshot().get(PROFILE));
 
         NpcAlias replacement =
@@ -164,6 +179,10 @@ class CompanionProfileObserverProjectionTest {
         );
 
         assertTrue(projection.find(ALIAS).isEmpty());
+        assertEquals(
+                rotated,
+                projection.findKnownAlias(ALIAS).orElseThrow()
+        );
         assertEquals(rotated, projection.find(replacement).orElseThrow());
         assertEquals("Second", projection.find(PROFILE)
                 .orElseThrow().displayName());

@@ -1,9 +1,7 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.api.internal.CompanionProfileObserverProjection;
-import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
-import java.util.List;
 import java.util.concurrent.CompletionStage;
 import javax.annotation.Nonnull;
 
@@ -24,14 +22,17 @@ final class SqliteProfileProjectionBootstrap {
         }
         return reader.findAllProjectionStates().thenApply(read -> {
             if (!(read instanceof PersistenceReadResult.Found<
-                    List<CompanionProfileProjectionState>> found)) {
+                    SqliteCompanionProfileReader.ProjectionSeed> found)) {
                 return new Result(
                         Status.CANONICAL_READ_FAILED,
                         readFailure(read)
                 );
             }
             try {
-                projection.rebuild(found.value());
+                projection.rebuild(
+                        found.value().states(),
+                        found.value().aliases()
+                );
                 return new Result(Status.COMPLETE, null);
             } catch (Throwable failure) {
                 return new Result(

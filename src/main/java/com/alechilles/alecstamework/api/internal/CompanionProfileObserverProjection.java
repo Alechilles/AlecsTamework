@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
+import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChange;
@@ -33,6 +34,7 @@ public final class CompanionProfileObserverProjection implements ProjectionConsu
     private final Map<ProfileId, CompanionProfileProjectionState> profiles =
             new HashMap<>();
     private final Map<NpcAlias, ProfileId> currentAliases = new HashMap<>();
+    private final Map<NpcAlias, ProfileId> knownAliases = new HashMap<>();
 
     public CompanionProfileObserverProjection(
             @Nonnull Consumer<NpcProfileChangedEvent> listener
@@ -97,13 +99,27 @@ public final class CompanionProfileObserverProjection implements ProjectionConsu
     public synchronized void rebuild(
             @Nonnull Collection<CompanionProfileProjectionState> states
     ) {
+        rebuild(states, List.of());
+    }
+
+    /** Rebuilds profiles and their complete durable runtime-alias lineage. */
+    public synchronized void rebuild(
+            @Nonnull Collection<CompanionProfileProjectionState> states,
+            @Nonnull Collection<CompanionAlias> aliases
+    ) {
         if (states == null) {
             throw new IllegalArgumentException(
                     "Canonical profile projection states are required"
             );
         }
+        if (aliases == null) {
+            throw new IllegalArgumentException(
+                    "Canonical profile aliases are required"
+            );
+        }
         profiles.clear();
         currentAliases.clear();
+        knownAliases.clear();
         for (CompanionProfileProjectionState state : List.copyOf(states)) {
             if (state == null
                     || profiles.putIfAbsent(state.profileId(), state) != null) {
@@ -112,6 +128,14 @@ public final class CompanionProfileObserverProjection implements ProjectionConsu
                 );
             }
             indexAlias(state);
+        }
+        for (CompanionAlias alias : List.copyOf(aliases)) {
+            if (alias == null || !profiles.containsKey(alias.profileId())) {
+                throw new IllegalArgumentException(
+                        "Profile aliases must reference a projected profile"
+                );
+            }
+            indexKnownAlias(alias.alias(), alias.profileId());
         }
     }
 
@@ -140,6 +164,19 @@ public final class CompanionProfileObserverProjection implements ProjectionConsu
                 : Optional.ofNullable(profiles.get(profileId));
     }
 
+    /** Resolves one current or retired runtime alias without touching storage. */
+    @Nonnull
+    public synchronized Optional<CompanionProfileProjectionState>
+    findKnownAlias(@Nonnull NpcAlias alias) {
+        if (alias == null) {
+            throw new IllegalArgumentException("NPC alias is required");
+        }
+        ProfileId profileId = knownAliases.get(alias);
+        return profileId == null
+                ? Optional.empty()
+                : Optional.ofNullable(profiles.get(profileId));
+    }
+
     /** Returns an immutable snapshot for bounded API iteration. */
     @Nonnull
     public synchronized Map<ProfileId, CompanionProfileProjectionState>
@@ -157,6 +194,9 @@ public final class CompanionProfileObserverProjection implements ProjectionConsu
         if (after == null) {
             if (before != null) {
                 profiles.remove(before.profileId());
+                knownAliases.entrySet().removeIf(
+                        entry -> entry.getValue().equals(before.profileId())
+                );
             }
             return;
         }
@@ -171,7 +211,10 @@ public final class CompanionProfileObserverProjection implements ProjectionConsu
             return;
         }
         ProfileId conflict = currentAliases.get(after.currentAlias());
-        if (conflict != null && !conflict.equals(after.profileId())) {
+        ProfileId knownConflict = knownAliases.get(after.currentAlias());
+        if ((conflict != null && !conflict.equals(after.profileId()))
+                || (knownConflict != null
+                && !knownConflict.equals(after.profileId()))) {
             throw new IllegalArgumentException(
                     "Profile projection current alias conflict"
             );
@@ -188,6 +231,16 @@ public final class CompanionProfileObserverProjection implements ProjectionConsu
         if (conflict != null && !conflict.equals(state.profileId())) {
             throw new IllegalArgumentException(
                     "Profile projection current alias conflict"
+            );
+        }
+        indexKnownAlias(state.currentAlias(), state.profileId());
+    }
+
+    private void indexKnownAlias(NpcAlias alias, ProfileId profileId) {
+        ProfileId conflict = knownAliases.putIfAbsent(alias, profileId);
+        if (conflict != null && !conflict.equals(profileId)) {
+            throw new IllegalArgumentException(
+                    "Profile projection known alias conflict"
             );
         }
     }

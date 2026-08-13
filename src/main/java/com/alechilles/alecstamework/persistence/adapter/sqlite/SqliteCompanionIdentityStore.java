@@ -15,6 +15,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import javax.annotation.Nonnull;
 
@@ -141,6 +143,27 @@ public final class SqliteCompanionIdentityStore implements CompanionIdentityPort
             }
         } catch (SQLException | RuntimeException failure) {
             throw storeFailure("identity_resolve_alias", failure);
+        }
+    }
+
+    /** Reads the complete current and retired alias lineage. */
+    public List<CompanionAlias> findAllAliases() {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT npc_uuid, profile_id, alias_generation, alias_state,
+                       lease_operation_id, mapped_at_ms, retired_at_ms
+                FROM companion_alias
+                WHERE alias_state IN ('CURRENT', 'RETIRED')
+                ORDER BY profile_id, alias_generation
+                """)) {
+            ArrayList<CompanionAlias> aliases = new ArrayList<>();
+            try (ResultSet row = statement.executeQuery()) {
+                while (row.next()) {
+                    aliases.add(readAlias(row));
+                }
+            }
+            return List.copyOf(aliases);
+        } catch (SQLException | RuntimeException failure) {
+            throw storeFailure("identity_find_all_aliases", failure);
         }
     }
 

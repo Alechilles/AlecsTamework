@@ -96,10 +96,10 @@ public final class SqliteCompanionProfileReader {
         ));
     }
 
-    /** Reads every public projection state on one consistent connection. */
+    /** Reads every public projection state and alias on one consistent connection. */
     @Nonnull
     public CompletionStage<PersistenceReadResult<
-            List<CompanionProfileProjectionState>>>
+            ProjectionSeed>>
     findAllProjectionStates() {
         return reads.execute(new SqliteReadCommand<>(
                 new PersistenceReadKind(
@@ -124,11 +124,31 @@ public final class SqliteCompanionProfileReader {
                                 model.currentCoopSlot()
                         ));
                     }
-                    return PersistenceReadResult.found(
-                            List.copyOf(states), states.size()
-                    );
+                    List<CompanionAlias> aliases =
+                            new SqliteCompanionIdentityStore(connection)
+                                    .findAllAliases();
+                    return PersistenceReadResult.found(new ProjectionSeed(
+                            states,
+                            aliases
+                    ), states.size());
                 }
         ));
+    }
+
+    /** Immutable startup seed for the non-blocking profile lookup. */
+    public record ProjectionSeed(
+            @Nonnull List<CompanionProfileProjectionState> states,
+            @Nonnull List<CompanionAlias> aliases
+    ) {
+        public ProjectionSeed {
+            if (states == null || aliases == null) {
+                throw new IllegalArgumentException(
+                        "Profile projection seed is required"
+                );
+            }
+            states = List.copyOf(states);
+            aliases = List.copyOf(aliases);
+        }
     }
 
     private PersistenceReadResult<CompanionProfileReadModel> compose(

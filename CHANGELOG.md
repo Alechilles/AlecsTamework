@@ -10,6 +10,9 @@
   exact-state identity reconciliation instead of treating it as a new NPC.
   This prevents duplicate companion identities and keeps the saved NPC state
   attached to the canonical companion.
+- Flutes, treat bags, and other command items now repair older linked records
+  that stored a retired NPC UUID as the profile ID. Recall redirects those
+  records to the current companion instead of silently finding no target.
 
 ## 3.1.4 - Companion Persistence and Return Hotfix - 2026-08-12
 

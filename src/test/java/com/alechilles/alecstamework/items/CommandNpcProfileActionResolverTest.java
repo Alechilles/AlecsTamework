@@ -127,6 +127,35 @@ class CommandNpcProfileActionResolverTest {
         assertEquals(source.groupId, result.groupId);
     }
 
+    @Test
+    void canonicalizationRepairsLegacyAliasStoredAsProfileId() {
+        UUID profileUuid = UUID.randomUUID();
+        UUID historicalUuid = UUID.randomUUID();
+        UUID currentUuid = UUID.randomUUID();
+        CommandNpcProfileActionResolver resolver = resolver(
+                profileUuid,
+                currentUuid,
+                LifecycleState.ACTIVE,
+                this::absent,
+                historicalUuid
+        );
+
+        CommandNpcProfileActionResolver.CanonicalRecords canonical =
+                resolver.canonicalizeRecords(List.of(
+                        record(historicalUuid, historicalUuid.toString()),
+                        record(currentUuid, profileUuid.toString())
+                ));
+
+        assertTrue(canonical.safeToPersist());
+        assertTrue(canonical.identityChanged());
+        assertEquals(1, canonical.records().size());
+        assertEquals(currentUuid, canonical.records().getFirst().npcUuid);
+        assertEquals(
+                profileUuid.toString(),
+                canonical.records().getFirst().profileId
+        );
+    }
+
     private CommandNpcProfileActionResolver resolver(
             UUID profileUuid,
             UUID currentUuid,
@@ -145,6 +174,22 @@ class CommandNpcProfileActionResolverTest {
             UUID currentUuid,
             LifecycleState lifecycleState,
             CommandNpcIdentityService.LiveNpcProbe probe
+    ) {
+        return resolver(
+                profileUuid,
+                currentUuid,
+                lifecycleState,
+                probe,
+                null
+        );
+    }
+
+    private CommandNpcProfileActionResolver resolver(
+            UUID profileUuid,
+            UUID currentUuid,
+            LifecycleState lifecycleState,
+            CommandNpcIdentityService.LiveNpcProbe probe,
+            UUID historicalUuid
     ) {
         CompanionProfileProjectionState projection =
                 new CompanionProfileProjectionState(
@@ -179,6 +224,8 @@ class CommandNpcProfileActionResolverTest {
                             NpcAlias alias
                     ) {
                         return projection.currentAlias().equals(alias)
+                                || (historicalUuid != null
+                                && historicalUuid.equals(alias.value()))
                                 ? Optional.of(projection)
                                 : Optional.empty();
                     }

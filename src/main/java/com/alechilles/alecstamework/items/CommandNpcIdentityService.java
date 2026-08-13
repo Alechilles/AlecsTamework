@@ -160,7 +160,11 @@ final class CommandNpcIdentityService {
                 record.profileId
         );
         if (explicitProfile != null
-                && !explicitProfile.equals(projected.profileId().toString())) {
+                && !explicitProfile.equals(projected.profileId().toString())
+                && !persistence.isKnownAliasForProfile(
+                        explicitProfile,
+                        projected.profileId()
+                )) {
             return conflict(record, explicitProfile, projected);
         }
         return resolveProjected(record, projected);

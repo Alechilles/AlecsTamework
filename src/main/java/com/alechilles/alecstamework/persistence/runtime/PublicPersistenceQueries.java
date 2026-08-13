@@ -88,11 +88,12 @@ public final class PublicPersistenceQueries {
         return adapter.profileIndex().find(profileId);
     }
 
+    /** Resolves one current or retired runtime alias without storage I/O. */
     @Nonnull
     public Optional<CompanionProfileProjectionState> projectedProfile(
             @Nonnull NpcAlias alias
     ) {
-        return adapter.profileIndex().find(alias);
+        return adapter.profileIndex().findKnownAlias(alias);
     }
 
     @Nonnull

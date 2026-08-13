@@ -48,7 +48,7 @@ final class CommandPersistenceView {
     }
 
     /**
-     * Resolves one command record by stable profile first and current alias second.
+     * Resolves one command record by stable profile first and known alias second.
      *
      * <p>Records created before their first projection use the NPC UUID as their deterministic
      * profile ID. Absence is not interpreted as a lifecycle state.</p>
@@ -76,6 +76,22 @@ final class CommandPersistenceView {
                     .map(ProfileSnapshot::from);
         }
         return Optional.empty();
+    }
+
+    /** Confirms that a legacy profile field contains an alias of this profile. */
+    boolean isKnownAliasForProfile(
+            @Nullable String rawCandidate,
+            @Nonnull ProfileId profileId
+    ) {
+        ProfileId candidate = parseProfileId(rawCandidate);
+        if (candidate == null || profileId == null
+                || safeFind(candidate).isPresent()) {
+            return false;
+        }
+        return safeFind(new NpcAlias(candidate.value()))
+                .map(CompanionProfileProjectionState::profileId)
+                .filter(profileId::equals)
+                .isPresent();
     }
 
     /** Resolves a deterministic stable profile identity for one command record. */
