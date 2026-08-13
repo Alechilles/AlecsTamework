@@ -46,8 +46,15 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
     private static final int EFFECT_INDEX_UNRESOLVED = Integer.MIN_VALUE;
     private static final int DISABLE_DESPAWN_SPAWN_CONFIGURATION = Integer.MIN_VALUE;
     private static int tranquilizerEffectIndex = EFFECT_INDEX_UNRESOLVED;
-    private final TameClaimLimitPolicyService claimLimitPolicyService =
-            new TameClaimLimitPolicyService();
+    private final TameClaimLimitPolicyService claimLimitPolicyService;
+
+    InteractionStateEffects() {
+        this(new TameClaimLimitPolicyService());
+    }
+
+    InteractionStateEffects(TameClaimLimitPolicyService claimLimitPolicyService) {
+        this.claimLimitPolicyService = claimLimitPolicyService;
+    }
     /**
      * Cross-template swaps (for example wild -> tamed livestock) can fail when preserving
      * state/substate names from the source role. Interaction-driven role changes should

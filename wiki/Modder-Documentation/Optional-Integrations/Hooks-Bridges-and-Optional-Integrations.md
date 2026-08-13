@@ -72,6 +72,10 @@ profiles in its configured global or per-world scope. It includes active,
 unloaded, captured, cooped, roster-stored, provisioned-dormant, dead, and Lost
 companions and uses reservations plus reconciliation to prevent oversubscription.
 
+Tamework shares reflected SimpleClaims capabilities for the current live
+plugin generation. A stopped or replaced SimpleClaims instance is detected
+before a policy check and is not reused.
+
 ### SimpleClaims damage policy
 
 `ProtectTamedFromNonMembers` enables SimpleClaims' native tamed-damage decision for eligible live tamed NPCs; it is not a simple membership-only check. Native evaluation preserves full-world protection, administrator access, owner/member permissions, direct player allies, allied parties using the attacker's resolved party ID, SimpleClaims' native tamed-damage permission, and the claim party's outsider setting.

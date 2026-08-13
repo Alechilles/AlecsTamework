@@ -83,6 +83,7 @@ import com.alechilles.alecstamework.damage.RespawnFallDamageGraceSystem;
 import com.alechilles.alecstamework.damage.ExpiryDismountFallDamageProtectionSystem;
 import com.alechilles.alecstamework.damage.ExpiryDismountLandingProtectionSystem;
 import com.alechilles.alecstamework.damage.SimpleClaimsTamedDamagePolicy;
+import com.alechilles.alecstamework.damage.SimpleClaimsCapabilityRuntime;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileSpawnSystem;
@@ -373,6 +374,8 @@ public class Tamework extends JavaPlugin {
             new OwnerPopulationLiveIndex();
     private final BreedingPairAdmissionRegistry breedingPairAdmissionRegistry =
             new BreedingPairAdmissionRegistry();
+    private final SimpleClaimsCapabilityRuntime simpleClaimsCapabilityRuntime =
+            new SimpleClaimsCapabilityRuntime();
     private int overrideAssetEventSuppressionDepth;
     private boolean globalReconcilePendingAfterOverrideReload;
     private ComponentType<EntityStore, TameworkOwnerComponent> ownerComponentType;
@@ -1120,7 +1123,8 @@ public class Tamework extends JavaPlugin {
                         EntityTrackerSystems.EntityViewer.getComponentType()
                 )
         );
-        SimpleClaimsTamedDamagePolicy damagePolicy = new SimpleClaimsTamedDamagePolicy();
+        SimpleClaimsTamedDamagePolicy damagePolicy =
+                new SimpleClaimsTamedDamagePolicy(simpleClaimsCapabilityRuntime);
         apiComposition = ReplacementTameworkApiFactory.compose(
                 persistenceBootstrap,
                 Duration.ofSeconds(5),
@@ -1572,6 +1576,7 @@ public class Tamework extends JavaPlugin {
             apiComposition.close();
             apiComposition = null;
         }
+        simpleClaimsCapabilityRuntime.close();
         api = null;
         closeBondedCompanions();
         if (commandNpcRelocationService != null) {
@@ -1741,6 +1746,11 @@ public class Tamework extends JavaPlugin {
     @Nonnull
     public BreedingPairAdmissionRegistry getBreedingPairAdmissionRegistry() {
         return breedingPairAdmissionRegistry;
+    }
+
+    @Nonnull
+    public SimpleClaimsCapabilityRuntime getSimpleClaimsCapabilityRuntime() {
+        return simpleClaimsCapabilityRuntime;
     }
 
     public TranslationRegistry getTranslationRegistry() {

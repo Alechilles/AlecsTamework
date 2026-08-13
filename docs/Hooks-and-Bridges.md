@@ -97,7 +97,10 @@ tamed-companion damage decision.
 The ordinary Tamework owner cap is separate. It counts canonical owned
 profiles in its configured global/per-world scope and uses durable positive
 reservations; it does not use claims or provider selection. There is no
-provider-neutral claims bridge or persistent reflected provider cache.
+provider-neutral claims bridge. Tamework resolves the live SimpleClaims plugin
+before each policy use and shares one reflected capability set for that plugin
+generation. A stop, replacement, or Tamework shutdown invalidates the cached
+capabilities so an old plugin class loader is not reused.
 
 ## Bonded capture completion
 

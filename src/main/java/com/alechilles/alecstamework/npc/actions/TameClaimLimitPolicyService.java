@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.damage.SimpleClaimsCapabilityRuntime;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Store;
@@ -19,19 +20,15 @@ import org.joml.Vector3d;
 public final class TameClaimLimitPolicyService {
     private static final long WARNING_THROTTLE_MS = 60_000L;
 
-    private final SimpleClaimsBreedingBridge simpleClaimsBridge;
     private final BreedingClaimLimitPolicyService claimPolicyService;
     private long nextWarningAtMs;
 
     public TameClaimLimitPolicyService() {
-        this(SimpleClaimsBreedingBridge.initialize());
+        this(new BreedingClaimLimitPolicyService());
     }
 
-    TameClaimLimitPolicyService(@Nullable SimpleClaimsBreedingBridge simpleClaimsBridge) {
-        this.simpleClaimsBridge = simpleClaimsBridge == null
-                ? SimpleClaimsBreedingBridge.initialize()
-                : simpleClaimsBridge;
-        this.claimPolicyService = new BreedingClaimLimitPolicyService(this.simpleClaimsBridge);
+    TameClaimLimitPolicyService(@Nonnull BreedingClaimLimitPolicyService claimPolicyService) {
+        this.claimPolicyService = claimPolicyService;
     }
 
     @Nonnull
@@ -51,16 +48,19 @@ public final class TameClaimLimitPolicyService {
             warnFailClosed("SimpleClaims tame limit check failed: world name was missing.");
             return BreedingClaimLimitPolicyService.Decision.deny("missing-world-name");
         }
-        if (!simpleClaimsBridge.isAvailable()) {
+        SimpleClaimsCapabilityRuntime.BridgeResolution bridgeResolution =
+                claimPolicyService.resolveBridge();
+        if (!bridgeResolution.available()) {
             warnFailClosed(
                     "SimpleClaims tame limit check failed: dependency unavailable ("
-                            + simpleClaimsBridge.getUnavailableReason()
+                            + bridgeResolution.reason()
                             + ")."
             );
             return BreedingClaimLimitPolicyService.Decision.deny("simpleclaims-unavailable");
         }
+        SimpleClaimsBreedingBridge bridge = bridgeResolution.bridge();
         BreedingClaimLimitPolicyService.ResolvedClaim resolvedClaim =
-                claimPolicyService.resolveClaim(worldName, tamePosition);
+                BreedingClaimLimitPolicyService.resolveClaim(bridge, worldName, tamePosition);
         if (resolvedClaim.status() == BreedingClaimLimitPolicyService.ClaimResolutionStatus.NO_CLAIM) {
             return BreedingClaimLimitPolicyService.Decision.allowWithoutCap(null, List.of(), "outside-claim");
         }
@@ -72,7 +72,7 @@ public final class TameClaimLimitPolicyService {
         }
         BreedingClaimLimitPolicyService.CountResult countResult =
                 claimPolicyService.countOwnedPopulationInClaim(
-                        store, worldName, resolvedClaim.key().partyId()
+                        bridge, store, worldName, resolvedClaim.key().partyId()
                 );
         if (!countResult.success()) {
             warnFailClosed(

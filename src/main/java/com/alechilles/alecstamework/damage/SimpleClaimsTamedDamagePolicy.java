@@ -36,9 +36,14 @@ public final class SimpleClaimsTamedDamagePolicy implements AutoCloseable {
 
     /** Creates a production policy that resolves the live SimpleClaims generation per decision. */
     public SimpleClaimsTamedDamagePolicy() {
+        this(new SimpleClaimsCapabilityRuntime());
+    }
+
+    /** Creates a policy that uses the shared SimpleClaims capability runtime. */
+    public SimpleClaimsTamedDamagePolicy(@Nonnull SimpleClaimsCapabilityRuntime runtime) {
         this(
                 new TamedDamageTargetEligibilityResolver(),
-                new SimpleClaimsDamageCapabilityRegistry(),
+                runtime.damageResolver(),
                 new HytaleDamageServerPermissionBypass(),
                 new ThrottledDamagePolicyWarningSink()
         );

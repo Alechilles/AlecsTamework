@@ -50,7 +50,7 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
     private long lastEarlyDebugMs;
 
     public ActionTameworkInteractPrompt(BuilderActionTameworkInteractPrompt builder, BuilderSupport support) {
-        super(builder, support);
+        super(builder, support, false);
     }
 
     @Override

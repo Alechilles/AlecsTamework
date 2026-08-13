@@ -7,10 +7,46 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SimpleClaimsDamageCapabilityRegistryTest {
+    /** Regression: repeated policy resolution must not reflect the same live plugin generation. */
+    @Test
+    void sharedRuntimeReflectsOnlyOncePerReadyPluginGeneration() {
+        FakeLocator locator = new FakeLocator(unavailable(SimpleClaimsPluginState.ABSENT, "not installed"));
+        AtomicInteger reflections = new AtomicInteger();
+        SimpleClaimsDamageCapabilityRegistry registry = new SimpleClaimsDamageCapabilityRegistry(
+                locator,
+                plugin -> {
+                    reflections.incrementAndGet();
+                    return generation(SimpleClaimsBreedingBridge.DamageAccessStatus.ALLOWED, true);
+                }
+        );
+        SimpleClaimsCapabilityRuntime runtime = new SimpleClaimsCapabilityRuntime(registry);
+
+        assertFalse(runtime.resolveBridge().available());
+        assertEquals(0, reflections.get(), "An absent optional plugin must not trigger reflection.");
+
+        locator.location.set(ready("plugin-a", "1.0.38"));
+        SimpleClaimsCapabilityRuntime.BridgeResolution first = runtime.resolveBridge();
+        SimpleClaimsCapabilityRuntime.BridgeResolution repeated = runtime.resolveBridge();
+        assertTrue(first.available());
+        assertSame(first.bridge(), repeated.bridge());
+        assertEquals(1, reflections.get());
+
+        locator.location.set(unavailable(SimpleClaimsPluginState.DISABLED, "stopped"));
+        assertFalse(runtime.resolveBridge().available());
+
+        locator.location.set(ready("plugin-a", "1.0.38"));
+        SimpleClaimsCapabilityRuntime.BridgeResolution restarted = runtime.resolveBridge();
+        assertTrue(restarted.available());
+        assertNotSame(first.bridge(), restarted.bridge());
+        assertEquals(2, reflections.get());
+    }
+
     @Test
     void absentReadyStopAndReplacementNeverUseStickyNegativeOrStalePositiveState() {
         FakeLocator locator = new FakeLocator(unavailable(SimpleClaimsPluginState.ABSENT, "not installed"));
@@ -125,6 +161,7 @@ class SimpleClaimsDamageCapabilityRegistryTest {
             boolean identityAvailable) {
         UUID partyId = UUID.randomUUID();
         return new SimpleClaimsDamageGeneration(
+                SimpleClaimsBreedingBridge.initialize(),
                 (world, position, attacker, permission) ->
                         new SimpleClaimsBreedingBridge.DamageAccessResult(status, partyId, null),
                 (world, position, attacker, permission) ->

@@ -39,17 +39,18 @@ final class BreedingHytalePairingService {
             new BreedingPairEffectsService();
     private final BreedingPairingEffectsService delayedEffects =
             new BreedingPairingEffectsService(new BreedingParticleOffsetResolver());
-    private final BreedingOffspringBirthService birthService =
-            new BreedingOffspringBirthService();
-    private final BreedingClaimLimitPolicyService limitPolicy =
-            new BreedingClaimLimitPolicyService();
+    private final BreedingOffspringBirthService birthService;
+    private final BreedingClaimLimitPolicyService limitPolicy;
 
     BreedingHytalePairingService(
             @Nonnull BreedingPartnerService partnerService,
-            @Nonnull BreedingPairAdmissionRegistry admissionRegistry
+            @Nonnull BreedingPairAdmissionRegistry admissionRegistry,
+            @Nonnull BreedingClaimLimitPolicyService limitPolicy
     ) {
         this.partnerService = partnerService;
         this.admissionRegistry = admissionRegistry;
+        this.limitPolicy = limitPolicy;
+        this.birthService = new BreedingOffspringBirthService(limitPolicy);
     }
 
     boolean tryPassive(

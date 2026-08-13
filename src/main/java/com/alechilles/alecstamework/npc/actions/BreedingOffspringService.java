@@ -25,8 +25,16 @@ final class BreedingOffspringService {
             @Nonnull BreedingPartnerService partnerService,
             @Nonnull BreedingPairAdmissionRegistry admissionRegistry
     ) {
+        this(partnerService, admissionRegistry, new BreedingClaimLimitPolicyService());
+    }
+
+    BreedingOffspringService(
+            @Nonnull BreedingPartnerService partnerService,
+            @Nonnull BreedingPairAdmissionRegistry admissionRegistry,
+            @Nonnull BreedingClaimLimitPolicyService claimLimitPolicy
+    ) {
         this.pairingService = new BreedingHytalePairingService(
-                partnerService, admissionRegistry
+                partnerService, admissionRegistry, claimLimitPolicy
         );
     }
 

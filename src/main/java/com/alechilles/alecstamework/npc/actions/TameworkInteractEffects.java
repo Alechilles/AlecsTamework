@@ -62,14 +62,18 @@ final class TameworkInteractEffects {
     TameworkInteractEffects(ActionTameworkInteract owner,
                             @Nullable InteractionExtensionRuntime extensionRuntime) {
         this.owner = owner;
+        BreedingClaimLimitPolicyService claimLimitPolicy =
+                new BreedingClaimLimitPolicyService();
         this.inventoryEffects = new InteractionInventoryEffects(owner);
         this.presentationEffects = new InteractionPresentationEffects(owner);
-        this.stateEffects = new InteractionStateEffects();
+        this.stateEffects = new InteractionStateEffects(
+                new TameClaimLimitPolicyService(claimLimitPolicy)
+        );
         this.roleChangeEffects = stateEffects;
         this.modeCycleEffects = new InteractionModeCycleEffects(owner, presentationEffects, stateEffects);
         this.mountEffects = new InteractionMountEffects(owner);
         this.hookEffects = new InteractionHookEffects(owner);
-        this.breedingEffects = new InteractionBreedingEffects(owner);
+        this.breedingEffects = new InteractionBreedingEffects(owner, claimLimitPolicy);
         this.ownerContinuationEffects = new InteractionOwnerContinuationEffects(owner, stateEffects);
         this.harvestEffects = new InteractionHarvestEffects(owner, inventoryEffects, stateEffects);
         this.extensionRuntime = extensionRuntime;

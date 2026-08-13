@@ -1,7 +1,9 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.damage.SimpleClaimsCapabilityRuntime;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
@@ -29,18 +31,16 @@ import org.joml.Vector3d;
  * Evaluates released SimpleClaims owner-population limits without a second durable authority.
  */
 final class BreedingClaimLimitPolicyService {
-    private final SimpleClaimsBreedingBridge simpleClaimsBridge;
+    private final SimpleClaimsCapabilityRuntime capabilityRuntime;
 
     BreedingClaimLimitPolicyService() {
-        this(SimpleClaimsBreedingBridge.initialize());
+        this(resolveCapabilityRuntime());
     }
 
     BreedingClaimLimitPolicyService(
-            @Nullable SimpleClaimsBreedingBridge simpleClaimsBridge
+            @Nonnull SimpleClaimsCapabilityRuntime capabilityRuntime
     ) {
-        this.simpleClaimsBridge = simpleClaimsBridge == null
-                ? SimpleClaimsBreedingBridge.initialize()
-                : simpleClaimsBridge;
+        this.capabilityRuntime = capabilityRuntime;
     }
 
     /**
@@ -154,13 +154,28 @@ final class BreedingClaimLimitPolicyService {
         if (store == null || spawnPosition == null || worldName == null) {
             return Decision.deny("missing-spawn-context");
         }
-        ResolvedClaim resolved = resolveClaim(worldName, spawnPosition);
+        SimpleClaimsCapabilityRuntime.BridgeResolution bridgeResolution = resolveBridge();
+        if (!bridgeResolution.available()) {
+            return evaluateResolved(
+                    globalConfig,
+                    new ResolvedClaim(
+                            ClaimResolutionStatus.UNAVAILABLE,
+                            null,
+                            0,
+                            bridgeResolution.reason()
+                    ),
+                    0,
+                    0
+            );
+        }
+        SimpleClaimsBreedingBridge bridge = bridgeResolution.bridge();
+        ResolvedClaim resolved = resolveClaim(bridge, worldName, spawnPosition);
         if (resolved.status() != ClaimResolutionStatus.CLAIM_FOUND
                 || resolved.key() == null) {
             return evaluateResolved(globalConfig, resolved, 0, 0);
         }
         CountResult count = countOwnedPopulationInClaim(
-                store, worldName, resolved.key().partyId()
+                bridge, store, worldName, resolved.key().partyId()
         );
         int pending = pendingClaims == null
                 ? 0
@@ -225,8 +240,28 @@ final class BreedingClaimLimitPolicyService {
                     ClaimResolutionStatus.ERROR, null, 0, "missing-world-or-position"
             );
         }
+        SimpleClaimsCapabilityRuntime.BridgeResolution resolution = resolveBridge();
+        if (!resolution.available()) {
+            return new ResolvedClaim(
+                    ClaimResolutionStatus.UNAVAILABLE, null, 0, resolution.reason()
+            );
+        }
+        return resolveClaim(resolution.bridge(), worldName, position);
+    }
+
+    @Nonnull
+    SimpleClaimsCapabilityRuntime.BridgeResolution resolveBridge() {
+        return capabilityRuntime.resolveBridge();
+    }
+
+    @Nonnull
+    static ResolvedClaim resolveClaim(
+            @Nonnull SimpleClaimsBreedingBridge bridge,
+            @Nonnull String worldName,
+            @Nonnull Vector3d position
+    ) {
         SimpleClaimsBreedingBridge.LookupResult lookup =
-                simpleClaimsBridge.lookupSimpleClaimsClaim(worldName, position);
+                bridge.lookupSimpleClaimsClaim(worldName, position);
         if (lookup == null) {
             return new ResolvedClaim(
                     ClaimResolutionStatus.ERROR, null, 0, "lookup-result-null"
@@ -250,6 +285,22 @@ final class BreedingClaimLimitPolicyService {
             @Nonnull String worldName,
             @Nonnull UUID claimPartyId
     ) {
+        SimpleClaimsCapabilityRuntime.BridgeResolution resolution = resolveBridge();
+        if (!resolution.available()) {
+            return new CountResult(false, 0, resolution.reason());
+        }
+        return countOwnedPopulationInClaim(
+                resolution.bridge(), store, worldName, claimPartyId
+        );
+    }
+
+    @Nonnull
+    CountResult countOwnedPopulationInClaim(
+            @Nonnull SimpleClaimsBreedingBridge bridge,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull String worldName,
+            @Nonnull UUID claimPartyId
+    ) {
         ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
         ComponentType<EntityStore, TransformComponent> transformType =
                 TransformComponent.getComponentType();
@@ -265,7 +316,7 @@ final class BreedingClaimLimitPolicyService {
                 (ArchetypeChunk<EntityStore> chunk,
                  CommandBuffer<EntityStore> commandBuffer) -> countChunk(
                         chunk, npcType, transformType, ownerType,
-                        worldName, claimPartyId, count, cache
+                        bridge, worldName, claimPartyId, count, cache
                 )
         );
         return count.failure == null
@@ -278,6 +329,7 @@ final class BreedingClaimLimitPolicyService {
             @Nonnull ComponentType<EntityStore, NPCEntity> npcType,
             @Nonnull ComponentType<EntityStore, TransformComponent> transformType,
             @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
+            @Nonnull SimpleClaimsBreedingBridge bridge,
             @Nonnull String worldName,
             @Nonnull UUID claimPartyId,
             @Nonnull ClaimCount count,
@@ -301,7 +353,7 @@ final class BreedingClaimLimitPolicyService {
             }
             ResolvedClaim claim = cache.computeIfAbsent(
                     chunkCacheKey(worldName, position),
-                    ignored -> resolveClaim(worldName, position)
+                    ignored -> resolveClaim(bridge, worldName, position)
             );
             if (claim.status() == ClaimResolutionStatus.UNAVAILABLE
                     || claim.status() == ClaimResolutionStatus.ERROR) {
@@ -395,6 +447,14 @@ final class BreedingClaimLimitPolicyService {
 
     private static boolean claimPolicyEnabled(@Nonnull TwGlobalConfig config) {
         return TameworkRuntimeSettings.simpleClaimsEnabled(config.isSimpleClaimsEnabled());
+    }
+
+    @Nonnull
+    private static SimpleClaimsCapabilityRuntime resolveCapabilityRuntime() {
+        Tamework plugin = Tamework.getInstance();
+        return plugin == null
+                ? new SimpleClaimsCapabilityRuntime()
+                : plugin.getSimpleClaimsCapabilityRuntime();
     }
 
     private static int multiplyCap(int perChunk, int claimChunkCount) {

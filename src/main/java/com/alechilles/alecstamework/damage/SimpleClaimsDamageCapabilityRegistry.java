@@ -1,13 +1,12 @@
 package com.alechilles.alecstamework.damage;
 
-import java.lang.ref.WeakReference;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import javax.annotation.Nonnull;
 
 /**
- * Weak positive-generation cache for SimpleClaims damage and identity access.
+ * Positive-generation cache for SimpleClaims damage, identity, and claim access.
  *
  * <p>Every resolve observes PluginManager first. Absent, disabled, failed, and incompatible states
  * are never sticky. Locator and reflection work occur outside the registry monitor, and an older
@@ -19,7 +18,7 @@ final class SimpleClaimsDamageCapabilityRegistry
     private final Function<Object, SimpleClaimsDamageGeneration> generationFactory;
     private final AtomicLong observationSequence = new AtomicLong();
     private SimpleClaimsPluginGeneration cachedLocationGeneration = SimpleClaimsPluginGeneration.NONE;
-    private WeakReference<Resolution> cachedReady;
+    private Resolution cachedReady;
     private long reflectedGeneration;
     private long cacheEpoch;
     private long latestPublishedObservation;
@@ -143,13 +142,10 @@ final class SimpleClaimsDamageCapabilityRegistry
         if (closed) {
             return new Snapshot(cacheEpoch, null);
         }
-        Resolution ready = cachedReady == null ? null : cachedReady.get();
+        Resolution ready = cachedReady;
         if (ready != null && cachedLocationGeneration.equals(locationGeneration)) {
             latestPublishedObservation = Math.max(latestPublishedObservation, observation);
             return new Snapshot(cacheEpoch, ready);
-        }
-        if (ready == null && cachedReady != null) {
-            clearCached();
         }
         return new Snapshot(cacheEpoch, null);
     }
@@ -170,7 +166,7 @@ final class SimpleClaimsDamageCapabilityRegistry
                 && cacheEpoch == observedEpoch
                 && observation >= latestPublishedObservation) {
             cachedLocationGeneration = location.generation();
-            cachedReady = new WeakReference<>(candidate);
+            cachedReady = candidate;
             latestPublishedObservation = observation;
         }
         return candidate;
@@ -185,9 +181,6 @@ final class SimpleClaimsDamageCapabilityRegistry
 
     private void clearCached() {
         cachedLocationGeneration = SimpleClaimsPluginGeneration.NONE;
-        if (cachedReady != null) {
-            cachedReady.clear();
-        }
         cachedReady = null;
     }
 

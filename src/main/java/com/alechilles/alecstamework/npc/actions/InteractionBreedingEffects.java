@@ -35,13 +35,20 @@ final class InteractionBreedingEffects {
     private final BreedingOffspringService offspringService;
 
     InteractionBreedingEffects(ActionTameworkInteract owner) {
+        this(owner, new BreedingClaimLimitPolicyService());
+    }
+
+    InteractionBreedingEffects(
+            ActionTameworkInteract owner,
+            BreedingClaimLimitPolicyService claimLimitPolicy
+    ) {
         this.owner = owner;
         Tamework plugin = Tamework.getInstance();
         BreedingPairAdmissionRegistry admissionRegistry = plugin == null
                 ? new BreedingPairAdmissionRegistry()
                 : plugin.getBreedingPairAdmissionRegistry();
         this.offspringService = new BreedingOffspringService(
-                new BreedingPartnerService(), admissionRegistry
+                new BreedingPartnerService(), admissionRegistry, claimLimitPolicy
         );
     }
 

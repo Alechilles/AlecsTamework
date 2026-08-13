@@ -263,6 +263,7 @@ class SimpleClaimsTamedDamagePolicyTest {
                 new SimpleClaimsPluginGeneration("plugin-a", "loader-a", 1L),
                 "1.0.38",
                 new SimpleClaimsDamageGeneration(
+                        null,
                         (world, position, attacker, key) -> new SimpleClaimsBreedingBridge.DamageAccessResult(
                                 SimpleClaimsBreedingBridge.DamageAccessStatus.DENIED, null, null),
                         (world, position, attacker, key) ->
@@ -284,6 +285,7 @@ class SimpleClaimsTamedDamagePolicyTest {
             SimpleClaimsBreedingBridge.DamageAccessStatus status,
             UUID partyId) {
         return new SimpleClaimsDamageGeneration(
+                null,
                 (world, position, attacker, key) ->
                         new SimpleClaimsBreedingBridge.DamageAccessResult(status, partyId, null),
                 (world, position, attacker, key) -> LegacySimpleClaimsPartyPermissionBypass.Result.notGranted(),

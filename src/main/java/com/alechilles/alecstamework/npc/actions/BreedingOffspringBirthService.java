@@ -33,8 +33,7 @@ final class BreedingOffspringBirthService {
             new BreedingFertilityOffspringService();
     private final BreedingOffspringSpawnService spawnService =
             new BreedingOffspringSpawnService(new BreedingOffspringRoleResolver());
-    private final BreedingClaimLimitPolicyService limitPolicy =
-            new BreedingClaimLimitPolicyService();
+    private final BreedingClaimLimitPolicyService limitPolicy;
     private final BreedingPopulationTypeService populationTypeService =
             new BreedingPopulationTypeService();
     private final BreedingNearbyPopulationAllowance nearbyAllowance =
@@ -51,6 +50,12 @@ final class BreedingOffspringBirthService {
             );
     private final BreedingSpawnCompletionGuard completionGuard =
             new BreedingSpawnCompletionGuard();
+
+    BreedingOffspringBirthService(
+            @Nonnull BreedingClaimLimitPolicyService limitPolicy
+    ) {
+        this.limitPolicy = limitPolicy;
+    }
 
     void spawn(@Nonnull World world, @Nonnull BreedingPairContext context) {
         Store<EntityStore> store = resolveStore(world);

@@ -49,7 +49,9 @@ public final class PassiveBreedingSweepService {
             @Nonnull BreedingPairAdmissionRegistry admissionRegistry
     ) {
         this.offspringService = new BreedingOffspringService(
-                new BreedingPartnerService(), admissionRegistry
+                new BreedingPartnerService(),
+                admissionRegistry,
+                new BreedingClaimLimitPolicyService()
         );
         this.populationTypeService = new BreedingPopulationTypeService();
     }

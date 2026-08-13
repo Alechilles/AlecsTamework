@@ -56,6 +56,14 @@ public class ActionTameworkInteract extends TameworkActionBase {
     private final InteractionLegacyAdoptionService legacyAdoptionService;
 
     public ActionTameworkInteract(BuilderActionTameworkInteract builder, BuilderSupport support) {
+        this(builder, support, true);
+    }
+
+    protected ActionTameworkInteract(
+            BuilderActionTameworkInteract builder,
+            BuilderSupport support,
+            boolean includeExecutionEffects
+    ) {
         super(builder);
         this.configIdOverride = builder.hasConfigIdOverride() ? builder.getConfigId(support) : null;
         this.hasLovedItemsOverride = builder.hasLovedItemsOverride();
@@ -135,8 +143,6 @@ public class ActionTameworkInteract extends TameworkActionBase {
         if (plugin != null) {
             interactionExtensionRuntime = plugin.getInteractionExtensionRuntime();
         }
-        TameworkInteractEffects effects = new TameworkInteractEffects(this, interactionExtensionRuntime);
-        InteractionExecutor executor = new InteractionExecutor(effects, feedHelper);
         InteractionCooldowns cooldowns = new InteractionCooldowns(this, cooldownAlarmPrefix);
         TameworkInteractRequirements requirements =
                 new TameworkInteractRequirements(
@@ -160,7 +166,14 @@ public class ActionTameworkInteract extends TameworkActionBase {
                 selector,
                 diagnostics
         );
-        this.execution = new InteractionExecution(executor, cooldowns);
+        if (includeExecutionEffects) {
+            TameworkInteractEffects effects =
+                    new TameworkInteractEffects(this, interactionExtensionRuntime);
+            InteractionExecutor executor = new InteractionExecutor(effects, feedHelper);
+            this.execution = new InteractionExecution(executor, cooldowns);
+        } else {
+            this.execution = null;
+        }
         this.legacyAdoptionService = new InteractionLegacyAdoptionService(selection::logDebug);
     }
 
@@ -238,7 +251,8 @@ public class ActionTameworkInteract extends TameworkActionBase {
         if (interaction.blockedByCooldown) {
             return false;
         }
-        return execution.applyInteraction(interaction, npcRef, role, infoProvider, store, player, ctx);
+        return execution != null
+                && execution.applyInteraction(interaction, npcRef, role, infoProvider, store, player, ctx);
     }
 
     // Builds the cached context snapshot for prompt/selection helpers.

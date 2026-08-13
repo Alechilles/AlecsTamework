@@ -7,6 +7,7 @@ import javax.annotation.Nullable;
 
 /** Reflected SimpleClaims damage/identity capabilities belonging to one plugin generation. */
 record SimpleClaimsDamageGeneration(
+        @Nullable SimpleClaimsBreedingBridge bridge,
         @Nonnull NativeSimpleClaimsDamageAccess nativeAccess,
         @Nonnull LegacySimpleClaimsPartyPermissionBypass legacyPartyBypass,
         @Nonnull SimpleClaimsClaimIdentityAccess claimIdentityAccess,
@@ -28,6 +29,7 @@ record SimpleClaimsDamageGeneration(
         }
         SimpleClaimsBreedingBridge bridge = SimpleClaimsBreedingBridge.forDamagePlugin(plugin);
         return new SimpleClaimsDamageGeneration(
+                bridge,
                 bridge::evaluateDamageAccess,
                 new ReflectiveLegacySimpleClaimsPartyPermissionBypass(bridge, classLoader),
                 (worldName, position) -> mapLookup(bridge.lookupClaimIdentity(worldName, position)),
@@ -41,6 +43,7 @@ record SimpleClaimsDamageGeneration(
     static SimpleClaimsDamageGeneration fixed(@Nonnull NativeSimpleClaimsDamageAccess nativeAccess,
                                               @Nonnull LegacySimpleClaimsPartyPermissionBypass legacyPartyBypass) {
         return new SimpleClaimsDamageGeneration(
+                null,
                 nativeAccess,
                 legacyPartyBypass,
                 (worldName, position) -> new SimpleClaimsClaimIdentityAccess.Result(
