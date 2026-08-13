@@ -154,6 +154,7 @@ player-scoped. In particular, `/tw config`, `/tw settings`, `/tw news`,
 - `/tw debugplayermodel unsafe [ModelId] [scale] | reset | status`
 - `/tw debugplayerinput [on|off|status]`
 - `/tw debuglag [on|off]`
+- `/tw debugrespawntrace [on|off]`
 - `/tw debugharvest [on|off]`
 - `/tw debugxpevents [on|off]`
 
@@ -165,6 +166,11 @@ it tries `Endgame_Pet_Dragon_Frost`; use `reset` to restore the saved player mod
 
 `/tw debugplayerinput` logs movement packets, mouse packets, interaction events, and per-tick player
 input/state snapshots for the executing player. Use it only during short input experiments; it is intentionally verbose.
+
+`/tw debugrespawntrace` logs capture-time stored health and needs, raw and
+normalized return projections, immediate live health and death state, first
+damage, and delayed 250 ms and 1 second probes for captured-item release and
+companion restoration. Enable it only for a short reproduction.
 
 `/tw debugdespawn` notes:
 - Default (no role filter) tracks all tamed companions.

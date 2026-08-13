@@ -50,6 +50,13 @@ do not participate in spawning and are removed when tracking ends.
 - `/tw debugrespawntrace`
 - `/tw debugxpevents`
 
+`/tw debugrespawntrace` logs the stored and normalized health/needs projection,
+the immediate live entity health and death-component state, first damage within
+the trace window, and delayed 250 ms and 1 second probes. It covers Soul
+Collector capture and release plus free and paid companion restoration. Enable
+it only for a short reproduction because each return operation emits several
+correlated lines.
+
 Death and Lost restoration is a gameplay flow. Roster-backed companions can
 use role-configured exact item costs, while legacy item-linked paths remain
 free. There is no debug-ready revival mutation or persistence repair command.

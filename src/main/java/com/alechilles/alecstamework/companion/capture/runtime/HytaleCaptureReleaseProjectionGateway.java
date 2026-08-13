@@ -10,6 +10,8 @@ import com.alechilles.alecstamework.companion.snapshot.SnapshotDecodeResult;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
 import com.alechilles.alecstamework.items.CompanionReturnStateNormalizer;
 import com.alechilles.alecstamework.items.HytaleCompanionProjectionSpawnExecutor;
+import com.alechilles.alecstamework.items.RecentRespawnTraceService;
+import com.alechilles.alecstamework.items.RespawnTraceLogSupport;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
@@ -38,6 +40,8 @@ final class HytaleCaptureReleaseProjectionGateway {
     private final OperationEnvelope operation;
     private final SnapshotCodecRegistry snapshotCodecs;
     private final HytaleCompanionProjectionSpawnExecutor projections;
+    @Nullable
+    private RecentRespawnTraceService.Trace activeTrace;
 
     HytaleCaptureReleaseProjectionGateway(
             World world,
@@ -56,10 +60,22 @@ final class HytaleCaptureReleaseProjectionGateway {
     }
 
     LiveOperationResult applyOrResolve() {
+        RecentRespawnTraceService.Trace trace = trace();
+        RespawnTraceLogSupport.log(
+                trace,
+                "start profile=" + request.profileId()
+                        + " operation=" + operation.operationId()
+                        + " source=" + request.sourceAlias()
+                        + " target=" + request.targetAlias()
+        );
         if (!CompanionFullStateProjection.KIND.equals(
                 request.projection().kind()
         ) || request.projection().payloadVersion()
                 != CompanionFullStateProjection.VERSION) {
+            RespawnTraceLogSupport.warn(
+                    trace,
+                    "failed stage=decode reason=projection_codec_mismatch"
+            );
             return LiveOperationResult.unknown(
                     "capture_release_projection_codec_mismatch",
                     null
@@ -69,22 +85,56 @@ final class HytaleCaptureReleaseProjectionGateway {
                 world,
                 store,
                 command(),
-                () -> decodeProjection(snapshotCodecs, request.projection())
+                () -> decodeProjection(trace)
         );
-        return result.status() == LiveOperationResult.Status.CONFIRMED
+        LiveOperationResult held = result.status()
+                == LiveOperationResult.Status.CONFIRMED
                 ? ensureHold(result)
                 : result;
+        RespawnTraceLogSupport.logProjectionResult(
+                world,
+                request.targetAlias().value(),
+                trace,
+                "capture_release",
+                held.status() + ":" + held.code(),
+                false
+        );
+        return held;
     }
 
     static SnapshotDecodeResult<CoopResidentStateSnapshot> decodeProjection(
             SnapshotCodecRegistry codecs,
             SnapshotCodecRegistry.EncodedSnapshot projection
     ) {
+        return normalizeProjection(codecs.decode(
+                projection,
+                CoopResidentStateSnapshot.class
+        ));
+    }
+
+    private SnapshotDecodeResult<CoopResidentStateSnapshot> decodeProjection(
+            @Nullable RecentRespawnTraceService.Trace trace
+    ) {
         SnapshotDecodeResult<CoopResidentStateSnapshot> decoded =
-                codecs.decode(
-                        projection,
+                snapshotCodecs.decode(
+                        request.projection(),
                         CoopResidentStateSnapshot.class
                 );
+        RespawnTraceLogSupport.logDecodedProjection(
+                trace, "capture_release_stored", decoded
+        );
+        SnapshotDecodeResult<CoopResidentStateSnapshot> normalized =
+                normalizeProjection(decoded);
+        RespawnTraceLogSupport.logDecodedProjection(
+                trace, "capture_release_normalized", normalized
+        );
+        return normalized;
+    }
+
+    private static SnapshotDecodeResult<CoopResidentStateSnapshot>
+    normalizeProjection(
+            SnapshotDecodeResult<CoopResidentStateSnapshot> decoded
+    ) {
         if (decoded instanceof SnapshotDecodeResult.Decoded<
                 CoopResidentStateSnapshot> found) {
             return new SnapshotDecodeResult.Decoded<>(
@@ -94,6 +144,31 @@ final class HytaleCaptureReleaseProjectionGateway {
             );
         }
         return decoded;
+    }
+
+    @Nullable
+    private RecentRespawnTraceService.Trace trace() {
+        if (activeTrace != null) {
+            return activeTrace;
+        }
+        return freshTrace();
+    }
+
+    @Nullable
+    private RecentRespawnTraceService.Trace freshTrace() {
+        if (!RespawnTraceLogSupport.isEnabled()) {
+            return null;
+        }
+        activeTrace = RespawnTraceLogSupport.startTrace(
+                "capture_release",
+                request.sourceAlias().value(),
+                request.ownerAssignment() == null
+                        ? null
+                        : request.ownerAssignment().value(),
+                null,
+                request.source().sourceArtifact().itemId()
+        );
+        return activeTrace;
     }
 
     ProjectionProbe probe() {
@@ -111,12 +186,23 @@ final class HytaleCaptureReleaseProjectionGateway {
     }
 
     void releaseHold() {
+        // The damage-correlation window starts when this entity can tick, not
+        // when its durable projection was prepared.
+        RecentRespawnTraceService.Trace trace = freshTrace();
         Ref<EntityStore> target =
                 world.getEntityRef(request.targetAlias().value());
         if (target == null || !target.isValid()) {
+            RespawnTraceLogSupport.warn(
+                    trace,
+                    "failed stage=hold_release reason=target_unavailable"
+            );
             return;
         }
         if (!hasExactMarker(target)) {
+            RespawnTraceLogSupport.warn(
+                    trace,
+                    "failed stage=hold_release reason=projection_marker_changed"
+            );
             throw new IllegalStateException(
                     "Capture release projection receipt changed before hold release"
             );
@@ -128,6 +214,14 @@ final class HytaleCaptureReleaseProjectionGateway {
                 target,
                 EntityTrackerSystems.Visible.getComponentType(),
                 nonTicking
+        );
+        RespawnTraceLogSupport.logProjectionResult(
+                world,
+                request.targetAlias().value(),
+                trace,
+                "capture_release_hold_released",
+                "CONFIRMED",
+                true
         );
     }
 

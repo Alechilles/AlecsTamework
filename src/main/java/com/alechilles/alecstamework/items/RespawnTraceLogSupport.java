@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotDecodeResult;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
@@ -84,6 +85,84 @@ public final class RespawnTraceLogSupport {
                 ? ""
                 : RecentRespawnTraceService.getInstance().describe(trace, System.currentTimeMillis()) + " ";
         emit(Level.WARNING, prefix + message);
+    }
+
+    /** Logs the health and needs state that a return projection will restore. */
+    public static void logSnapshot(
+            @Nullable RecentRespawnTraceService.Trace trace,
+            @Nonnull String stage,
+            @Nullable CoopResidentStateSnapshotService.CoopResidentStateSnapshot snapshot) {
+        if (!isEnabled()) {
+            return;
+        }
+        log(trace, "snapshot stage=" + stage + " " + describeSnapshot(snapshot));
+    }
+
+    /** Logs either a decoded stored projection or its stable decode failure. */
+    public static void logDecodedProjection(
+            @Nullable RecentRespawnTraceService.Trace trace,
+            @Nonnull String stage,
+            @Nonnull SnapshotDecodeResult<
+                    CoopResidentStateSnapshotService.CoopResidentStateSnapshot> decoded) {
+        if (decoded instanceof SnapshotDecodeResult.Decoded<
+                CoopResidentStateSnapshotService.CoopResidentStateSnapshot> found) {
+            logSnapshot(trace, stage, found.value());
+            return;
+        }
+        SnapshotDecodeResult.Failed<?> failed =
+                (SnapshotDecodeResult.Failed<?>) decoded;
+        warn(trace, "snapshot stage=" + stage
+                + " decode=failed code=" + failed.code());
+    }
+
+    /**
+     * Correlates a projected NPC with immediate damage callbacks and schedules two short probes.
+     */
+    public static void logProjectionResult(
+            @Nullable World world,
+            @Nullable UUID npcUuid,
+            @Nullable RecentRespawnTraceService.Trace trace,
+            @Nonnull String stage,
+            @Nonnull String result,
+            boolean confirmed) {
+        if (!isEnabled() || world == null || npcUuid == null) {
+            return;
+        }
+        Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
+        Store<EntityStore> store = world.getEntityStore() == null
+                ? null
+                : world.getEntityStore().getStore();
+        RecentRespawnTraceService.Trace correlated =
+                npcRef != null && npcRef.isValid()
+                        ? recordReplacement(trace, npcUuid)
+                        : trace;
+        log(correlated, "projection stage=" + stage
+                + " result=" + result
+                + " npc=" + npcUuid
+                + " " + describeNpcState(npcRef, store));
+        if (confirmed) {
+            scheduleProbe(world, npcUuid, correlated, 250L, stage + "_after_250ms");
+            scheduleProbe(world, npcUuid, correlated, 1000L, stage + "_after_1000ms");
+        }
+    }
+
+    @Nonnull
+    public static String describeSnapshot(
+            @Nullable CoopResidentStateSnapshotService.CoopResidentStateSnapshot snapshot) {
+        if (snapshot == null) {
+            return "state=<null>";
+        }
+        return String.format(
+                Locale.ROOT,
+                "source=%s role=%s health=%s/%s percent=%s needs={%s} capturedAtMs=%d",
+                snapshot.npcUuid(),
+                snapshot.roleId(),
+                number(snapshot.currentHealth()),
+                number(snapshot.maximumHealth()),
+                number(snapshot.healthPercent()),
+                describeNeeds(snapshot.needs()),
+                snapshot.capturedAtMs()
+        );
     }
 
     public static void scheduleProbe(@Nullable World world,
@@ -201,5 +280,29 @@ public final class RespawnTraceLogSupport {
             return;
         }
         plugin.getLogger().at(level).log(PREFIX + message);
+    }
+
+    @Nonnull
+    private static String number(@Nullable Double value) {
+        return value == null
+                ? "<none>"
+                : String.format(Locale.ROOT, "%.3f", value);
+    }
+
+    @Nonnull
+    private static String describeNeeds(@Nullable TameworkNeedsComponent needs) {
+        if (needs == null) {
+            return "<none>";
+        }
+        return String.format(
+                Locale.ROOT,
+                "config=%s hunger=%.3f thirst=%.3f pending=%.6f last=%d sweep=%d baseline=%.3f allowance=%.3f managed=%.3f",
+                needs.getConfigId(), needs.getHunger(), needs.getThirst(),
+                needs.getPendingNeedsDamage(), needs.getLastUpdateMs(),
+                needs.getLastPassiveSweepMs(),
+                needs.getRegenSuppressionBaselineHealth(),
+                needs.getRegenSuppressionAllowedHeal(),
+                needs.getLastManagedHealth()
+        );
     }
 }

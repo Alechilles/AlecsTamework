@@ -9,6 +9,8 @@ import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProject
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
 import com.alechilles.alecstamework.items.CompanionReturnStateNormalizer;
 import com.alechilles.alecstamework.items.HytaleCompanionProjectionSpawnExecutor;
+import com.alechilles.alecstamework.items.RecentRespawnTraceService;
+import com.alechilles.alecstamework.items.RespawnTraceLogSupport;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
@@ -17,6 +19,7 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Objects;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /** Production receipt-first gateway for death and lost companion restoration. */
 public final class HytaleCompanionRestorationWorldGateway
@@ -48,6 +51,15 @@ public final class HytaleCompanionRestorationWorldGateway
                     null
             );
         }
+        RecentRespawnTraceService.Trace trace = startTrace(request);
+        RespawnTraceLogSupport.log(
+                trace,
+                "start profile=" + request.profileId()
+                        + " operation=" + operation.operationId()
+                        + " sourceState=" + request.sourceState()
+                        + " source=" + request.projection().sourceAlias()
+                        + " target=" + request.targetAlias()
+        );
         HytaleCompanionProjectionSpawnExecutor.ProjectionCommand command =
                 new HytaleCompanionProjectionSpawnExecutor.ProjectionCommand(
                         "restoration",
@@ -60,17 +72,29 @@ public final class HytaleCompanionRestorationWorldGateway
                         request.expectedLifecycleRevision().value(),
                         request.placement()
                 );
-        return projections.applyOrResolve(
+        LiveOperationResult result = projections.applyOrResolve(
                 world,
                 store,
                 command,
-                () -> decodeProjection(request)
+                () -> decodeProjection(request, trace)
         );
+        RespawnTraceLogSupport.logProjectionResult(
+                world,
+                request.targetAlias().value(),
+                trace,
+                "restoration_" + request.sourceState().name().toLowerCase(
+                        java.util.Locale.ROOT
+                ),
+                result.status() + ":" + result.code(),
+                result.status() == LiveOperationResult.Status.CONFIRMED
+        );
+        return result;
     }
 
     @Nonnull
     private SnapshotDecodeResult<CoopResidentStateSnapshot> decodeProjection(
-            CompanionRestorationRequest request
+            CompanionRestorationRequest request,
+            @Nullable RecentRespawnTraceService.Trace trace
     ) {
         SnapshotCodecRegistry.EncodedSnapshot projection =
                 request.projection().fullState();
@@ -85,12 +109,37 @@ public final class HytaleCompanionRestorationWorldGateway
                     null
             );
         }
-        return normalizeProjection(
-                request.sourceState(),
+        SnapshotDecodeResult<CoopResidentStateSnapshot> decoded =
                 snapshotCodecs.decode(
                         projection,
                         CoopResidentStateSnapshot.class
-                )
+                );
+        RespawnTraceLogSupport.logDecodedProjection(
+                trace, "restoration_stored", decoded
+        );
+        SnapshotDecodeResult<CoopResidentStateSnapshot> normalized =
+                normalizeProjection(request.sourceState(), decoded);
+        RespawnTraceLogSupport.logDecodedProjection(
+                trace, "restoration_normalized", normalized
+        );
+        return normalized;
+    }
+
+    @Nullable
+    private RecentRespawnTraceService.Trace startTrace(
+            CompanionRestorationRequest request
+    ) {
+        if (!RespawnTraceLogSupport.isEnabled()) {
+            return null;
+        }
+        return RespawnTraceLogSupport.startTrace(
+                request.sourceState() == LifecycleState.DEAD_REVIVABLE
+                        ? "death_restoration"
+                        : "lost_restoration",
+                request.projection().sourceAlias().value(),
+                null,
+                null,
+                "command_restoration"
         );
     }
 

@@ -11,6 +11,8 @@ import com.alechilles.alecstamework.compat.HytaleChunkAccess;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
 import com.alechilles.alecstamework.items.CompanionReturnStateNormalizer;
 import com.alechilles.alecstamework.items.HytaleCompanionProjectionSpawnExecutor;
+import com.alechilles.alecstamework.items.RecentRespawnTraceService;
+import com.alechilles.alecstamework.items.RespawnTraceLogSupport;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
@@ -63,21 +65,38 @@ final class HytalePaidRevivalProjectionGateway {
     }
 
     ProjectionAttempt applyOrResolve() {
+        RecentRespawnTraceService.Trace trace = startTrace();
+        RespawnTraceLogSupport.log(
+                trace,
+                "start profile=" + request.sourceSnapshot().profileId()
+                        + " operation=" + operation.operationId()
+                        + " source=" + request.projection().sourceAlias()
+                        + " target=" + request.targetAlias()
+        );
         SpawnProbe initial = probe();
         if (initial.status() == SpawnStatus.EXACT) {
+            logProjection(trace, "initial_probe", "EXACT", true);
             return ProjectionAttempt.exact(initial.chunkIndex());
         }
         if (initial.status() == SpawnStatus.UNAVAILABLE) {
+            logProjection(trace, "initial_probe", "UNAVAILABLE", false);
             return ProjectionAttempt.retryable(initial.cause());
         }
         if (initial.status() == SpawnStatus.CONFLICT) {
+            logProjection(trace, "initial_probe", "CONFLICT", false);
             return ProjectionAttempt.conflict(initial.cause());
         }
         LiveOperationResult result = projections.applyOrResolve(
                 world,
                 store,
                 command(),
-                this::decodeProjection
+                () -> decodeProjection(trace)
+        );
+        logProjection(
+                trace,
+                "apply",
+                result.status() + ":" + result.code(),
+                result.status() == LiveOperationResult.Status.CONFIRMED
         );
         if (result.status() == LiveOperationResult.Status.RETRYABLE) {
             return ProjectionAttempt.retryable(result.cause());
@@ -94,7 +113,7 @@ final class HytalePaidRevivalProjectionGateway {
     }
 
     private SnapshotDecodeResult<CoopResidentStateSnapshot>
-    decodeProjection() {
+    decodeProjection(@Nullable RecentRespawnTraceService.Trace trace) {
         SnapshotCodecRegistry.EncodedSnapshot projection =
                 request.projection().fullState();
         if (!CompanionFullStateProjection.KIND.equals(
@@ -108,10 +127,48 @@ final class HytalePaidRevivalProjectionGateway {
                     null
             );
         }
-        return normalizeProjection(
+        SnapshotDecodeResult<CoopResidentStateSnapshot> decoded =
                 snapshotCodecs.decode(
                         projection, CoopResidentStateSnapshot.class
-                )
+                );
+        RespawnTraceLogSupport.logDecodedProjection(
+                trace, "paid_revival_stored", decoded
+        );
+        SnapshotDecodeResult<CoopResidentStateSnapshot> normalized =
+                normalizeProjection(decoded);
+        RespawnTraceLogSupport.logDecodedProjection(
+                trace, "paid_revival_normalized", normalized
+        );
+        return normalized;
+    }
+
+    private void logProjection(
+            @Nullable RecentRespawnTraceService.Trace trace,
+            String stage,
+            String result,
+            boolean confirmed
+    ) {
+        RespawnTraceLogSupport.logProjectionResult(
+                world,
+                request.targetAlias().value(),
+                trace,
+                "paid_revival_" + stage,
+                result,
+                confirmed
+        );
+    }
+
+    @Nullable
+    private RecentRespawnTraceService.Trace startTrace() {
+        if (!RespawnTraceLogSupport.isEnabled()) {
+            return null;
+        }
+        return RespawnTraceLogSupport.startTrace(
+                "paid_revival",
+                request.projection().sourceAlias().value(),
+                request.familyKey().ownerId().value(),
+                null,
+                request.familyKey().familyId()
         );
     }
 

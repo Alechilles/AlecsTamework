@@ -11,7 +11,10 @@ import javax.annotation.Nonnull;
 public final class TameworkDebugRespawnTraceCommand extends AbstractTameworkServerCommand {
 
     public TameworkDebugRespawnTraceCommand() {
-        super("debugrespawntrace", "Toggle Tamework linked companion respawn trace diagnostics logging.");
+        super(
+                "debugrespawntrace",
+                "Toggle Tamework capture, release, and revival health trace logging."
+        );
         setAllowsExtraArguments(true);
     }
 

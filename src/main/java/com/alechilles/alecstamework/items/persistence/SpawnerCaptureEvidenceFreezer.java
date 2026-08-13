@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
+import com.alechilles.alecstamework.items.RespawnTraceLogSupport;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.StablePersistenceIds;
@@ -123,6 +124,20 @@ final class SpawnerCaptureEvidenceFreezer {
                 fullState,
                 intent.resultingOwnerId(),
                 intent.resultingOwnerName()
+        );
+        RespawnTraceLogSupport.log(
+                null,
+                "capture operation=" + operationId
+                        + " profile=" + intent.profileId()
+                        + " source=" + intent.sourceAlias()
+                        + " live={"
+                        + RespawnTraceLogSupport.describeNpcState(
+                                intent.sourceRef(), intent.sourceStore()
+                        )
+                        + "}"
+        );
+        RespawnTraceLogSupport.logSnapshot(
+                null, "capture_stored", capturedState
         );
         SnapshotId snapshotId = new SnapshotId(
                 resolution.attemptId()
