@@ -25,11 +25,14 @@ import javax.annotation.Nullable;
  * Hides mounted NPC nameplates and restores the pre-mount/custom name when dismounted.
  */
 public final class NpcMountedNameplateVisibilitySystem extends TickingSystem<EntityStore> {
+    private static final long SWEEP_INTERVAL_MS = 100L;
+
     private final ComponentType<EntityStore, NPCEntity> npcType;
     private final ComponentType<EntityStore, NPCMountComponent> mountType;
     private final ComponentType<EntityStore, TameworkMountedNameplateComponent> mountedNameplateType;
     private final ComponentType<EntityStore, TameworkNpcNameComponent> customNameType;
     private final MountedNameplateTextService textService;
+    private final StoreSweepCadence sweepCadence;
 
     public NpcMountedNameplateVisibilitySystem(ComponentType<EntityStore, NPCEntity> npcType,
                                                ComponentType<EntityStore, NPCMountComponent> mountType,
@@ -40,11 +43,15 @@ public final class NpcMountedNameplateVisibilitySystem extends TickingSystem<Ent
         this.mountedNameplateType = mountedNameplateType;
         this.customNameType = customNameType;
         this.textService = new MountedNameplateTextService();
+        this.sweepCadence = new StoreSweepCadence(SWEEP_INTERVAL_MS, System::currentTimeMillis);
     }
 
     @Override
     public void tick(float dt, int systemIndex, @Nonnull Store<EntityStore> store) {
-        if (npcType == null || mountType == null || mountedNameplateType == null) {
+        if (!sweepCadence.claim(store)
+                || npcType == null
+                || mountType == null
+                || mountedNameplateType == null) {
             return;
         }
 

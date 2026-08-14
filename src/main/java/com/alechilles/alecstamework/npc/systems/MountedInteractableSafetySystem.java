@@ -20,8 +20,16 @@ import javax.annotation.Nonnull;
  * Ensures mounted NPCs carry Interactable so vanilla mount transfer/remove flows can safely remove it.
  */
 public final class MountedInteractableSafetySystem extends TickingSystem<EntityStore> {
+    private static final long SWEEP_INTERVAL_MS = 100L;
+
+    private final StoreSweepCadence sweepCadence =
+            new StoreSweepCadence(SWEEP_INTERVAL_MS, System::currentTimeMillis);
+
     @Override
     public void tick(float dt, int systemIndex, @Nonnull Store<EntityStore> store) {
+        if (!sweepCadence.claim(store)) {
+            return;
+        }
         ComponentType<EntityStore, NPCMountComponent> mountType = resolveMountTypeOrNull();
         ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
         ComponentType<EntityStore, Interactable> interactableType = Interactable.getComponentType();
