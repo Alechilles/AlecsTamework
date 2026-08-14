@@ -426,18 +426,28 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     }
 
     /** Drives exact cleanup and recovery for only the current ticking world. */
-    public void maintenanceTick(@Nonnull String worldKey) {
-        if (!operational()) return;
-        runStorageGuarded("maintenance", () -> {
+    @Nonnull
+    public WorldMaintenanceResult worldMaintenanceTick(@Nonnull String worldKey) {
+        if (!operational()) return WorldMaintenanceResult.incomplete();
+        return supplyStorageGuarded("maintenance", () -> {
             long now = clock.getAsLong();
-            durability.replayPendingCleanupForWorld(
+            int cleanupAttempts = durability.replayPendingCleanupForWorld(
                     cleanup, worldKey, now, 64);
-            localLifecycle.reconcileCurrentWorldResult(
+            var reconciliation = localLifecycle.reconcileCurrentWorldResult(
                     worldKey,
                     BondedCompanionProjectionService.RecoveryCause.MISSING_SCAN,
                     now);
-            databaseMaintenance(now);
-        });
+            return new WorldMaintenanceResult(
+                    cleanupAttempts,
+                    reconciliation.submitted(),
+                    reconciliation.complete());
+        }, WorldMaintenanceResult.incomplete());
+    }
+
+    /** Compatibility entry point that also runs process-wide retention. */
+    public void maintenanceTick(@Nonnull String worldKey) {
+        worldMaintenanceTick(worldKey);
+        maintenanceTick();
     }
 
     /** Returns committed runtime leases without opening the bonded database. */
@@ -485,6 +495,28 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         if (!operational()) return;
         runStorageGuarded("maintenance", () ->
                 databaseMaintenance(clock.getAsLong()));
+    }
+
+    /** Reports the completed work that controls the next world recovery pass. */
+    public record WorldMaintenanceResult(
+            int cleanupAttempts,
+            int reconciledLeases,
+            boolean complete
+    ) {
+        public WorldMaintenanceResult {
+            if (cleanupAttempts < 0 || reconciledLeases < 0) {
+                throw new IllegalArgumentException(
+                        "maintenance counts must be non-negative");
+            }
+        }
+
+        public boolean requiresFastCadence() {
+            return !complete || cleanupAttempts > 0 || reconciledLeases > 0;
+        }
+
+        private static WorldMaintenanceResult incomplete() {
+            return new WorldMaintenanceResult(0, 0, false);
+        }
     }
 
     private void databaseMaintenance(long now) {
