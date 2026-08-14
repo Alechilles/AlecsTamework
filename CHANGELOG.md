@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 3.1.6 - Companion Performance Hotfix - 2026-08-14
 
 ### Fixed
 - Reduced companion load stalls. Role appearance data and optional model APIs
