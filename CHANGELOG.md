@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 3.1.5 - Interaction Performance and Persistence Hotfix - 2026-08-13
 
 ### Fixed
 - Reduced world-thread stalls when NPC interaction actions are built. Prompt
