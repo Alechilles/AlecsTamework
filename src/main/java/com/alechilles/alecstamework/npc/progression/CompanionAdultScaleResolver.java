@@ -13,9 +13,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashSet;
-import java.util.Locale;
-import java.util.Set;
 import java.util.function.Function;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -26,6 +23,8 @@ import javax.annotation.Nullable;
 final class CompanionAdultScaleResolver {
     private static final double EPSILON = 0.000001;
     private static final double MIN_SCALE = 0.10;
+    private static final CompanionRoleAppearanceCache ROLE_APPEARANCE_CACHE =
+            new CompanionRoleAppearanceCache(CompanionAdultScaleResolver::readJsonObject);
 
     private CompanionAdultScaleResolver() {
     }
@@ -108,12 +107,17 @@ final class CompanionAdultScaleResolver {
         if (roleAssetPath == null || referencePathResolver == null) {
             return null;
         }
-        return resolveAppearanceFromRoleAsset(roleAssetPath, referencePathResolver, new HashSet<>());
+        return new CompanionRoleAppearanceCache(CompanionAdultScaleResolver::readJsonObject)
+                .resolve(roleAssetPath, referencePathResolver);
+    }
+
+    static void invalidateRoleAppearanceCache() {
+        ROLE_APPEARANCE_CACHE.clear();
     }
 
     @Nullable
     private static ModelAsset resolveRoleModelAsset(@Nullable String roleId) {
-        String appearanceName = resolveRoleAppearance(roleId, new HashSet<>());
+        String appearanceName = resolveRoleAppearance(roleId);
         if (appearanceName == null || appearanceName.isBlank()) {
             return null;
         }
@@ -121,51 +125,13 @@ final class CompanionAdultScaleResolver {
     }
 
     @Nullable
-    private static String resolveRoleAppearance(@Nullable String roleId, Set<String> visitedRoleIds) {
+    private static String resolveRoleAppearance(@Nullable String roleId) {
         String normalizedRoleId = normalizeRoleId(roleId);
-        if (normalizedRoleId == null || !visitedRoleIds.add(normalizedRoleId.toLowerCase(Locale.ROOT))) {
+        if (normalizedRoleId == null) {
             return null;
         }
         Path rolePath = resolveRoleAssetPath(normalizedRoleId);
-        if (rolePath == null) {
-            return null;
-        }
-        return resolveAppearanceFromRoleAsset(rolePath, CompanionAdultScaleResolver::resolveRoleAssetPath);
-    }
-
-    @Nullable
-    private static String resolveAppearanceFromRoleAsset(@Nullable Path roleAssetPath,
-                                                         @Nonnull Function<String, Path> referencePathResolver,
-                                                         Set<Path> visitedPaths) {
-        Path normalizedPath = normalizePath(roleAssetPath);
-        if (normalizedPath == null || !visitedPaths.add(normalizedPath)) {
-            return null;
-        }
-
-        JsonObject root = readJsonObject(normalizedPath);
-        if (root == null) {
-            return null;
-        }
-
-        String appearance = getString(root, "Appearance");
-        if (appearance != null) {
-            return appearance;
-        }
-        JsonObject modify = getObject(root, "Modify");
-        appearance = getString(modify, "Appearance");
-        if (appearance != null) {
-            return appearance;
-        }
-
-        String reference = getString(root, "Reference");
-        if (reference == null) {
-            return null;
-        }
-        Path referencePath = normalizePath(referencePathResolver.apply(reference));
-        if (referencePath == null) {
-            return null;
-        }
-        return resolveAppearanceFromRoleAsset(referencePath, referencePathResolver, visitedPaths);
+        return ROLE_APPEARANCE_CACHE.resolve(rolePath, CompanionAdultScaleResolver::resolveRoleAssetPath);
     }
 
     @Nullable
@@ -187,7 +153,7 @@ final class CompanionAdultScaleResolver {
     }
 
     @Nullable
-    private static JsonObject readJsonObject(@Nullable Path path) {
+    static JsonObject readJsonObject(@Nullable Path path) {
         if (path == null || !Files.isRegularFile(path)) {
             return null;
         }
@@ -197,28 +163,6 @@ final class CompanionAdultScaleResolver {
         } catch (IOException | RuntimeException ignored) {
             return null;
         }
-    }
-
-    @Nullable
-    private static JsonObject getObject(@Nullable JsonObject root, String key) {
-        if (root == null || key == null || key.isBlank()) {
-            return null;
-        }
-        JsonElement element = root.get(key);
-        return element != null && element.isJsonObject() ? element.getAsJsonObject() : null;
-    }
-
-    @Nullable
-    private static String getString(@Nullable JsonObject root, String key) {
-        if (root == null || key == null || key.isBlank()) {
-            return null;
-        }
-        JsonElement element = root.get(key);
-        if (element == null || !element.isJsonPrimitive() || !element.getAsJsonPrimitive().isString()) {
-            return null;
-        }
-        String value = element.getAsString();
-        return value == null || value.isBlank() ? null : value;
     }
 
     @Nullable

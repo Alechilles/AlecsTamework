@@ -48,6 +48,11 @@ public final class CompanionLifeStageService {
     private CompanionLifeStageService() {
     }
 
+    /** Invalidates role appearance metadata after an asset-generation change. */
+    public static void invalidateAdultRoleAppearanceCache() {
+        CompanionAdultScaleResolver.invalidateRoleAppearanceCache();
+    }
+
     public static void ensureLifeStageComponent(@Nullable Ref<EntityStore> npcRef,
                                                 @Nullable Store<EntityStore> store) {
         ensureLifeStageComponent(npcRef, store, null);

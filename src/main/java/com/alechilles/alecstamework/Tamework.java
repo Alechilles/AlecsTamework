@@ -110,6 +110,7 @@ import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
 import com.alechilles.alecstamework.npc.actions.BreedingPairAdmissionRegistry;
 import com.alechilles.alecstamework.npc.actions.HeldItemAttachmentInteractionService;
+import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.integration.creditor.CreditorIntegration;
 import com.alechilles.alecstamework.integration.nameplatebuilder.NameplateBuilderBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
@@ -1704,6 +1705,7 @@ public class Tamework extends JavaPlugin {
             return;
         }
         TwConfigOverrideManager.ReloadResult reloadResult = configOverrideManager.reloadOverrides(world);
+        CompanionLifeStageService.invalidateAdultRoleAppearanceCache();
         if (reloadResult.hasErrors()) {
             telemetryEvents.recordError(
                     "world_override_reload_errors",
@@ -1898,7 +1900,9 @@ public class Tamework extends JavaPlugin {
         if (configOverrideManager == null || world == null) {
             return TwConfigOverrideManager.ReloadResult.empty();
         }
-        return configOverrideManager.reloadOverrides(world);
+        TwConfigOverrideManager.ReloadResult result = configOverrideManager.reloadOverrides(world);
+        CompanionLifeStageService.invalidateAdultRoleAppearanceCache();
+        return result;
     }
 
     // Returns the active global config asset or defaults if none are loaded.
@@ -2901,6 +2905,7 @@ public class Tamework extends JavaPlugin {
     private void onBreedingAssetsLoaded(
             LoadedAssetsEvent<String, TwBreedingConfig, DefaultAssetMap<String, TwBreedingConfig>> event) {
         TwBreedingConfig.clearRoleCache();
+        CompanionLifeStageService.invalidateAdultRoleAppearanceCache();
         CompanionHappinessModifierService.clearCache();
         if (!event.isInitial()) {
             emitExperimentalConfigReload(TameworkConfigFamily.BREEDING, event.getLoadedAssets().keySet());
@@ -2910,6 +2915,7 @@ public class Tamework extends JavaPlugin {
     private void onBreedingAssetsRemoved(
             RemovedAssetsEvent<String, TwBreedingConfig, DefaultAssetMap<String, TwBreedingConfig>> event) {
         TwBreedingConfig.clearRoleCache();
+        CompanionLifeStageService.invalidateAdultRoleAppearanceCache();
         CompanionHappinessModifierService.clearCache();
         emitExperimentalConfigReload(TameworkConfigFamily.BREEDING, event.getRemovedAssets());
     }
@@ -2991,6 +2997,7 @@ public class Tamework extends JavaPlugin {
     private void onTraitAssetsLoaded(
             LoadedAssetsEvent<String, TwTraitConfig, DefaultAssetMap<String, TwTraitConfig>> event) {
         TwTraitConfig.clearRoleCache();
+        CompanionLifeStageService.invalidateAdultRoleAppearanceCache();
         if (!event.isInitial()) {
             emitExperimentalConfigReload(TameworkConfigFamily.TRAIT, event.getLoadedAssets().keySet());
         }
@@ -2999,6 +3006,7 @@ public class Tamework extends JavaPlugin {
     private void onTraitAssetsRemoved(
             RemovedAssetsEvent<String, TwTraitConfig, DefaultAssetMap<String, TwTraitConfig>> event) {
         TwTraitConfig.clearRoleCache();
+        CompanionLifeStageService.invalidateAdultRoleAppearanceCache();
         emitExperimentalConfigReload(TameworkConfigFamily.TRAIT, event.getRemovedAssets());
     }
 
