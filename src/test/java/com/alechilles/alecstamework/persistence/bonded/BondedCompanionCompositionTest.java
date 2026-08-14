@@ -227,6 +227,46 @@ class BondedCompanionCompositionTest {
         }
     }
 
+    /** Regression: a confirmed empty world must not poll SQLite again. */
+    @Test
+    void knownIdleWorldSkipsDatabaseUntilGlobalMaintenanceRuns()
+            throws Exception {
+        ArrayList<BondedCompanionStorageFailureEvidence> failures =
+                new ArrayList<>();
+        TameworkBondedCompanionComposition composition =
+                TameworkBondedCompanionComposition.open(
+                        temporaryDirectory,
+                        new BondedCompanionRosterRegistry(),
+                        null,
+                        () -> 10_000L,
+                        null,
+                        failures::add
+                );
+        Path database = temporaryDirectory.resolve(
+                BondedCompanionDataPath.FILE_NAME);
+        try {
+            var first = composition.worldMaintenanceTick("world-a");
+            assertTrue(first.complete());
+            assertFalse(first.requiresFastCadence());
+
+            replaceDatabase(database);
+
+            var skipped = assertDoesNotThrow(() ->
+                    composition.worldMaintenanceTick("world-a"));
+            assertTrue(skipped.complete());
+            assertFalse(skipped.requiresFastCadence());
+            assertTrue(composition.api().availability().available());
+            assertTrue(failures.isEmpty());
+
+            assertDoesNotThrow(() -> composition.maintenanceTick());
+            assertFalse(composition.api().availability().available());
+            assertEquals(1, failures.size());
+            assertEquals("maintenance", failures.getFirst().operation());
+        } finally {
+            composition.close();
+        }
+    }
+
     /** Regression: public API reads must disable a replaced database session. */
     @Test
     void apiReadFailsClosedAndReportsReplacedDatabaseOnce() throws Exception {

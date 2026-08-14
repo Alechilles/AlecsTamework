@@ -47,6 +47,23 @@ final class SqliteBondedCompanionCleanupQueue {
         }
     }
 
+    boolean hasPendingForWorld(String worldKey) {
+        try (Connection connection = connections.openReadConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT 1 FROM bonded_companion_cleanup
+                     WHERE cleanup_state = 'PENDING' AND world_key = ?
+                     LIMIT 1
+                     """)) {
+            statement.setString(1, worldKey);
+            try (ResultSet rows = statement.executeQuery()) {
+                return rows.next();
+            }
+        } catch (Exception failure) {
+            throw new IllegalStateException(
+                    "bonded cleanup activity query failed", failure);
+        }
+    }
+
     void recordOutcome(
             BondedCompanionProjectionCleanupService.CleanupIntent intent,
             BondedCompanionProjectionCleanupService.Outcome outcome,

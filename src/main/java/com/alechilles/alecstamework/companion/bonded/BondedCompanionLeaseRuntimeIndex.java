@@ -19,6 +19,7 @@ public final class BondedCompanionLeaseRuntimeIndex
     private final Map<String, Map<LeaseIdentity,
             BondedCompanionProjectionValidator.LeaseExpectation>> leasesByWorld = new HashMap<>();
     private final Map<LeaseIdentity, String> worldByLease = new HashMap<>();
+    private final Map<String, WorldActivity> activityByWorld = new HashMap<>();
 
     /** Publishes one lease after its durable LIVE transition succeeds. */
     @Override
@@ -32,6 +33,7 @@ public final class BondedCompanionLeaseRuntimeIndex
         leasesByWorld.computeIfAbsent(required.worldKey(), ignored -> new LinkedHashMap<>())
                 .put(identity, required);
         worldByLease.put(identity, required.worldKey());
+        activityByWorld.put(required.worldKey(), WorldActivity.ACTIVE);
     }
 
     /** Publishes one lease when rebuilding from complete durable evidence. */
@@ -46,7 +48,12 @@ public final class BondedCompanionLeaseRuntimeIndex
     public synchronized void ended(
             @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease
     ) {
-        removeIdentity(LeaseIdentity.of(Objects.requireNonNull(lease, "lease")));
+        BondedCompanionProjectionValidator.LeaseExpectation required =
+                Objects.requireNonNull(lease, "lease");
+        removeIdentity(LeaseIdentity.of(required));
+        activityByWorld.put(required.worldKey(),
+                hasWorldActivity(required.worldKey())
+                        ? WorldActivity.ACTIVE : WorldActivity.UNKNOWN);
     }
 
     public synchronized void remove(
@@ -61,13 +68,15 @@ public final class BondedCompanionLeaseRuntimeIndex
             @Nonnull Collection<BondedCompanionProjectionValidator.LeaseExpectation> leases
     ) {
         String world = text(worldKey, "worldKey");
-        clearWorld(world);
+        clearWorldLeases(world);
         for (BondedCompanionProjectionValidator.LeaseExpectation lease
                 : Objects.requireNonNull(leases, "leases")) {
             if (lease != null && world.equals(lease.worldKey())) {
                 activate(lease);
             }
         }
+        activityByWorld.put(world, hasWorldActivity(world)
+                ? WorldActivity.ACTIVE : WorldActivity.IDLE);
     }
 
     /** Returns a bounded deterministic immutable snapshot without durable I/O. */
@@ -99,8 +108,27 @@ public final class BondedCompanionLeaseRuntimeIndex
         return leases != null && !leases.isEmpty();
     }
 
+    /** Returns whether one complete refresh proved this world active or idle. */
+    @Nonnull
+    public synchronized WorldActivity worldActivity(@Nonnull String worldKey) {
+        return activityByWorld.getOrDefault(
+                text(worldKey, "worldKey"), WorldActivity.UNKNOWN);
+    }
+
+    /** Requires durable maintenance before this world can be called idle again. */
+    public synchronized void markWorldUnknown(@Nonnull String worldKey) {
+        String world = text(worldKey, "worldKey");
+        activityByWorld.put(world, hasWorldActivity(world)
+                ? WorldActivity.ACTIVE : WorldActivity.UNKNOWN);
+    }
+
     public synchronized void clearWorld(@Nonnull String worldKey) {
         String world = text(worldKey, "worldKey");
+        clearWorldLeases(world);
+        activityByWorld.remove(world);
+    }
+
+    private void clearWorldLeases(String world) {
         Map<LeaseIdentity, BondedCompanionProjectionValidator.LeaseExpectation> removed =
                 leasesByWorld.remove(world);
         if (removed != null) {
@@ -140,5 +168,12 @@ public final class BondedCompanionLeaseRuntimeIndex
         ) {
             return new LeaseIdentity(lease.profileId(), lease.leaseToken());
         }
+    }
+
+    /** Completeness-aware maintenance state for one world. */
+    public enum WorldActivity {
+        UNKNOWN,
+        IDLE,
+        ACTIVE
     }
 }

@@ -217,6 +217,11 @@ public final class SqliteBondedCompanionProjectionDurability implements
                 cleanup, worldKey, nowMs, limit);
     }
 
+    /** Reports whether exact cleanup work remains for one world. */
+    public boolean hasPendingCleanupForWorld(@Nonnull String worldKey) {
+        return cleanupReplay.hasPendingForWorld(worldKey);
+    }
+
     /** Attempts one newly committed capture cleanup and records its outcome. */
     @Nonnull
     public BondedCompanionProjectionCleanupService.Outcome attemptCleanup(

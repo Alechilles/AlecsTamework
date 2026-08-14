@@ -4,6 +4,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static com.alechilles.alecstamework.companion.bonded
+        .BondedCompanionLeaseRuntimeIndex.WorldActivity.ACTIVE;
+import static com.alechilles.alecstamework.companion.bonded
+        .BondedCompanionLeaseRuntimeIndex.WorldActivity.IDLE;
+import static com.alechilles.alecstamework.companion.bonded
+        .BondedCompanionLeaseRuntimeIndex.WorldActivity.UNKNOWN;
 
 import java.util.List;
 import java.util.UUID;
@@ -11,6 +17,24 @@ import org.junit.jupiter.api.Test;
 
 /** Protects the post-commit lease view used by world-thread warning checks. */
 class BondedCompanionLeaseRuntimeIndexTest {
+    /** Regression: an ended final lease must not hide pending durable cleanup. */
+    @Test
+    void completeEmptyWorldIsIdleUntilLeaseLifecycleMakesItUnknown() {
+        BondedCompanionLeaseRuntimeIndex index = new BondedCompanionLeaseRuntimeIndex();
+        var lease = lease("profile-a", "token-a", "world-a", 1L);
+
+        assertEquals(UNKNOWN, index.worldActivity("world-a"));
+
+        index.replaceWorld("world-a", List.of());
+        assertEquals(IDLE, index.worldActivity("world-a"));
+
+        index.activated(lease);
+        assertEquals(ACTIVE, index.worldActivity("world-a"));
+
+        index.ended(lease);
+        assertEquals(UNKNOWN, index.worldActivity("world-a"));
+    }
+
     @Test
     void activationAndExactTokenRemovalPreserveOtherLeases() {
         BondedCompanionLeaseRuntimeIndex index = new BondedCompanionLeaseRuntimeIndex();

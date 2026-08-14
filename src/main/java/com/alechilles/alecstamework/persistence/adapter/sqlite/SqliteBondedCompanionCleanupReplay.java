@@ -43,6 +43,11 @@ final class SqliteBondedCompanionCleanupReplay {
         return attempted;
     }
 
+    boolean hasPendingForWorld(String worldKey) {
+        return queue.hasPendingForWorld(
+                Objects.requireNonNull(worldKey, "worldKey"));
+    }
+
     BondedCompanionProjectionCleanupService.Outcome attempt(
             BondedCompanionProjectionCleanupService cleanup,
             BondedCompanionProjectionCleanupService.CleanupIntent intent,

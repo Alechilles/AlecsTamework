@@ -29,7 +29,8 @@ public final class BondedCompanionMaintenanceSystem
         String worldKey = world.getName();
         long now = System.nanoTime();
         BondedCompanionMaintenanceCadence.WorldClaim worldClaim =
-                cadence.claimWorld(worldKey, now);
+                composition.isWorldMaintenanceKnownIdle(worldKey)
+                        ? null : cadence.claimWorld(worldKey, now);
         if (worldClaim != null) {
             TameworkBondedCompanionComposition.WorldMaintenanceResult result =
                     composition.worldMaintenanceTick(worldKey);

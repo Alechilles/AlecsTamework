@@ -325,14 +325,16 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     /** Reconciles one started world using only exact persisted leases. */
     public void onWorldLoad(@Nonnull String worldKey) {
         if (!operational()) return;
+        runtimeLeases.markWorldUnknown(worldKey);
         runStorageGuarded("world_load", () -> {
             long now = clock.getAsLong();
-            durability.replayPendingCleanupForWorld(
+            int cleanupAttempts = durability.replayPendingCleanupForWorld(
                     cleanup, worldKey, now, 128);
-            localLifecycle.reconcileCurrentWorldResult(
+            var reconciliation = localLifecycle.reconcileCurrentWorldResult(
                     worldKey,
                     BondedCompanionProjectionService.RecoveryCause.WORLD_LOAD,
                     now);
+            settleWorldActivity(worldKey, cleanupAttempts, reconciliation);
         });
     }
 
@@ -429,7 +431,11 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     @Nonnull
     public WorldMaintenanceResult worldMaintenanceTick(@Nonnull String worldKey) {
         if (!operational()) return WorldMaintenanceResult.incomplete();
-        return supplyStorageGuarded("maintenance", () -> {
+        if (runtimeLeases.worldActivity(worldKey)
+                == BondedCompanionLeaseRuntimeIndex.WorldActivity.IDLE) {
+            return WorldMaintenanceResult.idle();
+        }
+        WorldMaintenanceResult result = supplyStorageGuarded("maintenance", () -> {
             long now = clock.getAsLong();
             int cleanupAttempts = durability.replayPendingCleanupForWorld(
                     cleanup, worldKey, now, 64);
@@ -437,11 +443,16 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                     worldKey,
                     BondedCompanionProjectionService.RecoveryCause.MISSING_SCAN,
                     now);
+            settleWorldActivity(worldKey, cleanupAttempts, reconciliation);
             return new WorldMaintenanceResult(
                     cleanupAttempts,
                     reconciliation.submitted(),
                     reconciliation.complete());
         }, WorldMaintenanceResult.incomplete());
+        if (!result.complete()) {
+            runtimeLeases.markWorldUnknown(worldKey);
+        }
+        return result;
     }
 
     /** Compatibility entry point that also runs process-wide retention. */
@@ -461,6 +472,12 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     /** Reports runtime lease activity for adaptive world recovery cadence. */
     public boolean hasRuntimeLeaseActivity(@Nonnull String worldKey) {
         return operational() && runtimeLeases.hasWorldActivity(worldKey);
+    }
+
+    /** Reports a world that needs no durable lease or cleanup polling. */
+    public boolean isWorldMaintenanceKnownIdle(@Nonnull String worldKey) {
+        return runtimeLeases.worldActivity(worldKey)
+                == BondedCompanionLeaseRuntimeIndex.WorldActivity.IDLE;
     }
 
     /** Resolves the durable profile name without trusting a disposable projection. */
@@ -516,6 +533,23 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
 
         private static WorldMaintenanceResult incomplete() {
             return new WorldMaintenanceResult(0, 0, false);
+        }
+
+        private static WorldMaintenanceResult idle() {
+            return new WorldMaintenanceResult(0, 0, true);
+        }
+    }
+
+    private void settleWorldActivity(
+            String worldKey,
+            int cleanupAttempts,
+            BondedCompanionLocalProjectionLifecycle.WorldReconciliationResult reconciliation
+    ) {
+        if (!reconciliation.complete()
+                || cleanupAttempts > 0
+                || (!runtimeLeases.hasWorldActivity(worldKey)
+                && durability.hasPendingCleanupForWorld(worldKey))) {
+            runtimeLeases.markWorldUnknown(worldKey);
         }
     }
 
