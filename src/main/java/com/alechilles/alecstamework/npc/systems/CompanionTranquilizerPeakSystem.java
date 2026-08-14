@@ -24,7 +24,7 @@ import javax.annotation.Nonnull;
 public final class CompanionTranquilizerPeakSystem extends TickingSystem<EntityStore> {
     private static final String TRANQUILIZER_EFFECT_ID = "Tw_Status_Tranquilized";
     private static final int UNRESOLVED_EFFECT_INDEX = Integer.MIN_VALUE;
-    private static final long SWEEP_INTERVAL_MS = 100L;
+    private static final long SWEEP_INTERVAL_MS = 1_000L;
 
     private final ComponentType<EntityStore, NPCEntity> npcType;
     private final ComponentType<EntityStore, EffectControllerComponent> effectControllerType;

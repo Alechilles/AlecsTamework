@@ -12,6 +12,8 @@
   cleanup uses a slower one-minute cadence.
 - Reduced mounted NPC tick work by limiting interactable safety and nameplate
   visibility scans to ten passes per second in each world.
+- Reduced idle tranquilizer tracking work by checking loaded NPC effects once
+  per second instead of ten times per second.
 
 ## 3.1.5 - Interaction Performance and Persistence Hotfix - 2026-08-13
 
