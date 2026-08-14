@@ -7,8 +7,9 @@
   are now cached, trait and progression repair share one load pass, and exact
   NPC identity lookups use an index.
 - Reduced bonded companion database work. Expiry warnings now use committed
-  runtime lease state, and worlds known to have no bonded companions skip their
-  recurring SQLite maintenance query while global recovery remains active.
+  runtime lease state, known-empty worlds skip recurring SQLite queries,
+  capture-event recovery polls only while delivery is pending, and retention
+  cleanup uses a slower one-minute cadence.
 - Reduced mounted NPC tick work by limiting interactable safety and nameplate
   visibility scans to ten passes per second in each world.
 

@@ -79,7 +79,7 @@ import javax.annotation.Nullable;
  * diagnostics runtime.
  */
 public final class TameworkBondedCompanionComposition implements AutoCloseable {
-    private static final long DATABASE_MAINTENANCE_INTERVAL_MS = 5_000L;
+    private static final long RETENTION_MAINTENANCE_INTERVAL_MS = 60_000L;
     private final BondedCompanionPersistenceRuntime persistence;
     private final BondedCompanionApiFacade api;
     private final BondedCompanionChangePublisher changes;
@@ -105,7 +105,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     private final BondedCompanionCaptureEventPublisher captureEvents;
     private final Map<UUID, String> ownerWorlds = new ConcurrentHashMap<>();
     private final AtomicBoolean closed = new AtomicBoolean();
-    private final AtomicReference<Long> nextDatabaseMaintenanceAtMs =
+    private final AtomicReference<Long> nextRetentionMaintenanceAtMs =
             new AtomicReference<>();
 
     private TameworkBondedCompanionComposition(
@@ -554,12 +554,12 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     }
 
     private void databaseMaintenance(long now) {
-        Long next = nextDatabaseMaintenanceAtMs.get();
-        if (next != null && now < next) return;
-        long following = safeAdd(now, DATABASE_MAINTENANCE_INTERVAL_MS);
-        if (!nextDatabaseMaintenanceAtMs.compareAndSet(next, following)) return;
-        publishPendingCaptureEvents(
+        publishPendingCaptureEventsIfRequired(
                 captureEvents, diagnostics, storageFailureHandler, 64);
+        Long next = nextRetentionMaintenanceAtMs.get();
+        if (next != null && now < next) return;
+        long following = safeAdd(now, RETENTION_MAINTENANCE_INTERVAL_MS);
+        if (!nextRetentionMaintenanceAtMs.compareAndSet(next, following)) return;
         store.pruneCleanup(now, 64);
         store.pruneOperations(now, 64);
     }
@@ -641,6 +641,23 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         if (captureEvents == null) return;
         try {
             captureEvents.publishPending(limit);
+        } catch (RuntimeException | LinkageError failure) {
+            storageFailures.accept("capture_event_publish", failure);
+            diagnostics.recordFailure(
+                    BondedCompanionDiagnosticSnapshot.FailureCategory.STORAGE
+            );
+        }
+    }
+
+    private static void publishPendingCaptureEventsIfRequired(
+            BondedCompanionCaptureEventPublisher captureEvents,
+            BondedCompanionDiagnosticContributor diagnostics,
+            BiConsumer<String, Throwable> storageFailures,
+            int limit
+    ) {
+        if (captureEvents == null) return;
+        try {
+            captureEvents.publishPendingIfRequired(limit);
         } catch (RuntimeException | LinkageError failure) {
             storageFailures.accept("capture_event_publish", failure);
             diagnostics.recordFailure(

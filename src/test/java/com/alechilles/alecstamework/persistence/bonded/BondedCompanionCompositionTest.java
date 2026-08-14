@@ -33,6 +33,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -150,6 +151,40 @@ class BondedCompanionCompositionTest {
             composition.maintenanceTick("world-b");
 
             assertEquals(1L, operationCount(database));
+        } finally {
+            composition.close();
+        }
+    }
+
+    /** Regression: idle retention must not reopen SQLite every five seconds. */
+    @Test
+    void retentionMaintenanceWaitsOneMinuteBetweenBatches() throws Exception {
+        AtomicLong now = new AtomicLong(10_000L);
+        TameworkBondedCompanionComposition composition =
+                TameworkBondedCompanionComposition.open(
+                        temporaryDirectory,
+                        new BondedCompanionRosterRegistry(),
+                        null,
+                        now::get
+                );
+        Path database = temporaryDirectory.toAbsolutePath().normalize()
+                .resolve(BondedCompanionDataPath.FILE_NAME);
+        try {
+            for (int index = 0; index < 65; index++) {
+                insertTerminalOperation(
+                        database, "expired-" + index, "SUCCEEDED", 9_999L);
+            }
+
+            composition.maintenanceTick();
+            assertEquals(1L, operationCount(database));
+
+            now.set(15_000L);
+            composition.maintenanceTick();
+            assertEquals(1L, operationCount(database));
+
+            now.set(70_000L);
+            composition.maintenanceTick();
+            assertEquals(0L, operationCount(database));
         } finally {
             composition.close();
         }

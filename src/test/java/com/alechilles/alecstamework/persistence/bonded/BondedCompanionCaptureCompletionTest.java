@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -91,16 +92,20 @@ class BondedCompanionCaptureCompletionTest {
         database.createCapturedProfile(
                 operation(), profile(), cleanup(), 4, evidence()
         );
+        AtomicInteger attempts = new AtomicInteger();
         BondedCompanionCaptureEventPublisher failingPublisher =
                 new BondedCompanionCaptureEventPublisher(
                         database,
                         ignored -> {
+                            attempts.incrementAndGet();
                             throw new IllegalStateException("sink-offline");
                         },
                         () -> 10_500L
                 );
 
         assertEquals(0, failingPublisher.publishPending(16));
+        assertEquals(0, failingPublisher.publishPendingIfRequired(16));
+        assertEquals(2, attempts.get());
 
         List<BondedCompanionCaptureResolvedEvent> recovered =
                 new ArrayList<>();
@@ -113,6 +118,52 @@ class BondedCompanionCaptureCompletionTest {
         assertEquals(evidence().operationId(),
                 recovered.getFirst().capture().operationId());
         assertEquals(0, restartedPublisher.publishPending(16));
+    }
+
+    /** Regression: idle maintenance must not poll an empty durable queue. */
+    @Test
+    void emptyCaptureQueueStaysIdleUntilForcedPublication() {
+        SqliteBondedCompanionDatabase database = database();
+        AtomicInteger queries = new AtomicInteger();
+        BondedCompanionCaptureEvidenceStore countingStore =
+                new BondedCompanionCaptureEvidenceStore() {
+                    @Override
+                    public java.util.Optional<BondedCompanionCaptureEvidence>
+                    findCaptureEvidence(
+                            UUID ownerUuid,
+                            String rosterId,
+                            UUID sourceNpcUuid
+                    ) {
+                        return database.findCaptureEvidence(
+                                ownerUuid, rosterId, sourceNpcUuid);
+                    }
+
+                    @Override
+                    public List<BondedCompanionCaptureEvidence>
+                    listUnpublishedCaptureEvidence(int limit) {
+                        queries.incrementAndGet();
+                        return database.listUnpublishedCaptureEvidence(limit);
+                    }
+
+                    @Override
+                    public boolean markCaptureEvidencePublished(
+                            BondedCompanionCaptureEvidence capture,
+                            long publishedAtMs
+                    ) {
+                        return database.markCaptureEvidencePublished(
+                                capture, publishedAtMs);
+                    }
+                };
+        BondedCompanionCaptureEventPublisher publisher =
+                new BondedCompanionCaptureEventPublisher(
+                        countingStore, ignored -> {}, () -> 11_000L);
+
+        assertEquals(0, publisher.publishPendingIfRequired(16));
+        assertEquals(0, publisher.publishPendingIfRequired(16));
+        assertEquals(1, queries.get());
+
+        assertEquals(0, publisher.publishPending(16));
+        assertEquals(2, queries.get());
     }
 
     /** Profile-lifetime capture evidence survives bounded operation pruning. */
