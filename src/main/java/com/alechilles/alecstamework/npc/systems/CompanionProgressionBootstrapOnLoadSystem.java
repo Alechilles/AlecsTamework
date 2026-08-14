@@ -32,9 +32,9 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Ensures progression components exist for tamed companions when NPC entities are loaded into the world store.
+ * Ensures trait and progression components exist when NPC entities enter the world store.
  *
- * <p>This self-heals missing shared happiness/breeding/traits state after reloads.
+ * <p>One role and config decision now serves untamed traits, tamed progression, and attachment repair.
  */
 public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<EntityStore> {
     private final ComponentType<EntityStore, NPCEntity> npcType;
@@ -61,27 +61,11 @@ public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<E
         if (roleId == null || roleId.isBlank()) {
             return;
         }
-        TameworkTamedComponent tamed = tamedType != null ? store.getComponent(reference, tamedType) : null;
-        boolean attachmentLoadBootstrap = isAttachmentBootstrapRequired(reference, store, roleId, reason, tamed);
-        boolean progressionBootstrap = isTamed(tamed) && requiresProgressionBootstrap(reference, store, roleId);
-        if (!attachmentLoadBootstrap && !progressionBootstrap) {
+        LoadDecision decision = buildLoadDecision(reference, store, roleId, reason);
+        if (!decision.requiresWork()) {
             return;
         }
-        commandBuffer.run(bufferStore -> {
-            if (bufferStore == null || reference == null || !reference.isValid()) {
-                return;
-            }
-            if (bufferStore.getComponent(reference, npcType) == null) {
-                return;
-            }
-            TameworkTamedComponent latestTamed = tamedType != null ? bufferStore.getComponent(reference, tamedType) : null;
-            if (isTamed(latestTamed) && requiresProgressionBootstrap(reference, bufferStore, roleId)) {
-                CompanionProgressionBootstrapService.ensureProgressionComponents(reference, bufferStore, roleId);
-            }
-            if (attachmentLoadBootstrap) {
-                CompanionAttachmentStateService.seedStoredAttachmentsOnLoad(reference, bufferStore);
-            }
-        });
+        commandBuffer.run(bufferStore -> applyLoadRepairs(reference, bufferStore, reason));
     }
 
     @Override
@@ -100,9 +84,49 @@ public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<E
         return Query.and(npcType);
     }
 
-    private boolean requiresProgressionBootstrap(@Nonnull Ref<EntityStore> reference,
-                                                 @Nonnull Store<EntityStore> store,
-                                                 String roleId) {
+    private void applyLoadRepairs(@Nonnull Ref<EntityStore> reference,
+                                  @Nullable Store<EntityStore> store,
+                                  @Nonnull AddReason reason) {
+        if (store == null || !reference.isValid() || store.getComponent(reference, npcType) == null) {
+            return;
+        }
+        String roleId = CompanionRoleIdResolver.resolveRoleId(reference, store);
+        if (roleId == null || roleId.isBlank()) {
+            return;
+        }
+        LoadDecision decision = buildLoadDecision(reference, store, roleId, reason);
+        if (decision.progressionRepair()) {
+            CompanionProgressionBootstrapService.ensureNonTraitProgressionComponents(reference, store, roleId);
+        }
+        if (decision.traitPlan() == CompanionTraitBootstrapPlan.LIFE_STAGE_ONLY) {
+            CompanionProgressionBootstrapService.ensureLifeStageOnLoad(reference, store, roleId);
+        } else if (decision.traitPlan() == CompanionTraitBootstrapPlan.FULL_REPAIR) {
+            CompanionProgressionBootstrapService.ensureTraitComponents(reference, store, roleId);
+        }
+        if (decision.attachmentRepair()) {
+            CompanionAttachmentStateService.seedStoredAttachmentsOnLoad(reference, store);
+        } else if (decision.progressionRepair()) {
+            CompanionAttachmentStateService.seedStoredAttachments(reference, store);
+        }
+    }
+
+    private LoadDecision buildLoadDecision(@Nonnull Ref<EntityStore> reference,
+                                           @Nonnull Store<EntityStore> store,
+                                           @Nonnull String roleId,
+                                           @Nonnull AddReason reason) {
+        TameworkTamedComponent tamed = tamedType != null ? store.getComponent(reference, tamedType) : null;
+        CompanionTraitBootstrapPlan traitPlan = resolveTraitBootstrapPlan(reference, store, roleId);
+        boolean tamedNpc = isTamed(tamed);
+        boolean progressionRepair = tamedNpc
+                && requiresNonTraitProgressionBootstrap(reference, store, roleId, traitPlan);
+        boolean attachmentRepair = isAttachmentBootstrapRequired(reference, store, roleId, reason, tamed);
+        return LoadDecision.classify(tamedNpc, traitPlan, progressionRepair, attachmentRepair);
+    }
+
+    private boolean requiresNonTraitProgressionBootstrap(@Nonnull Ref<EntityStore> reference,
+                                                         @Nonnull Store<EntityStore> store,
+                                                         String roleId,
+                                                         @Nonnull CompanionTraitBootstrapPlan traitPlan) {
         if (roleId == null || roleId.isBlank()) {
             return false;
         }
@@ -115,13 +139,14 @@ public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<E
         if (isBreedingBootstrapRequired(reference, store, roleId)) {
             return true;
         }
-        if (isLifeStageBootstrapRequired(reference, store, roleId)) {
+        if (traitPlan == CompanionTraitBootstrapPlan.NONE
+                && isLifeStageBootstrapRequired(reference, store, roleId)) {
             return true;
         }
         if (isTalentBootstrapRequired(reference, store, roleId)) {
             return true;
         }
-        return isTraitBootstrapRequired(reference, store, roleId);
+        return false;
     }
 
     private boolean isTalentBootstrapRequired(@Nonnull Ref<EntityStore> reference,
@@ -190,23 +215,21 @@ public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<E
         return store.getComponent(reference, breedingType) == null;
     }
 
-    private boolean isTraitBootstrapRequired(@Nonnull Ref<EntityStore> reference,
-                                             @Nonnull Store<EntityStore> store,
-                                             @Nonnull String roleId) {
+    private CompanionTraitBootstrapPlan resolveTraitBootstrapPlan(@Nonnull Ref<EntityStore> reference,
+                                                                  @Nonnull Store<EntityStore> store,
+                                                                  @Nonnull String roleId) {
         TwTraitConfig config = TwTraitConfig.resolveForRole(roleId);
         if (config == null || !config.isEnabled()) {
-            return false;
+            return CompanionTraitBootstrapPlan.NONE;
         }
         var traitsType = TameworkTraitsComponent.getComponentType();
         var lifeStageType = TameworkLifeStageComponent.getComponentType();
-        if (traitsType == null || lifeStageType == null) {
-            return false;
+        if (traitsType == null) {
+            return CompanionTraitBootstrapPlan.NONE;
         }
         TameworkTraitsComponent traits = store.getComponent(reference, traitsType);
-        if (traits == null || traits.getRollSeed() == 0L || traits.getTraitValues() == null || traits.getTraitValues().length == 0) {
-            return true;
-        }
-        return store.getComponent(reference, lifeStageType) == null;
+        boolean lifeStagePresent = lifeStageType == null || store.getComponent(reference, lifeStageType) != null;
+        return CompanionTraitBootstrapPlan.classify(traits, config.getId(), lifeStagePresent);
     }
 
     private boolean isLifeStageBootstrapRequired(@Nonnull Ref<EntityStore> reference,
@@ -294,5 +317,20 @@ public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<E
 
     private static boolean isTamed(@Nullable TameworkTamedComponent tamed) {
         return tamed != null && tamed.isTamed();
+    }
+
+    record LoadDecision(CompanionTraitBootstrapPlan traitPlan,
+                        boolean progressionRepair,
+                        boolean attachmentRepair) {
+        static LoadDecision classify(boolean tamed,
+                                     @Nonnull CompanionTraitBootstrapPlan traitPlan,
+                                     boolean progressionRepair,
+                                     boolean attachmentRepair) {
+            return new LoadDecision(traitPlan, tamed && progressionRepair, attachmentRepair);
+        }
+
+        boolean requiresWork() {
+            return traitPlan != CompanionTraitBootstrapPlan.NONE || progressionRepair || attachmentRepair;
+        }
     }
 }

@@ -44,15 +44,32 @@ public final class CompanionProgressionBootstrapService {
         if (roleId == null || roleId.isBlank()) {
             return;
         }
+        ensureNonTraitProgressionComponents(npcRef, store, roleId);
+        ensureTraitComponents(npcRef, store, roleId);
+        CompanionAttachmentStateService.seedStoredAttachments(npcRef, store);
+    }
+
+    /** Repairs tamed-only progression state without repeating trait and attachment work. */
+    public static void ensureNonTraitProgressionComponents(Ref<EntityStore> npcRef,
+                                                           Store<EntityStore> store,
+                                                           @Nullable String roleIdHint) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return;
+        }
+        String roleId = roleIdHint;
+        if (roleId == null || roleId.isBlank()) {
+            roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        }
+        if (roleId == null || roleId.isBlank()) {
+            return;
+        }
         TwBreedingConfig breedingConfig = TwBreedingConfig.resolveForRole(roleId);
         bootstrapHappinessComponent(npcRef, store, roleId);
         CompanionNeedsService.tickNeeds(npcRef, store, roleId);
         CompanionLevelingService.ensureLevelingComponent(npcRef, store, roleId);
         CompanionTalentService.ensureTalentsComponent(npcRef, store, roleId);
         TameworkHappinessComponent happiness = resolveHappinessComponent(npcRef, store);
-        bootstrapBreedingComponent(npcRef, store, breedingConfig, happiness);
-        ensureTraitComponents(npcRef, store, roleId);
-        CompanionAttachmentStateService.seedStoredAttachments(npcRef, store);
+        bootstrapBreedingComponent(npcRef, store, breedingConfig, happiness, roleId);
     }
 
     /**
@@ -185,7 +202,8 @@ public final class CompanionProgressionBootstrapService {
     private static void bootstrapBreedingComponent(Ref<EntityStore> npcRef,
                                                    Store<EntityStore> store,
                                                    TwBreedingConfig config,
-                                                   TameworkHappinessComponent happiness) {
+                                                   TameworkHappinessComponent happiness,
+                                                   String roleId) {
         if (config == null || !config.isEnabled()) {
             return;
         }
@@ -200,7 +218,6 @@ public final class CompanionProgressionBootstrapService {
         long lastUpdateMs = happiness != null && HappinessTimestampPolicy.isValid(happiness.getLastUpdateMs())
                 ? happiness.getLastUpdateMs()
                 : System.currentTimeMillis();
-        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
         boolean ready = happinessValue >= TameworkRuntimeSettings.breedingHappinessThreshold(
                 config.resolveHappiness(roleId).getThreshold(),
                 TwHappinessConfig.isEnabledForRole(roleId)

@@ -7,10 +7,26 @@ import com.hypixel.hytale.component.AddReason;
 import java.lang.reflect.Field;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompanionProgressionBootstrapOnLoadSystemTest {
+    @Test
+    void untamedNpcKeepsTraitRepairWhenLoadBootstrapIsConsolidated() {
+        CompanionProgressionBootstrapOnLoadSystem.LoadDecision decision =
+                CompanionProgressionBootstrapOnLoadSystem.LoadDecision.classify(
+                        false,
+                        CompanionTraitBootstrapPlan.FULL_REPAIR,
+                        true,
+                        false
+                );
+
+        assertEquals(CompanionTraitBootstrapPlan.FULL_REPAIR, decision.traitPlan());
+        assertFalse(decision.progressionRepair());
+        assertTrue(decision.requiresWork());
+    }
+
     @Test
     void queuesAttachmentRepairForLoadedUntamedNpcWithMigrationConfig() {
         assertTrue(CompanionProgressionBootstrapOnLoadSystem.shouldRunAttachmentLoadBootstrap(

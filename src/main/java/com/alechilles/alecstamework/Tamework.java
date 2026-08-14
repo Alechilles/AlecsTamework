@@ -215,7 +215,6 @@ import com.alechilles.alecstamework.npc.systems.CompanionMovementSpeedSyncSystem
 import com.alechilles.alecstamework.npc.systems.CompanionDespawnDiagnosticsSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionDespawnProtectionSystem;
 import com.alechilles.alecstamework.npc.systems.DynamicAttachmentEvaluationSystem;
-import com.alechilles.alecstamework.npc.systems.CompanionTraitBootstrapOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CommandLinkedRevivableDropSuppressionSystem;
 import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionNeedsSystem;
@@ -931,9 +930,6 @@ public class Tamework extends JavaPlugin {
                         EffectControllerComponent.getComponentType(),
                         tranquilizerPeakComponentType
                 )
-        );
-        getEntityStoreRegistry().registerSystem(
-                new CompanionTraitBootstrapOnLoadSystem(NPCEntity.getComponentType())
         );
         getEntityStoreRegistry().registerSystem(
                 new CompanionProgressionBootstrapOnLoadSystem(NPCEntity.getComponentType(), tamedComponentType)
