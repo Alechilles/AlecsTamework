@@ -187,6 +187,73 @@ class BondedCompanionLocalProjectionLifecycleTest {
     }
 
     @Test
+    void worldRefreshDistinguishesCompleteEmptyStateFromReadFailure() {
+        var lease = lease("profile-refresh", "lease-refresh", uuid(1_500), "world-a");
+        leases.add(lease);
+
+        BondedCompanionLocalProjectionLifecycle.WorldReconciliationResult complete =
+                lifecycle.reconcileCurrentWorldResult(
+                        "world-a",
+                        BondedCompanionProjectionService.RecoveryCause.WORLD_LOAD,
+                        -500L
+                );
+
+        assertTrue(complete.complete());
+        assertEquals(List.of(lease), complete.leases());
+
+        leases.failWorldReads = true;
+        BondedCompanionLocalProjectionLifecycle.WorldReconciliationResult failed =
+                lifecycle.reconcileCurrentWorldResult(
+                        "world-a",
+                        BondedCompanionProjectionService.RecoveryCause.MISSING_SCAN,
+                        -400L
+                );
+
+        assertFalse(failed.complete());
+        assertTrue(failed.leases().isEmpty());
+    }
+
+    @Test
+    void completeRefreshRunsBeforePostCommitReconciliationRemoval() {
+        var lease = lease("profile-order", "lease-order", uuid(1_600), "world-a");
+        durability.activate(lease);
+        leases.add(lease);
+        BondedCompanionLeaseRuntimeIndex runtimeIndex =
+                new BondedCompanionLeaseRuntimeIndex();
+        BondedCompanionProjectionService indexedProjections =
+                new BondedCompanionProjectionService(
+                        durability,
+                        durability,
+                        world,
+                        new BondedCompanionProjectionCleanupService(world),
+                        () -> "lease-new",
+                        () -> uuid(900),
+                        runtimeIndex
+                );
+        BondedCompanionLocalProjectionLifecycle indexedLifecycle =
+                new BondedCompanionLocalProjectionLifecycle(
+                        new BondedCompanionWorldLifecycleObserver(indexedProjections, world),
+                        leases,
+                        observations,
+                        64,
+                        128,
+                        (operation, failure) -> { },
+                        (worldKey, result) -> runtimeIndex.replaceWorld(
+                                worldKey, result.leases())
+                );
+
+        indexedLifecycle.reconcileCurrentWorldResult(
+                "world-a",
+                BondedCompanionProjectionService.RecoveryCause.MISSING_SCAN,
+                -500L
+        );
+
+        assertTrue(runtimeIndex.snapshotWorld("world-a", 64).isEmpty());
+        assertEquals(BondedCompanionState.STORED,
+                durability.states.get(lease.profileId()));
+    }
+
+    @Test
     void logoutKeysetPagesEveryMatchingOwnerLease() {
         observations.unavailableWorlds.add("world-a");
         for (int index = 0; index < 65; index++) {
@@ -290,6 +357,7 @@ class BondedCompanionLocalProjectionLifecycleTest {
                 leases = new ArrayList<>();
         private final List<String> worldQueries = new ArrayList<>();
         private final List<String> exactQueries = new ArrayList<>();
+        private boolean failWorldReads;
 
         void add(BondedCompanionProjectionValidator.LeaseExpectation lease) {
             leases.add(lease);
@@ -300,6 +368,9 @@ class BondedCompanionLocalProjectionLifecycleTest {
         inWorldAfter(String worldKey, String afterProfileId, int limit
         ) {
             worldQueries.add(worldKey);
+            if (failWorldReads) {
+                throw new IllegalStateException("simulated world lease read failure");
+            }
             return leases.stream().filter(lease -> lease.worldKey().equals(worldKey))
                     .filter(lease -> afterProfileId == null
                             || lease.profileId().compareTo(afterProfileId) > 0)

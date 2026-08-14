@@ -57,6 +57,62 @@ class BondedCompanionRecoveryTest {
     }
 
     @Test
+    void lifecycleObserverRunsOnlyAfterDurableLeaseTransitions() {
+        durability.events = world.events;
+        List<String> leaseEvents = new java.util.ArrayList<>();
+        BondedCompanionProjectionService observed = new BondedCompanionProjectionService(
+                durability,
+                durability,
+                world,
+                cleanup,
+                () -> "lease-observed",
+                () -> uuid(91),
+                new BondedCompanionProjectionService.LeaseLifecycleObserver() {
+                    @Override
+                    public void activated(
+                            BondedCompanionProjectionValidator.LeaseExpectation lease
+                    ) {
+                        leaseEvents.add("activated:" + lease.leaseToken());
+                    }
+
+                    @Override
+                    public void ended(
+                            BondedCompanionProjectionValidator.LeaseExpectation lease
+                    ) {
+                        leaseEvents.add("ended:" + lease.leaseToken());
+                    }
+                }
+        );
+        var summoned = observed.summon(new BondedCompanionProjectionService.SummonRequest(
+                uuid(1), "roster-a", "profile-a", 4L, "role-a",
+                snapshot(uuid(20)), "world-a", null, -5_000L, -3_000L,
+                new BondedCompanionActiveCapacity("family-a", 1)
+        ));
+        durability.snapshots.put("profile-a", snapshot(uuid(20)));
+
+        observed.store(new BondedCompanionProjectionService.StoreRequest(
+                summoned.lease(), 4L, -2_900L, new BondedCompanionOperation(
+                        "test", "store-observed", "0".repeat(64),
+                        uuid(1), "roster-a", "profile-a",
+                        BondedCompanionOperation.Type.STORE, -2_900L, 60_000L,
+                        new BondedCompanionOperation.StoreLeaseIdentity(
+                                summoned.lease().leaseToken(),
+                                summoned.lease().liveNpcUuid(),
+                                summoned.lease().worldKey()
+                        )
+                )
+        ));
+
+        assertEquals(List.of(
+                "activated:lease-observed",
+                "ended:lease-observed"
+        ), leaseEvents);
+        assertTrue(world.events.indexOf("confirm:profile-a:lease-observed:"
+                        + summoned.lease().liveNpcUuid())
+                < world.events.indexOf("store:profile-a"));
+    }
+
+    @Test
     void retryableSpawnPersistsRollbackCleanupBeforeWorldRemoval() {
         durability.events = world.events;
         world.spawnMode = RecordingBondedWorld.SpawnMode.RETRYABLE;

@@ -22,6 +22,7 @@ public final class BondedCompanionProjectionService {
             new BondedCompanionCleanupIntentFactory();
     private final Supplier<String> leaseTokens;
     private final Supplier<UUID> npcUuids;
+    private final LeaseLifecycleObserver leaseLifecycle;
 
     public BondedCompanionProjectionService(
             @Nonnull BondedCompanionProjectionStorePlanner storePlanner,
@@ -30,6 +31,20 @@ public final class BondedCompanionProjectionService {
             @Nonnull BondedCompanionProjectionCleanupService cleanup,
             @Nonnull Supplier<String> leaseTokens,
             @Nonnull Supplier<UUID> npcUuids
+    ) {
+        this(storePlanner, durability, world, cleanup, leaseTokens, npcUuids,
+                new LeaseLifecycleObserver() { });
+    }
+
+    /** Creates a projection service with post-commit lease lifecycle publication. */
+    public BondedCompanionProjectionService(
+            @Nonnull BondedCompanionProjectionStorePlanner storePlanner,
+            @Nonnull BondedCompanionProjectionDurability durability,
+            @Nonnull BondedCompanionProjectionWorld world,
+            @Nonnull BondedCompanionProjectionCleanupService cleanup,
+            @Nonnull Supplier<String> leaseTokens,
+            @Nonnull Supplier<UUID> npcUuids,
+            @Nonnull LeaseLifecycleObserver leaseLifecycle
     ) {
         this.storePlanner = Objects.requireNonNull(
                 storePlanner, "storePlanner");
@@ -40,6 +55,7 @@ public final class BondedCompanionProjectionService {
                 durability, cleanup);
         this.leaseTokens = Objects.requireNonNull(leaseTokens, "leaseTokens");
         this.npcUuids = Objects.requireNonNull(npcUuids, "npcUuids");
+        this.leaseLifecycle = Objects.requireNonNull(leaseLifecycle, "leaseLifecycle");
     }
 
     /** Creates durable ACTIVE/lease/recovery state before one world-thread spawn. */
@@ -78,7 +94,9 @@ public final class BondedCompanionProjectionService {
                     lease, spawned, "SPAWN_CONFIRM_FAILED", request.nowMs()
             );
         }
-        return new SummonResult(SummonStatus.ACTIVE, live(lease));
+        BondedCompanionProjectionValidator.LeaseExpectation liveLease = live(lease);
+        leaseLifecycle.activated(liveLease);
+        return new SummonResult(SummonStatus.ACTIVE, liveLease);
     }
 
     /** Captures full live state first, then durably stores and enqueues exact cleanup. */
@@ -88,6 +106,7 @@ public final class BondedCompanionProjectionService {
         StoreDurabilityResult prior = durability.findStoreResult(
                 request.operation());
         if (prior.status() == StoreDurabilityStatus.REPLAYED) {
+            leaseLifecycle.ended(request.lease());
             return new StoreResult(StoreStatus.STORED, null);
         }
         if (prior.status() != StoreDurabilityStatus.ABSENT) {
@@ -118,11 +137,13 @@ public final class BondedCompanionProjectionService {
         StoreDurabilityResult committed = durability.storeAndEnqueueCleanup(
                 request, planned.plan(), intent);
         if (committed.status() == StoreDurabilityStatus.REPLAYED) {
+            leaseLifecycle.ended(request.lease());
             return new StoreResult(StoreStatus.STORED, null);
         }
         if (committed.status() != StoreDurabilityStatus.APPLIED) {
             return new StoreResult(StoreStatus.DURABILITY_REJECTED, null);
         }
+        leaseLifecycle.ended(request.lease());
         BondedCompanionProjectionCleanupService.Outcome outcome = cleanup.recover(intent);
         StoreStatus status = outcome == BondedCompanionProjectionCleanupService.Outcome.REMOVED
                 || outcome == BondedCompanionProjectionCleanupService.Outcome.ALREADY_MISSING
@@ -183,6 +204,7 @@ public final class BondedCompanionProjectionService {
                 lease, planned.plan(), intents, reason)) {
             return new ReconcileResult(ReconcileStatus.DURABILITY_REJECTED, intents);
         }
+        leaseLifecycle.ended(lease);
         for (var intent : intents) {
             cleanup.recover(intent);
         }
@@ -215,9 +237,11 @@ public final class BondedCompanionProjectionService {
                     : ReconcileStatus.DURABILITY_REJECTED;
             return new ReconcileResult(status, List.of());
         }
-        return durability.confirmDeath(lease, planned.plan(), diedAtMs)
-                ? new ReconcileResult(ReconcileStatus.DEAD, List.of())
-                : new ReconcileResult(ReconcileStatus.DURABILITY_REJECTED, List.of());
+        if (!durability.confirmDeath(lease, planned.plan(), diedAtMs)) {
+            return new ReconcileResult(ReconcileStatus.DURABILITY_REJECTED, List.of());
+        }
+        leaseLifecycle.ended(lease);
+        return new ReconcileResult(ReconcileStatus.DEAD, List.of());
     }
 
     private SpawnResult safeSpawn(SpawnPlan plan) {
@@ -426,6 +450,17 @@ public final class BondedCompanionProjectionService {
     public enum RecoveryCause {
         STARTUP, WORLD_LOAD, PLAYER_JOIN, WORLD_TRANSFER, LOGOUT, EXPIRED,
         MISSING_SCAN
+    }
+
+    /** Receives lease changes only after their durable transaction succeeds. */
+    public interface LeaseLifecycleObserver {
+        default void activated(
+                @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease
+        ) { }
+
+        default void ended(
+                @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease
+        ) { }
     }
 
     public record SummonResult(

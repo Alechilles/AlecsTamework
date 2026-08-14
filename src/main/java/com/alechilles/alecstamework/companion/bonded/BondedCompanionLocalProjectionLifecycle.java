@@ -33,6 +33,7 @@ public final class BondedCompanionLocalProjectionLifecycle {
     private final int maximumObservations;
     private final long inspectionTimeoutMs;
     private final BiConsumer<String, Throwable> storageFailures;
+    private final BiConsumer<String, WorldReconciliationResult> worldRefresh;
 
     public BondedCompanionLocalProjectionLifecycle(
             @Nonnull BondedCompanionWorldLifecycleObserver observer,
@@ -73,6 +74,21 @@ public final class BondedCompanionLocalProjectionLifecycle {
                 storageFailures);
     }
 
+    /** Creates a lifecycle with a complete-world runtime refresh callback. */
+    public BondedCompanionLocalProjectionLifecycle(
+            @Nonnull BondedCompanionWorldLifecycleObserver observer,
+            @Nonnull LeaseSource leases,
+            @Nonnull ObservationSource observations,
+            int maximumLeases,
+            int maximumObservations,
+            @Nonnull BiConsumer<String, Throwable> storageFailures,
+            @Nonnull BiConsumer<String, WorldReconciliationResult> worldRefresh
+    ) {
+        this(observer, leases, observations, maximumLeases,
+                maximumObservations, DEFAULT_INSPECTION_TIMEOUT,
+                storageFailures, worldRefresh);
+    }
+
     /** Creates a lifecycle that reports storage exceptions before safe fallbacks. */
     public BondedCompanionLocalProjectionLifecycle(
             @Nonnull BondedCompanionWorldLifecycleObserver observer,
@@ -82,6 +98,22 @@ public final class BondedCompanionLocalProjectionLifecycle {
             int maximumObservations,
             @Nonnull Duration inspectionTimeout,
             @Nonnull BiConsumer<String, Throwable> storageFailures
+    ) {
+        this(observer, leases, observations, maximumLeases,
+                maximumObservations, inspectionTimeout, storageFailures,
+                (worldKey, result) -> { });
+    }
+
+    /** Creates a lifecycle with bounded inspection and complete refresh publication. */
+    public BondedCompanionLocalProjectionLifecycle(
+            @Nonnull BondedCompanionWorldLifecycleObserver observer,
+            @Nonnull LeaseSource leases,
+            @Nonnull ObservationSource observations,
+            int maximumLeases,
+            int maximumObservations,
+            @Nonnull Duration inspectionTimeout,
+            @Nonnull BiConsumer<String, Throwable> storageFailures,
+            @Nonnull BiConsumer<String, WorldReconciliationResult> worldRefresh
     ) {
         this.observer = Objects.requireNonNull(observer, "observer");
         this.leases = Objects.requireNonNull(leases, "leases");
@@ -100,10 +132,21 @@ public final class BondedCompanionLocalProjectionLifecycle {
         this.inspectionTimeoutMs = Math.max(1L, timeout.toMillis());
         this.storageFailures = Objects.requireNonNull(
                 storageFailures, "storageFailures");
+        this.worldRefresh = Objects.requireNonNull(worldRefresh, "worldRefresh");
     }
 
     /** Submits one conclusive-only inspection for leases owned by this world. */
     public int reconcileCurrentWorld(
+            @Nonnull String worldKey,
+            @Nonnull BondedCompanionProjectionService.RecoveryCause cause,
+            long observedAtMs
+    ) {
+        return reconcileCurrentWorldResult(worldKey, cause, observedAtMs).submitted();
+    }
+
+    /** Returns complete durable lease evidence for runtime-view replacement. */
+    @Nonnull
+    public WorldReconciliationResult reconcileCurrentWorldResult(
             @Nonnull String worldKey,
             @Nonnull BondedCompanionProjectionService.RecoveryCause cause,
             long observedAtMs
@@ -253,39 +296,69 @@ public final class BondedCompanionLocalProjectionLifecycle {
         }
     }
 
-    private int reconcileWorldPages(
+    private WorldReconciliationResult reconcileWorldPages(
             String worldKey,
             BondedCompanionProjectionService.RecoveryCause cause,
             long observedAtMs
     ) {
         String cursor = null;
-        int submitted = 0;
+        List<BondedCompanionProjectionValidator.LeaseExpectation> resolved =
+                new ArrayList<>();
         while (true) {
-            List<BondedCompanionProjectionValidator.LeaseExpectation> page =
+            WorldLeasePage pageResult =
                     safeWorldPage(worldKey, cursor);
-            if (page.isEmpty()) return submitted;
+            if (!pageResult.complete()) {
+                return new WorldReconciliationResult(0, resolved, false);
+            }
+            List<BondedCompanionProjectionValidator.LeaseExpectation> page =
+                    pageResult.leases();
+            if (page.isEmpty()) {
+                return completeWorldReconciliation(
+                        worldKey, cause, observedAtMs, resolved);
+            }
             List<BondedCompanionProjectionValidator.LeaseExpectation> local =
                     page.stream().filter(lease -> worldKey.equals(
                             lease.worldKey())).toList();
-            submit(worldKey, local, cause, observedAtMs, false);
-            submitted += local.size();
-            if (page.size() < maximumLeases) return submitted;
+            resolved.addAll(local);
+            if (page.size() < maximumLeases) {
+                return completeWorldReconciliation(
+                        worldKey, cause, observedAtMs, resolved);
+            }
             String next = page.getLast().profileId();
-            if (!advances(cursor, next)) return submitted;
+            if (!advances(cursor, next)) {
+                return new WorldReconciliationResult(0, resolved, false);
+            }
             cursor = next;
         }
     }
 
-    private List<BondedCompanionProjectionValidator.LeaseExpectation>
+    private WorldReconciliationResult completeWorldReconciliation(
+            String worldKey,
+            BondedCompanionProjectionService.RecoveryCause cause,
+            long observedAtMs,
+            List<BondedCompanionProjectionValidator.LeaseExpectation> leases
+    ) {
+        WorldReconciliationResult result = new WorldReconciliationResult(
+                leases.size(), leases, true);
+        worldRefresh.accept(worldKey, result);
+        for (int start = 0; start < leases.size(); start += maximumLeases) {
+            int end = Math.min(start + maximumLeases, leases.size());
+            submit(worldKey, List.copyOf(leases.subList(start, end)), cause,
+                    observedAtMs, false);
+        }
+        return result;
+    }
+
+    private WorldLeasePage
     safeWorldPage(String worldKey, @Nullable String afterProfileId) {
         try {
-            return List.copyOf(Objects.requireNonNull(
+            return new WorldLeasePage(List.copyOf(Objects.requireNonNull(
                     leases.inWorldAfter(
                             worldKey, afterProfileId, maximumLeases),
-                    "world leases").stream().filter(Objects::nonNull).toList());
+                    "world leases").stream().filter(Objects::nonNull).toList()), true);
         } catch (RuntimeException | LinkageError failure) {
             storageFailures.accept("world_lease_read", failure);
-            return List.of();
+            return new WorldLeasePage(List.of(), false);
         }
     }
 
@@ -387,6 +460,25 @@ public final class BondedCompanionLocalProjectionLifecycle {
     }
 
     private record LeaseCursor(String worldKey, String profileId) { }
+
+    private record WorldLeasePage(
+            List<BondedCompanionProjectionValidator.LeaseExpectation> leases,
+            boolean complete
+    ) { }
+
+    /** Durable paging result; only complete results may replace runtime state. */
+    public record WorldReconciliationResult(
+            int submitted,
+            @Nonnull List<BondedCompanionProjectionValidator.LeaseExpectation> leases,
+            boolean complete
+    ) {
+        public WorldReconciliationResult {
+            if (submitted < 0) {
+                throw new IllegalArgumentException("submitted must be non-negative");
+            }
+            leases = List.copyOf(Objects.requireNonNull(leases, "leases"));
+        }
+    }
 
     /** Schedules one inspection of the supplied exact recorded world. */
     @FunctionalInterface

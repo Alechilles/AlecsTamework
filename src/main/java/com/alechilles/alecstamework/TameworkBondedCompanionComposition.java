@@ -7,6 +7,8 @@ import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionLocalProjectionLifecycle;
 import com.alechilles.alecstamework.companion.bonded
+        .BondedCompanionLeaseRuntimeIndex;
+import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionCleanupService;
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionService;
@@ -86,6 +88,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     private final BondedCompanionProjectionService projections;
     private final BondedCompanionWorldLifecycleObserver observer;
     private final BondedCompanionLocalProjectionLifecycle localLifecycle;
+    private final BondedCompanionLeaseRuntimeIndex runtimeLeases;
     private final BondedCompanionProjectionCleanupService cleanup;
     private final SqliteBondedCompanionProjectionDurability durability;
     private final HytaleBondedCompanionWorldGateway world;
@@ -114,6 +117,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
             BondedCompanionProjectionService projections,
             BondedCompanionWorldLifecycleObserver observer,
             BondedCompanionLocalProjectionLifecycle localLifecycle,
+            BondedCompanionLeaseRuntimeIndex runtimeLeases,
             BondedCompanionProjectionCleanupService cleanup,
             SqliteBondedCompanionProjectionDurability durability,
             HytaleBondedCompanionWorldGateway world,
@@ -135,6 +139,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         this.projections = projections;
         this.observer = observer;
         this.localLifecycle = localLifecycle;
+        this.runtimeLeases = runtimeLeases;
         this.cleanup = cleanup;
         this.durability = durability;
         this.world = world;
@@ -232,11 +237,14 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         SqliteBondedCompanionProjectionDurability durability =
                 new SqliteBondedCompanionProjectionDurability(
                         databasePath, storageFailureHandler);
+        BondedCompanionLeaseRuntimeIndex runtimeLeases =
+                new BondedCompanionLeaseRuntimeIndex();
         BondedCompanionProjectionService projections =
                 new BondedCompanionProjectionService(
                         new BondedCompanionStorePlanner(store, rosters),
                         durability, world, cleanup,
-                        () -> UUID.randomUUID().toString(), UUID::randomUUID
+                        () -> UUID.randomUUID().toString(), UUID::randomUUID,
+                        runtimeLeases
                 );
         BondedCompanionWorldLifecycleObserver observer =
                 new BondedCompanionWorldLifecycleObserver(
@@ -249,7 +257,9 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         BondedCompanionLocalProjectionLifecycle localLifecycle =
                 new BondedCompanionLocalProjectionLifecycle(
                         observer, durability, world, 64, 128,
-                        storageFailureHandler);
+                        storageFailureHandler,
+                        (worldKey, result) -> runtimeLeases.replaceWorld(
+                                worldKey, result.leases()));
         BondedCompanionCoreApiOperations operations =
                 new BondedCompanionCoreApiOperations(
                         store, rosters, policies, transitions, projections,
@@ -290,7 +300,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         }
         return new TameworkBondedCompanionComposition(
                 runtime, api, changes, diagnostics,
-                transitions, projections, observer, localLifecycle,
+                transitions, projections, observer, localLifecycle, runtimeLeases,
                 cleanup, durability, world, store, rosters, clock, captureAuthor,
                 captureEvents, storageFailures, storageFailureHandler, logger
         );
@@ -319,7 +329,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
             long now = clock.getAsLong();
             durability.replayPendingCleanupForWorld(
                     cleanup, worldKey, now, 128);
-            localLifecycle.reconcileCurrentWorld(
+            localLifecycle.reconcileCurrentWorldResult(
                     worldKey,
                     BondedCompanionProjectionService.RecoveryCause.WORLD_LOAD,
                     now);
@@ -422,7 +432,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
             long now = clock.getAsLong();
             durability.replayPendingCleanupForWorld(
                     cleanup, worldKey, now, 64);
-            localLifecycle.reconcileCurrentWorld(
+            localLifecycle.reconcileCurrentWorldResult(
                     worldKey,
                     BondedCompanionProjectionService.RecoveryCause.MISSING_SCAN,
                     now);
@@ -437,6 +447,19 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         if (!operational() || maximumResults < 1) return List.of();
         return supplyStorageGuarded("active_lease_read", () ->
                 durability.inWorldAfter(worldKey, null, maximumResults), List.of());
+    }
+
+    /** Returns the post-commit runtime lease view without opening SQLite. */
+    @Nonnull
+    public List<BondedCompanionProjectionValidator.LeaseExpectation>
+    runtimeLeasesInWorld(@Nonnull String worldKey, int maximumResults) {
+        if (!operational() || maximumResults < 1) return List.of();
+        return runtimeLeases.snapshotWorld(worldKey, maximumResults);
+    }
+
+    /** Reports runtime lease activity for adaptive world recovery cadence. */
+    public boolean hasRuntimeLeaseActivity(@Nonnull String worldKey) {
+        return operational() && runtimeLeases.hasWorldActivity(worldKey);
     }
 
     /** Resolves the durable profile name without trusting a disposable projection. */
