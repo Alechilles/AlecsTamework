@@ -69,9 +69,12 @@ public final class CompanionProgressionBootstrapService {
         ensureTraitComponents(npcRef, store, roleId);
     }
 
-    private static void ensureTraitComponents(Ref<EntityStore> npcRef,
-                                              Store<EntityStore> store,
-                                              String roleId) {
+    public static void ensureTraitComponents(Ref<EntityStore> npcRef,
+                                             Store<EntityStore> store,
+                                             String roleId) {
+        if (npcRef == null || !npcRef.isValid() || store == null || roleId == null || roleId.isBlank()) {
+            return;
+        }
         TwTraitConfig traitConfig = TwTraitConfig.resolveForRole(roleId);
         double previousSizeMultiplier = resolveSizeMultiplier(npcRef, store, traitConfig);
         bootstrapTraitsComponent(npcRef, store, roleId);
@@ -96,6 +99,19 @@ public final class CompanionProgressionBootstrapService {
                 store.getComponent(npcRef, NPCEntity.getComponentType()),
                 store
         );
+    }
+
+    /** Restores only lifecycle state when valid trait state already exists. */
+    public static void ensureLifeStageOnLoad(Ref<EntityStore> npcRef,
+                                             Store<EntityStore> store,
+                                             String roleId) {
+        if (npcRef == null || !npcRef.isValid() || store == null || roleId == null || roleId.isBlank()) {
+            return;
+        }
+        CompanionLifeStageService.ensureLifeStageComponent(npcRef, store, roleId);
+        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+        CompanionLifeStageService.refreshLifeStage(npcRef, npc, store);
+        CompanionLifeStageService.ensureGrowthTickScheduled(npcRef, npc, store);
     }
 
     private static TameworkHappinessComponent bootstrapHappinessComponent(Ref<EntityStore> npcRef,

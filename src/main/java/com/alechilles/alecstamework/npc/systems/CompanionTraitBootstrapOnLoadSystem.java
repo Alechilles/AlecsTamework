@@ -48,7 +48,8 @@ public final class CompanionTraitBootstrapOnLoadSystem extends RefSystem<EntityS
         if (config == null || !config.isEnabled()) {
             return;
         }
-        if (!requiresTraitBootstrap(reference, store, config)) {
+        CompanionTraitBootstrapPlan plan = bootstrapPlan(reference, store, config);
+        if (plan == CompanionTraitBootstrapPlan.NONE) {
             return;
         }
         commandBuffer.run(bufferStore -> {
@@ -58,7 +59,28 @@ public final class CompanionTraitBootstrapOnLoadSystem extends RefSystem<EntityS
             if (bufferStore.getComponent(reference, npcType) == null) {
                 return;
             }
-            CompanionProgressionBootstrapService.ensureTraitComponents(reference, bufferStore);
+            String currentRoleId = CompanionRoleIdResolver.resolveRoleId(reference, bufferStore);
+            if (currentRoleId == null || currentRoleId.isBlank()) {
+                return;
+            }
+            TwTraitConfig currentConfig = TwTraitConfig.resolveForRole(currentRoleId);
+            if (currentConfig == null || !currentConfig.isEnabled()) {
+                return;
+            }
+            CompanionTraitBootstrapPlan currentPlan = bootstrapPlan(reference, bufferStore, currentConfig);
+            if (currentPlan == CompanionTraitBootstrapPlan.LIFE_STAGE_ONLY) {
+                CompanionProgressionBootstrapService.ensureLifeStageOnLoad(
+                        reference,
+                        bufferStore,
+                        currentRoleId
+                );
+            } else if (currentPlan == CompanionTraitBootstrapPlan.FULL_REPAIR) {
+                CompanionProgressionBootstrapService.ensureTraitComponents(
+                        reference,
+                        bufferStore,
+                        currentRoleId
+                );
+            }
         });
     }
 
@@ -78,29 +100,16 @@ public final class CompanionTraitBootstrapOnLoadSystem extends RefSystem<EntityS
         return Query.and(npcType);
     }
 
-    private boolean requiresTraitBootstrap(@Nonnull Ref<EntityStore> reference,
-                                           @Nonnull Store<EntityStore> store,
-                                           @Nonnull TwTraitConfig config) {
+    private CompanionTraitBootstrapPlan bootstrapPlan(@Nonnull Ref<EntityStore> reference,
+                                                      @Nonnull Store<EntityStore> store,
+                                                      @Nonnull TwTraitConfig config) {
         var traitsType = TameworkTraitsComponent.getComponentType();
         if (traitsType == null) {
-            return false;
+            return CompanionTraitBootstrapPlan.NONE;
         }
         TameworkTraitsComponent traits = store.getComponent(reference, traitsType);
-        if (traits == null) {
-            return true;
-        }
-        String configId = config.getId();
-        if (configId != null
-                && !configId.isBlank()
-                && (traits.getConfigId() == null
-                || traits.getConfigId().isBlank()
-                || !configId.equalsIgnoreCase(traits.getConfigId()))) {
-            return true;
-        }
-        if (traits.getRollSeed() == 0L || traits.getTraitValues() == null || traits.getTraitValues().length == 0) {
-            return true;
-        }
         var lifeStageType = TameworkLifeStageComponent.getComponentType();
-        return lifeStageType != null && store.getComponent(reference, lifeStageType) == null;
+        boolean lifeStagePresent = lifeStageType == null || store.getComponent(reference, lifeStageType) != null;
+        return CompanionTraitBootstrapPlan.classify(traits, config.getId(), lifeStagePresent);
     }
 }
