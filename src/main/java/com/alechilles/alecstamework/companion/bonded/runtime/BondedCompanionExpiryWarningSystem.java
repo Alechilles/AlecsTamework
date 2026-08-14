@@ -51,10 +51,7 @@ public final class BondedCompanionExpiryWarningSystem
         if (world == null || world.getName() == null) return;
 
         long nowNanos = System.nanoTime();
-        Long next = nextRuns.compute(world.getName(), (ignored, prior) ->
-                prior == null || nowNanos >= prior
-                        ? nowNanos + INTERVAL_NANOS : prior);
-        if (next == null || next != nowNanos + INTERVAL_NANOS) return;
+        if (!claimRun(world.getName(), nowNanos)) return;
         long nowMs = System.currentTimeMillis();
         List<BondedCompanionProjectionValidator.LeaseExpectation> leases =
                 composition.activeLeasesInWorld(
@@ -72,6 +69,25 @@ public final class BondedCompanionExpiryWarningSystem
         }
         delivered.removeIf(key -> key.worldKey().equals(world.getName())
                 && !activeLeaseTokens.contains(key.leaseToken()));
+    }
+
+    private boolean claimRun(String worldKey, long nowNanos) {
+        Long next = nextRuns.get(worldKey);
+        if (next != null && nowNanos < next) {
+            return false;
+        }
+        long following = safeAdd(nowNanos, INTERVAL_NANOS);
+        return next == null
+                ? nextRuns.putIfAbsent(worldKey, following) == null
+                : nextRuns.replace(worldKey, next, following);
+    }
+
+    private static long safeAdd(long value, long increment) {
+        try {
+            return Math.addExact(value, increment);
+        } catch (ArithmeticException overflow) {
+            return Long.MAX_VALUE;
+        }
     }
 
     private void sendIfDue(

@@ -190,9 +190,9 @@ class BondedCompanionCompositionTest {
         }
     }
 
-    /** Regression: expiry-warning lease reads must fail closed on schema loss. */
+    /** Regression: the one-second expiry source must not open the bonded database. */
     @Test
-    void activeLeaseReadFailsClosedAndReportsReplacedDatabaseOnce()
+    void activeLeaseReadUsesRuntimeStateUntilMaintenanceDetectsStorageLoss()
             throws Exception {
         ArrayList<BondedCompanionStorageFailureEvidence> failures =
                 new ArrayList<>();
@@ -212,11 +212,15 @@ class BondedCompanionCompositionTest {
 
             assertDoesNotThrow(() -> assertTrue(composition
                     .activeLeasesInWorld("world-a", 64).isEmpty()));
+
+            assertTrue(composition.api().availability().available());
+            assertTrue(failures.isEmpty());
+
             assertDoesNotThrow(() -> composition.maintenanceTick());
 
             assertFalse(composition.api().availability().available());
             assertEquals(1, failures.size());
-            assertEquals("active_lease_read",
+            assertEquals("maintenance",
                     failures.getFirst().operation());
         } finally {
             composition.close();

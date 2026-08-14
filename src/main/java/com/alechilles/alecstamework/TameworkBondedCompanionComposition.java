@@ -440,19 +440,10 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         });
     }
 
-    /** Returns the bounded set of active leases currently recorded in one world. */
+    /** Returns committed runtime leases without opening the bonded database. */
     @Nonnull
     public List<BondedCompanionProjectionValidator.LeaseExpectation>
     activeLeasesInWorld(@Nonnull String worldKey, int maximumResults) {
-        if (!operational() || maximumResults < 1) return List.of();
-        return supplyStorageGuarded("active_lease_read", () ->
-                durability.inWorldAfter(worldKey, null, maximumResults), List.of());
-    }
-
-    /** Returns the post-commit runtime lease view without opening SQLite. */
-    @Nonnull
-    public List<BondedCompanionProjectionValidator.LeaseExpectation>
-    runtimeLeasesInWorld(@Nonnull String worldKey, int maximumResults) {
         if (!operational() || maximumResults < 1) return List.of();
         return runtimeLeases.snapshotWorld(worldKey, maximumResults);
     }
