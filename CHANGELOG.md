@@ -3,11 +3,14 @@
 ## Unreleased
 
 ### Fixed
-- Reduced companion load stalls by caching role appearance data, repairing only
-  missing trait state, and using exact indexed NPC identity lookups.
-- Reduced bonded companion background work. Expiry warnings now use committed
-  runtime lease state instead of querying SQLite each second, and idle worlds
-  back off maintenance checks while active recovery keeps its fast cadence.
+- Reduced companion load stalls. Role appearance data and optional model APIs
+  are now cached, trait and progression repair share one load pass, and exact
+  NPC identity lookups use an index.
+- Reduced bonded companion database work. Expiry warnings now use committed
+  runtime lease state, and worlds known to have no bonded companions skip their
+  recurring SQLite maintenance query while global recovery remains active.
+- Reduced mounted NPC tick work by limiting interactable safety and nameplate
+  visibility scans to ten passes per second in each world.
 
 ## 3.1.5 - Interaction Performance and Persistence Hotfix - 2026-08-13
 
