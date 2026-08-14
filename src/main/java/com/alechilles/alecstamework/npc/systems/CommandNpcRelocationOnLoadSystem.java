@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
@@ -36,6 +37,7 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
 
     private final CommandNpcRelocationService relocationService;
     private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
+    private final ComponentType<EntityStore, NPCEntity> npcType;
 
     public CommandNpcRelocationOnLoadSystem(
             CommandNpcRelocationService relocationService,
@@ -43,6 +45,7 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
     ) {
         this.relocationService = relocationService;
         this.stateSnapshotService = stateSnapshotService;
+        this.npcType = NPCEntity.getComponentType();
     }
 
     @Override
@@ -86,7 +89,7 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
 
     @Override
     public Query<EntityStore> getQuery() {
-        return Query.any();
+        return npcType != null ? Query.and(npcType) : Query.any();
     }
 
     private void sanitizeRoleReferencesOnAdd(@Nonnull Ref<EntityStore> reference, @Nonnull Store<EntityStore> store) {

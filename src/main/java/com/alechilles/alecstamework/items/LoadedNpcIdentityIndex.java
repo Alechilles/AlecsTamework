@@ -31,6 +31,7 @@ public final class LoadedNpcIdentityIndex {
     private final Map<UUID, Set<Location>> locationsByNpc = new HashMap<>();
     private final Map<Location, Set<LoadedNpcObservation>> observationsByLocation = new HashMap<>();
     private final Map<UUID, Set<LoadedNpcObservation>> observationsByNpc = new HashMap<>();
+    private final Map<ObservationIdentity, LoadedNpcObservation> observationByIdentity = new HashMap<>();
     private final Map<Location, Long> mutationRevisionByLocation = new HashMap<>();
     private long mutationRevision;
     private boolean initializationComplete;
@@ -76,7 +77,6 @@ public final class LoadedNpcIdentityIndex {
         }
         synchronized (lock) {
             advanceMutationRevisionLocked(observation.location());
-            removeMatchingObservationLocked(observation);
             indexObservationLocked(observation);
         }
     }
@@ -108,7 +108,7 @@ public final class LoadedNpcIdentityIndex {
         }
         synchronized (lock) {
             advanceMutationRevisionLocked(observation.location());
-            removeMatchingObservationLocked(observation);
+            removeExactObservationLocked(observation);
             removeLegacyLocationLocked(observation.componentUuid(), observation.location());
             removeLegacyLocationLocked(observation.legacyNpcUuid(), observation.location());
         }
@@ -228,7 +228,8 @@ public final class LoadedNpcIdentityIndex {
         Set<LoadedNpcObservation> removed = observationsByLocation.remove(location);
         if (removed != null) {
             for (LoadedNpcObservation observation : removed) {
-                deindexObservationLocked(observation);
+                observationByIdentity.remove(ObservationIdentity.of(observation), observation);
+                deindexObservationByNpcLocked(observation);
             }
         }
     }
@@ -290,6 +291,15 @@ public final class LoadedNpcIdentityIndex {
         }
     }
     private void indexObservationLocked(@Nonnull LoadedNpcObservation observation) {
+        ObservationIdentity identity = ObservationIdentity.of(observation);
+        LoadedNpcObservation prior = observationByIdentity.get(identity);
+        if (observation.equals(prior)) {
+            return;
+        }
+        if (prior != null) {
+            removeObservationIndexesLocked(prior);
+        }
+        observationByIdentity.put(identity, observation);
         Set<LoadedNpcObservation> atLocation = observationsByLocation.computeIfAbsent(
                 observation.location(),
                 ignored -> new HashSet<>()
@@ -301,7 +311,7 @@ public final class LoadedNpcIdentityIndex {
             observationsByNpc.computeIfAbsent(npcUuid, ignored -> new HashSet<>()).add(observation);
         }
     }
-    private void deindexObservationLocked(@Nonnull LoadedNpcObservation observation) {
+    private void deindexObservationByNpcLocked(@Nonnull LoadedNpcObservation observation) {
         for (UUID npcUuid : observation.identityUuids()) {
             Set<LoadedNpcObservation> observations = observationsByNpc.get(npcUuid);
             if (observations == null) {
@@ -313,12 +323,23 @@ public final class LoadedNpcIdentityIndex {
             }
         }
     }
-    private void removeMatchingObservationLocked(@Nonnull LoadedNpcObservation expected) {
-        UUID stableIdentity = expected.stableIdentity();
-        removeObservationsLocked(
-                expected.location(),
-                observation -> stableIdentity.equals(observation.stableIdentity())
-        );
+    private void removeExactObservationLocked(@Nonnull LoadedNpcObservation expected) {
+        ObservationIdentity identity = ObservationIdentity.of(expected);
+        LoadedNpcObservation removed = observationByIdentity.remove(identity);
+        if (removed != null) {
+            removeObservationIndexesLocked(removed);
+        }
+    }
+    private void removeObservationIndexesLocked(@Nonnull LoadedNpcObservation observation) {
+        observationByIdentity.remove(ObservationIdentity.of(observation), observation);
+        Set<LoadedNpcObservation> atLocation = observationsByLocation.get(observation.location());
+        if (atLocation != null) {
+            atLocation.remove(observation);
+            if (atLocation.isEmpty()) {
+                observationsByLocation.remove(observation.location());
+            }
+        }
+        deindexObservationByNpcLocked(observation);
     }
     private void removeObservationsLocked(
             @Nonnull Location location,
@@ -327,20 +348,17 @@ public final class LoadedNpcIdentityIndex {
         if (observations == null) {
             return;
         }
-        List<LoadedNpcObservation> removed = new ArrayList<>();
         Iterator<LoadedNpcObservation> iterator = observations.iterator();
         while (iterator.hasNext()) {
             LoadedNpcObservation observation = iterator.next();
             if (predicate.test(observation)) {
                 iterator.remove();
-                removed.add(observation);
+                observationByIdentity.remove(ObservationIdentity.of(observation), observation);
+                deindexObservationByNpcLocked(observation);
             }
         }
         if (observations.isEmpty()) {
             observationsByLocation.remove(location);
-        }
-        for (LoadedNpcObservation observation : removed) {
-            deindexObservationLocked(observation);
         }
     }
     private void removeLegacyLocationLocked(@Nullable UUID npcUuid, @Nonnull Location location) {
@@ -367,6 +385,13 @@ public final class LoadedNpcIdentityIndex {
 
     /** Completeness/conflict state for one exact projection-marker probe. */
     public enum ProjectionProbeStatus { UNKNOWN, ABSENT, ONE_MATCH, MULTIPLE_MATCHES }
+
+    private record ObservationIdentity(@Nonnull Location location, @Nonnull UUID stableIdentity) {
+        private static ObservationIdentity of(@Nonnull LoadedNpcObservation observation) {
+            return new ObservationIdentity(observation.location(), observation.stableIdentity());
+        }
+    }
+
     /** Stable metadata identifying one loaded entity store without retaining that store. */
     public record Location(@Nonnull String worldName, @Nonnull String storeIdentity) {
         public Location {

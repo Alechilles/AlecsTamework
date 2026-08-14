@@ -218,6 +218,25 @@ class LoadedNpcIdentityIndexTest {
     }
 
     @Test
+    void exactRemovalKeepsTheSameStableIdentityInAnotherLocation() {
+        LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
+        LoadedNpcIdentityIndex.ProjectionKey replacementKey =
+                new LoadedNpcIdentityIndex.ProjectionKey(
+                        "profile-a", "operation-b", "RECOVERY", null, null, 0L
+                );
+        index.recordAdded(observation(NPC_UUID, WORLD_A, PROJECTION_KEY));
+        index.recordAdded(observation(NPC_UUID, WORLD_B, replacementKey));
+
+        index.recordRemoved(observation(NPC_UUID, WORLD_A, null));
+
+        assertEquals(List.of(WORLD_B), index.probe(NPC_UUID).locations());
+        assertEquals(
+                LoadedNpcIdentityIndex.ProjectionProbeStatus.ONE_MATCH,
+                index.probeProjection(replacementKey).status()
+        );
+    }
+
+    @Test
     void locationReplacementAtomicallyReconcilesProjectionObservations() {
         LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
         index.recordAdded(observation(NPC_UUID, WORLD_A, PROJECTION_KEY));
