@@ -127,6 +127,34 @@ class BondedCompanionCompositionTest {
         }
     }
 
+    /** Regression: multiple world ticks must not repeat global retention work. */
+    @Test
+    void worldMaintenanceCoalescesGlobalDatabaseWork() throws Exception {
+        long now = 10_000L;
+        TameworkBondedCompanionComposition composition =
+                TameworkBondedCompanionComposition.open(
+                        temporaryDirectory,
+                        new BondedCompanionRosterRegistry(),
+                        null,
+                        () -> now
+                );
+        Path database = temporaryDirectory.toAbsolutePath().normalize()
+                .resolve(BondedCompanionDataPath.FILE_NAME);
+        try {
+            for (int index = 0; index < 65; index++) {
+                insertTerminalOperation(
+                        database, "expired-" + index, "SUCCEEDED", now - 1L);
+            }
+
+            composition.maintenanceTick("world-a");
+            composition.maintenanceTick("world-b");
+
+            assertEquals(1L, operationCount(database));
+        } finally {
+            composition.close();
+        }
+    }
+
     /** Regression: a replaced bonded database must not escape a world tick. */
     @Test
     void maintenanceFailsClosedAndReportsReplacedDatabaseOnce() throws Exception {
@@ -521,6 +549,20 @@ class BondedCompanionCompositionTest {
                        AND idempotency_key = ?
                      """)) {
             statement.setString(1, key);
+            try (ResultSet row = statement.executeQuery()) {
+                assertTrue(row.next());
+                return row.getLong(1);
+            }
+        }
+    }
+
+    private long operationCount(Path database) throws Exception {
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openReadConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT COUNT(*) FROM bonded_companion_operation
+                     WHERE caller_namespace = 'maintenance-test'
+                     """)) {
             try (ResultSet row = statement.executeQuery()) {
                 assertTrue(row.next());
                 return row.getLong(1);

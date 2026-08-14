@@ -7,6 +7,9 @@
   actions no longer create unused breeding and taming services, and active
   SimpleClaims capability lookups are reused safely until its plugin instance
   stops or is replaced.
+- Reduced idle world-thread load from bonded companion maintenance. Recovery
+  checks now use a slower fallback cadence, and loaded worlds share one bounded
+  database maintenance pass instead of repeating it for every world.
 - Concurrent companion checkpoints during world load no longer make a valid
   persistence database enter read-only mode. Capture, release, and exact NPC
   state checkpoints remain available after large groups of companions load.

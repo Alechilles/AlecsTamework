@@ -63,6 +63,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
@@ -76,6 +77,7 @@ import javax.annotation.Nullable;
  * diagnostics runtime.
  */
 public final class TameworkBondedCompanionComposition implements AutoCloseable {
+    private static final long DATABASE_MAINTENANCE_INTERVAL_MS = 5_000L;
     private final BondedCompanionPersistenceRuntime persistence;
     private final BondedCompanionApiFacade api;
     private final BondedCompanionChangePublisher changes;
@@ -100,6 +102,8 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     private final BondedCompanionCaptureEventPublisher captureEvents;
     private final Map<UUID, String> ownerWorlds = new ConcurrentHashMap<>();
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final AtomicReference<Long> nextDatabaseMaintenanceAtMs =
+            new AtomicReference<>();
 
     private TameworkBondedCompanionComposition(
             BondedCompanionPersistenceRuntime persistence,
@@ -470,10 +474,22 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     }
 
     private void databaseMaintenance(long now) {
+        Long next = nextDatabaseMaintenanceAtMs.get();
+        if (next != null && now < next) return;
+        long following = safeAdd(now, DATABASE_MAINTENANCE_INTERVAL_MS);
+        if (!nextDatabaseMaintenanceAtMs.compareAndSet(next, following)) return;
         publishPendingCaptureEvents(
                 captureEvents, diagnostics, storageFailureHandler, 64);
         store.pruneCleanup(now, 64);
         store.pruneOperations(now, 64);
+    }
+
+    private static long safeAdd(long value, long increment) {
+        try {
+            return Math.addExact(value, increment);
+        } catch (ArithmeticException overflow) {
+            return Long.MAX_VALUE;
+        }
     }
 
     private boolean operational() {

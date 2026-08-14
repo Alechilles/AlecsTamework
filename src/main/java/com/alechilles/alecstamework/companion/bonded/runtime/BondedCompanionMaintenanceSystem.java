@@ -12,7 +12,7 @@ import javax.annotation.Nonnull;
 /** Drives bounded bonded cleanup, retention pruning, and lease expiry. */
 public final class BondedCompanionMaintenanceSystem
         extends TickingSystem<EntityStore> {
-    private static final long INTERVAL_NANOS = 1_000_000_000L;
+    private static final long INTERVAL_NANOS = 5_000_000_000L;
     private final TameworkBondedCompanionComposition composition;
     private final ConcurrentMap<String, Long> nextRuns = new ConcurrentHashMap<>();
 
@@ -30,10 +30,12 @@ public final class BondedCompanionMaintenanceSystem
         if (world == null || world.getName() == null) return;
         String worldKey = world.getName();
         long now = System.nanoTime();
-        Long next = nextRuns.compute(worldKey, (ignored, prior) ->
-                prior == null || now >= prior ? now + INTERVAL_NANOS : prior);
-        if (next != null && next == now + INTERVAL_NANOS) {
-            composition.maintenanceTick(worldKey);
-        }
+        Long next = nextRuns.get(worldKey);
+        if (next != null && now < next) return;
+        long following = now + INTERVAL_NANOS;
+        boolean claimed = next == null
+                ? nextRuns.putIfAbsent(worldKey, following) == null
+                : nextRuns.replace(worldKey, next, following);
+        if (claimed) composition.maintenanceTick(worldKey);
     }
 }
