@@ -9,7 +9,6 @@ import com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset;
 import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
@@ -22,6 +21,8 @@ import javax.annotation.Nullable;
 public final class CompanionModelScaleService {
     private static final double MIN_SCALE = 0.10;
     private static final double MIN_JUVENILE_COLLISION_SCALE = 0.70;
+    private static final CompanionModelAttachmentAccessor ADDITIONAL_ATTACHMENTS =
+            new CompanionModelAttachmentAccessor(type -> type.getMethod("getAdditionalAttachments"));
 
     private CompanionModelScaleService() {
     }
@@ -152,28 +153,7 @@ public final class CompanionModelScaleService {
         if (!direct.isEmpty()) {
             return direct;
         }
-        Map<String, String> byReflection = tryReadAttachmentsMap(model, "getAdditionalAttachments");
-        if (!byReflection.isEmpty()) {
-            return byReflection;
-        }
-        byReflection = tryReadAttachmentsMap(model, "getRandomAttachmentIds");
-        if (!byReflection.isEmpty()) {
-            return byReflection;
-        }
-        return Collections.emptyMap();
-    }
-
-    private static Map<String, String> tryReadAttachmentsMap(Model model, String methodName) {
-        try {
-            Method method = model.getClass().getMethod(methodName);
-            Object value = method.invoke(model);
-            if (value instanceof Map<?, ?> map) {
-                return sanitizeAttachmentMap(map);
-            }
-        } catch (ReflectiveOperationException ignored) {
-            return Collections.emptyMap();
-        }
-        return Collections.emptyMap();
+        return sanitizeAttachmentMap(ADDITIONAL_ATTACHMENTS.read(model));
     }
 
     private static Map<String, String> sanitizeAttachmentMap(@Nullable Map<?, ?> raw) {
