@@ -14,6 +14,8 @@
   visibility scans to ten passes per second in each world.
 - Reduced idle tranquilizer tracking work by checking loaded NPC effects once
   per second instead of ten times per second.
+- Updated the embedded Alec's Telemetry runtime to 1.2.1. Patchwork remains on
+  its latest published runtime, 1.3.0.
 
 ## 3.1.5 - Interaction Performance and Persistence Hotfix - 2026-08-13
 

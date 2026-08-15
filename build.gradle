@@ -27,6 +27,7 @@ java {
 repositories {
     mavenLocal()
     mavenCentral()
+    maven { url = uri('https://telemetry.alecsmods.com/maven/releases') }
     maven { url = uri('https://www.cursemaven.com') }
 }
 
