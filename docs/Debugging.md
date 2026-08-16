@@ -138,6 +138,11 @@ player-scoped. In particular, `/tw config`, `/tw settings`, `/tw news`,
   immediate live health and death state, first damage, and probes after 250 ms
   and 1 second. Early placement, world, thread, and exception failures are also
   recorded. Enable it only for a short reproduction.
+- New companion projections always clear stale fall distance and velocity and
+  receive brief spawn-time fall protection. This protection does not depend on
+  `/tw debugrespawntrace`. A cancelled invalid fall can appear under
+  `[tw-respawn-trace]` or `[tw-spawn-protection]`, depending on active trace
+  evidence.
 - Naming failures: confirm naming config binding and policy (`RequireTamed`, `RequireOwner`, rename/replace limits).
 
 ## Population and claim troubleshooting

@@ -62,6 +62,12 @@ each return operation emits several correlated lines.
 Dead-target capture denials always log the player, target, role, item, exact
 health, and death-component state, even when the respawn trace is disabled.
 
+Every newly inserted companion projection clears stale fall distance and
+velocity and receives brief spawn-time fall protection. This gameplay guard is
+active even when `/tw debugrespawntrace` is disabled. A cancelled invalid fall
+can appear under `[tw-respawn-trace]` or `[tw-spawn-protection]`, depending on
+active trace evidence.
+
 Death and Lost restoration is a gameplay flow. Roster-backed companions can
 use role-configured exact item costs, while legacy item-linked paths remain
 free. There is no debug-ready revival mutation or persistence repair command.

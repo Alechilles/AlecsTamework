@@ -23,30 +23,32 @@ public final class CommandCompanionSpawnPhysicsResetService {
     public static String resetSpawnedCompanionPhysics(@Nullable Ref<EntityStore> npcRef,
                                                       @Nullable NPCEntity npc,
                                                       @Nullable Store<EntityStore> store) {
+        return resetSpawnedCompanionPhysics(
+                npc, resolveVelocity(npcRef, store));
+    }
+
+    @Nonnull
+    static String resetSpawnedCompanionPhysics(
+            @Nullable NPCEntity npc,
+            @Nullable Velocity velocity
+    ) {
         double beforeFallDistance = npc != null ? npc.getCurrentFallDistance() : 0.0;
         String beforeVelocity = "<missing>";
         int clearedInstructions = 0;
-        boolean velocityComponent = false;
+        boolean velocityComponent = velocity != null;
 
         if (npc != null) {
             npc.setCurrentFallDistance(0.0);
         }
-        if (npcRef != null && npcRef.isValid() && store != null) {
-            ComponentType<EntityStore, Velocity> velocityType = Velocity.getComponentType();
-            if (velocityType != null) {
-                Velocity velocity = store.getComponent(npcRef, velocityType);
-                if (velocity != null) {
-                    velocityComponent = true;
-                    beforeVelocity = describeVector(velocity.getVelocity());
-                    List<Velocity.Instruction> instructions = velocity.getInstructions();
-                    if (instructions != null) {
-                        clearedInstructions = instructions.size();
-                        instructions.clear();
-                    }
-                    velocity.setZero();
-                    velocity.setClient(0.0, 0.0, 0.0);
-                }
+        if (velocity != null) {
+            beforeVelocity = describeVector(velocity.getVelocity());
+            List<Velocity.Instruction> instructions = velocity.getInstructions();
+            if (instructions != null) {
+                clearedInstructions = instructions.size();
+                instructions.clear();
             }
+            velocity.setZero();
+            velocity.setClient(0.0, 0.0, 0.0);
         }
 
         return String.format(
@@ -57,6 +59,28 @@ public final class CommandCompanionSpawnPhysicsResetService {
                 velocityComponent,
                 clearedInstructions
         );
+    }
+
+    @Nullable
+    private static Velocity resolveVelocity(
+            @Nullable Ref<EntityStore> npcRef,
+            @Nullable Store<EntityStore> store
+    ) {
+        if (npcRef == null || store == null) {
+            return null;
+        }
+        try {
+            if (!npcRef.isValid()) {
+                return null;
+            }
+            ComponentType<EntityStore, Velocity> velocityType =
+                    Velocity.getComponentType();
+            return velocityType == null
+                    ? null
+                    : store.getComponent(npcRef, velocityType);
+        } catch (RuntimeException | LinkageError ignored) {
+            return null;
+        }
     }
 
     @Nonnull

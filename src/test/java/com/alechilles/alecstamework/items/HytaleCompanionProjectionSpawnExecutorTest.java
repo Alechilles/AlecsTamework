@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotDecodeResult;
+import com.alechilles.alecstamework.damage.RecentSpawnProtectionService;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
 import com.alechilles.alecstamework.items.HytaleCompanionProjectionSpawnExecutor.AttemptGateway;
 import com.alechilles.alecstamework.items.HytaleCompanionProjectionSpawnExecutor.ProjectionCommand;
@@ -13,7 +14,9 @@ import com.alechilles.alecstamework.items.HytaleCompanionProjectionSpawnExecutor
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.ComponentRegistry;
+import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -27,6 +30,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -348,6 +352,51 @@ class HytaleCompanionProjectionSpawnExecutorTest {
         }
     }
 
+    @Test
+    void successfulProjectionClearsFallStateAndArmsSpawnProtection() {
+        ComponentRegistry<EntityStore> registry = new ComponentRegistry<>();
+        Store<EntityStore> store = registry.addStore(null, null);
+        Ref<EntityStore> spawnedRef = store.addEntity(
+                registry.newHolder(), AddReason.SPAWN);
+        SuccessfulSpawnGateway gateway =
+                new SuccessfulSpawnGateway(spawnedRef);
+        PlannedNpcProjectionSpawner spawner = new PlannedNpcProjectionSpawner(
+                (request, target) -> new CoopResidentStateRestorer.PostAddWork(
+                        null, null, null, null, null),
+                gateway
+        );
+        HytaleCompanionProjectionAttemptGateway attempts =
+                new HytaleCompanionProjectionAttemptGateway(
+                        null,
+                        store,
+                        spawner,
+                        new PlannedNpcProjectionPostAddService()
+                );
+        RecentSpawnProtectionService protections =
+                RecentSpawnProtectionService.getInstance();
+        protections.clear(TARGET.value());
+        try {
+            SpawnAttempt result = attempts.spawn(
+                    command(),
+                    snapshot(),
+                    command().projectionMarker()
+            );
+
+            assertEquals(SpawnStatus.SPAWNED, result.status());
+            assertEquals(0.0D, gateway.npc.getCurrentFallDistance());
+            RecentSpawnProtectionService.Protection protection =
+                    protections.getRecentProtection(
+                            TARGET.value(), System.currentTimeMillis());
+            assertNotNull(protection);
+            assertEquals("restoration", protection.branch());
+            assertEquals("tamed_test", protection.roleId());
+        } finally {
+            protections.clear(TARGET.value());
+            registry.removeStore(store);
+            registry.shutdown();
+        }
+    }
+
     private RecordingAttempts attempts(ReceiptResult... receipts) {
         return new RecordingAttempts(List.of(receipts));
     }
@@ -489,6 +538,44 @@ class HytaleCompanionProjectionSpawnExecutorTest {
                 PlannedNpcProjectionSpawner.SpawnedProjection spawned
         ) {
             throw new AssertionError("Failed spawn cannot be quarantined");
+        }
+    }
+
+    private static final class SuccessfulSpawnGateway
+            implements PlannedNpcProjectionSpawner.SpawnGateway {
+        private final Ref<EntityStore> spawnedRef;
+        private final NPCEntity npc = new NPCEntity();
+
+        private SuccessfulSpawnGateway(Ref<EntityStore> spawnedRef) {
+            this.spawnedRef = spawnedRef;
+        }
+
+        @Override
+        public PlannedNpcProjectionSpawner.GatewayResult spawn(
+                PlannedNpcProjectionSpawner.SpawnRequest request,
+                PlannedNpcProjectionSpawner.PreAddInstaller installer
+        ) {
+            npc.setLegacyUUID(request.plannedNpcUuid());
+            npc.setCurrentFallDistance(4_381_562.0D);
+            return new PlannedNpcProjectionSpawner.GatewayResult(
+                    PlannedNpcProjectionSpawner.Status.SPAWNED,
+                    new PlannedNpcProjectionSpawner.SpawnedProjection(
+                            spawnedRef,
+                            npc,
+                            request.plannedNpcUuid(),
+                            request.plannedNpcUuid(),
+                            request.projectionMarker().clone(),
+                            new CoopResidentStateRestorer.PostAddWork(
+                                    null, null, null, null, null)
+                    )
+            );
+        }
+
+        @Override
+        public void quarantine(
+                PlannedNpcProjectionSpawner.SpawnedProjection spawned
+        ) {
+            throw new AssertionError("Successful spawn cannot be quarantined");
         }
     }
 }

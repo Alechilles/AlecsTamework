@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Fixed
+- Newly spawned companion projections now clear stale fall distance and
+  velocity and receive brief fall-damage protection. Bonded summons and NPCs
+  released from capture items no longer die from invalid spawn-time falls.
 - Bonded roster companions now start every summon at full health. Capturing or
   storing a badly injured companion can no longer make its next summon die at
   once.

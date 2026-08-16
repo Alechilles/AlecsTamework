@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
+import com.alechilles.alecstamework.damage.RecentSpawnProtectionService;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
 import com.alechilles.alecstamework.items.HytaleCompanionProjectionSpawnExecutor.AttemptGateway;
 import com.alechilles.alecstamework.items.HytaleCompanionProjectionSpawnExecutor.ProjectionCommand;
@@ -108,8 +109,33 @@ final class HytaleCompanionProjectionAttemptGateway implements AttemptGateway {
         if (status != SpawnStatus.SPAWNED) {
             return SpawnAttempt.failed(status, null);
         }
+        applySpawnSafetyBestEffort(command, snapshot, result);
         applyPostAddBestEffort(command, result);
         return SpawnAttempt.spawned();
+    }
+
+    private void applySpawnSafetyBestEffort(
+            ProjectionCommand command,
+            CoopResidentStateSnapshot snapshot,
+            PlannedNpcProjectionSpawner.SpawnResult result
+    ) {
+        try {
+            CommandCompanionSpawnPhysicsResetService
+                    .resetSpawnedCompanionPhysics(
+                            result.reference(), result.npc(), store);
+        } catch (RuntimeException | LinkageError failure) {
+            logFollowUpFailure(command, "spawn_physics_reset", failure);
+        }
+        try {
+            RecentSpawnProtectionService.getInstance().record(
+                    command.targetAlias().value(),
+                    command.operationCode(),
+                    snapshot.roleId(),
+                    System.currentTimeMillis()
+            );
+        } catch (RuntimeException | LinkageError failure) {
+            logFollowUpFailure(command, "spawn_protection", failure);
+        }
     }
 
     private void applyPostAddBestEffort(
@@ -129,13 +155,21 @@ final class HytaleCompanionProjectionAttemptGateway implements AttemptGateway {
                     result.postAddWork()
             );
         } catch (RuntimeException | LinkageError failure) {
-            LOGGER.at(Level.WARNING).log(
-                    "Projection presentation could not be applied after "
-                            + "durable state insertion: operation="
-                            + command.operationId()
-                            + " profile=" + command.profileId()
-                            + " failure=" + failure.getClass().getSimpleName()
-            );
+            logFollowUpFailure(command, "presentation", failure);
         }
+    }
+
+    private void logFollowUpFailure(
+            ProjectionCommand command,
+            String stage,
+            Throwable failure
+    ) {
+        LOGGER.at(Level.WARNING).log(
+                "Projection follow-up could not be applied after durable "
+                        + "state insertion: stage=" + stage
+                        + " operation=" + command.operationId()
+                        + " profile=" + command.profileId()
+                        + " failure=" + failure.getClass().getSimpleName()
+        );
     }
 }
