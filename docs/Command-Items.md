@@ -147,6 +147,10 @@ world transfer, expiry, missing-projection recovery, and duplicate cleanup also
 converge to `STORED`. Bonded cards never display generic `UNLOADED`, `LOST`,
 `CAPTURED`, `COOPED`, or `ROSTER_STORED` aliases.
 
+Every bonded summon gives the new live projection full health. Captured or
+stored health can describe the durable card while the companion is stored, but
+it does not reduce health on the next live summon.
+
 `TwCommandItemConfig` recipient controls:
 - `MembershipMode`: `LinkedOnly`, `OwnerScope`, `MasterTarget`, `LinkedOrMasterTarget`
 - `RequireOwner`

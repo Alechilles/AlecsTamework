@@ -91,6 +91,10 @@ progression, traits, talents, life stage, attachments, command settings, and
 HyDragon namespaced extension data. The panel renders from this durable state
 immediately; relog is not a data-loading prerequisite.
 
+Every summon gives the new live projection full health. Stored health remains
+available for durable presentation, but it does not reduce health on the next
+live projection.
+
 ## Draconic Stone capture
 
 HyDragon's Draconic Stone uses:

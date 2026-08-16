@@ -141,6 +141,7 @@ Summon requires a world key plus a matching world-qualified
 state, expected revision, cooldown, family active capacity, role, snapshot, and
 world context before creating the projection. A session duration of `0` creates
 an unlimited lease; otherwise the lease carries a signed expiry timestamp.
+Each successful summon creates the live projection at full health.
 
 Store requires the active lease's world context. It snapshots the projection
 before retirement, merges available live state without deleting unavailable

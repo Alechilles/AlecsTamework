@@ -14,6 +14,7 @@ import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
@@ -94,6 +95,14 @@ public final class SpawnerCapturePolicyService {
         NPCEntity npc = store.getComponent(targetRef, NPCEntity.getComponentType());
         if (npc == null) {
             logCaptureDebug("denied reason=target-not-npc player=" + player.getUuid());
+            return false;
+        }
+        CaptureHealth captureHealth = resolveCaptureHealth(targetRef, store);
+        var deathType = DeathComponent.getComponentType();
+        boolean hasDeathComponent = deathType != null
+                && store.getComponent(targetRef, deathType) != null;
+        if (!isLivingCaptureTarget(captureHealth, hasDeathComponent)) {
+            logCaptureDebug("denied reason=target-dead player=" + player.getUuid());
             return false;
         }
         String roleId = rolePolicyService.resolveRoleIdFromNpc(npc);
@@ -196,6 +205,13 @@ public final class SpawnerCapturePolicyService {
     }
 
     public record CaptureHealth(double currentHealth, double maximumHealth) { }
+
+    /** Prevents capture artifacts from storing a terminal health state. */
+    static boolean isLivingCaptureTarget(CaptureHealth health,
+                                         boolean hasDeathComponent) {
+        return !hasDeathComponent
+                && (health == null || health.currentHealth() > 0.0D);
+    }
 
     private boolean hasRequiredEffect(Ref<EntityStore> targetRef,
                                       ItemFeatureConfig config,

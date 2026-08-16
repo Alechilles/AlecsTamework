@@ -24,6 +24,8 @@ Tamework-powered mods often use three reusable item families: naming items, spaw
 - Can have different empty and filled item variants
 - A successful capture and release move one saved companion between its live
   and filled-item states; they do not create a second copy
+- Normal capture items preserve current health instead of healing the
+  companion. An NPC that is already dead or at zero health cannot be captured.
 
 ## Command items
 - Link specific companions to a tool

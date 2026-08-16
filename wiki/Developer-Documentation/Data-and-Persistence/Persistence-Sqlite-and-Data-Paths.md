@@ -158,4 +158,5 @@ clear evidence, import coop residents, or change feature state.
 `Data/diagnostics`. The bundle contains the same sanitized replacement status,
 metrics, and durable detail exposed by the diagnostic reader. It excludes the
 SQLite database, saves, player identities, coordinates, inventory payloads,
-secrets, and unrestricted logs.
+secrets, and unrestricted logs. All `debugdb` response lines also go to the
+server log so operators can collect them after command chat closes.

@@ -34,6 +34,11 @@ Fields:
 - `Denylist`: list of role ids
 
 ## Capture settings
+Normal capture items preserve a living NPC's health when they release it. They
+do not heal it. Capture is rejected if the NPC already has a death state or has
+reached zero health, because that terminal state cannot produce a safe filled
+item.
+
 Fields:
 - `RequireTamed` (default true). Only allow capture if NPC is tamed (Tamework tamed component or a role id that starts with `Tamed`).
 - `TamesTarget` (default false). Enables wild capture: the target must be unowned and untamed, and capture atomically assigns the interacting player as owner while moving the companion into the `CAPTURED` lifecycle.

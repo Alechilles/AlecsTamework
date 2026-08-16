@@ -80,6 +80,16 @@ public final class BondedCompanionSnapshot {
      */
     @Nonnull
     public BondedCompanionSnapshot restoredAfterRevive() {
+        return restoredToFullHealth();
+    }
+
+    /** Returns a full-health snapshot for a new live summon. */
+    @Nonnull
+    public BondedCompanionSnapshot restoredForSummon() {
+        return restoredToFullHealth();
+    }
+
+    private BondedCompanionSnapshot restoredToFullHealth() {
         Double maximum = fullState.maximumHealth();
         boolean exactMaximum = maximum != null && Double.isFinite(maximum)
                 && maximum > 0.0D;

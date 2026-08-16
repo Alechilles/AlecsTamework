@@ -161,7 +161,8 @@ public final class BondedCompanionCoreApiOperations {
         BondedCompanionLease lease = validation.profile().activeLease();
         var result = projections.summon(new BondedCompanionProjectionService.SummonRequest(
                 request.ownerUuid(), request.rosterId(), request.profileId(),
-                request.expectedRevision(), profile.roleId(), snapshot,
+                request.expectedRevision(), profile.roleId(),
+                validation.profile().snapshot(),
                 request.worldKey(), placement(placement), now, lease.expiresAtMs(),
                 new BondedCompanionActiveCapacity(
                         profile.familyId(), resolved.policy().maximumActive()

@@ -91,7 +91,8 @@ and calls `BondedCompanionApi.findCapture` for restart recovery.
 
 Summon validates owner, roster/family, role, profile revision, cooldown,
 family active capacity, snapshot, world, and safe placement. It creates one
-lease token and one exact projection.
+lease token and one exact projection. Every summoned dragon or Miniwyvern
+starts at full health, regardless of the health stored on its roster profile.
 
 Dismiss/store captures the latest complete state before retiring that exact
 projection. Automatic non-death cleanup follows the same stored convergence

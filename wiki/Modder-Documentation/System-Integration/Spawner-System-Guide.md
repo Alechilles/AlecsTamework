@@ -26,7 +26,12 @@ Spawner items are the Tamework item family that captures an NPC into an item and
 - Role and attachment choices
 - Tamework name data
 - Tamed and owner state when configured
+- The captured health of a living NPC
 - Happiness, needs, breeding, traits, life stage, and other stored progression metadata
+
+Normal capture items do not heal an NPC. Tamework rejects capture if the NPC
+already has a death state or has reached zero health, because releasing that
+terminal snapshot would make the NPC die at once.
 
 Configured capture and spawn particles/sounds are emitted only after the
 canonical persistence operation publishes successfully. A failed or retryable

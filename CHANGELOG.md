@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Bonded roster companions now start every summon at full health. Capturing or
+  storing a badly injured companion can no longer make its next summon die at
+  once.
+- Normal capture items now reject NPCs that have already died or reached zero
+  health. Injured living NPCs keep their captured health when released, so the
+  item cannot be used as a free heal.
+- `/tw debugdb` now writes its chat responses to the server log so support
+  diagnostics remain available after the command output closes.
+
 ## 3.1.8 - Embedded Runtime Hotfix - 2026-08-15
 
 ### Fixed

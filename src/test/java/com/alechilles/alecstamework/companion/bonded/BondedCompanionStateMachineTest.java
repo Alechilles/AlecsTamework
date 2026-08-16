@@ -132,6 +132,27 @@ class BondedCompanionStateMachineTest {
     }
 
     @Test
+    void summonRestoresStoredCompanionToFullHealth() {
+        BondedCompanionSnapshot injuredSnapshot = snapshotWithHealth(
+                ROLE, "Ember", 25.0D, 400.0D, 6.25D);
+        BondedCompanionProfile stored = service.createCaptured(
+                new BondedCompanionTransitionService.CreationRequest(
+                        "capture-injured-health", OWNER, ROSTER,
+                        "dragon-injured-health", ROLE, injuredSnapshot,
+                        1L, -30_000L),
+                counts(0, 0)).profile();
+
+        BondedCompanionProfile active = service.summon(
+                mutation("summon-injured-health", stored, -20_000L), stored,
+                counts(1, 0), "lease-injured-health", "world:alpha"
+        ).profile();
+
+        assertEquals(100.0D, active.snapshot().fullState().healthPercent());
+        assertEquals(400.0D, active.snapshot().fullState().currentHealth());
+        assertEquals(400.0D, active.snapshot().fullState().maximumHealth());
+    }
+
+    @Test
     void rejectsEveryOtherStateTransition() {
         BondedCompanionProfile stored = createStored();
         BondedCompanionProfile active = service.summon(

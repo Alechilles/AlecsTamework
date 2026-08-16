@@ -96,7 +96,8 @@ public final class BondedCompanionTransitionService {
             );
             return applied(copy(
                     profile, BondedCompanionState.ACTIVE,
-                    profile.snapshot(), lease, profile.summonCooldownUntilMs(),
+                    profile.snapshot().restoredForSummon(), lease,
+                    profile.summonCooldownUntilMs(),
                     null, profile.reviveCount()
             ));
         } catch (ArithmeticException invalidTime) {
