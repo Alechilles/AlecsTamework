@@ -13,9 +13,11 @@ import com.alechilles.alecstamework.persistence.runtime
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceDiagnosticsSnapshot;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceMetricsSnapshot;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceOperationalStatus;
+import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
 import java.util.Locale;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -24,6 +26,7 @@ import javax.annotation.Nullable;
  */
 public final class TameworkDebugDbCommand
         extends AbstractTameworkServerCommand {
+    private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     private final PersistenceDiagnosticsReader diagnostics;
     private final PersistenceDiagnosticExporter exporter;
     private final BondedCompanionDiagnosticContributor bonded;
@@ -269,6 +272,7 @@ public final class TameworkDebugDbCommand
     }
 
     private void send(CommandContext context, String message) {
+        LOGGER.at(Level.INFO).log("/tw debugdb: " + message);
         context.sender().sendMessage(Message.raw(message));
     }
 }

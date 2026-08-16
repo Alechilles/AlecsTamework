@@ -73,4 +73,5 @@ replacement-persistence summary. `detail` adds bounded feature, outbox,
 operation-phase, incident, quarantine, and circuit counts. `export` writes a
 bounded redacted support ZIP under Tamework's universe data directory without
 including the database or save. None of these actions retries work or mutates
-saved persistence state.
+saved persistence state. Each response line is sent to the command caller and
+written to the server log, including the export bundle path.

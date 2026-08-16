@@ -22,7 +22,9 @@ the `patchwork.admin` permission.
 event/crash actions remain restricted to the existing allowlisted player identities.
 `/tw debugdb [status|health|integrity|detail|export]` is console-safe.
 Status and detail actions are read-only. `export` writes a bounded, redacted
-support ZIP without changing persistence state.
+support ZIP without changing persistence state. Every response line is sent to
+the command caller and written to the server log. This includes the export
+bundle path.
 
 Commands that operate on a world but not a player use Hytale's optional world
 argument. Console callers must provide the target world for `/tw reloadconfig`,
