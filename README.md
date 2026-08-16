@@ -29,7 +29,7 @@ If you are a player looking for gameplay built on Tamework, start with [Alec's A
 
 ## Why Tamework
 - **No Java required for most integrations**: the main integration path is built around JSON assets, templates, role wiring, and `Tw*Config` files rather than custom Java systems.
-- **Non-destructive asset patching**: Embedded Patchwork can add, merge, and insert JSON into one or many Hytale assets with composable conditions. Regeneration is explicit and reports which changes require a restart.
+- **Non-destructive asset patching**: Embedded Patchwork can add, merge, and insert JSON into one or many Hytale assets with composable conditions. It regenerates at startup, on an administrator reload, and after relevant directory-pack edits, and it reports which changes require a restart.
 - **A shared standard for tameable NPCs**: mods built on Tamework can present familiar ownership, naming, command, linked-panel, breeding, and progression behavior instead of inventing incompatible one-off systems.
 - **Optimized interactions**: build taming, feeding, mounting, harvesting, breeding, and custom interactions with `TwInteractionConfig` and `TameworkInteract`.
 - **Ownership and tame-state systems**: use reusable builders and role-scoped policy for owner checks, protection rules, and companion behavior.

@@ -17,8 +17,8 @@ Gradle builds one shaded jar containing Java code and resources under
 - Tamework keeps a direct `alecstelemetry-runtime` dependency because its
   conventional project is used by `CrashTelemetryService`. Patchwork carries
   the same runtime transitively for its contributed project. The release line
-  is Patchwork `1.3.0` with Alec's Telemetry `1.1.0`; Gradle dependency
-  convergence must select `1.1.0` for both edges.
+  is Patchwork `1.3.2` with Alec's Telemetry `1.2.1`; Gradle dependency
+  convergence must select `1.2.1` for both edges.
 - The two telemetry projects are independent: Tamework uses its conventional
   project and the embedded Patchwork runtime contributes a hosted-only
   `patchwork` project. They share one host-local Telemetry provider and one
@@ -61,7 +61,7 @@ can be inspected with:
 ./gradlew dependencyInsight --dependency alecstelemetry-runtime --configuration runtimeClasspath
 ```
 
-The expected selected version is `1.1.0`, whether Alec's Telemetry is reached
+The expected selected version is `1.2.1`, whether Alec's Telemetry is reached
 directly from Tamework or transitively through Patchwork.
 
 Tamework and Patchwork expose separate telemetry consent entries. The

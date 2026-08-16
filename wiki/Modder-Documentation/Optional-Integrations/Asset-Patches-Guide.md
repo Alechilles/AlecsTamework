@@ -9,7 +9,7 @@ draft: false
 
 Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
-Tamework includes Patchwork 1.0.0 for non-destructive JSON asset patches. Patchwork is standalone and embeddable: the highest compatible runtime version wins, and standalone wins only an equal-version tie. Passive copies forward their host contributions to the elected runtime.
+Tamework includes Patchwork 1.3.2 for non-destructive JSON asset patches. Patchwork is standalone and embeddable: the highest compatible runtime version wins, and standalone wins only an equal-version tie. Passive copies forward their host contributions to the elected runtime.
 
 Asset-only packs need no Java integration. Declare Patchwork as a dependency and put definitions under:
 
@@ -87,7 +87,7 @@ Macros require Tamework to be installed and still need explicit paths and anchor
 
 ## Administration and Reloads
 
-Patchwork generates only during early startup asset load or an authorized `/patchwork reload`. Editing a definition, source asset, or referenced config does not trigger generation automatically.
+Patchwork generates during early startup asset load, after an authorized `/patchwork reload`, and after relevant edits in a directory asset pack. It waits briefly so a small edit burst becomes one regeneration pass. Archive-pack and unregistered mod-data changes still need a manual reload or restart.
 
 ```text
 /patchwork status
@@ -97,7 +97,7 @@ Patchwork generates only during early startup asset load or an authorized `/patc
 
 Commands require `patchwork.admin` and default to `hytale:Admin`. Status reports runtime election, contributions, roots, generation results, integrity, and per-target outcomes.
 
-Patchwork 1.0.0 does not invoke Hytale's generic live-reload path, and Tamework contributes no live adapter. `/patchwork reload` commits changed generated files to disk and reports them as `restart-required`; restart the server to activate them. `/patchwork selftest` validates isolated generation and conditions without modifying the production pack.
+Patchwork 1.3.2 can confirm a live reload for monitored Hytale server stores when Hytale reports the expected generated provider and asset path. Tamework contributes no separate host adapter. Common, custom, unknown, disabled-monitor, or unconfirmed routes remain `restart-required`; restart the server to activate those changes. `/patchwork selftest` validates isolated generation and conditions without modifying the production pack.
 
 Generated pack ID: `Alechilles:Patchwork_GeneratedPatches`
 
