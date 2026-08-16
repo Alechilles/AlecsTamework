@@ -26,6 +26,7 @@ public final class RespawnFallDamageGraceSystem extends DamageEventSystem {
     private static final Logger LOGGER = Logger.getLogger(RespawnFallDamageGraceSystem.class.getName());
     private static final long FALL_DAMAGE_GRACE_MS = 2_000L;
     private static final String FALL_CAUSE_ID = "Fall";
+    private static final String DIAGNOSTIC_ONLY_BRANCH = "bonded_summon";
 
     @Override
     public SystemGroup<EntityStore> getGroup() {
@@ -80,7 +81,9 @@ public final class RespawnFallDamageGraceSystem extends DamageEventSystem {
     }
 
     static boolean isWithinFallDamageGrace(@Nullable RecentRespawnTraceService.Trace trace, long nowMs) {
-        if (trace == null || trace.replacementRecordedAtMs() <= 0L) {
+        if (trace == null
+                || DIAGNOSTIC_ONLY_BRANCH.equals(trace.branch())
+                || trace.replacementRecordedAtMs() <= 0L) {
             return false;
         }
         long ageMs = nowMs - trace.replacementRecordedAtMs();

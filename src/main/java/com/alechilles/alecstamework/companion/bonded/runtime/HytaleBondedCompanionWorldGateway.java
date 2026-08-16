@@ -56,25 +56,38 @@ public final class HytaleBondedCompanionWorldGateway implements
         BondedCompanionLocalProjectionLifecycle.ObservationSource {
     private final TameworkFullStateSnapshotReader snapshots;
     private final BondedCompanionProjectionSpawnBoundary spawns;
+    private final BondedCompanionSummonDiagnostics summonDiagnostics;
 
     public HytaleBondedCompanionWorldGateway() {
         this(new TameworkFullStateSnapshotReader(
                 new CoopResidentStateSnapshotService()
-        ), new BondedCompanionProjectionSpawnBoundary());
+        ), new BondedCompanionProjectionSpawnBoundary(),
+                new BondedCompanionSummonDiagnostics());
     }
 
     HytaleBondedCompanionWorldGateway(
             TameworkFullStateSnapshotReader snapshots
     ) {
-        this(snapshots, new BondedCompanionProjectionSpawnBoundary());
+        this(snapshots, new BondedCompanionProjectionSpawnBoundary(),
+                new BondedCompanionSummonDiagnostics());
     }
 
     HytaleBondedCompanionWorldGateway(
             TameworkFullStateSnapshotReader snapshots,
             BondedCompanionProjectionSpawnBoundary spawns
     ) {
+        this(snapshots, spawns, new BondedCompanionSummonDiagnostics());
+    }
+
+    HytaleBondedCompanionWorldGateway(
+            TameworkFullStateSnapshotReader snapshots,
+            BondedCompanionProjectionSpawnBoundary spawns,
+            BondedCompanionSummonDiagnostics summonDiagnostics
+    ) {
         this.snapshots = Objects.requireNonNull(snapshots, "snapshots");
         this.spawns = Objects.requireNonNull(spawns, "spawns");
+        this.summonDiagnostics = Objects.requireNonNull(
+                summonDiagnostics, "summonDiagnostics");
     }
 
     /** Spawns the exact planned UUID at the caller-frozen world placement. */
@@ -83,33 +96,45 @@ public final class HytaleBondedCompanionWorldGateway implements
             @Nonnull BondedCompanionProjectionService.SpawnPlan plan
     ) {
         Objects.requireNonNull(plan, "plan");
+        BondedCompanionSummonDiagnostics.Session trace =
+                summonDiagnostics.begin(plan);
         if (plan.placement() == null
                 || !plan.lease().worldKey().equals(
                         plan.placement().worldKey())) {
+            summonDiagnostics.warn(
+                    trace, "placement", "placement_world_mismatch");
             return BondedCompanionProjectionService.SpawnResult.retryRequired();
         }
         try {
             World world = Universe.get().getWorld(plan.placement().worldKey());
             if (world == null) {
+                summonDiagnostics.warn(
+                        trace, "world_lookup", "world_unavailable");
                 return BondedCompanionProjectionService.SpawnResult
                         .retryRequired();
             }
             if (!world.isInThread()) {
+                summonDiagnostics.warn(
+                        trace, "world_thread", "not_on_world_thread");
                 return BondedCompanionProjectionService.SpawnResult
                         .retryRequired();
             }
-            return spawnOnWorldThread(world, plan);
+            return spawnOnWorldThread(world, plan, trace);
         } catch (RuntimeException | LinkageError failure) {
+            summonDiagnostics.exception(trace, "world_gateway", failure);
             return BondedCompanionProjectionService.SpawnResult.failed();
         }
     }
 
     private BondedCompanionProjectionService.SpawnResult spawnOnWorldThread(
             World world,
-            BondedCompanionProjectionService.SpawnPlan plan
+            BondedCompanionProjectionService.SpawnPlan plan,
+            BondedCompanionSummonDiagnostics.Session trace
     ) {
         if (!world.isInThread() || world.getEntityStore() == null
                 || !world.getName().equals(plan.placement().worldKey())) {
+            summonDiagnostics.warn(
+                    trace, "world_validation", "world_context_mismatch");
             return BondedCompanionProjectionService.SpawnResult.retryRequired();
         }
         UUID plannedUuid = plan.lease().liveNpcUuid();
@@ -119,6 +144,7 @@ public final class HytaleBondedCompanionWorldGateway implements
                 plannedUuid,
                 plan.snapshot().fullState().npcUuid(),
                 plan.placement(), plan.snapshot(), plan.summonAuraEffectId());
+        summonDiagnostics.projection(trace, world, plannedUuid, result);
         return switch (result) {
             case CONFIRMED -> BondedCompanionProjectionService.SpawnResult
                     .spawned(plannedUuid);

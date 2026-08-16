@@ -11,6 +11,10 @@
   item cannot be used as a free heal.
 - `/tw debugdb` now writes its chat responses to the server log so support
   diagnostics remain available after the command output closes.
+- `/tw debugrespawntrace` now covers bonded roster summons, including planned
+  health, projection results, early world failures, immediate live state,
+  first damage, and delayed health probes. Dead-target capture denials now log
+  the target, role, item, health, and death-component state.
 
 ## 3.1.8 - Embedded Runtime Hotfix - 2026-08-15
 

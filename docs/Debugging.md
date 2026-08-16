@@ -130,6 +130,14 @@ player-scoped. In particular, `/tw config`, `/tw settings`, `/tw news`,
 
 ## Spawner/naming troubleshooting
 - Spawner failures: check role filters, tame/owner policy, range/cooldown, and captured metadata.
+- A dead-target capture denial writes the player, target, role, item, exact
+  health, and death-component state to the server log.
+- `/tw debugrespawntrace` covers normal captured-item releases, restoration,
+  and bonded roster summons. A bonded summon trace includes its planned
+  full-health snapshot, profile/lease/world identity, projection result,
+  immediate live health and death state, first damage, and probes after 250 ms
+  and 1 second. Early placement, world, thread, and exception failures are also
+  recorded. Enable it only for a short reproduction.
 - Naming failures: confirm naming config binding and policy (`RequireTamed`, `RequireOwner`, rename/replace limits).
 
 ## Population and claim troubleshooting

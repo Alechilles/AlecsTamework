@@ -41,4 +41,24 @@ class RespawnFallDamageGraceSystemTest {
         assertTrue(RespawnFallDamageGraceSystem.isWithinSpawnProtectionGrace(protection, 4_000L));
         assertFalse(RespawnFallDamageGraceSystem.isWithinSpawnProtectionGrace(protection, 4_001L));
     }
+
+    @Test
+    void bondedSummonDiagnosticsDoNotGrantFallDamageGrace() {
+        RecentRespawnTraceService service = RecentRespawnTraceService.getInstance();
+        UUID replacementUuid = UUID.randomUUID();
+        RecentRespawnTraceService.Trace trace = service.startTrace(
+                "bonded_summon",
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                "Dragon",
+                "bonded:hydragon:roster",
+                1_000L
+        );
+
+        trace = service.recordReplacementNpc(trace, replacementUuid, 1_100L);
+
+        assertFalse(RespawnFallDamageGraceSystem.isWithinFallDamageGrace(
+                trace, 1_100L));
+        service.clear(replacementUuid);
+    }
 }

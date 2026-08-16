@@ -53,9 +53,14 @@ do not participate in spawning and are removed when tracking ends.
 `/tw debugrespawntrace` logs the stored and normalized health/needs projection,
 the immediate live entity health and death-component state, first damage within
 the trace window, and delayed 250 ms and 1 second probes. It covers Soul
-Collector capture and release plus free and paid companion restoration. Enable
-it only for a short reproduction because each return operation emits several
-correlated lines.
+Collector capture and release, free and paid companion restoration, and bonded
+roster summons. Bonded summon traces also record the planned full-health
+snapshot, profile, lease, world, projection result, and early placement, world,
+thread, or exception failure. Enable it only for a short reproduction because
+each return operation emits several correlated lines.
+
+Dead-target capture denials always log the player, target, role, item, exact
+health, and death-component state, even when the respawn trace is disabled.
 
 Death and Lost restoration is a gameplay flow. Roster-backed companions can
 use role-configured exact item costs, while legacy item-linked paths remain

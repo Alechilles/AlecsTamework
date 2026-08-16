@@ -12,6 +12,7 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
@@ -101,11 +102,18 @@ public final class SpawnerCapturePolicyService {
         var deathType = DeathComponent.getComponentType();
         boolean hasDeathComponent = deathType != null
                 && store.getComponent(targetRef, deathType) != null;
+        String roleId = rolePolicyService.resolveRoleIdFromNpc(npc);
         if (!isLivingCaptureTarget(captureHealth, hasDeathComponent)) {
-            logCaptureDebug("denied reason=target-dead player=" + player.getUuid());
+            var uuidType = UUIDComponent.getComponentType();
+            UUIDComponent identity = uuidType == null
+                    ? null : store.getComponent(targetRef, uuidType);
+            logCaptureDebug(deadTargetDiagnostic(
+                    player.getUuid(),
+                    identity == null ? null : identity.getUuid(),
+                    roleId, itemStack.getItemId(), captureHealth,
+                    hasDeathComponent));
             return false;
         }
-        String roleId = rolePolicyService.resolveRoleIdFromNpc(npc);
         if (!rolePolicyService.isRoleAllowed(roleId, config)) {
             logCaptureDebug("denied reason=role-not-allowed player=" + player.getUuid() + " role=" + roleId);
             return false;
@@ -211,6 +219,25 @@ public final class SpawnerCapturePolicyService {
                                          boolean hasDeathComponent) {
         return !hasDeathComponent
                 && (health == null || health.currentHealth() > 0.0D);
+    }
+
+    static String deadTargetDiagnostic(
+            UUID playerUuid,
+            UUID targetUuid,
+            String roleId,
+            String itemId,
+            CaptureHealth health,
+            boolean hasDeathComponent
+    ) {
+        String healthValue = health == null
+                ? "<unavailable>"
+                : health.currentHealth() + "/" + health.maximumHealth();
+        return "denied reason=target-dead player=" + playerUuid
+                + " target=" + targetUuid
+                + " role=" + roleId
+                + " item=" + itemId
+                + " health=" + healthValue
+                + " deathComponent=" + hasDeathComponent;
     }
 
     private boolean hasRequiredEffect(Ref<EntityStore> targetRef,
