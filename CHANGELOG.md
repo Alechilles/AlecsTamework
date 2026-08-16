@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.1.7 - Embedded Runtime Hotfix - 2026-08-15
+## 3.1.8 - Embedded Runtime Hotfix - 2026-08-15
 
 ### Fixed
 - Updated the embedded Patchwork runtime to 1.3.2. Tamework now participates in
