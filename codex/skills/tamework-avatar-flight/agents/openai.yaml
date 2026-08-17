@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tamework Avatar Flight"
+  short_description: "Protects avatar flight lifecycle changes"
+  default_prompt: "Use $tamework-avatar-flight to change this avatar flight behavior across input, movement, visuals, and cleanup."
