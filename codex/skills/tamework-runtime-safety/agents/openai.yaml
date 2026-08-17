@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tamework Runtime Safety"
+  short_description: "Guards ECS, threading, and hot paths"
+  default_prompt: "Use $tamework-runtime-safety to review this Tamework runtime change for ECS, threading, cadence, and shutdown safety."
