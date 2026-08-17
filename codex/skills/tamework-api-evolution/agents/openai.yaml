@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tamework API Evolution"
+  short_description: "Evolves Tamework APIs without breaking clients"
+  default_prompt: "Use $tamework-api-evolution to design this Tamework public API change and verify compatibility."
