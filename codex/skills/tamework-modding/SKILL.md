@@ -1,11 +1,12 @@
 ---
 name: tamework-modding
-description: Use when working on Alec's Tamework or downstream mods that depend on Tamework. Handles Tamework Java registrations, `Tw*Config` assets, custom NPC builders, item interactions, ECS components, and role templates while verifying IDs and behavior against current source plus an exact-profile HytaleNpcAssetTools session.
+description: Use for general Tamework Java/JSON wiring that is not owned by a focused Tamework skill, especially custom NPC builder types, type registration, stable IDs, role templates, and current-source or exact-profile type discovery. Also use to route an unfamiliar Tamework task to its owning skill.
 ---
 
 # Tamework Modding
 
-Use this skill to keep Tamework edits coherent across Java registrations, JSON assets, and NPC role wiring.
+Use this skill for registration and wiring work, then load each focused skill
+that owns part of the change.
 
 ## Identify Scope
 
@@ -21,20 +22,36 @@ Use this skill to keep Tamework edits coherent across Java registrations, JSON a
 2. Classify the request.
    - `Integration`: consume existing Tamework features from another mod's
      assets.
-   - `Behavior change`: modify existing Tamework Java or JSON behavior.
+   - `Behavior change`: route to the owning domain skill below.
    - `New type`: add a new action/sensor/filter/component/asset family.
 
-## Load Only Needed References
+## Route Focused Work
+
+- `Tw*Config` schema, inheritance, override, editor, resolver, cache, or reload:
+  `$tamework-config-authoring`.
+- `TwInteractionConfig` prompt, sensor, action, state, or cooldown lifecycle:
+  `$tamework-interaction-configurator`.
+- Command items, hotswaps, radial controls, panels, target authority, or HUD:
+  `$tamework-command-runtime`.
+- Needs, happiness, breeding, traits, talents, levels, or life stages:
+  `$tamework-companion-progression`.
+- Public API, capability, result, event, version, self-test, or compatibility:
+  `$tamework-api-evolution`.
+- ECS, world-thread, async, tick, cadence, hot-path, or shutdown work:
+  `$tamework-runtime-safety`.
+- Avatar flight input, movement, model, rider, equipment, effects, or cleanup:
+  `$tamework-avatar-flight`.
+- Saved state, SQLite, snapshots, operations, recovery, or migration:
+  `$tamework-persistence`.
+
+Load more than one focused skill when a change crosses boundaries.
+
+## Load Registration References
 
 - Read `references/type-discovery.md` for the current-source discovery
   procedure.
-- Read `references/asset-paths-and-resolution.md` for locator hints, then verify
-  paths, resolution, and reload behavior in the current source commit.
-- When creating or editing any `Tw*Config` Java/codec/default JSON, load and follow:
-  `C:\Users\22ale\.codex\skills\hytale-asset-inheritance-contract\SKILL.md`
-  (treat this as required for config inheritance/fallback/tooltip/test behavior).
-- When modifying optimized interactions, also read:
-  `C:\Users\22ale\AppData\Roaming\Hytale\Modding\alecstamework\docs\Interactions.md`
+- Read `references/asset-paths-and-resolution.md` only for path discovery. Use
+  `$tamework-config-authoring` for any config-family change.
 - When modifying builder registrations, also read:
   `C:\Users\22ale\AppData\Roaming\Hytale\Modding\alecstamework\src\main\java\com\alechilles\alecstamework\npc\TameworkNpcBuilderRegistrar.java`
 
@@ -49,8 +66,6 @@ Use this skill to keep Tamework edits coherent across Java registrations, JSON a
 2. Edit all required layers, not just one file.
    - For new NPC action/sensor/filter types, update the builder class, runtime
      class, builder registrar, and docs.
-   - For new `Tw*Config` families, update the config class, `Tamework.java`
-     asset registration/event hooks, and docs.
    - For new item interaction types, update the interaction class and
      `Interaction.CODEC.register(...)` in `Tamework.java`.
 3. Preserve stable IDs.
@@ -58,34 +73,14 @@ Use this skill to keep Tamework edits coherent across Java registrations, JSON a
      names, and asset paths as API.
    - Avoid renaming existing IDs unless explicitly requested as a breaking
      change.
-4. Keep config behavior consistent.
-   - For all `Tw*Config` work, apply the
-     `hytale-asset-inheritance-contract` skill rules; do not implement ad-hoc
-     inheritance behavior.
-   - When adding new config fields/sections, update parent fallback, codec
-     tooltip docs, and tests per that contract.
-5. For asset changes, build a read-only candidate and run `author validate
+4. For asset changes, build a read-only candidate and run `author validate
    --scope affected`. Generate verification for behavior-sensitive builders,
    role changes, ownership, lifecycle, target-loss, and downstream consumers.
 
 ## Apply Tamework-Specific Rules
 
-- When current registration/profile evidence exposes `TameworkInteract` and
-  `TwInteractionConfig`, prefer that optimized interaction flow unless the user
-  asks for full vanilla instruction chains.
 - When a change depends on vanilla Hytale semantics, APIs, gamedata, client UI, or javadocs, use `hytale-workshop-mcp` for the base-game evidence before designing the Tamework-side edit.
 - For runtime reports, compare source repo and `Modding\run\mods` before assuming the game loaded the edited files. Use `UserData\Mods` only when diagnosing a legacy/manual install.
-- Verify `/tw reloadconfig` behavior in the current command and reload-service
-  source. At the last review it reloaded only the spawner, naming-item, and
-  command-item feature families; do not assume that list remains current.
-- Verify whether other `Tw*Config` families use normal asset loaded/removed
-  events before prescribing a reload workflow.
-- Thread-affinity rule for player access:
-  - Do not use `PlayerRef.getComponent(Player)` inside `TickingSystem.tick`, world tick systems, or async/delayed executors.
-  - In tick/system code, resolve players from the active world/store (`world.getEntityRef(uuid)` + `store.getComponent(ref, Player.getComponentType())`).
-  - Do not pass `Player` component objects into async/deferred callbacks. Pass `UUID` and resolve on world/tick thread.
-  - Avoid `Universe.getPlayers()` + player component access in runtime tick paths.
-- Do not add fallback helper methods that iterate `Universe.getPlayers()` for runtime remap/mutation logic.
 - Treat current Java registration plus the exact project profile as authority.
   A skill reference, old asset, shipped example, runtime copy, or remembered ID
   is discovery evidence only.
@@ -110,6 +105,7 @@ Use this skill to keep Tamework edits coherent across Java registrations, JSON a
    report unsupported claims as gaps.
 4. Report code edits, asset follow-up, project/knowledge/snapshot identity,
    candidate outcome, and verification evidence.
-5. Run a thread-safety grep pass for player access:
-`rg "PlayerRef\\.getComponent\\(Player|getComponent\\(Player\\.getComponentType\\(\\)\\)|Universe\\.get\\(\\).*getPlayers" -n src/main/java`
-6. If base-game evidence was used, cite the Workshop corpus/version plus FQCN, method, asset path, or UI path that drove the Tamework decision.
+5. If runtime or tick code changed, use `$tamework-runtime-safety` and run its
+   current guard checks.
+6. If base-game evidence was used, cite the Workshop corpus/version plus FQCN,
+   method, asset path, or UI path that drove the Tamework decision.

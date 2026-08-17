@@ -1,6 +1,6 @@
 ---
 name: tamework-interaction-configurator
-description: Use when editing Tamework TwInteractionConfig, command-item modes, prompts, sensors, actions, cooldowns, contextual interactions, command cycles, or interaction-triggered role behavior in Alec's Tamework and downstream mods. Uses exact-profile NPC guidance, inheritance provenance, affected-scope validation, and lifecycle verification.
+description: Use when editing Tamework `TwInteractionConfig` prompts, sensors, actions, cooldowns, contextual interactions, config-defined command modes, command cycles, or interaction-triggered role behavior. Does not own command-item hotswaps, panels, target authority, or HUD runtime.
 ---
 
 # Tamework Interaction Configurator
@@ -28,6 +28,15 @@ Keep interaction prompts and interaction execution perfectly aligned.
 8. Generate verification for prompt visibility, executable action, denied
    conditions, mode cycle, cooldown, reset, target loss, and ownership where
    applicable. Use logs and live behavior only as additional runtime evidence.
+
+## Route Runtime Work
+
+- Use `$tamework-command-runtime` when the change touches command-item
+  hotswaps, radial controls, linked or bonded panels, target authority, HUD
+  state, or command cleanup.
+- Use `$tamework-config-authoring` for shared config-family schema, codec,
+  inheritance, override, editor, cache, or reload behavior.
+- Use `$tamework-runtime-safety` for ECS, tick, thread, async, or cadence work.
 
 ## Output Contract
 

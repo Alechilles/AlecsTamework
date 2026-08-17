@@ -3,8 +3,7 @@
 This directory is the canonical source for Tamework-specific Codex skills.
 Do not maintain separate editable copies under `.codex/skills`.
 
-Run this command from the repository root after a clone, skill addition, or
-skill rename:
+Run this command from the repository root after a clone or skill addition:
 
 ```bash
 bash scripts/tools/link-codex-skills.sh
@@ -14,6 +13,11 @@ The installer discovers each immediate child directory that contains a
 `SKILL.md`. It creates a Windows junction under the active Codex skills folder.
 It is idempotent and stops when a target exists but points elsewhere. It never
 deletes or replaces a conflicting target.
+
+For a rename, first move the canonical repository directory. Then explicitly
+remove the old `.codex/skills/<old-name>` junction after verifying its exact
+target, and run the installer to create the new junction. The installer does
+not scan for or remove stale names.
 
 ## Skill Boundaries
 
