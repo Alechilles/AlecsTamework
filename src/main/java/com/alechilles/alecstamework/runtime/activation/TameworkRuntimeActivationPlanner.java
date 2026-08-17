@@ -62,12 +62,8 @@ public final class TameworkRuntimeActivationPlanner {
 
         markMissingCapabilities(closure, states, reasons, checkedEvidence);
         propagateUnavailableDependencies(closure, states, reasons);
+        pruneUnreachableActiveModules(closure, directModules, states);
         return new TameworkRuntimeActivationPlan(states, reasons, dependencies);
-    }
-
-    /** Alias for {@link #plan(TameworkActivationEvidence)}. */
-    public TameworkRuntimeActivationPlan createPlan(TameworkActivationEvidence evidence) {
-        return plan(evidence);
     }
 
     /** Compares a startup plan with a reload candidate without applying either plan. */
@@ -80,14 +76,6 @@ public final class TameworkRuntimeActivationPlanner {
         return startup.topologyFingerprint().equals(candidate.topologyFingerprint())
                 ? TameworkTopologyComparison.UNCHANGED
                 : TameworkTopologyComparison.RESTART_REQUIRED;
-    }
-
-    /** Alias for {@link #compare(TameworkRuntimeActivationPlan, TameworkRuntimeActivationPlan)}. */
-    public TameworkTopologyComparison comparePlans(
-            TameworkRuntimeActivationPlan startup,
-            TameworkRuntimeActivationPlan candidate
-    ) {
-        return compare(startup, candidate);
     }
 
     /** Returns module IDs whose planned states differ between two snapshots. */
@@ -173,6 +161,40 @@ public final class TameworkRuntimeActivationPlanner {
                 }
             }
         } while (changed);
+    }
+
+    private void pruneUnreachableActiveModules(
+            Set<TameworkRuntimeModule> closure,
+            List<TameworkRuntimeModule> directModules,
+            Map<TameworkRuntimeModule, TameworkRuntimeActivationPlan.ModuleState> states
+    ) {
+        Set<TameworkRuntimeModule> runnableClosure = new LinkedHashSet<>();
+        for (TameworkRuntimeModule module : directModules) {
+            if (states.get(module) == TameworkRuntimeActivationPlan.ModuleState.ACTIVE) {
+                collectRunnableClosure(module, runnableClosure, states);
+            }
+        }
+        for (TameworkRuntimeModule module : closure) {
+            if (states.get(module) == TameworkRuntimeActivationPlan.ModuleState.ACTIVE
+                    && !runnableClosure.contains(module)) {
+                states.put(module, TameworkRuntimeActivationPlan.ModuleState.DORMANT);
+            }
+        }
+    }
+
+    private void collectRunnableClosure(
+            TameworkRuntimeModule module,
+            Set<TameworkRuntimeModule> runnableClosure,
+            Map<TameworkRuntimeModule, TameworkRuntimeActivationPlan.ModuleState> states
+    ) {
+        if (!runnableClosure.add(module)) {
+            return;
+        }
+        for (TameworkRuntimeModule dependency : catalog.directDependencies(module)) {
+            if (states.get(dependency) == TameworkRuntimeActivationPlan.ModuleState.ACTIVE) {
+                collectRunnableClosure(dependency, runnableClosure, states);
+            }
+        }
     }
 
     private void validateEvidenceModules(TameworkActivationEvidence evidence) {

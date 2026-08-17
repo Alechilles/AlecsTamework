@@ -76,11 +76,6 @@ public final class TameworkActivationEvidence {
         return capabilityId != null && availableCapabilities.contains(capabilityId.trim());
     }
 
-    /** Alias for {@link #hasCapability(String)}. */
-    public boolean isCapabilityAvailable(String capabilityId) {
-        return hasCapability(capabilityId);
-    }
-
     /** Returns the immutable provider capability set. */
     public Set<String> availableCapabilities() {
         return availableCapabilities;
@@ -127,32 +122,9 @@ public final class TameworkActivationEvidence {
             return publicCapability(module, capabilityId, capabilityId);
         }
 
-        /** Alias for {@link #publicCapability(TameworkRuntimeModule, String, String)}. */
-        public Builder requireCapability(
-                TameworkRuntimeModule module,
-                String capabilityId,
-                String source
-        ) {
-            return publicCapability(module, capabilityId, source);
-        }
-
         /** Adds durable state or recovery evidence. */
         public Builder durableState(TameworkRuntimeModule module, String stateId) {
             return activate(module, TameworkActivationReason.durableState(stateId));
-        }
-
-        /** Adds durable recovery evidence with an explicit probe source. */
-        public Builder durableState(
-                TameworkRuntimeModule module,
-                String stateId,
-                String source
-        ) {
-            return activate(module, TameworkActivationReason.durableState(stateId, source));
-        }
-
-        /** Alias for durable state evidence. */
-        public Builder recovery(TameworkRuntimeModule module, String recoveryId) {
-            return durableState(module, recoveryId);
         }
 
         /** Marks an external provider capability as ready without activating its bridge. */
@@ -161,13 +133,7 @@ public final class TameworkActivationEvidence {
             return this;
         }
 
-        /** Alias for {@link #availableCapability(String)}. */
-        public Builder providerReady(String capabilityId) {
-            return availableCapability(capabilityId);
-        }
-
-        /** Adds an arbitrary immutable reason for a module. */
-        public Builder activate(
+        private Builder activate(
                 TameworkRuntimeModule module,
                 TameworkActivationReason reason
         ) {
@@ -177,8 +143,7 @@ public final class TameworkActivationEvidence {
             return this;
         }
 
-        /** Adds a capability requirement without adding a second direct reason. */
-        public Builder addRequiredCapability(
+        private Builder addRequiredCapability(
                 TameworkRuntimeModule module,
                 String capabilityId
         ) {

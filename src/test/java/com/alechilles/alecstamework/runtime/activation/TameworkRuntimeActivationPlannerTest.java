@@ -26,6 +26,17 @@ class TameworkRuntimeActivationPlannerTest {
     }
 
     @Test
+    void hStatsActivatesWithoutCoreOwnershipDependency() {
+        TameworkRuntimeModuleCatalog catalog = TameworkRuntimeModuleCatalog.standard();
+        TameworkRuntimeActivationPlan plan = new TameworkRuntimeActivationPlanner(catalog)
+                .plan(TameworkActivationEvidence.builder()
+                        .content(TameworkRuntimeModule.HSTATS, "hstats-profile")
+                        .build());
+
+        assertEquals(Set.of(TameworkRuntimeModule.HSTATS), plan.activeModules());
+    }
+
+    @Test
     void directEvidenceExpandsTheExactDependencyClosure() {
         TameworkRuntimeModule leaf = TameworkRuntimeModule.of("test-leaf");
         TameworkRuntimeModule dependency = TameworkRuntimeModule.of("test-dependency");
@@ -84,7 +95,7 @@ class TameworkRuntimeActivationPlannerTest {
     void aRequiredMissingCapabilityMakesTheModuleUnavailable() {
         TameworkRuntimeModule module = TameworkRuntimeModule.of("test-provider-bound");
         TameworkRuntimeModuleCatalog catalog = new TameworkRuntimeModuleCatalog(List.of(
-                TameworkRuntimeModuleDescriptor.withRequiredCapabilities(
+                new TameworkRuntimeModuleDescriptor(
                         module, List.of(), List.of("TW_EXTERNAL_ANIMAL_MODIFIERS_V1")
                 )
         ));
@@ -98,6 +109,56 @@ class TameworkRuntimeActivationPlannerTest {
                         && reason.detail().contains("TW_EXTERNAL_ANIMAL_MODIFIERS_V1")
         ));
         assertFalse(plan.isActive(module));
+    }
+
+    @Test
+    void unavailableRootDoesNotKeepAnOrphanDependencyActive() {
+        TameworkRuntimeModule orphan = TameworkRuntimeModule.of("test-orphan-dependency");
+        TameworkRuntimeModule root = TameworkRuntimeModule.of("test-unavailable-root");
+        TameworkRuntimeModuleCatalog catalog = new TameworkRuntimeModuleCatalog(List.of(
+                TameworkRuntimeModuleDescriptor.of(orphan),
+                new TameworkRuntimeModuleDescriptor(
+                        root,
+                        List.of(orphan),
+                        List.of("test-provider")
+                )
+        ));
+
+        TameworkRuntimeActivationPlan plan = new TameworkRuntimeActivationPlanner(catalog)
+                .plan(TameworkActivationEvidence.builder().content(root, "broken-profile").build());
+
+        assertEquals(TameworkRuntimeActivationPlan.ModuleState.UNAVAILABLE, plan.state(root));
+        assertEquals(TameworkRuntimeActivationPlan.ModuleState.DORMANT, plan.state(orphan));
+        assertTrue(plan.activeModules().isEmpty());
+    }
+
+    @Test
+    void sharedDependencyRemainsActiveForAnIndependentRunnableRoot() {
+        TameworkRuntimeModule shared = TameworkRuntimeModule.of("test-shared-dependency");
+        TameworkRuntimeModule unavailableRoot = TameworkRuntimeModule.of("test-unavailable-root");
+        TameworkRuntimeModule runnableRoot = TameworkRuntimeModule.of("test-runnable-root");
+        TameworkRuntimeModuleCatalog catalog = new TameworkRuntimeModuleCatalog(List.of(
+                TameworkRuntimeModuleDescriptor.of(shared),
+                new TameworkRuntimeModuleDescriptor(
+                        unavailableRoot,
+                        List.of(shared),
+                        List.of("test-provider")
+                ),
+                TameworkRuntimeModuleDescriptor.of(runnableRoot, shared)
+        ));
+
+        TameworkRuntimeActivationPlan plan = new TameworkRuntimeActivationPlanner(catalog)
+                .plan(TameworkActivationEvidence.builder()
+                        .content(unavailableRoot, "broken-profile")
+                        .content(runnableRoot, "healthy-profile")
+                        .build());
+
+        assertEquals(TameworkRuntimeActivationPlan.ModuleState.UNAVAILABLE,
+                plan.state(unavailableRoot));
+        assertEquals(TameworkRuntimeActivationPlan.ModuleState.ACTIVE,
+                plan.state(runnableRoot));
+        assertEquals(TameworkRuntimeActivationPlan.ModuleState.ACTIVE, plan.state(shared));
+        assertEquals(Set.of(runnableRoot, shared), plan.activeModules());
     }
 
     @Test
@@ -128,6 +189,63 @@ class TameworkRuntimeActivationPlannerTest {
     }
 
     @Test
+    void fingerprintsDistinguishGraphsWhenIdsContainDelimiters() {
+        TameworkRuntimeModule root = TameworkRuntimeModule.of("test-root");
+        TameworkRuntimeModule a = TameworkRuntimeModule.of("a");
+        TameworkRuntimeModule bCommaC = TameworkRuntimeModule.of("b,c");
+        TameworkRuntimeModule aCommaB = TameworkRuntimeModule.of("a,b");
+        TameworkRuntimeModule c = TameworkRuntimeModule.of("c");
+
+        TameworkRuntimeModuleCatalog firstCatalog = new TameworkRuntimeModuleCatalog(List.of(
+                TameworkRuntimeModuleDescriptor.of(root, a, bCommaC),
+                TameworkRuntimeModuleDescriptor.of(a),
+                TameworkRuntimeModuleDescriptor.of(bCommaC),
+                TameworkRuntimeModuleDescriptor.of(aCommaB),
+                TameworkRuntimeModuleDescriptor.of(c)
+        ));
+        TameworkRuntimeModuleCatalog secondCatalog = new TameworkRuntimeModuleCatalog(List.of(
+                TameworkRuntimeModuleDescriptor.of(root, aCommaB, c),
+                TameworkRuntimeModuleDescriptor.of(a),
+                TameworkRuntimeModuleDescriptor.of(bCommaC),
+                TameworkRuntimeModuleDescriptor.of(aCommaB),
+                TameworkRuntimeModuleDescriptor.of(c)
+        ));
+        TameworkActivationEvidence evidence = TameworkActivationEvidence.builder()
+                .content(root, "root-content")
+                .content(a, "a-content")
+                .content(bCommaC, "b-c-content")
+                .content(aCommaB, "a-b-content")
+                .content(c, "c-content")
+                .build();
+        TameworkRuntimeActivationPlan first = new TameworkRuntimeActivationPlanner(firstCatalog)
+                .plan(evidence);
+        TameworkRuntimeActivationPlan second = new TameworkRuntimeActivationPlanner(secondCatalog)
+                .plan(evidence);
+
+        assertFalse(first.topologyFingerprint().equals(second.topologyFingerprint()));
+        assertEquals(TameworkTopologyComparison.RESTART_REQUIRED,
+                new TameworkRuntimeActivationPlanner(firstCatalog).compare(first, second));
+    }
+
+    @Test
+    void distinctTrustedReasonsWithDelimiterCharactersAreBothRetained() {
+        TameworkRuntimeModule module = TameworkRuntimeModule.of("test-reasons");
+        TameworkRuntimeModuleCatalog catalog = new TameworkRuntimeModuleCatalog(List.of(
+                TameworkRuntimeModuleDescriptor.of(module)
+        ));
+        TameworkRuntimeActivationPlan plan = new TameworkRuntimeActivationPlanner(catalog).plan(
+                TameworkActivationEvidence.builder()
+                        .publicCapability(module, "a|b", "c")
+                        .publicCapability(module, "a", "b|c")
+                        .availableCapability("a|b")
+                        .availableCapability("a")
+                        .build()
+        );
+
+        assertEquals(2, plan.reasonsFor(module).size());
+    }
+
+    @Test
     void aReloadThatChangesTopologyRequiresRestart() {
         TameworkRuntimeModule module = TameworkRuntimeModule.of("test-reload");
         TameworkRuntimeModuleCatalog catalog = new TameworkRuntimeModuleCatalog(List.of(
@@ -138,13 +256,16 @@ class TameworkRuntimeActivationPlannerTest {
         TameworkRuntimeActivationPlan candidate = planner.plan(
                 TameworkActivationEvidence.builder().content(module, "new-config").build()
         );
+        TameworkRuntimeActivationPlan sameTopology = planner.plan(
+                TameworkActivationEvidence.builder().content(module, "same-topology").build()
+        );
 
         assertEquals(TameworkTopologyComparison.RESTART_REQUIRED,
                 planner.compare(startup, candidate));
         assertEquals(TameworkTopologyComparison.UNCHANGED,
-                planner.compare(candidate, planner.plan(
-                        TameworkActivationEvidence.builder().content(module, "same-topology").build()
-                )));
+                planner.compare(candidate, sameTopology));
+        assertEquals(Set.of(module), planner.changedModules(startup, candidate));
+        assertTrue(planner.changedModules(candidate, sameTopology).isEmpty());
     }
 
     @Test

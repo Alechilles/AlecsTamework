@@ -8,23 +8,5 @@ package com.alechilles.alecstamework.runtime.activation;
  */
 public enum TameworkTopologyComparison {
     UNCHANGED,
-    RESTART_REQUIRED;
-
-    public boolean isUnchanged() {
-        return this == UNCHANGED;
-    }
-
-    public boolean isRestartRequired() {
-        return this == RESTART_REQUIRED;
-    }
-
-    /** Returns this value for callers that prefer a named status accessor. */
-    public TameworkTopologyComparison status() {
-        return this;
-    }
-
-    /** Alias for {@link #status()}. */
-    public TameworkTopologyComparison result() {
-        return this;
-    }
+    RESTART_REQUIRED
 }

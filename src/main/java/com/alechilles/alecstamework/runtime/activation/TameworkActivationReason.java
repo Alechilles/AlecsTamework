@@ -23,20 +23,14 @@ public final class TameworkActivationReason implements Comparable<TameworkActiva
     private final String source;
     private final String detail;
 
-    /** Creates one immutable reason. */
-    public TameworkActivationReason(Kind kind, String source, String detail) {
+    private TameworkActivationReason(Kind kind, String source, String detail) {
         this.kind = Objects.requireNonNull(kind, "Activation reason kind is required");
         this.source = requireText(source, "Activation reason source");
         this.detail = requireText(detail, "Activation reason detail");
     }
 
-    /** Creates content evidence for one module or effective asset source. */
-    public static TameworkActivationReason content(String source) {
-        return new TameworkActivationReason(Kind.CONTENT, "content", source);
-    }
-
     /** Creates content evidence tied to a module's effective asset source. */
-    public static TameworkActivationReason content(
+    static TameworkActivationReason content(
             TameworkRuntimeModule module,
             String source
     ) {
@@ -47,17 +41,8 @@ public final class TameworkActivationReason implements Comparable<TameworkActiva
         );
     }
 
-    /** Creates public-capability evidence for a capability requirement. */
-    public static TameworkActivationReason publicCapability(String capabilityId) {
-        return new TameworkActivationReason(
-                Kind.PUBLIC_CAPABILITY,
-                "capability",
-                capabilityId
-        );
-    }
-
     /** Creates public-capability evidence with a producer or consumer source. */
-    public static TameworkActivationReason publicCapability(
+    static TameworkActivationReason publicCapability(
             String capabilityId,
             String source
     ) {
@@ -69,7 +54,7 @@ public final class TameworkActivationReason implements Comparable<TameworkActiva
     }
 
     /** Creates durable-state or recovery evidence. */
-    public static TameworkActivationReason durableState(String stateId) {
+    static TameworkActivationReason durableState(String stateId) {
         return new TameworkActivationReason(
                 Kind.DURABLE_STATE,
                 "durable-state",
@@ -77,25 +62,8 @@ public final class TameworkActivationReason implements Comparable<TameworkActiva
         );
     }
 
-    /** Creates durable-state evidence with an explicit probe source. */
-    public static TameworkActivationReason durableState(
-            String stateId,
-            String source
-    ) {
-        return new TameworkActivationReason(
-                Kind.DURABLE_STATE,
-                source,
-                stateId
-        );
-    }
-
-    /** Alias for durable recovery evidence. */
-    public static TameworkActivationReason recovery(String recoveryId) {
-        return durableState(recoveryId);
-    }
-
     /** Creates the reason recorded when a required external capability is missing. */
-    public static TameworkActivationReason missingCapability(String capabilityId) {
+    static TameworkActivationReason missingCapability(String capabilityId) {
         String value = requireText(capabilityId, "Capability ID");
         return new TameworkActivationReason(
                 Kind.PUBLIC_CAPABILITY,
@@ -105,7 +73,7 @@ public final class TameworkActivationReason implements Comparable<TameworkActiva
     }
 
     /** Creates a dependency edge reason. */
-    public static TameworkActivationReason dependency(
+    static TameworkActivationReason dependency(
             TameworkRuntimeModule dependent,
             TameworkRuntimeModule dependency
     ) {
@@ -119,7 +87,7 @@ public final class TameworkActivationReason implements Comparable<TameworkActiva
     }
 
     /** Creates a dependency reason for a complete path from direct evidence. */
-    public static TameworkActivationReason dependency(
+    static TameworkActivationReason dependency(
             List<TameworkRuntimeModule> path
     ) {
         if (path == null || path.size() < 2 || path.stream().anyMatch(Objects::isNull)) {
@@ -147,14 +115,17 @@ public final class TameworkActivationReason implements Comparable<TameworkActiva
         return detail;
     }
 
-    /** Returns a stable rendering for diagnostics and deterministic ordering. */
-    public String stableKey() {
-        return kind.name() + "|" + source + "|" + detail;
-    }
-
     @Override
     public int compareTo(TameworkActivationReason other) {
-        return stableKey().compareTo(other.stableKey());
+        int kindComparison = kind.compareTo(other.kind);
+        if (kindComparison != 0) {
+            return kindComparison;
+        }
+        int sourceComparison = source.compareTo(other.source);
+        if (sourceComparison != 0) {
+            return sourceComparison;
+        }
+        return detail.compareTo(other.detail);
     }
 
     @Override
@@ -173,7 +144,7 @@ public final class TameworkActivationReason implements Comparable<TameworkActiva
 
     @Override
     public String toString() {
-        return stableKey();
+        return kind + "(" + source + ":" + detail + ")";
     }
 
     private static TameworkRuntimeModule requireModule(TameworkRuntimeModule module) {

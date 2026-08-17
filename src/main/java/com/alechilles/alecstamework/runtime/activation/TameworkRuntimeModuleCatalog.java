@@ -7,7 +7,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -47,14 +46,6 @@ public final class TameworkRuntimeModuleCatalog {
         validateDependencies(byModule);
         this.descriptors = immutableDescriptorMap(byModule);
         this.modules = Collections.unmodifiableSet(new LinkedHashSet<>(this.descriptors.keySet()));
-    }
-
-    /** Creates a catalog from descriptors. */
-    public static TameworkRuntimeModuleCatalog of(
-            TameworkRuntimeModuleDescriptor... descriptors
-    ) {
-        Objects.requireNonNull(descriptors, "Runtime module descriptors are required");
-        return new TameworkRuntimeModuleCatalog(List.of(descriptors));
     }
 
     /** Creates the current built-in Tamework module topology. */
@@ -157,7 +148,7 @@ public final class TameworkRuntimeModuleCatalog {
                         core,
                         persistence
                 ),
-                TameworkRuntimeModuleDescriptor.of(TameworkRuntimeModule.HSTATS, core),
+                TameworkRuntimeModuleDescriptor.of(TameworkRuntimeModule.HSTATS),
                 TameworkRuntimeModuleDescriptor.of(
                         TameworkRuntimeModule.DEBUG_SELF_TEST,
                         core

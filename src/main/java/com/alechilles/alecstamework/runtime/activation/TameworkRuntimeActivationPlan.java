@@ -77,11 +77,6 @@ public final class TameworkRuntimeActivationPlan {
         return state;
     }
 
-    /** Alias for {@link #state(TameworkRuntimeModule)}. */
-    public ModuleState moduleState(TameworkRuntimeModule module) {
-        return state(module);
-    }
-
     /** Returns whether a module is active in this immutable plan. */
     public boolean isActive(TameworkRuntimeModule module) {
         return state(module) == ModuleState.ACTIVE;
@@ -144,11 +139,6 @@ public final class TameworkRuntimeActivationPlan {
         return topologyFingerprint;
     }
 
-    /** Alias for {@link #topologyFingerprint()}. */
-    public String fingerprint() {
-        return topologyFingerprint;
-    }
-
     static String fingerprint(
             Map<TameworkRuntimeModule, ModuleState> states,
             Map<TameworkRuntimeModule, Set<TameworkRuntimeModule>> dependencies
@@ -156,16 +146,18 @@ public final class TameworkRuntimeActivationPlan {
         List<TameworkRuntimeModule> modules = new ArrayList<>(states.keySet());
         Collections.sort(modules);
         StringBuilder canonical = new StringBuilder();
+        appendField(canonical, Integer.toString(modules.size()));
         for (TameworkRuntimeModule module : modules) {
-            canonical.append(module.id())
-                    .append('|')
-                    .append(states.get(module).name())
-                    .append('|');
-            dependencies.getOrDefault(module, Set.of()).stream()
+            appendField(canonical, module.id());
+            appendField(canonical, states.get(module).name());
+            List<String> dependencyIds = dependencies.getOrDefault(module, Set.of()).stream()
                     .map(TameworkRuntimeModule::id)
                     .sorted()
-                    .forEach(dependency -> canonical.append(dependency).append(','));
-            canonical.append(';');
+                    .toList();
+            appendField(canonical, Integer.toString(dependencyIds.size()));
+            for (String dependencyId : dependencyIds) {
+                appendField(canonical, dependencyId);
+            }
         }
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256")
@@ -179,6 +171,11 @@ public final class TameworkRuntimeActivationPlan {
         } catch (NoSuchAlgorithmException impossible) {
             throw new AssertionError("JVM must provide SHA-256", impossible);
         }
+    }
+
+    private static void appendField(StringBuilder canonical, String value) {
+        byte[] encoded = value.getBytes(StandardCharsets.UTF_8);
+        canonical.append(encoded.length).append(':').append(value);
     }
 
     private static Map<TameworkRuntimeModule, ModuleState> immutableStates(
