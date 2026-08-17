@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tamework Companion Progression"
+  short_description: "Protects companion progression lifecycles"
+  default_prompt: "Use $tamework-companion-progression to change this companion progression behavior across runtime, save, and restore paths."
