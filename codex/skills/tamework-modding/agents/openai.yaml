@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tamework Modding"
+  short_description: "Edits Tamework code and profile-locked assets"
+  default_prompt: "Use $tamework-modding to update this Tamework code and its NPC assets using current registrations and exact-profile validation."

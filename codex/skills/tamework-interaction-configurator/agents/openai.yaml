@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tamework Interaction Configurator"
+  short_description: "Validates Tamework interaction lifecycle wiring"
+  default_prompt: "Use $tamework-interaction-configurator to wire this interaction with exact-profile guidance, inheritance provenance, and lifecycle verification."

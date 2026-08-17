@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tamework Test Authoring"
+  short_description: "Tests Tamework code and asset behavior contracts"
+  default_prompt: "Use $tamework-test-authoring to add focused Tamework regression tests and separate Java, asset-validation, and runtime evidence."
