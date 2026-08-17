@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 3.1.9 - Companion Spawn Safety Hotfix - 2026-08-16
 
 ### Fixed
 - Newly spawned companion projections now clear stale fall distance and
