@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tamework Command Runtime"
+  short_description: "Protects command and panel runtime flows"
+  default_prompt: "Use $tamework-command-runtime to trace and change this command action across authority, UI, execution, and cleanup."
