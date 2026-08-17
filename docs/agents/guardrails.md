@@ -13,9 +13,11 @@ This page collects repo-specific checks that should be run before trusting an an
 
 Before finalizing changes to runtime systems, tick paths, async callbacks, damage dispatch, or player access, run:
 
-```powershell
+```bash
 rg "PlayerRef\.getComponent\(Player|getComponent\(Player\.getComponentType\(\)\)|Universe\.get\(\).*getPlayers" -n src/main/java
-.\mvnw.cmd -Dtest=EcsWriteSafetyGuardTest,AsyncThreadSafetyGuardTest test
+bash ../gradlew -p .. :alecstamework:test \
+  --tests '*EcsWriteSafetyGuardTest' \
+  --tests '*AsyncThreadSafetyGuardTest'
 ```
 
 If matches are in tick/runtime paths, resolve players from the current world/store or route writes through `CommandBuffer` before merge.
@@ -24,8 +26,9 @@ If matches are in tick/runtime paths, resolve players from the current world/sto
 
 Run this after changing `AGENTS.md`, `docs/agents`, package layout, scripts, tests, or major docs:
 
-```powershell
-.\scripts\tools\check-agent-docs.ps1
+```bash
+pwsh -NoProfile -ExecutionPolicy Bypass \
+  -File scripts/tools/check-agent-docs.ps1
 ```
 
 The check verifies that:
@@ -41,8 +44,10 @@ The check verifies that:
 After changing the replacement kernel, identity, lifecycle, snapshot, operation, recovery, or
 projection code, run:
 
-```powershell
-.\mvnw.cmd -Dtest=ReplacementPersistenceArchitectureGuardTest,PersistenceProcessCrashMatrixTest test
+```bash
+bash ../gradlew -p .. :alecstamework:test \
+  --tests '*ReplacementPersistenceArchitectureGuardTest' \
+  --tests '*PersistenceProcessCrashMatrixTest'
 ```
 
 The architecture guard enforces one canonical lifecycle mutation path, connection-bound stores,

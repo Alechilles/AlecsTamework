@@ -22,6 +22,7 @@ Thumbs.db
 *.cache
 **/__pycache__/
 *.py[cod]
+/.codex-remote-attachments/
 
 # Focused verification compiler output
 /outputs/*-check/

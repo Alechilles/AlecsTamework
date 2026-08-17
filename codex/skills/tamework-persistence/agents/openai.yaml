@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tamework Persistence"
+  short_description: "Safely extend Tamework persistence systems"
+  default_prompt: "Use $tamework-persistence to plan or verify this Tamework persistence change."
