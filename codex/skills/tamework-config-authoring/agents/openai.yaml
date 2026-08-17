@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tamework Config Authoring"
+  short_description: "Changes Tamework config families safely"
+  default_prompt: "Use $tamework-config-authoring to change this Tamework config family across its full runtime contract."
