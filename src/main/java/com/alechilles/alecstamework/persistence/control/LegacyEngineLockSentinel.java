@@ -37,10 +37,12 @@ final class LegacyEngineLockSentinel {
     }
 
     private static void retireRegularFile(Path legacyPath) throws IOException {
-        try (FileChannel channel = FileChannel.open(
+        FileChannel channel = FileChannel.open(
                 legacyPath,
                 StandardOpenOption.WRITE
-        )) {
+        );
+        boolean retainChannel = false;
+        try {
             FileLock lock = tryLock(channel);
             try {
                 if (!Files.isRegularFile(
@@ -56,6 +58,16 @@ final class LegacyEngineLockSentinel {
             } finally {
                 lock.release();
             }
+        } catch (PersistenceEngineLockUnavailableException failure) {
+            if (failure.sameProcess()) {
+                retainChannel = true;
+                PersistenceEngineLease.retainOverlappingChannel(channel);
+            }
+            throw failure;
+        } finally {
+            if (!retainChannel) {
+                channel.close();
+            }
         }
     }
 
@@ -63,16 +75,18 @@ final class LegacyEngineLockSentinel {
         try {
             FileLock lock = channel.tryLock();
             if (lock == null) {
-                throw unavailable();
+                throw PersistenceEngineLockUnavailableException.legacy(
+                        false,
+                        null
+                );
             }
             return lock;
         } catch (OverlappingFileLockException failure) {
-            throw unavailable();
+            throw PersistenceEngineLockUnavailableException.legacy(
+                    true,
+                    failure
+            );
         }
-    }
-
-    private static IllegalStateException unavailable() {
-        return new IllegalStateException("persistence_engine_lock_unavailable");
     }
 
     private static void createDirectorySentinel(Path legacyPath)

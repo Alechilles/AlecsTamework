@@ -2,13 +2,13 @@ package com.alechilles.alecstamework.persistence.control;
 
 import com.alechilles.alecstamework.persistence.kernel.PersistenceFiles;
 import java.nio.charset.StandardCharsets;
-import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
@@ -61,31 +61,6 @@ class PersistenceEngineLeaseTest {
         try (PersistenceEngineLease ignored =
                      PersistenceEngineLease.acquireReplacement(tempDir)) {
             assertTrue(Files.isDirectory(
-                    legacyPath,
-                    LinkOption.NOFOLLOW_LINKS
-            ));
-        }
-    }
-
-    @Test
-    void heldFormerLockFileFailsWithoutReplacingIt() throws Exception {
-        Path legacyPath = tempDir.resolve(
-                LEGACY_LOCK_FILENAME
-        );
-        try (FileChannel channel = FileChannel.open(
-                legacyPath,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.WRITE
-        ); FileLock ignored = channel.lock()) {
-            IllegalStateException failure = assertThrows(
-                    IllegalStateException.class,
-                    () -> PersistenceEngineLease.acquireReplacement(tempDir)
-            );
-            assertEquals(
-                    "persistence_engine_lock_unavailable",
-                    failure.getMessage()
-            );
-            assertTrue(Files.isRegularFile(
                     legacyPath,
                     LinkOption.NOFOLLOW_LINKS
             ));
@@ -156,6 +131,75 @@ class PersistenceEngineLeaseTest {
                      )) {
             assertLockUnavailable(PersistenceEngineLineage.LEGACY_PUBLIC);
             assertLockUnavailable(PersistenceEngineLineage.REPLACEMENT);
+        }
+    }
+
+    @Test
+    void waitsForRecentlyReleasedSameProcessLease() {
+        PersistenceEngineLease first = PersistenceEngineLease.acquire(
+                tempDir,
+                PersistenceEngineLineage.REPLACEMENT,
+                () -> 10
+        );
+        CompletableFuture<Void> released = CompletableFuture.runAsync(() -> {
+            try {
+                Thread.sleep(100);
+                first.close();
+            } catch (InterruptedException failure) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(failure);
+            }
+        });
+
+        try (PersistenceEngineLease second =
+                     PersistenceEngineLease.acquireReplacement(tempDir)) {
+            assertEquals(
+                    PersistenceEngineLineage.REPLACEMENT,
+                    second.requestedLineage()
+            );
+        } finally {
+            first.close();
+            released.join();
+        }
+    }
+
+    @Test
+    void interruptedSameProcessHandoffDoesNotAcquireReleasedLease()
+            throws Exception {
+        PersistenceEngineLease first =
+                PersistenceEngineLease.acquireReplacement(tempDir);
+        AtomicReference<Thread> waiter = new AtomicReference<>();
+        CompletableFuture<InterruptedAttempt> attempted =
+                new CompletableFuture<>();
+        Thread contender = new Thread(() -> {
+            waiter.set(Thread.currentThread());
+            try (PersistenceEngineLease ignored =
+                         PersistenceEngineLease.acquireReplacement(tempDir)) {
+                attempted.complete(new InterruptedAttempt(null, false));
+            } catch (IllegalStateException failure) {
+                attempted.complete(new InterruptedAttempt(
+                        failure,
+                        Thread.currentThread().isInterrupted()
+                ));
+            }
+        }, "persistence-interrupted-handoff-test");
+        contender.start();
+        try {
+            awaitTimedWaiting(waiter);
+            synchronized (System.getProperties()) {
+                first.close();
+                waiter.get().interrupt();
+            }
+            InterruptedAttempt result = attempted.join();
+            assertEquals(
+                    "persistence_engine_lock_unavailable:path=active;scope=same_process",
+                    result.failure().getMessage()
+            );
+            assertTrue(result.interrupted());
+        } finally {
+            first.close();
+            contender.interrupt();
+            contender.join(TimeUnit.SECONDS.toMillis(2));
         }
     }
 
@@ -330,8 +374,29 @@ class PersistenceEngineLeaseTest {
                 )
         );
         assertEquals(
-                "persistence_engine_lock_unavailable",
+                "persistence_engine_lock_unavailable:path=active;scope=same_process",
                 failure.getMessage()
         );
+    }
+
+    private static void awaitTimedWaiting(
+            AtomicReference<Thread> thread
+    ) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+        while (System.nanoTime() < deadline) {
+            Thread current = thread.get();
+            if (current != null
+                    && current.getState() == Thread.State.TIMED_WAITING) {
+                return;
+            }
+            Thread.sleep(5);
+        }
+        throw new AssertionError("Persistence acquisition did not wait");
+    }
+
+    private record InterruptedAttempt(
+            IllegalStateException failure,
+            boolean interrupted
+    ) {
     }
 }

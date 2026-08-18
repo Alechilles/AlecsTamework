@@ -8,7 +8,11 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Optional;
+import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 
@@ -21,7 +25,14 @@ import javax.annotation.Nonnull;
 public final class PersistenceEngineLease implements AutoCloseable {
     public static final String LOCK_FILENAME =
             "LOCK";
+    private static final long LOCK_HANDOFF_TIMEOUT_NANOS =
+            TimeUnit.SECONDS.toNanos(3);
+    private static final long LOCK_RETRY_INTERVAL_NANOS =
+            TimeUnit.MILLISECONDS.toNanos(50);
+    private static final String JVM_RESERVATION_PREFIX =
+            "com.alechilles.alecstamework.persistence.owner:";
 
+    private final JvmReservation reservation;
     private final PersistenceEngineLineage requestedLineage;
     private final PersistenceEngineManifestStore manifests;
     private final LongSupplier clock;
@@ -31,12 +42,14 @@ public final class PersistenceEngineLease implements AutoCloseable {
     private boolean startupPublished;
 
     private PersistenceEngineLease(
+            JvmReservation reservation,
             PersistenceEngineLineage requestedLineage,
             PersistenceEngineManifestStore manifests,
             LongSupplier clock,
             FileChannel channel,
             FileLock lock
     ) {
+        this.reservation = reservation;
         this.requestedLineage = requestedLineage;
         this.manifests = manifests;
         this.clock = clock;
@@ -78,7 +91,61 @@ public final class PersistenceEngineLease implements AutoCloseable {
                     "Engine lease directory, lineage, and clock are required"
             );
         }
-        Path directory = dataDirectory.toAbsolutePath().normalize();
+        Path directory = canonicalDirectory(dataDirectory);
+        long deadline = System.nanoTime() + LOCK_HANDOFF_TIMEOUT_NANOS;
+        JvmReservation reservation = JvmReservation.acquire(
+                directory,
+                deadline
+        );
+        try {
+            PersistenceEngineLockUnavailableException lastFailure = null;
+            while (true) {
+                if (lastFailure != null
+                        && (System.nanoTime() >= deadline
+                        || Thread.currentThread().isInterrupted())) {
+                    throw lastFailure;
+                }
+                try {
+                    return acquireOnce(
+                            directory,
+                            requested,
+                            clock,
+                            reservation
+                    );
+                } catch (PersistenceEngineLockUnavailableException failure) {
+                    if (failure.sameProcess()) {
+                        throw failure;
+                    }
+                    lastFailure = failure;
+                    long remaining = deadline - System.nanoTime();
+                    if (remaining <= 0
+                            || Thread.currentThread().isInterrupted()) {
+                        throw failure;
+                    }
+                    LockSupport.parkNanos(Math.min(
+                            remaining,
+                            LOCK_RETRY_INTERVAL_NANOS
+                    ));
+                }
+            }
+        } catch (PersistenceEngineLockUnavailableException failure) {
+            if (failure.sameProcess()) {
+                reservation.retain();
+            }
+            reservation.close();
+            throw failure;
+        } catch (RuntimeException | Error failure) {
+            reservation.close();
+            throw failure;
+        }
+    }
+
+    private static PersistenceEngineLease acquireOnce(
+            Path directory,
+            PersistenceEngineLineage requested,
+            LongSupplier clock,
+            JvmReservation reservation
+    ) {
         FileChannel channel = null;
         try {
             Files.createDirectories(directory);
@@ -86,8 +153,9 @@ public final class PersistenceEngineLease implements AutoCloseable {
             channel = openLock(directory.resolve(LOCK_FILENAME));
             FileLock lock = channel.tryLock();
             if (lock == null) {
-                throw new IllegalStateException(
-                        "persistence_engine_lock_unavailable"
+                throw PersistenceEngineLockUnavailableException.active(
+                        false,
+                        null
                 );
             }
             PersistenceEngineManifestStore manifests =
@@ -95,6 +163,7 @@ public final class PersistenceEngineLease implements AutoCloseable {
             Optional<PersistenceEngineManifest> current = manifests.read();
             validateSelection(requested, current);
             PersistenceEngineLease lease = new PersistenceEngineLease(
+                    reservation,
                     requested,
                     manifests,
                     clock,
@@ -106,16 +175,25 @@ public final class PersistenceEngineLease implements AutoCloseable {
             }
             return lease;
         } catch (OverlappingFileLockException failure) {
-            closeChannel(channel);
-            throw new IllegalStateException(
-                    "persistence_engine_lock_unavailable",
+            retainOverlappingChannel(channel);
+            throw PersistenceEngineLockUnavailableException.active(
+                    true,
                     failure
             );
         } catch (RuntimeException failure) {
-            closeChannel(channel);
+            if (!closeChannel(channel)) {
+                reservation.retain();
+            }
+            throw failure;
+        } catch (Error failure) {
+            if (!closeChannel(channel)) {
+                reservation.retain();
+            }
             throw failure;
         } catch (Exception failure) {
-            closeChannel(channel);
+            if (!closeChannel(channel)) {
+                reservation.retain();
+            }
             throw new IllegalStateException(
                     "persistence_engine_lease_failed",
                     failure
@@ -195,10 +273,17 @@ public final class PersistenceEngineLease implements AutoCloseable {
         } catch (Exception releaseFailure) {
             failure = merge(failure, releaseFailure);
         }
+        boolean channelClosed = false;
         try {
             channel.close();
+            channelClosed = true;
         } catch (Exception closeFailure) {
             failure = merge(failure, closeFailure);
+        }
+        if (channelClosed) {
+            reservation.close();
+        } else {
+            reservation.retain();
         }
         if (failure != null) {
             throw failure;
@@ -254,14 +339,43 @@ public final class PersistenceEngineLease implements AutoCloseable {
         return existing;
     }
 
-    private static void closeChannel(FileChannel channel) {
+    private static boolean closeChannel(FileChannel channel) {
         if (channel == null) {
-            return;
+            return true;
         }
         try {
             channel.close();
+            return true;
         } catch (Exception ignored) {
             // Preserve the acquisition failure as the primary diagnostic.
+            return false;
+        }
+    }
+
+    static void retainOverlappingChannel(FileChannel channel) {
+        if (channel == null) {
+            return;
+        }
+        Thread safetyHold = new Thread(() -> {
+            while (channel.isOpen()) {
+                LockSupport.park();
+            }
+        }, "tamework-overlapping-lock-safety-hold");
+        safetyHold.setDaemon(true);
+        safetyHold.setContextClassLoader(null);
+        safetyHold.start();
+    }
+
+    private static Path canonicalDirectory(Path dataDirectory) {
+        Path normalized = dataDirectory.toAbsolutePath().normalize();
+        try {
+            Files.createDirectories(normalized);
+            return normalized.toRealPath();
+        } catch (Exception failure) {
+            throw new IllegalStateException(
+                    "persistence_engine_lease_failed",
+                    failure
+            );
         }
     }
 
@@ -286,5 +400,82 @@ public final class PersistenceEngineLease implements AutoCloseable {
             );
         }
         return channel;
+    }
+
+    /** Process-wide reservation shared across Tamework plugin classloaders. */
+    private static final class JvmReservation implements AutoCloseable {
+        private final Properties properties;
+        private final String key;
+        private final String token;
+        private boolean retained;
+        private boolean closed;
+
+        private JvmReservation(
+                Properties properties,
+                String key,
+                String token
+        ) {
+            this.properties = properties;
+            this.key = key;
+            this.token = token;
+        }
+
+        private static JvmReservation acquire(
+                Path directory,
+                long deadline
+        ) {
+            Properties properties = System.getProperties();
+            String key = JVM_RESERVATION_PREFIX + directory;
+            String token = UUID.randomUUID().toString();
+            PersistenceEngineLockUnavailableException failure =
+                    PersistenceEngineLockUnavailableException.active(
+                            true,
+                            null
+                    );
+            boolean contended = false;
+            while (true) {
+                if (contended && (System.nanoTime() >= deadline
+                        || Thread.currentThread().isInterrupted())) {
+                    throw failure;
+                }
+                synchronized (properties) {
+                    if (properties.getProperty(key) == null) {
+                        properties.setProperty(key, token);
+                        return new JvmReservation(
+                                properties,
+                                key,
+                                token
+                        );
+                    }
+                }
+                contended = true;
+                long remaining = deadline - System.nanoTime();
+                if (remaining <= 0
+                        || Thread.currentThread().isInterrupted()) {
+                    throw failure;
+                }
+                LockSupport.parkNanos(Math.min(
+                        remaining,
+                        LOCK_RETRY_INTERVAL_NANOS
+                ));
+            }
+        }
+
+        private synchronized void retain() {
+            retained = true;
+        }
+
+        @Override
+        public synchronized void close() {
+            if (closed || retained) {
+                return;
+            }
+            synchronized (properties) {
+                if (token.equals(properties.getProperty(key))) {
+                    properties.remove(key);
+                }
+            }
+            closed = true;
+        }
     }
 }

@@ -13,6 +13,9 @@
 - Tamework now registers its NPC builders before generic persistence starts. If another process
   owns the persistence lock, Tamework and dependent Animal Husbandry NPC assets still load while
   saved-state features remain safely unavailable.
+- Generic persistence now waits through a short server-shutdown handoff before it rejects a held
+  process lock. A lock error now identifies the active or legacy path and whether the owner is in
+  the same process or another process.
 - Fixed water buckets placing water above feed troughs instead of filling them. Tamework now starts
   its embedded asset patcher before the initial asset load, so bucket integration changes refresh
   when the server starts.

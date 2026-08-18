@@ -118,6 +118,14 @@ and `Tamework/Data/.tamework-import-lock/LOCK` serializes replacement-import
 publication. These files are ephemeral: Tamework recreates them when needed,
 and Hytale excludes them from world backups.
 
+At startup, Tamework waits up to three seconds for a previous server process
+to release its persistence lock. If the lock remains held, startup fails
+closed. The error reports `path=active` or `path=legacy` and
+`scope=same_process` or `scope=external_process`. For `external_process`,
+close the other Hytale server process and restart. For `same_process`, close
+the Hytale client or server process fully and then restart it. Do not delete or
+replace a held lock file.
+
 After an upgrade, `Tamework/Data/.tamework-persistence-engine.lock/` may
 remain as an empty upgrade sentinel. It contains no gameplay data and
 intentionally prevents older Tamework builds from reopening the upgraded
