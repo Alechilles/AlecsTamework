@@ -106,7 +106,7 @@ final class InteractionMatchHelpers {
             return allowBlank;
         }
         if (ctx != null) {
-            Boolean cachedMatch = ctx.promptContextMatches.get(context);
+            Boolean cachedMatch = ctx.getPromptContextMatch(context);
             if (cachedMatch != null) {
                 return cachedMatch;
             }
@@ -114,7 +114,7 @@ final class InteractionMatchHelpers {
         boolean matched = matchesRoleInteractionContext(context, role, infoProvider, ctx)
                 || matchesHeldItemInteractionContext(context, ctx);
         if (ctx != null) {
-            ctx.promptContextMatches.put(context, matched);
+            ctx.cachePromptContextMatch(context, matched);
         }
         return matched;
     }

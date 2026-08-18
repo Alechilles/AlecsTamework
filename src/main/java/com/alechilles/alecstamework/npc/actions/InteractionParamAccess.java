@@ -5,12 +5,14 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedIntera
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedItem;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -51,6 +53,15 @@ final class InteractionParamAccess {
                                                    Role role) {
         StdScope[] roleScopes = paramResolver.resolveRoleScopes(role, null);
         return InteractionContextSnapshot.from(player, roleScopes, playerRef);
+    }
+
+    InteractionContextSnapshot buildContextSnapshot(Player player,
+                                                    @Nullable Ref<EntityStore> playerRef,
+                                                    Role role,
+                                                    @Nullable ItemStack activeItem,
+                                                    @Nullable UUID playerId) {
+        StdScope[] roleScopes = paramResolver.resolveRoleScopes(role, null);
+        return InteractionContextSnapshot.from(player, roleScopes, playerRef, activeItem, playerId);
     }
 
     // Resolves the primary role scope for param evaluation.

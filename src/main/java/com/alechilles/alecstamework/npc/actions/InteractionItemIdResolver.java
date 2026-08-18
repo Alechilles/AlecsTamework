@@ -31,7 +31,7 @@ final class InteractionItemIdResolver {
             return null;
         }
         if (ctx != null) {
-            String[] cached = ctx.resolvedItemIdsByParamName.get(itemsParam);
+            String[] cached = ctx.getResolvedItemIds(itemsParam);
             if (cached != null) {
                 return cached.length == 0 ? null : cached;
             }
@@ -41,7 +41,7 @@ final class InteractionItemIdResolver {
                 ? null
                 : InteractionItemParser.parseItemIdsFromParam(rawValues);
         if (ctx != null) {
-            ctx.resolvedItemIdsByParamName.put(itemsParam, resolved != null ? resolved : EMPTY_ITEMS);
+            ctx.cacheResolvedItemIds(itemsParam, resolved != null ? resolved : EMPTY_ITEMS);
         }
         return resolved;
     }
@@ -51,12 +51,6 @@ final class InteractionItemIdResolver {
                                                          @Nullable Role role,
                                                          @Nullable InteractionContextSnapshot ctx,
                                                          @Nullable String[] lovedItems) {
-        if (ctx != null) {
-            InteractionRequiredItems cached = ctx.feedRequirementItemsByInteraction.get(interaction);
-            if (cached != null) {
-                return cached;
-            }
-        }
         String[] paramItems = resolveItemsParam(role, ctx, interaction.getItemsParam());
         String[] explicitItems = resolveExplicitFeedItemIds(interaction.getItemsInHand());
         String[] profileItems = TwFoodConfig.resolveAcceptedItemIdsForRole(resolveRoleId(role));
@@ -70,9 +64,6 @@ final class InteractionItemIdResolver {
             resolved = new InteractionRequiredItems(lovedItems, true);
         } else {
             resolved = new InteractionRequiredItems(EMPTY_ITEMS, false);
-        }
-        if (ctx != null) {
-            ctx.feedRequirementItemsByInteraction.put(interaction, resolved);
         }
         return resolved;
     }

@@ -21,6 +21,7 @@ import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.role.Role;
@@ -29,6 +30,7 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import com.hypixel.hytale.server.npc.util.expression.ExecutionContext;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import com.hypixel.hytale.server.npc.util.expression.Scope;
+import java.util.UUID;
 
 /**
  * Prototype action that executes a TwInteractionConfig-driven interaction flow.
@@ -260,6 +262,14 @@ public class ActionTameworkInteract extends TameworkActionBase {
                                                     Ref<EntityStore> playerRef,
                                                     Role role) {
         return resolution.buildContextSnapshot(player, playerRef, role);
+    }
+
+    InteractionContextSnapshot buildContextSnapshot(Player player,
+                                                    Ref<EntityStore> playerRef,
+                                                    Role role,
+                                                    ItemStack activeItem,
+                                                    UUID playerId) {
+        return resolution.buildContextSnapshot(player, playerRef, role, activeItem, playerId);
     }
 
     // Resolves the interaction config for prompt/selection helpers.

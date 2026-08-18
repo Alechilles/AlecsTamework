@@ -90,7 +90,7 @@ final class InteractionItemRequirementResolver {
         if (requirement == null || ctx == null) {
             return false;
         }
-        Inventory inventory = ctx.inventory;
+        Inventory inventory = ctx.resolveInventory();
         if (inventory == null) {
             return false;
         }
@@ -393,7 +393,7 @@ final class InteractionItemRequirementResolver {
 
     // Returns the combined inventory container for the interaction context.
     CombinedItemContainer resolveInventoryContainer(InteractionContextSnapshot ctx) {
-        return ctx != null ? ctx.combinedInventory : null;
+        return ctx != null ? ctx.resolveCombinedInventory() : null;
     }
 
     // Normalizes quantity to a minimum of one.

@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.npc.actions;
 
-import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.protocol.MovementStates;
@@ -20,8 +19,6 @@ import javax.annotation.Nullable;
  */
 final class InteractionContextSnapshot {
     final Player player;
-    final Inventory inventory;
-    final CombinedItemContainer combinedInventory;
     final ItemStack activeItem;
     final String activeItemId;
     final UUID playerId;
@@ -36,10 +33,18 @@ final class InteractionContextSnapshot {
     Boolean cachedPlayerIsOwner;
     @Nullable
     MovementStates cachedPlayerMovementStates;
-    final Map<String, Boolean> promptContextMatches;
-    final Map<String, String[]> resolvedItemIdsByParamName;
-    final Map<FeedInteraction, InteractionRequiredItems> feedRequirementItemsByInteraction;
-    final Map<String, InteractionAlarmHelper.AlarmSnapshot> alarmSnapshotsByName;
+    @Nullable
+    private Inventory inventory;
+    private boolean inventoryResolved;
+    @Nullable
+    private CombinedItemContainer combinedInventory;
+    private boolean combinedInventoryResolved;
+    @Nullable
+    private Map<String, Boolean> promptContextMatches;
+    @Nullable
+    private Map<String, String[]> resolvedItemIdsByParamName;
+    @Nullable
+    private Map<String, InteractionAlarmHelper.AlarmSnapshot> alarmSnapshotsByName;
 
     private InteractionContextSnapshot(Player player,
                                        Inventory inventory,
@@ -51,16 +56,14 @@ final class InteractionContextSnapshot {
                                        @Nullable Ref<EntityStore> playerRef) {
         this.player = player;
         this.inventory = inventory;
+        this.inventoryResolved = inventory != null;
         this.combinedInventory = combinedInventory;
+        this.combinedInventoryResolved = combinedInventory != null;
         this.activeItem = activeItem;
         this.activeItemId = activeItemId;
         this.playerId = playerId;
         this.roleScopes = roleScopes;
         this.playerRef = playerRef;
-        this.promptContextMatches = new HashMap<>();
-        this.resolvedItemIdsByParamName = new HashMap<>();
-        this.feedRequirementItemsByInteraction = new HashMap<>();
-        this.alarmSnapshotsByName = new HashMap<>();
     }
 
     private InteractionContextSnapshot(Player player,
@@ -76,20 +79,27 @@ final class InteractionContextSnapshot {
     static InteractionContextSnapshot from(@Nullable Player player,
                                            StdScope[] roleScopes,
                                            @Nullable Ref<EntityStore> playerRef) {
+        ItemStack activeItem = PlayerInventoryAccess.getActiveHotbarItem(player);
+        UUID playerId = player != null ? player.getUuid() : null;
+        return from(player, roleScopes, playerRef, activeItem, playerId);
+    }
+
+    static InteractionContextSnapshot from(@Nullable Player player,
+                                           StdScope[] roleScopes,
+                                           @Nullable Ref<EntityStore> playerRef,
+                                           @Nullable ItemStack activeItem,
+                                           @Nullable UUID playerId) {
         if (player == null) {
             return new InteractionContextSnapshot(null, null, null, null, null, null, roleScopes, playerRef);
         }
-        Inventory inventory = player.getInventory();
-        CombinedItemContainer combined = inventory != null ? inventory.getCombinedBackpackStorageHotbar() : null;
-        ItemStack active = PlayerInventoryAccess.getActiveHotbarItem(player);
-        String activeId = (active != null && !active.isEmpty()) ? active.getItemId() : null;
+        String activeId = activeItem != null && !activeItem.isEmpty() ? activeItem.getItemId() : null;
         return new InteractionContextSnapshot(
                 player,
-                inventory,
-                combined,
-                active,
+                null,
+                null,
+                activeItem,
                 activeId,
-                player.getUuid(),
+                playerId,
                 roleScopes,
                 playerRef
         );
@@ -97,5 +107,62 @@ final class InteractionContextSnapshot {
 
     static InteractionContextSnapshot from(@Nullable Player player, StdScope[] roleScopes) {
         return from(player, roleScopes, null);
+    }
+
+    @Nullable
+    CombinedItemContainer resolveCombinedInventory() {
+        if (!combinedInventoryResolved) {
+            Inventory resolvedInventory = resolveInventory();
+            combinedInventory = resolvedInventory != null
+                    ? resolvedInventory.getCombinedBackpackStorageHotbar()
+                    : null;
+            combinedInventoryResolved = true;
+        }
+        return combinedInventory;
+    }
+
+    @Nullable
+    Inventory resolveInventory() {
+        if (!inventoryResolved) {
+            inventory = player != null ? player.getInventory() : null;
+            inventoryResolved = true;
+        }
+        return inventory;
+    }
+
+    @Nullable
+    Boolean getPromptContextMatch(String context) {
+        return promptContextMatches != null ? promptContextMatches.get(context) : null;
+    }
+
+    void cachePromptContextMatch(String context, boolean matched) {
+        if (promptContextMatches == null) {
+            promptContextMatches = new HashMap<>();
+        }
+        promptContextMatches.put(context, matched);
+    }
+
+    @Nullable
+    String[] getResolvedItemIds(String paramName) {
+        return resolvedItemIdsByParamName != null ? resolvedItemIdsByParamName.get(paramName) : null;
+    }
+
+    void cacheResolvedItemIds(String paramName, String[] itemIds) {
+        if (resolvedItemIdsByParamName == null) {
+            resolvedItemIdsByParamName = new HashMap<>();
+        }
+        resolvedItemIdsByParamName.put(paramName, itemIds);
+    }
+
+    @Nullable
+    InteractionAlarmHelper.AlarmSnapshot getAlarmSnapshot(String alarmName) {
+        return alarmSnapshotsByName != null ? alarmSnapshotsByName.get(alarmName) : null;
+    }
+
+    void cacheAlarmSnapshot(String alarmName, InteractionAlarmHelper.AlarmSnapshot snapshot) {
+        if (alarmSnapshotsByName == null) {
+            alarmSnapshotsByName = new HashMap<>();
+        }
+        alarmSnapshotsByName.put(alarmName, snapshot);
     }
 }

@@ -73,14 +73,14 @@ final class InteractionAlarmHelper {
                            String alarmName,
                            InteractionContextSnapshot ctx) {
         if (ctx != null && alarmName != null && !alarmName.isBlank()) {
-            AlarmSnapshot cached = ctx.alarmSnapshotsByName.get(alarmName);
+            AlarmSnapshot cached = ctx.getAlarmSnapshot(alarmName);
             if (cached != null) {
                 return cached;
             }
         }
         AlarmSnapshot snapshot = snapshotUncached(npcRef, store, alarmName);
         if (ctx != null && alarmName != null && !alarmName.isBlank()) {
-            ctx.alarmSnapshotsByName.put(alarmName, snapshot);
+            ctx.cacheAlarmSnapshot(alarmName, snapshot);
         }
         return snapshot;
     }

@@ -105,7 +105,7 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
             resolved = cachedSelection.resolvedInteraction();
             prompt = cachedSelection.promptState();
         } else {
-            ctx = buildContextSnapshot(player, interactionTarget, role);
+            ctx = buildContextSnapshot(player, interactionTarget, role, activeItem, playerId);
             config = resolveConfig(role, ctx);
             if (config != null && config.isEnabled()) {
                 boolean adoptionPending = claimLegacyOwnershipForPrompt(npcRef, store, player);

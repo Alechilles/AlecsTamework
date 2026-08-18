@@ -4,9 +4,11 @@ import com.hypixel.hytale.component.Ref;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
+import java.util.UUID;
 
 /** Resolves interaction configs and role-scoped parameters. */
 final class InteractionResolution {
@@ -23,6 +25,14 @@ final class InteractionResolution {
                                                     Ref<EntityStore> playerRef,
                                                     Role role) {
         return paramAccess.buildContextSnapshot(player, playerRef, role);
+    }
+
+    InteractionContextSnapshot buildContextSnapshot(Player player,
+                                                    Ref<EntityStore> playerRef,
+                                                    Role role,
+                                                    ItemStack activeItem,
+                                                    UUID playerId) {
+        return paramAccess.buildContextSnapshot(player, playerRef, role, activeItem, playerId);
     }
 
     // Resolves the interaction config using overrides and role params.
