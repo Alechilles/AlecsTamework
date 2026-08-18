@@ -76,4 +76,14 @@ class NeedsSweepSchedulerTest {
     void invalidBaseIntervalFallsBackToImmediateSweep() {
         assertEquals(0L, NeedsSweepIntervalPolicy.intervalMsForRatios(1.0, 1.0, 0L));
     }
+
+    @Test
+    void healthyOutcomeUsesAdaptiveDelayAndNoSuppression() {
+        CompanionNeedsScheduledUpdate.Outcome outcome =
+                CompanionNeedsScheduledUpdate.outcomeForRatiosForTests(0.9, 0.9, false, false, 2_000L);
+
+        assertEquals(16_000L, outcome.nextDelayMs());
+        assertFalse(outcome.suppressionActive());
+        assertFalse(outcome.needsDamageActive());
+    }
 }

@@ -196,6 +196,9 @@ public final class CompanionNeedsService {
         return runNeedsUpdate(npcRef, store, roleId, 0.0, 0.0, false, true, commandBuffer, null);
     }
 
+    /**
+     * Compatibility path for the legacy scan until the scheduled system replaces its caller.
+     */
     public static boolean tickNeedsIfDue(@Nullable Ref<EntityStore> npcRef,
                                          @Nullable Store<EntityStore> store,
                                          @Nullable CommandBuffer<EntityStore> commandBuffer,
@@ -232,6 +235,24 @@ public final class CompanionNeedsService {
                 false,
                 true,
                 commandBuffer,
+                null,
+                true
+        );
+    }
+
+    /** Runs one scheduled needs update without a command buffer on the current world thread. */
+    public static boolean tickScheduledNeeds(@Nullable Ref<EntityStore> npcRef,
+                                              @Nullable Store<EntityStore> store,
+                                              @Nullable String roleId) {
+        return runNeedsUpdate(
+                npcRef,
+                store,
+                roleId,
+                0.0,
+                0.0,
+                false,
+                true,
+                null,
                 null,
                 true
         );
