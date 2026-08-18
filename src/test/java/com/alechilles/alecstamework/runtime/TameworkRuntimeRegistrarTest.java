@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.runtime.TameworkRuntimeRegistrationContext.R
 import com.alechilles.alecstamework.runtime.activation.TameworkActivationEvidence;
 import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeActivationPlan;
 import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeActivationPlanner;
+import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeDiagnostics;
 import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeModule;
 import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeModuleCatalog;
 import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeModuleDescriptor;
@@ -67,6 +68,41 @@ class TameworkRuntimeRegistrarTest {
 
         assertEquals(List.of("dependency", "active"), target.registered);
         assertEquals(List.of("dependency", "active"), observed);
+    }
+
+    @Test
+    void telemetryDistinguishesInactiveActiveIdleAndLoadedAnimalStates() {
+        TameworkRuntimeModule active = TameworkRuntimeModule.of("animal-runtime");
+        TameworkRuntimeModule dormant = TameworkRuntimeModule.of("unused-runtime");
+        TameworkRuntimeActivationPlan plan = plan(
+                List.of(
+                        TameworkRuntimeModuleDescriptor.of(active),
+                        TameworkRuntimeModuleDescriptor.of(dormant)
+                ),
+                TameworkActivationEvidence.builder().content(active, "husbandry-profile").build()
+        );
+        TameworkRuntimeDiagnostics diagnostics = new TameworkRuntimeDiagnostics(plan);
+        RecordingTarget target = new RecordingTarget();
+
+        new TameworkRuntimeRegistrar().register(
+                TameworkRuntimeRegistrationContext.builder(plan, target)
+                        .participant(participant(active, "animal-system", RegistrationKind.ECS_SYSTEM, target))
+                        .participant(participant(dormant, "unused-system", RegistrationKind.ECS_SYSTEM, target))
+                        .build(),
+                participant -> TameworkRuntimeRegistrationTelemetry.record(diagnostics, participant)
+        );
+
+        assertEquals(TameworkRuntimeDiagnostics.CounterSnapshot.zero(), diagnostics.countersFor(dormant));
+        assertEquals(1, diagnostics.countersFor(active).systemRegistrations());
+        assertEquals(0, diagnostics.countersFor(active).callbacks());
+        assertEquals(0, diagnostics.countersFor(active).workCycles());
+
+        diagnostics.recordCallback(active);
+        diagnostics.recordWorkCycle(active);
+
+        assertEquals(1, diagnostics.countersFor(active).callbacks());
+        assertEquals(1, diagnostics.countersFor(active).workCycles());
+        assertEquals(TameworkRuntimeDiagnostics.CounterSnapshot.zero(), diagnostics.countersFor(dormant));
     }
 
     @Test

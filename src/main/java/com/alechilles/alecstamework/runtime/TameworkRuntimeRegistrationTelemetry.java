@@ -13,11 +13,10 @@ public final class TameworkRuntimeRegistrationTelemetry {
             TameworkRuntimeRegistrationContext.Participant participant
     ) {
         switch (participant.kind()) {
+            case ECS_SYSTEM, CHUNK_SYSTEM ->
+                    diagnostics.recordSystemRegistration(participant.module());
             case WORKER -> diagnostics.recordWorkerStart(participant.module());
             case LISTENER, SUBSCRIPTION -> diagnostics.recordSubscription(participant.module());
-            default -> {
-                // ECS callbacks are counted by instrumented systems, not registration.
-            }
         }
     }
 }

@@ -34,6 +34,16 @@ public final class TameworkRuntimeDiagnostics {
         increment(module, CounterKind.CALLBACKS);
     }
 
+    /** Records one installed ECS or chunk system for a known module. */
+    public void recordSystemRegistration(TameworkRuntimeModule module) {
+        increment(module, CounterKind.SYSTEM_REGISTRATIONS);
+    }
+
+    /** Records one completed runtime work cycle for a known module. */
+    public void recordWorkCycle(TameworkRuntimeModule module) {
+        increment(module, CounterKind.WORK_CYCLES);
+    }
+
     /** Records one worker-start attempt for a known module. */
     public void recordWorkerStart(TameworkRuntimeModule module) {
         increment(module, CounterKind.WORKER_STARTS);
@@ -100,21 +110,27 @@ public final class TameworkRuntimeDiagnostics {
     }
 
     private enum CounterKind {
+        SYSTEM_REGISTRATIONS,
         CALLBACKS,
+        WORK_CYCLES,
         WORKER_STARTS,
         SUBSCRIPTIONS,
         DATABASE_OPENS
     }
 
     private static final class Counters {
+        private final AtomicLong systemRegistrations = new AtomicLong();
         private final AtomicLong callbacks = new AtomicLong();
+        private final AtomicLong workCycles = new AtomicLong();
         private final AtomicLong workerStarts = new AtomicLong();
         private final AtomicLong subscriptions = new AtomicLong();
         private final AtomicLong databaseOpens = new AtomicLong();
 
         private void increment(CounterKind kind) {
             switch (kind) {
+                case SYSTEM_REGISTRATIONS -> systemRegistrations.incrementAndGet();
                 case CALLBACKS -> callbacks.incrementAndGet();
+                case WORK_CYCLES -> workCycles.incrementAndGet();
                 case WORKER_STARTS -> workerStarts.incrementAndGet();
                 case SUBSCRIPTIONS -> subscriptions.incrementAndGet();
                 case DATABASE_OPENS -> databaseOpens.incrementAndGet();
@@ -123,7 +139,9 @@ public final class TameworkRuntimeDiagnostics {
 
         private CounterSnapshot snapshot() {
             return new CounterSnapshot(
+                    systemRegistrations.get(),
                     callbacks.get(),
+                    workCycles.get(),
                     workerStarts.get(),
                     subscriptions.get(),
                     databaseOpens.get()
@@ -133,13 +151,15 @@ public final class TameworkRuntimeDiagnostics {
 
     /** Immutable counter values at one instant. */
     public record CounterSnapshot(
+            long systemRegistrations,
             long callbacks,
+            long workCycles,
             long workerStarts,
             long subscriptions,
             long databaseOpens
     ) {
         public CounterSnapshot {
-            if (callbacks < 0L || workerStarts < 0L
+            if (systemRegistrations < 0L || callbacks < 0L || workCycles < 0L || workerStarts < 0L
                     || subscriptions < 0L || databaseOpens < 0L) {
                 throw new IllegalArgumentException("Diagnostic counters cannot be negative");
             }
@@ -147,7 +167,7 @@ public final class TameworkRuntimeDiagnostics {
 
         /** Returns an all-zero counter snapshot. */
         public static CounterSnapshot zero() {
-            return new CounterSnapshot(0L, 0L, 0L, 0L);
+            return new CounterSnapshot(0L, 0L, 0L, 0L, 0L, 0L);
         }
     }
 

@@ -31,7 +31,9 @@ public final class TameworkActivationStatusCommand extends AbstractTameworkServe
             TameworkRuntimeDiagnostics.ModuleSnapshot snapshot = state.diagnostics().module(module);
             TameworkRuntimeDiagnostics.CounterSnapshot counters = snapshot.counters();
             send(context, module.id() + "=" + snapshot.state()
+                    + ", systems=" + counters.systemRegistrations()
                     + ", callbacks=" + counters.callbacks()
+                    + ", workCycles=" + counters.workCycles()
                     + ", workers=" + counters.workerStarts()
                     + ", subscriptions=" + counters.subscriptions()
                     + ", databaseOpens=" + counters.databaseOpens()
