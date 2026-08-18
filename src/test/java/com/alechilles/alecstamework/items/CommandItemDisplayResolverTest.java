@@ -5,12 +5,12 @@ import org.junit.jupiter.api.Test;
 
 class CommandItemDisplayResolverTest {
     @Test
-    void resolvesBundledCommandItemName() {
+    void humanizesCommandItemWithoutLoadedLocalization() {
         CommandItemDisplayResolver resolver = new CommandItemDisplayResolver();
 
         Assertions.assertEquals(
-                "Tamework Example Command Whistle",
-                resolver.resolveItemDisplayName(null, "Tamework_Command_Whistle_Example")
+                "Runeteria Husbandry Whistle",
+                resolver.resolveItemDisplayName(null, "Runeteria_Husbandry_Whistle")
         );
     }
 
