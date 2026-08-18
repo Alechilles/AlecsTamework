@@ -17,6 +17,13 @@
   translations, and example-only art into a separate disabled-by-default
   `Alec's Tamework! Examples` asset pack. Bundled examples no longer activate
   Tamework runtime modules on servers that do not install the pack.
+- Reusable avatar-flight, tranquilizer, and attachment-display assets no
+  longer count as active gameplay by themselves. Library-only servers do not
+  register their avatar-flight, mount, projectile-hazard, attachment, movement,
+  or companion-core tick systems.
+- Active companion attachment, movement, flight-control, and despawn sweeps
+  now reuse per-world scratch collections instead of allocating new candidate
+  lists and sets on every pass.
 
 ### Fixed
 - Restored the shared Nametag and Soul Lantern models, textures, icons,

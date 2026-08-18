@@ -20,8 +20,11 @@ subscription, worker, scheduler, or database runtime.
 
 Enabled configs count only when they resolve to real roles or items. Disabled
 configs, empty targets, missing assets, debug defaults, and installed but
-unused integrations do not count. Pending durable state can keep its recovery
-authority active after content is removed.
+unused integrations do not count. Reusable library content is passive too.
+The bundled avatar-flight profile, Flightmaster's Talisman, tranquilizer
+media, and attachment display labels do not install gameplay systems unless a
+downstream profile or feature gate declares that it uses them. Pending durable
+state can keep its recovery authority active after content is removed.
 
 Each module is `ACTIVE`, `DORMANT`, or `UNAVAILABLE`. An unavailable module is
 required but lacks a required capability or writable persistence authority.

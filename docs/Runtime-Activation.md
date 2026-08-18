@@ -20,7 +20,12 @@ Tamework uses these evidence sources:
 
 Disabled configs, empty target lists, missing target assets, debug defaults,
 and an installed but unused optional integration do not activate a module.
-The optional example pack is also absent from the main plugin jar, so its
+Reusable library assets also stay passive until consumer content opts in. For
+example, the bundled avatar-flight profile, Flightmaster's Talisman,
+tranquilizer media, and attachment display labels do not install their runtime
+systems by themselves. A downstream avatar-flight profile, enabled
+tranquilizer asset set, or role-targeted runtime config supplies the required
+intent. The optional example pack is absent from the main plugin jar, so its
 teaching assets do not wake production modules.
 
 Each module has one state:
