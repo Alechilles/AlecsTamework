@@ -1663,6 +1663,7 @@ public class Tamework extends JavaPlugin {
 
     /** Refreshes runtime-backed API settings without exposing its implementation. */
     public void onRuntimeSettingsChanged() {
+        CompanionMovementSpeedSyncSystem.invalidateConfigRevision();
         if (apiComposition != null) {
             apiComposition.onRuntimeSettingsChanged();
         }
@@ -2943,6 +2944,7 @@ public class Tamework extends JavaPlugin {
     private void onLevelingAssetsLoaded(
             LoadedAssetsEvent<String, TwLevelingConfig, DefaultAssetMap<String, TwLevelingConfig>> event) {
         TwLevelingConfig.clearRoleCache();
+        CompanionMovementSpeedSyncSystem.invalidateConfigRevision();
         if (!event.isInitial()) {
             emitExperimentalConfigReload(TameworkConfigFamily.LEVELING, event.getLoadedAssets().keySet());
         }
@@ -2951,6 +2953,7 @@ public class Tamework extends JavaPlugin {
     private void onLevelingAssetsRemoved(
             RemovedAssetsEvent<String, TwLevelingConfig, DefaultAssetMap<String, TwLevelingConfig>> event) {
         TwLevelingConfig.clearRoleCache();
+        CompanionMovementSpeedSyncSystem.invalidateConfigRevision();
         emitExperimentalConfigReload(TameworkConfigFamily.LEVELING, event.getRemovedAssets());
     }
 
@@ -2958,6 +2961,7 @@ public class Tamework extends JavaPlugin {
             LoadedAssetsEvent<String, TwTraitConfig, DefaultAssetMap<String, TwTraitConfig>> event) {
         TwTraitConfig.clearRoleCache();
         CompanionLifeStageService.invalidateAdultRoleAppearanceCache();
+        CompanionMovementSpeedSyncSystem.invalidateConfigRevision();
         if (!event.isInitial()) {
             emitExperimentalConfigReload(TameworkConfigFamily.TRAIT, event.getLoadedAssets().keySet());
         }
@@ -2967,12 +2971,14 @@ public class Tamework extends JavaPlugin {
             RemovedAssetsEvent<String, TwTraitConfig, DefaultAssetMap<String, TwTraitConfig>> event) {
         TwTraitConfig.clearRoleCache();
         CompanionLifeStageService.invalidateAdultRoleAppearanceCache();
+        CompanionMovementSpeedSyncSystem.invalidateConfigRevision();
         emitExperimentalConfigReload(TameworkConfigFamily.TRAIT, event.getRemovedAssets());
     }
 
     private void onTalentAssetsLoaded(
             LoadedAssetsEvent<String, TwTalentConfig, DefaultAssetMap<String, TwTalentConfig>> event) {
         TwTalentConfig.clearRoleCache();
+        CompanionMovementSpeedSyncSystem.invalidateConfigRevision();
         if (!event.isInitial()) {
             emitExperimentalConfigReload(TameworkConfigFamily.TALENT, event.getLoadedAssets().keySet());
         }
@@ -2981,6 +2987,7 @@ public class Tamework extends JavaPlugin {
     private void onTalentAssetsRemoved(
             RemovedAssetsEvent<String, TwTalentConfig, DefaultAssetMap<String, TwTalentConfig>> event) {
         TwTalentConfig.clearRoleCache();
+        CompanionMovementSpeedSyncSystem.invalidateConfigRevision();
         emitExperimentalConfigReload(TameworkConfigFamily.TALENT, event.getRemovedAssets());
     }
 

@@ -1,14 +1,15 @@
 package com.alechilles.alecstamework.npc.systems;
 
+import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
 import com.alechilles.alecstamework.config.assets.TwCompanionMovementConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
-import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
 import com.alechilles.alecstamework.npc.movement.NativeMountMovementSettingsService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionMovementSpeedEffectService;
 import com.alechilles.alecstamework.npc.progression.CompanionMovementSpeedResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionSettings;
 import com.alechilles.alecstamework.util.StoreScopedState;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
@@ -24,10 +25,11 @@ import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nonnull;
@@ -42,10 +44,12 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
     private static final AtomicLong CONFIG_REVISION = new AtomicLong();
 
     private final StoreScopedState<TickState> statesByStore = new StoreScopedState<>(TickState::new);
+    private final CompanionMovementSpeedInputFingerprint inputFingerprint =
+            new CompanionMovementSpeedInputFingerprint();
     private final CompanionMovementSpeedResolver speedResolver = new CompanionMovementSpeedResolver();
     private final NativeMountMovementSettingsService riderSettings = new NativeMountMovementSettingsService();
 
-    /** Marks all live-store fingerprints stale after companion movement asset changes. */
+    /** Marks all live-store fingerprints stale after movement-related config changes. */
     public static void invalidateConfigRevision() {
         CONFIG_REVISION.incrementAndGet();
     }
@@ -77,6 +81,9 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
         }
         HashSet<UUID> activeIds = state.activeNpcIds;
         activeIds.clear();
+        boolean levelingEnabled = CompanionProgressionSettings.isLevelingEnabled();
+        boolean talentsEnabled = CompanionProgressionSettings.isTalentsEnabled();
+        long configRevision = CONFIG_REVISION.get();
         store.forEachChunk(Query.and(npcType),
                 (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> buffer) -> {
             for (int index = 0; index < chunk.size(); index++) {
@@ -90,8 +97,9 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
                 }
                 UUID npcId = npc.getUuid();
                 activeIds.add(npcId);
-                MovementSpeedFingerprint fingerprint = buildFingerprint(npcRef, store);
-                if (!hasChanged(state.lastFingerprintByNpc.get(npcId), fingerprint)) {
+                if (!hasInputChanged(
+                        state.lastFingerprintByNpc.get(npcId), npcRef, npcId, npc.getRoleIndex(), store,
+                        levelingEnabled, talentsEnabled, configRevision)) {
                     continue;
                 }
                 buffer.run(bufferStore -> {
@@ -143,6 +151,38 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
     @Nullable
     private MovementSpeedFingerprint buildFingerprint(@Nonnull Ref<EntityStore> npcRef,
                                                       @Nonnull Store<EntityStore> store) {
+        return buildFingerprint(
+                npcRef,
+                store,
+                CompanionProgressionSettings.isLevelingEnabled(),
+                CompanionProgressionSettings.isTalentsEnabled());
+    }
+
+    private boolean hasInputChanged(@Nullable MovementSpeedFingerprint previous,
+                                    @Nonnull Ref<EntityStore> npcRef,
+                                    @Nonnull UUID npcUuid,
+                                    int roleIndex,
+                                    @Nonnull Store<EntityStore> store,
+                                    boolean levelingEnabled,
+                                    boolean talentsEnabled,
+                                    long configRevision) {
+        NPCMountComponent mount = store.getComponent(npcRef, NPCMountComponent.getComponentType());
+        PlayerRef owner = mount == null ? null : mount.getOwnerPlayerRef();
+        return hasChanged(
+                previous,
+                npcUuid,
+                NativeMountMovementSettingsService.resolveManagedRoleId(npcRef, store),
+                inputFingerprint.resolve(npcRef, store, roleIndex, levelingEnabled, talentsEnabled),
+                configRevision,
+                mount != null,
+                owner == null ? null : owner.getUuid());
+    }
+
+    @Nullable
+    private MovementSpeedFingerprint buildFingerprint(@Nonnull Ref<EntityStore> npcRef,
+                                                       @Nonnull Store<EntityStore> store,
+                                                       boolean levelingEnabled,
+                                                       boolean talentsEnabled) {
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
         if (npc == null || npc.getUuid() == null) {
             return null;
@@ -150,11 +190,11 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
         NPCMountComponent mount = store.getComponent(npcRef, NPCMountComponent.getComponentType());
         PlayerRef owner = mount == null ? null : mount.getOwnerPlayerRef();
         String sourceRoleId = NativeMountMovementSettingsService.resolveManagedRoleId(npcRef, store);
-        return createFingerprint(
+        return new MovementSpeedFingerprint(
                 npc.getUuid(),
                 sourceRoleId,
-                resolveEffectiveAttachments(npcRef, store),
-                selectAppliedMultiplier(mount != null, resolveMovementMultiplier(npcRef, sourceRoleId, store)),
+                inputFingerprint.resolve(
+                        npcRef, store, npc.getRoleIndex(), levelingEnabled, talentsEnabled),
                 CONFIG_REVISION.get(),
                 mount != null,
                 owner == null ? null : owner.getUuid()
@@ -185,22 +225,25 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
         return CompanionModelAttachmentService.resolveCurrentAttachments(npcRef, store);
     }
 
-    static MovementSpeedFingerprint createFingerprint(@Nonnull UUID npcUuid,
-                                                       @Nullable String sourceRoleId,
-                                                       @Nullable Map<String, String> effectiveAttachments,
-                                                       double quantizedMultiplier,
-                                                       long configRevision,
-                                                       boolean nativeMounted,
-                                                       @Nullable UUID riderUuid) {
-        Map<String, String> attachments = effectiveAttachments == null || effectiveAttachments.isEmpty()
-                ? Map.of() : Map.copyOf(effectiveAttachments);
-        return new MovementSpeedFingerprint(
-                npcUuid, sourceRoleId, attachments, quantizedMultiplier, configRevision, nativeMounted, riderUuid);
-    }
-
     static boolean hasChanged(@Nullable MovementSpeedFingerprint previous,
                               @Nullable MovementSpeedFingerprint current) {
         return current != null && !current.equals(previous);
+    }
+
+    static boolean hasChanged(@Nullable MovementSpeedFingerprint previous,
+                              @Nonnull UUID npcUuid,
+                              @Nullable String sourceRoleId,
+                              long inputSignature,
+                              long configRevision,
+                              boolean nativeMounted,
+                              @Nullable UUID riderUuid) {
+        return previous == null
+                || !npcUuid.equals(previous.npcUuid())
+                || !Objects.equals(sourceRoleId, previous.sourceRoleId())
+                || inputSignature != previous.inputSignature()
+                || configRevision != previous.configRevision()
+                || nativeMounted != previous.nativeMounted()
+                || !Objects.equals(riderUuid, previous.riderUuid());
     }
 
     /** Pure lifecycle completion rule used by the deferred callback before it commits a fingerprint. */
@@ -232,17 +275,18 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
             valuesByNpc.clear();
             return;
         }
-        for (UUID npcId : new ArrayList<>(valuesByNpc.keySet())) {
+        Iterator<UUID> npcIds = valuesByNpc.keySet().iterator();
+        while (npcIds.hasNext()) {
+            UUID npcId = npcIds.next();
             if (npcId != null && !activeNpcIds.contains(npcId)) {
-                valuesByNpc.remove(npcId);
+                npcIds.remove();
             }
         }
     }
 
     record MovementSpeedFingerprint(@Nonnull UUID npcUuid,
                                     @Nullable String sourceRoleId,
-                                    @Nonnull Map<String, String> effectiveAttachments,
-                                    double quantizedMultiplier,
+                                    long inputSignature,
                                     long configRevision,
                                     boolean nativeMounted,
                                     @Nullable UUID riderUuid) {

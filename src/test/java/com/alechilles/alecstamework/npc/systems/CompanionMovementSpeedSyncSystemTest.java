@@ -38,28 +38,15 @@ class CompanionMovementSpeedSyncSystemTest {
     void fingerprintChangesForEveryManagedLifecycleInput() {
         UUID npcId = UUID.randomUUID();
         CompanionMovementSpeedSyncSystem.MovementSpeedFingerprint baseline =
-                CompanionMovementSpeedSyncSystem.createFingerprint(
-                        npcId, "Wolf_Default", Map.of("Saddle", "Plain"), 1.10, 3L, false, null);
+                fingerprint(npcId, "Wolf_Default", 11L, 3L, false, null);
 
         assertFalse(CompanionMovementSpeedSyncSystem.hasChanged(baseline, baseline));
-        assertTrue(CompanionMovementSpeedSyncSystem.hasChanged(baseline,
-                CompanionMovementSpeedSyncSystem.createFingerprint(
-                        npcId, "Wolf_Armored", Map.of("Saddle", "Plain"), 1.10, 3L, false, null)));
-        assertTrue(CompanionMovementSpeedSyncSystem.hasChanged(baseline,
-                CompanionMovementSpeedSyncSystem.createFingerprint(
-                        npcId, "Wolf_Default", Map.of("Saddle", "Armored"), 1.10, 3L, false, null)));
-        assertTrue(CompanionMovementSpeedSyncSystem.hasChanged(baseline,
-                CompanionMovementSpeedSyncSystem.createFingerprint(
-                        npcId, "Wolf_Default", Map.of("Saddle", "Plain"), 1.15, 3L, false, null)));
-        assertTrue(CompanionMovementSpeedSyncSystem.hasChanged(baseline,
-                CompanionMovementSpeedSyncSystem.createFingerprint(
-                        npcId, "Wolf_Default", Map.of("Saddle", "Plain"), 1.10, 4L, false, null)));
-        assertTrue(CompanionMovementSpeedSyncSystem.hasChanged(baseline,
-                CompanionMovementSpeedSyncSystem.createFingerprint(
-                        npcId, "Wolf_Default", Map.of("Saddle", "Plain"), 1.10, 3L, true, UUID.randomUUID())));
-        assertTrue(CompanionMovementSpeedSyncSystem.hasChanged(baseline,
-                CompanionMovementSpeedSyncSystem.createFingerprint(
-                        npcId, "Wolf_Default", Map.of("Saddle", "Plain"), 1.10, 3L, false, UUID.randomUUID())));
+        assertFalse(changed(baseline, npcId, "Wolf_Default", 11L, 3L, false, null));
+        assertTrue(changed(baseline, npcId, "Wolf_Armored", 11L, 3L, false, null));
+        assertTrue(changed(baseline, npcId, "Wolf_Default", 12L, 3L, false, null));
+        assertTrue(changed(baseline, npcId, "Wolf_Default", 11L, 4L, false, null));
+        assertTrue(changed(baseline, npcId, "Wolf_Default", 11L, 3L, true, UUID.randomUUID()));
+        assertTrue(changed(baseline, npcId, "Wolf_Default", 11L, 3L, false, UUID.randomUUID()));
     }
 
     @Test
@@ -72,5 +59,20 @@ class CompanionMovementSpeedSyncSystemTest {
 
         assertEquals(1.024, CompanionMovementSpeedSyncSystem.selectAppliedMultiplier(true, resolved), 0.0000001);
         assertEquals(1.0, CompanionMovementSpeedSyncSystem.selectAppliedMultiplier(false, resolved), 0.0000001);
+    }
+
+    private static CompanionMovementSpeedSyncSystem.MovementSpeedFingerprint fingerprint(
+            UUID npcId, String roleId, long inputSignature, long configRevision,
+            boolean nativeMounted, UUID riderId) {
+        return new CompanionMovementSpeedSyncSystem.MovementSpeedFingerprint(
+                npcId, roleId, inputSignature, configRevision, nativeMounted, riderId);
+    }
+
+    private static boolean changed(
+            CompanionMovementSpeedSyncSystem.MovementSpeedFingerprint previous,
+            UUID npcId, String roleId, long inputSignature, long configRevision,
+            boolean nativeMounted, UUID riderId) {
+        return CompanionMovementSpeedSyncSystem.hasChanged(
+                previous, npcId, roleId, inputSignature, configRevision, nativeMounted, riderId);
     }
 }
