@@ -263,7 +263,8 @@ public final class CompanionNeedsService {
             return false;
         }
         TwNeedsConfig config = resolveNeedsConfig(npcRef, store, roleId, component);
-        if (!CompanionNeedsRuntimePolicy.isNeedsEnabled(config)) {
+        TameworkRuntimeSettings settings = TameworkRuntimeSettings.currentOrNull();
+        if (!CompanionNeedsRuntimePolicy.isNeedsEnabled(config, settings)) {
             return removeNeedsRuntimeState(npcRef, store, commandBuffer, needsType, component);
         }
         TwNeedsConfig.ValueSettings values = config.getValues();
@@ -288,7 +289,7 @@ public final class CompanionNeedsService {
             component.setThirst(thirst);
             changed = true;
         }
-        boolean suppressNaturalRegen = shouldSuppressNaturalRegen(config, values, hunger, thirst);
+        boolean suppressNaturalRegen = shouldSuppressNaturalRegen(config, values, hunger, thirst, settings);
         boolean diagnosticsEnabled = isNeedsDamageDiagnosticsEnabled();
         String npcId = diagnosticsEnabled ? resolveNpcId(npcRef, store) : "<disabled>";
         double healthBeforeSuppression = diagnosticsEnabled ? resolveCurrentHealth(npcRef, store) : Double.NaN;
@@ -298,7 +299,7 @@ public final class CompanionNeedsService {
                 commandBuffer,
                 component,
                 suppressNaturalRegen,
-                !CompanionNeedsRuntimePolicy.resolveDamage(config).isLethal()
+                !CompanionNeedsRuntimePolicy.resolveDamage(config, settings).isLethal()
         );
         double healthAfterSuppression = diagnosticsEnabled ? resolveCurrentHealth(npcRef, store) : Double.NaN;
         if (suppressionChanged) {
@@ -563,10 +564,11 @@ public final class CompanionNeedsService {
             return false;
         }
         TwNeedsConfig config = resolveNeedsConfig(npcRef, store, roleId, component);
-        if (!CompanionNeedsRuntimePolicy.isNeedsEnabled(config)) {
+        TameworkRuntimeSettings settings = TameworkRuntimeSettings.currentOrNull();
+        if (!CompanionNeedsRuntimePolicy.isNeedsEnabled(config, settings)) {
             return false;
         }
-        return requiresFrequentNaturalRegenSuppressionTick(component, config);
+        return requiresFrequentNaturalRegenSuppressionTick(component, config, settings);
     }
 
     static boolean runNeedsUpdate(@Nullable Ref<EntityStore> npcRef,

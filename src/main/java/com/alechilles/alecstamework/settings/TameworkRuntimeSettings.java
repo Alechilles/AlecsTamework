@@ -11,15 +11,43 @@ import javax.annotation.Nullable;
  * Non-null runtime view of the server-wide settings owned by `/tw settings`.
  */
 public final class TameworkRuntimeSettings {
+    @Nullable
+    private static volatile TameworkRuntimeSettings cachedCurrent;
+
     private final ResolvedTameworkSettings values;
+    private final NeedsResourceMode resolvedNeedsResourceMode;
+    private final TwNeedsConfig.TickPolicySettings resolvedNeedsTickPolicy;
+    private final TwNeedsConfig.DamageSettings resolvedNeedsDamage;
 
     private TameworkRuntimeSettings(@Nonnull ResolvedTameworkSettings values) {
         this.values = values;
+        this.resolvedNeedsResourceMode = NeedsResourceMode.fromConfigValue(values.needsResourceMode());
+        this.resolvedNeedsTickPolicy = TwNeedsConfig.TickPolicySettings.of(
+                TwNeedsConfig.TickPolicyMode.fromConfigValue(values.needsTickPolicyMode()),
+                values.needsOwnerOfflineGraceHours(),
+                values.needsOwnerOfflineDecayMultiplier()
+        );
+        this.resolvedNeedsDamage = TwNeedsConfig.DamageSettings.of(
+                values.needsDamageEnabled(),
+                TwNeedsConfig.DamageModel.fromConfigValue(values.needsDamageModel()),
+                TwNeedsConfig.DualNeedRule.fromConfigValue(values.needsDamageDualNeedRule()),
+                values.needsStarvationDamagePerMinute(),
+                values.needsDehydrationDamagePerMinute(),
+                values.needsDamageLethal()
+        );
     }
 
     @Nonnull
     public static TameworkRuntimeSettings current() {
-        return new TameworkRuntimeSettings(TameworkSettingsStore.loadRuntimeGlobalSettings());
+        ResolvedTameworkSettings values = TameworkSettingsStore.loadRuntimeGlobalSettings();
+        TameworkRuntimeSettings cached = cachedCurrent;
+        // The settings store replaces this immutable snapshot when settings change.
+        if (cached != null && cached.values == values) {
+            return cached;
+        }
+        TameworkRuntimeSettings refreshed = new TameworkRuntimeSettings(values);
+        cachedCurrent = refreshed;
+        return refreshed;
     }
 
     @Nullable
@@ -133,7 +161,7 @@ public final class TameworkRuntimeSettings {
 
     @Nonnull
     public NeedsResourceMode needsResourceModeValue() {
-        return NeedsResourceMode.fromConfigValue(values.needsResourceMode());
+        return resolvedNeedsResourceMode;
     }
 
     @Nonnull
@@ -177,23 +205,12 @@ public final class TameworkRuntimeSettings {
 
     @Nonnull
     public TwNeedsConfig.TickPolicySettings resolveNeedsTickPolicy(@Nullable TwNeedsConfig.TickPolicySettings ignoredBase) {
-        return TwNeedsConfig.TickPolicySettings.of(
-                TwNeedsConfig.TickPolicyMode.fromConfigValue(values.needsTickPolicyMode()),
-                values.needsOwnerOfflineGraceHours(),
-                values.needsOwnerOfflineDecayMultiplier()
-        );
+        return resolvedNeedsTickPolicy;
     }
 
     @Nonnull
     public TwNeedsConfig.DamageSettings resolveNeedsDamage(@Nullable TwNeedsConfig.DamageSettings ignoredBase) {
-        return TwNeedsConfig.DamageSettings.of(
-                values.needsDamageEnabled(),
-                TwNeedsConfig.DamageModel.fromConfigValue(values.needsDamageModel()),
-                TwNeedsConfig.DualNeedRule.fromConfigValue(values.needsDamageDualNeedRule()),
-                values.needsStarvationDamagePerMinute(),
-                values.needsDehydrationDamagePerMinute(),
-                values.needsDamageLethal()
-        );
+        return resolvedNeedsDamage;
     }
 
     public boolean happinessEnabled() {

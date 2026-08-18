@@ -7,6 +7,8 @@
 - Updated the embedded Patchwork runtime to 1.3.3. Its packaged telemetry descriptor now declares
   the Patchwork version and passive heartbeat capability, so player-ready discovery no longer logs
   that the shaded Patchwork descriptor is incomplete.
+- Reduced world-tick work for companion needs by reusing parsed runtime settings instead of rebuilding
+  the same damage and tick-policy objects for each companion check.
 
 ## 3.1.9 - Companion Spawn Safety Hotfix - 2026-08-16
 
