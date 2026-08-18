@@ -155,7 +155,9 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
         if (projector == null) {
             return TargetResolution.miss(true, "projector_missing");
         }
-        ScanDiagnostics diagnostics = new ScanDiagnostics();
+        BlockSetMembership blockSetMembership = blockSetIndex == Integer.MIN_VALUE
+                ? null : resolveBlockSetMembership();
+        ScanDiagnostics diagnostics = isDiagnosticsEnabled() ? new ScanDiagnostics() : null;
         ScanContext context = new ScanContext(
                 ref,
                 role,
@@ -170,6 +172,7 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                 (int) Math.floor(npcPosition.z),
                 range * range,
                 new HashMap<>(),
+                blockSetMembership,
                 projector,
                 PositionTargetRejectCache.hasRejectedTargetFor(npcUuid, label, nowMs)
                         ? target -> PositionTargetRejectCache.isRejected(npcUuid, label, target, nowMs)
@@ -183,13 +186,13 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
             RingResult ringResult = scanRing(context, horizontalRadius, checkedSources);
             checkedSources += ringResult.checkedSources();
             if (ringResult.target() != null) {
-                return TargetResolution.hit(ringResult.target(), diagnostics.summary("source_ready"));
+                return TargetResolution.hit(ringResult.target(), scanDetail(diagnostics, "source_ready"));
             }
             if (ringResult.deferred() || checkedSources >= MAX_SOURCE_CANDIDATES_PER_SCAN) {
-                return TargetResolution.miss(false, diagnostics.summary("source_limit_deferred"));
+                return TargetResolution.miss(false, scanDetail(diagnostics, "source_limit_deferred"));
             }
         }
-        return TargetResolution.miss(true, diagnostics.summary("scan_exhausted"));
+        return TargetResolution.miss(true, scanDetail(diagnostics, "scan_exhausted"));
     }
 
     @Nonnull
@@ -211,10 +214,20 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                             context.chunkCache()
                     );
                     if (worldChunk == null
-                            || !matchesConfiguredBlock(worldChunk, x, y, z, blockSetIndex, blockTypes)) {
+                            || !matchesConfiguredBlock(
+                                    worldChunk,
+                                    x,
+                                    y,
+                                    z,
+                                    blockSetIndex,
+                                    blockTypes,
+                                    context.blockSetMembership()
+                            )) {
                         continue;
                     }
-                    context.diagnostics().recordMatchingSource(x, y, z, worldChunk.getBlockType(x, y, z));
+                    if (context.diagnostics() != null) {
+                        context.diagnostics().recordMatchingSource(x, y, z, worldChunk.getBlockType(x, y, z));
+                    }
                     checkedSources++;
                     if (alreadyCheckedSources + checkedSources > MAX_SOURCE_CANDIDATES_PER_SCAN) {
                         return RingResult.deferred(checkedSources);
@@ -245,7 +258,11 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                 context.projector()
         );
         if (target == null || (context.rejector() != null && context.rejector().rejects(target))) {
-            context.diagnostics().recordProjectionRejected(target == null ? "projection_failed" : "target_rejected");
+            if (context.diagnostics() != null) {
+                context.diagnostics().recordProjectionRejected(
+                        target == null ? "projection_failed" : "target_rejected"
+                );
+            }
             return CandidateResult.empty();
         }
         PathPreflightResult preflight = PATH_PREFLIGHT_SERVICE.preflight(
@@ -258,7 +275,7 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                 context.nowMs()
         );
         if (preflight.ready()) {
-            context.diagnostics().recordPreflight(preflight.reason());
+            recordPreflight(context.diagnostics(), preflight.reason());
             return CandidateResult.hit(target);
         }
         if (preflight.noPath()) {
@@ -269,10 +286,10 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                     PositionTargetRejectCache.DEFAULT_TTL_SECONDS,
                     context.nowMs()
             );
-            context.diagnostics().recordPreflight(preflight.reason());
+            recordPreflight(context.diagnostics(), preflight.reason());
             return CandidateResult.empty();
         }
-        context.diagnostics().recordPreflight(preflight.reason());
+        recordPreflight(context.diagnostics(), preflight.reason());
         return CandidateResult.pending();
     }
 
@@ -281,10 +298,16 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                                           int y,
                                           int z,
                                           int blockSetIndex,
-                                          @Nonnull Set<String> blockTypes) {
-        BlockType blockType = worldChunk.getBlockType(x, y, z);
-        int blockId = worldChunk.getBlock(x, y, z);
-        return matchesConfiguredBlock(blockType, blockId, blockSetIndex, blockTypes, resolveBlockSetMembership());
+                                          @Nonnull Set<String> blockTypes,
+                                          @Nullable BlockSetMembership blockSetMembership) {
+        if (!blockTypes.isEmpty()
+                && matchesExactBlockType(worldChunk.getBlockType(x, y, z), blockTypes)) {
+            return true;
+        }
+        if (blockSetIndex == Integer.MIN_VALUE || blockSetMembership == null) {
+            return false;
+        }
+        return blockSetMembership.blockInSet(blockSetIndex, worldChunk.getBlock(x, y, z));
     }
 
     static boolean matchesConfiguredBlock(@Nullable BlockType blockType,
@@ -308,14 +331,56 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
         if (blockType == null) {
             return false;
         }
-        String id = sanitizeNullableId(blockType.getId());
-        if (id != null && blockTypes.contains(id)) {
+        if (matchesExactBlockType(blockType, blockTypes)) {
             return true;
         }
         if (blockSetIndex == Integer.MIN_VALUE || blockSetMembership == null) {
             return false;
         }
         return blockSetMembership.blockInSet(blockSetIndex, blockId);
+    }
+
+    private static boolean matchesExactBlockType(@Nullable BlockType blockType,
+                                                 @Nonnull Set<String> blockTypes) {
+        if (blockType == null || blockTypes.isEmpty()) {
+            return false;
+        }
+        String id = blockType.getId();
+        if (id == null || id.isEmpty()) {
+            return false;
+        }
+        if (blockTypes.contains(id)) {
+            return true;
+        }
+        if (!requiresIdNormalization(id)) {
+            return false;
+        }
+        String normalized = sanitizeNullableId(id);
+        return normalized != null && blockTypes.contains(normalized);
+    }
+
+    private static boolean requiresIdNormalization(@Nonnull String id) {
+        int lastIndex = id.length() - 1;
+        if (Character.isWhitespace(id.charAt(0)) || Character.isWhitespace(id.charAt(lastIndex))) {
+            return true;
+        }
+        for (int i = 0; i <= lastIndex; i++) {
+            if (Character.isUpperCase(id.charAt(i))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Nonnull
+    private static String scanDetail(@Nullable ScanDiagnostics diagnostics, @Nonnull String result) {
+        return diagnostics == null ? result : diagnostics.summary(result);
+    }
+
+    private static void recordPreflight(@Nullable ScanDiagnostics diagnostics, @Nonnull String reason) {
+        if (diagnostics != null) {
+            diagnostics.recordPreflight(reason);
+        }
     }
 
     @Nonnull
@@ -509,9 +574,10 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                                int blockZ,
                                double radiusSq,
                                @Nonnull Map<Long, WorldChunk> chunkCache,
+                               @Nullable BlockSetMembership blockSetMembership,
                                @Nonnull NeedsResourceStandTargetSelector.CandidateProjector projector,
                                @Nullable TargetRejector rejector,
-                               @Nonnull ScanDiagnostics diagnostics) {
+                               @Nullable ScanDiagnostics diagnostics) {
     }
 
     private record TargetResolution(@Nullable Vector3d target, boolean cacheMiss, @Nonnull String detail) {
