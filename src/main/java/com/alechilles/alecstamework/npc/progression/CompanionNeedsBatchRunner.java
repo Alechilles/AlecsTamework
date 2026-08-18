@@ -66,7 +66,7 @@ public final class CompanionNeedsBatchRunner {
         long startedAtNs = nanoClock.getAsLong();
         Store<EntityStore> store = resolveStore(world);
         WarningState warningState = store == null ? null : warningStatesByStore.get(store);
-        Map<UUID, Integer> starvingLinkedByOwner = warningState == null
+        WarningAccumulator starvingLinkedByOwner = warningState == null
                 ? null
                 : warningState.pendingStarvingLinkedByOwner;
         int processed = processDue(
@@ -80,10 +80,13 @@ public final class CompanionNeedsBatchRunner {
         );
         processSuppression(world, store, state);
         boolean hasRemainingDue = state.hasDue(nowMs);
-        if (warningState != null && !hasRemainingDue) {
-            notifyOwners(world, store, warningState, warningState.pendingStarvingLinkedByOwner, nowMs);
-            warningState.pendingStarvingLinkedByOwner.clear();
-            pruneWarningThrottleEntries(warningState, nowMs);
+        if (warningState != null) {
+            Map<UUID, Integer> counts = warningState.pendingStarvingLinkedByOwner
+                    .drainIfNoBacklog(hasRemainingDue);
+            if (!hasRemainingDue) {
+                notifyOwners(world, store, warningState, counts, nowMs);
+                pruneWarningThrottleEntries(warningState, nowMs);
+            }
         }
         return new BatchResult(processed, hasRemainingDue);
     }
@@ -94,9 +97,9 @@ public final class CompanionNeedsBatchRunner {
                            long nowMs,
                            @Nonnull LongSupplier nanoClock,
                            long startedAtNs,
-                           @Nullable Map<UUID, Integer> starvingLinkedByOwner) {
-        int processed = 0;
-        while (processed < MAX_UPDATES_PER_BATCH) {
+                           @Nullable WarningAccumulator starvingLinkedByOwner) {
+        int attempted = 0;
+        while (attempted < MAX_UPDATES_PER_BATCH) {
             long dueAtMs = state.schedule().nextDueAtMs();
             UUID npcId = state.schedule().pollDue(nowMs);
             if (npcId == null) {
@@ -105,10 +108,11 @@ public final class CompanionNeedsBatchRunner {
             if (!state.hasMember(npcId)) {
                 continue;
             }
-            if (processed > 0 && elapsedNs(startedAtNs, nanoClock.getAsLong()) >= MAX_BATCH_NANOS) {
+            if (attempted > 0 && elapsedNs(startedAtNs, nanoClock.getAsLong()) >= MAX_BATCH_NANOS) {
                 state.schedule().reschedule(npcId, dueAtMs);
                 break;
             }
+            attempted++;
             CompanionNeedsScheduledUpdate.Outcome outcome = updateNpc(world, state, npcId);
             if (outcome == null) {
                 state.remove(npcId);
@@ -116,9 +120,8 @@ public final class CompanionNeedsBatchRunner {
             }
             reschedule(state, npcId, nowMs, outcome);
             collectMalnourishmentCount(store, world, npcId, outcome, starvingLinkedByOwner);
-            processed++;
         }
-        return processed;
+        return attempted;
     }
 
     @Nullable
@@ -204,7 +207,7 @@ public final class CompanionNeedsBatchRunner {
                                                    @Nullable World world,
                                                    @Nonnull UUID npcId,
                                                    @Nonnull CompanionNeedsScheduledUpdate.Outcome outcome,
-                                                   @Nullable Map<UUID, Integer> counts) {
+                                                   @Nullable WarningAccumulator counts) {
         if (store == null || world == null || counts == null || !outcome.needsDamageActive()) {
             return;
         }
@@ -217,7 +220,7 @@ public final class CompanionNeedsBatchRunner {
                 || links.getToolIds().length == 0) {
             return;
         }
-        counts.merge(links.getOwnerId(), 1, Integer::sum);
+        counts.add(links.getOwnerId());
     }
 
     @Nullable
@@ -323,8 +326,33 @@ public final class CompanionNeedsBatchRunner {
         CompanionNeedsScheduledUpdate.Outcome update(@Nonnull UUID npcId);
     }
 
+    /** Aggregates linked-owner warnings across partial due batches. */
+    static final class WarningAccumulator {
+        private final Map<UUID, Integer> countsByOwner = new HashMap<>();
+
+        void add(@Nullable UUID ownerId) {
+            if (ownerId != null) {
+                countsByOwner.merge(ownerId, 1, Integer::sum);
+            }
+        }
+
+        @Nonnull
+        Map<UUID, Integer> drainIfNoBacklog(boolean hasRemainingDue) {
+            if (hasRemainingDue || countsByOwner.isEmpty()) {
+                return Map.of();
+            }
+            Map<UUID, Integer> drained = new HashMap<>(countsByOwner);
+            countsByOwner.clear();
+            return drained;
+        }
+
+        int count(@Nonnull UUID ownerId) {
+            return countsByOwner.getOrDefault(ownerId, 0);
+        }
+    }
+
     private static final class WarningState {
         private final Map<UUID, Long> lastWarningByOwner = new HashMap<>();
-        private final Map<UUID, Integer> pendingStarvingLinkedByOwner = new HashMap<>();
+        private final WarningAccumulator pendingStarvingLinkedByOwner = new WarningAccumulator();
     }
 }

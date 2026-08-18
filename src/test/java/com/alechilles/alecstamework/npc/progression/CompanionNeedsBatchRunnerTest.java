@@ -124,11 +124,66 @@ class CompanionNeedsBatchRunnerTest {
                 () -> 0L
         );
 
-        assertEquals(0, result.processed());
+        assertEquals(1, result.processed());
         assertFalse(result.hasRemainingDue());
         assertFalse(state.membership().contains(npcId));
         assertFalse(state.suppressionIds().contains(npcId));
         assertFalse(state.hasDue(0L));
+    }
+
+    @Test
+    void manyInvalidDueIdsStillSpillAcrossTheAttemptBudget() {
+        CompanionNeedsRuntimeRegistry.WorldState state =
+                CompanionNeedsRuntimeRegistry.newStateForTests();
+        for (int i = 0; i < 130; i++) {
+            UUID npcId = new UUID(1L, i + 1L);
+            state.register(npcId, -2_000L);
+            state.schedule().reschedule(npcId, -130L + i);
+        }
+        AtomicInteger attempts = new AtomicInteger();
+        CompanionNeedsBatchRunner runner = new CompanionNeedsBatchRunner(npcId -> {
+            attempts.incrementAndGet();
+            return null;
+        });
+
+        CompanionNeedsBatchRunner.BatchResult first = runner.run(
+                null,
+                state,
+                0L,
+                () -> 0L
+        );
+        CompanionNeedsBatchRunner.BatchResult second = runner.run(
+                null,
+                state,
+                0L,
+                () -> 0L
+        );
+
+        assertEquals(128, first.processed());
+        assertTrue(first.hasRemainingDue());
+        assertEquals(2, second.processed());
+        assertFalse(second.hasRemainingDue());
+        assertEquals(130, attempts.get());
+    }
+
+    @Test
+    void warningAccumulatorFlushes130OnlyAfterDueBacklogDrains() {
+        UUID ownerId = new UUID(2L, 3L);
+        CompanionNeedsBatchRunner.WarningAccumulator accumulator =
+                new CompanionNeedsBatchRunner.WarningAccumulator();
+        for (int i = 0; i < 128; i++) {
+            accumulator.add(ownerId);
+        }
+
+        assertEquals(128, accumulator.count(ownerId));
+        assertTrue(accumulator.drainIfNoBacklog(true).isEmpty());
+        assertEquals(128, accumulator.count(ownerId));
+
+        accumulator.add(ownerId);
+        accumulator.add(ownerId);
+        assertEquals(130, accumulator.count(ownerId));
+        assertEquals(130, accumulator.drainIfNoBacklog(false).get(ownerId));
+        assertEquals(0, accumulator.count(ownerId));
     }
 
     @Test
