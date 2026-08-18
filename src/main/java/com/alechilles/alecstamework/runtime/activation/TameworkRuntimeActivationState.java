@@ -17,8 +17,7 @@ public final class TameworkRuntimeActivationState {
     private final TameworkRuntimeActivationPlan plan;
     private final TameworkRuntimeDiagnostics diagnostics;
 
-    /** Creates one immutable activation state for the supplied plan. */
-    public TameworkRuntimeActivationState(TameworkRuntimeActivationPlan plan) {
+    private TameworkRuntimeActivationState(TameworkRuntimeActivationPlan plan) {
         this.plan = Objects.requireNonNull(plan, "Activation plan is required");
         this.diagnostics = new TameworkRuntimeDiagnostics(plan);
     }

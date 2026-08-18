@@ -67,15 +67,24 @@ class TameworkRuntimeActivationStateTest {
     }
 
     @Test
-    void countersArePassiveSnapshotsAndDormantModulesRemainAtZero() {
+    void countersRecordAttemptsAndUntouchedDormantModulesRemainAtZero() {
         TameworkRuntimeModule active = TameworkRuntimeModule.of("active-module");
-        TameworkRuntimeModule dormant = TameworkRuntimeModule.of("dormant-module");
+        TameworkRuntimeModule attemptedDormant = TameworkRuntimeModule.of("attempted-dormant-module");
+        TameworkRuntimeModule untouchedDormant = TameworkRuntimeModule.of("untouched-dormant-module");
+        TameworkRuntimeModule unavailable = TameworkRuntimeModule.of("unavailable-module");
         TameworkRuntimeModuleCatalog catalog = new TameworkRuntimeModuleCatalog(List.of(
                 TameworkRuntimeModuleDescriptor.of(active),
-                TameworkRuntimeModuleDescriptor.of(dormant)
+                TameworkRuntimeModuleDescriptor.of(attemptedDormant),
+                TameworkRuntimeModuleDescriptor.of(untouchedDormant),
+                new TameworkRuntimeModuleDescriptor(
+                        unavailable, List.of(), List.of("missing-provider")
+                )
         ));
         TameworkRuntimeActivationPlan plan = new TameworkRuntimeActivationPlanner(catalog).plan(
-                TameworkActivationEvidence.builder().content(active, "active-config").build()
+                TameworkActivationEvidence.builder()
+                        .content(active, "active-config")
+                        .content(unavailable, "unavailable-config")
+                        .build()
         );
         TameworkRuntimeDiagnostics diagnostics = TameworkRuntimeActivationState.of(plan).diagnostics();
 
@@ -85,11 +94,23 @@ class TameworkRuntimeActivationStateTest {
         diagnostics.recordDatabaseOpen(active);
         TameworkRuntimeDiagnostics.CounterSnapshot first = diagnostics.countersFor(active);
         diagnostics.recordCallback(active);
-        diagnostics.recordCallback(dormant);
+        diagnostics.recordCallback(attemptedDormant);
+        diagnostics.recordWorkerStart(attemptedDormant);
+        diagnostics.recordSubscription(attemptedDormant);
+        diagnostics.recordDatabaseOpen(attemptedDormant);
+        diagnostics.recordCallback(unavailable);
+        diagnostics.recordWorkerStart(unavailable);
+        diagnostics.recordSubscription(unavailable);
+        diagnostics.recordDatabaseOpen(unavailable);
 
         assertEquals(new TameworkRuntimeDiagnostics.CounterSnapshot(1, 1, 1, 1), first);
         assertEquals(2, diagnostics.countersFor(active).callbacks());
-        assertEquals(TameworkRuntimeDiagnostics.CounterSnapshot.zero(), diagnostics.countersFor(dormant));
+        TameworkRuntimeDiagnostics.CounterSnapshot attempt =
+                new TameworkRuntimeDiagnostics.CounterSnapshot(1, 1, 1, 1);
+        assertEquals(attempt, diagnostics.countersFor(attemptedDormant));
+        assertEquals(attempt, diagnostics.countersFor(unavailable));
+        assertEquals(TameworkRuntimeDiagnostics.CounterSnapshot.zero(),
+                diagnostics.countersFor(untouchedDormant));
     }
 
     @Test

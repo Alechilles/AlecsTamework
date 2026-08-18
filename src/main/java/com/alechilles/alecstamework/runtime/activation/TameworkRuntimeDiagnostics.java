@@ -29,22 +29,22 @@ public final class TameworkRuntimeDiagnostics {
         this.counters = Collections.unmodifiableMap(values);
     }
 
-    /** Records one callback for an active module. */
+    /** Records one callback attempt for a known module. */
     public void recordCallback(TameworkRuntimeModule module) {
         increment(module, CounterKind.CALLBACKS);
     }
 
-    /** Records one started worker for an active module. */
+    /** Records one worker-start attempt for a known module. */
     public void recordWorkerStart(TameworkRuntimeModule module) {
         increment(module, CounterKind.WORKER_STARTS);
     }
 
-    /** Records one active subscription for an active module. */
+    /** Records one subscription attempt for a known module. */
     public void recordSubscription(TameworkRuntimeModule module) {
         increment(module, CounterKind.SUBSCRIPTIONS);
     }
 
-    /** Records one database open for an active module. */
+    /** Records one database-open attempt for a known module. */
     public void recordDatabaseOpen(TameworkRuntimeModule module) {
         increment(module, CounterKind.DATABASE_OPENS);
     }
@@ -92,9 +92,7 @@ public final class TameworkRuntimeDiagnostics {
     }
 
     private void increment(TameworkRuntimeModule module, CounterKind kind) {
-        if (plan.isActive(module)) {
-            counters(module).increment(kind);
-        }
+        counters(module).increment(kind);
     }
 
     private static String ids(Set<TameworkRuntimeModule> modules) {

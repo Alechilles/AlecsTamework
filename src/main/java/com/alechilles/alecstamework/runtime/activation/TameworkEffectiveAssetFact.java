@@ -20,8 +20,7 @@ public final class TameworkEffectiveAssetFact {
     private final Set<String> effectiveTargets;
     private final Set<String> configuredItemIds;
 
-    /** Creates one immutable effective-content fact. */
-    public TameworkEffectiveAssetFact(
+    private TameworkEffectiveAssetFact(
             TameworkRuntimeModule module,
             boolean enabled,
             String source,
@@ -33,16 +32,6 @@ public final class TameworkEffectiveAssetFact {
         this.source = normalizeSource(source, module);
         this.effectiveTargets = immutableNonBlank(effectiveTargets);
         this.configuredItemIds = immutableNonBlank(configuredItemIds);
-    }
-
-    /** Creates a fact whose source is the stable module ID. */
-    public TameworkEffectiveAssetFact(
-            TameworkRuntimeModule module,
-            boolean enabled,
-            Collection<String> effectiveTargets,
-            Collection<String> configuredItemIds
-    ) {
-        this(module, enabled, null, effectiveTargets, configuredItemIds);
     }
 
     /** Creates one immutable effective-content fact. */

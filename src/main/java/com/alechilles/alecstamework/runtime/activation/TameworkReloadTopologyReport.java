@@ -19,8 +19,7 @@ public final class TameworkReloadTopologyReport {
     private final String startupFingerprint;
     private final String candidateFingerprint;
 
-    /** Compares two plans without applying either plan. */
-    public TameworkReloadTopologyReport(
+    private TameworkReloadTopologyReport(
             TameworkRuntimeActivationPlan startup,
             TameworkRuntimeActivationPlan candidate
     ) {
