@@ -22,6 +22,18 @@ bash ../gradlew -p .. :alecstamework:test \
 
 If matches are in tick/runtime paths, resolve players from the current world/store or route writes through `CommandBuffer` before merge.
 
+Before adding or expanding a tick system, record:
+
+- which reliable events or dirty signals were considered;
+- why continuous simulation, time-based behavior, recovery, or missing events
+  still require a tick;
+- the query scope, cadence, maximum batch, and idle backoff;
+- whether a low-frequency reconciliation pass can replace frequent polling;
+- unload and shutdown cleanup for listeners, caches, and scheduled work.
+
+Reject full-player or full-entity polling for infrequent state changes when a
+reliable event source exists.
+
 ## Agent Documentation Checks
 
 Run this after changing `AGENTS.md`, `docs/agents`, package layout, scripts, tests, or major docs:
