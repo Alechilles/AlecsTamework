@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Fixed water buckets placing water above feed troughs instead of filling them when a Creative
+  placement mode was active.
 - Updated the embedded Patchwork runtime to 1.3.3. Its packaged telemetry descriptor now declares
   the Patchwork version and passive heartbeat capability, so player-ready discovery no longer logs
   that the shaded Patchwork descriptor is incomplete.

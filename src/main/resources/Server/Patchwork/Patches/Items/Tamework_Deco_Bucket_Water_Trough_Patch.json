@@ -11,84 +11,24 @@
         "Secondary": {
           "Interactions": [
             {
-              "Type": "BlockCondition",
-              "Matchers": [
-                {
-                  "Block": {
-                    "Id": "Tw_Feed_Trough"
-                  }
-                },
-                {
-                  "Block": {
-                    "Id": "*Tw_Feed_Trough_State_Water"
-                  }
-                },
-                {
-                  "Block": {
-                    "Id": "**Tw_Feed_Trough_State_Water_State_90"
-                  }
-                },
-                {
-                  "Block": {
-                    "Id": "**Tw_Feed_Trough_State_Water_State_80"
-                  }
-                },
-                {
-                  "Block": {
-                    "Id": "**Tw_Feed_Trough_State_Water_State_70"
-                  }
-                },
-                {
-                  "Block": {
-                    "Id": "**Tw_Feed_Trough_State_Water_State_60"
-                  }
-                },
-                {
-                  "Block": {
-                    "Id": "**Tw_Feed_Trough_State_Water_State_50"
-                  }
-                },
-                {
-                  "Block": {
-                    "Id": "**Tw_Feed_Trough_State_Water_State_40"
-                  }
-                },
-                {
-                  "Block": {
-                    "Id": "**Tw_Feed_Trough_State_Water_State_30"
-                  }
-                },
-                {
-                  "Block": {
-                    "Id": "**Tw_Feed_Trough_State_Water_State_20"
-                  }
-                },
-                {
-                  "Block": {
-                    "Id": "**Tw_Feed_Trough_State_Water_State_10"
-                  }
-                }
-              ],
+              "Type": "ChangeBlock",
+              "Changes": {
+                "Tw_Feed_Trough": "**Tw_Feed_Trough_State_Water_State_Full",
+                "*Tw_Feed_Trough_State_Water": "**Tw_Feed_Trough_State_Water_State_Full",
+                "**Tw_Feed_Trough_State_Water_State_90": "**Tw_Feed_Trough_State_Water_State_Full",
+                "**Tw_Feed_Trough_State_Water_State_80": "**Tw_Feed_Trough_State_Water_State_Full",
+                "**Tw_Feed_Trough_State_Water_State_70": "**Tw_Feed_Trough_State_Water_State_Full",
+                "**Tw_Feed_Trough_State_Water_State_60": "**Tw_Feed_Trough_State_Water_State_Full",
+                "**Tw_Feed_Trough_State_Water_State_50": "**Tw_Feed_Trough_State_Water_State_Full",
+                "**Tw_Feed_Trough_State_Water_State_40": "**Tw_Feed_Trough_State_Water_State_Full",
+                "**Tw_Feed_Trough_State_Water_State_30": "**Tw_Feed_Trough_State_Water_State_Full",
+                "**Tw_Feed_Trough_State_Water_State_20": "**Tw_Feed_Trough_State_Water_State_Full",
+                "**Tw_Feed_Trough_State_Water_State_10": "**Tw_Feed_Trough_State_Water_State_Full"
+              },
               "Next": {
-                "Type": "ChangeBlock",
-                "Changes": {
-                  "Tw_Feed_Trough": "**Tw_Feed_Trough_State_Water_State_Full",
-                  "*Tw_Feed_Trough_State_Water": "**Tw_Feed_Trough_State_Water_State_Full",
-                  "**Tw_Feed_Trough_State_Water_State_90": "**Tw_Feed_Trough_State_Water_State_Full",
-                  "**Tw_Feed_Trough_State_Water_State_80": "**Tw_Feed_Trough_State_Water_State_Full",
-                  "**Tw_Feed_Trough_State_Water_State_70": "**Tw_Feed_Trough_State_Water_State_Full",
-                  "**Tw_Feed_Trough_State_Water_State_60": "**Tw_Feed_Trough_State_Water_State_Full",
-                  "**Tw_Feed_Trough_State_Water_State_50": "**Tw_Feed_Trough_State_Water_State_Full",
-                  "**Tw_Feed_Trough_State_Water_State_40": "**Tw_Feed_Trough_State_Water_State_Full",
-                  "**Tw_Feed_Trough_State_Water_State_30": "**Tw_Feed_Trough_State_Water_State_Full",
-                  "**Tw_Feed_Trough_State_Water_State_20": "**Tw_Feed_Trough_State_Water_State_Full",
-                  "**Tw_Feed_Trough_State_Water_State_10": "**Tw_Feed_Trough_State_Water_State_Full"
-                },
-                "Next": {
-                  "Type": "ModifyInventory",
-                  "AdjustHeldItemDurability": -1,
-                  "BrokenItem": "Deco_Bucket"
-                }
+                "Type": "ModifyInventory",
+                "AdjustHeldItemDurability": -1,
+                "BrokenItem": "Deco_Bucket"
               },
               "Failed": {
                 "Type": "PlaceFluid",
