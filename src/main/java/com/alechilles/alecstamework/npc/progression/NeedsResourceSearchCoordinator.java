@@ -6,8 +6,6 @@ import com.alechilles.alecstamework.performance.TameworkRuntimePressureService;
 import com.alechilles.alecstamework.util.StoreScopedState;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -20,7 +18,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.joml.Vector3d;
 
 /**
  * Coordinates bounded, deduplicated needs-resource searches for each world store.
@@ -111,6 +108,9 @@ public final class NeedsResourceSearchCoordinator {
         if (state.pending.isEmpty()) {
             return 0;
         }
+        if (state.attemptedTickInitialized && state.lastAttemptedWorldTick == worldTick) {
+            return 0;
+        }
         RuntimePressureLevel pressure = pressureService.level(
                 RuntimePressureDomain.NEEDS_RESOURCE_SEARCH,
                 nowMs
@@ -118,6 +118,8 @@ public final class NeedsResourceSearchCoordinator {
         if (!admissionPolicy.maySearch(pressure, worldTick)) {
             return 0;
         }
+        state.attemptedTickInitialized = true;
+        state.lastAttemptedWorldTick = worldTick;
 
         Map.Entry<RequestKey, PendingRequest> entry = state.pending.entrySet().iterator().next();
         state.pending.remove(entry.getKey());
@@ -214,6 +216,8 @@ public final class NeedsResourceSearchCoordinator {
                 new NeedsResourceAreaSearchCache(MAX_PENDING_REQUESTS);
         private final LinkedHashMap<RequestKey, PendingRequest> pending = new LinkedHashMap<>();
         private long lastFailureWarningMs = Long.MIN_VALUE;
+        private boolean attemptedTickInitialized;
+        private long lastAttemptedWorldTick;
     }
 
     private static final class PendingRequest {
@@ -247,32 +251,19 @@ public final class NeedsResourceSearchCoordinator {
         private final double consumeRadius;
         @Nonnull
         private final List<String> itemIds;
-        @Nonnull
-        private final Map<String, Number> itemValues;
 
-        public Request(@Nonnull String resourceKind,
-                       @Nonnull NeedsResourceAreaSearchCache.AreaKey areaKey,
-                       double radius,
-                       int verticalRadius,
-                       double consumeRadius,
-                       @Nonnull List<String> itemIds) {
-            this(resourceKind, areaKey, radius, verticalRadius, consumeRadius, itemIds, Map.of());
-        }
-
-        public Request(@Nonnull String resourceKind,
-                       @Nonnull NeedsResourceAreaSearchCache.AreaKey areaKey,
-                       double radius,
-                       int verticalRadius,
-                       double consumeRadius,
-                       @Nonnull List<String> itemIds,
-                       @Nonnull Map<String, ? extends Number> itemValues) {
+        Request(@Nonnull String resourceKind,
+                @Nonnull NeedsResourceAreaSearchCache.AreaKey areaKey,
+                double radius,
+                int verticalRadius,
+                double consumeRadius,
+                @Nonnull List<String> itemIds) {
             this.resourceKind = normalizeResourceKind(resourceKind);
             this.areaKey = Objects.requireNonNull(areaKey, "areaKey");
             this.radius = requirePositiveFinite(radius, "radius");
             this.verticalRadius = Math.max(0, verticalRadius);
             this.consumeRadius = requireNonNegativeFinite(consumeRadius, "consumeRadius");
-            this.itemIds = immutableItemIds(itemIds);
-            this.itemValues = immutableItemValues(itemValues);
+            this.itemIds = NeedsResourceAreaSearchCache.AreaKey.normalizeItemIds(itemIds);
         }
 
         /**
@@ -292,11 +283,13 @@ public final class NeedsResourceSearchCoordinator {
             NeedsResourceAreaSearchCache.AreaKey areaKey = NeedsResourceAreaSearchCache.AreaKey.from(
                     worldName,
                     resourceKind,
-                    new Vector3d(originX, originY, originZ),
+                    originX,
+                    originY,
+                    originZ,
                     radius,
                     verticalRadius,
                     consumeRadius,
-                    Objects.requireNonNull(itemIds, "itemIds").hashCode()
+                    itemIds
             );
             if (areaKey == null) {
                 throw new IllegalArgumentException("area key cannot be built from the supplied origin");
@@ -317,7 +310,7 @@ public final class NeedsResourceSearchCoordinator {
         }
 
         @Nonnull
-        public NeedsResourceAreaSearchCache.AreaKey areaKey() {
+        NeedsResourceAreaSearchCache.AreaKey areaKey() {
             return areaKey;
         }
 
@@ -346,16 +339,6 @@ public final class NeedsResourceSearchCoordinator {
             return itemIds;
         }
 
-        @Nonnull
-        public Map<String, Number> itemValues() {
-            return itemValues;
-        }
-
-        @Nonnull
-        public Optional<Map<String, Number>> itemValuesOptional() {
-            return itemValues.isEmpty() ? Optional.empty() : Optional.of(itemValues);
-        }
-
         @Override
         public boolean equals(Object other) {
             if (this == other) {
@@ -369,8 +352,7 @@ public final class NeedsResourceSearchCoordinator {
                     && Double.compare(consumeRadius, request.consumeRadius) == 0
                     && resourceKind.equals(request.resourceKind)
                     && areaKey.equals(request.areaKey)
-                    && itemIds.equals(request.itemIds)
-                    && itemValues.equals(request.itemValues);
+                    && itemIds.equals(request.itemIds);
         }
 
         @Override
@@ -381,8 +363,7 @@ public final class NeedsResourceSearchCoordinator {
                     radius,
                     verticalRadius,
                     consumeRadius,
-                    itemIds,
-                    itemValues
+                    itemIds
             );
         }
 
@@ -416,34 +397,6 @@ public final class NeedsResourceSearchCoordinator {
             return value;
         }
 
-        @Nonnull
-        private static List<String> immutableItemIds(@Nonnull List<String> values) {
-            Objects.requireNonNull(values, "itemIds");
-            ArrayList<String> copy = new ArrayList<>(values.size());
-            for (String value : values) {
-                copy.add(Objects.requireNonNull(value, "itemId"));
-            }
-            return Collections.unmodifiableList(copy);
-        }
-
-        @Nonnull
-        private static Map<String, Number> immutableItemValues(
-                @Nonnull Map<String, ? extends Number> values) {
-            Objects.requireNonNull(values, "itemValues");
-            LinkedHashMap<String, Number> copy = new LinkedHashMap<>();
-            for (Map.Entry<String, ? extends Number> entry : values.entrySet()) {
-                String itemId = Objects.requireNonNull(entry.getKey(), "itemValue itemId");
-                Number value = Objects.requireNonNull(entry.getValue(), "itemValue");
-                if (value instanceof Double doubleValue && !Double.isFinite(doubleValue)) {
-                    throw new IllegalArgumentException("itemValue must be finite");
-                }
-                if (value instanceof Float floatValue && !Float.isFinite(floatValue)) {
-                    throw new IllegalArgumentException("itemValue must be finite");
-                }
-                copy.put(itemId, value);
-            }
-            return Collections.unmodifiableMap(copy);
-        }
     }
 
     /**

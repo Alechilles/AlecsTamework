@@ -205,6 +205,36 @@ class NeedsResourceAreaSearchCacheTest {
     }
 
     @Test
+    void scalarAreaKeyFactoryUsesCanonicalFoodIdentityWithoutVectorAllocation() {
+        NeedsResourceAreaSearchCache.AreaKey vectorKey = NeedsResourceAreaSearchCache.AreaKey.from(
+                "world",
+                "food_container",
+                new Vector3d(-0.1, 64.9, -4.1),
+                16.0,
+                2,
+                3.0,
+                List.of(" Food_Beef ", "FOOD_BEEF")
+        );
+        NeedsResourceAreaSearchCache.AreaKey scalarKey = NeedsResourceAreaSearchCache.AreaKey.from(
+                "world",
+                "food_container",
+                -0.1,
+                64.9,
+                -4.1,
+                16.0,
+                2,
+                3.0,
+                List.of("food_beef")
+        );
+
+        assertEquals(vectorKey, scalarKey);
+        assertEquals(List.of("food_beef"), scalarKey.normalizedItemIds());
+        assertEquals(-1, scalarKey.cellX());
+        assertEquals(16, scalarKey.cellY());
+        assertEquals(-2, scalarKey.cellZ());
+    }
+
+    @Test
     void foodAndWaterDoNotShareAreaKeys() {
         NeedsResourceAreaSearchCache.AreaKey foodKey = NeedsResourceAreaSearchCache.AreaKey.from(
                 "world", "food_container", new Vector3d(10.0, 64.0, 10.0), 16.0, 2, 3.0, 0);

@@ -13,8 +13,8 @@ import org.joml.Vector3d;
  * <p>The result contains only primitive coordinates and scalar metadata. It can
  * therefore be shared by several NPCs without retaining ECS or world state.
  */
-final class NeedsResourceCandidates {
-    static final int MAX_CANDIDATES = 16;
+public final class NeedsResourceCandidates {
+    public static final int MAX_CANDIDATES = 16;
     private static final double DISTANCE_EPSILON = 0.000001;
 
     private NeedsResourceCandidates() {
@@ -23,17 +23,17 @@ final class NeedsResourceCandidates {
     /**
      * One ranked block coordinate and the radius used when approaching it.
      */
-    record Candidate(int x, int y, int z, double approachRadius) {
+    public record Candidate(int x, int y, int z, double approachRadius) {
     }
 
     /**
      * Immutable ranked candidates and the source metadata from one search.
      */
-    record Snapshot(@Nonnull List<Candidate> candidates,
-                    boolean foundSource,
-                    boolean sourceInConsumeRange,
-                    long ttlMs) {
-        Snapshot {
+    public record Snapshot(@Nonnull List<Candidate> candidates,
+                           boolean foundSource,
+                           boolean sourceInConsumeRange,
+                           long ttlMs) {
+        public Snapshot {
             Objects.requireNonNull(candidates, "candidates");
             int candidateCount = Math.min(MAX_CANDIDATES, candidates.size());
             candidates = List.copyOf(candidates.subList(0, candidateCount));
@@ -47,10 +47,10 @@ final class NeedsResourceCandidates {
          * applies the current NPC's range and rejection checks.
          */
         @Nullable
-        Candidate select(@Nullable Vector3d origin,
-                         double radius,
-                         int verticalRadius,
-                         @Nonnull Predicate<Candidate> accept) {
+        public Candidate select(@Nullable Vector3d origin,
+                                double radius,
+                                int verticalRadius,
+                                @Nonnull Predicate<Candidate> accept) {
             if (!isFinitePosition(origin)
                     || !Double.isFinite(radius)
                     || radius <= 0.0) {
@@ -76,19 +76,19 @@ final class NeedsResourceCandidates {
             return null;
         }
 
-        boolean hasCandidates() {
+        public boolean hasCandidates() {
             return !candidates.isEmpty();
         }
 
-        boolean hasTarget() {
+        public boolean hasTarget() {
             return hasCandidates();
         }
 
-        boolean foundConsumableSource() {
+        public boolean foundConsumableSource() {
             return foundSource;
         }
 
-        boolean foundConsumableSourceInConsumeRange() {
+        public boolean foundConsumableSourceInConsumeRange() {
             return sourceInConsumeRange;
         }
     }

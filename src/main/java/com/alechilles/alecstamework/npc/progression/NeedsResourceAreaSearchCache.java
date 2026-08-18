@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.progression;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 import javax.annotation.Nonnull;
@@ -245,7 +246,43 @@ final class NeedsResourceAreaSearchCache {
                    int radiusKey,
                    int verticalScanRadius,
                    int consumeRadiusKey,
-                   int itemIdsHash) {
+                   int itemIdsHash,
+                   @Nonnull List<String> normalizedItemIds,
+                   boolean legacyItemIdsHash) {
+        AreaKey {
+            worldName = worldName.trim().toLowerCase(Locale.ROOT);
+            resourceKind = resourceKind.trim().toLowerCase(Locale.ROOT);
+            normalizedItemIds = List.copyOf(normalizedItemIds);
+        }
+
+        /**
+         * Keeps direct construction source-compatible for old package callers
+         * while new requests use the canonical list factory.
+         */
+        AreaKey(String worldName,
+                String resourceKind,
+                int cellX,
+                int cellY,
+                int cellZ,
+                int radiusKey,
+                int verticalScanRadius,
+                int consumeRadiusKey,
+                int itemIdsHash) {
+            this(
+                    worldName,
+                    resourceKind,
+                    cellX,
+                    cellY,
+                    cellZ,
+                    radiusKey,
+                    verticalScanRadius,
+                    consumeRadiusKey,
+                    itemIdsHash,
+                    List.of(),
+                    true
+            );
+        }
+
         @Nullable
         static AreaKey from(@Nullable String worldName,
                             @Nonnull String resourceKind,
@@ -262,17 +299,151 @@ final class NeedsResourceAreaSearchCache {
                     || radius <= 0.0) {
                 return null;
             }
+            return fromLegacyScalars(
+                    worldName,
+                    resourceKind,
+                    position.x,
+                    position.y,
+                    position.z,
+                    radius,
+                    verticalScanRadius,
+                    consumeRadius,
+                    itemIdsHash
+            );
+        }
+
+        /**
+         * Builds a collision-safe key from normalized food item identity.
+         */
+        @Nullable
+        static AreaKey from(@Nullable String worldName,
+                            @Nonnull String resourceKind,
+                            @Nullable Vector3d position,
+                            double radius,
+                            int verticalScanRadius,
+                            double consumeRadius,
+                            @Nullable List<String> itemIds) {
+            if (position == null) {
+                return null;
+            }
+            return from(
+                    worldName,
+                    resourceKind,
+                    position.x,
+                    position.y,
+                    position.z,
+                    radius,
+                    verticalScanRadius,
+                    consumeRadius,
+                    itemIds
+            );
+        }
+
+        /**
+         * Scalar overload used by queued requests. It avoids creating a
+         * temporary vector while building a new coordinator key.
+         */
+        @Nullable
+        static AreaKey from(@Nullable String worldName,
+                            @Nonnull String resourceKind,
+                            double positionX,
+                            double positionY,
+                            double positionZ,
+                            double radius,
+                            int verticalScanRadius,
+                            double consumeRadius,
+                            @Nullable List<String> itemIds) {
+            if (!isValidBaseInput(worldName, resourceKind, positionX, positionY, positionZ, radius)) {
+                return null;
+            }
+            List<String> normalizedItemIds = normalizeItemIds(itemIds);
             return new AreaKey(
-                    worldName.trim().toLowerCase(Locale.ROOT),
-                    resourceKind.trim().toLowerCase(Locale.ROOT),
-                    Math.floorDiv((int) Math.floor(position.x), POSITION_CACHE_CELL_SIZE_BLOCKS),
-                    Math.floorDiv((int) Math.floor(position.y), POSITION_CACHE_CELL_SIZE_BLOCKS),
-                    Math.floorDiv((int) Math.floor(position.z), POSITION_CACHE_CELL_SIZE_BLOCKS),
+                    worldName,
+                    resourceKind,
+                    quantizedCell(positionX),
+                    quantizedCell(positionY),
+                    quantizedCell(positionZ),
                     Math.max(1, (int) Math.ceil(radius * 10.0)),
                     Math.max(0, verticalScanRadius),
                     Math.max(0, (int) Math.ceil(consumeRadius * 10.0)),
-                    itemIdsHash
+                    normalizedItemIds.hashCode(),
+                    normalizedItemIds,
+                    false
             );
+        }
+
+        @Nullable
+        private static AreaKey fromLegacyScalars(@Nullable String worldName,
+                                                  @Nonnull String resourceKind,
+                                                  double positionX,
+                                                  double positionY,
+                                                  double positionZ,
+                                                  double radius,
+                                                  int verticalScanRadius,
+                                                  double consumeRadius,
+                                                  int itemIdsHash) {
+            if (!isValidBaseInput(worldName, resourceKind, positionX, positionY, positionZ, radius)) {
+                return null;
+            }
+            return new AreaKey(
+                    worldName,
+                    resourceKind,
+                    quantizedCell(positionX),
+                    quantizedCell(positionY),
+                    quantizedCell(positionZ),
+                    Math.max(1, (int) Math.ceil(radius * 10.0)),
+                    Math.max(0, verticalScanRadius),
+                    Math.max(0, (int) Math.ceil(consumeRadius * 10.0)),
+                    itemIdsHash,
+                    List.of(),
+                    true
+            );
+        }
+
+        @Nonnull
+        static List<String> normalizeItemIds(@Nullable List<String> itemIds) {
+            TreeSet<String> normalized = new TreeSet<>();
+            if (itemIds == null) {
+                return List.of();
+            }
+            for (String itemId : itemIds) {
+                if (itemId == null || itemId.isBlank()) {
+                    continue;
+                }
+                normalized.add(itemId.trim().toLowerCase(Locale.ROOT));
+            }
+            return List.copyOf(normalized);
+        }
+
+        private static boolean isValidBaseInput(@Nullable String worldName,
+                                                @Nonnull String resourceKind,
+                                                double positionX,
+                                                double positionY,
+                                                double positionZ,
+                                                double radius) {
+            return worldName != null
+                    && !worldName.isBlank()
+                    && resourceKind != null
+                    && !resourceKind.isBlank()
+                    && Double.isFinite(positionX)
+                    && Double.isFinite(positionY)
+                    && Double.isFinite(positionZ)
+                    && Double.isFinite(radius)
+                    && radius > 0.0;
+        }
+
+        private static int quantizedCell(double coordinate) {
+            return Math.floorDiv(blockCoordinate(coordinate), POSITION_CACHE_CELL_SIZE_BLOCKS);
+        }
+
+        private static int blockCoordinate(double coordinate) {
+            if (coordinate <= Integer.MIN_VALUE) {
+                return Integer.MIN_VALUE;
+            }
+            if (coordinate >= Integer.MAX_VALUE) {
+                return Integer.MAX_VALUE;
+            }
+            return (int) Math.floor(coordinate);
         }
     }
 

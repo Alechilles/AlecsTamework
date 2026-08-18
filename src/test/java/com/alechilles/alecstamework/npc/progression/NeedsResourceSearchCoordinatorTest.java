@@ -9,8 +9,6 @@ import static com.alechilles.alecstamework.performance.RuntimePressureLevel.WARM
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.performance.TameworkRuntimePressureService;
@@ -22,7 +20,6 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.UUID;
-import org.joml.Vector3d;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -120,6 +117,21 @@ class NeedsResourceSearchCoordinatorTest {
     }
 
     @Test
+    void repeatedProcessCallsCannotAttemptTwoSearchesOnOneWorldTick() {
+        try (TestEntityComponentStore store = newStore()) {
+            coordinator.clear(store);
+            CountingExecutor executor = new CountingExecutor(hitSnapshot(1_500L));
+            coordinator.lookupOrEnqueue(store, uuid(250), request(250), NOW_MS);
+            coordinator.lookupOrEnqueue(store, uuid(251), request(251), NOW_MS);
+
+            assertEquals(1, coordinator.processOne(store, -8L, NOW_MS, executor));
+            assertEquals(0, coordinator.processOne(store, -8L, NOW_MS, executor));
+            assertEquals(1, executor.calls());
+            assertEquals(1, coordinator.pendingCountForTests(store));
+        }
+    }
+
+    @Test
     void oldestPendingKeysCompleteFirst() {
         try (TestEntityComponentStore store = newStore()) {
             coordinator.clear(store);
@@ -171,12 +183,12 @@ class NeedsResourceSearchCoordinatorTest {
 
             assertEquals(HIT, coordinator.lookupOrEnqueue(store, uuid(501), hitRequest, NOW_MS + 99L).status());
             assertEquals(DEFERRED, coordinator.lookupOrEnqueue(store, uuid(501), hitRequest, NOW_MS + 100L).status());
-            assertEquals(1, coordinator.processOne(store, 8L, NOW_MS + 100L, hitExecutor));
+            assertEquals(1, coordinator.processOne(store, 16L, NOW_MS + 100L, hitExecutor));
 
             NeedsResourceSearchCoordinator.Request missRequest = request(501);
             CountingExecutor missExecutor = new CountingExecutor(missSnapshot(100L));
             coordinator.lookupOrEnqueue(store, uuid(502), missRequest, NOW_MS);
-            coordinator.processOne(store, 16L, NOW_MS, missExecutor);
+            coordinator.processOne(store, 24L, NOW_MS, missExecutor);
 
             NeedsResourceSearchCoordinator.Lookup miss =
                     coordinator.lookupOrEnqueue(store, uuid(503), missRequest, NOW_MS + 99L);
@@ -212,19 +224,92 @@ class NeedsResourceSearchCoordinatorTest {
     }
 
     @Test
+    void nullSearchResultConsumesTickBudgetAndCanRetryAfterShortMiss() {
+        try (TestEntityComponentStore store = newStore()) {
+            coordinator.clear(store);
+            UUID firstNpc = uuid(650);
+            UUID secondNpc = uuid(651);
+            NeedsResourceSearchCoordinator.Request firstRequest = request(650);
+            NeedsResourceSearchCoordinator.Request secondRequest = request(651);
+            CountingExecutor executor = new CountingExecutor(hitSnapshot(1_500L));
+            executor.returnNullNext = true;
+
+            coordinator.lookupOrEnqueue(store, firstNpc, firstRequest, NOW_MS);
+            coordinator.lookupOrEnqueue(store, secondNpc, secondRequest, NOW_MS);
+
+            assertEquals(1, coordinator.processOne(store, -8L, NOW_MS, executor));
+            assertEquals(0, coordinator.processOne(store, -8L, NOW_MS, executor));
+            assertEquals(1, executor.calls());
+            assertEquals(1, coordinator.pendingCountForTests(store));
+
+            assertEquals(1, coordinator.processOne(store, -7L, NOW_MS, executor));
+            long retryAt = NOW_MS + new NeedsResourceSearchAdmissionPolicy().deferredTtlMs(firstNpc);
+            assertEquals(MISS, coordinator.lookupOrEnqueue(store, firstNpc, firstRequest, retryAt - 1L).status());
+            assertEquals(DEFERRED, coordinator.lookupOrEnqueue(store, firstNpc, firstRequest, retryAt).status());
+            assertEquals(1, coordinator.processOne(store, 0L, retryAt, executor));
+            assertEquals(HIT, coordinator.lookupOrEnqueue(store, firstNpc, firstRequest, retryAt + 1L).status());
+        }
+    }
+
+    @Test
+    void foodIdentityUsesCollisionSafeNormalizedAreaKeys() {
+        try (TestEntityComponentStore store = newStore()) {
+            coordinator.clear(store);
+            NeedsResourceSearchCoordinator.Request aa = request(
+                    "food_container", 900, List.of("Aa"));
+            NeedsResourceSearchCoordinator.Request bb = request(
+                    "food_container", 900, List.of("BB"));
+            CountingExecutor executor = new CountingExecutor(hitSnapshot(1_500L));
+
+            coordinator.lookupOrEnqueue(store, uuid(900), aa, NOW_MS);
+            coordinator.processOne(store, 8L, NOW_MS, executor);
+
+            assertEquals(DEFERRED, coordinator.lookupOrEnqueue(store, uuid(901), bb, NOW_MS).status());
+            assertEquals(1, coordinator.pendingCountForTests(store));
+        }
+    }
+
+    @Test
+    void equivalentFoodIdsSharePendingAndCachedResults() {
+        try (TestEntityComponentStore store = newStore()) {
+            coordinator.clear(store);
+            NeedsResourceSearchCoordinator.Request first = request(
+                    "food_container", 901, List.of(" Food_Beef ", "FOOD_WHEAT", "food_beef"));
+            NeedsResourceSearchCoordinator.Request equivalent = request(
+                    "food_container", 901, List.of("food_wheat", "Food_Beef"));
+            CountingExecutor executor = new CountingExecutor(hitSnapshot(1_500L));
+
+            assertEquals(DEFERRED, coordinator.lookupOrEnqueue(store, uuid(902), first, NOW_MS).status());
+            assertEquals(DEFERRED, coordinator.lookupOrEnqueue(store, uuid(903), equivalent, NOW_MS).status());
+            assertEquals(1, coordinator.pendingCountForTests(store));
+            coordinator.processOne(store, 8L, NOW_MS, executor);
+
+            assertEquals(HIT, coordinator.lookupOrEnqueue(store, uuid(904), equivalent, NOW_MS + 1L).status());
+            assertEquals(1, executor.calls());
+        }
+    }
+
+    @Test
     void clearRemovesOnlyTheSelectedStoreState() {
         try (TestEntityComponentStore firstStore = newStore();
              TestEntityComponentStore secondStore = newStore()) {
             coordinator.clear(firstStore);
             coordinator.clear(secondStore);
             NeedsResourceSearchCoordinator.Request request = request(700);
+            CountingExecutor executor = new CountingExecutor(hitSnapshot(1_500L));
             coordinator.lookupOrEnqueue(firstStore, uuid(700), request, NOW_MS);
             coordinator.lookupOrEnqueue(secondStore, uuid(701), request, NOW_MS);
+            assertEquals(1, coordinator.processOne(firstStore, 8L, NOW_MS, executor));
+            assertEquals(HIT, coordinator.lookupOrEnqueue(
+                    firstStore, uuid(702), request, NOW_MS + 1L).status());
 
             coordinator.clear(firstStore);
 
             assertEquals(0, coordinator.pendingCountForTests(firstStore));
             assertEquals(1, coordinator.pendingCountForTests(secondStore));
+            assertEquals(DEFERRED, coordinator.lookupOrEnqueue(
+                    firstStore, uuid(703), request, NOW_MS + 1L).status());
+            assertEquals(1, coordinator.pendingCountForTests(firstStore));
         }
     }
 
@@ -235,7 +320,7 @@ class NeedsResourceSearchCoordinatorTest {
             List<String> itemIds = new ArrayList<>(List.of("Food_Beef", "Food_Wheat"));
             NeedsResourceSearchCoordinator.Request request = request(800, itemIds);
             itemIds.clear();
-            assertEquals(List.of("Food_Beef", "Food_Wheat"), request.itemIds());
+            assertEquals(List.of("food_beef", "food_wheat"), request.itemIds());
 
             coordinator.lookupOrEnqueue(store, uuid(800), request, NOW_MS);
             assertEquals(1, coordinator.pendingCountForTests(store));
@@ -255,18 +340,17 @@ class NeedsResourceSearchCoordinatorTest {
     }
 
     private static NeedsResourceSearchCoordinator.Request request(int index, List<String> itemIds) {
-        NeedsResourceAreaSearchCache.AreaKey areaKey = NeedsResourceAreaSearchCache.AreaKey.from(
+        return request("water", index, itemIds);
+    }
+
+    private static NeedsResourceSearchCoordinator.Request request(
+            String resourceKind, int index, List<String> itemIds) {
+        return NeedsResourceSearchCoordinator.Request.forArea(
+                resourceKind,
                 "test-world",
-                "water",
-                new Vector3d(index * 4.0, 64.0, 0.0),
-                16.0,
-                1,
-                3.0,
-                itemIds.hashCode()
-        );
-        return new NeedsResourceSearchCoordinator.Request(
-                "water",
-                areaKey,
+                index * 4.0,
+                64.0,
+                0.0,
                 16.0,
                 1,
                 3.0,
@@ -292,6 +376,7 @@ class NeedsResourceSearchCoordinatorTest {
         private final List<NeedsResourceSearchCoordinator.Request> requests = new ArrayList<>();
         private final List<List<UUID>> waiters = new ArrayList<>();
         private boolean failNext;
+        private boolean returnNullNext;
 
         private CountingExecutor(NeedsResourceCandidates.Snapshot... snapshots) {
             for (NeedsResourceCandidates.Snapshot snapshot : snapshots) {
@@ -309,6 +394,10 @@ class NeedsResourceSearchCoordinatorTest {
             if (failNext) {
                 failNext = false;
                 throw new IllegalStateException("test search failure");
+            }
+            if (returnNullNext) {
+                returnNullNext = false;
+                return null;
             }
             NeedsResourceCandidates.Snapshot result = results.peekFirst();
             if (results.size() > 1) {
