@@ -65,7 +65,10 @@ public final class CompanionNeedsBatchRunner {
         }
         long startedAtNs = nanoClock.getAsLong();
         Store<EntityStore> store = resolveStore(world);
-        Map<UUID, Integer> starvingLinkedByOwner = new HashMap<>();
+        WarningState warningState = store == null ? null : warningStatesByStore.get(store);
+        Map<UUID, Integer> starvingLinkedByOwner = warningState == null
+                ? null
+                : warningState.pendingStarvingLinkedByOwner;
         int processed = processDue(
                 world,
                 store,
@@ -76,12 +79,13 @@ public final class CompanionNeedsBatchRunner {
                 starvingLinkedByOwner
         );
         processSuppression(world, store, state);
-        if (processed > 0 && store != null) {
-            WarningState warningState = warningStatesByStore.get(store);
-            notifyOwners(world, store, warningState, starvingLinkedByOwner, nowMs);
+        boolean hasRemainingDue = state.hasDue(nowMs);
+        if (warningState != null && !hasRemainingDue) {
+            notifyOwners(world, store, warningState, warningState.pendingStarvingLinkedByOwner, nowMs);
+            warningState.pendingStarvingLinkedByOwner.clear();
             pruneWarningThrottleEntries(warningState, nowMs);
         }
-        return new BatchResult(processed, state.hasDue(nowMs));
+        return new BatchResult(processed, hasRemainingDue);
     }
 
     private int processDue(@Nullable World world,
@@ -90,7 +94,7 @@ public final class CompanionNeedsBatchRunner {
                            long nowMs,
                            @Nonnull LongSupplier nanoClock,
                            long startedAtNs,
-                           @Nonnull Map<UUID, Integer> starvingLinkedByOwner) {
+                           @Nullable Map<UUID, Integer> starvingLinkedByOwner) {
         int processed = 0;
         while (processed < MAX_UPDATES_PER_BATCH) {
             long dueAtMs = state.schedule().nextDueAtMs();
@@ -107,7 +111,8 @@ public final class CompanionNeedsBatchRunner {
             }
             CompanionNeedsScheduledUpdate.Outcome outcome = updateNpc(world, state, npcId);
             if (outcome == null) {
-                outcome = CompanionNeedsScheduledUpdate.retryOutcome();
+                state.remove(npcId);
+                continue;
             }
             reschedule(state, npcId, nowMs, outcome);
             collectMalnourishmentCount(store, world, npcId, outcome, starvingLinkedByOwner);
@@ -133,16 +138,16 @@ public final class CompanionNeedsBatchRunner {
             @Nonnull UUID npcId) {
         Store<EntityStore> store = resolveStore(world);
         if (store == null || !state.hasMember(npcId) || world == null) {
-            return CompanionNeedsScheduledUpdate.retryOutcome();
+            return null;
         }
         Ref<EntityStore> npcRef;
         try {
             npcRef = world.getEntityRef(npcId);
         } catch (IllegalStateException ignored) {
-            return CompanionNeedsScheduledUpdate.retryOutcome();
+            return null;
         }
         if (npcRef == null || !npcRef.isValid() || npcRef.getStore() != store) {
-            return CompanionNeedsScheduledUpdate.retryOutcome();
+            return null;
         }
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
         return CompanionNeedsScheduledUpdate.run(npcRef, store, roleId, BASE_INTERVAL_MS);
@@ -199,8 +204,8 @@ public final class CompanionNeedsBatchRunner {
                                                    @Nullable World world,
                                                    @Nonnull UUID npcId,
                                                    @Nonnull CompanionNeedsScheduledUpdate.Outcome outcome,
-                                                   @Nonnull Map<UUID, Integer> counts) {
-        if (store == null || world == null || !outcome.needsDamageActive()) {
+                                                   @Nullable Map<UUID, Integer> counts) {
+        if (store == null || world == null || counts == null || !outcome.needsDamageActive()) {
             return;
         }
         Ref<EntityStore> npcRef = resolveRef(world, store, npcId);
@@ -320,5 +325,6 @@ public final class CompanionNeedsBatchRunner {
 
     private static final class WarningState {
         private final Map<UUID, Long> lastWarningByOwner = new HashMap<>();
+        private final Map<UUID, Integer> pendingStarvingLinkedByOwner = new HashMap<>();
     }
 }
