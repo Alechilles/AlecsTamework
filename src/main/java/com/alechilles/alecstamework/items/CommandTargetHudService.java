@@ -114,13 +114,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                                           @Nonnull StoreTickState tickState,
                                           long nowMs) {
         CommandTargetHudActivationTracker.CandidateBatch batch =
-                activationTracker.selectCandidateBatch(
-                        MAX_CANDIDATES_PER_PASS,
-                        tickState.nextDirtyCandidateCursor,
-                        tickState.nextCandidateCursor
-                );
-        tickState.nextDirtyCandidateCursor = batch.nextDirtyCursor();
-        tickState.nextCandidateCursor = batch.nextRegularCursor();
+                activationTracker.selectCandidateBatch(MAX_CANDIDATES_PER_PASS);
         for (UUID playerUuid : batch.playerUuids()) {
             PlayerCandidate candidate = resolvePlayerCandidate(playerUuid, store);
             if (candidate == null) {
@@ -743,10 +737,6 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     private static final class StoreTickState {
         private long nextSweepAtMs;
         private long nextFallbackDiscoveryAtMs;
-        @Nullable
-        private UUID nextDirtyCandidateCursor;
-        @Nullable
-        private UUID nextCandidateCursor;
     }
 
     private record PlayerCandidate(@Nonnull UUID playerUuid,

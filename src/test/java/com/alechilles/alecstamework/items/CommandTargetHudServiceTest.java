@@ -301,7 +301,9 @@ class CommandTargetHudServiceTest {
         for (UUID playerUuid : candidates) {
             tracker.recordResolvedHand(playerUuid, "Tamework:CommandFlute", true, 1_000L);
         }
-        UUID cursor = offset == 0 ? null : candidates.get(offset - 1);
-        return tracker.selectCandidateBatch(maxCandidates, null, cursor).playerUuids();
+        if (offset > 0) {
+            tracker.selectCandidateBatch(offset);
+        }
+        return tracker.selectCandidateBatch(maxCandidates).playerUuids();
     }
 }

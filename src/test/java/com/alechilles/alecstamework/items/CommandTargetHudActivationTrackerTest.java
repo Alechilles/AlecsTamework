@@ -1,8 +1,6 @@
 package com.alechilles.alecstamework.items;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -98,13 +96,18 @@ class CommandTargetHudActivationTrackerTest {
     }
 
     @Test
-    void inactivePlayersAreRemovedFromInspectionCandidatesAfterResolution() {
+    void inactivePlayersKeepPendingDirtyCandidatesUntilSelection() {
         CommandTargetHudActivationTracker tracker = new CommandTargetHudActivationTracker();
         tracker.markDirty(PLAYER_UUID);
 
         tracker.recordResolvedHand(PLAYER_UUID, null, false, 1_000L);
 
-        Assertions.assertFalse(tracker.candidatePlayerUuids().contains(PLAYER_UUID));
+        Assertions.assertTrue(tracker.candidatePlayerUuids().contains(PLAYER_UUID));
+        Assertions.assertEquals(
+                List.of(PLAYER_UUID),
+                tracker.selectCandidateBatch(1).playerUuids()
+        );
+        Assertions.assertTrue(tracker.candidatePlayerUuids().isEmpty());
     }
 
     @Test
@@ -119,7 +122,7 @@ class CommandTargetHudActivationTrackerTest {
     }
 
     @Test
-    void boundedCandidateBatchPrioritizesDirtyPlayersAndRotatesRegularPlayers() {
+    void boundedCandidateBatchPrioritizesDirtyPlayersAndRotatesActivePlayers() {
         CommandTargetHudActivationTracker tracker = new CommandTargetHudActivationTracker();
         UUID regularA = MANY_PLAYER_UUIDS.get(0);
         UUID regularB = MANY_PLAYER_UUIDS.get(1);
@@ -128,62 +131,39 @@ class CommandTargetHudActivationTrackerTest {
         tracker.recordResolvedHand(regularB, "Tamework:CommandFlute", true, 1_000L);
         tracker.markDirty(dirty);
 
-        CommandTargetHudActivationTracker.CandidateBatch first =
-                tracker.selectCandidateBatch(2, null, null);
+        Assertions.assertEquals(
+                List.of(dirty, regularA),
+                tracker.selectCandidateBatch(2).playerUuids()
+        );
         tracker.recordResolvedHand(dirty, "Tamework:CommandFlute", true, 1_001L);
-        CommandTargetHudActivationTracker.CandidateBatch second =
-                tracker.selectCandidateBatch(
-                        2,
-                        first.nextDirtyCursor(),
-                        first.nextRegularCursor()
-                );
 
-        Assertions.assertEquals(List.of(dirty, regularA), first.playerUuids());
-        Assertions.assertEquals(List.of(regularB, dirty), second.playerUuids());
+        Assertions.assertEquals(
+                List.of(regularB, dirty),
+                tracker.selectCandidateBatch(2).playerUuids()
+        );
     }
 
     @Test
-    void dirtyCandidateBatchRotatesBeforeTheNextFallbackSweep() {
+    void repeatedDirtyMarksProduceOnePendingCandidate() {
         CommandTargetHudActivationTracker tracker = new CommandTargetHudActivationTracker();
-        for (UUID playerUuid : MANY_PLAYER_UUIDS.subList(0, 5)) {
-            tracker.markDirty(playerUuid);
-        }
+        tracker.markDirty(PLAYER_UUID);
+        tracker.markDirty(PLAYER_UUID);
+        tracker.markDirty(PLAYER_UUID);
 
-        CommandTargetHudActivationTracker.CandidateBatch first =
-                tracker.selectCandidateBatch(2, null, null);
-        CommandTargetHudActivationTracker.CandidateBatch second =
-                tracker.selectCandidateBatch(2, first.nextDirtyCursor(), first.nextRegularCursor());
-
-        Assertions.assertEquals(MANY_PLAYER_UUIDS.subList(0, 2), first.playerUuids());
-        Assertions.assertEquals(MANY_PLAYER_UUIDS.subList(2, 4), second.playerUuids());
+        Assertions.assertEquals(
+                List.of(PLAYER_UUID),
+                tracker.selectCandidateBatch(4).playerUuids()
+        );
+        Assertions.assertTrue(tracker.selectCandidateBatch(4).playerUuids().isEmpty());
     }
 
     @Test
-    void fallbackSweepDoesNotStarveTheLastDirtyPlayer() {
+    void inactiveResolutionRemovesQueuedRegularCandidate() {
         CommandTargetHudActivationTracker tracker = new CommandTargetHudActivationTracker();
-        List<UUID> players = java.util.stream.LongStream.rangeClosed(1L, 61L)
-                .mapToObj(value -> new UUID(0L, value))
-                .toList();
-        players.forEach(tracker::markDirty);
-        Set<UUID> processed = new HashSet<>();
-        UUID dirtyCursor = null;
-        UUID regularCursor = null;
+        tracker.recordResolvedHand(PLAYER_UUID, "Tamework:CommandFlute", true, 1_000L);
+        tracker.recordResolvedHand(PLAYER_UUID, null, false, 1_001L);
 
-        for (int pass = 0; pass < 16; pass++) {
-            if (pass == 15) {
-                players.forEach(tracker::markDirty);
-            }
-            CommandTargetHudActivationTracker.CandidateBatch batch =
-                    tracker.selectCandidateBatch(4, dirtyCursor, regularCursor);
-            dirtyCursor = batch.nextDirtyCursor();
-            regularCursor = batch.nextRegularCursor();
-            for (UUID playerUuid : batch.playerUuids()) {
-                processed.add(playerUuid);
-                tracker.recordResolvedHand(playerUuid, "Tamework:CommandFlute", true, pass);
-            }
-        }
-
-        Assertions.assertEquals(new HashSet<>(players), processed);
+        Assertions.assertTrue(tracker.selectCandidateBatch(4).playerUuids().isEmpty());
     }
 
     @Test
@@ -241,7 +221,7 @@ class CommandTargetHudActivationTrackerTest {
             while (running.get() && failure.get() == null) {
                 List<UUID> candidates = tracker.candidatePlayerUuids();
                 CommandTargetHudActivationTracker.CandidateBatch batch =
-                        tracker.selectCandidateBatch(4, null, null);
+                        tracker.selectCandidateBatch(4);
                 Assertions.assertThrows(UnsupportedOperationException.class, () -> candidates.add(PLAYER_UUID));
                 Assertions.assertThrows(
                         UnsupportedOperationException.class,
