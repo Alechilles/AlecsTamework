@@ -24,6 +24,8 @@
   that the shaded Patchwork descriptor is incomplete.
 - Reduced world-tick work for companion needs by reusing parsed runtime settings instead of rebuilding
   the same damage and tick-policy objects for each companion check.
+- Reduced interaction prompt work by reusing reload-aware food lists and role scopes, avoiding
+  temporary selection objects, and skipping unchanged prompt-cache writes.
 
 ## 3.1.9 - Companion Spawn Safety Hotfix - 2026-08-16
 

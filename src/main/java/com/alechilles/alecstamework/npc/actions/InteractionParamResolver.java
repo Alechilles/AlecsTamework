@@ -14,6 +14,8 @@ final class InteractionParamResolver {
     private final StdScope execScopeSnapshot;
     private final StdScope sensorScopeSnapshot;
     private final StdScopeLookupCache scopeLookupCache = new StdScopeLookupCache();
+    private StdScope cachedPrimaryScope;
+    private StdScope[] cachedOrderedScopes;
 
     InteractionParamResolver(StdScope globalScopeSnapshot,
                              StdScope execScopeSnapshot,
@@ -112,6 +114,9 @@ final class InteractionParamResolver {
     }
 
     private StdScope[] orderedScopes(StdScope primary) {
+        if (cachedOrderedScopes != null && cachedPrimaryScope == primary) {
+            return cachedOrderedScopes;
+        }
         StdScope[] scopes = new StdScope[5];
         int count = 0;
         if (primary != null) {
@@ -138,7 +143,9 @@ final class InteractionParamResolver {
                 && sensorScopeSnapshot != execScopeSnapshot) {
             scopes[count++] = sensorScopeSnapshot;
         }
-        return count == scopes.length ? scopes : Arrays.copyOf(scopes, count);
+        cachedPrimaryScope = primary;
+        cachedOrderedScopes = count == scopes.length ? scopes : Arrays.copyOf(scopes, count);
+        return cachedOrderedScopes;
     }
 
     private String getStringFromScope(StdScope scope, String paramName) {

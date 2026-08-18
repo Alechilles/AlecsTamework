@@ -94,22 +94,45 @@ final class InteractionItemIdResolver {
     }
 
     @Nonnull
-    private String[] combineItemIds(@Nullable String[]... sources) {
-        LinkedHashSet<String> merged = new LinkedHashSet<>();
-        if (sources == null || sources.length == 0) {
+    private String[] combineItemIds(@Nullable String[] paramItems,
+                                    @Nullable String[] explicitItems,
+                                    @Nullable String[] profileItems) {
+        String[] onlySource = null;
+        int sourceCount = 0;
+        if (hasItems(paramItems)) {
+            onlySource = paramItems;
+            sourceCount++;
+        }
+        if (hasItems(explicitItems)) {
+            onlySource = explicitItems;
+            sourceCount++;
+        }
+        if (hasItems(profileItems)) {
+            onlySource = profileItems;
+            sourceCount++;
+        }
+        if (sourceCount == 0) {
             return EMPTY_ITEMS;
         }
-        for (String[] source : sources) {
-            if (!hasItems(source)) {
-                continue;
-            }
-            for (String item : source) {
-                if (item != null && !item.isBlank()) {
-                    merged.add(item.trim());
-                }
+        if (sourceCount == 1) {
+            return onlySource;
+        }
+        LinkedHashSet<String> merged = new LinkedHashSet<>();
+        addItems(merged, paramItems);
+        addItems(merged, explicitItems);
+        addItems(merged, profileItems);
+        return merged.isEmpty() ? EMPTY_ITEMS : merged.toArray(new String[0]);
+    }
+
+    private void addItems(@Nonnull LinkedHashSet<String> merged, @Nullable String[] source) {
+        if (source == null) {
+            return;
+        }
+        for (String item : source) {
+            if (item != null && !item.isBlank()) {
+                merged.add(item.trim());
             }
         }
-        return merged.isEmpty() ? EMPTY_ITEMS : merged.toArray(new String[0]);
     }
 
     private boolean hasItems(@Nullable String[] items) {

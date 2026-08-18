@@ -1,8 +1,8 @@
 package com.alechilles.alecstamework.config.assets;
 
-import java.util.HashMap;
 import java.util.Locale;
-import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -11,26 +11,34 @@ import javax.annotation.Nullable;
  */
 final class TwFoodProfileCache {
     private final Object lock = new Object();
-    private long generation = Long.MIN_VALUE;
-    private Map<String, TwFoodConfig.ResolvedFoodProfile> profilesByRole = new HashMap<>();
+    private volatile CacheState state = new CacheState(Long.MIN_VALUE, new ConcurrentHashMap<>());
 
     @Nonnull
     TwFoodConfig.ResolvedFoodProfile resolve(@Nullable String roleId,
                                              long currentGeneration,
                                              @Nonnull ProfileFactory factory) {
         String key = normalizeRoleKey(roleId);
+        CacheState snapshot = state;
+        if (snapshot.generation != currentGeneration) {
+            snapshot = switchGeneration(currentGeneration);
+        }
+        TwFoodConfig.ResolvedFoodProfile cached = snapshot.profilesByRole.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        return snapshot.profilesByRole.computeIfAbsent(key, ignored -> factory.resolve(roleId));
+    }
+
+    @Nonnull
+    private CacheState switchGeneration(long currentGeneration) {
         synchronized (lock) {
-            if (generation != currentGeneration) {
-                profilesByRole = new HashMap<>();
-                generation = currentGeneration;
+            CacheState current = state;
+            if (current.generation >= currentGeneration) {
+                return current;
             }
-            TwFoodConfig.ResolvedFoodProfile cached = profilesByRole.get(key);
-            if (cached != null) {
-                return cached;
-            }
-            TwFoodConfig.ResolvedFoodProfile resolved = factory.resolve(roleId);
-            profilesByRole.put(key, resolved);
-            return resolved;
+            current = new CacheState(currentGeneration, new ConcurrentHashMap<>());
+            state = current;
+            return current;
         }
     }
 
@@ -50,5 +58,9 @@ final class TwFoodProfileCache {
     interface ProfileFactory {
         @Nonnull
         TwFoodConfig.ResolvedFoodProfile resolve(@Nullable String roleId);
+    }
+
+    private record CacheState(long generation,
+                              ConcurrentMap<String, TwFoodConfig.ResolvedFoodProfile> profilesByRole) {
     }
 }

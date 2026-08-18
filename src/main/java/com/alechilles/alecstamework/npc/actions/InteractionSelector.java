@@ -58,7 +58,6 @@ final class InteractionSelector {
             return null;
         }
         InteractionPromptPlan promptPlan = promptPlanCache.getOrBuild(config, this::buildPromptPlan);
-        ActionTameworkInteract.ResolvedInteraction[] blockedContext = new ActionTameworkInteract.ResolvedInteraction[1];
         ActionTameworkInteract.ResolvedInteraction contextual = findFirstPromptMatch(
                 config,
                 interactionConfigId,
@@ -70,11 +69,12 @@ final class InteractionSelector {
                 store,
                 player,
                 ctx,
-                blocked -> blockedContext[0] = blockedContext[0] == null ? blocked : blockedContext[0]
+                true
         );
-        if (contextual != null) {
+        if (contextual != null && !contextual.blockedByCooldown) {
             return contextual;
         }
+        ActionTameworkInteract.ResolvedInteraction blockedContext = contextual;
         ActionTameworkInteract.ResolvedInteraction conditional = findFirstPromptMatch(
                 config,
                 interactionConfigId,
@@ -86,8 +86,7 @@ final class InteractionSelector {
                 store,
                 player,
                 ctx,
-                blocked -> {
-                }
+                false
         );
         if (conditional != null) {
             return conditional;
@@ -103,10 +102,9 @@ final class InteractionSelector {
                 store,
                 player,
                 ctx,
-                blocked -> {
-                }
+                false
         );
-        return generic != null ? generic : blockedContext[0];
+        return generic != null ? generic : blockedContext;
     }
 
     private ActionTameworkInteract.ResolvedInteraction findFirstPromptMatch(TwInteractionConfig config,
@@ -119,10 +117,11 @@ final class InteractionSelector {
                                                                             Store<EntityStore> store,
                                                                             Player player,
                                                                             InteractionContextSnapshot ctx,
-                                                                            BlockedContextConsumer blockedContextConsumer) {
+                                                                            boolean retainBlockedContext) {
         if (indexes == null || indexes.length == 0) {
             return null;
         }
+        ActionTameworkInteract.ResolvedInteraction blockedContext = null;
         for (int index : indexes) {
             if (index < 0 || index >= entries.length) {
                 continue;
@@ -137,25 +136,29 @@ final class InteractionSelector {
                     : null;
             if (cooldownSeconds > 0
                     && (cooldownAlarmName == null || !cooldowns.isCooldownReady(npcRef, store, cooldownAlarmName))) {
-                blockedContextConsumer.accept(new ActionTameworkInteract.ResolvedInteraction(
-                        interactionConfigId,
-                        entry,
-                        index,
-                        cooldownSeconds,
-                        cooldownAlarmName,
-                        true
-                ));
+                if (retainBlockedContext && blockedContext == null) {
+                    blockedContext = new ActionTameworkInteract.ResolvedInteraction(
+                            interactionConfigId,
+                            entry,
+                            index,
+                            cooldownSeconds,
+                            cooldownAlarmName,
+                            true
+                    );
+                }
                 continue;
             }
             if (isHarvestAlarmBlocking(entry, npcRef, role, infoProvider, store, ctx, true)) {
-                blockedContextConsumer.accept(new ActionTameworkInteract.ResolvedInteraction(
-                        interactionConfigId,
-                        entry,
-                        index,
-                        cooldownSeconds,
-                        cooldownAlarmName,
-                        true
-                ));
+                if (retainBlockedContext && blockedContext == null) {
+                    blockedContext = new ActionTameworkInteract.ResolvedInteraction(
+                            interactionConfigId,
+                            entry,
+                            index,
+                            cooldownSeconds,
+                            cooldownAlarmName,
+                            true
+                    );
+                }
                 continue;
             }
             if (!requirements.requirementsMetForPrompt(
@@ -179,7 +182,7 @@ final class InteractionSelector {
                     cooldownAlarmName
             );
         }
-        return null;
+        return blockedContext;
     }
 
     InteractionPromptPlan buildPromptPlan(InteractionEntry[] entries) {
@@ -229,10 +232,6 @@ final class InteractionSelector {
             return EntryPromptCategory.CONDITIONAL;
         }
         return EntryPromptCategory.GENERIC;
-    }
-
-    private interface BlockedContextConsumer {
-        void accept(ActionTameworkInteract.ResolvedInteraction blockedContext);
     }
 
     private enum EntryPromptCategory {

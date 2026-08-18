@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.actions;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.logging.Level;
 
@@ -86,7 +87,12 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         }
 
         long nowMs = System.currentTimeMillis();
-        PromptSelectionFingerprint fingerprint = buildPromptSelectionFingerprint(player, role);
+        ItemStack activeItem = PlayerInventoryAccess.getActiveHotbarItem(player);
+        boolean hasActiveItem = activeItem != null && !activeItem.isEmpty();
+        String activeItemId = hasActiveItem ? activeItem.getItemId() : null;
+        int activeQuantity = hasActiveItem ? activeItem.getQuantity() : 0;
+        int stateIndex = stateSupport.getStateIndex();
+        int subStateIndex = stateSupport.getSubStateIndex();
         CachedPromptSelection cachedSelection = cachedPromptSelections.get(playerId);
 
         InteractionContextSnapshot ctx = null;
@@ -94,7 +100,7 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         ActionTameworkInteract.ResolvedInteraction resolved = null;
         PromptState prompt;
         if (cachedSelection != null
-                && cachedSelection.matches(fingerprint, nowMs)) {
+                && cachedSelection.matches(activeItemId, activeQuantity, stateIndex, subStateIndex, nowMs)) {
             config = cachedSelection.config();
             resolved = cachedSelection.resolvedInteraction();
             prompt = cachedSelection.promptState();
@@ -120,7 +126,10 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
             cachedPromptSelections.put(
                     playerId,
                     new CachedPromptSelection(
-                            fingerprint,
+                            activeItemId,
+                            activeQuantity,
+                            stateIndex,
+                            subStateIndex,
                             nowMs + PROMPT_SELECTION_CACHE_TTL_MS,
                             config,
                             resolved,
@@ -137,6 +146,7 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         if (changed) {
             // Force a refresh when the prompt changes so the hint updates on the client.
             stateSupport.setInteractable(npcRef, interactionTarget, false, null, false, store);
+            lastPrompts.put(playerId, prompt);
         }
         stateSupport.setInteractable(
                 npcRef,
@@ -146,7 +156,6 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
                 prompt.showPrompt,
                 store
         );
-        lastPrompts.put(playerId, prompt);
         return true;
     }
 
@@ -160,16 +169,6 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
             return true;
         }
         return false;
-    }
-
-    private PromptSelectionFingerprint buildPromptSelectionFingerprint(Player player, Role role) {
-        ItemStack activeItem = PlayerInventoryAccess.getActiveHotbarItem(player);
-        String activeItemId = activeItem != null && !activeItem.isEmpty() ? activeItem.getItemId() : null;
-        int activeQuantity = activeItem != null && !activeItem.isEmpty() ? activeItem.getQuantity() : 0;
-        StateSupport stateSupport = NpcSupportAccess.state(role, null, null);
-        int stateIndex = stateSupport != null ? stateSupport.getStateIndex() : -1;
-        int subStateIndex = stateSupport != null ? stateSupport.getSubStateIndex() : -1;
-        return new PromptSelectionFingerprint(activeItemId, activeQuantity, stateIndex, subStateIndex);
     }
 
     // Determines the prompt state (visibility + hint key) for the selected entry.
@@ -224,6 +223,9 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
 
     // Simple value object for prompt hint/visibility.
     private static final class PromptState {
+        private static final PromptState HIDDEN = new PromptState(null, false, false);
+        private static final PromptState HIDDEN_INTERACTABLE = new PromptState(null, false, true);
+
         final String hint;
         final boolean showPrompt;
         final boolean interactable;
@@ -268,23 +270,28 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         }
 
         static PromptState hidden(boolean interactable) {
-            return new PromptState(null, false, interactable);
+            return interactable ? HIDDEN_INTERACTABLE : HIDDEN;
         }
     }
 
-    private record PromptSelectionFingerprint(String activeItemId,
-                                              int activeQuantity,
-                                              int stateIndex,
-                                              int subStateIndex) {
-    }
-
-    private record CachedPromptSelection(PromptSelectionFingerprint fingerprint,
+    private record CachedPromptSelection(String activeItemId,
+                                         int activeQuantity,
+                                         int stateIndex,
+                                         int subStateIndex,
                                          long expiresAtMs,
                                          TwInteractionConfig config,
                                          ActionTameworkInteract.ResolvedInteraction resolvedInteraction,
                                          PromptState promptState) {
-        private boolean matches(PromptSelectionFingerprint fingerprint, long nowMs) {
-            return this.fingerprint.equals(fingerprint) && nowMs < expiresAtMs;
+        private boolean matches(String activeItemId,
+                                int activeQuantity,
+                                int stateIndex,
+                                int subStateIndex,
+                                long nowMs) {
+            return this.activeQuantity == activeQuantity
+                    && this.stateIndex == stateIndex
+                    && this.subStateIndex == subStateIndex
+                    && Objects.equals(this.activeItemId, activeItemId)
+                    && nowMs < expiresAtMs;
         }
     }
 

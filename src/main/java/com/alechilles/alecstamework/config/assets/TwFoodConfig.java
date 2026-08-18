@@ -12,6 +12,7 @@ import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.codec.codecs.map.MapCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -713,6 +714,8 @@ public final class TwFoodConfig implements JsonAssetWithMap<String, DefaultAsset
     public static final class ResolvedFoodProfile {
         private final FoodSettings foods;
         private final HappinessSettings happiness;
+        private volatile String[] acceptedItemIds;
+        private volatile String[] needsConsumeItemIds;
 
         private ResolvedFoodProfile(@Nonnull FoodSettings foods, @Nonnull HappinessSettings happiness) {
             this.foods = foods;
@@ -730,12 +733,42 @@ public final class TwFoodConfig implements JsonAssetWithMap<String, DefaultAsset
 
         @Nonnull
         public String[] acceptedItemIds() {
-            return uniqueItems(FoodCategory.Preferred, FoodCategory.Premium, FoodCategory.Compatible, FoodCategory.Disliked);
+            String[] resolved = acceptedItemIds;
+            if (resolved == null) {
+                synchronized (this) {
+                    resolved = acceptedItemIds;
+                    if (resolved == null) {
+                        resolved = uniqueItems(
+                                FoodCategory.Preferred,
+                                FoodCategory.Premium,
+                                FoodCategory.Compatible,
+                                FoodCategory.Disliked
+                        );
+                        acceptedItemIds = resolved;
+                    }
+                }
+            }
+            return Arrays.copyOf(resolved, resolved.length);
         }
 
         @Nonnull
         public String[] needsConsumeItemIds() {
-            return uniqueItems(FoodCategory.Premium, FoodCategory.Preferred, FoodCategory.Compatible, FoodCategory.Disliked);
+            String[] resolved = needsConsumeItemIds;
+            if (resolved == null) {
+                synchronized (this) {
+                    resolved = needsConsumeItemIds;
+                    if (resolved == null) {
+                        resolved = uniqueItems(
+                                FoodCategory.Premium,
+                                FoodCategory.Preferred,
+                                FoodCategory.Compatible,
+                                FoodCategory.Disliked
+                        );
+                        needsConsumeItemIds = resolved;
+                    }
+                }
+            }
+            return Arrays.copyOf(resolved, resolved.length);
         }
 
         @Nonnull
