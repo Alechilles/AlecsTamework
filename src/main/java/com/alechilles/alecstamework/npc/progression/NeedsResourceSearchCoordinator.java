@@ -252,12 +252,12 @@ public final class NeedsResourceSearchCoordinator {
         @Nonnull
         private final List<String> itemIds;
 
-        Request(@Nonnull String resourceKind,
-                @Nonnull NeedsResourceAreaSearchCache.AreaKey areaKey,
-                double radius,
-                int verticalRadius,
-                double consumeRadius,
-                @Nonnull List<String> itemIds) {
+        private Request(@Nonnull String resourceKind,
+                        @Nonnull NeedsResourceAreaSearchCache.AreaKey areaKey,
+                        double radius,
+                        int verticalRadius,
+                        double consumeRadius,
+                        @Nonnull List<String> itemIds) {
             this.resourceKind = normalizeResourceKind(resourceKind);
             this.areaKey = Objects.requireNonNull(areaKey, "areaKey");
             this.radius = requirePositiveFinite(radius, "radius");
