@@ -114,6 +114,29 @@ public final class TameworkActivationEvidence {
             );
         }
 
+        /** Adds a downstream capability request without an external provider gate. */
+        public Builder requestedCapability(
+                TameworkRuntimeModule module,
+                String capabilityId,
+                String source
+        ) {
+            TameworkRuntimeModule checkedModule = requireModule(module);
+            String checkedCapability = requireText(capabilityId, "Capability ID");
+            return activate(
+                    checkedModule,
+                    TameworkActivationReason.publicCapability(checkedCapability, source)
+            );
+        }
+
+        /** Requires a provider capability without directly activating the module. */
+        public Builder requiredCapability(
+                TameworkRuntimeModule module,
+                String capabilityId
+        ) {
+            addRequiredCapability(requireModule(module), requireText(capabilityId, "Capability ID"));
+            return this;
+        }
+
         /** Adds a public-capability requirement using the capability as its source. */
         public Builder publicCapability(
                 TameworkRuntimeModule module,

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework;
 
 import java.util.Set;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.nio.file.Path;
@@ -11,7 +12,6 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import com.alechilles.alecstamework.api.TameworkApi;
-import com.alechilles.alecstamework.api.TameworkApiCapability;
 import com.alechilles.alecstamework.api.TameworkConfigFamily;
 import com.alechilles.alecstamework.api.TameworkProgressionTimeScales;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
@@ -25,16 +25,9 @@ import com.alechilles.alecstamework.assets.TameworkAssetEditorPackService;
 import com.alechilles.alecstamework.integration.patchwork.TameworkPatchworkRuntime;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightDisconnectRecoveryService;
-import com.alechilles.alecstamework.avatarflight.AvatarFlightEquipmentVisualSystem;
-import com.alechilles.alecstamework.avatarflight.AvatarFlightHudSystem;
-import com.alechilles.alecstamework.avatarflight.AvatarFlightHotbarGuardSystem;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightInputComponent;
-import com.alechilles.alecstamework.avatarflight.AvatarFlightInventoryGuardSystem;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightMountSessionComponent;
-import com.alechilles.alecstamework.avatarflight.AvatarFlightMountSessionSystem;
-import com.alechilles.alecstamework.avatarflight.AvatarFlightMovementSystem;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightRiderVisualComponent;
-import com.alechilles.alecstamework.avatarflight.AvatarFlightRiderVisualCleanupSystem;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceRecoverySystem;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightStaleOwnerRecoveryRegistry;
@@ -94,20 +87,6 @@ import com.alechilles.alecstamework.damage.TraitDamageModifierSystem;
 import com.alechilles.alecstamework.damage.TranquilizedSleepAnimationRestoreSystem;
 import com.alechilles.alecstamework.debug.CompanionXpEventDebugLogService;
 import com.alechilles.alecstamework.debug.PlayerInputDebugProbe;
-import com.alechilles.alecstamework.debug.PlayerInputDebugSystem;
-import com.alechilles.alecstamework.interactions.TameworkCommandInteraction;
-import com.alechilles.alecstamework.interactions.TameworkCommandHotswapInteraction;
-import com.alechilles.alecstamework.interactions.TameworkCaptureChannelInteraction;
-import com.alechilles.alecstamework.interactions.TameworkClearFeedTroughWaterInteraction;
-import com.alechilles.alecstamework.interactions.TameworkFlightAirbrakeInteraction;
-import com.alechilles.alecstamework.interactions.TameworkAvatarFlightCombatAbilityInteraction;
-import com.alechilles.alecstamework.interactions.TameworkFlightBoostInteraction;
-import com.alechilles.alecstamework.interactions.TameworkFlightFlapInteraction;
-import com.alechilles.alecstamework.interactions.TameworkLaunchHomingVisualProjectileInteraction;
-import com.alechilles.alecstamework.interactions.TameworkLaunchProjectileInteraction;
-import com.alechilles.alecstamework.interactions.TameworkManagedCoopCaptureCrateInteraction;
-import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
-import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
 import com.alechilles.alecstamework.npc.actions.BreedingPairAdmissionRegistry;
 import com.alechilles.alecstamework.npc.actions.HeldItemAttachmentInteractionService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
@@ -139,8 +118,6 @@ import com.alechilles.alecstamework.items.OwnerInteractionListener;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
 import com.alechilles.alecstamework.items.TranquilizerRecipeVisibilityService;
 import com.alechilles.alecstamework.items.scarecrow.ScarecrowBlockEventSystems;
-import com.alechilles.alecstamework.items.scarecrow.TameworkCollectScarecrowInteraction;
-import com.alechilles.alecstamework.items.scarecrow.TameworkPlaceScarecrowInteraction;
 import com.alechilles.alecstamework.items.persistence.ImportedCompanionRecallRecovery;
 import com.alechilles.alecstamework.items.persistence.CompositeRecallRecoverySink;
 import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
@@ -150,6 +127,21 @@ import com.alechilles.alecstamework.metrics.CrashTelemetryService;
 import com.alechilles.alecstamework.metrics.BondedCompanionPersistenceTelemetry;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.metrics.TameworkHStatsIntegration;
+import com.alechilles.alecstamework.runtime.activation.TameworkReloadTopologyReport;
+import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeActivationPlan;
+import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeActivationState;
+import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeDiagnostics;
+import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeModule;
+import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeCapabilityRequests;
+import com.alechilles.alecstamework.runtime.TameworkRuntimeHandle;
+import com.alechilles.alecstamework.runtime.TameworkRuntimeActivationCoordinator;
+import com.alechilles.alecstamework.runtime.TameworkInteractionCodecRegistrar;
+import com.alechilles.alecstamework.runtime.TameworkActiveAssetInitializer;
+import com.alechilles.alecstamework.runtime.TameworkRuntimeParticipantRegistry;
+import com.alechilles.alecstamework.runtime.TameworkRuntimeRegistrationTarget;
+import com.alechilles.alecstamework.runtime.TameworkRuntimeRegistrationTelemetry;
+import com.alechilles.alecstamework.runtime.TameworkRuntimeRegistrar;
+import com.alechilles.alecstamework.runtime.TameworkRuntimeRegistrationContext;
 import com.alechilles.alecstamework.persistence.runtime.player.TameworkInventoryOperationReceiptsComponent;
 import com.alechilles.alecstamework.npc.TameworkNpcBuilderRegistrar;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
@@ -184,6 +176,7 @@ import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
 import com.alechilles.alecstamework.persistence.diagnostics
         .PersistenceDiagnosticExporter;
 import com.alechilles.alecstamework.persistence.TameworkDataPathService;
+import com.alechilles.alecstamework.persistence.activation.TameworkPersistenceActivationEvidence;
 import com.alechilles.alecstamework.companion.bonded.runtime
         .BondedCompanionExpiryWarningSystem;
 import com.alechilles.alecstamework.companion.bonded.runtime
@@ -196,63 +189,31 @@ import com.alechilles.alecstamework.companion.command.timed.runtime
         .TimedSummonOwnerLifecycleService;
 import com.alechilles.alecstamework.persistence.runtime
         .PublicPersistenceShutdownReport;
-import com.alechilles.alecstamework.ownership.live.OwnerPopulationEntitySystem;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationLiveIndex;
-import com.alechilles.alecstamework.ownership.live.OwnerPopulationOwnerChangeSystem;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureManager;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureMarkerComponent;
 import com.alechilles.alecstamework.selftest.ApiSelfTestRunner;
 import com.alechilles.alecstamework.ui.TameworkSettingsAnnouncementService;
 import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileComponent;
 import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileSystem;
-import com.alechilles.alecstamework.npc.systems.CompanionProgressionBootstrapOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionSpawnAuthorityCleanupSystems;
-import com.alechilles.alecstamework.npc.systems.SummonedCompanionExperienceSystem;
-import com.alechilles.alecstamework.npc.systems.CompanionPassiveBreedingSystem;
-import com.alechilles.alecstamework.npc.systems.CompanionLifeStageResumeOnLoadSystem;
-import com.alechilles.alecstamework.npc.systems.CompanionAttachmentSyncSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionMovementSpeedSyncSystem;
-import com.alechilles.alecstamework.npc.systems.CompanionDespawnDiagnosticsSystem;
-import com.alechilles.alecstamework.npc.systems.CompanionDespawnProtectionSystem;
-import com.alechilles.alecstamework.npc.systems.DynamicAttachmentEvaluationSystem;
-import com.alechilles.alecstamework.npc.systems.CommandLinkedRevivableDropSuppressionSystem;
 import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem;
-import com.alechilles.alecstamework.npc.systems.CompanionNeedsSystem;
-import com.alechilles.alecstamework.npc.systems.CompanionTraitStatSyncSystem;
-import com.alechilles.alecstamework.npc.systems.CompanionTranquilizerPeakSystem;
-import com.alechilles.alecstamework.npc.systems.FlyingCompanionControlSystem;
-import com.alechilles.alecstamework.npc.systems.MountedInteractableSafetySystem;
-import com.alechilles.alecstamework.npc.systems.MountedGlideCleanupSystem;
-import com.alechilles.alecstamework.npc.systems.MountedGlideInputCaptureSystem;
-import com.alechilles.alecstamework.npc.systems.MountedGlidePlayerVelocitySystem;
-import com.alechilles.alecstamework.npc.systems.MountedNpcTeleportSafetySystem;
-import com.alechilles.alecstamework.npc.systems.MountedOwnerReferenceSanitySystem;
-import com.alechilles.alecstamework.npc.systems.MountedRideCleanupSystem;
-import com.alechilles.alecstamework.npc.systems.MountedRideInputCaptureSystem;
 import com.alechilles.alecstamework.npc.network.MountedRidePacketHandler;
-import com.alechilles.alecstamework.npc.systems.MountedRideRiderCleanupSystem;
-import com.alechilles.alecstamework.npc.systems.MountedRideRiderFollowSystem;
-import com.alechilles.alecstamework.npc.systems.ShoulderRideNpcFollowSystem;
-import com.alechilles.alecstamework.npc.systems.ShoulderRidePlayerTeleportSystem;
-import com.alechilles.alecstamework.npc.systems.ShoulderRideNpcStateSystem;
-import com.alechilles.alecstamework.npc.systems.NpcDebugDisplayResumeOnLoadSystem;
-import com.alechilles.alecstamework.npc.systems.NpcMountedNameplateVisibilitySystem;
-import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
 import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
 import com.hypixel.hytale.assetstore.event.RemovedAssetsEvent;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
-import com.hypixel.hytale.builtin.mounts.MountedByComponent;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.component.system.ISystem;
+import com.hypixel.hytale.component.system.EcsEvent;
 import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
 import com.hypixel.hytale.server.core.asset.type.item.config.CraftingRecipe;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.asset.type.item.config.ItemDropList;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
-import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
@@ -260,22 +221,11 @@ import com.hypixel.hytale.server.core.io.ServerManager;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
 import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
-import com.hypixel.hytale.server.core.entity.Frozen;
-import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
-import com.hypixel.hytale.server.core.modules.entity.component.Interactable;
-import com.hypixel.hytale.server.core.modules.entity.component.Intangible;
-import com.hypixel.hytale.server.core.modules.entity.component.Invulnerable;
-import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
-import com.hypixel.hytale.server.core.modules.entity.player.PlayerInput;
-import com.hypixel.hytale.server.core.modules.entity.teleport.Teleport;
 import com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystems;
-import com.hypixel.hytale.server.core.modules.physics.component.Velocity;
-import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
-import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
-import java.util.UUID;
+import java.util.function.Supplier;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -287,7 +237,6 @@ import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.components.SpawnBeaconReference;
 import com.hypixel.hytale.server.npc.components.SpawnMarkerReference;
-import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.spawning.spawnmarkers.SpawnMarkerEntity;
 
 /**
@@ -333,6 +282,18 @@ public class Tamework extends JavaPlugin {
     private CompanionXpEventDebugLogService companionXpEventDebugLogService;
     private TameworkNpcBuilderRegistrar npcBuilderRegistrar;
     private TameworkHStatsIntegration hStatsIntegration;
+    private final TameworkRuntimeActivationCoordinator runtimeActivationCoordinator =
+            new TameworkRuntimeActivationCoordinator();
+    private TameworkRuntimeActivationPlan runtimeStartupPlan;
+    private TameworkRuntimeActivationState runtimeActivationState;
+    private TameworkRuntimeDiagnostics runtimeStartupDiagnostics;
+    private TameworkRuntimeHandle runtimeHandle;
+    private final TameworkRuntimeCapabilityRequests runtimeCapabilityRequests =
+            new TameworkRuntimeCapabilityRequests();
+    private TameworkRuntimeParticipantRegistry runtimeParticipants;
+    private Runnable runtimeServiceInitializer;
+    private TameworkPersistenceActivationEvidence genericPersistenceActivationEvidence;
+    private TameworkPersistenceActivationEvidence bondedPersistenceActivationEvidence;
     private CrashTelemetryService crashTelemetryService;
     private final TameworkTelemetryEvents telemetryEvents = new TameworkTelemetryEvents();
     private TameworkSettingsAnnouncementService settingsAnnouncementService;
@@ -417,6 +378,7 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkBondedReviveEscrowComponent>
             bondedReviveEscrowComponentType;
     private ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> feedTroughWaterChargesComponentType;
+    private ComponentType<EntityStore, SpawnMarkerEntity> spawnMarkerEntityType;
     private volatile boolean debugHookLogs;
     private volatile boolean debugSpawnerLogs;
     private volatile boolean debugSpawnerLocationLogs;
@@ -514,6 +476,10 @@ public class Tamework extends JavaPlugin {
     }
 
     private void setupInternal() {
+        runtimeParticipants = new TameworkRuntimeParticipantRegistry(
+                eventType -> getEntityStoreRegistry().registerEntityEventType(eventType),
+                getLogger()
+        );
         itemFeatureRegistry = new ItemFeatureRegistry();
         spawnerItemConfigReloadService = new SpawnerItemConfigReloadService(
                 itemFeatureRegistry,
@@ -543,91 +509,28 @@ public class Tamework extends JavaPlugin {
         );
         assetEditorPackService = new TameworkAssetEditorPackService(this);
         patchworkRuntime = new TameworkPatchworkRuntime(this);
-        try {
-            patchworkRuntime.start();
-        } catch (RuntimeException exception) {
-            getLogger().at(Level.SEVERE).withCause(exception).log(
-                    "Patchwork failed to start; Tamework will continue without generated asset patches."
-            );
-        }
-        configOverrideManager = new TwConfigOverrideManager(this, patchworkRuntime::generatedPatchRoot);
         tranquilizerRecipeVisibilityService = new TranquilizerRecipeVisibilityService();
         feedTroughWaterChargeDroplistCompatService = new FeedTroughWaterChargeDroplistCompatService();
         npcBuilderRegistrar = new TameworkNpcBuilderRegistrar(this);
-        hStatsIntegration = new TameworkHStatsIntegration(this);
-        ServerManager.get().registerSubPacketHandlers(MountedRidePacketHandler::new);
-        // Register the custom item interaction used by spawner items.
-        Interaction.CODEC.register("TameworkSpawn", TameworkSpawnInteraction.class, TameworkSpawnInteraction.CODEC);
-        Interaction.CODEC.register(
-                TameworkManagedCoopCaptureCrateInteraction.TYPE_ID,
-                TameworkManagedCoopCaptureCrateInteraction.class,
-                TameworkManagedCoopCaptureCrateInteraction.CODEC
-        );
-        Interaction.CODEC.register(
-                "TameworkCaptureChannel",
-                TameworkCaptureChannelInteraction.class,
-                TameworkCaptureChannelInteraction.CODEC
-        );
-        // Register the custom item interaction used by naming items.
-        Interaction.CODEC.register("TameworkNameNpc", TameworkNameNpcInteraction.class, TameworkNameNpcInteraction.CODEC);
-        // Register the custom item interaction used by command items.
-        Interaction.CODEC.register("TameworkCommand", TameworkCommandInteraction.class, TameworkCommandInteraction.CODEC);
-        Interaction.CODEC.register("TameworkCommandHotswap", TameworkCommandHotswapInteraction.class,
-                TameworkCommandHotswapInteraction.CODEC);
-        // Register the custom item interactions used by Flightmaster's Talisman controls.
-        Interaction.CODEC.register(
-                "TameworkFlightFlap",
-                TameworkFlightFlapInteraction.class,
-                TameworkFlightFlapInteraction.CODEC
-        );
-        Interaction.CODEC.register(
-                "TameworkFlightAirbrake",
-                TameworkFlightAirbrakeInteraction.class,
-                TameworkFlightAirbrakeInteraction.CODEC
-        );
-        Interaction.CODEC.register(
-                "TameworkFlightBoost",
-                TameworkFlightBoostInteraction.class,
-                TameworkFlightBoostInteraction.CODEC
-        );
-        Interaction.CODEC.register(
-                "TameworkAvatarFlightCombatAbility",
-                TameworkAvatarFlightCombatAbilityInteraction.class,
-                TameworkAvatarFlightCombatAbilityInteraction.CODEC
-        );
-        // Register the custom block interaction used to empty water trough states.
-        Interaction.CODEC.register(
-                "TameworkClearFeedTroughWater",
-                TameworkClearFeedTroughWaterInteraction.class,
-                TameworkClearFeedTroughWaterInteraction.CODEC
-        );
-        // Register the custom projectile interaction used for solved lobbed shots.
-        Interaction.CODEC.register(
-                "TameworkLaunchProjectile",
-                TameworkLaunchProjectileInteraction.class,
-                TameworkLaunchProjectileInteraction.CODEC
-        );
-        Interaction.CODEC.register(
-                "TameworkLaunchHomingVisualProjectile",
-                TameworkLaunchHomingVisualProjectileInteraction.class,
-                TameworkLaunchHomingVisualProjectileInteraction.CODEC
-        );
-        Interaction.CODEC.register(
-                TameworkPlaceScarecrowInteraction.TYPE_ID,
-                TameworkPlaceScarecrowInteraction.class,
-                TameworkPlaceScarecrowInteraction.CODEC
-        );
-        Interaction.CODEC.register(
-                TameworkCollectScarecrowInteraction.TYPE_ID,
-                TameworkCollectScarecrowInteraction.class,
-                TameworkCollectScarecrowInteraction.CODEC
+        TameworkInteractionCodecRegistrar.registerAll();
+        // Builders are passive decoders and must exist before the initial NPC asset load.
+        npcBuilderRegistrar.registerNpcActionsIfReady();
+        deferGlobalListener(
+                TameworkRuntimeModule.MOUNTS,
+                "mounted-ride-packet-handler",
+                () -> ServerManager.get().registerSubPacketHandlers(MountedRidePacketHandler::new)
         );
         itemFeatureRegistry.registerDefaults();
         registerGlobalConfigAssets();
         registerCompanionAssets();
         registerCapturePolicyAssets();
         registerBondedCompanionRosterAssets();
-        populationGroupAssetRegistrar.register();
+        populationGroupAssetRegistrar.registerAssetStore();
+        deferAssetSubscription(
+                TameworkRuntimeModule.GENERIC_PERSISTENCE,
+                "population-group-assets",
+                populationGroupAssetRegistrar::activate
+        );
         registerCoopAssets();
         registerSpawnerItemAssets();
         registerNamingItemAssets();
@@ -650,11 +553,28 @@ public class Tamework extends JavaPlugin {
         registerTalentAssets();
         registerDebugAssets();
         CreditorIntegration.setup(this);
-        getEventRegistry().register(LoadedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsLoaded);
-        getEventRegistry().register(RemovedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsRemoved);
-        getEventRegistry().register(LoadedAssetsEvent.class, Item.class, this::onItemAssetsLoaded);
-        getEventRegistry().register(LoadedAssetsEvent.class, ItemDropList.class, this::onItemDropListAssetsLoaded);
-        getEventRegistry().register(RemovedAssetsEvent.class, ItemDropList.class, this::onItemDropListAssetsRemoved);
+        deferCraftingRecipeSubscriptions();
+        deferAssetSubscription(
+                TameworkRuntimeModule.SPAWNER_ITEMS,
+                "item-assets-loaded",
+                () -> getEventRegistry().register(
+                        LoadedAssetsEvent.class, Item.class, this::onItemAssetsLoaded
+                )
+        );
+        deferAssetSubscription(
+                TameworkRuntimeModule.FOOD,
+                "item-drop-list-assets-loaded",
+                () -> getEventRegistry().register(
+                        LoadedAssetsEvent.class, ItemDropList.class, this::onItemDropListAssetsLoaded
+                )
+        );
+        deferAssetSubscription(
+                TameworkRuntimeModule.FOOD,
+                "item-drop-list-assets-removed",
+                () -> getEventRegistry().register(
+                        RemovedAssetsEvent.class, ItemDropList.class, this::onItemDropListAssetsRemoved
+                )
+        );
 
         TameworkComponentRegistrar.RegisteredComponents components = TameworkComponentRegistrar.register(this);
         ownerComponentType = components.owner();
@@ -696,363 +616,136 @@ public class Tamework extends JavaPlugin {
         bondedReviveEscrowComponentType = components.bondedReviveEscrow();
         feedTroughWaterChargesComponentType = components.feedTroughWaterCharges();
 
-        getEntityStoreRegistry().registerSystem(
-                new OwnerPopulationEntitySystem(
-                        ownerPopulationLiveIndex,
-                        NPCEntity.getComponentType(),
-                        ownerComponentType
-                )
-        );
-        getEntityStoreRegistry().registerSystem(
-                new OwnerPopulationOwnerChangeSystem(
-                        ownerPopulationLiveIndex,
-                        NPCEntity.getComponentType(),
-                        ownerComponentType
-                )
-        );
-        getEntityStoreRegistry().registerSystem(
-                new NpcNamePersistenceSystem(npcNameComponentType, NPCEntity.getComponentType())
-        );
-        getEntityStoreRegistry().registerSystem(
-                new PlayerInputDebugSystem(
-                        PlayerInput.getComponentType(),
-                        UUIDComponent.getComponentType(),
-                        MovementStatesComponent.getComponentType(),
-                        HeadRotation.getComponentType(),
-                        TransformComponent.getComponentType(),
-                        Velocity.getComponentType(),
-                        ModelComponent.getComponentType()
-                )
-        );
-        getEntityStoreRegistry().registerSystem(
-                new AvatarFlightMovementSystem(
-                        avatarFlightComponentType,
-                        avatarFlightInputComponentType,
-                        avatarFlightMountSessionComponentType,
-                        avatarFlightSourceComponentType,
-                        UUIDComponent.getComponentType(),
-                        Velocity.getComponentType(),
-                        MovementStatesComponent.getComponentType(),
-                        HeadRotation.getComponentType(),
-                        TransformComponent.getComponentType()
-                )
-        );
-        getEntityStoreRegistry().registerSystem(
-                new AvatarFlightMountSessionSystem(
-                        avatarFlightMountSessionComponentType,
-                        avatarFlightSourceComponentType,
-                        avatarFlightInputComponentType,
-                        UUIDComponent.getComponentType(),
-                        TransformComponent.getComponentType(),
-                        DeathComponent.getComponentType()
-                )
-        );
-        getEntityStoreRegistry().registerSystem(
-                new AvatarFlightHudSystem(
-                        avatarFlightComponentType,
-                        avatarFlightInputComponentType,
-                        avatarFlightMountSessionComponentType,
-                        avatarFlightSourceComponentType,
-                        UUIDComponent.getComponentType(),
-                        Player.getComponentType()
-                )
-        );
-        getEntityStoreRegistry().registerSystem(
-                new AvatarFlightInventoryGuardSystem(avatarFlightComponentType)
-        );
-        getEntityStoreRegistry().registerSystem(
-                new AvatarFlightHotbarGuardSystem(avatarFlightComponentType)
-        );
-        getEntityStoreRegistry().registerSystem(
-                new AvatarFlightEquipmentVisualSystem(
-                        avatarFlightComponentType,
-                        avatarFlightRiderVisualComponentType,
-                        EntityTrackerSystems.Visible.getComponentType()
-                )
-        );
-        getEntityStoreRegistry().registerSystem(
-                new AvatarFlightRiderVisualCleanupSystem(
-                        avatarFlightRiderVisualComponentType,
-                        avatarFlightComponentType
-                )
-        );
-        ComponentType<EntityStore, NPCMountComponent> npcMountComponentType = resolveNpcMountComponentTypeOrNull();
-        if (npcMountComponentType == null) {
-            getLogger().at(Level.WARNING).log(
-                    "Mount plugin component type unavailable during setup; skipping mount-dependent Tamework systems."
-            );
-        } else {
-            getEntityStoreRegistry().registerSystem(
-                    new MountedOwnerReferenceSanitySystem(
-                            NPCEntity.getComponentType(),
-                            npcMountComponentType,
-                            Player.getComponentType(),
-                            Interactable.getComponentType()
-                    )
-            );
-            getEntityStoreRegistry().registerSystem(
-                    new MountedNpcTeleportSafetySystem(
-                            NPCEntity.getComponentType(),
-                            npcMountComponentType,
-                            Teleport.getComponentType(),
-                            Player.getComponentType(),
-                            Interactable.getComponentType()
-                    )
-            );
-            getEntityStoreRegistry().registerSystem(
-                    new NpcMountedNameplateVisibilitySystem(
-                            NPCEntity.getComponentType(),
-                            npcMountComponentType,
-                            mountedNameplateComponentType,
-                            npcNameComponentType
-                    )
-            );
-            getEntityStoreRegistry().registerSystem(new MountedInteractableSafetySystem());
-            getEntityStoreRegistry().registerSystem(
-                    new MountedGlideInputCaptureSystem(
-                            npcMountComponentType,
-                            PlayerInput.getComponentType(),
-                            MovementStatesComponent.getComponentType(),
-                            HeadRotation.getComponentType(),
-                            mountedGlideRiderComponentType,
-                            mountedGlideComponentType,
-                            UUIDComponent.getComponentType(),
-                            TransformComponent.getComponentType()
-                    )
-            );
-            getEntityStoreRegistry().registerSystem(
-                    new MountedGlidePlayerVelocitySystem(
-                            mountedGlideComponentType,
-                            npcMountComponentType,
-                            TransformComponent.getComponentType(),
-                            Velocity.getComponentType(),
-                            MovementStatesComponent.getComponentType()
-                    )
-            );
-            getEntityStoreRegistry().registerSystem(
-                    new MountedGlideCleanupSystem(
-                            npcMountComponentType,
-                            mountedGlideRiderComponentType,
-                            mountedGlideComponentType,
-                            UUIDComponent.getComponentType(),
-                            NPCEntity.getComponentType(),
-                            DeathComponent.getComponentType(),
-                            Player.getComponentType()
-                    )
-            );
+        spawnMarkerEntityType = TameworkCompanionRuntimeParticipants.add(this, runtimeParticipants);
+
+        runtimeServiceInitializer = () -> {
+        if (runtimeStartupPlan == null) {
+            return;
         }
-        ComponentType<EntityStore, MountedComponent> mountedComponentType = resolveMountedComponentTypeOrNull();
-        if (mountedComponentType == null) {
-            getLogger().at(Level.WARNING).log(
-                    "Mount plugin mounted component type unavailable during setup; skipping legacy Tamework ride systems."
-            );
-        } else {
-            getEntityStoreRegistry().registerSystem(
-                    new MountedRideInputCaptureSystem(
-                            mountedComponentType,
-                            PlayerInput.getComponentType(),
-                            rideRiderComponentType,
-                            rideMountComponentType,
-                            UUIDComponent.getComponentType(),
-                            MovementStatesComponent.getComponentType()
-                    )
-            );
-            getEntityStoreRegistry().registerSystem(
-                    new MountedRideCleanupSystem(
-                            mountedComponentType,
-                            rideRiderComponentType,
-                            rideMountComponentType,
-                            UUIDComponent.getComponentType(),
-                            NPCEntity.getComponentType(),
-                            TransformComponent.getComponentType(),
-                            DeathComponent.getComponentType()
-                    )
-            );
-            getEntityStoreRegistry().registerSystem(
-                    new MountedRideRiderFollowSystem(
-                            mountedComponentType,
-                            rideRiderComponentType,
-                            rideMountComponentType,
-                            TransformComponent.getComponentType()
-                    )
-            );
-            getEntityStoreRegistry().registerSystem(
-                    new MountedRideRiderCleanupSystem(
-                            mountedComponentType,
-                            rideRiderComponentType,
-                            rideMountComponentType,
-                            UUIDComponent.getComponentType(),
-                            NPCEntity.getComponentType(),
-                            DeathComponent.getComponentType()
-                    )
-            );
-            getEntityStoreRegistry().registerSystem(
-                    new ShoulderRideNpcFollowSystem(
-                            shoulderRideComponentType,
-                            mountedComponentType,
-                            TransformComponent.getComponentType(),
-                            Velocity.getComponentType(),
-                            DeathComponent.getComponentType(),
-                            MovementStatesComponent.getComponentType())
-            );
-            getEntityStoreRegistry().registerSystem(
-                    new ShoulderRideNpcStateSystem(
-                            shoulderRideComponentType,
-                            mountedComponentType,
-                            Interactable.getComponentType(),
-                            Intangible.getComponentType(),
-                            Invulnerable.getComponentType(),
-                            Frozen.getComponentType(),
-                            MovementStatesComponent.getComponentType())
-            );
-            getEntityStoreRegistry().registerSystem(
-                    new ShoulderRidePlayerTeleportSystem(
-                            Player.getComponentType(),
-                            Teleport.getComponentType(),
-                            MountedByComponent.getComponentType(),
-                            mountedComponentType,
-                            shoulderRideComponentType)
-            );
+        if (runtimeStartupPlan.activeModules().stream()
+                .anyMatch(module -> module != TameworkRuntimeModule.HSTATS)) {
+            try {
+                patchworkRuntime.start();
+                configOverrideManager = new TwConfigOverrideManager(
+                        this, patchworkRuntime::generatedPatchRoot
+                );
+            } catch (RuntimeException exception) {
+                getLogger().at(Level.SEVERE).withCause(exception).log(
+                        "Patchwork failed to start; Tamework will continue without generated asset patches."
+                );
+            }
         }
-        getEntityStoreRegistry().registerSystem(
-                new NpcDebugDisplayResumeOnLoadSystem(NPCEntity.getComponentType())
-        );
-        getEntityStoreRegistry().registerSystem(
-                new CompanionTraitStatSyncSystem(
-                        NPCEntity.getComponentType(),
-                        EntityStatMap.getComponentType(),
-                        traitsComponentType
-                )
-        );
-        getEntityStoreRegistry().registerSystem(
-                new CompanionTranquilizerPeakSystem(
-                        NPCEntity.getComponentType(),
-                        EffectControllerComponent.getComponentType(),
-                        tranquilizerPeakComponentType
-                )
-        );
-        getEntityStoreRegistry().registerSystem(
-                new CompanionProgressionBootstrapOnLoadSystem(NPCEntity.getComponentType(), tamedComponentType)
-        );
-        getEntityStoreRegistry().registerSystem(
-                new CompanionSpawnAuthorityCleanupSystems.Npc(
-                        NPCEntity.getComponentType(), tamedComponentType
-                )
-        );
-        ComponentType<EntityStore, SpawnMarkerEntity> spawnMarkerEntityType =
-                resolveOptionalSpawnMarkerEntityComponentType();
-        getEntityStoreRegistry().registerSystem(
-                new SummonedCompanionExperienceSystem(
-                        NPCEntity.getComponentType(),
-                        projectionIdentityComponentType,
-                        levelingComponentType,
-                        DeathComponent.getComponentType()
-                )
-        );
-        getEntityStoreRegistry().registerSystem(
-                new CompanionLifeStageResumeOnLoadSystem(NPCEntity.getComponentType(), lifeStageComponentType)
-        );
-        registerOptionalCommandLinkedRevivableDropSuppressionSystem();
-        getEntityStoreRegistry().registerSystem(
-                new DynamicAttachmentEvaluationSystem(
-                        NPCEntity.getComponentType(),
-                        attachmentsComponentType,
-                        dynamicAttachmentsComponentType,
-                        ownerComponentType,
-                        tamedComponentType,
-                        lifeStageComponentType,
-                        happinessComponentType,
-                        needsComponentType,
-                        traitsComponentType,
-                        commandLinksComponentType
-                )
-        );
-        getEntityStoreRegistry().registerSystem(new CompanionAttachmentSyncSystem());
-        getEntityStoreRegistry().registerSystem(new CompanionMovementSpeedSyncSystem());
-        getEntityStoreRegistry().registerSystem(new CompanionDespawnProtectionSystem());
-        getEntityStoreRegistry().registerSystem(new FlyingCompanionControlSystem());
-        getEntityStoreRegistry().registerSystem(
-                new CompanionDespawnDiagnosticsSystem(
-                        NPCEntity.getComponentType(),
-                        tamedComponentType,
-                        ownerComponentType,
-                        resolveOptionalSpawnMarkerReferenceComponentType(),
-                        resolveOptionalSpawnBeaconReferenceComponentType(),
-                        UUIDComponent.getComponentType()
-                )
-        );
-        getEntityStoreRegistry().registerSystem(new CompanionNeedsSystem());
-        getEntityStoreRegistry().registerSystem(
-                new CompanionPassiveBreedingSystem(breedingPairAdmissionRegistry)
-        );
+        boolean genericPersistenceNeeded = runtimeStartupPlan.isActive(
+                TameworkRuntimeModule.GENERIC_PERSISTENCE
+        ) || genericPersistenceActivationEvidence.hasDurableWork();
+        boolean bondedPersistenceNeeded = runtimeStartupPlan.isActive(
+                TameworkRuntimeModule.BONDED_PERSISTENCE
+        ) || bondedPersistenceActivationEvidence.hasDurableWork();
+        if (!genericPersistenceNeeded && !bondedPersistenceNeeded) {
+            return;
+        }
         apiEventBus = new TameworkEventBus(getLogger());
         runtimeDataDirectory = new TameworkDataPathService(getLogger())
                 .resolveAndInitializeDataPathLayout(getDataDirectory())
                 .targetDirectory();
-        bondedCompanionComposition = TameworkBondedCompanionComposition.open(
+        bondedCompanionComposition = TameworkBondedCompanionComposition.openIfActive(
                 runtimeDataDirectory,
                 bondedCompanionRosterRegistry,
                 getLogger(),
                 System::currentTimeMillis,
                 apiEventBus::publishPersistenceEvent,
-                BondedCompanionPersistenceTelemetry::recordRuntimeFailure
+                BondedCompanionPersistenceTelemetry::recordRuntimeFailure,
+                runtimeStartupPlan,
+                bondedPersistenceActivationEvidence
         );
-        getEntityStoreRegistry().registerSystem(
-                new BondedCompanionMaintenanceSystem(
-                        bondedCompanionComposition
-                )
-        );
-        getEntityStoreRegistry().registerSystem(
-                new BondedCompanionExpiryWarningSystem(
-                        bondedCompanionComposition
-                )
-        );
-        getEntityStoreRegistry().registerSystem(
-                new BondedCompanionDeathSystem(
+        if (bondedCompanionComposition != null) {
+        runtimeStartupDiagnostics.recordDatabaseOpen(TameworkRuntimeModule.BONDED_PERSISTENCE);
+        deferEntitySystem(TameworkRuntimeModule.BONDED_PERSISTENCE,
+                "bonded-companion-maintenance",
+                () -> new BondedCompanionMaintenanceSystem(bondedCompanionComposition));
+        deferEntitySystem(TameworkRuntimeModule.BONDED_PERSISTENCE,
+                "bonded-companion-expiry-warning",
+                () -> new BondedCompanionExpiryWarningSystem(bondedCompanionComposition));
+        deferEntitySystem(TameworkRuntimeModule.BONDED_PERSISTENCE,
+                "bonded-companion-death",
+                () -> new BondedCompanionDeathSystem(
                         bondedCompanionComposition,
                         projectionIdentityComponentType,
                         UUIDComponent.getComponentType()
+                ));
+        deferGlobalListener(
+                TameworkRuntimeModule.BONDED_PERSISTENCE,
+                "bonded-world-load-reconciliation",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this, StartWorldEvent.class,
+                        bondedCompanionComposition::onWorldLoad,
+                        "bonded companion world-load reconciliation"
                 )
         );
-        TameworkEventRegistrationSupport.registerGlobal(
-                this, StartWorldEvent.class,
-                bondedCompanionComposition::onWorldLoad,
-                "bonded companion world-load reconciliation"
+        deferGlobalListener(
+                TameworkRuntimeModule.BONDED_PERSISTENCE,
+                "bonded-player-added-reconciliation",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this, AddPlayerToWorldEvent.class,
+                        bondedCompanionComposition::onPlayerAdded,
+                        "bonded companion player join/transfer reconciliation"
+                )
         );
-        TameworkEventRegistrationSupport.registerGlobal(
-                this, AddPlayerToWorldEvent.class,
-                bondedCompanionComposition::onPlayerAdded,
-                "bonded companion player join/transfer reconciliation"
+        deferGlobalListener(
+                TameworkRuntimeModule.BONDED_PERSISTENCE,
+                "bonded-player-disconnect-reconciliation",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this, PlayerDisconnectEvent.class,
+                        bondedCompanionComposition::onPlayerLogout,
+                        "bonded companion logout reconciliation"
+                )
         );
-        TameworkEventRegistrationSupport.registerGlobal(
-                this, PlayerDisconnectEvent.class,
-                bondedCompanionComposition::onPlayerLogout,
-                "bonded companion logout reconciliation"
-        );
+        }
         try {
-            persistenceComposition = TameworkPersistenceComposition.create(
+            persistenceComposition = TameworkPersistenceComposition.createIfActive(
                     this,
                     components,
                     apiEventBus,
                     itemFeatureRegistry,
                     commandItemRegistry,
-                    populationGroupConfigRegistry
+                    populationGroupConfigRegistry,
+                    runtimeStartupPlan,
+                    genericPersistenceActivationEvidence
             );
+            if (persistenceComposition == null) {
+                if (bondedCompanionComposition != null) {
+                    activateBondedOnlyFallback(
+                            new IllegalStateException("Generic persistence is dormant")
+                    );
+                }
+                return;
+            }
+            runtimeStartupDiagnostics.recordDatabaseOpen(TameworkRuntimeModule.GENERIC_PERSISTENCE);
         } catch (RuntimeException genericStartupFailure) {
             if (spawnMarkerEntityType != null) {
-                getEntityStoreRegistry().registerSystem(
-                        new CompanionSpawnAuthorityCleanupSystems.Marker(
+                deferEntitySystem(
+                        TameworkRuntimeModule.CORE_OWNERSHIP,
+                        "companion-spawn-authority-cleanup-marker-fallback",
+                        () -> new CompanionSpawnAuthorityCleanupSystems.Marker(
                                 spawnMarkerEntityType,
                                 tamedComponentType
                         )
                 );
             }
-            activateBondedOnlyFallback(genericStartupFailure);
+            if (bondedCompanionComposition != null) {
+                activateBondedOnlyFallback(genericStartupFailure);
+            } else {
+                getLogger().at(Level.SEVERE).withCause(genericStartupFailure).log(
+                        "Generic persistence composition failed and no bonded authority is active."
+                );
+            }
             return;
         }
         if (spawnMarkerEntityType != null) {
-            getEntityStoreRegistry().registerSystem(
-                    new CompanionSpawnAuthorityCleanupSystems.Marker(
+            deferEntitySystem(
+                    TameworkRuntimeModule.CORE_OWNERSHIP,
+                    "companion-spawn-authority-cleanup-marker",
+                    () -> new CompanionSpawnAuthorityCleanupSystems.Marker(
                             spawnMarkerEntityType,
                             tamedComponentType
                     )
@@ -1069,10 +762,11 @@ public class Tamework extends JavaPlugin {
                 ))
         );
         runtimeDataDirectory = persistenceComposition.dataDirectory();
-        bondedDiagnosticRegistration =
-                persistenceComposition.registerBondedDiagnostics(
-                        bondedCompanionComposition.diagnostics()
-                );
+        if (bondedCompanionComposition != null) {
+            bondedDiagnosticRegistration = persistenceComposition.registerBondedDiagnostics(
+                    bondedCompanionComposition.diagnostics()
+            );
+        }
         persistenceBootstrap = persistenceComposition.persistence();
         commandLinkedNpcStateSnapshotService =
                 persistenceComposition.snapshots();
@@ -1102,20 +796,24 @@ public class Tamework extends JavaPlugin {
                         Duration.ofSeconds(5)
                 )
         );
-        getEntityStoreRegistry().registerSystem(new CaptureChannelVfxSystem());
-        getEntityStoreRegistry().registerSystem(new CaptureChannelSessionCleanupSystem());
-        getEntityStoreRegistry().registerSystem(new ScarecrowBlockEventSystems.Placed());
-        getEntityStoreRegistry().registerSystem(new ScarecrowBlockEventSystems.Broken());
-        getEntityStoreRegistry().registerSystem(
-                new AvatarFlightSourceRecoverySystem(
+        deferEntitySystem(TameworkRuntimeModule.CAPTURE,
+                "capture-channel-vfx", CaptureChannelVfxSystem::new);
+        deferEntitySystem(TameworkRuntimeModule.CAPTURE,
+                "capture-channel-session-cleanup", CaptureChannelSessionCleanupSystem::new);
+        deferEntitySystem(TameworkRuntimeModule.SCARECROWS,
+                "scarecrow-block-placed", ScarecrowBlockEventSystems.Placed::new);
+        deferEntitySystem(TameworkRuntimeModule.SCARECROWS,
+                "scarecrow-block-broken", ScarecrowBlockEventSystems.Broken::new);
+        deferEntitySystem(TameworkRuntimeModule.AVATAR_FLIGHT,
+                "avatar-flight-source-recovery", () -> new AvatarFlightSourceRecoverySystem(
                         avatarFlightSourceComponentType,
                         avatarFlightMountSessionComponentType,
                         UUIDComponent.getComponentType(),
                         DeathComponent.getComponentType()
                 )
         );
-        getEntityStoreRegistry().registerSystem(
-                new AvatarFlightSourceVisibilitySystem(
+        deferEntitySystem(TameworkRuntimeModule.AVATAR_FLIGHT,
+                "avatar-flight-source-visibility", () -> new AvatarFlightSourceVisibilitySystem(
                         avatarFlightSourceComponentType,
                         EntityTrackerSystems.EntityViewer.getComponentType()
                 )
@@ -1132,7 +830,7 @@ public class Tamework extends JavaPlugin {
                 traitEffectRegistry,
                 damagePolicy,
                 persistenceComposition.featureApiDependencies(),
-                bondedCompanionComposition.api()
+                bondedCompanionComposition == null ? null : bondedCompanionComposition.api()
         );
         api = apiComposition.api();
         apiComposition.activateCapturePolicyRuntime(
@@ -1144,8 +842,8 @@ public class Tamework extends JavaPlugin {
                         () -> persistenceComposition.facades().queries()
                                 .projectedTimedSummons()
                 );
-        getEntityStoreRegistry().registerSystem(
-                new TimedSummonOwnerDeathSystem(
+        deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
+                "timed-summon-owner-death", () -> new TimedSummonOwnerDeathSystem(
                         timedSummonOwnerLifecycle,
                         Player.getComponentType(),
                         UUIDComponent.getComponentType()
@@ -1157,64 +855,69 @@ public class Tamework extends JavaPlugin {
         );
         apiSelfTestFixtureManager = new ApiSelfTestFixtureManager();
         apiSelfTestRunner = new ApiSelfTestRunner();
-        getEntityStoreRegistry().registerSystem(
-                new CommandNpcRelocationOnLoadSystem(
+        deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
+                "command-npc-relocation-on-load", () -> new CommandNpcRelocationOnLoadSystem(
                         commandNpcRelocationService,
                         commandLinkedNpcStateSnapshotService
                 )
         );
-        getChunkStoreRegistry().registerSystem(
-                new CommandDirectLiveCoopSystem(
+        deferChunkSystem(TameworkRuntimeModule.COOPS,
+                "command-direct-live-coop", () -> new CommandDirectLiveCoopSystem(
                         persistenceComposition.directLiveCoopAuthor(),
                         persistenceComposition.directLiveCoopProjections()
                 )
         );
-        getChunkStoreRegistry().registerSystem(new FeedTroughFoodStateSyncSystem());
+        deferChunkSystem(TameworkRuntimeModule.FOOD,
+                "feed-trough-food-state-sync", FeedTroughFoodStateSyncSystem::new);
 
-        // Damage event is needed for owner damage filtering; avoid double-registration.
-        try {
-            getEntityStoreRegistry().registerEntityEventType(Damage.class);
-        } catch (IllegalArgumentException ex) {
-            getLogger().at(Level.INFO).log("Damage event type already registered; skipping registration.");
-        }
+        // Damage event is needed for owner damage filtering; register it with the damage module.
+        deferEntityEventType(TameworkRuntimeModule.DAMAGE_PROJECTILES, "damage-event-type", Damage.class);
 
         // Register damage filter system (configurable owner protection).
-        getEntityStoreRegistry().registerSystem(new DamageTargetMemorySystem());
-        getEntityStoreRegistry().registerSystem(new TranquilizedSleepAnimationRestoreSystem());
-        getEntityStoreRegistry().registerSystem(new RespawnFallDamageGraceSystem());
-        getEntityStoreRegistry().registerSystem(
-                new ExpiryDismountFallDamageProtectionSystem());
-        getEntityStoreRegistry().registerSystem(
-                new ExpiryDismountLandingProtectionSystem());
-        getEntityStoreRegistry().registerSystem(new OwnerDamageFilterSystem(getLogger(), damagePolicy));
-        getEntityStoreRegistry().registerSystem(new TraitDamageModifierSystem());
-        getEntityStoreRegistry().registerSystem(new CompanionHappinessDamageImpulseSystem());
-        getEntityStoreRegistry().registerSystem(new CompanionCombatExperienceSystem());
-        getEntityStoreRegistry().registerSystem(
-                new TameworkProjectileImpactEffectSystem(
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "damage-target-memory", DamageTargetMemorySystem::new);
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "tranquilized-sleep-animation-restore", TranquilizedSleepAnimationRestoreSystem::new);
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "respawn-fall-damage-grace", RespawnFallDamageGraceSystem::new);
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "expiry-dismount-fall-damage-protection", ExpiryDismountFallDamageProtectionSystem::new);
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "expiry-dismount-landing-protection", ExpiryDismountLandingProtectionSystem::new);
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "owner-damage-filter", () -> new OwnerDamageFilterSystem(getLogger(), damagePolicy));
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "trait-damage-modifier", TraitDamageModifierSystem::new);
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "companion-happiness-damage-impulse", CompanionHappinessDamageImpulseSystem::new);
+        deferEntitySystem(TameworkRuntimeModule.LEVELING,
+                "companion-combat-experience", CompanionCombatExperienceSystem::new);
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "projectile-impact-effect", () -> new TameworkProjectileImpactEffectSystem(
                         projectileImpactEffectComponentType,
                         com.hypixel.hytale.server.core.entity.entities.ProjectileComponent.getComponentType(),
                         com.hypixel.hytale.server.core.modules.entity.component.TransformComponent.getComponentType()
                 )
         );
-        getEntityStoreRegistry().registerSystem(
-                new TameworkLingeringHazardProjectileSpawnSystem(
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "lingering-hazard-projectile-spawn", () -> new TameworkLingeringHazardProjectileSpawnSystem(
                         lingeringHazardProjectileComponentType,
                         lingeringHazardComponentType,
                         com.hypixel.hytale.server.core.entity.entities.ProjectileComponent.getComponentType(),
                         com.hypixel.hytale.server.core.modules.entity.component.TransformComponent.getComponentType()
                 )
         );
-        getEntityStoreRegistry().registerSystem(
-                new TameworkLingeringHazardSystem(
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "lingering-hazard", () -> new TameworkLingeringHazardSystem(
                         lingeringHazardComponentType,
                         com.hypixel.hytale.server.core.modules.entity.component.TransformComponent.getComponentType()
                 )
         );
-        getEntityStoreRegistry().registerSystem(new HomingVisualProjectileSystem(
-                homingVisualProjectileComponentType,
-                TransformComponent.getComponentType()
-        ));
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "homing-visual-projectile", () -> new HomingVisualProjectileSystem(
+                        homingVisualProjectileComponentType,
+                        TransformComponent.getComponentType()
+                ));
 
         // Load item feature configs from bundled defaults and mod overrides.
         int loadedSpawner = loadSpawnerItemAssets();
@@ -1228,19 +931,23 @@ public class Tamework extends JavaPlugin {
         NameplateBuilderBridgeLoader.initialize(this);
 
         // Core handler for capture/spawn flows.
-        spawnerFeatureHandler = new SpawnerFeatureHandler(
-                getLogger(),
-                itemFeatureRegistry,
-                translationRegistry,
-                persistenceComposition.captureAuthor(),
-                persistenceComposition.releaseAuthor(),
-                capturePolicyRegistry,
-                interactionExtensionRegistry,
-                persistenceComposition.tameAndLinkEvidence(),
-                bondedCompanionComposition.captureAuthor(),
-                bondedCompanionRosterRegistry,
-                commandItemRegistry
-        );
+        if (bondedCompanionComposition == null) {
+            spawnerFeatureHandler = new SpawnerFeatureHandler(
+                    getLogger(), itemFeatureRegistry, translationRegistry,
+                    persistenceComposition.captureAuthor(), persistenceComposition.releaseAuthor(),
+                    capturePolicyRegistry, interactionExtensionRegistry,
+                    persistenceComposition.tameAndLinkEvidence()
+            );
+        } else {
+            spawnerFeatureHandler = new SpawnerFeatureHandler(
+                    getLogger(), itemFeatureRegistry, translationRegistry,
+                    persistenceComposition.captureAuthor(), persistenceComposition.releaseAuthor(),
+                    capturePolicyRegistry, interactionExtensionRegistry,
+                    persistenceComposition.tameAndLinkEvidence(),
+                    bondedCompanionComposition.captureAuthor(), bondedCompanionRosterRegistry,
+                    commandItemRegistry
+            );
+        }
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
         // Core handler for command-item linking and dispatch.
@@ -1258,181 +965,246 @@ public class Tamework extends JavaPlugin {
         );
         CommandWorldChangeTravelEventHandler commandWorldChangeTravelEventHandler =
                 new CommandWorldChangeTravelEventHandler(commandItemFeatureHandler);
-        getEntityStoreRegistry().registerSystem(
-                new CommandTeleportArrivalRelocationSystem(commandItemFeatureHandler)
-        );
-        getEntityStoreRegistry().registerSystem(
-                new CommandWorldChangeArrivalSystem(commandWorldChangeTravelEventHandler)
-        );
-        getEntityStoreRegistry().registerSystem(
-                new CommandLinkedNpcInventoryCanonicalizationSystem(commandItemFeatureHandler)
-        );
+        deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
+                "command-teleport-arrival-relocation",
+                () -> new CommandTeleportArrivalRelocationSystem(commandItemFeatureHandler));
+        deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
+                "command-world-change-arrival",
+                () -> new CommandWorldChangeArrivalSystem(commandWorldChangeTravelEventHandler));
+        deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
+                "command-linked-npc-inventory-canonicalization",
+                () -> new CommandLinkedNpcInventoryCanonicalizationSystem(commandItemFeatureHandler));
         CommandTargetHudActivationTracker commandTargetHudActivationTracker = new CommandTargetHudActivationTracker();
-        getEntityStoreRegistry().registerSystem(
-                new CommandTargetHudActiveSlotSystem(commandTargetHudActivationTracker)
-        );
-        getEntityStoreRegistry().registerSystem(
-                new CommandTargetHudInventoryChangeSystem(commandTargetHudActivationTracker)
-        );
-        getEntityStoreRegistry().registerSystem(
-                new CommandTargetHudService(commandItemRegistry, commandTargetHudActivationTracker)
-        );
-        getEntityStoreRegistry().registerSystem(
-                new CommandHotswapHudService(commandItemRegistry)
-        );
+        deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
+                "command-target-hud-active-slot",
+                () -> new CommandTargetHudActiveSlotSystem(commandTargetHudActivationTracker));
+        deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
+                "command-target-hud-inventory-change",
+                () -> new CommandTargetHudInventoryChangeSystem(commandTargetHudActivationTracker));
+        deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
+                "command-target-hud",
+                () -> new CommandTargetHudService(commandItemRegistry, commandTargetHudActivationTracker));
+        deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
+                "command-hotswap-hud",
+                () -> new CommandHotswapHudService(commandItemRegistry));
 
-        // Register /tw commands if the server supports it.
-        if (getCommandRegistry() != null) {
-            getCommandRegistry().registerCommand(
-                    new TameworkCommandRoot(
-                            persistenceComposition.diagnosticsReader(),
-                            persistenceComposition.diagnosticsExporter(),
-                            bondedCompanionComposition.diagnostics(),
-                            spawnBeaconVisualizationService
-                    )
-            );
-        }
         applyDebugConfigDefaults();
         settingsAnnouncementService = new TameworkSettingsAnnouncementService(this);
 
         // Global listener to enforce owner-only interactions.
         OwnerInteractionListener ownerInteractionListener =
                 new OwnerInteractionListener(translationRegistry, getLogger());
-        TameworkEventRegistrationSupport.registerGlobal(
-                this,
-                PlayerInteractEvent.class,
-                PlayerInputDebugProbe::logPlayerInteract,
-                "player input debug interaction logging"
+        deferGlobalListener(
+                TameworkRuntimeModule.DEBUG_SELF_TEST,
+                "player-input-debug-interaction",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        PlayerInteractEvent.class,
+                        PlayerInputDebugProbe::logPlayerInteract,
+                        "player input debug interaction logging"
+                )
         );
-        TameworkEventRegistrationSupport.registerGlobal(
-                this,
-                PlayerInteractEvent.class,
-                ownerInteractionListener::onPlayerInteract,
-                "owner interaction enforcement"
+        deferGlobalListener(
+                TameworkRuntimeModule.CORE_OWNERSHIP,
+                "owner-interaction-enforcement",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        PlayerInteractEvent.class,
+                        ownerInteractionListener::onPlayerInteract,
+                        "owner interaction enforcement"
+                )
         );
         OwnerPresenceTimelineService ownerPresenceTimelineService = OwnerPresenceTimelineService.get();
-        TameworkEventRegistrationSupport.registerGlobal(
-                this,
-                PlayerConnectEvent.class,
-                ownerPresenceTimelineService::onPlayerConnect,
-                "owner presence connect tracking"
+        deferGlobalListener(
+                TameworkRuntimeModule.CORE_OWNERSHIP,
+                "owner-presence-connect",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        PlayerConnectEvent.class,
+                        ownerPresenceTimelineService::onPlayerConnect,
+                        "owner presence connect tracking"
+                )
         );
-        TameworkEventRegistrationSupport.registerGlobal(
-                this,
-                PlayerDisconnectEvent.class,
-                ownerPresenceTimelineService::onPlayerDisconnect,
-                "owner presence disconnect tracking"
+        deferGlobalListener(
+                TameworkRuntimeModule.CORE_OWNERSHIP,
+                "owner-presence-disconnect",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        PlayerDisconnectEvent.class,
+                        ownerPresenceTimelineService::onPlayerDisconnect,
+                        "owner presence disconnect tracking"
+                )
         );
-        TameworkEventRegistrationSupport.registerGlobal(
-                this,
-                PlayerDisconnectEvent.class,
-                event -> timedSummonOwnerLifecycle.onOwnerLogout(
-                        event == null || event.getPlayerRef() == null
-                                ? null : event.getPlayerRef().getUuid()
-                ),
-                "timed summon owner logout storage"
+        deferGlobalListener(
+                TameworkRuntimeModule.COMMAND_ITEMS,
+                "timed-summon-owner-logout",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        PlayerDisconnectEvent.class,
+                        event -> timedSummonOwnerLifecycle.onOwnerLogout(
+                                event == null || event.getPlayerRef() == null
+                                        ? null : event.getPlayerRef().getUuid()
+                        ),
+                        "timed summon owner logout storage"
+                )
         );
-        TameworkEventRegistrationSupport.registerGlobal(
-                this,
-                PlayerDisconnectEvent.class,
-                new AvatarFlightDisconnectRecoveryService()::onPlayerDisconnect,
-                "avatar flight disconnect cleanup"
+        deferGlobalListener(
+                TameworkRuntimeModule.AVATAR_FLIGHT,
+                "avatar-flight-disconnect-cleanup",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        PlayerDisconnectEvent.class,
+                        new AvatarFlightDisconnectRecoveryService()::onPlayerDisconnect,
+                        "avatar flight disconnect cleanup"
+                )
         );
         if (settingsAnnouncementService != null) {
-            TameworkEventRegistrationSupport.registerGlobal(
-                    this,
-                    PlayerConnectEvent.class,
-                    settingsAnnouncementService::onPlayerConnect,
-                    "settings announcement connect reset"
+            deferGlobalListener(
+                    TameworkRuntimeModule.COMMAND_ITEMS,
+                    "settings-announcement-connect",
+                    () -> TameworkEventRegistrationSupport.registerGlobal(
+                            this,
+                            PlayerConnectEvent.class,
+                            settingsAnnouncementService::onPlayerConnect,
+                            "settings announcement connect reset"
+                    )
             );
-            TameworkEventRegistrationSupport.registerGlobal(
-                    this,
-                    PlayerDisconnectEvent.class,
-                    settingsAnnouncementService::onPlayerDisconnect,
-                    "settings announcement disconnect reset"
+            deferGlobalListener(
+                    TameworkRuntimeModule.COMMAND_ITEMS,
+                    "settings-announcement-disconnect",
+                    () -> TameworkEventRegistrationSupport.registerGlobal(
+                            this,
+                            PlayerDisconnectEvent.class,
+                            settingsAnnouncementService::onPlayerDisconnect,
+                            "settings announcement disconnect reset"
+                    )
             );
-            TameworkEventRegistrationSupport.registerGlobal(
-                    this,
-                    PlayerReadyEvent.class,
-                    settingsAnnouncementService::onPlayerReady,
-                    "settings announcement ready prompt"
+            deferGlobalListener(
+                    TameworkRuntimeModule.COMMAND_ITEMS,
+                    "settings-announcement-ready",
+                    () -> TameworkEventRegistrationSupport.registerGlobal(
+                            this,
+                            PlayerReadyEvent.class,
+                            settingsAnnouncementService::onPlayerReady,
+                            "settings announcement ready prompt"
+                    )
             );
         }
         if (namingFeatureHandler != null) {
-            TameworkEventRegistrationSupport.registerGlobal(
-                    this,
-                    PlayerChatEvent.class,
-                    namingFeatureHandler::onPlayerChat,
-                    "name item chat capture"
+            deferGlobalListener(
+                    TameworkRuntimeModule.NAMING_ITEMS,
+                    "name-item-chat-capture",
+                    () -> TameworkEventRegistrationSupport.registerGlobal(
+                            this,
+                            PlayerChatEvent.class,
+                            namingFeatureHandler::onPlayerChat,
+                            "name item chat capture"
+                    )
             );
-            TameworkEventRegistrationSupport.registerGlobal(
-                    this,
-                    PlayerDisconnectEvent.class,
-                    namingFeatureHandler::onPlayerDisconnect,
-                    "name item disconnect cleanup"
+            deferGlobalListener(
+                    TameworkRuntimeModule.NAMING_ITEMS,
+                    "name-item-disconnect-cleanup",
+                    () -> TameworkEventRegistrationSupport.registerGlobal(
+                            this,
+                            PlayerDisconnectEvent.class,
+                            namingFeatureHandler::onPlayerDisconnect,
+                            "name item disconnect cleanup"
+                    )
             );
         }
         if (commandItemFeatureHandler != null) {
-            TameworkEventRegistrationSupport.registerGlobal(
-                    this,
-                    PlayerConnectEvent.class,
-                    commandWorldChangeTravelEventHandler::onPlayerConnect,
-                    "command item travel session connect tracking"
+            deferGlobalListener(
+                    TameworkRuntimeModule.COMMAND_ITEMS,
+                    "command-travel-connect",
+                    () -> TameworkEventRegistrationSupport.registerGlobal(
+                            this,
+                            PlayerConnectEvent.class,
+                            commandWorldChangeTravelEventHandler::onPlayerConnect,
+                            "command item travel session connect tracking"
+                    )
             );
-            TameworkEventRegistrationSupport.registerGlobal(
-                    this,
-                    PlayerDisconnectEvent.class,
-                    commandWorldChangeTravelEventHandler::onPlayerDisconnect,
-                    "command item travel session disconnect cleanup"
+            deferGlobalListener(
+                    TameworkRuntimeModule.COMMAND_ITEMS,
+                    "command-travel-disconnect",
+                    () -> TameworkEventRegistrationSupport.registerGlobal(
+                            this,
+                            PlayerDisconnectEvent.class,
+                            commandWorldChangeTravelEventHandler::onPlayerDisconnect,
+                            "command item travel session disconnect cleanup"
+                    )
             );
-            TameworkEventRegistrationSupport.registerGlobal(
-                    this,
-                    AddPlayerToWorldEvent.class,
-                    commandWorldChangeTravelEventHandler::onAddPlayerToWorld,
-                    "command item world-change relocation"
+            deferGlobalListener(
+                    TameworkRuntimeModule.COMMAND_ITEMS,
+                    "command-travel-world-change",
+                    () -> TameworkEventRegistrationSupport.registerGlobal(
+                            this,
+                            AddPlayerToWorldEvent.class,
+                            commandWorldChangeTravelEventHandler::onAddPlayerToWorld,
+                            "command item world-change relocation"
+                    )
             );
         }
-        TameworkEventRegistrationSupport.registerGlobal(
-                this,
-                AddPlayerToWorldEvent.class,
-                this::onPlayerAddedToWorldForOverrides,
-                "loaded world override initialization"
+        deferGlobalListener(
+                TameworkRuntimeModule.CORE_OWNERSHIP,
+                "world-override-initialization",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        AddPlayerToWorldEvent.class,
+                        this::onPlayerAddedToWorldForOverrides,
+                        "loaded world override initialization"
+                )
         );
-        TameworkEventRegistrationSupport.registerGlobal(
-                this,
-                AddPlayerToWorldEvent.class,
-                event -> {
-                    PlayerRef playerRef = event == null || event.getHolder() == null
-                            ? null : event.getHolder().getComponent(
-                            PlayerRef.getComponentType()
-                    );
-                    if (playerRef != null
-                            && AvatarFlightStaleOwnerRecoveryRegistry.claim(
-                            playerRef.getUuid())) {
-                        timedSummonOwnerLifecycle.onStaleAvatarFlightRecovery(
-                                playerRef.getUuid()
-                        );
-                    }
-                },
-                "stale avatar flight roster storage"
+        deferGlobalListener(
+                TameworkRuntimeModule.AVATAR_FLIGHT,
+                "stale-avatar-flight-roster",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        AddPlayerToWorldEvent.class,
+                        event -> {
+                            PlayerRef playerRef = event == null || event.getHolder() == null
+                                    ? null : event.getHolder().getComponent(
+                                    PlayerRef.getComponentType()
+                            );
+                            if (playerRef != null
+                                    && AvatarFlightStaleOwnerRecoveryRegistry.claim(
+                                    playerRef.getUuid())) {
+                                timedSummonOwnerLifecycle.onStaleAvatarFlightRecovery(
+                                        playerRef.getUuid()
+                                );
+                            }
+                        },
+                        "stale avatar flight roster storage"
+                )
         );
-        TameworkEventRegistrationSupport.registerGlobal(
-                this,
-                RemoveWorldEvent.class,
-                this::onWorldRemovedForCrashTelemetry,
-                "crash telemetry world cleanup"
+        deferGlobalListener(
+                TameworkRuntimeModule.CORE_OWNERSHIP,
+                "crash-telemetry-world-cleanup",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        RemoveWorldEvent.class,
+                        this::onWorldRemovedForCrashTelemetry,
+                        "crash telemetry world cleanup"
+                )
         );
-        TameworkEventRegistrationSupport.registerGlobal(
-                this,
-                RemoveWorldEvent.class,
-                this::onWorldRemovedForProgressionTiming,
-                "progression timing world cleanup"
+        deferGlobalListener(
+                TameworkRuntimeModule.LEVELING,
+                "progression-timing-world-cleanup",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        RemoveWorldEvent.class,
+                        this::onWorldRemovedForProgressionTiming,
+                        "progression timing world cleanup"
+                )
         );
-        TameworkEventRegistrationSupport.registerGlobal(
-                this,
-                RemoveWorldEvent.class,
-                this::onWorldRemovedForSpawnBeaconVisualization,
-                "spawn beacon visualization world cleanup"
+        deferGlobalListener(
+                TameworkRuntimeModule.CORE_OWNERSHIP,
+                "spawn-beacon-world-cleanup",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        RemoveWorldEvent.class,
+                        this::onWorldRemovedForSpawnBeaconVisualization,
+                        "spawn beacon visualization world cleanup"
+                )
         );
         reconcileTranquilizerRecipeVisibility();
         getLogger().at(Level.INFO).log(
@@ -1447,12 +1219,79 @@ public class Tamework extends JavaPlugin {
                         + (commandItemRegistry != null ? " (total: " + commandItemRegistry.snapshot().size() + ")" : "")
         );
 
-        // Register custom NPC action/sensor builders once NPCPlugin is available.
-        if (npcBuilderRegistrar != null) {
-            npcBuilderRegistrar.registerNpcActionsIfReady();
-        }
+        };
     }
 
+    private void deferEntitySystem(
+            TameworkRuntimeModule module,
+            String participantId,
+            Supplier<?> factory
+    ) {
+        runtimeParticipants.entitySystem(module, participantId, factory);
+    }
+
+    private void deferCraftingRecipeSubscriptions() {
+        deferAssetSubscription(TameworkRuntimeModule.CAPTURE, "capture-crafting-recipe-assets-loaded",
+                () -> getEventRegistry().register(LoadedAssetsEvent.class, CraftingRecipe.class,
+                        (LoadedAssetsEvent<String, CraftingRecipe, DefaultAssetMap<String, CraftingRecipe>> ignored) ->
+                                onCaptureCraftingRecipeAssetsChanged()));
+        deferAssetSubscription(TameworkRuntimeModule.CAPTURE, "capture-crafting-recipe-assets-removed",
+                () -> getEventRegistry().register(RemovedAssetsEvent.class, CraftingRecipe.class,
+                        (RemovedAssetsEvent<String, CraftingRecipe, DefaultAssetMap<String, CraftingRecipe>> ignored) ->
+                                onCaptureCraftingRecipeAssetsChanged()));
+        deferAssetSubscription(TameworkRuntimeModule.FOOD, "food-crafting-recipe-assets-loaded",
+                () -> getEventRegistry().register(LoadedAssetsEvent.class, CraftingRecipe.class,
+                        (LoadedAssetsEvent<String, CraftingRecipe, DefaultAssetMap<String, CraftingRecipe>> ignored) ->
+                                onFoodCraftingRecipeAssetsChanged()));
+        deferAssetSubscription(TameworkRuntimeModule.FOOD, "food-crafting-recipe-assets-removed",
+                () -> getEventRegistry().register(RemovedAssetsEvent.class, CraftingRecipe.class,
+                        (RemovedAssetsEvent<String, CraftingRecipe, DefaultAssetMap<String, CraftingRecipe>> ignored) ->
+                                onFoodCraftingRecipeAssetsChanged()));
+    }
+
+    private void deferChunkSystem(
+            TameworkRuntimeModule module,
+            String participantId,
+            Supplier<?> factory
+    ) {
+        runtimeParticipants.chunkSystem(module, participantId, factory);
+    }
+
+    private void deferOptionalEntitySystem(
+            TameworkRuntimeModule module,
+            String participantId,
+            Supplier<?> factory
+    ) {
+        runtimeParticipants.optionalEntitySystem(module, participantId, factory);
+    }
+
+    private <T extends EcsEvent> void deferEntityEventType(
+            TameworkRuntimeModule module,
+            String participantId,
+            Class<? super T> eventType
+    ) {
+        runtimeParticipants.entityEventType(module, participantId, eventType);
+    }
+
+    /** Defers one global listener until the owning module is active. */
+    private void deferGlobalListener(
+            TameworkRuntimeModule module,
+            String participantId,
+            Runnable registration
+    ) {
+        runtimeParticipants.listener(module, participantId, registration);
+    }
+
+    /** Defers one asset event subscription until the owning module is active. */
+    private void deferAssetSubscription(
+            TameworkRuntimeModule module,
+            String participantId,
+            Runnable registration
+    ) {
+        runtimeParticipants.subscription(module, participantId, registration);
+    }
+
+    /** Defers ECS registration until the frozen activation plan is available. */
     @Override
     protected void start() {
         long startedAtNanos = System.nanoTime();
@@ -1525,23 +1364,114 @@ public class Tamework extends JavaPlugin {
     }
 
     private void startInternal() {
-        OwnerPresenceTimelineService.get().seedOnlinePlayersFromUniverse();
-        CreditorIntegration.start(this);
-        initializeOverridesForLoadedWorlds();
-        getLogger().at(Level.INFO).log("Alec's Tamework! has been enabled!");
-        if (hStatsIntegration != null) {
-            hStatsIntegration.initialize();
+        prepareRuntimeActivation();
+        TameworkActiveAssetInitializer.initialize(
+                runtimeStartupPlan, populationGroupAssetRegistrar::initialize,
+                this::rebuildCapturePolicyIndex, this::rebuildBondedCompanionRosterIndex);
+        initializeRuntimeServices();
+        registerRuntimeParticipants();
+        runtimeActivationState = TameworkRuntimeActivationState.of(
+                runtimeStartupPlan, runtimeStartupDiagnostics
+        );
+        getLogger().at(Level.INFO).log(runtimeActivationState.diagnostics().startupSummary());
+        registerCommandRoot();
+        if (runtimeStartupPlan.isActive(TameworkRuntimeModule.CORE_OWNERSHIP)) {
+            OwnerPresenceTimelineService.get().seedOnlinePlayersFromUniverse();
+            CreditorIntegration.start(this);
+            initializeOverridesForLoadedWorlds();
         }
-        if (crashTelemetryService != null) {
+        getLogger().at(Level.INFO).log("Alec's Tamework! has been enabled!");
+        if (crashTelemetryService != null
+                && runtimeStartupPlan.isActive(TameworkRuntimeModule.CORE_OWNERSHIP)) {
             crashTelemetryService.start();
         }
-        if (assetEditorPackService != null) {
+        if (assetEditorPackService != null
+                && runtimeStartupPlan.isActive(TameworkRuntimeModule.CORE_OWNERSHIP)) {
             assetEditorPackService.ensurePackVisible();
         }
     }
 
+    private void registerCommandRoot() {
+        if (getCommandRegistry() != null) {
+            getCommandRegistry().registerCommand(new TameworkCommandRoot(
+                    persistenceComposition == null ? null : persistenceComposition.diagnosticsReader(),
+                    persistenceComposition == null ? null : persistenceComposition.diagnosticsExporter(),
+                    bondedCompanionComposition == null ? null : bondedCompanionComposition.diagnostics(),
+                    spawnBeaconVisualizationService
+            ));
+        }
+    }
+
+    /** Runs deferred persistence and feature-service construction after the plan is frozen. */
+    private void initializeRuntimeServices() {
+        if (runtimeServiceInitializer == null) {
+            return;
+        }
+        Runnable initializer = runtimeServiceInitializer;
+        runtimeServiceInitializer = null;
+        initializer.run();
+    }
+
+    /** Installs optional workers through the same preflight and ownership boundary as ECS work. */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void registerRuntimeParticipants() {
+        if (runtimeStartupPlan == null) {
+            return;
+        }
+        TameworkRuntimeRegistrationContext.RegistrationTarget target =
+                new TameworkRuntimeRegistrationTarget(
+                        system -> getEntityStoreRegistry().registerSystem(
+                                (ISystem<EntityStore>) system),
+                        system -> getChunkStoreRegistry().registerSystem(
+                                (ISystem<ChunkStore>) system)
+                );
+        TameworkRuntimeRegistrationContext.Builder contextBuilder =
+                TameworkRuntimeRegistrationContext.builder(runtimeStartupPlan, target);
+        for (TameworkRuntimeRegistrationContext.Participant participant
+                : runtimeParticipants.participants()) {
+            contextBuilder.participant(participant);
+        }
+        TameworkRuntimeRegistrationContext context = contextBuilder
+                .participant(TameworkRuntimeRegistrationContext.Participant.prepared(
+                        TameworkRuntimeModule.HSTATS,
+                        "hstats-worker",
+                        TameworkRuntimeRegistrationContext.RegistrationKind.WORKER,
+                        () -> new TameworkHStatsIntegration(this),
+                        (ignoredTarget, prepared) -> {
+                            hStatsIntegration = (TameworkHStatsIntegration) prepared;
+                            hStatsIntegration.initialize();
+                            return hStatsIntegration;
+                        }
+                ))
+                .build();
+        runtimeHandle = new TameworkRuntimeRegistrar().register(
+                context,
+                participant -> TameworkRuntimeRegistrationTelemetry.record(
+                        runtimeStartupDiagnostics, participant
+                )
+        );
+    }
+    /** Probes durable state and builds the private startup candidate. */
+    private void prepareRuntimeActivation() {
+        TameworkRuntimeActivationCoordinator.Preparation preparation =
+                runtimeActivationCoordinator.prepare(getDataDirectory(), getLogger(), runtimeCapabilityRequests);
+        runtimeStartupPlan = preparation.plan();
+        runtimeStartupDiagnostics = new TameworkRuntimeDiagnostics(runtimeStartupPlan);
+        genericPersistenceActivationEvidence = preparation.genericPersistence();
+        bondedPersistenceActivationEvidence = preparation.bondedPersistence();
+    }
     @Override
     protected void shutdown() {
+        if (runtimeHandle != null) {
+            try {
+                runtimeHandle.close();
+            } catch (RuntimeException exception) {
+                getLogger().at(Level.WARNING).withCause(exception).log(
+                        "Tamework runtime participant teardown was not clean."
+                );
+            }
+            runtimeHandle = null;
+        }
         spawnBeaconVisualizationService.close();
         if (patchworkRuntime != null) {
             try {
@@ -1591,6 +1521,7 @@ public class Tamework extends JavaPlugin {
         apiSelfTestRunner = null;
         crashTelemetryService = null;
         settingsAnnouncementService = null;
+        runtimeActivationState = null;
         getLogger().at(Level.INFO).log("Alec's Tamework! has been disabled!");
     }
 
@@ -1794,6 +1725,39 @@ public class Tamework extends JavaPlugin {
     @Nonnull
     public TameworkTelemetryEvents getTelemetryEvents() {
         return telemetryEvents;
+    }
+
+    /** Returns the immutable startup activation state after plugin start. */
+    @Nullable
+    public TameworkRuntimeActivationState getRuntimeActivationState() {
+        return runtimeActivationState;
+    }
+
+    /**
+     * Requests one runtime capability during setup.
+     *
+     * <p>Downstream plugins must request before Tamework publishes its startup
+     * topology. A later request is rejected because live systems are restart-bound.</p>
+     */
+    public void requestRuntimeCapability(
+            @Nonnull TameworkRuntimeModule module,
+            @Nonnull String capabilityId
+    ) {
+        runtimeCapabilityRequests.request(module, capabilityId);
+    }
+
+    /** Compares current effective assets with the frozen startup topology. */
+    @Nullable
+    public TameworkReloadTopologyReport compareRuntimeActivationTopology() {
+        if (runtimeActivationState == null) {
+            return null;
+        }
+        return runtimeActivationCoordinator.compare(
+                runtimeActivationState.plan(),
+                runtimeCapabilityRequests.snapshot(),
+                genericPersistenceActivationEvidence,
+                bondedPersistenceActivationEvidence
+        );
     }
 
     @Nullable
@@ -2004,8 +1968,10 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwSpawnerConfig::getId)
                         .build()
         );
-        getEventRegistry().register(LoadedAssetsEvent.class, TwSpawnerConfig.class, this::onSpawnerAssetsLoaded);
-        getEventRegistry().register(RemovedAssetsEvent.class, TwSpawnerConfig.class, this::onSpawnerAssetsRemoved);
+        deferAssetSubscription(TameworkRuntimeModule.SPAWNER_ITEMS, "spawner-config-assets-loaded",
+                () -> getEventRegistry().register(LoadedAssetsEvent.class, TwSpawnerConfig.class, this::onSpawnerAssetsLoaded));
+        deferAssetSubscription(TameworkRuntimeModule.SPAWNER_ITEMS, "spawner-config-assets-removed",
+                () -> getEventRegistry().register(RemovedAssetsEvent.class, TwSpawnerConfig.class, this::onSpawnerAssetsRemoved));
         spawnerAssetsRegistered = true;
     }
 
@@ -2020,8 +1986,10 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwNameItemConfig::getId)
                         .build()
         );
-        getEventRegistry().register(LoadedAssetsEvent.class, TwNameItemConfig.class, this::onNamingAssetsLoaded);
-        getEventRegistry().register(RemovedAssetsEvent.class, TwNameItemConfig.class, this::onNamingAssetsRemoved);
+        deferAssetSubscription(TameworkRuntimeModule.NAMING_ITEMS, "naming-config-assets-loaded",
+                () -> getEventRegistry().register(LoadedAssetsEvent.class, TwNameItemConfig.class, this::onNamingAssetsLoaded));
+        deferAssetSubscription(TameworkRuntimeModule.NAMING_ITEMS, "naming-config-assets-removed",
+                () -> getEventRegistry().register(RemovedAssetsEvent.class, TwNameItemConfig.class, this::onNamingAssetsRemoved));
         namingAssetsRegistered = true;
     }
 
@@ -2036,8 +2004,10 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwNamesConfig::getId)
                         .build()
         );
-        getEventRegistry().register(LoadedAssetsEvent.class, TwNamesConfig.class, this::onNamesAssetsLoaded);
-        getEventRegistry().register(RemovedAssetsEvent.class, TwNamesConfig.class, this::onNamesAssetsRemoved);
+        deferAssetSubscription(TameworkRuntimeModule.NAMING_ITEMS, "names-config-assets-loaded",
+                () -> getEventRegistry().register(LoadedAssetsEvent.class, TwNamesConfig.class, this::onNamesAssetsLoaded));
+        deferAssetSubscription(TameworkRuntimeModule.NAMING_ITEMS, "names-config-assets-removed",
+                () -> getEventRegistry().register(RemovedAssetsEvent.class, TwNamesConfig.class, this::onNamesAssetsRemoved));
         namesAssetsRegistered = true;
     }
 
@@ -2052,8 +2022,10 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwCommandItemConfig::getId)
                         .build()
         );
-        getEventRegistry().register(LoadedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsLoaded);
-        getEventRegistry().register(RemovedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsRemoved);
+        deferAssetSubscription(TameworkRuntimeModule.COMMAND_ITEMS, "command-config-assets-loaded",
+                () -> getEventRegistry().register(LoadedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsLoaded));
+        deferAssetSubscription(TameworkRuntimeModule.COMMAND_ITEMS, "command-config-assets-removed",
+                () -> getEventRegistry().register(RemovedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsRemoved));
         commandAssetsRegistered = true;
     }
 
@@ -2112,32 +2084,23 @@ public class Tamework extends JavaPlugin {
                         )
                         .build()
         );
-        getEventRegistry().register(
-                LoadedAssetsEvent.class,
-                TwBondedCompanionRosterConfig.class,
-                this::onBondedCompanionRosterAssetsLoaded
-        );
-        getEventRegistry().register(
-                RemovedAssetsEvent.class,
-                TwBondedCompanionRosterConfig.class,
-                this::onBondedCompanionRosterAssetsRemoved
-        );
+        deferAssetSubscription(TameworkRuntimeModule.BONDED_PERSISTENCE, "bonded-roster-assets-loaded",
+                () -> getEventRegistry().register(
+                        LoadedAssetsEvent.class,
+                        TwBondedCompanionRosterConfig.class,
+                        this::onBondedCompanionRosterAssetsLoaded
+                ));
+        deferAssetSubscription(TameworkRuntimeModule.BONDED_PERSISTENCE, "bonded-roster-assets-removed",
+                () -> getEventRegistry().register(
+                        RemovedAssetsEvent.class,
+                        TwBondedCompanionRosterConfig.class,
+                        this::onBondedCompanionRosterAssetsRemoved
+                ));
         bondedCompanionRosterAssetsRegistered = true;
     }
 
-    private void registerOptionalCommandLinkedRevivableDropSuppressionSystem() {
-        try {
-            getEntityStoreRegistry().registerSystem(new CommandLinkedRevivableDropSuppressionSystem());
-        } catch (RuntimeException | LinkageError error) {
-            getLogger().at(Level.WARNING).withCause(error).log(
-                    "Skipping command-linked revivable drop suppression system because required NPC damage dependencies "
-                            + "are unavailable during setup."
-            );
-        }
-    }
-
     @Nullable
-    private ComponentType<EntityStore, SpawnMarkerReference> resolveOptionalSpawnMarkerReferenceComponentType() {
+    ComponentType<EntityStore, SpawnMarkerReference> resolveOptionalSpawnMarkerReferenceComponentType() {
         try {
             return SpawnMarkerReference.getComponentType();
         } catch (RuntimeException | LinkageError error) {
@@ -2150,7 +2113,7 @@ public class Tamework extends JavaPlugin {
     }
 
     @Nullable
-    private ComponentType<EntityStore, SpawnBeaconReference> resolveOptionalSpawnBeaconReferenceComponentType() {
+    ComponentType<EntityStore, SpawnBeaconReference> resolveOptionalSpawnBeaconReferenceComponentType() {
         try {
             return SpawnBeaconReference.getComponentType();
         } catch (RuntimeException | LinkageError error) {
@@ -2163,7 +2126,7 @@ public class Tamework extends JavaPlugin {
     }
 
     @Nullable
-    private ComponentType<EntityStore, SpawnMarkerEntity> resolveOptionalSpawnMarkerEntityComponentType() {
+    ComponentType<EntityStore, SpawnMarkerEntity> resolveOptionalSpawnMarkerEntityComponentType() {
         try {
             return SpawnMarkerEntity.getComponentType();
         } catch (RuntimeException | LinkageError error) {
@@ -2186,8 +2149,10 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwGlobalConfig::getId)
                         .build()
         );
-        getEventRegistry().register(LoadedAssetsEvent.class, TwGlobalConfig.class, this::onGlobalAssetsLoaded);
-        getEventRegistry().register(RemovedAssetsEvent.class, TwGlobalConfig.class, this::onGlobalAssetsRemoved);
+        deferAssetSubscription(TameworkRuntimeModule.CORE_OWNERSHIP, "global-config-assets-loaded",
+                () -> getEventRegistry().register(LoadedAssetsEvent.class, TwGlobalConfig.class, this::onGlobalAssetsLoaded));
+        deferAssetSubscription(TameworkRuntimeModule.CORE_OWNERSHIP, "global-config-assets-removed",
+                () -> getEventRegistry().register(RemovedAssetsEvent.class, TwGlobalConfig.class, this::onGlobalAssetsRemoved));
         globalAssetsRegistered = true;
     }
 
@@ -2202,8 +2167,10 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwCompanionConfig::getId)
                         .build()
         );
-        getEventRegistry().register(LoadedAssetsEvent.class, TwCompanionConfig.class, this::onCompanionAssetsLoaded);
-        getEventRegistry().register(RemovedAssetsEvent.class, TwCompanionConfig.class, this::onCompanionAssetsRemoved);
+        deferAssetSubscription(TameworkRuntimeModule.CORE_OWNERSHIP, "companion-config-assets-loaded",
+                () -> getEventRegistry().register(LoadedAssetsEvent.class, TwCompanionConfig.class, this::onCompanionAssetsLoaded));
+        deferAssetSubscription(TameworkRuntimeModule.CORE_OWNERSHIP, "companion-config-assets-removed",
+                () -> getEventRegistry().register(RemovedAssetsEvent.class, TwCompanionConfig.class, this::onCompanionAssetsRemoved));
         companionAssetsRegistered = true;
     }
 
@@ -2218,10 +2185,12 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwCapturePolicyConfig::getId)
                         .build()
         );
-        getEventRegistry().register(
-                LoadedAssetsEvent.class, TwCapturePolicyConfig.class, this::onCapturePolicyAssetsLoaded);
-        getEventRegistry().register(
-                RemovedAssetsEvent.class, TwCapturePolicyConfig.class, this::onCapturePolicyAssetsRemoved);
+        deferAssetSubscription(TameworkRuntimeModule.CAPTURE, "capture-policy-assets-loaded",
+                () -> getEventRegistry().register(
+                        LoadedAssetsEvent.class, TwCapturePolicyConfig.class, this::onCapturePolicyAssetsLoaded));
+        deferAssetSubscription(TameworkRuntimeModule.CAPTURE, "capture-policy-assets-removed",
+                () -> getEventRegistry().register(
+                        RemovedAssetsEvent.class, TwCapturePolicyConfig.class, this::onCapturePolicyAssetsRemoved));
         capturePolicyAssetsRegistered = true;
     }
 
@@ -2236,8 +2205,10 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwInteractionConfig::getId)
                         .build()
         );
-        getEventRegistry().register(LoadedAssetsEvent.class, TwInteractionConfig.class, this::onInteractionAssetsLoaded);
-        getEventRegistry().register(RemovedAssetsEvent.class, TwInteractionConfig.class, this::onInteractionAssetsRemoved);
+        deferAssetSubscription(TameworkRuntimeModule.INTERACTIONS, "interaction-config-assets-loaded",
+                () -> getEventRegistry().register(LoadedAssetsEvent.class, TwInteractionConfig.class, this::onInteractionAssetsLoaded));
+        deferAssetSubscription(TameworkRuntimeModule.INTERACTIONS, "interaction-config-assets-removed",
+                () -> getEventRegistry().register(RemovedAssetsEvent.class, TwInteractionConfig.class, this::onInteractionAssetsRemoved));
         interactionAssetsRegistered = true;
     }
 
@@ -2252,8 +2223,10 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwMountedGlideConfig::getId)
                         .build()
         );
-        getEventRegistry().register(LoadedAssetsEvent.class, TwMountedGlideConfig.class, this::onMountedGlideAssetsLoaded);
-        getEventRegistry().register(RemovedAssetsEvent.class, TwMountedGlideConfig.class, this::onMountedGlideAssetsRemoved);
+        deferAssetSubscription(TameworkRuntimeModule.MOUNTS, "mounted-glide-assets-loaded",
+                () -> getEventRegistry().register(LoadedAssetsEvent.class, TwMountedGlideConfig.class, this::onMountedGlideAssetsLoaded));
+        deferAssetSubscription(TameworkRuntimeModule.MOUNTS, "mounted-glide-assets-removed",
+                () -> getEventRegistry().register(RemovedAssetsEvent.class, TwMountedGlideConfig.class, this::onMountedGlideAssetsRemoved));
         mountedGlideAssetsRegistered = true;
     }
 
@@ -2268,16 +2241,18 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwMountedDescentConfig::getId)
                         .build()
         );
-        getEventRegistry().register(
-                LoadedAssetsEvent.class,
-                TwMountedDescentConfig.class,
-                this::onMountedDescentAssetsLoaded
-        );
-        getEventRegistry().register(
-                RemovedAssetsEvent.class,
-                TwMountedDescentConfig.class,
-                this::onMountedDescentAssetsRemoved
-        );
+        deferAssetSubscription(TameworkRuntimeModule.MOUNTS, "mounted-descent-assets-loaded",
+                () -> getEventRegistry().register(
+                        LoadedAssetsEvent.class,
+                        TwMountedDescentConfig.class,
+                        this::onMountedDescentAssetsLoaded
+                ));
+        deferAssetSubscription(TameworkRuntimeModule.MOUNTS, "mounted-descent-assets-removed",
+                () -> getEventRegistry().register(
+                        RemovedAssetsEvent.class,
+                        TwMountedDescentConfig.class,
+                        this::onMountedDescentAssetsRemoved
+                ));
         mountedDescentAssetsRegistered = true;
     }
 
@@ -2292,8 +2267,10 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwAvatarFlightConfig::getId)
                         .build()
         );
-        getEventRegistry().register(LoadedAssetsEvent.class, TwAvatarFlightConfig.class, this::onAvatarFlightAssetsLoaded);
-        getEventRegistry().register(RemovedAssetsEvent.class, TwAvatarFlightConfig.class, this::onAvatarFlightAssetsRemoved);
+        deferAssetSubscription(TameworkRuntimeModule.AVATAR_FLIGHT, "avatar-flight-assets-loaded",
+                () -> getEventRegistry().register(LoadedAssetsEvent.class, TwAvatarFlightConfig.class, this::onAvatarFlightAssetsLoaded));
+        deferAssetSubscription(TameworkRuntimeModule.AVATAR_FLIGHT, "avatar-flight-assets-removed",
+                () -> getEventRegistry().register(RemovedAssetsEvent.class, TwAvatarFlightConfig.class, this::onAvatarFlightAssetsRemoved));
         avatarFlightAssetsRegistered = true;
     }
 
@@ -2308,8 +2285,10 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwCoopConfig::getId)
                         .build()
         );
-        getEventRegistry().register(LoadedAssetsEvent.class, TwCoopConfig.class, this::onCoopAssetsLoaded);
-        getEventRegistry().register(RemovedAssetsEvent.class, TwCoopConfig.class, this::onCoopAssetsRemoved);
+        deferAssetSubscription(TameworkRuntimeModule.COOPS, "coop-config-assets-loaded",
+                () -> getEventRegistry().register(LoadedAssetsEvent.class, TwCoopConfig.class, this::onCoopAssetsLoaded));
+        deferAssetSubscription(TameworkRuntimeModule.COOPS, "coop-config-assets-removed",
+                () -> getEventRegistry().register(RemovedAssetsEvent.class, TwCoopConfig.class, this::onCoopAssetsRemoved));
         coopAssetsRegistered = true;
     }
 
@@ -2324,8 +2303,10 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwHappinessConfig::getId)
                         .build()
         );
-        getEventRegistry().register(LoadedAssetsEvent.class, TwHappinessConfig.class, this::onHappinessAssetsLoaded);
-        getEventRegistry().register(RemovedAssetsEvent.class, TwHappinessConfig.class, this::onHappinessAssetsRemoved);
+        deferAssetSubscription(TameworkRuntimeModule.HAPPINESS, "happiness-config-assets-loaded",
+                () -> getEventRegistry().register(LoadedAssetsEvent.class, TwHappinessConfig.class, this::onHappinessAssetsLoaded));
+        deferAssetSubscription(TameworkRuntimeModule.HAPPINESS, "happiness-config-assets-removed",
+                () -> getEventRegistry().register(RemovedAssetsEvent.class, TwHappinessConfig.class, this::onHappinessAssetsRemoved));
         happinessAssetsRegistered = true;
     }
 
@@ -2340,8 +2321,10 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwFoodConfig::getId)
                         .build()
         );
-        getEventRegistry().register(LoadedAssetsEvent.class, TwFoodConfig.class, this::onFoodAssetsLoaded);
-        getEventRegistry().register(RemovedAssetsEvent.class, TwFoodConfig.class, this::onFoodAssetsRemoved);
+        deferAssetSubscription(TameworkRuntimeModule.FOOD, "food-config-assets-loaded",
+                () -> getEventRegistry().register(LoadedAssetsEvent.class, TwFoodConfig.class, this::onFoodAssetsLoaded));
+        deferAssetSubscription(TameworkRuntimeModule.FOOD, "food-config-assets-removed",
+                () -> getEventRegistry().register(RemovedAssetsEvent.class, TwFoodConfig.class, this::onFoodAssetsRemoved));
         foodAssetsRegistered = true;
     }
 
@@ -2356,8 +2339,10 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwNeedsConfig::getId)
                         .build()
         );
-        getEventRegistry().register(LoadedAssetsEvent.class, TwNeedsConfig.class, this::onNeedsAssetsLoaded);
-        getEventRegistry().register(RemovedAssetsEvent.class, TwNeedsConfig.class, this::onNeedsAssetsRemoved);
+        deferAssetSubscription(TameworkRuntimeModule.NEEDS, "needs-config-assets-loaded",
+                () -> getEventRegistry().register(LoadedAssetsEvent.class, TwNeedsConfig.class, this::onNeedsAssetsLoaded));
+        deferAssetSubscription(TameworkRuntimeModule.NEEDS, "needs-config-assets-removed",
+                () -> getEventRegistry().register(RemovedAssetsEvent.class, TwNeedsConfig.class, this::onNeedsAssetsRemoved));
         needsAssetsRegistered = true;
     }
 
@@ -2372,8 +2357,10 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwBreedingConfig::getId)
                         .build()
         );
-        getEventRegistry().register(LoadedAssetsEvent.class, TwBreedingConfig.class, this::onBreedingAssetsLoaded);
-        getEventRegistry().register(RemovedAssetsEvent.class, TwBreedingConfig.class, this::onBreedingAssetsRemoved);
+        deferAssetSubscription(TameworkRuntimeModule.BREEDING, "breeding-config-assets-loaded",
+                () -> getEventRegistry().register(LoadedAssetsEvent.class, TwBreedingConfig.class, this::onBreedingAssetsLoaded));
+        deferAssetSubscription(TameworkRuntimeModule.BREEDING, "breeding-config-assets-removed",
+                () -> getEventRegistry().register(RemovedAssetsEvent.class, TwBreedingConfig.class, this::onBreedingAssetsRemoved));
         breedingAssetsRegistered = true;
     }
 
@@ -2388,16 +2375,18 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwAttachmentMigrationConfig::getId)
                         .build()
         );
-        getEventRegistry().register(
-                LoadedAssetsEvent.class,
-                TwAttachmentMigrationConfig.class,
-                this::onAttachmentMigrationAssetsLoaded
-        );
-        getEventRegistry().register(
-                RemovedAssetsEvent.class,
-                TwAttachmentMigrationConfig.class,
-                this::onAttachmentMigrationAssetsRemoved
-        );
+        deferAssetSubscription(TameworkRuntimeModule.ATTACHMENTS, "attachment-migration-assets-loaded",
+                () -> getEventRegistry().register(
+                        LoadedAssetsEvent.class,
+                        TwAttachmentMigrationConfig.class,
+                        this::onAttachmentMigrationAssetsLoaded
+                ));
+        deferAssetSubscription(TameworkRuntimeModule.ATTACHMENTS, "attachment-migration-assets-removed",
+                () -> getEventRegistry().register(
+                        RemovedAssetsEvent.class,
+                        TwAttachmentMigrationConfig.class,
+                        this::onAttachmentMigrationAssetsRemoved
+                ));
         attachmentMigrationAssetsRegistered = true;
     }
 
@@ -2412,16 +2401,18 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwAttachmentDisplayConfig::getId)
                         .build()
         );
-        getEventRegistry().register(
-                LoadedAssetsEvent.class,
-                TwAttachmentDisplayConfig.class,
-                this::onAttachmentDisplayAssetsLoaded
-        );
-        getEventRegistry().register(
-                RemovedAssetsEvent.class,
-                TwAttachmentDisplayConfig.class,
-                this::onAttachmentDisplayAssetsRemoved
-        );
+        deferAssetSubscription(TameworkRuntimeModule.ATTACHMENTS, "attachment-display-assets-loaded",
+                () -> getEventRegistry().register(
+                        LoadedAssetsEvent.class,
+                        TwAttachmentDisplayConfig.class,
+                        this::onAttachmentDisplayAssetsLoaded
+                ));
+        deferAssetSubscription(TameworkRuntimeModule.ATTACHMENTS, "attachment-display-assets-removed",
+                () -> getEventRegistry().register(
+                        RemovedAssetsEvent.class,
+                        TwAttachmentDisplayConfig.class,
+                        this::onAttachmentDisplayAssetsRemoved
+                ));
         attachmentDisplayAssetsRegistered = true;
     }
 
@@ -2436,16 +2427,18 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwDynamicAttachmentsConfig::getId)
                         .build()
         );
-        getEventRegistry().register(
-                LoadedAssetsEvent.class,
-                TwDynamicAttachmentsConfig.class,
-                this::onDynamicAttachmentsAssetsLoaded
-        );
-        getEventRegistry().register(
-                RemovedAssetsEvent.class,
-                TwDynamicAttachmentsConfig.class,
-                this::onDynamicAttachmentsAssetsRemoved
-        );
+        deferAssetSubscription(TameworkRuntimeModule.ATTACHMENTS, "dynamic-attachments-assets-loaded",
+                () -> getEventRegistry().register(
+                        LoadedAssetsEvent.class,
+                        TwDynamicAttachmentsConfig.class,
+                        this::onDynamicAttachmentsAssetsLoaded
+                ));
+        deferAssetSubscription(TameworkRuntimeModule.ATTACHMENTS, "dynamic-attachments-assets-removed",
+                () -> getEventRegistry().register(
+                        RemovedAssetsEvent.class,
+                        TwDynamicAttachmentsConfig.class,
+                        this::onDynamicAttachmentsAssetsRemoved
+                ));
         dynamicAttachmentsAssetsRegistered = true;
     }
 
@@ -2460,16 +2453,18 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwCompanionMovementConfig::getId)
                         .build()
         );
-        getEventRegistry().register(
-                LoadedAssetsEvent.class,
-                TwCompanionMovementConfig.class,
-                this::onCompanionMovementAssetsLoaded
-        );
-        getEventRegistry().register(
-                RemovedAssetsEvent.class,
-                TwCompanionMovementConfig.class,
-                this::onCompanionMovementAssetsRemoved
-        );
+        deferAssetSubscription(TameworkRuntimeModule.COMPANION_MOVEMENT, "companion-movement-assets-loaded",
+                () -> getEventRegistry().register(
+                        LoadedAssetsEvent.class,
+                        TwCompanionMovementConfig.class,
+                        this::onCompanionMovementAssetsLoaded
+                ));
+        deferAssetSubscription(TameworkRuntimeModule.COMPANION_MOVEMENT, "companion-movement-assets-removed",
+                () -> getEventRegistry().register(
+                        RemovedAssetsEvent.class,
+                        TwCompanionMovementConfig.class,
+                        this::onCompanionMovementAssetsRemoved
+                ));
         companionMovementAssetsRegistered = true;
     }
 
@@ -2484,8 +2479,10 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwLevelingConfig::getId)
                         .build()
         );
-        getEventRegistry().register(LoadedAssetsEvent.class, TwLevelingConfig.class, this::onLevelingAssetsLoaded);
-        getEventRegistry().register(RemovedAssetsEvent.class, TwLevelingConfig.class, this::onLevelingAssetsRemoved);
+        deferAssetSubscription(TameworkRuntimeModule.LEVELING, "leveling-config-assets-loaded",
+                () -> getEventRegistry().register(LoadedAssetsEvent.class, TwLevelingConfig.class, this::onLevelingAssetsLoaded));
+        deferAssetSubscription(TameworkRuntimeModule.LEVELING, "leveling-config-assets-removed",
+                () -> getEventRegistry().register(RemovedAssetsEvent.class, TwLevelingConfig.class, this::onLevelingAssetsRemoved));
         levelingAssetsRegistered = true;
     }
 
@@ -2500,8 +2497,10 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwTraitConfig::getId)
                         .build()
         );
-        getEventRegistry().register(LoadedAssetsEvent.class, TwTraitConfig.class, this::onTraitAssetsLoaded);
-        getEventRegistry().register(RemovedAssetsEvent.class, TwTraitConfig.class, this::onTraitAssetsRemoved);
+        deferAssetSubscription(TameworkRuntimeModule.TRAITS, "trait-config-assets-loaded",
+                () -> getEventRegistry().register(LoadedAssetsEvent.class, TwTraitConfig.class, this::onTraitAssetsLoaded));
+        deferAssetSubscription(TameworkRuntimeModule.TRAITS, "trait-config-assets-removed",
+                () -> getEventRegistry().register(RemovedAssetsEvent.class, TwTraitConfig.class, this::onTraitAssetsRemoved));
         traitAssetsRegistered = true;
     }
 
@@ -2516,8 +2515,10 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwTalentConfig::getId)
                         .build()
         );
-        getEventRegistry().register(LoadedAssetsEvent.class, TwTalentConfig.class, this::onTalentAssetsLoaded);
-        getEventRegistry().register(RemovedAssetsEvent.class, TwTalentConfig.class, this::onTalentAssetsRemoved);
+        deferAssetSubscription(TameworkRuntimeModule.TALENTS, "talent-config-assets-loaded",
+                () -> getEventRegistry().register(LoadedAssetsEvent.class, TwTalentConfig.class, this::onTalentAssetsLoaded));
+        deferAssetSubscription(TameworkRuntimeModule.TALENTS, "talent-config-assets-removed",
+                () -> getEventRegistry().register(RemovedAssetsEvent.class, TwTalentConfig.class, this::onTalentAssetsRemoved));
         talentAssetsRegistered = true;
     }
 
@@ -2532,8 +2533,10 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwDebugConfig::getId)
                         .build()
         );
-        getEventRegistry().register(LoadedAssetsEvent.class, TwDebugConfig.class, this::onDebugAssetsLoaded);
-        getEventRegistry().register(RemovedAssetsEvent.class, TwDebugConfig.class, this::onDebugAssetsRemoved);
+        deferAssetSubscription(TameworkRuntimeModule.DEBUG_SELF_TEST, "debug-config-assets-loaded",
+                () -> getEventRegistry().register(LoadedAssetsEvent.class, TwDebugConfig.class, this::onDebugAssetsLoaded));
+        deferAssetSubscription(TameworkRuntimeModule.DEBUG_SELF_TEST, "debug-config-assets-removed",
+                () -> getEventRegistry().register(RemovedAssetsEvent.class, TwDebugConfig.class, this::onDebugAssetsRemoved));
         debugAssetsRegistered = true;
     }
 
@@ -2623,21 +2626,17 @@ public class Tamework extends JavaPlugin {
         reconcileTranquilizerRecipeVisibility();
     }
 
-    private void onCraftingRecipeAssetsLoaded(
-            LoadedAssetsEvent<String, CraftingRecipe, DefaultAssetMap<String, CraftingRecipe>> event) {
+    private void onCaptureCraftingRecipeAssetsChanged() {
         if (deferGlobalReconcileIfSuppressed()) {
             return;
         }
         reconcileTranquilizerRecipeVisibility();
-        reconcileFeedTroughWaterChargeDroplistCompat();
     }
 
-    private void onCraftingRecipeAssetsRemoved(
-            RemovedAssetsEvent<String, CraftingRecipe, DefaultAssetMap<String, CraftingRecipe>> event) {
+    private void onFoodCraftingRecipeAssetsChanged() {
         if (deferGlobalReconcileIfSuppressed()) {
             return;
         }
-        reconcileTranquilizerRecipeVisibility();
         reconcileFeedTroughWaterChargeDroplistCompat();
     }
 
@@ -3587,7 +3586,7 @@ public class Tamework extends JavaPlugin {
     }
 
     @Nullable
-    private ComponentType<EntityStore, NPCMountComponent> resolveNpcMountComponentTypeOrNull() {
+    ComponentType<EntityStore, NPCMountComponent> resolveNpcMountComponentTypeOrNull() {
         try {
             return NPCMountComponent.getComponentType();
         } catch (Throwable throwable) {
@@ -3596,7 +3595,7 @@ public class Tamework extends JavaPlugin {
     }
 
     @Nullable
-    private ComponentType<EntityStore, MountedComponent> resolveMountedComponentTypeOrNull() {
+    ComponentType<EntityStore, MountedComponent> resolveMountedComponentTypeOrNull() {
         try {
             return MountedComponent.getComponentType();
         } catch (Throwable throwable) {

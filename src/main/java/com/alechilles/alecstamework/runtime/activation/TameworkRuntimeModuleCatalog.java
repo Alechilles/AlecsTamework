@@ -62,7 +62,7 @@ public final class TameworkRuntimeModuleCatalog {
 
         return new TameworkRuntimeModuleCatalog(List.of(
                 TameworkRuntimeModuleDescriptor.of(core),
-                TameworkRuntimeModuleDescriptor.of(interactions, core),
+                TameworkRuntimeModuleDescriptor.of(interactions, core, persistence),
                 TameworkRuntimeModuleDescriptor.of(
                         TameworkRuntimeModule.CAPTURE,
                         core,
@@ -113,7 +113,7 @@ public final class TameworkRuntimeModuleCatalog {
                         food,
                         happiness
                 ),
-                TameworkRuntimeModuleDescriptor.of(leveling, core),
+                TameworkRuntimeModuleDescriptor.of(leveling, core, persistence),
                 TameworkRuntimeModuleDescriptor.of(
                         TameworkRuntimeModule.TRAITS,
                         core,

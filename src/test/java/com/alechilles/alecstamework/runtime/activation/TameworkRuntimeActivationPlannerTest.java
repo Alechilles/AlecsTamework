@@ -135,6 +135,26 @@ class TameworkRuntimeActivationPlannerTest {
     }
 
     @Test
+    void aConditionalRequirementDoesNotWakeDormantPersistence() {
+        TameworkRuntimeModule module = TameworkRuntimeModule.of("test-persistence");
+        TameworkRuntimeModuleCatalog catalog = new TameworkRuntimeModuleCatalog(List.of(
+                TameworkRuntimeModuleDescriptor.of(module)
+        ));
+        TameworkRuntimeActivationPlanner planner = new TameworkRuntimeActivationPlanner(catalog);
+
+        TameworkRuntimeActivationPlan dormant = planner.plan(TameworkActivationEvidence.builder()
+                .requiredCapability(module, "persistence-writable")
+                .build());
+        TameworkRuntimeActivationPlan readOnly = planner.plan(TameworkActivationEvidence.builder()
+                .content(module, "animal-profile")
+                .requiredCapability(module, "persistence-writable")
+                .build());
+
+        assertEquals(TameworkRuntimeActivationPlan.ModuleState.DORMANT, dormant.state(module));
+        assertEquals(TameworkRuntimeActivationPlan.ModuleState.UNAVAILABLE, readOnly.state(module));
+    }
+
+    @Test
     void unavailableRootDoesNotKeepAnOrphanDependencyActive() {
         TameworkRuntimeModule orphan = TameworkRuntimeModule.of("test-orphan-dependency");
         TameworkRuntimeModule root = TameworkRuntimeModule.of("test-unavailable-root");

@@ -14,6 +14,13 @@ import java.util.Objects;
 public final class TameworkAssetActivationEvidenceCollector {
     /** Collects direct content evidence from one immutable fact sequence. */
     public TameworkActivationEvidence collect(Iterable<? extends TameworkEffectiveAssetFact> facts) {
+        return collectBuilder(facts).build();
+    }
+
+    /** Collects facts into a builder so setup-only request evidence can merge. */
+    public TameworkActivationEvidence.Builder collectBuilder(
+            Iterable<? extends TameworkEffectiveAssetFact> facts
+    ) {
         Objects.requireNonNull(facts, "Effective asset facts are required");
         List<TameworkEffectiveAssetFact> ordered = new ArrayList<>();
         for (TameworkEffectiveAssetFact fact : facts) {
@@ -28,6 +35,6 @@ public final class TameworkAssetActivationEvidenceCollector {
                 evidence.content(fact.module(), fact.source());
             }
         }
-        return evidence.build();
+        return evidence;
     }
 }

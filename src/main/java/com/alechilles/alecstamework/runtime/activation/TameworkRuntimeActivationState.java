@@ -18,13 +18,31 @@ public final class TameworkRuntimeActivationState {
     private final TameworkRuntimeDiagnostics diagnostics;
 
     private TameworkRuntimeActivationState(TameworkRuntimeActivationPlan plan) {
+        this(plan, new TameworkRuntimeDiagnostics(plan));
+    }
+
+    private TameworkRuntimeActivationState(
+            TameworkRuntimeActivationPlan plan,
+            TameworkRuntimeDiagnostics diagnostics
+    ) {
         this.plan = Objects.requireNonNull(plan, "Activation plan is required");
-        this.diagnostics = new TameworkRuntimeDiagnostics(plan);
+        this.diagnostics = Objects.requireNonNull(diagnostics, "Runtime diagnostics are required");
+        if (!plan.topologyFingerprint().equals(diagnostics.topologyFingerprint())) {
+            throw new IllegalArgumentException("Runtime diagnostics topology does not match the plan");
+        }
     }
 
     /** Creates one immutable activation state for the supplied plan. */
     public static TameworkRuntimeActivationState of(TameworkRuntimeActivationPlan plan) {
         return new TameworkRuntimeActivationState(plan);
+    }
+
+    /** Creates a state that retains counters collected during registration. */
+    public static TameworkRuntimeActivationState of(
+            TameworkRuntimeActivationPlan plan,
+            TameworkRuntimeDiagnostics diagnostics
+    ) {
+        return new TameworkRuntimeActivationState(plan, diagnostics);
     }
 
     /** Publishes a complete state atomically and returns the published value. */
