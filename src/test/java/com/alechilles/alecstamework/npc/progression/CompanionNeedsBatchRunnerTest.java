@@ -207,4 +207,27 @@ class CompanionNeedsBatchRunnerTest {
         assertFalse(result.hasRemainingDue());
         assertEquals(0, updates.get());
     }
+
+    @Test
+    void futureDueMembershipDoesNotResolveEntitiesOrDispatch() {
+        CompanionNeedsRuntimeRegistry.WorldState state =
+                CompanionNeedsRuntimeRegistry.newStateForTests();
+        for (int i = 0; i < 10_000; i++) {
+            state.register(new UUID(0L, i + 1L), 1_000_000L);
+        }
+        AtomicInteger entityResolutions = new AtomicInteger();
+        AtomicInteger dispatches = new AtomicInteger();
+
+        CompanionNeedsDispatchPolicy.Decision decision =
+                CompanionNeedsDispatchPolicy.decide(state, 0L);
+        if (decision == CompanionNeedsDispatchPolicy.Decision.DISPATCH) {
+            dispatches.incrementAndGet();
+            entityResolutions.incrementAndGet();
+        }
+
+        assertEquals(CompanionNeedsDispatchPolicy.Decision.IDLE, decision);
+        assertEquals(0, entityResolutions.get());
+        assertEquals(0, dispatches.get());
+        assertFalse(state.isDispatchPending());
+    }
 }

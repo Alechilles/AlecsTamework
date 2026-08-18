@@ -2,6 +2,8 @@ package com.alechilles.alecstamework;
 
 import com.alechilles.alecstamework.avatarflight.*;
 import com.alechilles.alecstamework.debug.PlayerInputDebugSystem;
+import com.alechilles.alecstamework.npc.progression.CompanionNeedsBatchRunner;
+import com.alechilles.alecstamework.npc.progression.CompanionNeedsRuntimeRegistry;
 import com.alechilles.alecstamework.npc.systems.*;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationEntitySystem;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationOwnerChangeSystem;
@@ -183,6 +185,8 @@ public final class TameworkCompanionRuntimeParticipants {
             Tamework plugin,
             TameworkRuntimeParticipantRegistry participants
     ) {
+        CompanionNeedsRuntimeRegistry needsRegistry = new CompanionNeedsRuntimeRegistry();
+        CompanionNeedsBatchRunner needsRunner = new CompanionNeedsBatchRunner();
         participants.entitySystem(TameworkRuntimeModule.DEBUG_SELF_TEST, "npcdebugdisplayresumeonloadsystem",
                 () -> new NpcDebugDisplayResumeOnLoadSystem(NPCEntity.getComponentType()));
         participants.entitySystem(TameworkRuntimeModule.TRAITS, "companiontraitstatsyncsystem",
@@ -226,8 +230,14 @@ public final class TameworkCompanionRuntimeParticipants {
                         plugin.getTamedComponentType(), plugin.getOwnerComponentType(),
                         plugin.resolveOptionalSpawnMarkerReferenceComponentType(),
                         plugin.resolveOptionalSpawnBeaconReferenceComponentType(), UUIDComponent.getComponentType()));
+        participants.entitySystem(TameworkRuntimeModule.NEEDS, "companionneedslifecyclesystem",
+                () -> new CompanionNeedsLifecycleSystem(needsRegistry, NPCEntity.getComponentType(),
+                        plugin.getTamedComponentType()));
+        participants.entitySystem(TameworkRuntimeModule.NEEDS, "companionneedstamedchangesystem",
+                () -> new CompanionNeedsTamedChangeSystem(needsRegistry, NPCEntity.getComponentType(),
+                        plugin.getTamedComponentType()));
         participants.entitySystem(TameworkRuntimeModule.NEEDS, "companionneedssystem",
-                CompanionNeedsSystem::new);
+                () -> new CompanionNeedsSystem(needsRegistry, needsRunner));
         participants.entitySystem(TameworkRuntimeModule.BREEDING, "companionpassivebreedingsystem",
                 () -> new CompanionPassiveBreedingSystem(plugin.getBreedingPairAdmissionRegistry()));
     }
