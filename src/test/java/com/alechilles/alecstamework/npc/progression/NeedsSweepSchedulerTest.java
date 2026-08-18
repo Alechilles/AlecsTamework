@@ -86,4 +86,11 @@ class NeedsSweepSchedulerTest {
         assertFalse(outcome.suppressionActive());
         assertFalse(outcome.needsDamageActive());
     }
+
+    @Test
+    void missingConfigUsesThirtySecondRetry() {
+        CompanionNeedsScheduledUpdate.Outcome outcome = CompanionNeedsScheduledUpdate.retryOutcome();
+
+        assertEquals(30_000L, outcome.nextDelayMs());
+    }
 }

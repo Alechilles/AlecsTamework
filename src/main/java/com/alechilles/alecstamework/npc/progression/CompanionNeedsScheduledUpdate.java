@@ -44,13 +44,19 @@ public final class CompanionNeedsScheduledUpdate {
             return retryOutcome();
         }
 
-        long nextDelayMs = NeedsSweepIntervalPolicy.intervalMs(component, config, baseIntervalMs);
         boolean suppressionActive = CompanionNeedsService.requiresFrequentNaturalRegenSuppressionTick(
                 component,
                 config
         );
         boolean needsDamageActive = CompanionNeedsService.isNeedsDamageActive(npcRef, store, roleId);
-        return new Outcome(nextDelayMs, suppressionActive, needsDamageActive);
+        TwNeedsConfig.ValueSettings values = config.getValues();
+        return outcomeForRatios(
+                resolveRatio(component.getHunger(), values.getHungerMin(), values.getHungerMax()),
+                resolveRatio(component.getThirst(), values.getThirstMin(), values.getThirstMax()),
+                suppressionActive,
+                needsDamageActive,
+                baseIntervalMs
+        );
     }
 
     static Outcome outcomeForRatiosForTests(double hungerRatio,
@@ -58,6 +64,20 @@ public final class CompanionNeedsScheduledUpdate {
                                             boolean suppressionActive,
                                             boolean needsDamageActive,
                                             long baseIntervalMs) {
+        return outcomeForRatios(
+                hungerRatio,
+                thirstRatio,
+                suppressionActive,
+                needsDamageActive,
+                baseIntervalMs
+        );
+    }
+
+    static Outcome outcomeForRatios(double hungerRatio,
+                                    double thirstRatio,
+                                    boolean suppressionActive,
+                                    boolean needsDamageActive,
+                                    long baseIntervalMs) {
         long nextDelayMs = NeedsSweepIntervalPolicy.intervalMsForRatios(
                 hungerRatio,
                 thirstRatio,
@@ -67,8 +87,19 @@ public final class CompanionNeedsScheduledUpdate {
     }
 
     @Nonnull
-    private static Outcome retryOutcome() {
+    static Outcome retryOutcome() {
         return new Outcome(CONFIG_RETRY_DELAY_MS, false, false);
+    }
+
+    private static double resolveRatio(double value, double min, double max) {
+        if (!Double.isFinite(value) || !Double.isFinite(min) || !Double.isFinite(max) || max <= min) {
+            return 0.0;
+        }
+        double ratio = (value - min) / (max - min);
+        if (!Double.isFinite(ratio)) {
+            return 0.0;
+        }
+        return Math.max(0.0, Math.min(1.0, ratio));
     }
 
     /** The next delay and active state produced by one scheduled update. */
