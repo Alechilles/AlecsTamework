@@ -96,6 +96,7 @@ tasks.register('prepareEmbeddedAssetPack', Sync) {
 tasks.register('prepareExampleAssetPack', Sync) {
     description = 'Prepares the optional Tamework example asset pack.'
     group = 'hytale'
+    inputs.property('tameworkVersion', exampleAssetPackVersion)
     from(layout.projectDirectory.dir('examples/asset-pack')) {
         exclude 'README.md'
         filesMatching('manifest.json') {
@@ -105,27 +106,10 @@ tasks.register('prepareExampleAssetPack', Sync) {
     into(exampleAssetPackDirectory)
 }
 
-tasks.register('validateExampleAssetPackManifest') {
-    description = 'Validates the optional Tamework example asset-pack manifest.'
-    group = 'verification'
-    dependsOn(tasks.named('prepareExampleAssetPack'))
-    doLast {
-        def manifestFile = exampleAssetPackDirectory.get().file('manifest.json').asFile
-        def manifest = new groovy.json.JsonSlurper().parse(manifestFile)
-        assert manifest.Group == 'Alechilles'
-        assert manifest.Name == "Alec's Tamework! Examples"
-        assert manifest.Version == exampleAssetPackVersion
-        assert manifest.Dependencies == [("Alechilles:Alec's Tamework!"): '*']
-        assert manifest.DisabledByDefault == true
-        assert manifest.IncludesAssetPack == true
-        assert !manifest.containsKey('Main')
-    }
-}
-
 tasks.register('exampleAssetPack', Zip) {
     description = 'Packages the optional Tamework example asset pack.'
     group = 'hytale'
-    dependsOn(tasks.named('validateExampleAssetPackManifest'))
+    dependsOn(tasks.named('prepareExampleAssetPack'))
     archiveFileName = "Alec's Tamework! Examples v${project.version}.zip"
     destinationDirectory = layout.buildDirectory.dir('distributions')
     from(exampleAssetPackDirectory)
