@@ -405,74 +405,7 @@ public class Tamework extends JavaPlugin {
 
     @Override
     protected void setup() {
-        long startedAtNanos = System.nanoTime();
-        initializeCrashTelemetry();
-        try {
-            setupInternal();
-            int durationMs = telemetryEvents.elapsedMillis(startedAtNanos);
-            telemetryEvents.recordLifecycle(
-                    "plugin_setup",
-                    durationMs,
-                    true,
-                    TameworkTelemetryEvents.context()
-                            .subsystem("plugin")
-                            .phase("setup")
-                            .operation("setupInternal")
-                            .detail("Tamework setupInternal completed.")
-                            .build()
-            );
-            telemetryEvents.recordPerformance(
-                    "plugin_setup_duration",
-                    durationMs,
-                    (double) durationMs,
-                    TameworkTelemetryEvents.context()
-                            .subsystem("plugin")
-                            .phase("setup")
-                            .operation("setupInternal")
-                            .detail("Tamework plugin setup duration.")
-                            .build()
-            );
-            if (crashTelemetryService != null) {
-                crashTelemetryService.recordBreadcrumb("lifecycle", "Tamework setup completed.");
-            }
-        } catch (Throwable throwable) {
-            int durationMs = telemetryEvents.elapsedMillis(startedAtNanos);
-            telemetryEvents.recordLifecycle(
-                    "plugin_setup",
-                    durationMs,
-                    false,
-                    TameworkTelemetryEvents.context()
-                            .subsystem("plugin")
-                            .phase("setup")
-                            .operation("setupInternal")
-                            .detail("Tamework setupInternal failed.")
-                            .build()
-            );
-            telemetryEvents.recordPerformance(
-                    "plugin_setup_duration",
-                    durationMs,
-                    (double) durationMs,
-                    TameworkTelemetryEvents.context()
-                            .subsystem("plugin")
-                            .phase("setup")
-                            .operation("setupInternal")
-                            .detail("Failed Tamework plugin setup duration.")
-                            .detail("result", "failed")
-                            .build()
-            );
-            telemetryEvents.recordError(
-                    "plugin_setup_failed",
-                    throwable,
-                    TameworkTelemetryEvents.context()
-                            .subsystem("plugin")
-                            .phase("setup")
-                            .operation("setupInternal")
-                            .detail("Tamework setupInternal threw an exception.")
-                            .build()
-            );
-            captureSetupFailure(throwable);
-            throw throwable;
-        }
+        setupInternal();
     }
 
     private void setupInternal() {
@@ -552,7 +485,14 @@ public class Tamework extends JavaPlugin {
         registerTraitAssets();
         registerTalentAssets();
         registerDebugAssets();
-        CreditorIntegration.setup(this);
+        deferGlobalListener(
+                TameworkRuntimeModule.CORE_OWNERSHIP,
+                "creditor-integration",
+                () -> {
+                    CreditorIntegration.setup(this);
+                    CreditorIntegration.start(this);
+                }
+        );
         deferCraftingRecipeSubscriptions();
         deferAssetSubscription(
                 TameworkRuntimeModule.SPAWNER_ITEMS,
@@ -617,6 +557,7 @@ public class Tamework extends JavaPlugin {
         feedTroughWaterChargesComponentType = components.feedTroughWaterCharges();
 
         spawnMarkerEntityType = TameworkCompanionRuntimeParticipants.add(this, runtimeParticipants);
+        deferPersistenceIndependentRuntimeParticipants();
 
         runtimeServiceInitializer = () -> {
         if (runtimeStartupPlan == null) {
@@ -713,6 +654,11 @@ public class Tamework extends JavaPlugin {
                     genericPersistenceActivationEvidence
             );
             if (persistenceComposition == null) {
+                if (runtimeStartupPlan.isActive(TameworkRuntimeModule.GENERIC_PERSISTENCE)) {
+                    throw new IllegalStateException(
+                            "Active generic persistence returned no runtime composition"
+                    );
+                }
                 if (bondedCompanionComposition != null) {
                     activateBondedOnlyFallback(
                             new IllegalStateException("Generic persistence is dormant")
@@ -722,6 +668,13 @@ public class Tamework extends JavaPlugin {
             }
             runtimeStartupDiagnostics.recordDatabaseOpen(TameworkRuntimeModule.GENERIC_PERSISTENCE);
         } catch (RuntimeException genericStartupFailure) {
+            if (runtimeStartupPlan.isActive(TameworkRuntimeModule.GENERIC_PERSISTENCE)) {
+                closeBondedCompanions();
+                throw new IllegalStateException(
+                        "Required generic persistence failed during startup",
+                        genericStartupFailure
+                );
+            }
             if (spawnMarkerEntityType != null) {
                 deferEntitySystem(
                         TameworkRuntimeModule.CORE_OWNERSHIP,
@@ -800,24 +753,6 @@ public class Tamework extends JavaPlugin {
                 "capture-channel-vfx", CaptureChannelVfxSystem::new);
         deferEntitySystem(TameworkRuntimeModule.CAPTURE,
                 "capture-channel-session-cleanup", CaptureChannelSessionCleanupSystem::new);
-        deferEntitySystem(TameworkRuntimeModule.SCARECROWS,
-                "scarecrow-block-placed", ScarecrowBlockEventSystems.Placed::new);
-        deferEntitySystem(TameworkRuntimeModule.SCARECROWS,
-                "scarecrow-block-broken", ScarecrowBlockEventSystems.Broken::new);
-        deferEntitySystem(TameworkRuntimeModule.AVATAR_FLIGHT,
-                "avatar-flight-source-recovery", () -> new AvatarFlightSourceRecoverySystem(
-                        avatarFlightSourceComponentType,
-                        avatarFlightMountSessionComponentType,
-                        UUIDComponent.getComponentType(),
-                        DeathComponent.getComponentType()
-                )
-        );
-        deferEntitySystem(TameworkRuntimeModule.AVATAR_FLIGHT,
-                "avatar-flight-source-visibility", () -> new AvatarFlightSourceVisibilitySystem(
-                        avatarFlightSourceComponentType,
-                        EntityTrackerSystems.EntityViewer.getComponentType()
-                )
-        );
         SimpleClaimsTamedDamagePolicy damagePolicy =
                 new SimpleClaimsTamedDamagePolicy(simpleClaimsCapabilityRuntime);
         apiComposition = ReplacementTameworkApiFactory.compose(
@@ -867,58 +802,6 @@ public class Tamework extends JavaPlugin {
                         persistenceComposition.directLiveCoopProjections()
                 )
         );
-        deferChunkSystem(TameworkRuntimeModule.FOOD,
-                "feed-trough-food-state-sync", FeedTroughFoodStateSyncSystem::new);
-
-        // Damage event is needed for owner damage filtering; register it with the damage module.
-        deferEntityEventType(TameworkRuntimeModule.DAMAGE_PROJECTILES, "damage-event-type", Damage.class);
-
-        // Register damage filter system (configurable owner protection).
-        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
-                "damage-target-memory", DamageTargetMemorySystem::new);
-        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
-                "tranquilized-sleep-animation-restore", TranquilizedSleepAnimationRestoreSystem::new);
-        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
-                "respawn-fall-damage-grace", RespawnFallDamageGraceSystem::new);
-        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
-                "expiry-dismount-fall-damage-protection", ExpiryDismountFallDamageProtectionSystem::new);
-        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
-                "expiry-dismount-landing-protection", ExpiryDismountLandingProtectionSystem::new);
-        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
-                "owner-damage-filter", () -> new OwnerDamageFilterSystem(getLogger(), damagePolicy));
-        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
-                "trait-damage-modifier", TraitDamageModifierSystem::new);
-        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
-                "companion-happiness-damage-impulse", CompanionHappinessDamageImpulseSystem::new);
-        deferEntitySystem(TameworkRuntimeModule.LEVELING,
-                "companion-combat-experience", CompanionCombatExperienceSystem::new);
-        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
-                "projectile-impact-effect", () -> new TameworkProjectileImpactEffectSystem(
-                        projectileImpactEffectComponentType,
-                        com.hypixel.hytale.server.core.entity.entities.ProjectileComponent.getComponentType(),
-                        com.hypixel.hytale.server.core.modules.entity.component.TransformComponent.getComponentType()
-                )
-        );
-        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
-                "lingering-hazard-projectile-spawn", () -> new TameworkLingeringHazardProjectileSpawnSystem(
-                        lingeringHazardProjectileComponentType,
-                        lingeringHazardComponentType,
-                        com.hypixel.hytale.server.core.entity.entities.ProjectileComponent.getComponentType(),
-                        com.hypixel.hytale.server.core.modules.entity.component.TransformComponent.getComponentType()
-                )
-        );
-        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
-                "lingering-hazard", () -> new TameworkLingeringHazardSystem(
-                        lingeringHazardComponentType,
-                        com.hypixel.hytale.server.core.modules.entity.component.TransformComponent.getComponentType()
-                )
-        );
-        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
-                "homing-visual-projectile", () -> new HomingVisualProjectileSystem(
-                        homingVisualProjectileComponentType,
-                        TransformComponent.getComponentType()
-                ));
-
         // Load item feature configs from bundled defaults and mod overrides.
         int loadedSpawner = loadSpawnerItemAssets();
         int loadedNaming = loadNameItemAssets();
@@ -1222,6 +1105,75 @@ public class Tamework extends JavaPlugin {
         };
     }
 
+    private void deferPersistenceIndependentRuntimeParticipants() {
+        deferEntitySystem(TameworkRuntimeModule.SCARECROWS,
+                "scarecrow-block-placed", ScarecrowBlockEventSystems.Placed::new);
+        deferEntitySystem(TameworkRuntimeModule.SCARECROWS,
+                "scarecrow-block-broken", ScarecrowBlockEventSystems.Broken::new);
+        deferEntitySystem(TameworkRuntimeModule.AVATAR_FLIGHT,
+                "avatar-flight-source-recovery", () -> new AvatarFlightSourceRecoverySystem(
+                        avatarFlightSourceComponentType,
+                        avatarFlightMountSessionComponentType,
+                        UUIDComponent.getComponentType(),
+                        DeathComponent.getComponentType()
+                ));
+        deferEntitySystem(TameworkRuntimeModule.AVATAR_FLIGHT,
+                "avatar-flight-source-visibility", () -> new AvatarFlightSourceVisibilitySystem(
+                        avatarFlightSourceComponentType,
+                        EntityTrackerSystems.EntityViewer.getComponentType()
+                ));
+        deferChunkSystem(TameworkRuntimeModule.FOOD,
+                "feed-trough-food-state-sync", FeedTroughFoodStateSyncSystem::new);
+        deferDamageRuntimeParticipants();
+    }
+
+    private void deferDamageRuntimeParticipants() {
+        deferEntityEventType(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "damage-event-type", Damage.class);
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "damage-target-memory", DamageTargetMemorySystem::new);
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "tranquilized-sleep-animation-restore", TranquilizedSleepAnimationRestoreSystem::new);
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "respawn-fall-damage-grace", RespawnFallDamageGraceSystem::new);
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "expiry-dismount-fall-damage-protection", ExpiryDismountFallDamageProtectionSystem::new);
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "expiry-dismount-landing-protection", ExpiryDismountLandingProtectionSystem::new);
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "owner-damage-filter", () -> new OwnerDamageFilterSystem(
+                        getLogger(), new SimpleClaimsTamedDamagePolicy(simpleClaimsCapabilityRuntime)));
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "trait-damage-modifier", TraitDamageModifierSystem::new);
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "companion-happiness-damage-impulse", CompanionHappinessDamageImpulseSystem::new);
+        deferEntitySystem(TameworkRuntimeModule.LEVELING,
+                "companion-combat-experience", CompanionCombatExperienceSystem::new);
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "projectile-impact-effect", () -> new TameworkProjectileImpactEffectSystem(
+                        projectileImpactEffectComponentType,
+                        com.hypixel.hytale.server.core.entity.entities.ProjectileComponent.getComponentType(),
+                        TransformComponent.getComponentType()
+                ));
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "lingering-hazard-projectile-spawn", () -> new TameworkLingeringHazardProjectileSpawnSystem(
+                        lingeringHazardProjectileComponentType,
+                        lingeringHazardComponentType,
+                        com.hypixel.hytale.server.core.entity.entities.ProjectileComponent.getComponentType(),
+                        TransformComponent.getComponentType()
+                ));
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "lingering-hazard", () -> new TameworkLingeringHazardSystem(
+                        lingeringHazardComponentType,
+                        TransformComponent.getComponentType()
+                ));
+        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "homing-visual-projectile", () -> new HomingVisualProjectileSystem(
+                        homingVisualProjectileComponentType,
+                        TransformComponent.getComponentType()
+                ));
+    }
+
     private void deferEntitySystem(
             TameworkRuntimeModule module,
             String participantId,
@@ -1365,6 +1317,9 @@ public class Tamework extends JavaPlugin {
 
     private void startInternal() {
         prepareRuntimeActivation();
+        if (runtimeStartupPlan.isActive(TameworkRuntimeModule.CORE_OWNERSHIP)) {
+            initializeCrashTelemetry();
+        }
         TameworkActiveAssetInitializer.initialize(
                 runtimeStartupPlan, populationGroupAssetRegistrar::initialize,
                 this::rebuildCapturePolicyIndex, this::rebuildBondedCompanionRosterIndex);
@@ -1377,7 +1332,6 @@ public class Tamework extends JavaPlugin {
         registerCommandRoot();
         if (runtimeStartupPlan.isActive(TameworkRuntimeModule.CORE_OWNERSHIP)) {
             OwnerPresenceTimelineService.get().seedOnlinePlayersFromUniverse();
-            CreditorIntegration.start(this);
             initializeOverridesForLoadedWorlds();
         }
         getLogger().at(Level.INFO).log("Alec's Tamework! has been enabled!");
@@ -1560,13 +1514,6 @@ public class Tamework extends JavaPlugin {
             getLogger().at(Level.WARNING).withCause(ex)
                     .log("Failed to initialize Tamework embedded telemetry; continuing without telemetry.");
         }
-    }
-
-    private void captureSetupFailure(@Nullable Throwable throwable) {
-        if (crashTelemetryService == null || throwable == null) {
-            return;
-        }
-        crashTelemetryService.captureSetupFailure(throwable);
     }
 
     private void captureStartFailure(@Nullable Throwable throwable) {
@@ -1792,6 +1739,10 @@ public class Tamework extends JavaPlugin {
     }
 
     public void endItemFeatureAssetReloadSuppression() {
+        endItemFeatureAssetReloadSuppression(true);
+    }
+
+    public void endItemFeatureAssetReloadSuppression(boolean applyPendingReload) {
         boolean shouldReload = false;
         synchronized (itemFeatureReloadSuppressionLock) {
             if (itemFeatureReloadSuppressionDepth > 0) {
@@ -1799,7 +1750,7 @@ public class Tamework extends JavaPlugin {
             }
             if (itemFeatureReloadSuppressionDepth == 0 && itemFeatureReloadPending) {
                 itemFeatureReloadPending = false;
-                shouldReload = true;
+                shouldReload = applyPendingReload;
             }
         }
         if (shouldReload) {

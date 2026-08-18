@@ -138,10 +138,14 @@ public final class TameworkRuntimeModuleCatalog {
                         TameworkRuntimeModule.DAMAGE_PROJECTILES,
                         core
                 ),
-                TameworkRuntimeModuleDescriptor.of(persistence, core),
                 TameworkRuntimeModuleDescriptor.of(
                         TameworkRuntimeModule.DORMANT_PERSISTENCE,
-                        persistence
+                        core
+                ),
+                TameworkRuntimeModuleDescriptor.of(
+                        persistence,
+                        core,
+                        TameworkRuntimeModule.DORMANT_PERSISTENCE
                 ),
                 TameworkRuntimeModuleDescriptor.of(
                         TameworkRuntimeModule.BONDED_PERSISTENCE,

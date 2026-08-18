@@ -39,6 +39,9 @@ public final class TameworkRuntimeActivationEvidenceSource {
         addRoleFact(facts, TameworkRuntimeModule.GENERIC_PERSISTENCE,
                 "Tamework/PopulationGroups", TwPopulationGroupConfig.getAssetMap(),
                 TwPopulationGroupConfig::isEnabled, config -> Arrays.asList(config.getRoleIds()));
+        addRoleFact(facts, TameworkRuntimeModule.BONDED_PERSISTENCE,
+                "Tamework/BondedCompanions/Rosters", TwBondedCompanionRosterConfig.getAssetMap(),
+                ignored -> true, config -> Arrays.asList(config.getAllowedRoles()));
         addItemConfigFact(facts, TameworkRuntimeModule.NAMING_ITEMS,
                 "Tamework/Items/Naming", TwNameItemConfig.getAssetMap(),
                 ignored -> true, config -> Collections.singletonList(config.getItemId()));
@@ -56,7 +59,11 @@ public final class TameworkRuntimeActivationEvidenceSource {
                 "Tamework/Mounts/Descent", TwMountedDescentConfig.getAssetMap(),
                 TwMountedDescentConfig::isEnabled,
                 config -> !config.getProfiles().isEmpty());
-        // Flight tuning is passive until a command or downstream capability uses it.
+        addItemFact(facts, TameworkRuntimeModule.AVATAR_FLIGHT,
+                "Item/Tamework_Flightmasters_Talisman", "Tamework_Flightmasters_Talisman");
+        addEnabledFact(facts, TameworkRuntimeModule.AVATAR_FLIGHT,
+                "Tamework/AvatarFlight", TwAvatarFlightConfig.getAssetMap(),
+                TwAvatarFlightConfig::isEnabled, ignored -> true);
         addRoleFact(facts, TameworkRuntimeModule.COMPANION_MOVEMENT,
                 "Tamework/CompanionMovement", TwCompanionMovementConfig.getAssetMap(),
                 TwCompanionMovementConfig::isEnabled, config -> Arrays.asList(config.getRoleIds()));
@@ -98,8 +105,14 @@ public final class TameworkRuntimeActivationEvidenceSource {
                 TwCoopConfig::isEnabled,
                 config -> config.getBlockTypeIds().length > 0
                         || config.getLifecycleRules().getAcceptedRoleIds().length > 0);
-        // Debug defaults are passive toggles. They do not justify starting the
-        // debug ECS systems or listeners on a normal server.
+        addItemFact(facts, TameworkRuntimeModule.SCARECROWS,
+                "Item/Tamework_Scarecrow", "Tamework_Scarecrow");
+        addItemFact(facts, TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "Item/Weapon_Arrow_Tranquilizer", "Weapon_Arrow_Tranquilizer");
+        addEnabledFact(facts, TameworkRuntimeModule.DEBUG_SELF_TEST,
+                "Tamework/Debug", TwDebugConfig.getAssetMap(),
+                TwDebugConfig::isEnabled,
+                TameworkRuntimeActivationEvidenceSource::usesDebugRuntimeSystems);
         if (HStatsServerUuidFile.readEnabledServerUuid(Path.of("hstats-server-uuid.txt")) != null) {
             facts.add(TameworkEffectiveAssetFact.of(
                     TameworkRuntimeModule.HSTATS, true, "hstats-server-uuid.txt",
@@ -137,6 +150,22 @@ public final class TameworkRuntimeActivationEvidenceSource {
         ));
     }
 
+    private static void addItemFact(
+            List<TameworkEffectiveAssetFact> facts,
+            TameworkRuntimeModule module,
+            String source,
+            String itemId
+    ) {
+        boolean exists = itemAssetExists(itemId);
+        facts.add(TameworkEffectiveAssetFact.of(
+                module,
+                exists,
+                source,
+                Set.of(),
+                exists ? Set.of(itemId) : Set.of()
+        ));
+    }
+
     private static <T extends JsonAsset<String>> void addEnabledFact(
             List<TameworkEffectiveAssetFact> facts,
             TameworkRuntimeModule module,
@@ -170,5 +199,12 @@ public final class TameworkRuntimeActivationEvidenceSource {
     private static boolean roleExists(String roleId) {
         NPCPlugin plugin = NPCPlugin.get();
         return plugin != null && plugin.getIndex(roleId) >= 0;
+    }
+
+    private static boolean usesDebugRuntimeSystems(TwDebugConfig config) {
+        TwDebugConfig.DebugCommandsSection commands = config.getDebugCommands();
+        return commands.isRide()
+                || commands.isFlyingCompanion()
+                || commands.isAvatarFlight();
     }
 }

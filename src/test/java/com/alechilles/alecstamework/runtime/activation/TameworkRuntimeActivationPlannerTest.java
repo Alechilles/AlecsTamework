@@ -60,6 +60,18 @@ class TameworkRuntimeActivationPlannerTest {
     }
 
     @Test
+    void genericPersistenceActivatesPositiveDormancyEvidenceBoundaries() {
+        TameworkRuntimeActivationPlan plan = new TameworkRuntimeActivationPlanner(
+                TameworkRuntimeModuleCatalog.standard()
+        ).plan(TameworkActivationEvidence.builder()
+                .content(TameworkRuntimeModule.GENERIC_PERSISTENCE, "capture-profile")
+                .build());
+
+        assertTrue(plan.isActive(TameworkRuntimeModule.GENERIC_PERSISTENCE));
+        assertTrue(plan.isActive(TameworkRuntimeModule.DORMANT_PERSISTENCE));
+    }
+
+    @Test
     void directEvidenceExpandsTheExactDependencyClosure() {
         TameworkRuntimeModule leaf = TameworkRuntimeModule.of("test-leaf");
         TameworkRuntimeModule dependency = TameworkRuntimeModule.of("test-dependency");
