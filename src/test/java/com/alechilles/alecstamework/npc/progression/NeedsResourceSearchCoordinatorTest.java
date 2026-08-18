@@ -15,6 +15,7 @@ import com.alechilles.alecstamework.performance.TameworkRuntimePressureService;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.component.TestEntityComponentStore;
+import java.util.AbstractList;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -290,6 +291,32 @@ class NeedsResourceSearchCoordinatorTest {
     }
 
     @Test
+    void changingItemIdListCannotSplitRequestAndAreaKeyIdentity() {
+        try (TestEntityComponentStore store = newStore()) {
+            coordinator.clear(store);
+            ChangingItemIds changingItemIds = new ChangingItemIds("Food_Beef", "Food_Wheat");
+            NeedsResourceSearchCoordinator.Request request = request(
+                    "food_container", 902, changingItemIds);
+            CountingExecutor executor = new CountingExecutor(hitSnapshot(1_500L));
+
+            assertEquals(List.of("food_beef"), request.itemIds());
+            assertEquals(request.itemIds(), request.areaKey().normalizedItemIds());
+            coordinator.lookupOrEnqueue(store, uuid(905), request, NOW_MS);
+            assertEquals(1, coordinator.processOne(store, 8L, NOW_MS, executor));
+            assertEquals(List.of("food_beef"), executor.requests().get(0).itemIds());
+
+            NeedsResourceSearchCoordinator.Request equivalent = request(
+                    "food_container", 902, List.of("FOOD_BEEF"));
+            NeedsResourceSearchCoordinator.Request different = request(
+                    "food_container", 902, List.of("FOOD_WHEAT"));
+            assertEquals(HIT, coordinator.lookupOrEnqueue(
+                    store, uuid(906), equivalent, NOW_MS + 1L).status());
+            assertEquals(DEFERRED, coordinator.lookupOrEnqueue(
+                    store, uuid(907), different, NOW_MS + 1L).status());
+        }
+    }
+
+    @Test
     void clearRemovesOnlyTheSelectedStoreState() {
         try (TestEntityComponentStore firstStore = newStore();
              TestEntityComponentStore secondStore = newStore()) {
@@ -416,6 +443,30 @@ class NeedsResourceSearchCoordinatorTest {
 
         private List<List<UUID>> waiters() {
             return List.copyOf(waiters);
+        }
+    }
+
+    private static final class ChangingItemIds extends AbstractList<String> {
+        private final String firstValue;
+        private final String secondValue;
+        private int reads;
+
+        private ChangingItemIds(String firstValue, String secondValue) {
+            this.firstValue = firstValue;
+            this.secondValue = secondValue;
+        }
+
+        @Override
+        public String get(int index) {
+            if (index != 0) {
+                throw new IndexOutOfBoundsException(index);
+            }
+            return reads++ == 0 ? firstValue : secondValue;
+        }
+
+        @Override
+        public int size() {
+            return 1;
         }
     }
 }

@@ -256,14 +256,13 @@ public final class NeedsResourceSearchCoordinator {
                         @Nonnull NeedsResourceAreaSearchCache.AreaKey areaKey,
                         double radius,
                         int verticalRadius,
-                        double consumeRadius,
-                        @Nonnull List<String> itemIds) {
+                        double consumeRadius) {
             this.resourceKind = normalizeResourceKind(resourceKind);
             this.areaKey = Objects.requireNonNull(areaKey, "areaKey");
             this.radius = requirePositiveFinite(radius, "radius");
             this.verticalRadius = Math.max(0, verticalRadius);
             this.consumeRadius = requireNonNegativeFinite(consumeRadius, "consumeRadius");
-            this.itemIds = NeedsResourceAreaSearchCache.AreaKey.normalizeItemIds(itemIds);
+            this.itemIds = areaKey.normalizedItemIds();
         }
 
         /**
@@ -299,8 +298,7 @@ public final class NeedsResourceSearchCoordinator {
                     areaKey,
                     radius,
                     verticalRadius,
-                    consumeRadius,
-                    itemIds
+                    consumeRadius
             );
         }
 
