@@ -53,9 +53,8 @@ public final class CompanionNeedsSystem extends TickingSystem<EntityStore> {
         if (world == null) {
             return;
         }
-        state.setDispatchPending(true);
         CompanionNeedsBatchRunner runner = batchRunner;
-        try {
+        CompanionNeedsDispatchPolicy.dispatchIfNeeded(state, nowMs, () -> {
             world.execute(() -> {
                 try {
                     runner.run(world, state, System.currentTimeMillis(), System::nanoTime);
@@ -63,9 +62,6 @@ public final class CompanionNeedsSystem extends TickingSystem<EntityStore> {
                     state.setDispatchPending(false);
                 }
             });
-        } catch (RuntimeException | Error failure) {
-            state.setDispatchPending(false);
-            throw failure;
-        }
+        });
     }
 }

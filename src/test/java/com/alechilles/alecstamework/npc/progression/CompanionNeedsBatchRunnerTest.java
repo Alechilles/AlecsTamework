@@ -217,15 +217,15 @@ class CompanionNeedsBatchRunnerTest {
         }
         AtomicInteger entityResolutions = new AtomicInteger();
         AtomicInteger dispatches = new AtomicInteger();
-
-        CompanionNeedsDispatchPolicy.Decision decision =
-                CompanionNeedsDispatchPolicy.decide(state, 0L);
-        if (decision == CompanionNeedsDispatchPolicy.Decision.DISPATCH) {
+        Runnable entityResolver = entityResolutions::incrementAndGet;
+        Runnable dispatcher = () -> {
             dispatches.incrementAndGet();
-            entityResolutions.incrementAndGet();
-        }
+            entityResolver.run();
+        };
 
-        assertEquals(CompanionNeedsDispatchPolicy.Decision.IDLE, decision);
+        boolean dispatched = CompanionNeedsDispatchPolicy.dispatchIfNeeded(state, 0L, dispatcher);
+
+        assertFalse(dispatched);
         assertEquals(0, entityResolutions.get());
         assertEquals(0, dispatches.get());
         assertFalse(state.isDispatchPending());

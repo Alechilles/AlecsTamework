@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-/** Regression coverage for the generation-safe companion needs due queue. */
+/** Regression coverage for the indexed companion needs due queue. */
 class CompanionNeedsScheduleTest {
     @Test
     void returnsNothingWhenNoNpcIsDue() {
@@ -43,7 +43,7 @@ class CompanionNeedsScheduleTest {
     }
 
     @Test
-    void ignoresOldHeapGenerationAfterRegistrationRefresh() {
+    void ignoresOldRegistrationAfterRefresh() {
         CompanionNeedsSchedule schedule = new CompanionNeedsSchedule();
         UUID npc = new UUID(5L, 6L);
         schedule.register(npc, 1_000L, 0L);

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.progression;
 
+import java.util.Objects;
 import javax.annotation.Nonnull;
 
 /**
@@ -23,6 +24,24 @@ public final class CompanionNeedsDispatchPolicy {
             return Decision.IDLE;
         }
         return Decision.DISPATCH;
+    }
+
+    /** Claims and invokes one dispatcher when the current state needs work. */
+    public static boolean dispatchIfNeeded(@Nonnull CompanionNeedsRuntimeRegistry.WorldState state,
+                                           long nowMs,
+                                           @Nonnull Runnable dispatcher) {
+        Objects.requireNonNull(dispatcher, "dispatcher");
+        if (decide(state, nowMs) != Decision.DISPATCH) {
+            return false;
+        }
+        state.setDispatchPending(true);
+        try {
+            dispatcher.run();
+            return true;
+        } catch (RuntimeException | Error failure) {
+            state.setDispatchPending(false);
+            throw failure;
+        }
     }
 
     /** Result of the O(1) dispatch check. */

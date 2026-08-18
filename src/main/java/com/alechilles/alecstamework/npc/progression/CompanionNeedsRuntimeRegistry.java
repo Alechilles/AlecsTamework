@@ -21,7 +21,7 @@ public final class CompanionNeedsRuntimeRegistry {
 
     private final StoreScopedState<WorldState> statesByStore = new StoreScopedState<>(WorldState::new);
 
-    /** Registers or refreshes one tamed companion in its store's schedule. */
+    /** Registers one tamed companion in its store's schedule. */
     public void register(@Nonnull Store<EntityStore> store, @Nonnull UUID npcId, long nowMs) {
         state(store).register(npcId, nowMs);
     }
@@ -60,10 +60,12 @@ public final class CompanionNeedsRuntimeRegistry {
         private final LinkedHashSet<UUID> suppressionIds = new LinkedHashSet<>();
         private boolean dispatchPending;
 
-        /** Registers or refreshes an NPC using deterministic initial jitter. */
+        /** Registers an NPC once using deterministic initial jitter. */
         public void register(@Nonnull UUID npcId, long nowMs) {
             Objects.requireNonNull(npcId, "npcId");
-            membership.add(npcId);
+            if (!membership.add(npcId)) {
+                return;
+            }
             long initialDelayMs = NeedsSweepScheduler.stableOffsetMs(npcId, BASE_SWEEP_INTERVAL_MS);
             schedule.register(npcId, nowMs, initialDelayMs);
         }

@@ -3,80 +3,73 @@ package com.alechilles.alecstamework.npc.progression;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.PriorityQueue;
+import java.util.TreeSet;
 import java.util.UUID;
 
 /**
- * Stores the next needs-update time for each companion in a generation-safe due queue.
+ * Stores the next needs-update time for each companion in an indexed ordered due queue.
  *
- * <p>Refreshing an entry leaves its old heap entry in place. The generation check removes that
- * stale entry when it reaches the head of the queue.
+ * <p>Each UUID has one entry in both indexes. Refresh and removal update the ordered set at the
+ * same time, so an idle head check never performs lazy stale-entry cleanup.
  */
 final class CompanionNeedsSchedule {
-    private final PriorityQueue<Entry> due = new PriorityQueue<>();
-    private final Map<UUID, State> states = new HashMap<>();
-    private long generationSequence;
+    private final TreeSet<Entry> due = new TreeSet<>();
+    private final Map<UUID, Entry> entriesByNpc = new HashMap<>();
+    private Entry firstDue;
 
     void register(UUID npcId, long nowMs, long initialDelayMs) {
         Objects.requireNonNull(npcId, "npcId");
-        long generation = nextGeneration();
         long dueAtMs = safeAdd(nowMs, Math.max(0L, initialDelayMs));
-        states.put(npcId, new State(generation, dueAtMs));
-        due.add(new Entry(npcId, generation, dueAtMs));
+        replace(npcId, dueAtMs);
     }
 
     void remove(UUID npcId) {
         Objects.requireNonNull(npcId, "npcId");
-        states.remove(npcId);
+        Entry existing = entriesByNpc.remove(npcId);
+        if (existing == null) {
+            return;
+        }
+        due.remove(existing);
+        if (existing == firstDue) {
+            firstDue = due.isEmpty() ? null : due.first();
+        }
     }
 
     UUID pollDue(long nowMs) {
-        discardStale();
-        Entry entry = due.peek();
+        Entry entry = firstDue;
         if (entry == null || entry.dueAtMs() > nowMs) {
             return null;
         }
-        due.poll();
-        states.remove(entry.npcId());
+        due.remove(entry);
+        entriesByNpc.remove(entry.npcId());
+        firstDue = due.isEmpty() ? null : due.first();
         return entry.npcId();
     }
 
     void reschedule(UUID npcId, long dueAtMs) {
         Objects.requireNonNull(npcId, "npcId");
-        long generation = nextGeneration();
-        states.put(npcId, new State(generation, dueAtMs));
-        due.add(new Entry(npcId, generation, dueAtMs));
+        replace(npcId, dueAtMs);
     }
 
     long nextDueAtMs() {
-        discardStale();
-        Entry entry = due.peek();
-        return entry == null ? 0L : entry.dueAtMs();
+        return firstDue == null ? 0L : firstDue.dueAtMs();
     }
 
     int size() {
-        return states.size();
+        return entriesByNpc.size();
     }
 
-    private long nextGeneration() {
-        return ++generationSequence;
-    }
-
-    private void discardStale() {
-        while (true) {
-            Entry entry = due.peek();
-            if (entry == null || isCurrent(entry)) {
-                return;
-            }
-            due.poll();
+    private void replace(UUID npcId, long dueAtMs) {
+        Entry existing = entriesByNpc.remove(npcId);
+        if (existing != null) {
+            due.remove(existing);
         }
-    }
-
-    private boolean isCurrent(Entry entry) {
-        State state = states.get(entry.npcId());
-        return state != null
-                && state.generation() == entry.generation()
-                && state.dueAtMs() == entry.dueAtMs();
+        Entry replacement = new Entry(npcId, dueAtMs);
+        entriesByNpc.put(npcId, replacement);
+        due.add(replacement);
+        if (existing == firstDue || firstDue == null || replacement.compareTo(firstDue) < 0) {
+            firstDue = due.first();
+        }
     }
 
     private static long safeAdd(long value, long increment) {
@@ -86,7 +79,7 @@ final class CompanionNeedsSchedule {
         return value + increment;
     }
 
-    private record Entry(UUID npcId, long generation, long dueAtMs) implements Comparable<Entry> {
+    private record Entry(UUID npcId, long dueAtMs) implements Comparable<Entry> {
         @Override
         public int compareTo(Entry other) {
             int dueComparison = Long.compare(dueAtMs, other.dueAtMs);
@@ -95,8 +88,5 @@ final class CompanionNeedsSchedule {
             }
             return npcId.compareTo(other.npcId);
         }
-    }
-
-    private record State(long generation, long dueAtMs) {
     }
 }
