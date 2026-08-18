@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.1.10 - Embedded Patchwork Telemetry Fix - 2026-08-18
+
+### Fixed
+
+- Updated the embedded Patchwork runtime to 1.3.3. Its packaged telemetry descriptor now declares
+  the Patchwork version and passive heartbeat capability, so player-ready discovery no longer logs
+  that the shaded Patchwork descriptor is incomplete.
+
 ## 3.1.9 - Companion Spawn Safety Hotfix - 2026-08-16
 
 ### Changed
