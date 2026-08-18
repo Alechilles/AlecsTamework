@@ -91,6 +91,46 @@ class NeedsResourceAreaSearchCacheTest {
     }
 
     @Test
+    void legacyBlockCenteredTargetRoundTripKeepsFractionalCoordinates() {
+        NeedsResourceAreaSearchCache cache = new NeedsResourceAreaSearchCache(16);
+        NeedsResourceAreaSearchCache.AreaKey key = NeedsResourceAreaSearchCache.AreaKey.from(
+                "world", "water", new Vector3d(10.0, 64.0, 10.0), 16.0, 2, 3.0, 0);
+        Vector3d target = new Vector3d(12.5, 64.5, 12.5);
+
+        cache.put(key, NeedsResourceAreaSearchCache.AreaSearchSnapshot.hit(target, 2.0, 1_500L), 1_000L);
+
+        NeedsResourceAreaSearchCache.AreaSearchSnapshot cached = cache.get(
+                key,
+                new Vector3d(10.0, 64.0, 10.0),
+                16.0,
+                2,
+                1_100L
+        );
+
+        assertNotSame(target, cached.target());
+        assertEquals(target.x, cached.target().x, 0.000001);
+        assertEquals(target.y, cached.target().y, 0.000001);
+        assertEquals(target.z, cached.target().z, 0.000001);
+    }
+
+    @Test
+    void selectionRejectsCandidateWhosePublishedCenterIsOutsideHorizontalRange() {
+        NeedsResourceCandidates.Snapshot snapshot = new NeedsResourceCandidates.Snapshot(
+                List.of(new NeedsResourceCandidates.Candidate(1, 64, 0, 2.0)),
+                true,
+                true,
+                1_500L
+        );
+
+        assertNull(snapshot.select(
+                new Vector3d(0.0, 64.0, 0.0),
+                1.1,
+                0,
+                candidate -> true
+        ));
+    }
+
+    @Test
     void nearbyPositionsShareAreaKeyWithoutNpcUuid() {
         NeedsResourceAreaSearchCache.AreaKey first = NeedsResourceAreaSearchCache.AreaKey.from(
                 "world", "water", new Vector3d(10.25, 64.0, 10.25), 16.0, 2, 3.0, 0);

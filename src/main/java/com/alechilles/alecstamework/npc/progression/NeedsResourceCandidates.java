@@ -61,12 +61,12 @@ final class NeedsResourceCandidates {
             double originBlockY = Math.floor(origin.y);
             int clampedVerticalRadius = Math.max(0, verticalRadius);
             for (Candidate candidate : candidates) {
-                double dx = candidate.x() - origin.x;
-                double dz = candidate.z() - origin.z;
+                double dx = (candidate.x() + 0.5) - origin.x;
+                double dz = (candidate.z() + 0.5) - origin.z;
                 if ((dx * dx) + (dz * dz) > radiusSquared + DISTANCE_EPSILON) {
                     continue;
                 }
-                if (Math.abs(candidate.y() - originBlockY) > clampedVerticalRadius) {
+                if (Math.abs(Math.floor(candidate.y() + 0.5) - originBlockY) > clampedVerticalRadius) {
                     continue;
                 }
                 if (accept.test(candidate)) {

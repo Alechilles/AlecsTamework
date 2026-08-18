@@ -51,6 +51,22 @@ final class NeedsResourceAreaSearchCache {
             return null;
         }
         NeedsResourceCandidates.Snapshot snapshot = cached.snapshot();
+        long remainingTtlMs = Math.max(1L, cached.expiresAtMs() - nowMs);
+        LegacyTargetCoordinates legacyTarget = cached.legacyTarget();
+        if (legacyTarget != null) {
+            if (!legacyTarget.isUsable(currentPosition, radius, verticalScanRadius)
+                    || snapshot.candidates().isEmpty()) {
+                return null;
+            }
+            NeedsResourceCandidates.Candidate candidate = snapshot.candidates().get(0);
+            return AreaSearchSnapshot.hit(
+                    new Vector3d(legacyTarget.x(), legacyTarget.y(), legacyTarget.z()),
+                    snapshot.foundSource(),
+                    snapshot.sourceInConsumeRange(),
+                    candidate.approachRadius(),
+                    remainingTtlMs
+            );
+        }
         NeedsResourceCandidates.Candidate candidate = snapshot.select(
                 currentPosition,
                 radius,
@@ -60,7 +76,6 @@ final class NeedsResourceAreaSearchCache {
         if (snapshot.hasCandidates() && candidate == null) {
             return null;
         }
-        long remainingTtlMs = Math.max(1L, cached.expiresAtMs() - nowMs);
         if (candidate == null) {
             return AreaSearchSnapshot.miss(
                     snapshot.foundSource(),
@@ -70,7 +85,7 @@ final class NeedsResourceAreaSearchCache {
             );
         }
         return AreaSearchSnapshot.hit(
-                new Vector3d(candidate.x(), candidate.y(), candidate.z()),
+                new Vector3d(candidate.x() + 0.5, candidate.y() + 0.5, candidate.z() + 0.5),
                 snapshot.foundSource(),
                 snapshot.sourceInConsumeRange(),
                 candidate.approachRadius(),
@@ -84,6 +99,13 @@ final class NeedsResourceAreaSearchCache {
     void put(@Nullable AreaKey key,
              @Nonnull NeedsResourceCandidates.Snapshot snapshot,
              long nowMs) {
+        putInternal(key, snapshot, nowMs, null);
+    }
+
+    private void putInternal(@Nullable AreaKey key,
+                             @Nonnull NeedsResourceCandidates.Snapshot snapshot,
+                             long nowMs,
+                             @Nullable LegacyTargetCoordinates legacyTarget) {
         if (key == null || !shouldShareResult(snapshot.hasCandidates(), snapshot.foundSource())) {
             return;
         }
@@ -91,7 +113,7 @@ final class NeedsResourceAreaSearchCache {
         if (entries.size() >= maxEntries) {
             return;
         }
-        entries.put(key, CachedAreaSearch.from(snapshot, nowMs));
+        entries.put(key, CachedAreaSearch.from(snapshot, nowMs, legacyTarget));
     }
 
     /**
@@ -99,7 +121,7 @@ final class NeedsResourceAreaSearchCache {
      */
     void put(@Nullable AreaKey key, @Nonnull AreaSearchSnapshot snapshot, long nowMs) {
         if (snapshot.target() == null) {
-            put(
+            putInternal(
                     key,
                     new NeedsResourceCandidates.Snapshot(
                             List.of(),
@@ -107,7 +129,8 @@ final class NeedsResourceAreaSearchCache {
                             snapshot.foundConsumableSourceInConsumeRange(),
                             snapshot.ttlMs()
                     ),
-                    nowMs
+                    nowMs,
+                    null
             );
             return;
         }
@@ -115,7 +138,7 @@ final class NeedsResourceAreaSearchCache {
         if (candidate == null) {
             return;
         }
-        put(
+        putInternal(
                 key,
                 new NeedsResourceCandidates.Snapshot(
                         List.of(candidate),
@@ -123,7 +146,8 @@ final class NeedsResourceAreaSearchCache {
                         snapshot.foundConsumableSourceInConsumeRange(),
                         snapshot.ttlMs()
                 ),
-                nowMs
+                nowMs,
+                new LegacyTargetCoordinates(snapshot.target().x(), snapshot.target().y(), snapshot.target().z())
         );
     }
 
@@ -186,6 +210,31 @@ final class NeedsResourceAreaSearchCache {
             return Integer.MAX_VALUE;
         }
         return (int) Math.floor(coordinate);
+    }
+
+    private record LegacyTargetCoordinates(double x, double y, double z) {
+        boolean isUsable(@Nullable Vector3d currentPosition,
+                         double radius,
+                         int verticalScanRadius) {
+            if (currentPosition == null
+                    || !Double.isFinite(currentPosition.x)
+                    || !Double.isFinite(currentPosition.y)
+                    || !Double.isFinite(currentPosition.z)
+                    || !Double.isFinite(x)
+                    || !Double.isFinite(y)
+                    || !Double.isFinite(z)
+                    || !Double.isFinite(radius)
+                    || radius <= 0.0) {
+                return false;
+            }
+            double dx = x - currentPosition.x;
+            double dz = z - currentPosition.z;
+            if ((dx * dx) + (dz * dz) > (radius * radius) + 0.000001) {
+                return false;
+            }
+            return Math.abs(Math.floor(y) - Math.floor(currentPosition.y))
+                    <= Math.max(0, verticalScanRadius);
+        }
     }
 
     record AreaKey(@Nonnull String worldName,
@@ -280,11 +329,20 @@ final class NeedsResourceAreaSearchCache {
     }
 
     private record CachedAreaSearch(@Nonnull NeedsResourceCandidates.Snapshot snapshot,
+                                    @Nullable LegacyTargetCoordinates legacyTarget,
                                     long expiresAtMs) {
         @Nonnull
         static CachedAreaSearch from(@Nonnull NeedsResourceCandidates.Snapshot snapshot, long nowMs) {
+            return from(snapshot, nowMs, null);
+        }
+
+        @Nonnull
+        static CachedAreaSearch from(@Nonnull NeedsResourceCandidates.Snapshot snapshot,
+                                     long nowMs,
+                                     @Nullable LegacyTargetCoordinates legacyTarget) {
             return new CachedAreaSearch(
                     snapshot,
+                    legacyTarget,
                     nowMs + Math.max(1L, snapshot.ttlMs())
             );
         }
