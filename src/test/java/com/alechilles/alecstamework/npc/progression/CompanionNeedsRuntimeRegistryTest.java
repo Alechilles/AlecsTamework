@@ -18,7 +18,8 @@ class CompanionNeedsRuntimeRegistryTest {
 
         state.remove(npc);
 
-        assertNull(state.schedule().pollDue(1_000L));
+        assertNull(state.schedule().pollDue(Long.MAX_VALUE));
+        assertFalse(state.membership().contains(npc));
         assertFalse(state.suppressionIds().contains(npc));
     }
 }
