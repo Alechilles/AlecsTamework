@@ -22,8 +22,15 @@ When extending spawner behavior, add logic to these service domains instead of c
 - `FilledItemId` (optional). The filled variant item id, if used.
 - `IconDefault` (optional). Default icon override used for filled items.
 - `TooltipMode` (optional, default `Additive`). Controls captured-spawner item description composition.
-  - `Additive`: appends Tamework lines (`Species`, `Gender`, and resolved attachments) to the base item description.
-  - `Replace`: writes only Tamework lines as the captured item description.
+  - `Additive`: keeps the base item description, adds a blank line, and then writes the Tamework tooltip.
+  - `Replace`: writes only the Tamework tooltip as the captured item description.
+
+The Tamework tooltip starts with a compact companion summary. It includes the saved name and species,
+an abbreviated color-coded gender when available, and the current and maximum level when progression
+metadata and its config are available. A Traits section shows each saved trait's player-facing name,
+current value, configured maximum possible value, and signed percentage relative to its default. Trait
+values fade from white toward green above the default and toward red below it. An Appearance section
+lists friendly attachment labels from `TwAttachmentDisplayConfig`.
 
 ## AllowedRoles
 Controls which NPC roles can be captured or spawned.

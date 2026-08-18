@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwAttachmentDisplayConfig;
+import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
+import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.npc.attachments.AttachmentDisplayResolver;
 import com.hypixel.hytale.server.core.Message;
@@ -14,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import org.bson.BsonBoolean;
 import org.bson.BsonDocument;
+import org.bson.BsonInt32;
 import org.bson.BsonString;
 import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
@@ -37,7 +40,10 @@ class SpawnerItemDisplayMetadataServiceTest {
         assertSame(stack, updated);
         assertNotNull(metadata);
         assertEquals("Fluffy (Mob_Cat)", metadata.getName().getAnsiMessage());
-        assertEquals("Base description\nSpecies: Mob_Cat", metadata.getDescription().getAnsiMessage());
+        assertEquals(
+                "Base description\n\nFluffy - Mob_Cat",
+                plainText(metadata.getDescription())
+        );
     }
 
     @Test
@@ -52,7 +58,7 @@ class SpawnerItemDisplayMetadataServiceTest {
         assertSame(stack, updated);
         assertNotNull(metadata);
         assertEquals("Fluffy (Mob_Cat)", metadata.getName().getAnsiMessage());
-        assertEquals("Species: Mob_Cat", metadata.getDescription().getAnsiMessage());
+        assertEquals("Fluffy - Mob_Cat", plainText(metadata.getDescription()));
     }
 
     @Test
@@ -72,7 +78,7 @@ class SpawnerItemDisplayMetadataServiceTest {
 
         assertNotNull(display);
         assertEquals("Bison", display.getName().getAnsiMessage());
-        assertEquals("Base description\nSpecies: Bison", display.getDescription().getAnsiMessage());
+        assertEquals("Base description\n\nBison", plainText(display.getDescription()));
     }
 
     @Test
@@ -105,8 +111,8 @@ class SpawnerItemDisplayMetadataServiceTest {
                 writer.metadata.getName().getAnsiMessage()
         );
         assertEquals(
-                "Base description\nSpecies: Black Wolf",
-                writer.metadata.getDescription().getAnsiMessage()
+                "Base description\n\nBlack Wolf",
+                plainText(writer.metadata.getDescription())
         );
     }
 
@@ -124,7 +130,7 @@ class SpawnerItemDisplayMetadataServiceTest {
 
         assertNotNull(display);
         assertEquals("Cat", display.getName().getAnsiMessage());
-        assertEquals("Species: Cat", display.getDescription().getAnsiMessage());
+        assertEquals("Cat", plainText(display.getDescription()));
     }
 
     @Test
@@ -143,7 +149,7 @@ class SpawnerItemDisplayMetadataServiceTest {
                 writer
         );
         BsonDocument metadata = capturedMetadata("Fluffy", "Mob_Cat", "Fluffy")
-                .append(TameworkMetadataKeys.LIFE_STAGE_GENDER, new BsonString("Female"))
+                .append(TameworkMetadataKeys.LIFE_STAGE_GENDER, new BsonString("Male"))
                 .append(TameworkMetadataKeys.CAPTURE_MODEL_ID, new BsonString("Model_Cat"))
                 .append(TameworkMetadataKeys.ATTACHMENTS, new BsonString("{\"BaseColor\":\"Black\"}"));
 
@@ -151,9 +157,79 @@ class SpawnerItemDisplayMetadataServiceTest {
                 stack(metadata),
                 config(ItemFeatureConfig.SpawnerTooltipMode.ADDITIVE)
         );
-        String description = writer.metadata.getDescription().getAnsiMessage();
+        String description = plainText(writer.metadata.getDescription());
 
-        assertEquals("Species: Mob_Cat\nGender: Female\nCoat: Black Coat", description);
+        assertEquals(
+                "Fluffy - Mob_Cat (M)\n\n-- Appearance --\nCoat: Black Coat",
+                description
+        );
+        assertEquals("#63A9FF", messageWithText(writer.metadata.getDescription(), "M").getColor());
+    }
+
+    @Test
+    void writesColoredProgressionSummaryTraitsAndAppearance() throws Exception {
+        TranslationRegistry translations = new TranslationRegistry();
+        CapturingDisplayMetadataWriter writer = new CapturingDisplayMetadataWriter();
+        TwTraitConfig traitConfig = traitConfig(
+                "Traits_Sheep",
+                trait("Trait_Size", "Size", 0.65, 1.0, 1.35),
+                trait("Trait_Temperament", "Temperament", 0.5, 1.0, 1.5)
+        );
+        TwLevelingConfig levelingConfig = levelingConfig("Levels_Sheep", 25);
+        SpawnerTooltipPresentationService presentation = new SpawnerTooltipPresentationService(
+                translations,
+                id -> traitConfig,
+                role -> traitConfig,
+                id -> levelingConfig,
+                role -> levelingConfig
+        );
+        SpawnerItemDisplayMetadataService service = new SpawnerItemDisplayMetadataService(
+                translations,
+                new AttachmentDisplayResolver(List.of(displayConfig(
+                        "Display_Sheep",
+                        0,
+                        true,
+                        entry("sheep", appliesTo(new String[] { "Mob_Sheep" }, null, null, null),
+                                set("Fleece", "Fleece", Map.of("White", "White")))
+                ))),
+                stack -> null,
+                writer,
+                presentation
+        );
+        BsonDocument metadata = capturedMetadata("Jane", "Mob_Sheep", "Jane")
+                .append(TameworkMetadataKeys.LIFE_STAGE_GENDER, new BsonString("Female"))
+                .append(TameworkMetadataKeys.LEVELING_CONFIG_ID, new BsonString("Levels_Sheep"))
+                .append(TameworkMetadataKeys.LEVELING_LEVEL, new BsonInt32(15))
+                .append(TameworkMetadataKeys.TRAITS_CONFIG_ID, new BsonString("Traits_Sheep"))
+                .append(TameworkMetadataKeys.TRAITS_VALUES, new BsonString(
+                        "[{\"id\":\"Trait_Size\",\"value\":1.1925},"
+                                + "{\"id\":\"Trait_Temperament\",\"value\":0.75}]"
+                ))
+                .append(TameworkMetadataKeys.ATTACHMENTS, new BsonString("{\"Fleece\":\"White\"}"));
+
+        service.applyCapturedDisplayMetadata(
+                stack(metadata),
+                config(ItemFeatureConfig.SpawnerTooltipMode.REPLACE)
+        );
+        Message description = writer.metadata.getDescription();
+
+        assertEquals(
+                "Jane - Mob_Sheep (F) - Level 15/25\n\n"
+                        + "-- Traits --\n"
+                        + "Size: 1.19/1.35 (+55%)\n"
+                        + "Temperament: 0.75/1.50 (-50%)\n\n"
+                        + "-- Appearance --\n"
+                        + "Fleece: White",
+                plainText(description)
+        );
+        assertEquals("#FF8FBD", messageWithText(description, "F").getColor());
+        assertEquals("#A2E8AE", messageWithText(description, "1.19").getColor());
+        assertEquals("#A2E8AE", messageWithText(description, "+55%").getColor());
+        assertEquals("#FFAEAE", messageWithText(description, "0.75").getColor());
+        assertEquals("#FFAEAE", messageWithText(description, "-50%").getColor());
+        assertEquals("#FFFFFF", messageWithText(description, "/1.35 (").getColor());
+        assertEquals("#F6C453", messageWithText(description, "-- Traits --").getColor());
+        assertEquals("#74D7E8", messageWithText(description, "-- Appearance --").getColor());
     }
 
     @Test
@@ -179,7 +255,7 @@ class SpawnerItemDisplayMetadataServiceTest {
                 config(ItemFeatureConfig.SpawnerTooltipMode.ADDITIVE)
         );
 
-        assertEquals("Species: Mob_Cat", writer.metadata.getDescription().getAnsiMessage());
+        assertEquals("Fluffy - Mob_Cat", plainText(writer.metadata.getDescription()));
     }
 
     @Test
@@ -324,6 +400,37 @@ class SpawnerItemDisplayMetadataServiceTest {
         return Map.of(setId, set);
     }
 
+    private static TwTraitConfig traitConfig(String id, TwTraitConfig.TraitDefinition... definitions)
+            throws Exception {
+        TwTraitConfig config = construct(TwTraitConfig.class);
+        setField(config, "id", id);
+        setField(config, "traits", definitions);
+        return config;
+    }
+
+    private static TwTraitConfig.TraitDefinition trait(String id,
+                                                       String displayName,
+                                                       double min,
+                                                       double defaultValue,
+                                                       double max) throws Exception {
+        TwTraitConfig.TraitDefinition definition = construct(TwTraitConfig.TraitDefinition.class);
+        setField(definition, "id", id);
+        setField(definition, "displayName", displayName);
+        setField(definition, "breedingMin", min);
+        setField(definition, "defaultValue", defaultValue);
+        setField(definition, "breedingMax", max);
+        return definition;
+    }
+
+    private static TwLevelingConfig levelingConfig(String id, int maxLevel) throws Exception {
+        TwLevelingConfig config = construct(TwLevelingConfig.class);
+        TwLevelingConfig.LevelSettings levels = construct(TwLevelingConfig.LevelSettings.class);
+        setField(levels, "maxLevel", maxLevel);
+        setField(config, "id", id);
+        setField(config, "levels", levels);
+        return config;
+    }
+
     private static <T> T construct(Class<T> type) throws Exception {
         Constructor<T> constructor = type.getDeclaredConstructor();
         constructor.setAccessible(true);
@@ -347,6 +454,46 @@ class SpawnerItemDisplayMetadataServiceTest {
         Field field = Unsafe.class.getDeclaredField("theUnsafe");
         field.setAccessible(true);
         return (Unsafe) field.get(null);
+    }
+
+    private static String plainText(Message message) {
+        if (message == null) {
+            return "";
+        }
+        StringBuilder text = new StringBuilder();
+        if (message.getRawText() != null) {
+            text.append(message.getRawText());
+        }
+        for (Message child : message.getChildren()) {
+            text.append(plainText(child));
+        }
+        return text.toString();
+    }
+
+    private static Message messageWithText(Message message, String expectedText) {
+        if (expectedText.equals(message.getRawText())) {
+            return message;
+        }
+        for (Message child : message.getChildren()) {
+            Message match = messageWithTextOrNull(child, expectedText);
+            if (match != null) {
+                return match;
+            }
+        }
+        throw new AssertionError("No message segment found for text: " + expectedText);
+    }
+
+    private static Message messageWithTextOrNull(Message message, String expectedText) {
+        if (expectedText.equals(message.getRawText())) {
+            return message;
+        }
+        for (Message child : message.getChildren()) {
+            Message match = messageWithTextOrNull(child, expectedText);
+            if (match != null) {
+                return match;
+            }
+        }
+        return null;
     }
 
     private static final class CapturingDisplayMetadataWriter

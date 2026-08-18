@@ -2,6 +2,12 @@
 
 ## 3.1.10 - Embedded Patchwork Telemetry Fix - 2026-08-18
 
+### Changed
+
+- Captured spawner tooltips now show a compact companion summary, level and maximum level, trait
+  names with color-coded values, and a separate appearance section. Gender markers use pink
+  for female companions and blue for male companions.
+
 ### Fixed
 
 - Fixed water buckets placing water above feed troughs instead of filling them when a Creative

@@ -164,8 +164,18 @@ Runtime icon lookup checks exact role overrides first, then the first matching s
 Controls how captured-spawner item display metadata composes the base item description and Tamework detail lines.
 
 Accepted values:
-- `Additive`: append Tamework lines such as `Species`, `Gender`, and friendly attachment names from `TwAttachmentDisplayConfig`
+- `Additive`: keep the base item description, add a blank line, and then append the Tamework tooltip
 - `Replace`: replace the base description text with Tamework captured-spawner output
+
+The Tamework output starts with a compact companion summary. When the saved data is available, it
+includes the companion name, species, abbreviated gender, current level, and maximum level. Female
+markers are pink and male markers are blue.
+
+Saved traits appear under a gold Traits header. Each row uses the trait's configured display name and
+shows the current value, configured maximum possible value, and signed percentage relative to the
+default. Values above the default fade from white toward green. Values below the default fade from
+white toward red. Friendly attachment choices from `TwAttachmentDisplayConfig` appear under a cyan
+Appearance header.
 
 ## Defaults and Cross-System Notes
 - The sample asset is in the optional pack at
