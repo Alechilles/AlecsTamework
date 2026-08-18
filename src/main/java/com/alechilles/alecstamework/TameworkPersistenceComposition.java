@@ -67,6 +67,7 @@ import com.alechilles.alecstamework.runtime.activation
         .TameworkRuntimeActivationPlan;
 import com.alechilles.alecstamework.runtime.activation
         .TameworkRuntimeModule;
+import com.alechilles.alecstamework.runtime.TameworkRuntimeParticipantRegistry;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.universe.world.events.AllWorldsLoadedEvent;
@@ -166,6 +167,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 commandItems,
                 populationGroups,
                 null,
+                null,
                 null
         );
     }
@@ -186,7 +188,8 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             @Nonnull CommandItemRegistry commandItems,
             @Nonnull PopulationGroupConfigRegistry populationGroups,
             @Nonnull TameworkRuntimeActivationPlan activationPlan,
-            @Nonnull TameworkPersistenceActivationEvidence activationEvidence
+            @Nonnull TameworkPersistenceActivationEvidence activationEvidence,
+            @Nonnull TameworkRuntimeParticipantRegistry runtimeParticipants
     ) {
         if (!TameworkPersistenceActivationGate.shouldConstruct(
                 activationPlan,
@@ -203,7 +206,8 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 commandItems,
                 populationGroups,
                 activationPlan,
-                activationEvidence
+                activationEvidence,
+                runtimeParticipants
         );
     }
 
@@ -215,7 +219,8 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             @Nonnull CommandItemRegistry commandItems,
             @Nonnull PopulationGroupConfigRegistry populationGroups,
             @Nullable TameworkRuntimeActivationPlan activationPlan,
-            @Nullable TameworkPersistenceActivationEvidence activationEvidence
+            @Nullable TameworkPersistenceActivationEvidence activationEvidence,
+            @Nullable TameworkRuntimeParticipantRegistry runtimeParticipants
     ) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(components, "components");
@@ -240,41 +245,45 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 commandItems,
                 populationGroups,
                 activationPlan,
-                activationEvidence
+                activationEvidence,
+                runtimeParticipants
         );
         AtomicBoolean startupWorldsLoaded = new AtomicBoolean();
-        TameworkEventRegistrationSupport.registerGlobal(
-                plugin,
-                StartWorldEvent.class,
-                event -> {
+        Runnable startWorldRegistration = () -> TameworkEventRegistrationSupport.registerGlobal(
+                plugin, StartWorldEvent.class, event -> {
                     identityBootstrap.onStartWorld(event);
                     if (startupWorldsLoaded.get()) {
                         composition.resumeAfterWorldEvidence();
                     }
-                },
-                "replacement persistence identity bootstrap"
-        );
-        TameworkEventRegistrationSupport.registerGlobal(
-                plugin,
-                AllWorldsLoadedEvent.class,
-                ignored -> {
+                }, "replacement persistence identity bootstrap");
+        Runnable worldsLoadedRegistration = () -> TameworkEventRegistrationSupport.registerGlobal(
+                plugin, AllWorldsLoadedEvent.class, ignored -> {
                     startupWorldsLoaded.set(true);
                     identityBootstrap.bootstrapUniverse();
                     composition.resumeAfterWorldEvidence();
-                },
-                "replacement persistence startup-world seal"
-        );
+                }, "replacement persistence startup-world seal");
+        if (runtimeParticipants == null) {
+            startWorldRegistration.run();
+            worldsLoadedRegistration.run();
+        } else {
+            runtimeParticipants.listener(TameworkRuntimeModule.GENERIC_PERSISTENCE,
+                    "replacement-persistence-start-world", startWorldRegistration);
+            runtimeParticipants.listener(TameworkRuntimeModule.GENERIC_PERSISTENCE,
+                    "replacement-persistence-worlds-loaded", worldsLoadedRegistration);
+        }
         if (activationPlan == null) {
             TameworkDormantPersistenceRegistration.register(
                     plugin, components, composition.dormantAuthor()
             );
         } else {
-            TameworkDormantPersistenceRegistration.registerIfActive(
-                    plugin,
-                    components,
-                    composition.dormantAuthor(),
-                    activationPlan
-            );
+            if (runtimeParticipants == null) {
+                TameworkDormantPersistenceRegistration.registerIfActive(
+                        plugin, components, composition.dormantAuthor(), activationPlan);
+            } else {
+                TameworkDormantPersistenceRegistration.declareIfActive(
+                        plugin, components, composition.dormantAuthor(), activationPlan,
+                        runtimeParticipants);
+            }
         }
         return composition;
     }
@@ -326,6 +335,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 commandItems,
                 populationGroups,
                 null,
+                null,
                 null
         );
     }
@@ -358,7 +368,8 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             @Nonnull CommandItemRegistry commandItems,
             @Nonnull PopulationGroupConfigRegistry populationGroups,
             @Nullable TameworkRuntimeActivationPlan activationPlan,
-            @Nullable TameworkPersistenceActivationEvidence activationEvidence
+            @Nullable TameworkPersistenceActivationEvidence activationEvidence,
+            @Nullable TameworkRuntimeParticipantRegistry runtimeParticipants
     ) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(pluginDataDirectory, "pluginDataDirectory");
@@ -423,7 +434,8 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                                     Objects.requireNonNull(
                                             activationEvidence,
                                             "Active persistence requires activation evidence"
-                                    )
+                                    ),
+                                    runtimeParticipants
                             ),
                             "Active generic persistence requires restored features"
                     );

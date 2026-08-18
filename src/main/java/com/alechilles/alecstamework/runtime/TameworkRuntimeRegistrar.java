@@ -11,6 +11,25 @@ import java.util.function.Consumer;
  * handle owns every installed resource.</p>
  */
 public final class TameworkRuntimeRegistrar {
+    /** Constructs every active prepared resource without changing the target. */
+    public void preflight(TameworkRuntimeRegistrationContext context) {
+        TameworkRuntimeRegistrationContext checked = Objects.requireNonNull(
+                context,
+                "Runtime registration context is required"
+        );
+        for (TameworkRuntimeRegistrationContext.Participant participant
+                : checked.activeParticipants()) {
+            try {
+                participant.preflight();
+            } catch (Exception exception) {
+                throw new IllegalStateException(
+                        "Runtime participant preflight failed: " + participant.id(),
+                        exception
+                );
+            }
+        }
+    }
+
     /** Registers the active participants from one frozen context. */
     public TameworkRuntimeHandle register(TameworkRuntimeRegistrationContext context) {
         return register(context, ignored -> { });
@@ -27,16 +46,7 @@ public final class TameworkRuntimeRegistrar {
         );
         Consumer<TameworkRuntimeRegistrationContext.Participant> observer =
                 Objects.requireNonNull(installed, "Registration observer is required");
-        for (TameworkRuntimeRegistrationContext.Participant participant : checked.activeParticipants()) {
-            try {
-                participant.preflight();
-            } catch (Exception exception) {
-                throw new IllegalStateException(
-                        "Runtime participant preflight failed: " + participant.id(),
-                        exception
-                );
-            }
-        }
+        preflight(checked);
 
         TameworkRuntimeHandle handle = new TameworkRuntimeHandle();
         try {

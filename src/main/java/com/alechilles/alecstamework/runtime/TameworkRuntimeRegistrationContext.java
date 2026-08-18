@@ -158,13 +158,21 @@ public final class TameworkRuntimeRegistrationContext {
                     id,
                     kind,
                     () -> {
-                        Object resource = factory.create();
-                        if (resource == null) {
-                            throw new IllegalStateException(
-                                    "Runtime participant factory returned null: " + id
-                            );
+                        if (prepared.get() != null) {
+                            return;
                         }
-                        prepared.set(resource);
+                        synchronized (prepared) {
+                            if (prepared.get() != null) {
+                                return;
+                            }
+                            Object resource = factory.create();
+                            if (resource == null) {
+                                throw new IllegalStateException(
+                                        "Runtime participant factory returned null: " + id
+                                );
+                            }
+                            prepared.set(resource);
+                        }
                     },
                     target -> registration.register(target, prepared.get())
             );

@@ -36,6 +36,7 @@ import com.alechilles.alecstamework.runtime.activation
         .TameworkRuntimeActivationPlan;
 import com.alechilles.alecstamework.runtime.activation
         .TameworkRuntimeModule;
+import com.alechilles.alecstamework.runtime.TameworkRuntimeParticipantRegistry;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -99,6 +100,23 @@ final class TameworkRestoredFeatureComposition implements AutoCloseable {
             @Nonnull ItemFeatureRegistry itemFeatures,
             @Nonnull CommandItemRegistry commandItems
     ) {
+        TameworkRestoredFeatureComposition composition = build(
+                plugin, persistenceDirectory, bootstrap, facades,
+                populationGroups, itemFeatures, commandItems);
+        plugin.getEntityStoreRegistry().registerSystem(
+                composition.liveEvidence.trackingSystem());
+        return composition;
+    }
+
+    private static TameworkRestoredFeatureComposition build(
+            Tamework plugin,
+            Path persistenceDirectory,
+            PersistenceBootstrap bootstrap,
+            PersistenceDomainFacades facades,
+            PopulationGroupConfigRegistry populationGroups,
+            ItemFeatureRegistry itemFeatures,
+            CommandItemRegistry commandItems
+    ) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(persistenceDirectory, "persistenceDirectory");
         Objects.requireNonNull(bootstrap, "bootstrap");
@@ -147,18 +165,13 @@ final class TameworkRestoredFeatureComposition implements AutoCloseable {
                         true,
                         true
                 );
-        TameworkRestoredFeatureComposition composition =
-                new TameworkRestoredFeatureComposition(
+        return new TameworkRestoredFeatureComposition(
                         plugin.getLogger(),
                         live,
                         dependencies,
                         tameAndLink,
                         coop::capture
                 );
-        plugin.getEntityStoreRegistry().registerSystem(
-                live.trackingSystem()
-        );
-        return composition;
     }
 
     /**
@@ -176,7 +189,8 @@ final class TameworkRestoredFeatureComposition implements AutoCloseable {
             @Nonnull ItemFeatureRegistry itemFeatures,
             @Nonnull CommandItemRegistry commandItems,
             @Nonnull TameworkRuntimeActivationPlan activationPlan,
-            @Nonnull TameworkPersistenceActivationEvidence activationEvidence
+            @Nonnull TameworkPersistenceActivationEvidence activationEvidence,
+            @Nonnull TameworkRuntimeParticipantRegistry runtimeParticipants
     ) {
         if (!TameworkPersistenceActivationGate.shouldConstruct(
                 activationPlan,
@@ -185,15 +199,15 @@ final class TameworkRestoredFeatureComposition implements AutoCloseable {
         )) {
             return null;
         }
-        return create(
-                plugin,
-                persistenceDirectory,
-                bootstrap,
-                facades,
-                populationGroups,
-                itemFeatures,
-                commandItems
+        TameworkRestoredFeatureComposition composition = build(
+                plugin, persistenceDirectory, bootstrap, facades,
+                populationGroups, itemFeatures, commandItems);
+        runtimeParticipants.entitySystem(
+                TameworkRuntimeModule.GENERIC_PERSISTENCE,
+                "replacement-live-evidence-tracking",
+                composition.liveEvidence::trackingSystem
         );
+        return composition;
     }
 
     @Nonnull

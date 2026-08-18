@@ -651,7 +651,8 @@ public class Tamework extends JavaPlugin {
                     commandItemRegistry,
                     populationGroupConfigRegistry,
                     runtimeStartupPlan,
-                    genericPersistenceActivationEvidence
+                    genericPersistenceActivationEvidence,
+                    runtimeParticipants
             );
             if (persistenceComposition == null) {
                 if (runtimeStartupPlan.isActive(TameworkRuntimeModule.GENERIC_PERSISTENCE)) {
@@ -1323,6 +1324,7 @@ public class Tamework extends JavaPlugin {
         TameworkActiveAssetInitializer.initialize(
                 runtimeStartupPlan, populationGroupAssetRegistrar::initialize,
                 this::rebuildCapturePolicyIndex, this::rebuildBondedCompanionRosterIndex);
+        preflightDeclaredRuntimeParticipants();
         initializeRuntimeServices();
         registerRuntimeParticipants();
         runtimeActivationState = TameworkRuntimeActivationState.of(
@@ -1364,6 +1366,20 @@ public class Tamework extends JavaPlugin {
         Runnable initializer = runtimeServiceInitializer;
         runtimeServiceInitializer = null;
         initializer.run();
+    }
+
+    /** Validates setup-declared factories before persistence can mutate state. */
+    private void preflightDeclaredRuntimeParticipants() {
+        TameworkRuntimeRegistrationContext.Builder builder =
+                TameworkRuntimeRegistrationContext.builder(
+                        runtimeStartupPlan,
+                        (kind, participantId) -> () -> { }
+                );
+        for (TameworkRuntimeRegistrationContext.Participant participant
+                : runtimeParticipants.participants()) {
+            builder.participant(participant);
+        }
+        new TameworkRuntimeRegistrar().preflight(builder.build());
     }
 
     /** Installs optional workers through the same preflight and ownership boundary as ECS work. */

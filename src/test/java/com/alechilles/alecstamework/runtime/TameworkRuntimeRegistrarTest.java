@@ -135,6 +135,35 @@ class TameworkRuntimeRegistrarTest {
     }
 
     @Test
+    void earlyPreflightResourceIsReusedDuringRegistration() {
+        TameworkRuntimeModule module = TameworkRuntimeModule.of("preflight-once");
+        TameworkRuntimeActivationPlan plan = plan(
+                List.of(module),
+                TameworkActivationEvidence.builder().content(module, "profile").build()
+        );
+        RecordingTarget target = new RecordingTarget();
+        AtomicInteger factoryCalls = new AtomicInteger();
+        Participant participant = Participant.prepared(
+                module, "prepared-system", RegistrationKind.ECS_SYSTEM,
+                () -> {
+                    factoryCalls.incrementAndGet();
+                    return new Object();
+                }
+        );
+        TameworkRuntimeRegistrationContext context =
+                TameworkRuntimeRegistrationContext.builder(plan, target)
+                        .participant(participant)
+                        .build();
+        TameworkRuntimeRegistrar registrar = new TameworkRuntimeRegistrar();
+
+        registrar.preflight(context);
+        registrar.register(context);
+
+        assertEquals(1, factoryCalls.get());
+        assertEquals(List.of("prepared-system"), target.registered);
+    }
+
+    @Test
     void handleClosesResourcesInReverseRegistrationOrder() {
         TameworkRuntimeModule first = TameworkRuntimeModule.of("first");
         TameworkRuntimeModule second = TameworkRuntimeModule.of("second");
