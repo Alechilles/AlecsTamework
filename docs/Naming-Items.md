@@ -15,6 +15,10 @@ When changing naming flow, keep policy checks and effect execution in their exis
 ## Asset location
 `<ModRoot>/Server/Tamework/Items/Naming/*.json`
 
+The framework's default name pool remains in the main jar. The sample naming
+config and item are in the optional `Alec's Tamework! Examples` asset pack.
+Install and explicitly enable that pack before using the sample paths below.
+
 ## Interaction usage
 Add `TameworkNameNpc` to an item’s `Interactions` block:
 
@@ -96,7 +100,7 @@ Spawner capture preserves the Tamework name and restores it on spawn.
     "MinLength": 1,
     "MaxLength": 24,
     "AllowedChars": "LettersNumbersSpaces",
-    "RandomNamesId": "TwNames_Default",
+    "RandomNamesId": "TwNamesDefault",
     "TrimWhitespace": true,
     "ReplaceExisting": true,
     "ConsumeItem": false,
@@ -108,10 +112,10 @@ Spawner capture preserves the Tamework name and restores it on spawn.
 ```
 
 ## Example assets
-Example assets included in the mod:
-- `Server/Tamework/Items/Naming/NameItem_Tamework_Example.json`
-- `Server/Tamework/Names/TwNames_Default.json`
-- `Server/Item/Items/Naming/Tamework_Nametag_Example.json`
+Example assets in the optional `Alec's Tamework! Examples` asset pack:
+- `examples/asset-pack/Server/Tamework/Items/Naming/TwNameExample.json`
+- `src/main/resources/Server/Tamework/Names/TwNamesDefault.json`
+- `examples/asset-pack/Server/Item/Items/Naming/Tamework_Nametag_Example.json`
 
 Translations used by the example item:
 - `items.Tamework_Nametag_Example.name`

@@ -8,6 +8,9 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 - Runtime is intentionally decomposed into orchestrators + focused services (selection, validation, persistence, relocation, UI view-models, feedback).
 
 ## Major subsystems
+- Immutable runtime activation plan and deferred participant registration
+  (`runtime` and `runtime/activation`); see
+  [Runtime Activation](Runtime-Activation.md)
 - NPC action/sensor/filter builder registration (`TameworkNpcBuilderRegistrar`)
 - Optimized interaction pipeline (`TwInteractionConfig` + `TameworkInteract`)
 - Hook bridge (`TriggerNpcHook` + `TameworkHook`)
@@ -47,6 +50,9 @@ This document is a high-level map of how Alec's Tamework is organized and where 
   see the
   [HyDragon Integration Guide](../wiki/Modder-Documentation/System-Integration/HyDragon-Integration-Guide.md)
 - Thin embedded Patchwork lifecycle and Tamework macro contribution (`integration/patchwork`). Patchwork owns patch discovery, generation, election, and `/patchwork`; new definitions use `Server/Patchwork/Patches`, while the legacy Tamework root remains readable for compatibility.
+- Framework assets: `src/main/resources/Server/Tamework`
+- Optional examples: `examples/asset-pack/Server/Tamework` and the matching
+  `Common`/`Server` assets
 - Asset-set gates and tranquilizer recipe visibility reconciliation (`TwGlobalConfig.AssetSets`)
 - Metrics telemetry bootstrap + dependency forwarding (`TameworkHStatsIntegration`)
 
@@ -108,6 +114,7 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 
 ## Where to look
 - Entrypoint: `src/main/java/com/alechilles/alecstamework/Tamework.java`
+- Runtime activation: `src/main/java/com/alechilles/alecstamework/runtime`
 - Builder registration: `src/main/java/com/alechilles/alecstamework/npc/TameworkNpcBuilderRegistrar.java`
 - Actions: `src/main/java/com/alechilles/alecstamework/npc/actions`
 - Sensors: `src/main/java/com/alechilles/alecstamework/npc/sensors`
@@ -124,7 +131,9 @@ This document is a high-level map of how Alec's Tamework is organized and where 
   `src/main/java/com/alechilles/alecstamework/persistence`
 - Gameplay persistence authors:
   `src/main/java/com/alechilles/alecstamework/items/persistence`
-- Bundled assets/examples: `src/main/resources/Server/Tamework`
+- Framework assets: `src/main/resources/Server/Tamework`
+- Optional examples: `examples/asset-pack/Server/Tamework` and matching
+  `Common`/`Server` assets
 
 ## Versioned docs
 Canonical public and contributor docs now live under `/wiki` in the main repo. `/docs` remains as legacy source material used to seed that wiki.

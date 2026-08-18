@@ -49,6 +49,14 @@ import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionPersistenceReadiness;
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionStorePlanner;
+import com.alechilles.alecstamework.persistence.activation
+        .TameworkPersistenceActivationEvidence;
+import com.alechilles.alecstamework.persistence.activation
+        .TameworkPersistenceActivationGate;
+import com.alechilles.alecstamework.runtime.activation
+        .TameworkRuntimeActivationPlan;
+import com.alechilles.alecstamework.runtime.activation
+        .TameworkRuntimeModule;
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionSchemaManager;
 import com.alechilles.alecstamework.persistence.diagnostics
@@ -176,6 +184,44 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     ) {
         return open(commonDataDirectory, rosters, logger, clock,
                 captureEventSink, null);
+    }
+
+    /**
+     * Opens bonded persistence only when its frozen plan or its own durable
+     * evidence needs the authority.
+     *
+     * <p>The generic persistence authority is not consulted. Read-only
+     * bonded evidence is reported by the caller and never upgraded to a
+     * writer.</p>
+     */
+    @Nullable
+    public static TameworkBondedCompanionComposition openIfActive(
+            @Nonnull Path commonDataDirectory,
+            @Nonnull BondedCompanionRosterRegistry rosters,
+            @Nullable HytaleLogger logger,
+            @Nonnull LongSupplier clock,
+            @Nullable Consumer<BondedCompanionCaptureResolvedEvent>
+                    captureEventSink,
+            @Nullable Consumer<BondedCompanionStorageFailureEvidence>
+                    storageFailureSink,
+            @Nonnull TameworkRuntimeActivationPlan activationPlan,
+            @Nonnull TameworkPersistenceActivationEvidence activationEvidence
+    ) {
+        if (!TameworkPersistenceActivationGate.shouldConstruct(
+                activationPlan,
+                activationEvidence,
+                TameworkRuntimeModule.BONDED_PERSISTENCE
+        )) {
+            return null;
+        }
+        return open(
+                commonDataDirectory,
+                rosters,
+                logger,
+                clock,
+                captureEventSink,
+                storageFailureSink
+        );
     }
 
     /** Opens the bonded authority with optional capture and storage-failure sinks. */

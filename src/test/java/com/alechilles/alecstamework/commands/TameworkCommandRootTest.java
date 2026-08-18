@@ -25,6 +25,10 @@ class TameworkCommandRootTest {
                 root.getSubCommands().get("reloadconfig").getPermission()
         );
         assertEquals(
+                "tamework.command.tw.activation",
+                root.getSubCommands().get("activation").getPermission()
+        );
+        assertEquals(
                 "tamework.command.tw.setlevel",
                 root.getSubCommands().get("setlevel").getPermission()
         );

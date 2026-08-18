@@ -1,0 +1,13 @@
+npcRoles.Mob_Tamework_Example.name=Tamework Example
+npcRoles.Mob_Tamework_Example_Simple.name=Tamework Example (Simple)
+npcRoles.Mob_Tamework_Example_Patch.name=Tamework Example (Patch)
+items.Spawner_Tamework_Example.name=Tamework Example Spawner
+items.Spawner_Tamework_Example.description=Spawns the Tamework example NPC.
+items.Tamework_Nametag_Example.name=Tamework Example Name Tag
+items.Tamework_Nametag_Example.description=Names a tamed NPC you own.
+items.Tamework_Command_Whistle_Example.name=Tamework Example Command Whistle
+items.Tamework_Command_Whistle_Example.description=Links pets and issues command-item orders.
+npcRoles.Tamework_Example.name=Tamework Example
+npcRoles.Tamework_Example_Simple.name=Tamework Example (Simple)
+npcRoles.Tamework_Example_Vanilla.name=Tamework Example (Vanilla)
+npcRoles.Tamework_Example_Simple_Vanilla.name=Tamework Example (Simple, Vanilla)

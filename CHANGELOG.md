@@ -2,6 +2,22 @@
 
 ## 3.1.9 - Companion Spawn Safety Hotfix - 2026-08-16
 
+### Changed
+- Tamework now builds one startup activation plan from effective content,
+  dependency requirements, public capability requests, and durable recovery
+  evidence. Unused modules install no runtime systems, feature listeners,
+  workers, or persistence runtime.
+- `/tw activation` now reports module states, reasons, passive work counters,
+  and whether changed content requires a restart. Reloads do not change the
+  live system topology.
+- Generic and bonded persistence now use separate read-only startup probes.
+  Empty servers do not create their databases, while pending durable work
+  keeps its required recovery authority active.
+- Moved enabled Tamework sample NPCs, items, progression configs,
+  translations, and example-only art into a separate disabled-by-default
+  `Alec's Tamework! Examples` asset pack. Bundled examples no longer activate
+  Tamework runtime modules on servers that do not install the pack.
+
 ### Fixed
 - Newly spawned companion projections now clear stale fall distance and
   velocity and receive brief fall-damage protection. Bonded summons and NPCs

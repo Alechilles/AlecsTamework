@@ -1,12 +1,3 @@
-npcRoles.Mob_Tamework_Example.name=Tamework Beispiel
-npcRoles.Mob_Tamework_Example_Simple.name=Tamework Beispiel (Einfach)
-npcRoles.Mob_Tamework_Example_Patch.name=Tamework Beispiel (Patch)
-items.Spawner_Tamework_Example.name=Tamework Beispiel Spawner
-items.Spawner_Tamework_Example.description=Beschwört das Tamework-Beispiel-NPC.
-items.Tamework_Nametag_Example.name=Tamework Beispiel Namensschild
-items.Tamework_Nametag_Example.description=Gibt einem gezähmten NPC, den du besitzt, einen Namen.
-items.Tamework_Command_Whistle_Example.name=Tamework Beispiel Befehls-Pfeife
-items.Tamework_Command_Whistle_Example.description=Verknüpft Haustiere und erteilt Befehle über Befehlsgegenstände.
 items.Tamework_Flightmasters_Talisman.name=Flightmaster's Talisman
 items.Tamework_Flightmasters_Talisman.description=Channels a transformed dragon's upward flaps, forward boosts, and airbraking.
 items.Tamework_Scarecrow.name=Scarecrow
@@ -15,11 +6,6 @@ tamework.scarecrow.invalidSurface=The scarecrow needs a solid surface.
 tamework.scarecrow.occupied=There is not enough room for the scarecrow.
 tamework.scarecrow.itemChanged=The held scarecrow changed before it could be placed.
 tamework.scarecrow.placeUnavailable=The scarecrow could not be placed here.
-npcRoles.Tamework_Example.name=Tamework Beispiel
-npcRoles.Tamework_Example_Simple.name=Tamework Beispiel (Einfach)
-npcRoles.Tamework_Example_Vanilla.name=Tamework Beispiel (Vanilla)
-npcRoles.Tamework_Example_Simple_Vanilla.name=Tamework Beispiel (Einfach, Vanilla)
-
 # === Tamework Interaktionshinweise ===
 interactionHints.tame=Drücke [{key}] zum Zähmen
 interactionHints.feed=Drücke [{key}] zum Füttern

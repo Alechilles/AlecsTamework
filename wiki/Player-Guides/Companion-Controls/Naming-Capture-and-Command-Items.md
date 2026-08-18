@@ -39,10 +39,10 @@ Tamework-powered mods often use three reusable item families: naming items, spaw
   status from the companion's saved lifecycle rather than deciding those states
   from stale item metadata
 
-Tamework's bundled example command whistle is a development/reference item and
-has no recipe. Servers may give it directly for testing, while production mods
-are expected to provide their own player-facing command item and acquisition
-method.
+The optional `Alec's Tamework! Examples` pack contains a development/reference
+command whistle and has no recipe. Enable the pack and give the item directly
+for testing. Production mods are expected to provide their own player-facing
+command item and acquisition method.
 
 ## Tooltips and icons
 - Some spawner items show captured `Name` and `Role` lines in the tooltip.

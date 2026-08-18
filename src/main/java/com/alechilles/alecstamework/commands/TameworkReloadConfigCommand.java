@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
+import com.alechilles.alecstamework.runtime.activation.TameworkReloadTopologyReport;
 import com.alechilles.alecstelemetry.api.TelemetryEventContext;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -46,16 +47,34 @@ public final class TameworkReloadConfigCommand extends AbstractWorldCommand {
         );
         commandContext.sender().sendMessage(Message.raw("Reloading Tamework configs..."));
         CompletableFuture.supplyAsync(() -> {
-            TameworkSettingsStore.invalidateRuntimeGlobalOverridesCache();
-            TwConfigOverrideManager.ReloadResult reloadResult = plugin.reloadConfigOverrides(world);
-            int loaded = plugin.reloadItemFeatureConfigs();
+            plugin.beginItemFeatureAssetReloadSuppression();
+            boolean suppressionEnded = false;
+            TwConfigOverrideManager.ReloadResult reloadResult;
+            TameworkReloadTopologyReport topologyReport;
+            try {
+                reloadResult = plugin.reloadConfigOverrides(world);
+                topologyReport = plugin.compareRuntimeActivationTopology();
+                plugin.endItemFeatureAssetReloadSuppression(false);
+                suppressionEnded = true;
+            } finally {
+                if (!suppressionEnded) {
+                    plugin.endItemFeatureAssetReloadSuppression(false);
+                }
+            }
+            int loaded = 0;
+            if (!topologyReport.restartRequired()) {
+                TameworkSettingsStore.invalidateRuntimeGlobalOverridesCache();
+                loaded = plugin.reloadItemFeatureConfigs();
+            }
             int totalSpawners = plugin.getItemFeatureRegistry() != null
                     ? plugin.getItemFeatureRegistry().snapshot().size()
                     : 0;
             int totalNaming = plugin.getNameItemRegistry() != null
                     ? plugin.getNameItemRegistry().snapshot().size()
                     : 0;
-            return new ReloadSummary(reloadResult, loaded, totalSpawners, totalNaming);
+            return new ReloadSummary(
+                    reloadResult, loaded, totalSpawners, totalNaming, topologyReport
+            );
         }).whenComplete((summary, throwable) -> world.execute(() -> {
             int durationMs = telemetryEvents.elapsedMillis(startedAtNanos);
             if (throwable != null || summary == null) {
@@ -89,7 +108,9 @@ public final class TameworkReloadConfigCommand extends AbstractWorldCommand {
                 commandContext.sender().sendMessage(Message.raw("Reload failed. See server log for details."));
                 return;
             }
-            plugin.applyDebugConfigDefaults();
+            if (summary.topologyReport() == null || !summary.topologyReport().restartRequired()) {
+                plugin.applyDebugConfigDefaults();
+            }
             String result = TameworkReloadConfigTelemetry.reloadResultLabel(summary.reloadResult());
             boolean partial = "partial".equals(result);
             telemetryEvents.recordLifecycle(
@@ -128,8 +149,17 @@ public final class TameworkReloadConfigCommand extends AbstractWorldCommand {
                             + " ItemLoaded=" + summary.itemLoaded()
                             + " Spawners=" + summary.totalSpawners()
                             + " Naming=" + summary.totalNaming()
-                            + " DebugDefaults=applied"
+                            + " DebugDefaults="
+                            + (summary.topologyReport() != null && summary.topologyReport().restartRequired()
+                            ? "unchanged"
+                            : "applied")
             ));
+            if (summary.topologyReport() != null && summary.topologyReport().restartRequired()) {
+                commandContext.sender().sendMessage(Message.raw(
+                        "Runtime topology changed; restart required. "
+                                + summary.topologyReport().summary()
+                ));
+            }
             if (summary.reloadResult().hasErrors()) {
                 commandContext.sender().sendMessage(Message.raw(
                         "Override reload reported " + summary.reloadResult().getErrors().size()
@@ -163,6 +193,7 @@ public final class TameworkReloadConfigCommand extends AbstractWorldCommand {
     private record ReloadSummary(@Nonnull TwConfigOverrideManager.ReloadResult reloadResult,
                                  int itemLoaded,
                                  int totalSpawners,
-                                 int totalNaming) {
+                                 int totalNaming,
+                                 TameworkReloadTopologyReport topologyReport) {
     }
 }

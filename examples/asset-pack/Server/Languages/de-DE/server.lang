@@ -1,0 +1,13 @@
+npcRoles.Mob_Tamework_Example.name=Tamework Beispiel
+npcRoles.Mob_Tamework_Example_Simple.name=Tamework Beispiel (Einfach)
+npcRoles.Mob_Tamework_Example_Patch.name=Tamework Beispiel (Patch)
+items.Spawner_Tamework_Example.name=Tamework Beispiel Spawner
+items.Spawner_Tamework_Example.description=Beschwört das Tamework-Beispiel-NPC.
+items.Tamework_Nametag_Example.name=Tamework Beispiel Namensschild
+items.Tamework_Nametag_Example.description=Gibt einem gezähmten NPC, den du besitzt, einen Namen.
+items.Tamework_Command_Whistle_Example.name=Tamework Beispiel Befehls-Pfeife
+items.Tamework_Command_Whistle_Example.description=Verknüpft Haustiere und erteilt Befehle über Befehlsgegenstände.
+npcRoles.Tamework_Example.name=Tamework Beispiel
+npcRoles.Tamework_Example_Simple.name=Tamework Beispiel (Einfach)
+npcRoles.Tamework_Example_Vanilla.name=Tamework Beispiel (Vanilla)
+npcRoles.Tamework_Example_Simple_Vanilla.name=Tamework Beispiel (Einfach, Vanilla)

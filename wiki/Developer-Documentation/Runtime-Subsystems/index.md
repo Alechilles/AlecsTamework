@@ -11,6 +11,7 @@ Parent: [Developer Documentation](/mod/alecs-tamework/developer-documentation) |
 This subsection groups subsystem-level runtime internals used by core Tamework features.
 
 ## Child Pages
+- [Runtime Activation](/mod/alecs-tamework/runtime-activation)
 - [Optimized Interaction Pipeline Internals](/mod/alecs-tamework/optimized-interaction-pipeline-internals)
 - [Spawner Runtime Internals](/mod/alecs-tamework/spawner-runtime-internals)
 - [Naming Runtime Internals](/mod/alecs-tamework/naming-runtime-internals)

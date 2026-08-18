@@ -37,7 +37,8 @@ public final class PopulationGroupAssetRegistrar {
         );
     }
 
-    public void register() {
+    /** Registers only the passive asset store during plugin setup. */
+    public void registerAssetStore() {
         if (registered) {
             return;
         }
@@ -51,6 +52,14 @@ public final class PopulationGroupAssetRegistrar {
                         .setKeyFunction(TwPopulationGroupConfig::getId)
                         .build()
         );
+        registered = true;
+    }
+
+    /** Starts active reload subscriptions and builds the initial index. */
+    public void activate() {
+        if (!registered) {
+            throw new IllegalStateException("Population-group asset store is not registered");
+        }
         plugin.getEventRegistry().register(
                 LoadedAssetsEvent.class,
                 TwPopulationGroupConfig.class,
@@ -61,7 +70,12 @@ public final class PopulationGroupAssetRegistrar {
                 TwPopulationGroupConfig.class,
                 this::onRemoved
         );
-        registered = true;
+        initialize();
+    }
+
+    /** Builds the current immutable index without installing a listener. */
+    public void initialize() {
+        rebuild();
     }
 
     private void onLoaded(

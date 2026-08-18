@@ -78,7 +78,8 @@ Example:
 }
 ```
 
-The bundled `TwMountedGlideExample` profile shows the full field set.
+The optional `Alec's Tamework! Examples` pack includes `TwMountedGlideExample`
+with the full field set. Enable that pack before using the profile.
 
 ## Input Notes
 The current implementation reads mounted movement, jump, sprint, crouch, and look rotation. Jump is treated as a press edge because native mounted jump packets may keep reporting `true` after a single press while airborne. Forward/run movement is only movement intent; only the native sprint flag selects a forward flap. It does not consume Q/drop, left-click, or right-click for flight controls.

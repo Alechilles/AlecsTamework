@@ -86,14 +86,15 @@ gold, and subdued-gray states respectively. This action is not offered by
 bonded-companion rosters, whose active profiles are stored outside generic
 command-group metadata.
 
-### Bundled example and acquisition boundary
+### Optional example and acquisition boundary
 
-Tamework ships `Tamework_Command_Whistle_Example` with the
-`TwCommandExample` config as a development/reference item. The config includes
+The optional `Alec's Tamework! Examples` pack includes
+`Tamework_Command_Whistle_Example` and the `TwCommandExample` config as
+development/reference assets. The config includes
 the HyDragon-relevant `Follow`, `Hold`, `Recall`, and `AttackTarget` commands,
-but the item has no bundled recipe or other polished player-acquisition path.
-In a production pack it is available only when an operator or development
-workflow gives the item directly.
+but the item has no recipe or other polished player-acquisition path. Enable
+the example pack only when an operator or development workflow needs the item
+directly.
 
 Downstream mods should ship their own named item, command config, localization,
 icon, and recipe/acquisition flow. Do not present the example whistle as a

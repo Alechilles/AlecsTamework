@@ -19,7 +19,7 @@ import javax.annotation.Nonnull;
  */
 public final class TameworkApiTestPrepareCommand extends AbstractPlayerCommand {
     public TameworkApiTestPrepareCommand() {
-        super("prepare", "Provision the bundled API self-test fixtures.");
+        super("prepare", "Provision fixtures from the optional Tamework example asset pack.");
         requirePermission(TameworkApiTestPermission.NODE);
         setPermissionGroups("OP", "Admin", "Operator");
     }

@@ -30,7 +30,10 @@ Set the long-term progression baseline first:
 
 This gives you a shared advancement layer that combat, feed, harvest, and breeding hooks can all contribute to.
 
-Tamework ships `Server/Tamework/Leveling/TwLevelingExample.json` for the bundled example mobs. Use it as a small working baseline for enabled feed, harvest, breeding, and combat XP sources before tuning a real species.
+The optional `Alec's Tamework! Examples` pack includes
+`Server/Tamework/Leveling/TwLevelingExample.json` for its sample mobs. Enable
+the pack and use it as a small working baseline for feed, harvest, breeding,
+and combat XP sources before tuning a real species.
 
 ### Avatar-flight XP
 Avatar-flight species can also award companion XP by configuring `TwLevelingConfig.XpSources.Flight` on the original parked source role:
@@ -57,7 +60,10 @@ Decide:
 - prerequisite chains
 - which shared effect keys each node grants
 
-Tamework ships `Server/Tamework/Talents/TwTalentsExample.json` for the bundled example mobs. It is intentionally passive-only and demonstrates health, movement, combat, toughness, and harvest-bonus effect keys.
+The optional `Alec's Tamework! Examples` pack includes
+`Server/Tamework/Talents/TwTalentsExample.json` for its sample mobs. It is
+intentionally passive-only and demonstrates health, movement, combat,
+toughness, and harvest-bonus effect keys.
 
 Avatar-flight talent trees can additionally use the six flight effect keys documented in the [TwTalentConfig Reference](/mod/alecs-tamework/twtalentconfig-reference). They are resolved from the parked source companion for a valid flight session; invalid sessions remain neutral.
 
