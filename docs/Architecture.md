@@ -8,6 +8,9 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 - Runtime is intentionally decomposed into orchestrators + focused services (selection, validation, persistence, relocation, UI view-models, feedback).
 
 ## Major subsystems
+- Immutable runtime activation plan and deferred participant registration
+  (`runtime` and `runtime/activation`); see
+  [Runtime Activation](Runtime-Activation.md)
 - NPC action/sensor/filter builder registration (`TameworkNpcBuilderRegistrar`)
 - Optimized interaction pipeline (`TwInteractionConfig` + `TameworkInteract`)
 - Hook bridge (`TriggerNpcHook` + `TameworkHook`)
@@ -111,6 +114,7 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 
 ## Where to look
 - Entrypoint: `src/main/java/com/alechilles/alecstamework/Tamework.java`
+- Runtime activation: `src/main/java/com/alechilles/alecstamework/runtime`
 - Builder registration: `src/main/java/com/alechilles/alecstamework/npc/TameworkNpcBuilderRegistrar.java`
 - Actions: `src/main/java/com/alechilles/alecstamework/npc/actions`
 - Sensors: `src/main/java/com/alechilles/alecstamework/npc/sensors`

@@ -93,6 +93,12 @@ namespaced profile extension data instead of writing Tamework metadata or
 SQLite rows directly. Always check the relevant capability before using an
 optional API surface.
 
+Tamework also builds one immutable runtime activation plan at startup. It
+installs no systems, feature listeners, workers, or database runtime for an
+unused module. See [Runtime Activation](docs/Runtime-Activation.md) for
+automatic evidence, restart-bound reloads, `/tw activation`, and the
+Runeteria/RuneProfessions activation contract.
+
 Player-facing Tamework config strings support `server.lang` keys. Built-in talents, traits, command labels, interaction messages, happiness labels, and major UI labels use language keys so translation packs can override copy without changing behavior assets.
 
 ## Documentation
