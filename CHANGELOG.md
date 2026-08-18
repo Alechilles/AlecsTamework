@@ -2,6 +2,12 @@
 
 ## 3.1.9 - Companion Spawn Safety Hotfix - 2026-08-16
 
+### Changed
+- Moved enabled Tamework sample NPCs, items, progression configs,
+  translations, and example-only art into a separate disabled-by-default
+  `Alec's Tamework! Examples` asset pack. Bundled examples no longer activate
+  Tamework runtime modules on servers that do not install the pack.
+
 ### Fixed
 - Newly spawned companion projections now clear stale fall distance and
   velocity and receive brief fall-damage protection. Bonded summons and NPCs

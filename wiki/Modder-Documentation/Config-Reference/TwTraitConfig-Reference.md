@@ -93,8 +93,12 @@ Authoring guidance:
 - `IconPath` should point at a real asset if you want icon rendering instead of glyph fallback.
 
 ## Defaults and Cross-System Notes
-- The bundled default asset in `src/main/resources/Server/Tamework/Traits/TwTraitConfig_Default.json` is the shipped baseline.
-- Shipped example effect keys include `HappinessGainMultiplier`, `FertilityMultiplier`, `MaxHealthMultiplier`, `SizeMultiplier`, `MoveSpeedMultiplier`, `DamageTakenMultiplier`, `DamageDealtMultiplier`, and `HarvestDoubleDropChanceMultiplier`.
+- The optional `Alec's Tamework! Examples` pack includes
+  `Server/Tamework/Traits/TwTraitsDefault.json` for its sample roles.
+- Example effect keys include `HappinessGainMultiplier`,
+  `FertilityMultiplier`, `MaxHealthMultiplier`, `SizeMultiplier`,
+  `MoveSpeedMultiplier`, `DamageTakenMultiplier`, `DamageDealtMultiplier`,
+  and `HarvestDoubleDropChanceMultiplier`.
 - `ConflictsWith` is how you prevent incompatible traits from coexisting in the same roll set.
 - Traits only affect offspring inheritance when [TwBreedingConfig Reference](/mod/alecs-tamework/twbreedingconfig-reference) also enables `InheritTraits`.
 

@@ -411,7 +411,10 @@ public final class ApiSelfTestFixtureManager {
         }
         int roleIndex = npcPlugin.getIndex(TameworkIds.NPC_ROLE_TAMEWORK_EXAMPLE);
         if (roleIndex < 0) {
-            throw new IllegalStateException("Example NPC role missing: " + TameworkIds.NPC_ROLE_TAMEWORK_EXAMPLE);
+            throw new IllegalStateException(
+                    "Optional Tamework example asset pack is not installed or enabled; missing role: "
+                            + TameworkIds.NPC_ROLE_TAMEWORK_EXAMPLE
+            );
         }
         Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(store, roleIndex, spawnPosition, rotation, null, null);
         if (spawned == null || spawned.first() == null || spawned.second() == null) {

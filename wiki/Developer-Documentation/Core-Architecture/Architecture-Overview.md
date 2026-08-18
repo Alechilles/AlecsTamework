@@ -9,7 +9,8 @@ draft: false
 Parent: [Core Architecture](/mod/alecs-tamework/core-architecture) | [Developer Documentation](/mod/alecs-tamework/developer-documentation)
 
 Tamework is split into two broad layers:
-- asset layer: NPC templates, items, particle assets, bundled `Server/Tamework` configs, and translation content
+- asset layer: NPC templates, items, particle assets, framework `Server/Tamework` configs, and translation content
+- optional example layer: the separately installed `Alec's Tamework! Examples` asset pack with sample NPCs, items, progression configs, translations, and art
 - plugin layer: Java code for actions, sensors, services, systems, persistence, UI, and commands
 
 ## Major subsystems
@@ -52,7 +53,9 @@ read-only import inputs. Unreleased v5-v9 databases are refused unchanged.
   `docs/Required-Persistence-Feature-Inventory.md`
 - Builder registration: `src/main/java/com/alechilles/alecstamework/npc/TameworkNpcBuilderRegistrar.java`
 - Config assets: `src/main/java/com/alechilles/alecstamework/config/assets`
-- Bundled examples: `src/main/resources/Server/Tamework`
+- Framework assets: `src/main/resources/Server/Tamework`
+- Optional examples: `examples/asset-pack/Server/Tamework` and the matching
+  `Common`/`Server` assets
 
 ## Related Pages
 - [Bootstrap, Builder Registration, and Extension Points](/mod/alecs-tamework/bootstrap-builder-registration-and-extension-points)

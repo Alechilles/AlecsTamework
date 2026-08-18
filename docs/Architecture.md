@@ -47,6 +47,9 @@ This document is a high-level map of how Alec's Tamework is organized and where 
   see the
   [HyDragon Integration Guide](../wiki/Modder-Documentation/System-Integration/HyDragon-Integration-Guide.md)
 - Thin embedded Patchwork lifecycle and Tamework macro contribution (`integration/patchwork`). Patchwork owns patch discovery, generation, election, and `/patchwork`; new definitions use `Server/Patchwork/Patches`, while the legacy Tamework root remains readable for compatibility.
+- Framework assets: `src/main/resources/Server/Tamework`
+- Optional examples: `examples/asset-pack/Server/Tamework` and the matching
+  `Common`/`Server` assets
 - Asset-set gates and tranquilizer recipe visibility reconciliation (`TwGlobalConfig.AssetSets`)
 - Metrics telemetry bootstrap + dependency forwarding (`TameworkHStatsIntegration`)
 
@@ -124,7 +127,9 @@ This document is a high-level map of how Alec's Tamework is organized and where 
   `src/main/java/com/alechilles/alecstamework/persistence`
 - Gameplay persistence authors:
   `src/main/java/com/alechilles/alecstamework/items/persistence`
-- Bundled assets/examples: `src/main/resources/Server/Tamework`
+- Framework assets: `src/main/resources/Server/Tamework`
+- Optional examples: `examples/asset-pack/Server/Tamework` and matching
+  `Common`/`Server` assets
 
 ## Versioned docs
 Canonical public and contributor docs now live under `/wiki` in the main repo. `/docs` remains as legacy source material used to seed that wiki.

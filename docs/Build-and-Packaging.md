@@ -6,7 +6,9 @@ How the project is packaged and where outputs go.
 
 Gradle builds one shaded jar containing Java code and resources under
 `src/main/resources`. The Hytale Gradle plugin writes the release version to
-`manifest.json`.
+`manifest.json`. The main jar contains the Tamework framework assets, but it
+does not contain the enabled example NPC, item, progression, or example-only
+art graph.
 
 ## Packaging model
 
@@ -25,6 +27,21 @@ Gradle builds one shaded jar containing Java code and resources under
   writable token per project, while consent remains project-specific.
 - The shared workspace links both mods' asset files into its `run/mods` tree,
   so edits in Tamework and HyDragon can reload together.
+
+## Optional example asset pack
+
+The example graph is packaged as a separate, opt-in asset pack. Build it with:
+
+```bash
+./gradlew exampleAssetPack
+```
+
+Gradle writes `build/distributions/Alec's Tamework! Examples v<version>.zip`.
+The pack manifest declares `Alechilles:Alec's Tamework!` as a dependency. Put
+the ZIP beside the Tamework jar and explicitly enable it only when you need
+the sample livestock, items, configs, translations, and art. The pack is
+disabled by default. Do not install or enable it on a library-only production
+server.
 
 ## Development workspace
 
@@ -50,12 +67,18 @@ Run the test suite before packaging:
 
 ```bash
 ./gradlew test packagingTest
+./gradlew validateManifest validateExampleAssetPackManifest assemble
+jar tf "build/libs/Alec's Tamework! v<version>.jar" | rg -i 'example|livestock|tamework_nametag|soul_lantern'
+unzip -l "build/distributions/Alec's Tamework! Examples v<version>.zip"
 ```
 
 `packagingTest` loads the built shaded jar in an isolated classloader and
 executes Patchwork's packaged version/optional-telemetry behavior. It is a
-behavior smoke test, not a ZIP-entry inventory check. Dependency convergence
-can be inspected with:
+The first archive check should return no enabled example entries. The example
+ZIP should list the moved graph and its manifest.
+
+It is a behavior smoke test, not a ZIP-entry inventory check. Dependency
+convergence can be inspected with:
 
 ```bash
 ./gradlew dependencyInsight --dependency alecstelemetry-runtime --configuration runtimeClasspath

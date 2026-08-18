@@ -61,15 +61,15 @@ The Python generator can create override data and renderer jobs without opening 
 
 ```bash
 python scripts/tools/generate_spawner_icon_overrides.py \
-  --asset-root src/main/resources \
-  --model Server/Models/Livestock/Sheep.json \
-  --spawner-config Server/Tamework/Items/Spawners/Spawner_Tamework_Example.json \
-  --roles Sheep,Tamed_Sheep \
-  --include-empty-set Fleece \
-  --icon-template "Icons/ItemsGenerated/Spawner_Sheep_{set_fleece}_{set_basecolor}.png" \
+  --asset-root examples/asset-pack \
+  --model Server/Models/Livestock/Tamework_Example.json \
+  --spawner-config Server/Tamework/Items/Spawners/TwSpawnerExample.json \
+  --roles Mob_Tamework_Example,Mob_Tamework_Example_Baby \
+  --include-empty-set Fur \
+  --icon-template "Icons/ItemsGenerated/Tamework_Spawner_{set_fur}.png" \
   --icon-override-mode group \
   --camera-auto-frame \
-  --write-spawner Server/Tamework/Items/Spawners/Spawner_Tamework_Example.generated.json \
+  --write-spawner .tmp/TwSpawnerExample.generated.json \
   --renderer-jobs-out .tmp/sheep_render_jobs.json
 ```
 

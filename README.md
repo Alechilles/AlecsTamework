@@ -71,7 +71,22 @@ Integrating Tamework is usually a content-authoring workflow, not a programming 
 - Add configs for the Tamework systems you want to support.
 - Declare Patchwork as a dependency for asset-only patch packs. Declare Alec's Tamework too when the patch uses Tamework macros or behavior.
 
-In both cases, no Java is required: copy and adapt examples, enable the systems you want through comprehensive configs, and polish. The full setup and implementation details can be found in the wiki.
+### Optional example asset pack
+
+The Tamework plugin jar does not include sample NPCs, sample items, or sample
+progression configs. This keeps a library-only installation dormant until a
+downstream mod supplies matching assets.
+
+Build the optional examples with `./gradlew exampleAssetPack`. Install the
+generated `Alec's Tamework! Examples v<version>.zip` beside the Tamework jar
+and explicitly enable it only when you need the sample graph. The pack is
+disabled by default, declares Tamework as a dependency, and can be omitted
+from production servers.
+
+In both cases, no Java is required: install the optional example pack when you
+need a starting point, then copy and adapt its assets. Enable the systems you
+want through comprehensive configs, and polish. The full setup and
+implementation details can be found in the wiki.
 
 Advanced integrations should use the Public API for canonical profiles and
 namespaced profile extension data instead of writing Tamework metadata or

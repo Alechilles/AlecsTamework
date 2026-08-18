@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.config;
 
 /**
- * Centralized IDs for example items and NPC roles.
+ * Centralized IDs supplied by the optional Tamework example asset pack.
  */
 public final class TameworkIds {
     public static final String ITEM_SPAWNER_EXAMPLE = "Spawner_Tamework_Example";

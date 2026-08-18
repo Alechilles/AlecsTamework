@@ -17,6 +17,8 @@ version = property('mod_version')
 def patchworkVersion = property('patchwork_version')
 def telemetryCoordinates = "com.alechilles:alecstelemetry-runtime:${property('alecstelemetry_version')}"
 def embeddedAssetPackDirectory = layout.buildDirectory.dir('generated/embeddedAssetPack')
+def exampleAssetPackDirectory = layout.buildDirectory.dir('generated/exampleAssetPack')
+def exampleAssetPackVersion = project.version.toString()
 
 java {
     toolchain {
@@ -91,6 +93,44 @@ tasks.register('prepareEmbeddedAssetPack', Sync) {
     into(embeddedAssetPackDirectory)
 }
 
+tasks.register('prepareExampleAssetPack', Sync) {
+    description = 'Prepares the optional Tamework example asset pack.'
+    group = 'hytale'
+    from(layout.projectDirectory.dir('examples/asset-pack')) {
+        exclude 'README.md'
+        filesMatching('manifest.json') {
+            expand(tameworkVersion: exampleAssetPackVersion)
+        }
+    }
+    into(exampleAssetPackDirectory)
+}
+
+tasks.register('validateExampleAssetPackManifest') {
+    description = 'Validates the optional Tamework example asset-pack manifest.'
+    group = 'verification'
+    dependsOn(tasks.named('prepareExampleAssetPack'))
+    doLast {
+        def manifestFile = exampleAssetPackDirectory.get().file('manifest.json').asFile
+        def manifest = new groovy.json.JsonSlurper().parse(manifestFile)
+        assert manifest.Group == 'Alechilles'
+        assert manifest.Name == "Alec's Tamework! Examples"
+        assert manifest.Version == exampleAssetPackVersion
+        assert manifest.Dependencies == [("Alechilles:Alec's Tamework!"): '*']
+        assert manifest.DisabledByDefault == true
+        assert manifest.IncludesAssetPack == true
+        assert !manifest.containsKey('Main')
+    }
+}
+
+tasks.register('exampleAssetPack', Zip) {
+    description = 'Packages the optional Tamework example asset pack.'
+    group = 'hytale'
+    dependsOn(tasks.named('validateExampleAssetPackManifest'))
+    archiveFileName = "Alec's Tamework! Examples v${project.version}.zip"
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    from(exampleAssetPackDirectory)
+}
+
 tasks.named('classes') {
     dependsOn(tasks.named('prepareEmbeddedAssetPack'))
 }
@@ -117,6 +157,7 @@ tasks.named('shadowJar', ShadowJar) {
 
 tasks.named('assemble') {
     dependsOn(tasks.named('shadowJar'))
+    dependsOn(tasks.named('exampleAssetPack'))
 }
 
 tasks.withType(Test).configureEach {

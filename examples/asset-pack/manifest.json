@@ -1,0 +1,22 @@
+{
+  "Group": "Alechilles",
+  "Name": "Alec's Tamework! Examples",
+  "Version": "${tameworkVersion}",
+  "Description": "Optional Tamework example NPCs, items, configs, and asset-patch fixtures.",
+  "Authors": [
+    {
+      "Name": "Alec (Alechilles)",
+      "Email": "",
+      "Url": "https://www.curseforge.com/members/alechilles/projects"
+    }
+  ],
+  "ServerVersion": "*",
+  "Dependencies": {
+    "Alechilles:Alec's Tamework!": "*"
+  },
+  "OptionalDependencies": {},
+  "LoadBefore": {},
+  "DisabledByDefault": true,
+  "IncludesAssetPack": true,
+  "SubPlugins": []
+}

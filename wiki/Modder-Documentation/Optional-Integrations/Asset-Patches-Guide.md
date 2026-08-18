@@ -83,7 +83,10 @@ Mod-data paths remain below a registered data root. `TameworkSetting` is retired
 - `TameworkHookInstruction` inserts a `TameworkHook` sensor branch.
 - `TameworkStateInstruction` inserts a branch referencing a Tamework instruction component.
 
-Macros require Tamework to be installed and still need explicit paths and anchors. Tamework's example uses `Server/NPC/Roles/_Core/Templates/Tamework_Example_Patch.json`, `Server/NPC/Roles/Creature/Mammal/Mob_Tamework_Example_Patch.json`, and `Server/Patchwork/Patches/Examples/Tamework_Example_Patch.json`.
+Macros require Tamework to be installed and still need explicit paths and anchors. The optional `Alec's Tamework! Examples` pack uses
+`Server/NPC/Roles/_Core/Templates/Tamework_Example_Patch.json`,
+`Server/NPC/Roles/Creature/Mammal/Mob_Tamework_Example_Patch.json`, and
+`Server/Patchwork/Patches/Examples/Tamework_Example_Patch.json`.
 
 ## Administration and Reloads
 

@@ -240,17 +240,18 @@ Fields:
 The role allowlist controls live command recipients and presentation access;
 the bonded roster family policies remain the lifecycle and capacity authority.
 
-## Bundled Example Is Not a Player Acquisition Flow
+## Optional Example Is Not a Player Acquisition Flow
 
 `Tamework_Command_Whistle_Example` and `TwCommandExample` are development and
-configuration examples. The example covers the HyDragon-relevant `Follow`,
-`Hold`, `Recall`, and `AttackTarget` command path, but Tamework ships no recipe
-or other polished acquisition path for that item. It must be given by an
-operator or development workflow.
+configuration examples in the optional `Alec's Tamework! Examples` pack. The
+example covers the HyDragon-relevant `Follow`, `Hold`, `Recall`, and
+`AttackTarget` command path, but the pack includes no recipe or other polished
+acquisition path for that item. Enable the pack and give it to an operator or
+development workflow when needed.
 
 A production downstream mod should provide its own item identity, localized
 presentation, command config, and recipe or other explicit acquisition
-mechanic. Treat the bundled example as reference material, not as a finished
+mechanic. Treat the optional example as reference material, not as a finished
 player-facing tool.
 
 ## Minimal Example

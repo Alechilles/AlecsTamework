@@ -1,0 +1,13 @@
+npcRoles.Mob_Tamework_Example.name=Exemplo do Tamework
+npcRoles.Mob_Tamework_Example_Simple.name=Exemplo do Tamework (Simples)
+npcRoles.Mob_Tamework_Example_Patch.name=Exemplo do Tamework (Patch)
+items.Spawner_Tamework_Example.name=Gerador de Exemplo do Tamework
+items.Spawner_Tamework_Example.description=Gera o NPC de exemplo do Tamework.
+items.Tamework_Nametag_Example.name=Etiqueta de Nome de Exemplo do Tamework
+items.Tamework_Nametag_Example.description=Dá nome a um NPC domesticado que pertence a você.
+items.Tamework_Command_Whistle_Example.name=Apito de Comando de Exemplo do Tamework
+items.Tamework_Command_Whistle_Example.description=Vincula mascotes e emite ordens de item de comando.
+npcRoles.Tamework_Example.name=Exemplo do Tamework
+npcRoles.Tamework_Example_Simple.name=Exemplo do Tamework (Simples)
+npcRoles.Tamework_Example_Vanilla.name=Exemplo do Tamework (Vanilla)
+npcRoles.Tamework_Example_Simple_Vanilla.name=Exemplo do Tamework (Simples, Vanilla)

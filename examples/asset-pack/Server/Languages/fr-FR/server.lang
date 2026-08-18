@@ -1,0 +1,13 @@
+npcRoles.Mob_Tamework_Example.name=Exemple Tamework
+npcRoles.Mob_Tamework_Example_Simple.name=Exemple Tamework (simple)
+npcRoles.Mob_Tamework_Example_Patch.name=Exemple Tamework (patch)
+items.Spawner_Tamework_Example.name=Générateur d'exemple Tamework
+items.Spawner_Tamework_Example.description=Fait apparaître le PNJ d'exemple Tamework.
+items.Tamework_Nametag_Example.name=Étiquette de nom d'exemple Tamework
+items.Tamework_Nametag_Example.description=Nomme un PNJ apprivoisé qui vous appartient.
+items.Tamework_Command_Whistle_Example.name=Sifflet de commande d'exemple Tamework
+items.Tamework_Command_Whistle_Example.description=Lie les familiers et lance des ordres d'objet de commande.
+npcRoles.Tamework_Example.name=Exemple Tamework
+npcRoles.Tamework_Example_Simple.name=Exemple Tamework (simple)
+npcRoles.Tamework_Example_Vanilla.name=Exemple Tamework (vanilla)
+npcRoles.Tamework_Example_Simple_Vanilla.name=Exemple Tamework (simple, vanilla)

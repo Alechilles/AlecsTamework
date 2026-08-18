@@ -168,7 +168,10 @@ Accepted values:
 - `Replace`: replace the base description text with Tamework captured-spawner output
 
 ## Defaults and Cross-System Notes
-- The shipped example asset is `src/main/resources/Server/Tamework/Items/Spawners/Spawner_Tamework_Example.json`.
+- The sample asset is in the optional pack at
+  `examples/asset-pack/Server/Tamework/Items/Spawners/TwSpawnerExample.json`.
+  Install and explicitly enable `Alec's Tamework! Examples` before using it;
+  the main Tamework jar does not ship enabled sample assets.
 - Captured Tamework names and progression metadata are preserved on the item and restored on spawn.
 - Capture owner clearing and spawn owner assignment are settings-owned runtime policy.
 - Spawner capture and release preserve canonical profile identity and tool-link
