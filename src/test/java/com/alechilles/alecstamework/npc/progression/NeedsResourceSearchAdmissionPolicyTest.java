@@ -6,6 +6,7 @@ import static com.alechilles.alecstamework.performance.RuntimePressureLevel.NORM
 import static com.alechilles.alecstamework.performance.RuntimePressureLevel.WARM;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.UUID;
@@ -23,6 +24,8 @@ class NeedsResourceSearchAdmissionPolicyTest {
         assertFalse(policy.maySearch(HOT, 10L));
         assertTrue(policy.maySearch(EMERGENCY, 8L));
         assertFalse(policy.maySearch(EMERGENCY, 12L));
+        assertTrue(policy.maySearch(EMERGENCY, -8L));
+        assertFalse(policy.maySearch(EMERGENCY, -12L));
     }
 
     @Test
@@ -31,5 +34,22 @@ class NeedsResourceSearchAdmissionPolicyTest {
 
         assertTrue(ttl >= 100L && ttl <= 300L);
         assertEquals(ttl, policy.deferredTtlMs(new UUID(1L, 2L)));
+    }
+
+    @Test
+    void deferredTtlCoversAllInclusiveValuesAndNegativeMixedBits() {
+        for (long mixedUuidBits = 0L; mixedUuidBits < 201L; mixedUuidBits++) {
+            assertEquals(
+                    100L + mixedUuidBits,
+                    policy.deferredTtlMs(new UUID(mixedUuidBits, 0L)));
+        }
+
+        assertEquals(300L, policy.deferredTtlMs(new UUID(-1L, 0L)));
+    }
+
+    @Test
+    void nonnullInputsAreRequired() {
+        assertThrows(NullPointerException.class, () -> policy.maySearch(null, 0L));
+        assertThrows(NullPointerException.class, () -> policy.deferredTtlMs(null));
     }
 }
