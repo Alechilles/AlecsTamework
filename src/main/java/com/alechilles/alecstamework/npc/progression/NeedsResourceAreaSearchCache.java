@@ -1,13 +1,16 @@
 package com.alechilles.alecstamework.npc.progression;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
 /**
- * Short-lived area-level cache for needs resource search results shared by nearby companions.
+ * Short-lived area-level cache for immutable needs-resource candidates shared
+ * by nearby companions.
  */
 final class NeedsResourceAreaSearchCache {
     static final int POSITION_CACHE_CELL_SIZE_BLOCKS = 4;
@@ -19,12 +22,123 @@ final class NeedsResourceAreaSearchCache {
         this.maxEntries = Math.max(16, maxEntries);
     }
 
+    /**
+     * Returns a non-expired immutable candidate snapshot for a coordinator.
+     */
+    @Nullable
+    NeedsResourceCandidates.Snapshot getSnapshot(@Nullable AreaKey key, long nowMs) {
+        CachedAreaSearch cached = getCached(key, nowMs);
+        return cached != null ? cached.toSnapshot(nowMs) : null;
+    }
+
+    @Nullable
+    NeedsResourceCandidates.Snapshot get(@Nullable AreaKey key, long nowMs) {
+        return getSnapshot(key, nowMs);
+    }
+
+    /**
+     * Compatibility adapter for callers that still expect one mutable target
+     * vector. The vector is created only after a candidate passes selection.
+     */
     @Nullable
     AreaSearchSnapshot get(@Nullable AreaKey key,
                            @Nullable Vector3d currentPosition,
                            double radius,
                            int verticalScanRadius,
                            long nowMs) {
+        CachedAreaSearch cached = getCached(key, nowMs);
+        if (cached == null) {
+            return null;
+        }
+        NeedsResourceCandidates.Snapshot snapshot = cached.snapshot();
+        NeedsResourceCandidates.Candidate candidate = snapshot.select(
+                currentPosition,
+                radius,
+                verticalScanRadius,
+                ACCEPT_ALL_CANDIDATES
+        );
+        if (snapshot.hasCandidates() && candidate == null) {
+            return null;
+        }
+        long remainingTtlMs = Math.max(1L, cached.expiresAtMs() - nowMs);
+        if (candidate == null) {
+            return AreaSearchSnapshot.miss(
+                    snapshot.foundSource(),
+                    snapshot.sourceInConsumeRange(),
+                    2.0,
+                    remainingTtlMs
+            );
+        }
+        return AreaSearchSnapshot.hit(
+                new Vector3d(candidate.x(), candidate.y(), candidate.z()),
+                snapshot.foundSource(),
+                snapshot.sourceInConsumeRange(),
+                candidate.approachRadius(),
+                remainingTtlMs
+        );
+    }
+
+    /**
+     * Stores immutable candidates for new coordinator callers.
+     */
+    void put(@Nullable AreaKey key,
+             @Nonnull NeedsResourceCandidates.Snapshot snapshot,
+             long nowMs) {
+        if (key == null || !shouldShareResult(snapshot.hasCandidates(), snapshot.foundSource())) {
+            return;
+        }
+        pruneExpired(nowMs);
+        if (entries.size() >= maxEntries) {
+            return;
+        }
+        entries.put(key, CachedAreaSearch.from(snapshot, nowMs));
+    }
+
+    /**
+     * Compatibility adapter for the former single-target cache API.
+     */
+    void put(@Nullable AreaKey key, @Nonnull AreaSearchSnapshot snapshot, long nowMs) {
+        if (snapshot.target() == null) {
+            put(
+                    key,
+                    new NeedsResourceCandidates.Snapshot(
+                            List.of(),
+                            snapshot.foundConsumableSource(),
+                            snapshot.foundConsumableSourceInConsumeRange(),
+                            snapshot.ttlMs()
+                    ),
+                    nowMs
+            );
+            return;
+        }
+        NeedsResourceCandidates.Candidate candidate = toCandidate(snapshot.target(), snapshot.approachRadius());
+        if (candidate == null) {
+            return;
+        }
+        put(
+                key,
+                new NeedsResourceCandidates.Snapshot(
+                        List.of(candidate),
+                        snapshot.foundConsumableSource(),
+                        snapshot.foundConsumableSourceInConsumeRange(),
+                        snapshot.ttlMs()
+                ),
+                nowMs
+        );
+    }
+
+    void clearForTests() {
+        entries.clear();
+    }
+
+    static boolean shouldShareResult(boolean hasTarget, boolean foundConsumableSource) {
+        return hasTarget || !foundConsumableSource;
+    }
+
+    private static final Predicate<NeedsResourceCandidates.Candidate> ACCEPT_ALL_CANDIDATES = candidate -> true;
+
+    @Nullable
+    private CachedAreaSearch getCached(@Nullable AreaKey key, long nowMs) {
         if (key == null) {
             return null;
         }
@@ -36,34 +150,7 @@ final class NeedsResourceAreaSearchCache {
             entries.remove(key, cached);
             return null;
         }
-        if (!NeedsResourceSearchCachePolicy.isCachedTargetUsable(
-                currentPosition,
-                cached.target(),
-                radius,
-                verticalScanRadius
-        )) {
-            return null;
-        }
-        return cached.toSnapshot(nowMs);
-    }
-
-    void put(@Nullable AreaKey key, @Nonnull AreaSearchSnapshot snapshot, long nowMs) {
-        if (key == null || !shouldShareResult(snapshot.hasTarget(), snapshot.foundConsumableSource())) {
-            return;
-        }
-        pruneExpired(nowMs);
-        if (entries.size() >= maxEntries) {
-            return;
-        }
-        entries.put(key, CachedAreaSearch.from(snapshot, nowMs));
-    }
-
-    void clearForTests() {
-        entries.clear();
-    }
-
-    static boolean shouldShareResult(boolean hasTarget, boolean foundConsumableSource) {
-        return hasTarget || !foundConsumableSource;
+        return cached;
     }
 
     private void pruneExpired(long nowMs) {
@@ -73,6 +160,32 @@ final class NeedsResourceAreaSearchCache {
         entries.entrySet().removeIf(entry -> entry == null
                 || entry.getValue() == null
                 || nowMs >= entry.getValue().expiresAtMs());
+    }
+
+    @Nullable
+    private static NeedsResourceCandidates.Candidate toCandidate(@Nonnull Vector3d target,
+                                                                  double approachRadius) {
+        if (!Double.isFinite(target.x)
+                || !Double.isFinite(target.y)
+                || !Double.isFinite(target.z)) {
+            return null;
+        }
+        return new NeedsResourceCandidates.Candidate(
+                blockCoordinate(target.x),
+                blockCoordinate(target.y),
+                blockCoordinate(target.z),
+                approachRadius
+        );
+    }
+
+    private static int blockCoordinate(double coordinate) {
+        if (coordinate <= Integer.MIN_VALUE) {
+            return Integer.MIN_VALUE;
+        }
+        if (coordinate >= Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        return (int) Math.floor(coordinate);
     }
 
     record AreaKey(@Nonnull String worldName,
@@ -114,6 +227,9 @@ final class NeedsResourceAreaSearchCache {
         }
     }
 
+    /**
+     * Legacy single-target result retained while callers migrate to snapshots.
+     */
     record AreaSearchSnapshot(@Nullable Vector3d target,
                               boolean foundConsumableSource,
                               boolean foundConsumableSourceInConsumeRange,
@@ -121,12 +237,41 @@ final class NeedsResourceAreaSearchCache {
                               long ttlMs) {
         @Nonnull
         static AreaSearchSnapshot hit(@Nonnull Vector3d target, double approachRadius, long ttlMs) {
-            return new AreaSearchSnapshot(new Vector3d(target), true, true, approachRadius, ttlMs);
+            return hit(target, true, true, approachRadius, ttlMs);
+        }
+
+        @Nonnull
+        private static AreaSearchSnapshot hit(@Nonnull Vector3d target,
+                                              boolean foundConsumableSource,
+                                              boolean foundConsumableSourceInConsumeRange,
+                                              double approachRadius,
+                                              long ttlMs) {
+            return new AreaSearchSnapshot(
+                    target,
+                    foundConsumableSource,
+                    foundConsumableSourceInConsumeRange,
+                    approachRadius,
+                    ttlMs
+            );
         }
 
         @Nonnull
         static AreaSearchSnapshot sourceAbsentMiss(long ttlMs) {
-            return new AreaSearchSnapshot(null, false, false, 2.0, ttlMs);
+            return miss(false, false, 2.0, ttlMs);
+        }
+
+        @Nonnull
+        private static AreaSearchSnapshot miss(boolean foundConsumableSource,
+                                               boolean foundConsumableSourceInConsumeRange,
+                                               double approachRadius,
+                                               long ttlMs) {
+            return new AreaSearchSnapshot(
+                    null,
+                    foundConsumableSource,
+                    foundConsumableSourceInConsumeRange,
+                    approachRadius,
+                    ttlMs
+            );
         }
 
         boolean hasTarget() {
@@ -134,29 +279,22 @@ final class NeedsResourceAreaSearchCache {
         }
     }
 
-    private record CachedAreaSearch(@Nullable Vector3d target,
-                                    boolean foundConsumableSource,
-                                    boolean foundConsumableSourceInConsumeRange,
-                                    double approachRadius,
+    private record CachedAreaSearch(@Nonnull NeedsResourceCandidates.Snapshot snapshot,
                                     long expiresAtMs) {
         @Nonnull
-        static CachedAreaSearch from(@Nonnull AreaSearchSnapshot snapshot, long nowMs) {
+        static CachedAreaSearch from(@Nonnull NeedsResourceCandidates.Snapshot snapshot, long nowMs) {
             return new CachedAreaSearch(
-                    snapshot.target() != null ? new Vector3d(snapshot.target()) : null,
-                    snapshot.foundConsumableSource(),
-                    snapshot.foundConsumableSourceInConsumeRange(),
-                    snapshot.approachRadius(),
+                    snapshot,
                     nowMs + Math.max(1L, snapshot.ttlMs())
             );
         }
 
         @Nonnull
-        AreaSearchSnapshot toSnapshot(long nowMs) {
-            return new AreaSearchSnapshot(
-                    target != null ? new Vector3d(target) : null,
-                    foundConsumableSource,
-                    foundConsumableSourceInConsumeRange,
-                    approachRadius,
+        NeedsResourceCandidates.Snapshot toSnapshot(long nowMs) {
+            return new NeedsResourceCandidates.Snapshot(
+                    snapshot.candidates(),
+                    snapshot.foundSource(),
+                    snapshot.sourceInConsumeRange(),
                     Math.max(1L, expiresAtMs - nowMs)
             );
         }
