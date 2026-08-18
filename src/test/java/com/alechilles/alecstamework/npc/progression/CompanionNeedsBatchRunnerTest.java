@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -229,5 +230,89 @@ class CompanionNeedsBatchRunnerTest {
         assertEquals(0, entityResolutions.get());
         assertEquals(0, dispatches.get());
         assertFalse(state.isDispatchPending());
+    }
+
+    @Test
+    void failedDueUpdateStaysRegisteredAndRetriesOnLaterRun() {
+        CompanionNeedsRuntimeRegistry.WorldState state =
+                CompanionNeedsRuntimeRegistry.newStateForTests();
+        UUID npcId = new UUID(0L, 101L);
+        state.register(npcId, -2_000L);
+        state.schedule().reschedule(npcId, 0L);
+        AtomicInteger attempts = new AtomicInteger();
+        CompanionNeedsBatchRunner runner = new CompanionNeedsBatchRunner(ignored -> {
+            if (attempts.getAndIncrement() == 0) {
+                throw new IllegalStateException("injected one-time failure");
+            }
+            return CompanionNeedsScheduledUpdate.outcomeForRatiosForTests(
+                    0.9,
+                    0.9,
+                    false,
+                    false,
+                    2_000L
+            );
+        });
+
+        CompanionNeedsBatchRunner.BatchResult failedRun = assertDoesNotThrow(() -> runner.run(
+                null,
+                state,
+                0L,
+                () -> 0L
+        ));
+
+        assertEquals(1, failedRun.processed());
+        assertFalse(failedRun.hasRemainingDue());
+        assertTrue(state.hasMember(npcId));
+        assertEquals(
+                CompanionNeedsBatchRunner.FAILED_UPDATE_RETRY_DELAY_MS,
+                state.schedule().nextDueAtMs()
+        );
+
+        CompanionNeedsBatchRunner.BatchResult recoveredRun = runner.run(
+                null,
+                state,
+                CompanionNeedsBatchRunner.FAILED_UPDATE_RETRY_DELAY_MS,
+                () -> 0L
+        );
+
+        assertEquals(1, recoveredRun.processed());
+        assertFalse(recoveredRun.hasRemainingDue());
+        assertEquals(2, attempts.get());
+        assertTrue(state.hasMember(npcId));
+    }
+
+    @Test
+    void failedSuppressionUpdateDoesNotAbortLaterActiveIds() {
+        CompanionNeedsRuntimeRegistry.WorldState state =
+                CompanionNeedsRuntimeRegistry.newStateForTests();
+        UUID failingId = new UUID(0L, 102L);
+        UUID succeedingId = new UUID(0L, 103L);
+        state.register(failingId, 1_000_000L);
+        state.register(succeedingId, 1_000_000L);
+        state.setSuppressionActive(failingId, true);
+        state.setSuppressionActive(succeedingId, true);
+        AtomicInteger failingAttempts = new AtomicInteger();
+        List<UUID> attemptedIds = new ArrayList<>();
+        CompanionNeedsBatchRunner runner = new CompanionNeedsBatchRunner(
+                ignored -> null,
+                npcId -> {
+                    attemptedIds.add(npcId);
+                    if (npcId.equals(failingId) && failingAttempts.getAndIncrement() == 0) {
+                        throw new IllegalStateException("injected one-time suppression failure");
+                    }
+                    return false;
+                }
+        );
+
+        runner.run(null, state, 0L, () -> 0L);
+
+        assertEquals(List.of(failingId, succeedingId), attemptedIds);
+        assertTrue(state.suppressionIds().contains(failingId));
+        assertFalse(state.suppressionIds().contains(succeedingId));
+
+        runner.run(null, state, 0L, () -> 0L);
+
+        assertEquals(2, failingAttempts.get());
+        assertFalse(state.suppressionIds().contains(failingId));
     }
 }

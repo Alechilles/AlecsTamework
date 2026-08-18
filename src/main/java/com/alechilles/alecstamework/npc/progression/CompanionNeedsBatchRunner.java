@@ -14,6 +14,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.LongSupplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -26,24 +28,34 @@ import javax.annotation.Nullable;
 public final class CompanionNeedsBatchRunner {
     static final int MAX_UPDATES_PER_BATCH = 128;
     static final long MAX_BATCH_NANOS = 500_000L;
+    static final long FAILED_UPDATE_RETRY_DELAY_MS = 250L;
     private static final long BASE_INTERVAL_MS = 2_000L;
     private static final long WARNING_THROTTLE_MS = 60L * 1_000L;
     private static final long WARNING_PRUNE_WINDOW_MS = 24L * 60L * 60L * 1_000L;
     private static final String WARNING_SUFFIX = " linked NPCs dying from malnourishment";
+    private static final Logger LOGGER = Logger.getLogger(CompanionNeedsBatchRunner.class.getName());
 
     private final NpcUpdate testUpdate;
+    private final SuppressionUpdate testSuppressionUpdate;
     private final TameworkUiMessageService uiMessageService = new TameworkUiMessageService();
     private final StoreScopedState<WarningState> warningStatesByStore =
             new StoreScopedState<>(WarningState::new);
 
     /** Creates a runner that resolves and updates NPCs through the current world and store. */
     public CompanionNeedsBatchRunner() {
-        this.testUpdate = null;
+        this(null, null);
     }
 
     /** Creates a runner with a package-local updater for deterministic scheduler tests. */
     CompanionNeedsBatchRunner(@Nonnull NpcUpdate testUpdate) {
+        this(testUpdate, null);
+    }
+
+    /** Creates a runner with package-local seams for due and suppression behavior tests. */
+    CompanionNeedsBatchRunner(@Nonnull NpcUpdate testUpdate,
+                              @Nonnull SuppressionUpdate testSuppressionUpdate) {
         this.testUpdate = testUpdate;
+        this.testSuppressionUpdate = testSuppressionUpdate;
     }
 
     /**
@@ -76,9 +88,10 @@ public final class CompanionNeedsBatchRunner {
                 nowMs,
                 nanoClock,
                 startedAtNs,
-                starvingLinkedByOwner
+                starvingLinkedByOwner,
+                warningState
         );
-        processSuppression(world, store, state);
+        processSuppression(world, store, state, warningState, nowMs);
         boolean hasRemainingDue = state.hasDue(nowMs);
         if (warningState != null) {
             Map<UUID, Integer> counts = warningState.pendingStarvingLinkedByOwner
@@ -97,7 +110,8 @@ public final class CompanionNeedsBatchRunner {
                            long nowMs,
                            @Nonnull LongSupplier nanoClock,
                            long startedAtNs,
-                           @Nullable WarningAccumulator starvingLinkedByOwner) {
+                           @Nullable WarningAccumulator starvingLinkedByOwner,
+                           @Nullable WarningState warningState) {
         int attempted = 0;
         while (attempted < MAX_UPDATES_PER_BATCH) {
             long dueAtMs = state.schedule().nextDueAtMs();
@@ -113,13 +127,34 @@ public final class CompanionNeedsBatchRunner {
                 break;
             }
             attempted++;
-            CompanionNeedsScheduledUpdate.Outcome outcome = updateNpc(world, state, npcId);
-            if (outcome == null) {
-                state.remove(npcId);
-                continue;
+            try {
+                CompanionNeedsScheduledUpdate.Outcome outcome = updateNpc(world, state, npcId);
+                if (outcome == null) {
+                    state.remove(npcId);
+                    continue;
+                }
+                reschedule(state, npcId, nowMs, outcome);
+                collectMalnourishmentCount(store, world, npcId, outcome, starvingLinkedByOwner);
+            } catch (RuntimeException failure) {
+                if (state.hasMember(npcId)) {
+                    long retryAtMs = safeAdd(nowMs, FAILED_UPDATE_RETRY_DELAY_MS);
+                    state.schedule().reschedule(npcId, retryAtMs);
+                    logFailure(
+                            warningState,
+                            store,
+                            npcId,
+                            "needs update",
+                            "retry scheduled at " + retryAtMs + " ms",
+                            failure,
+                            nowMs
+                    );
+                    // A saturated world clock cannot represent a later timestamp. Stop this
+                    // batch so the requeued UUID is never polled again in the same run.
+                    if (retryAtMs <= nowMs) {
+                        break;
+                    }
+                }
             }
-            reschedule(state, npcId, nowMs, outcome);
-            collectMalnourishmentCount(store, world, npcId, outcome, starvingLinkedByOwner);
         }
         return attempted;
     }
@@ -167,8 +202,11 @@ public final class CompanionNeedsBatchRunner {
 
     private void processSuppression(@Nullable World world,
                                     @Nullable Store<EntityStore> store,
-                                    @Nonnull CompanionNeedsRuntimeRegistry.WorldState state) {
-        if (world == null || store == null || !state.hasSuppressionActive()) {
+                                    @Nonnull CompanionNeedsRuntimeRegistry.WorldState state,
+                                    @Nullable WarningState warningState,
+                                    long nowMs) {
+        if (!state.hasSuppressionActive()
+                || (testSuppressionUpdate == null && (world == null || store == null))) {
             return;
         }
         Iterator<UUID> iterator = state.suppressionIds().iterator();
@@ -178,17 +216,76 @@ public final class CompanionNeedsBatchRunner {
                 iterator.remove();
                 continue;
             }
-            Ref<EntityStore> npcRef = resolveRef(world, store, npcId);
-            if (npcRef == null) {
-                iterator.remove();
-                continue;
-            }
-            String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
-            CompanionNeedsService.tickNaturalRegenSuppressionOnly(npcRef, store, roleId);
-            if (!CompanionNeedsService.requiresFrequentNaturalRegenSuppressionTick(npcRef, store, roleId)) {
-                iterator.remove();
+            try {
+                if (!runSuppressionUpdate(world, store, npcId)) {
+                    iterator.remove();
+                }
+            } catch (RuntimeException failure) {
+                if (!state.hasMember(npcId)) {
+                    iterator.remove();
+                }
+                logFailure(
+                        warningState,
+                        store,
+                        npcId,
+                        "regeneration suppression update",
+                        "retained for a later tick",
+                        failure,
+                        nowMs
+                );
             }
         }
+    }
+
+    private boolean runSuppressionUpdate(@Nullable World world,
+                                         @Nullable Store<EntityStore> store,
+                                         @Nonnull UUID npcId) {
+        if (testSuppressionUpdate != null) {
+            return testSuppressionUpdate.update(npcId);
+        }
+        if (world == null || store == null) {
+            return true;
+        }
+        Ref<EntityStore> npcRef = resolveRef(world, store, npcId);
+        if (npcRef == null) {
+            return false;
+        }
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        CompanionNeedsService.tickNaturalRegenSuppressionOnly(npcRef, store, roleId);
+        return CompanionNeedsService.requiresFrequentNaturalRegenSuppressionTick(
+                npcRef,
+                store,
+                roleId
+        );
+    }
+
+    private static void logFailure(@Nullable WarningState warningState,
+                                   @Nullable Store<EntityStore> store,
+                                   @Nonnull UUID npcId,
+                                   @Nonnull String operation,
+                                   @Nonnull String recovery,
+                                   @Nonnull RuntimeException failure,
+                                   long nowMs) {
+        if (warningState == null || store == null || !shouldLogFailure(warningState, nowMs)
+                || !LOGGER.isLoggable(Level.WARNING)) {
+            return;
+        }
+        warningState.lastFailureWarningAtMs = nowMs;
+        String storeId = Integer.toHexString(System.identityHashCode(store));
+        LOGGER.log(
+                Level.WARNING,
+                "Companion needs " + operation
+                        + " failed for npc=" + npcId
+                        + ", store=" + storeId
+                        + "; " + recovery,
+                failure
+        );
+    }
+
+    private static boolean shouldLogFailure(@Nonnull WarningState warningState, long nowMs) {
+        Long lastFailureWarningAtMs = warningState.lastFailureWarningAtMs;
+        return lastFailureWarningAtMs == null
+                || nowMs >= safeAdd(lastFailureWarningAtMs, WARNING_THROTTLE_MS);
     }
 
     @Nullable
@@ -326,6 +423,11 @@ public final class CompanionNeedsBatchRunner {
         CompanionNeedsScheduledUpdate.Outcome update(@Nonnull UUID npcId);
     }
 
+    @FunctionalInterface
+    interface SuppressionUpdate {
+        boolean update(@Nonnull UUID npcId);
+    }
+
     /** Aggregates linked-owner warnings across partial due batches. */
     static final class WarningAccumulator {
         private final Map<UUID, Integer> countsByOwner = new HashMap<>();
@@ -354,5 +456,6 @@ public final class CompanionNeedsBatchRunner {
     private static final class WarningState {
         private final Map<UUID, Long> lastWarningByOwner = new HashMap<>();
         private final WarningAccumulator pendingStarvingLinkedByOwner = new WarningAccumulator();
+        private Long lastFailureWarningAtMs;
     }
 }
