@@ -27,7 +27,6 @@ import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -55,20 +54,27 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     private final CommandTargetHudAttachmentResolver attachmentResolver;
     private final CommandTargetHudTameRequirementResolver tameRequirementResolver;
     private final CommandTargetHudActivationTracker activationTracker;
-    private final CommandTargetInspector targetInspector = new CommandTargetInspector();
+    private final CommandTargetInspector targetInspector;
     private final Map<UUID, HudState> stateByPlayer = new HashMap<>();
     private final Map<StaticTargetCacheKey, StaticTargetDisplay> staticTargetCache = new HashMap<>();
     private final Map<UUID, DebugLogState> debugLogStateByPlayer = new HashMap<>();
     private final Map<Store<EntityStore>, StoreTickState> storeTickStateByStore = new IdentityHashMap<>();
 
     public CommandTargetHudService(CommandItemRegistry registry) {
-        this(registry, new CommandTargetHudActivationTracker());
+        this(registry, new CommandTargetHudActivationTracker(), new CommandTargetInspector());
     }
 
     public CommandTargetHudService(CommandItemRegistry registry,
                                    @Nonnull CommandTargetHudActivationTracker activationTracker) {
+        this(registry, activationTracker, new CommandTargetInspector());
+    }
+
+    public CommandTargetHudService(CommandItemRegistry registry,
+                                   @Nonnull CommandTargetHudActivationTracker activationTracker,
+                                   @Nonnull CommandTargetInspector targetInspector) {
         this.registry = registry;
         this.activationTracker = activationTracker;
+        this.targetInspector = targetInspector;
         this.linkPolicyService = new CommandLinkPolicyService();
         CommandNpcNameResolver nameResolver = new CommandNpcNameResolver();
         this.loadedSnapshotService = new CommandLoadedNpcStatusSnapshotService(
@@ -107,11 +113,15 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     private void processCandidatePlayers(@Nonnull Store<EntityStore> store,
                                           @Nonnull StoreTickState tickState,
                                           long nowMs) {
-        List<UUID> selectedCandidates = selectCandidatesForCurrentPass(
-                activationTracker.candidatePlayerUuids(),
-                tickState
-        );
-        for (UUID playerUuid : selectedCandidates) {
+        CommandTargetHudActivationTracker.CandidateBatch batch =
+                activationTracker.selectCandidateBatch(
+                        MAX_CANDIDATES_PER_PASS,
+                        tickState.nextDirtyCandidateCursor,
+                        tickState.nextCandidateCursor
+                );
+        tickState.nextDirtyCandidateCursor = batch.nextDirtyCursor();
+        tickState.nextCandidateCursor = batch.nextRegularCursor();
+        for (UUID playerUuid : batch.playerUuids()) {
             PlayerCandidate candidate = resolvePlayerCandidate(playerUuid, store);
             if (candidate == null) {
                 debugMissingFromStore(playerUuid, nowMs);
@@ -119,42 +129,6 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             }
             updatePlayer(candidate.playerUuid(), candidate.player(), candidate.playerRef(), store, nowMs);
         }
-    }
-
-    @Nonnull
-    private List<UUID> selectCandidatesForCurrentPass(@Nonnull List<UUID> candidates,
-                                                      @Nonnull StoreTickState tickState) {
-        if (candidates.isEmpty()) {
-            tickState.nextCandidateOffset = 0;
-            return List.of();
-        }
-        ArrayList<UUID> dirtyCandidates = new ArrayList<>();
-        ArrayList<UUID> regularCandidates = new ArrayList<>();
-        for (UUID candidate : candidates) {
-            if (activationTracker.isDirty(candidate)) {
-                dirtyCandidates.add(candidate);
-            } else {
-                regularCandidates.add(candidate);
-            }
-        }
-
-        ArrayList<UUID> selected = new ArrayList<>(Math.min(MAX_CANDIDATES_PER_PASS, candidates.size()));
-        for (UUID candidate : dirtyCandidates) {
-            if (selected.size() >= MAX_CANDIDATES_PER_PASS) {
-                return List.copyOf(selected);
-            }
-            selected.add(candidate);
-        }
-
-        int remaining = MAX_CANDIDATES_PER_PASS - selected.size();
-        List<UUID> selectedRegular = selectCandidatesForPass(regularCandidates, remaining, tickState.nextCandidateOffset);
-        selected.addAll(selectedRegular);
-        tickState.nextCandidateOffset = nextCandidateOffsetForPass(
-                tickState.nextCandidateOffset,
-                selectedRegular.size(),
-                regularCandidates.size()
-        );
-        return selected.isEmpty() ? List.of() : List.copyOf(selected);
     }
 
     private void seedCandidatesFromPlayerSweep(@Nonnull Store<EntityStore> store) {
@@ -225,7 +199,14 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             return;
         }
 
-        TargetCandidate candidate = resolveTarget(player, playerRef, activeCommand, store);
+        TargetCandidate candidate = resolveTarget(
+                playerUuid,
+                player,
+                playerRef,
+                activeCommand,
+                store,
+                nowMs
+        );
         String targetKey = candidate != null ? candidate.key() : null;
         if (!shouldRefresh(previous, targetKey, nowMs)) {
             rememberScan(playerUuid, previous, activeCommand.itemId(), nowMs);
@@ -248,10 +229,12 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     }
 
     @Nullable
-    private TargetCandidate resolveTarget(@Nullable Player player,
+    private TargetCandidate resolveTarget(@Nonnull UUID playerUuid,
+                                          @Nullable Player player,
                                           @Nullable Ref<EntityStore> playerRef,
                                           @Nonnull ActiveCommandItem activeCommand,
-                                          @Nonnull Store<EntityStore> store) {
+                                          @Nonnull Store<EntityStore> store,
+                                          long nowMs) {
         if (player == null || playerRef == null || !playerRef.isValid()) {
             return null;
         }
@@ -260,7 +243,12 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             return null;
         }
 
-        CommandTargetInspector.Target target = targetInspector.resolveTarget(playerRef, store);
+        CommandTargetInspector.Target target = targetInspector.resolveTarget(
+                playerUuid,
+                playerRef,
+                store,
+                nowMs
+        );
         if (target == null) {
             return null;
         }
@@ -715,36 +703,6 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         return ttlMs > 0L && nowMs >= cachedAtMs && nowMs - cachedAtMs < ttlMs;
     }
 
-    static List<UUID> selectCandidatesForPassForTests(@Nonnull List<UUID> candidates,
-                                                       int maxCandidates,
-                                                       int offset) {
-        return selectCandidatesForPass(candidates, maxCandidates, offset);
-    }
-
-    @Nonnull
-    private static List<UUID> selectCandidatesForPass(@Nonnull List<UUID> candidates,
-                                                      int maxCandidates,
-                                                      int offset) {
-        if (candidates.isEmpty() || maxCandidates <= 0) {
-            return List.of();
-        }
-        int size = candidates.size();
-        int limit = Math.min(maxCandidates, size);
-        int start = Math.floorMod(offset, size);
-        ArrayList<UUID> selected = new ArrayList<>(limit);
-        for (int i = 0; i < limit; i++) {
-            selected.add(candidates.get((start + i) % size));
-        }
-        return List.copyOf(selected);
-    }
-
-    private static int nextCandidateOffsetForPass(int offset, int selectedCount, int candidateCount) {
-        if (candidateCount <= 0 || selectedCount <= 0) {
-            return 0;
-        }
-        return Math.floorMod(offset + selectedCount, candidateCount);
-    }
-
     static double resolveRequiredTranquilizerSecondsForTests(@Nullable String requirementId,
                                                             @Nullable String jsonPayload) {
         return TameworkTameFoodDisplayResolver.resolveRequiredTranquilizerSeconds(requirementId, jsonPayload);
@@ -785,7 +743,10 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     private static final class StoreTickState {
         private long nextSweepAtMs;
         private long nextFallbackDiscoveryAtMs;
-        private int nextCandidateOffset;
+        @Nullable
+        private UUID nextDirtyCandidateCursor;
+        @Nullable
+        private UUID nextCandidateCursor;
     }
 
     private record PlayerCandidate(@Nonnull UUID playerUuid,

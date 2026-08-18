@@ -78,7 +78,7 @@ class CommandTargetHudServiceTest {
     void candidateSelectionCapsAndRotatesFromOffset() {
         Assertions.assertEquals(
                 List.of(PLAYER_B, PLAYER_C),
-                CommandTargetHudService.selectCandidatesForPassForTests(
+                selectRegularCandidates(
                         List.of(PLAYER_A, PLAYER_B, PLAYER_C, PLAYER_D),
                         2,
                         1
@@ -90,7 +90,7 @@ class CommandTargetHudServiceTest {
     void candidateSelectionWrapsAroundCandidateList() {
         Assertions.assertEquals(
                 List.of(PLAYER_D, PLAYER_A),
-                CommandTargetHudService.selectCandidatesForPassForTests(
+                selectRegularCandidates(
                         List.of(PLAYER_A, PLAYER_B, PLAYER_C, PLAYER_D),
                         2,
                         3
@@ -292,5 +292,16 @@ class CommandTargetHudServiceTest {
         Assertions.assertNull(CommandTargetHudService.resolveOwnerDisplayNameForTests(
                 new TameworkOwnerComponent(null, "Alec")
         ));
+    }
+
+    private List<UUID> selectRegularCandidates(List<UUID> candidates,
+                                               int maxCandidates,
+                                               int offset) {
+        CommandTargetHudActivationTracker tracker = new CommandTargetHudActivationTracker();
+        for (UUID playerUuid : candidates) {
+            tracker.recordResolvedHand(playerUuid, "Tamework:CommandFlute", true, 1_000L);
+        }
+        UUID cursor = offset == 0 ? null : candidates.get(offset - 1);
+        return tracker.selectCandidateBatch(maxCandidates, null, cursor).playerUuids();
     }
 }

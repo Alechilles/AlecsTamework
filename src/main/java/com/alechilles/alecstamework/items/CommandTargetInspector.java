@@ -14,19 +14,56 @@ import javax.annotation.Nullable;
 /**
  * Resolves the NPC under a command-item user's reticle and whether its link action can apply.
  */
-final class CommandTargetInspector {
+public final class CommandTargetInspector {
     static final float TARGET_DISTANCE = 15.0f;
+    private static final long TARGET_CACHE_MS = 200L;
 
     private final CommandLinkPolicyService linkPolicyService = new CommandLinkPolicyService();
+    private final CommandTargetQueryCache queryCache;
+
+    public CommandTargetInspector() {
+        this(new CommandTargetQueryCache(TARGET_CACHE_MS));
+    }
+
+    CommandTargetInspector(CommandTargetQueryCache queryCache) {
+        this.queryCache = queryCache;
+    }
 
     @Nullable
-    Target resolveTarget(@Nullable Ref<EntityStore> playerRef,
-                         @Nullable Store<EntityStore> store) {
-        if (playerRef == null || !playerRef.isValid() || store == null) {
+    Target resolveTarget(@Nullable UUID playerUuid,
+                         @Nullable Ref<EntityStore> playerRef,
+                         @Nullable Store<EntityStore> store,
+                         long nowMs) {
+        if (playerUuid == null || playerRef == null || !playerRef.isValid() || store == null) {
             return null;
         }
+        UUID targetUuid = queryCache.resolve(
+                store,
+                playerUuid,
+                nowMs,
+                () -> queryTargetUuid(playerRef, store)
+        );
+        return resolveCachedTarget(targetUuid, store);
+    }
+
+    @Nullable
+    private UUID queryTargetUuid(Ref<EntityStore> playerRef, Store<EntityStore> store) {
         Ref<EntityStore> targetRef = TargetUtil.getTargetEntity(playerRef, TARGET_DISTANCE, store);
         if (targetRef == null || !targetRef.isValid() || targetRef.equals(playerRef)) {
+            return null;
+        }
+        NPCEntity npc = store.getComponent(targetRef, NPCEntity.getComponentType());
+        return npc != null ? npc.getUuid() : null;
+    }
+
+    @Nullable
+    private Target resolveCachedTarget(@Nullable UUID targetUuid, Store<EntityStore> store) {
+        if (targetUuid == null || store.getExternalData() == null
+                || store.getExternalData().getWorld() == null) {
+            return null;
+        }
+        Ref<EntityStore> targetRef = store.getExternalData().getWorld().getEntityRef(targetUuid);
+        if (targetRef == null || !targetRef.isValid()) {
             return null;
         }
         NPCEntity npc = store.getComponent(targetRef, NPCEntity.getComponentType());
@@ -36,14 +73,15 @@ final class CommandTargetInspector {
     boolean isLinkable(@Nullable Player player,
                        @Nullable Ref<EntityStore> playerRef,
                        @Nullable TwCommandItemConfig config,
-                       @Nullable Store<EntityStore> store) {
+                       @Nullable Store<EntityStore> store,
+                       long nowMs) {
         if (player == null || config == null || store == null
                 || config.usesBondedCompanionRoster()
                 || !config.isLinkEnabled()
                 || !config.isLinkUseTogglesMembership()) {
             return false;
         }
-        Target target = resolveTarget(playerRef, store);
+        Target target = resolveTarget(player.getUuid(), playerRef, store, nowMs);
         if (target == null || !CommandGenericTargetAuthority.allowsGenericTargetMutation(
                 target.reference(), store)) {
             return false;

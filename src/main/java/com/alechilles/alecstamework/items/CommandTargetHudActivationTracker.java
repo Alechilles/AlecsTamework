@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -93,6 +94,77 @@ public final class CommandTargetHudActivationTracker {
         return List.copyOf(candidatePlayers);
     }
 
+    synchronized CandidateBatch selectCandidateBatch(int maxCandidates,
+                                                     @Nullable UUID dirtyCursor,
+                                                     @Nullable UUID regularCursor) {
+        if (candidatePlayers.isEmpty() || maxCandidates <= 0) {
+            return CandidateBatch.EMPTY;
+        }
+        int limit = Math.min(maxCandidates, candidatePlayers.size());
+        ArrayList<UUID> selected = new ArrayList<>(limit);
+        UUID nextDirtyCursor = selectCandidates(
+                selected,
+                limit,
+                true,
+                dirtyCursor
+        );
+        UUID nextRegularCursor = selectCandidates(
+                selected,
+                limit,
+                false,
+                regularCursor
+        );
+        return new CandidateBatch(List.copyOf(selected), nextDirtyCursor, nextRegularCursor);
+    }
+
+    @Nullable
+    private UUID selectCandidates(ArrayList<UUID> selected,
+                                  int limit,
+                                  boolean dirty,
+                                  @Nullable UUID cursor) {
+        if (selected.size() >= limit) {
+            return cursor;
+        }
+        boolean cursorPresent = cursor != null && candidatePlayers.contains(cursor);
+        boolean pastCursor = !cursorPresent;
+        UUID nextCursor = cursor;
+        for (UUID playerUuid : candidatePlayers) {
+            if (!pastCursor) {
+                if (playerUuid.equals(cursor)) {
+                    pastCursor = true;
+                }
+                continue;
+            }
+            if (isDirtyEntry(playerUuid) == dirty) {
+                selected.add(playerUuid);
+                nextCursor = playerUuid;
+                if (selected.size() >= limit) {
+                    return nextCursor;
+                }
+            }
+        }
+        if (cursorPresent) {
+            for (UUID playerUuid : candidatePlayers) {
+                if (isDirtyEntry(playerUuid) == dirty) {
+                    selected.add(playerUuid);
+                    nextCursor = playerUuid;
+                    if (selected.size() >= limit) {
+                        return nextCursor;
+                    }
+                }
+                if (playerUuid.equals(cursor)) {
+                    break;
+                }
+            }
+        }
+        return nextCursor;
+    }
+
+    private boolean isDirtyEntry(@Nonnull UUID playerUuid) {
+        HandState state = statesByPlayer.get(playerUuid);
+        return state == null || state.dirty();
+    }
+
     static boolean shouldInspectForTests(boolean dirty,
                                          boolean commandItem,
                                          long lastResolvedMs,
@@ -113,5 +185,11 @@ public final class CommandTargetHudActivationTracker {
                 activeItemId = null;
             }
         }
+    }
+
+    record CandidateBatch(@Nonnull List<UUID> playerUuids,
+                          @Nullable UUID nextDirtyCursor,
+                          @Nullable UUID nextRegularCursor) {
+        private static final CandidateBatch EMPTY = new CandidateBatch(List.of(), null, null);
     }
 }

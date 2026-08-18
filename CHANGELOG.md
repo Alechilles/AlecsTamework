@@ -27,6 +27,8 @@
 - Reduced interaction prompt work by reusing reload-aware food lists and role scopes, avoiding
   temporary selection objects, resolving combined inventories only when required, and skipping
   unchanged prompt-cache writes.
+- Reduced command HUD world-tick work by reusing unchanged group status, sharing reticle target
+  queries between the target and hotswap HUDs, and selecting bounded player batches.
 
 ## 3.1.9 - Companion Spawn Safety Hotfix - 2026-08-16
 

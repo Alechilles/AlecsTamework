@@ -27,17 +27,39 @@ import javax.annotation.Nullable;
 /** Shows the assigned Q/E/R command glyphs while a command flute is equipped. */
 public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
     private static final long REFRESH_INTERVAL_MS = 200L;
+    private static final CommandHotswapHudViewModel HIDDEN_MODEL = new CommandHotswapHudViewModel(
+            CommandHotswapHudViewModel.Slot.hidden("LMB"),
+            CommandHotswapHudViewModel.Slot.hidden("RMB"),
+            CommandHotswapHudViewModel.Slot.hidden("Q"),
+            CommandHotswapHudViewModel.Slot.hidden("E"),
+            CommandHotswapHudViewModel.Slot.hidden("R"),
+            CommandHotswapHudViewModel.GroupStatus.hidden()
+    );
+    private static final CommandHotswapHudViewModel.Slot OPEN_MENU_SLOT =
+            new CommandHotswapHudViewModel.Slot(
+                    true, "RMB", "Tamework/CommandHotswaps/OpenMenu.png", ""
+            );
+    private static final CommandHotswapHudViewModel.Slot LINK_SLOT =
+            new CommandHotswapHudViewModel.Slot(
+                    true, "LMB", "Tamework/CommandHotswaps/Link.png", ""
+            );
 
     private final CommandItemRegistry registry;
     private final CommandHotswapAssignmentStore assignments = new CommandHotswapAssignmentStore();
-    private final CommandTargetInspector targetInspector = new CommandTargetInspector();
+    private final CommandTargetInspector targetInspector;
     private final CommandHotswapHudGroupStatusResolver groupStatusResolver =
             new CommandHotswapHudGroupStatusResolver(null, null, null);
     private final Map<UUID, HudState> statesByPlayer = new HashMap<>();
     private final Map<Store<EntityStore>, Long> nextRefreshByStore = new IdentityHashMap<>();
 
     public CommandHotswapHudService(@Nonnull CommandItemRegistry registry) {
+        this(registry, new CommandTargetInspector());
+    }
+
+    public CommandHotswapHudService(@Nonnull CommandItemRegistry registry,
+                                    @Nonnull CommandTargetInspector targetInspector) {
         this.registry = registry;
+        this.targetInspector = targetInspector;
     }
 
     @Override
@@ -51,22 +73,22 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
         store.forEachChunk(
                 Query.and(Player.getComponentType()),
                 (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> ignored) ->
-                        updateChunk(chunk)
+                        updateChunk(chunk, nowMs)
         );
     }
 
-    private void updateChunk(@Nonnull ArchetypeChunk<EntityStore> chunk) {
+    private void updateChunk(@Nonnull ArchetypeChunk<EntityStore> chunk, long nowMs) {
         for (int index = 0; index < chunk.size(); index++) {
-            updatePlayer(chunk.getComponent(index, Player.getComponentType()));
+            updatePlayer(chunk.getComponent(index, Player.getComponentType()), nowMs);
         }
     }
 
-    private void updatePlayer(@Nullable Player player) {
+    private void updatePlayer(@Nullable Player player, long nowMs) {
         UUID playerUuid = player != null ? player.getUuid() : null;
         if (playerUuid == null) {
             return;
         }
-        CommandHotswapHudViewModel model = resolveModel(player);
+        CommandHotswapHudViewModel model = resolveModel(player, nowMs);
         HudState previous = statesByPlayer.get(playerUuid);
         if (!model.visible()) {
             removeHud(playerUuid, player, previous);
@@ -89,7 +111,7 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
     }
 
     @Nonnull
-    private CommandHotswapHudViewModel resolveModel(@Nullable Player player) {
+    private CommandHotswapHudViewModel resolveModel(@Nullable Player player, long nowMs) {
         ItemStack stack = PlayerInventoryAccess.getActiveHotbarItem(player);
         if (stack == null || stack.isEmpty() || stack.getItemId() == null || registry == null) {
             return hiddenModel();
@@ -99,16 +121,14 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
             return hiddenModel();
         }
         return new CommandHotswapHudViewModel(
-                resolvePrimarySlot(player, stack, config),
-                new CommandHotswapHudViewModel.Slot(
-                        true, "RMB", "Tamework/CommandHotswaps/OpenMenu.png", ""
-                ),
+                resolvePrimarySlot(player, stack, config, nowMs),
+                OPEN_MENU_SLOT,
                 resolveSlot(stack, config, Slot.Q, "Q"),
                 resolveSlot(stack, config, Slot.E, "E"),
                 resolveSlot(stack, config, Slot.R, "R"),
                 config.usesBondedCompanionRoster()
                         ? CommandHotswapHudViewModel.GroupStatus.hidden()
-                        : groupStatusResolver.resolve(stack)
+                        : groupStatusResolver.resolve(player.getUuid(), stack)
         );
     }
 
@@ -116,12 +136,12 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
     private CommandHotswapHudViewModel.Slot resolvePrimarySlot(
             @Nonnull Player player,
             @Nonnull ItemStack stack,
-            @Nonnull TwCommandItemConfig config) {
+            @Nonnull TwCommandItemConfig config,
+            long nowMs) {
         if (targetInspector.isLinkable(player, player.getReference(), config,
-                player.getWorld() != null ? player.getWorld().getEntityStore().getStore() : null)) {
-            return new CommandHotswapHudViewModel.Slot(
-                    true, "LMB", "Tamework/CommandHotswaps/Link.png", ""
-            );
+                player.getWorld() != null ? player.getWorld().getEntityStore().getStore() : null,
+                nowMs)) {
+            return LINK_SLOT;
         }
         String selectedId = stack.getFromMetadataOrNull(
                 TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING);
@@ -170,14 +190,7 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
 
     @Nonnull
     private static CommandHotswapHudViewModel hiddenModel() {
-        return new CommandHotswapHudViewModel(
-                CommandHotswapHudViewModel.Slot.hidden("LMB"),
-                CommandHotswapHudViewModel.Slot.hidden("RMB"),
-                CommandHotswapHudViewModel.Slot.hidden("Q"),
-                CommandHotswapHudViewModel.Slot.hidden("E"),
-                CommandHotswapHudViewModel.Slot.hidden("R"),
-                CommandHotswapHudViewModel.GroupStatus.hidden()
-        );
+        return HIDDEN_MODEL;
     }
 
     private void removeHud(@Nonnull UUID playerUuid,

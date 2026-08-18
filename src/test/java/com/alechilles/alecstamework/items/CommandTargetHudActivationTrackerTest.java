@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.items;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -117,6 +119,74 @@ class CommandTargetHudActivationTrackerTest {
     }
 
     @Test
+    void boundedCandidateBatchPrioritizesDirtyPlayersAndRotatesRegularPlayers() {
+        CommandTargetHudActivationTracker tracker = new CommandTargetHudActivationTracker();
+        UUID regularA = MANY_PLAYER_UUIDS.get(0);
+        UUID regularB = MANY_PLAYER_UUIDS.get(1);
+        UUID dirty = MANY_PLAYER_UUIDS.get(2);
+        tracker.recordResolvedHand(regularA, "Tamework:CommandFlute", true, 1_000L);
+        tracker.recordResolvedHand(regularB, "Tamework:CommandFlute", true, 1_000L);
+        tracker.markDirty(dirty);
+
+        CommandTargetHudActivationTracker.CandidateBatch first =
+                tracker.selectCandidateBatch(2, null, null);
+        tracker.recordResolvedHand(dirty, "Tamework:CommandFlute", true, 1_001L);
+        CommandTargetHudActivationTracker.CandidateBatch second =
+                tracker.selectCandidateBatch(
+                        2,
+                        first.nextDirtyCursor(),
+                        first.nextRegularCursor()
+                );
+
+        Assertions.assertEquals(List.of(dirty, regularA), first.playerUuids());
+        Assertions.assertEquals(List.of(regularB, dirty), second.playerUuids());
+    }
+
+    @Test
+    void dirtyCandidateBatchRotatesBeforeTheNextFallbackSweep() {
+        CommandTargetHudActivationTracker tracker = new CommandTargetHudActivationTracker();
+        for (UUID playerUuid : MANY_PLAYER_UUIDS.subList(0, 5)) {
+            tracker.markDirty(playerUuid);
+        }
+
+        CommandTargetHudActivationTracker.CandidateBatch first =
+                tracker.selectCandidateBatch(2, null, null);
+        CommandTargetHudActivationTracker.CandidateBatch second =
+                tracker.selectCandidateBatch(2, first.nextDirtyCursor(), first.nextRegularCursor());
+
+        Assertions.assertEquals(MANY_PLAYER_UUIDS.subList(0, 2), first.playerUuids());
+        Assertions.assertEquals(MANY_PLAYER_UUIDS.subList(2, 4), second.playerUuids());
+    }
+
+    @Test
+    void fallbackSweepDoesNotStarveTheLastDirtyPlayer() {
+        CommandTargetHudActivationTracker tracker = new CommandTargetHudActivationTracker();
+        List<UUID> players = java.util.stream.LongStream.rangeClosed(1L, 61L)
+                .mapToObj(value -> new UUID(0L, value))
+                .toList();
+        players.forEach(tracker::markDirty);
+        Set<UUID> processed = new HashSet<>();
+        UUID dirtyCursor = null;
+        UUID regularCursor = null;
+
+        for (int pass = 0; pass < 16; pass++) {
+            if (pass == 15) {
+                players.forEach(tracker::markDirty);
+            }
+            CommandTargetHudActivationTracker.CandidateBatch batch =
+                    tracker.selectCandidateBatch(4, dirtyCursor, regularCursor);
+            dirtyCursor = batch.nextDirtyCursor();
+            regularCursor = batch.nextRegularCursor();
+            for (UUID playerUuid : batch.playerUuids()) {
+                processed.add(playerUuid);
+                tracker.recordResolvedHand(playerUuid, "Tamework:CommandFlute", true, pass);
+            }
+        }
+
+        Assertions.assertEquals(new HashSet<>(players), processed);
+    }
+
+    @Test
     void candidateSnapshotsTolerateConcurrentEventMutations() throws Exception {
         CommandTargetHudActivationTracker tracker = new CommandTargetHudActivationTracker();
         for (UUID playerUuid : MANY_PLAYER_UUIDS) {
@@ -170,7 +240,13 @@ class CommandTargetHudActivationTrackerTest {
             start.await();
             while (running.get() && failure.get() == null) {
                 List<UUID> candidates = tracker.candidatePlayerUuids();
+                CommandTargetHudActivationTracker.CandidateBatch batch =
+                        tracker.selectCandidateBatch(4, null, null);
                 Assertions.assertThrows(UnsupportedOperationException.class, () -> candidates.add(PLAYER_UUID));
+                Assertions.assertThrows(
+                        UnsupportedOperationException.class,
+                        () -> batch.playerUuids().add(PLAYER_UUID)
+                );
             }
         } catch (Throwable throwable) {
             failure.compareAndSet(null, throwable);

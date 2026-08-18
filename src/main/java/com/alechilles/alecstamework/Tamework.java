@@ -107,6 +107,7 @@ import com.alechilles.alecstamework.items.CommandTargetHudActivationTracker;
 import com.alechilles.alecstamework.items.CommandTargetHudActiveSlotSystem;
 import com.alechilles.alecstamework.items.CommandTargetHudInventoryChangeSystem;
 import com.alechilles.alecstamework.items.CommandTargetHudService;
+import com.alechilles.alecstamework.items.CommandTargetInspector;
 import com.alechilles.alecstamework.items.CommandTeleportArrivalRelocationSystem;
 import com.alechilles.alecstamework.items.CoopDebugLogger;
 import com.alechilles.alecstamework.items.FeedTroughFoodStateSyncSystem;
@@ -857,6 +858,7 @@ public class Tamework extends JavaPlugin {
                 "command-linked-npc-inventory-canonicalization",
                 () -> new CommandLinkedNpcInventoryCanonicalizationSystem(commandItemFeatureHandler));
         CommandTargetHudActivationTracker commandTargetHudActivationTracker = new CommandTargetHudActivationTracker();
+        CommandTargetInspector commandTargetInspector = new CommandTargetInspector();
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
                 "command-target-hud-active-slot",
                 () -> new CommandTargetHudActiveSlotSystem(commandTargetHudActivationTracker));
@@ -865,10 +867,14 @@ public class Tamework extends JavaPlugin {
                 () -> new CommandTargetHudInventoryChangeSystem(commandTargetHudActivationTracker));
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
                 "command-target-hud",
-                () -> new CommandTargetHudService(commandItemRegistry, commandTargetHudActivationTracker));
+                () -> new CommandTargetHudService(
+                        commandItemRegistry,
+                        commandTargetHudActivationTracker,
+                        commandTargetInspector
+                ));
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
                 "command-hotswap-hud",
-                () -> new CommandHotswapHudService(commandItemRegistry));
+                () -> new CommandHotswapHudService(commandItemRegistry, commandTargetInspector));
 
         applyDebugConfigDefaults();
         settingsAnnouncementService = new TameworkSettingsAnnouncementService(this);

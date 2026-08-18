@@ -99,6 +99,11 @@ final class LinkedNpcRecordCodec {
         if (parts.length < offset + 3) {
             return null;
         }
+        if (isMetadataToken(parts[offset])
+                || isMetadataToken(parts[offset + 1])
+                || isMetadataToken(parts[offset + 2])) {
+            return null;
+        }
         try {
             return new Vector3d(
                     Double.parseDouble(parts[offset]),
@@ -108,6 +113,10 @@ final class LinkedNpcRecordCodec {
         } catch (NumberFormatException ignored) {
             return null;
         }
+    }
+
+    private boolean isMetadataToken(String value) {
+        return value != null && value.indexOf('=') >= 0;
     }
 
     private ParsedTokens parseTokens(String[] parts, int startIndex) {
