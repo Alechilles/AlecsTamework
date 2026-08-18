@@ -21,6 +21,9 @@ import javax.annotation.Nullable;
 
 /** Adapts effective Tamework assets into immutable startup evidence. */
 public final class TameworkRuntimeActivationEvidenceSource {
+    private static final String PASSIVE_AVATAR_FLIGHT_PROFILE_ID =
+            "Tamework_Avatar_Flight_Default";
+
     private TameworkRuntimeActivationEvidenceSource() {
     }
 
@@ -59,23 +62,17 @@ public final class TameworkRuntimeActivationEvidenceSource {
                 "Tamework/Mounts/Descent", TwMountedDescentConfig.getAssetMap(),
                 TwMountedDescentConfig::isEnabled,
                 config -> !config.getProfiles().isEmpty());
-        addItemFact(facts, TameworkRuntimeModule.AVATAR_FLIGHT,
-                "Item/Tamework_Flightmasters_Talisman", "Tamework_Flightmasters_Talisman");
-        addEnabledFact(facts, TameworkRuntimeModule.AVATAR_FLIGHT,
+        addEnabledConsumerFact(facts, TameworkRuntimeModule.AVATAR_FLIGHT,
                 "Tamework/AvatarFlight", TwAvatarFlightConfig.getAssetMap(),
-                TwAvatarFlightConfig::isEnabled, ignored -> true);
+                TwAvatarFlightConfig::isEnabled,
+                config -> !PASSIVE_AVATAR_FLIGHT_PROFILE_ID.equals(config.getId()),
+                ignored -> true);
         addRoleFact(facts, TameworkRuntimeModule.COMPANION_MOVEMENT,
                 "Tamework/CompanionMovement", TwCompanionMovementConfig.getAssetMap(),
                 TwCompanionMovementConfig::isEnabled, config -> Arrays.asList(config.getRoleIds()));
         addRoleFact(facts, TameworkRuntimeModule.ATTACHMENTS,
                 "Tamework/Attachments/Migration", TwAttachmentMigrationConfig.getAssetMap(),
                 TwAttachmentMigrationConfig::isEnabled, config -> Arrays.asList(config.getRoleIds()));
-        addRoleFact(facts, TameworkRuntimeModule.ATTACHMENTS,
-                "Tamework/Attachments/Display", TwAttachmentDisplayConfig.getAssetMap(),
-                TwAttachmentDisplayConfig::isEnabled,
-                config -> Arrays.stream(config.getEntries())
-                        .flatMap(entry -> Arrays.stream(entry.getAppliesTo().getRoleIds()))
-                        .toList());
         addRoleFact(facts, TameworkRuntimeModule.ATTACHMENTS,
                 "Tamework/Attachments/Dynamic", TwDynamicAttachmentsConfig.getAssetMap(),
                 TwDynamicAttachmentsConfig::isEnabled, config -> Arrays.asList(config.getRoleIds()));
@@ -107,8 +104,10 @@ public final class TameworkRuntimeActivationEvidenceSource {
                         || config.getLifecycleRules().getAcceptedRoleIds().length > 0);
         addItemFact(facts, TameworkRuntimeModule.SCARECROWS,
                 "Item/Tamework_Scarecrow", "Tamework_Scarecrow");
-        addItemFact(facts, TameworkRuntimeModule.DAMAGE_PROJECTILES,
-                "Item/Weapon_Arrow_Tranquilizer", "Weapon_Arrow_Tranquilizer");
+        addEnabledFact(facts, TameworkRuntimeModule.DAMAGE_PROJECTILES,
+                "Tamework/Global/AssetSets/Tranquilizers", TwGlobalConfig.getAssetMap(),
+                TwGlobalConfig::isEnabled,
+                TameworkRuntimeActivationEvidenceSource::usesDamageProjectileRuntime);
         addEnabledFact(facts, TameworkRuntimeModule.DEBUG_SELF_TEST,
                 "Tamework/Debug", TwDebugConfig.getAssetMap(),
                 TwDebugConfig::isEnabled,
@@ -179,6 +178,25 @@ public final class TameworkRuntimeActivationEvidenceSource {
         ));
     }
 
+    private static <T extends JsonAsset<String>> void addEnabledConsumerFact(
+            List<TameworkEffectiveAssetFact> facts,
+            TameworkRuntimeModule module,
+            String source,
+            DefaultAssetMap<String, T> assetMap,
+            java.util.function.Predicate<T> enabled,
+            java.util.function.Predicate<T> consumerIntent,
+            java.util.function.Predicate<T> hasContent
+    ) {
+        facts.add(TameworkAssetActivationEvidenceAdapter.enabledConsumerConfigs(
+                module,
+                source,
+                assetValues(assetMap),
+                enabled,
+                consumerIntent,
+                hasContent
+        ));
+    }
+
     private static <T extends JsonAsset<String>> Collection<T> assetValues(
             @Nullable DefaultAssetMap<String, T> assetMap
     ) {
@@ -206,5 +224,11 @@ public final class TameworkRuntimeActivationEvidenceSource {
         return commands.isRide()
                 || commands.isFlyingCompanion()
                 || commands.isAvatarFlight();
+    }
+
+    private static boolean usesDamageProjectileRuntime(TwGlobalConfig config) {
+        return config.isTranquilizerShortbowAssetSetEnabled()
+                || config.isTranquilizerArrowAssetSetEnabled()
+                || config.isTranquilizerPotionAssetSetEnabled();
     }
 }

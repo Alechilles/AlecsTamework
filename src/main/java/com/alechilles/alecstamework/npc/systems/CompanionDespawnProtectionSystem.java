@@ -47,7 +47,8 @@ public final class CompanionDespawnProtectionSystem extends TickingSystem<Entity
             return;
         }
 
-        List<Ref<EntityStore>> candidates = new ArrayList<>();
+        List<Ref<EntityStore>> candidates = tickState.candidates;
+        candidates.clear();
         store.forEachChunk(
                 Query.and(npcType),
                 (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) -> {
@@ -110,5 +111,6 @@ public final class CompanionDespawnProtectionSystem extends TickingSystem<Entity
 
     private static final class TickState {
         private long nextSweepAtMs;
+        private final List<Ref<EntityStore>> candidates = new ArrayList<>();
     }
 }

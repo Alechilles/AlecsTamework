@@ -48,8 +48,10 @@ public final class CompanionAttachmentSyncSystem extends TickingSystem<EntitySto
             return;
         }
 
-        List<Ref<EntityStore>> candidates = new ArrayList<>();
-        HashSet<UUID> activeNpcIds = new HashSet<>();
+        List<Ref<EntityStore>> candidates = tickState.candidates;
+        HashSet<UUID> activeNpcIds = tickState.activeNpcIds;
+        candidates.clear();
+        activeNpcIds.clear();
         store.forEachChunk(
                 Query.and(npcType, attachmentsType),
                 (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) -> {
@@ -156,6 +158,8 @@ public final class CompanionAttachmentSyncSystem extends TickingSystem<EntitySto
 
     private static final class TickState {
         private long nextSweepAtMs;
+        private final List<Ref<EntityStore>> candidates = new ArrayList<>();
+        private final HashSet<UUID> activeNpcIds = new HashSet<>();
         private final Map<UUID, AttachmentSyncFingerprint> lastSyncedFingerprintByNpc = new HashMap<>();
     }
 }

@@ -71,7 +71,8 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
             return;
         }
 
-        List<Ref<EntityStore>> refs = new ArrayList<>();
+        List<Ref<EntityStore>> refs = tickState.candidates;
+        refs.clear();
         store.forEachChunk(
                 Query.and(npcType, transformType, flyingType),
                 (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) -> {
@@ -676,6 +677,7 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
 
     private static final class FlyingTickState {
         private long nextSweepAtMs;
+        private final List<Ref<EntityStore>> candidates = new ArrayList<>();
         private final Map<Ref<EntityStore>, Vector3d> landingTargets = new HashMap<>();
         private final Map<Ref<EntityStore>, String> debugSignatures = new HashMap<>();
     }

@@ -75,7 +75,8 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
         if (npcType == null) {
             return;
         }
-        HashSet<UUID> activeIds = new HashSet<>();
+        HashSet<UUID> activeIds = state.activeNpcIds;
+        activeIds.clear();
         store.forEachChunk(Query.and(npcType),
                 (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> buffer) -> {
             for (int index = 0; index < chunk.size(); index++) {
@@ -256,6 +257,7 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
 
     private static final class TickState {
         private long nextSweepAtMs;
+        private final HashSet<UUID> activeNpcIds = new HashSet<>();
         private final Map<UUID, MovementSpeedFingerprint> lastFingerprintByNpc = new HashMap<>();
     }
 }

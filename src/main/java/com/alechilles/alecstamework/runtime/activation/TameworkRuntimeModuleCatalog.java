@@ -66,7 +66,8 @@ public final class TameworkRuntimeModuleCatalog {
                 TameworkRuntimeModuleDescriptor.of(
                         TameworkRuntimeModule.CAPTURE,
                         core,
-                        persistence
+                        persistence,
+                        TameworkRuntimeModule.DAMAGE_PROJECTILES
                 ),
                 TameworkRuntimeModuleDescriptor.of(
                         TameworkRuntimeModule.NAMING_ITEMS,
@@ -92,8 +93,7 @@ public final class TameworkRuntimeModuleCatalog {
                 TameworkRuntimeModuleDescriptor.of(movement, core),
                 TameworkRuntimeModuleDescriptor.of(
                         TameworkRuntimeModule.ATTACHMENTS,
-                        core,
-                        movement
+                        core
                 ),
                 TameworkRuntimeModuleDescriptor.of(needs, core),
                 TameworkRuntimeModuleDescriptor.of(
@@ -131,8 +131,7 @@ public final class TameworkRuntimeModuleCatalog {
                         persistence
                 ),
                 TameworkRuntimeModuleDescriptor.of(
-                        TameworkRuntimeModule.SCARECROWS,
-                        core
+                        TameworkRuntimeModule.SCARECROWS
                 ),
                 TameworkRuntimeModuleDescriptor.of(
                         TameworkRuntimeModule.DAMAGE_PROJECTILES,

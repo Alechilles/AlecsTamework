@@ -108,7 +108,8 @@ public final class DynamicAttachmentEvaluationSystem extends TickingSystem<Entit
         }
 
         DynamicAttachmentConfigIndex index = DynamicAttachmentConfigIndex.current();
-        HashSet<UUID> activeNpcIds = new HashSet<>();
+        HashSet<UUID> activeNpcIds = tickState.activeNpcIds;
+        activeNpcIds.clear();
         store.forEachChunk(
                 Query.and(npcComponentType),
                 (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) -> {
@@ -371,6 +372,7 @@ public final class DynamicAttachmentEvaluationSystem extends TickingSystem<Entit
 
     private static final class TickState {
         private long nextSweepAtMs;
+        private final HashSet<UUID> activeNpcIds = new HashSet<>();
         private final Map<UUID, DynamicAttachmentFingerprint> lastFingerprintByNpc = new HashMap<>();
     }
 }

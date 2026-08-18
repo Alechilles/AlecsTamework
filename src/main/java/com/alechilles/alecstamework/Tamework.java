@@ -1129,24 +1129,24 @@ public class Tamework extends JavaPlugin {
     }
 
     private void deferDamageRuntimeParticipants() {
-        deferEntityEventType(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+        deferEntityEventType(TameworkRuntimeModule.CORE_OWNERSHIP,
                 "damage-event-type", Damage.class);
-        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+        deferEntitySystem(TameworkRuntimeModule.CORE_OWNERSHIP,
                 "damage-target-memory", DamageTargetMemorySystem::new);
-        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+        deferEntitySystem(TameworkRuntimeModule.CAPTURE,
                 "tranquilized-sleep-animation-restore", TranquilizedSleepAnimationRestoreSystem::new);
-        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+        deferEntitySystem(TameworkRuntimeModule.CORE_OWNERSHIP,
                 "respawn-fall-damage-grace", RespawnFallDamageGraceSystem::new);
-        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+        deferEntitySystem(TameworkRuntimeModule.BONDED_PERSISTENCE,
                 "expiry-dismount-fall-damage-protection", ExpiryDismountFallDamageProtectionSystem::new);
-        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+        deferEntitySystem(TameworkRuntimeModule.BONDED_PERSISTENCE,
                 "expiry-dismount-landing-protection", ExpiryDismountLandingProtectionSystem::new);
-        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+        deferEntitySystem(TameworkRuntimeModule.CORE_OWNERSHIP,
                 "owner-damage-filter", () -> new OwnerDamageFilterSystem(
                         getLogger(), new SimpleClaimsTamedDamagePolicy(simpleClaimsCapabilityRuntime)));
-        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+        deferEntitySystem(TameworkRuntimeModule.TRAITS,
                 "trait-damage-modifier", TraitDamageModifierSystem::new);
-        deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
+        deferEntitySystem(TameworkRuntimeModule.HAPPINESS,
                 "companion-happiness-damage-impulse", CompanionHappinessDamageImpulseSystem::new);
         deferEntitySystem(TameworkRuntimeModule.LEVELING,
                 "companion-combat-experience", CompanionCombatExperienceSystem::new);

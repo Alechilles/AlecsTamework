@@ -37,6 +37,42 @@ class TameworkRuntimeActivationPlannerTest {
     }
 
     @Test
+    void attachmentRuntimeDoesNotWakeCompanionMovement() {
+        TameworkRuntimeActivationPlan plan = new TameworkRuntimeActivationPlanner(
+                TameworkRuntimeModuleCatalog.standard()
+        ).plan(TameworkActivationEvidence.builder()
+                .content(TameworkRuntimeModule.ATTACHMENTS, "dynamic-attachment-profile")
+                .build());
+
+        assertTrue(plan.isActive(TameworkRuntimeModule.ATTACHMENTS));
+        assertTrue(plan.isActive(TameworkRuntimeModule.CORE_OWNERSHIP));
+        assertFalse(plan.isActive(TameworkRuntimeModule.COMPANION_MOVEMENT));
+    }
+
+    @Test
+    void scarecrowRuntimeDoesNotWakeCompanionCore() {
+        TameworkRuntimeActivationPlan plan = new TameworkRuntimeActivationPlanner(
+                TameworkRuntimeModuleCatalog.standard()
+        ).plan(TameworkActivationEvidence.builder()
+                .content(TameworkRuntimeModule.SCARECROWS, "scarecrow-item")
+                .build());
+
+        assertEquals(Set.of(TameworkRuntimeModule.SCARECROWS), plan.activeModules());
+    }
+
+    @Test
+    void captureRuntimeKeepsItsProjectileSupportActive() {
+        TameworkRuntimeActivationPlan plan = new TameworkRuntimeActivationPlanner(
+                TameworkRuntimeModuleCatalog.standard()
+        ).plan(TameworkActivationEvidence.builder()
+                .content(TameworkRuntimeModule.CAPTURE, "capture-profile")
+                .build());
+
+        assertTrue(plan.isActive(TameworkRuntimeModule.CAPTURE));
+        assertTrue(plan.isActive(TameworkRuntimeModule.DAMAGE_PROJECTILES));
+    }
+
+    @Test
     void bondedPersistenceDoesNotWakeGenericPersistence() {
         TameworkRuntimeModuleCatalog catalog =
                 TameworkRuntimeModuleCatalog.standard();

@@ -61,9 +61,40 @@ class TameworkAssetActivationEvidenceAdapterTest {
         assertTrue(itemFact.configuredItemIds().contains("Tamework_Command"));
     }
 
+    @Test
+    void passiveReusableConfigNeedsAConsumerProfileToActivate() {
+        TameworkEffectiveAssetFact passiveOnly =
+                TameworkAssetActivationEvidenceAdapter.enabledConsumerConfigs(
+                        TameworkRuntimeModule.AVATAR_FLIGHT,
+                        "avatar-flight",
+                        List.of(new ConsumerConfig("Tamework_Avatar_Flight_Default", true)),
+                        ConsumerConfig::enabled,
+                        config -> !"Tamework_Avatar_Flight_Default".equals(config.id()),
+                        ignored -> true
+                );
+        TameworkEffectiveAssetFact downstreamConsumer =
+                TameworkAssetActivationEvidenceAdapter.enabledConsumerConfigs(
+                        TameworkRuntimeModule.AVATAR_FLIGHT,
+                        "avatar-flight",
+                        List.of(
+                                new ConsumerConfig("Tamework_Avatar_Flight_Default", true),
+                                new ConsumerConfig("HyDragonNordicDrake", true)
+                        ),
+                        ConsumerConfig::enabled,
+                        config -> !"Tamework_Avatar_Flight_Default".equals(config.id()),
+                        ignored -> true
+                );
+
+        assertFalse(passiveOnly.hasEffectiveContent());
+        assertTrue(downstreamConsumer.hasEffectiveContent());
+    }
+
     private record RoleConfig(boolean enabled, List<String> roles) {
     }
 
     private record ItemConfig(boolean enabled, List<String> items) {
+    }
+
+    private record ConsumerConfig(String id, boolean enabled) {
     }
 }

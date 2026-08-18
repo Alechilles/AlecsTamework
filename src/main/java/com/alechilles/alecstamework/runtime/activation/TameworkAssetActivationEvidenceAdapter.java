@@ -36,6 +36,25 @@ public final class TameworkAssetActivationEvidenceAdapter {
         );
     }
 
+    /** Builds evidence only for enabled records that declare consumer intent. */
+    public static <T> TameworkEffectiveAssetFact enabledConsumerConfigs(
+            TameworkRuntimeModule module,
+            String source,
+            Iterable<? extends T> configs,
+            Predicate<? super T> enabled,
+            Predicate<? super T> consumerIntent,
+            Predicate<? super T> hasContent
+    ) {
+        Objects.requireNonNull(consumerIntent, "consumer intent predicate is required");
+        return enabledConfigs(
+                module,
+                source,
+                configs,
+                config -> enabled.test(config) && consumerIntent.test(config),
+                hasContent
+        );
+    }
+
     /**
      * Builds role evidence from enabled records with at least one loaded role.
      * Empty role arrays do not activate a role-targeted family.
