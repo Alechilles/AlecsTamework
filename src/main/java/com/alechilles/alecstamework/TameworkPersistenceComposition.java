@@ -33,6 +33,10 @@ import com.alechilles.alecstamework.lifecycle
         .TameworkEventRegistrationSupport;
 import com.alechilles.alecstamework.persistence.TameworkDataPathLayout;
 import com.alechilles.alecstamework.persistence.TameworkDataPathService;
+import com.alechilles.alecstamework.persistence.activation
+        .TameworkPersistenceActivationEvidence;
+import com.alechilles.alecstamework.persistence.activation
+        .TameworkPersistenceActivationGate;
 import com.alechilles.alecstamework.persistence.compensation.runtime
         .HytaleRefundDeliveryBoundary;
 import com.alechilles.alecstamework.persistence.control
@@ -59,6 +63,10 @@ import com.alechilles.alecstamework.persistence.runtime
         .PublicPersistenceShutdownReport;
 import com.alechilles.alecstamework.persistence.runtime.player
         .TameworkInventoryOperationReceiptsComponent;
+import com.alechilles.alecstamework.runtime.activation
+        .TameworkRuntimeActivationPlan;
+import com.alechilles.alecstamework.runtime.activation
+        .TameworkRuntimeModule;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.universe.world.events.AllWorldsLoadedEvent;
@@ -72,6 +80,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Owns the single bootstrap and released gameplay persistence boundaries.
@@ -149,6 +158,65 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             @Nonnull CommandItemRegistry commandItems,
             @Nonnull PopulationGroupConfigRegistry populationGroups
     ) {
+        return createInternal(
+                plugin,
+                components,
+                events,
+                itemFeatures,
+                commandItems,
+                populationGroups,
+                null,
+                null
+        );
+    }
+
+    /**
+     * Creates persistence only when the frozen plan or durable evidence needs
+     * the generic authority.
+     *
+     * <p>Read-only evidence is never upgraded to a writer. A missing database
+     * is allowed when active production content requires a new authority.</p>
+     */
+    @Nullable
+    static TameworkPersistenceComposition createIfActive(
+            @Nonnull Tamework plugin,
+            @Nonnull TameworkComponentRegistrar.RegisteredComponents components,
+            @Nonnull TameworkEventBus events,
+            @Nonnull ItemFeatureRegistry itemFeatures,
+            @Nonnull CommandItemRegistry commandItems,
+            @Nonnull PopulationGroupConfigRegistry populationGroups,
+            @Nonnull TameworkRuntimeActivationPlan activationPlan,
+            @Nonnull TameworkPersistenceActivationEvidence activationEvidence
+    ) {
+        if (!TameworkPersistenceActivationGate.shouldConstruct(
+                activationPlan,
+                activationEvidence,
+                TameworkRuntimeModule.GENERIC_PERSISTENCE
+        )) {
+            return null;
+        }
+        return createInternal(
+                plugin,
+                components,
+                events,
+                itemFeatures,
+                commandItems,
+                populationGroups,
+                activationPlan,
+                activationEvidence
+        );
+    }
+
+    private static TameworkPersistenceComposition createInternal(
+            @Nonnull Tamework plugin,
+            @Nonnull TameworkComponentRegistrar.RegisteredComponents components,
+            @Nonnull TameworkEventBus events,
+            @Nonnull ItemFeatureRegistry itemFeatures,
+            @Nonnull CommandItemRegistry commandItems,
+            @Nonnull PopulationGroupConfigRegistry populationGroups,
+            @Nullable TameworkRuntimeActivationPlan activationPlan,
+            @Nullable TameworkPersistenceActivationEvidence activationEvidence
+    ) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(components, "components");
         LoadedNpcIdentityIndex identityIndex = new LoadedNpcIdentityIndex();
@@ -170,7 +238,9 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 components.inventoryOperationReceipts(),
                 itemFeatures,
                 commandItems,
-                populationGroups
+                populationGroups,
+                activationPlan,
+                activationEvidence
         );
         AtomicBoolean startupWorldsLoaded = new AtomicBoolean();
         TameworkEventRegistrationSupport.registerGlobal(
@@ -194,9 +264,18 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 },
                 "replacement persistence startup-world seal"
         );
-        TameworkDormantPersistenceRegistration.register(
-                plugin, components, composition.dormantAuthor()
-        );
+        if (activationPlan == null) {
+            TameworkDormantPersistenceRegistration.register(
+                    plugin, components, composition.dormantAuthor()
+            );
+        } else {
+            TameworkDormantPersistenceRegistration.registerIfActive(
+                    plugin,
+                    components,
+                    composition.dormantAuthor(),
+                    activationPlan
+            );
+        }
         return composition;
     }
 
@@ -227,10 +306,59 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             @Nonnull ComponentType<
                     EntityStore,
                     TameworkInventoryOperationReceiptsComponent
-                    > inventoryReceipts,
+            > inventoryReceipts,
             @Nonnull ItemFeatureRegistry itemFeatures,
             @Nonnull CommandItemRegistry commandItems,
             @Nonnull PopulationGroupConfigRegistry populationGroups
+    ) {
+        return open(
+                plugin,
+                pluginDataDirectory,
+                logger,
+                events,
+                identityBootstrap,
+                identityIndex,
+                captureSourceReceipts,
+                coopReceipts,
+                retirement,
+                inventoryReceipts,
+                itemFeatures,
+                commandItems,
+                populationGroups,
+                null,
+                null
+        );
+    }
+
+    @Nonnull
+    private static TameworkPersistenceComposition open(
+            @Nonnull Tamework plugin,
+            @Nonnull Path pluginDataDirectory,
+            @Nonnull HytaleLogger logger,
+            @Nonnull TameworkEventBus events,
+            @Nonnull LoadedNpcIdentityBootstrapService identityBootstrap,
+            @Nonnull LoadedNpcIdentityIndex identityIndex,
+            @Nonnull ComponentType<
+                    EntityStore,
+                    TameworkCaptureSourceReceiptsComponent
+                    > captureSourceReceipts,
+            @Nonnull ComponentType<
+                    ChunkStore,
+                    TameworkCoopCaptureReceiptsComponent
+                    > coopReceipts,
+            @Nonnull ComponentType<
+                    EntityStore,
+                    TameworkPersistenceRetirementComponent
+                    > retirement,
+            @Nonnull ComponentType<
+                    EntityStore,
+                    TameworkInventoryOperationReceiptsComponent
+                    > inventoryReceipts,
+            @Nonnull ItemFeatureRegistry itemFeatures,
+            @Nonnull CommandItemRegistry commandItems,
+            @Nonnull PopulationGroupConfigRegistry populationGroups,
+            @Nullable TameworkRuntimeActivationPlan activationPlan,
+            @Nullable TameworkPersistenceActivationEvidence activationEvidence
     ) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(pluginDataDirectory, "pluginDataDirectory");
@@ -272,15 +400,33 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 );
         TameworkRestoredFeatureComposition restoredFeatures;
         try {
-            restoredFeatures = TameworkRestoredFeatureComposition.create(
-                        plugin,
-                        paths.targetDirectory(),
-                        bootstrap,
-                        facades,
-                        populationGroups,
-                        itemFeatures,
-                        commandItems
-                );
+            restoredFeatures = activationPlan == null
+                    ? TameworkRestoredFeatureComposition.create(
+                            plugin,
+                            paths.targetDirectory(),
+                            bootstrap,
+                            facades,
+                            populationGroups,
+                            itemFeatures,
+                            commandItems
+                    )
+                    : Objects.requireNonNull(
+                            TameworkRestoredFeatureComposition.createIfActive(
+                                    plugin,
+                                    paths.targetDirectory(),
+                                    bootstrap,
+                                    facades,
+                                    populationGroups,
+                                    itemFeatures,
+                                    commandItems,
+                                    activationPlan,
+                                    Objects.requireNonNull(
+                                            activationEvidence,
+                                            "Active persistence requires activation evidence"
+                                    )
+                            ),
+                            "Active generic persistence requires restored features"
+                    );
         } catch (RuntimeException | Error failure) {
             bootstrap.close();
             throw failure;

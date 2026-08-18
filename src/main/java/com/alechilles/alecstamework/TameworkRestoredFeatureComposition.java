@@ -25,9 +25,17 @@ import com.alechilles.alecstamework.persistence.authoring.runtime
         .HytaleReplacementFeatureLiveEvidenceSource;
 import com.alechilles.alecstamework.persistence.facade
         .ReplacementPersistenceDiagnosticsAdapters;
+import com.alechilles.alecstamework.persistence.activation
+        .TameworkPersistenceActivationEvidence;
+import com.alechilles.alecstamework.persistence.activation
+        .TameworkPersistenceActivationGate;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
 import com.alechilles.alecstamework.persistence.runtime
         .PersistenceDomainFacades;
+import com.alechilles.alecstamework.runtime.activation
+        .TameworkRuntimeActivationPlan;
+import com.alechilles.alecstamework.runtime.activation
+        .TameworkRuntimeModule;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -35,6 +43,7 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Owns restored feature authors, live evidence, and codec-created runtime seams.
@@ -150,6 +159,41 @@ final class TameworkRestoredFeatureComposition implements AutoCloseable {
                 live.trackingSystem()
         );
         return composition;
+    }
+
+    /**
+     * Builds restored feature seams only for an active generic persistence
+     * module. The guard runs before snapshot, author, or tracking-system
+     * construction.
+     */
+    @Nullable
+    static TameworkRestoredFeatureComposition createIfActive(
+            @Nonnull Tamework plugin,
+            @Nonnull Path persistenceDirectory,
+            @Nonnull PersistenceBootstrap bootstrap,
+            @Nonnull PersistenceDomainFacades facades,
+            @Nonnull PopulationGroupConfigRegistry populationGroups,
+            @Nonnull ItemFeatureRegistry itemFeatures,
+            @Nonnull CommandItemRegistry commandItems,
+            @Nonnull TameworkRuntimeActivationPlan activationPlan,
+            @Nonnull TameworkPersistenceActivationEvidence activationEvidence
+    ) {
+        if (!TameworkPersistenceActivationGate.shouldConstruct(
+                activationPlan,
+                activationEvidence,
+                TameworkRuntimeModule.GENERIC_PERSISTENCE
+        )) {
+            return null;
+        }
+        return create(
+                plugin,
+                persistenceDirectory,
+                bootstrap,
+                facades,
+                populationGroups,
+                itemFeatures,
+                commandItems
+        );
     }
 
     @Nonnull

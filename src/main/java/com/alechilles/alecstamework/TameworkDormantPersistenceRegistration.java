@@ -7,6 +7,10 @@ import com.alechilles.alecstamework.items.persistence.PositiveEvidenceDormantAut
 import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
 import com.alechilles.alecstamework.npc.systems.CompanionDormantDeathSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionDormantRemovalSystem;
+import com.alechilles.alecstamework.runtime.activation
+        .TameworkRuntimeActivationPlan;
+import com.alechilles.alecstamework.runtime.activation
+        .TameworkRuntimeModule;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.universe.world.events.RemoveWorldEvent;
@@ -17,6 +21,19 @@ import javax.annotation.Nonnull;
 /** Registers the positive-evidence ECS and world boundaries for dormant authoring. */
 final class TameworkDormantPersistenceRegistration {
     private TameworkDormantPersistenceRegistration() {
+    }
+
+    /** Registers dormant evidence boundaries only for an active plan. */
+    static void registerIfActive(
+            @Nonnull Tamework plugin,
+            @Nonnull TameworkComponentRegistrar.RegisteredComponents components,
+            @Nonnull PositiveEvidenceDormantAuthor dormantAuthor,
+            @Nonnull TameworkRuntimeActivationPlan activationPlan
+    ) {
+        if (activationPlan.isActive(
+                TameworkRuntimeModule.DORMANT_PERSISTENCE)) {
+            register(plugin, components, dormantAuthor);
+        }
     }
 
     static void register(

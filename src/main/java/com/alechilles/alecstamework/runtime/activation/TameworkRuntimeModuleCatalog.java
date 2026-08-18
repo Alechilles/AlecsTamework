@@ -145,8 +145,7 @@ public final class TameworkRuntimeModuleCatalog {
                 ),
                 TameworkRuntimeModuleDescriptor.of(
                         TameworkRuntimeModule.BONDED_PERSISTENCE,
-                        core,
-                        persistence
+                        core
                 ),
                 TameworkRuntimeModuleDescriptor.of(TameworkRuntimeModule.HSTATS),
                 TameworkRuntimeModuleDescriptor.of(

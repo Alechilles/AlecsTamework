@@ -37,6 +37,29 @@ class TameworkRuntimeActivationPlannerTest {
     }
 
     @Test
+    void bondedPersistenceDoesNotWakeGenericPersistence() {
+        TameworkRuntimeModuleCatalog catalog =
+                TameworkRuntimeModuleCatalog.standard();
+        TameworkRuntimeActivationPlan plan =
+                new TameworkRuntimeActivationPlanner(catalog).plan(
+                        TameworkActivationEvidence.builder()
+                                .content(TameworkRuntimeModule.BONDED_PERSISTENCE,
+                                        "bonded-profile")
+                                .build());
+
+        assertEquals(
+                Set.of(TameworkRuntimeModule.CORE_OWNERSHIP),
+                catalog.directDependencies(
+                        TameworkRuntimeModule.BONDED_PERSISTENCE)
+        );
+        assertTrue(plan.isActive(TameworkRuntimeModule.BONDED_PERSISTENCE));
+        assertEquals(
+                TameworkRuntimeActivationPlan.ModuleState.DORMANT,
+                plan.state(TameworkRuntimeModule.GENERIC_PERSISTENCE)
+        );
+    }
+
+    @Test
     void directEvidenceExpandsTheExactDependencyClosure() {
         TameworkRuntimeModule leaf = TameworkRuntimeModule.of("test-leaf");
         TameworkRuntimeModule dependency = TameworkRuntimeModule.of("test-dependency");
