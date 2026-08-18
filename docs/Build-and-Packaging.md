@@ -41,7 +41,9 @@ The pack manifest declares `Alechilles:Alec's Tamework!` as a dependency. Put
 the ZIP beside the Tamework jar and explicitly enable it only when you need
 the sample livestock, items, configs, translations, and art. The pack is
 disabled by default. Do not install or enable it on a library-only production
-server.
+server. Reusable framework media stays in the main jar. This includes the
+Nametag and Soul Lantern models, textures, icons, particles, and audio that
+dependent mods reference.
 
 ## Development workspace
 
@@ -68,14 +70,14 @@ Run the test suite before packaging:
 ```bash
 ./gradlew test packagingTest
 ./gradlew validateManifest validateExampleAssetPackManifest assemble
-jar tf "build/libs/Alec's Tamework! v<version>.jar" | rg -i 'example|livestock|tamework_nametag|soul_lantern'
+jar tf "build/libs/Alec's Tamework! v<version>.jar" | rg -i 'Mob_Tamework_Example|Spawner_Tamework_Example|Tamework_Nametag_Example|Tamework_Command_Whistle_Example|Tw[A-Za-z]*Example'
 unzip -l "build/distributions/Alec's Tamework! Examples v<version>.zip"
 ```
 
 `packagingTest` loads the built shaded jar in an isolated classloader and
-executes Patchwork's packaged version/optional-telemetry behavior. It is a
-The first archive check should return no enabled example entries. The example
-ZIP should list the moved graph and its manifest.
+executes Patchwork's packaged version/optional-telemetry behavior. The first
+archive check should return no enabled example entries. The example ZIP should
+list the optional graph and its manifest.
 
 It is a behavior smoke test, not a ZIP-entry inventory check. Dependency
 convergence can be inspected with:

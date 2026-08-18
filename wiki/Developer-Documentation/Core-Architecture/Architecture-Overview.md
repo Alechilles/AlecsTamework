@@ -9,8 +9,8 @@ draft: false
 Parent: [Core Architecture](/mod/alecs-tamework/core-architecture) | [Developer Documentation](/mod/alecs-tamework/developer-documentation)
 
 Tamework is split into two broad layers:
-- asset layer: NPC templates, items, particle assets, framework `Server/Tamework` configs, and translation content
-- optional example layer: the separately installed `Alec's Tamework! Examples` asset pack with sample NPCs, items, progression configs, translations, and art
+- asset layer: NPC templates, items, particle assets, framework `Server/Tamework` configs, translation content, and reusable media used by dependent mods
+- optional example layer: the separately installed `Alec's Tamework! Examples` asset pack with sample NPCs, items, progression configs, translations, and sample-specific art
 - plugin layer: Java code for actions, sensors, services, systems, persistence, UI, and commands
 
 ## Major subsystems

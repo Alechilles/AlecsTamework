@@ -9,12 +9,19 @@ import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeDiagnostic
 import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeModule;
 import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeModuleCatalog;
 import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeModuleDescriptor;
+import com.hypixel.hytale.component.ComponentRegistry;
+import com.hypixel.hytale.component.dependency.Dependency;
+import com.hypixel.hytale.component.dependency.Order;
+import com.hypixel.hytale.component.dependency.SystemDependency;
+import com.hypixel.hytale.component.system.ISystem;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /** Behavior tests for dormant boundaries, preflight, and resource ownership. */
@@ -68,6 +75,32 @@ class TameworkRuntimeRegistrarTest {
 
         assertEquals(List.of("dependency", "active"), target.registered);
         assertEquals(List.of("dependency", "active"), observed);
+    }
+
+    @Test
+    void sameModuleSystemDependencyRegistersBeforeItsConsumer() {
+        TameworkRuntimeModule module = TameworkRuntimeModule.of("systems");
+        TameworkRuntimeActivationPlan plan = plan(
+                List.of(module),
+                TameworkActivationEvidence.builder().content(module, "profile").build()
+        );
+        ComponentRegistry<Object> registry = new ComponentRegistry<>();
+
+        new TameworkRuntimeRegistrar().register(
+                TameworkRuntimeRegistrationContext.builder(plan, systemTarget(registry))
+                        .participant(Participant.prepared(
+                                module, "z-dependency", RegistrationKind.ECS_SYSTEM,
+                                DependencySystem::new
+                        ))
+                        .participant(Participant.prepared(
+                                module, "a-consumer", RegistrationKind.ECS_SYSTEM,
+                                ConsumerSystem::new
+                        ))
+                        .build()
+        );
+
+        assertTrue(registry.hasSystemClass(DependencySystem.class));
+        assertTrue(registry.hasSystemClass(ConsumerSystem.class));
     }
 
     @Test
@@ -200,6 +233,28 @@ class TameworkRuntimeRegistrarTest {
         return Participant.of(module, id, kind, ignored -> target.resource(id));
     }
 
+    @SuppressWarnings("unchecked")
+    private static TameworkRuntimeRegistrationContext.RegistrationTarget systemTarget(
+            ComponentRegistry<Object> registry
+    ) {
+        return new TameworkRuntimeRegistrationContext.RegistrationTarget() {
+            @Override
+            public AutoCloseable register(RegistrationKind kind, String participantId) {
+                throw new UnsupportedOperationException("Prepared system resource is required");
+            }
+
+            @Override
+            public AutoCloseable register(
+                    RegistrationKind kind,
+                    String participantId,
+                    Object resource
+            ) {
+                registry.registerSystem((ISystem<Object>) resource);
+                return () -> { };
+            }
+        };
+    }
+
     private static TameworkRuntimeActivationPlan plan(
             List<?> descriptors,
             TameworkActivationEvidence evidence
@@ -234,6 +289,16 @@ class TameworkRuntimeRegistrarTest {
 
         private AutoCloseable resource(String participantId) {
             return register(RegistrationKind.WORKER, participantId);
+        }
+    }
+
+    private static final class DependencySystem implements ISystem<Object> {
+    }
+
+    private static final class ConsumerSystem implements ISystem<Object> {
+        @Override
+        public Set<Dependency<Object>> getDependencies() {
+            return Set.of(new SystemDependency<>(Order.AFTER, DependencySystem.class));
         }
     }
 }

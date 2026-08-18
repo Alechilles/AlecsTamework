@@ -76,6 +76,9 @@ Integrating Tamework is usually a content-authoring workflow, not a programming 
 The Tamework plugin jar does not include sample NPCs, sample items, or sample
 progression configs. This keeps a library-only installation dormant until a
 downstream mod supplies matching assets.
+Reusable framework media, including the Nametag and Soul Lantern asset
+closures, remain in the main jar so dependent mods can reference them without
+installing the examples pack.
 
 Build the optional examples with `./gradlew exampleAssetPack`. Install the
 generated `Alec's Tamework! Examples v<version>.zip` beside the Tamework jar

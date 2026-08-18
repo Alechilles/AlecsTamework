@@ -296,10 +296,11 @@ public final class TameworkRuntimeRegistrationContext {
 
         Map<TameworkRuntimeModule, Integer> moduleOrder = moduleOrder(plan);
         List<Participant> ordered = new ArrayList<>(byId.values());
-        ordered.sort(Comparator
-                .comparingInt((Participant participant) -> moduleOrder.get(participant.module()))
-                .thenComparing(Participant::kind)
-                .thenComparing(Participant::id));
+        // Hytale validates referenced system types during registration.
+        // Preserve declaration order within one module.
+        ordered.sort(Comparator.comparingInt(
+                (Participant participant) -> moduleOrder.get(participant.module())
+        ));
         return Collections.unmodifiableList(ordered);
     }
 
