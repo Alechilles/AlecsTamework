@@ -61,6 +61,27 @@ class TameworkPersistenceActivationProbeTest {
         assertFalse(evidence.hasDurableWork());
     }
 
+    /** Regression: a normal WAL must wake recovery instead of becoming read-only. */
+    @Test
+    void validWalSidecarActivatesRecovery() throws Exception {
+        Path database = temporaryDirectory.resolve("tamework-state.sqlite");
+        initializeSchema(database);
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openWriterConnection();
+             Statement statement = connection.createStatement()) {
+            statement.execute("PRAGMA wal_autocheckpoint=0");
+            statement.execute("PRAGMA user_version=1");
+            assertTrue(Files.isRegularFile(database.resolveSibling(
+                    "tamework-state.sqlite-wal")));
+
+            TameworkPersistenceActivationEvidence evidence = probe(database);
+
+            assertEquals(PersistenceActivationMode.ACTIVE, evidence.mode());
+            assertTrue(evidence.evidence().contains(
+                    "persistence-wal-recovery"));
+        }
+    }
+
     /** Regression: unfinished durable work must keep the complete recovery authority active. */
     @Test
     void nonterminalOperationActivatesGenericAuthority() throws Exception {

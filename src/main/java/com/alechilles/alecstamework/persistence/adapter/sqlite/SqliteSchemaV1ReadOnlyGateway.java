@@ -41,7 +41,7 @@ public final class SqliteSchemaV1ReadOnlyGateway {
                 throw new SQLException("replacement_schema_definition_mismatch");
             }
             verifyHistory(connection, sha256(script));
-            requireSingleValue(connection, "PRAGMA integrity_check", "ok",
+            requireSingleValue(connection, "PRAGMA quick_check(1)", "ok",
                     "replacement_integrity_check_failed");
             requireNoRows(connection, "PRAGMA foreign_key_check",
                     "replacement_foreign_key_check_failed");

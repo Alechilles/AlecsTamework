@@ -50,23 +50,27 @@ public final class BondedCompanionPersistenceActivationProbe {
     /** Classifies bonded evidence using at most one immutable SQLite session. */
     @Nonnull
     public TameworkPersistenceActivationEvidence probe() {
+        PathState state = inspectPath(databasePath);
         SidecarState sidecars = inspectSidecars();
         if (sidecars == SidecarState.UNKNOWN) {
             return TameworkPersistenceActivationEvidence.readOnly(
                     true, "bonded-sidecar-state-unavailable");
         }
-        if (sidecars != SidecarState.NONE) {
+        if (sidecars == SidecarState.INVALID) {
             return TameworkPersistenceActivationEvidence.readOnly(
                     true, sidecars == SidecarState.INVALID
                             ? "bonded-sidecar-not-regular"
                             : "bonded-sidecar-present");
         }
-        PathState state = inspectPath(databasePath);
         if (state == PathState.UNKNOWN) {
             return TameworkPersistenceActivationEvidence.readOnly(
                     true, "bonded-file-state-unavailable");
         }
         if (state == PathState.MISSING) {
+            if (sidecars == SidecarState.PRESENT) {
+                return TameworkPersistenceActivationEvidence.readOnly(
+                        true, "bonded-orphan-sidecar");
+            }
             return TameworkPersistenceActivationEvidence.dormant(false, false);
         }
         if (state != PathState.REGULAR) {
@@ -84,6 +88,12 @@ public final class BondedCompanionPersistenceActivationProbe {
                         true, "bonded-schema-unverified");
             }
             Set<String> evidence = durableEvidence(connection);
+            if (sidecars == SidecarState.PRESENT) {
+                LinkedHashSet<String> recoveryEvidence =
+                        new LinkedHashSet<>(evidence);
+                recoveryEvidence.add("bonded-wal-recovery");
+                evidence = Set.copyOf(recoveryEvidence);
+            }
             if (evidence.isEmpty()) {
                 return TameworkPersistenceActivationEvidence.dormant(true, true);
             }

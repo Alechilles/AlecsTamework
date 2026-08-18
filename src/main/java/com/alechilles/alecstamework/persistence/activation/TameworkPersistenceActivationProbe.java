@@ -119,17 +119,16 @@ public final class TameworkPersistenceActivationProbe {
     /** Classifies one target and its historical source candidates. */
     @Nonnull
     public TameworkPersistenceActivationEvidence probe() {
+        PathState target = inspectPath(databasePath);
         SidecarState sidecars = inspectSidecars(databasePath);
         if (sidecars == SidecarState.UNKNOWN) {
             return readOnly(true, "persistence-sidecar-state-unavailable");
         }
-        if (sidecars != SidecarState.NONE) {
+        if (sidecars == SidecarState.INVALID) {
             return readOnly(true, sidecars == SidecarState.INVALID
                     ? "persistence-sidecar-not-regular"
                     : "persistence-sidecar-present");
         }
-
-        PathState target = inspectPath(databasePath);
         if (target == PathState.UNKNOWN) {
             return readOnly(true, "persistence-file-state-unavailable");
         }
@@ -138,12 +137,17 @@ public final class TameworkPersistenceActivationProbe {
             return readOnly(true, "persistence-file-not-regular");
         }
         if (target == PathState.REGULAR) {
-            return probeTarget();
+            return probeTarget(sidecars == SidecarState.PRESENT);
+        }
+        if (sidecars == SidecarState.PRESENT) {
+            return readOnly(true, "persistence-orphan-sidecar");
         }
         return probeHistoricalSources();
     }
 
-    private TameworkPersistenceActivationEvidence probeTarget() {
+    private TameworkPersistenceActivationEvidence probeTarget(
+            boolean recoverySidecarPresent
+    ) {
         try (Connection connection =
                      connections.openImmutableSchemaProbeConnection()) {
             if (connection == null) {
@@ -151,6 +155,12 @@ public final class TameworkPersistenceActivationProbe {
             }
             SqliteSchemaV1ReadOnlyGateway.verify(connection);
             Set<String> evidence = durableEvidence(connection);
+            if (recoverySidecarPresent) {
+                LinkedHashSet<String> recoveryEvidence =
+                        new LinkedHashSet<>(evidence);
+                recoveryEvidence.add("persistence-wal-recovery");
+                evidence = Set.copyOf(recoveryEvidence);
+            }
             if (evidence.isEmpty()) {
                 return TameworkPersistenceActivationEvidence.dormant(
                         true, true);

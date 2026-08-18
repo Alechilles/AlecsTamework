@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.Statement;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -56,6 +57,27 @@ class BondedCompanionPersistenceActivationProbeTest {
         assertTrue(evidence.databasePresent());
         assertTrue(evidence.schemaValid());
         assertFalse(evidence.hasDurableWork());
+    }
+
+    /** Regression: a normal bonded WAL must wake its isolated recovery path. */
+    @Test
+    void validWalSidecarActivatesRecovery() throws Exception {
+        Path database = temporaryDirectory.resolve(
+                BondedCompanionDataPath.FILE_NAME);
+        initializeSchema(database);
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openWriterConnection();
+             Statement statement = connection.createStatement()) {
+            statement.execute("PRAGMA wal_autocheckpoint=0");
+            statement.execute("PRAGMA user_version=1");
+            assertTrue(Files.isRegularFile(database.resolveSibling(
+                    BondedCompanionDataPath.FILE_NAME + "-wal")));
+
+            TameworkPersistenceActivationEvidence evidence = probe(database);
+
+            assertEquals(PersistenceActivationMode.ACTIVE, evidence.mode());
+            assertTrue(evidence.evidence().contains("bonded-wal-recovery"));
+        }
     }
 
     /** Regression: bonded profiles activate bonded authority without generic state. */

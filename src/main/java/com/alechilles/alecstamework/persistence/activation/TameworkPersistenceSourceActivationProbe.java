@@ -4,8 +4,11 @@ import com.alechilles.alecstamework.persistence.kernel.PersistenceFiles;
 import com.alechilles.alecstamework.persistence.adapter.sqlite
         .SqliteConnectionFactory;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
 import java.nio.charset.CodingErrorAction;
+import java.nio.charset.CoderResult;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -25,6 +28,7 @@ import java.util.Set;
 
 /** Inspects legacy and historical source candidates without target mutation. */
 final class TameworkPersistenceSourceActivationProbe {
+    private static final int DAT_PROBE_BYTES = 64 * 1024;
     private static final String LEGACY_DATABASE =
             PersistenceFiles.LEGACY_DATABASE;
     private static final List<String> LEGACY_DAT_FILES = List.of(
@@ -135,8 +139,7 @@ final class TameworkPersistenceSourceActivationProbe {
         try (Connection connection = new SqliteConnectionFactory(path)
                 .openImmutableSchemaProbeConnection()) {
             if (connection == null
-                    || !singleValue(connection, "PRAGMA quick_check", "ok")
-                    || !singleValue(connection, "PRAGMA integrity_check", "ok")
+                    || !singleValue(connection, "PRAGMA quick_check(1)", "ok")
                     || hasRows(connection, "PRAGMA foreign_key_check")) {
                 return false;
             }
@@ -273,12 +276,16 @@ final class TameworkPersistenceSourceActivationProbe {
     }
 
     private boolean validUtf8(Path path) {
-        try {
-            StandardCharsets.UTF_8.newDecoder()
+        try (InputStream input = Files.newInputStream(path)) {
+            byte[] prefix = input.readNBytes(DAT_PROBE_BYTES + 1);
+            boolean complete = prefix.length <= DAT_PROBE_BYTES;
+            ByteBuffer bytes = ByteBuffer.wrap(
+                    prefix, 0, Math.min(prefix.length, DAT_PROBE_BYTES));
+            CoderResult result = StandardCharsets.UTF_8.newDecoder()
                     .onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT)
-                    .decode(ByteBuffer.wrap(Files.readAllBytes(path)));
-            return true;
+                    .decode(bytes, CharBuffer.allocate(bytes.remaining()), complete);
+            return !result.isError();
         } catch (IOException failure) {
             return false;
         }
