@@ -441,7 +441,18 @@ public class Tamework extends JavaPlugin {
                 this::emitExperimentalConfigReload
         );
         assetEditorPackService = new TameworkAssetEditorPackService(this);
-        patchworkRuntime = new TameworkPatchworkRuntime(this);
+        // Patchwork must subscribe to Hytale's one-time LoadAssetEvent before plugin setup returns.
+        try {
+            patchworkRuntime = new TameworkPatchworkRuntime(this);
+            patchworkRuntime.start();
+            configOverrideManager = new TwConfigOverrideManager(
+                    this, patchworkRuntime::generatedPatchRoot
+            );
+        } catch (RuntimeException | LinkageError exception) {
+            getLogger().at(Level.SEVERE).withCause(exception).log(
+                    "Patchwork failed to start; Tamework will continue without generated asset patches."
+            );
+        }
         tranquilizerRecipeVisibilityService = new TranquilizerRecipeVisibilityService();
         feedTroughWaterChargeDroplistCompatService = new FeedTroughWaterChargeDroplistCompatService();
         npcBuilderRegistrar = new TameworkNpcBuilderRegistrar(this);
@@ -562,19 +573,6 @@ public class Tamework extends JavaPlugin {
         runtimeServiceInitializer = () -> {
         if (runtimeStartupPlan == null) {
             return;
-        }
-        if (runtimeStartupPlan.activeModules().stream()
-                .anyMatch(module -> module != TameworkRuntimeModule.HSTATS)) {
-            try {
-                patchworkRuntime.start();
-                configOverrideManager = new TwConfigOverrideManager(
-                        this, patchworkRuntime::generatedPatchRoot
-                );
-            } catch (RuntimeException exception) {
-                getLogger().at(Level.SEVERE).withCause(exception).log(
-                        "Patchwork failed to start; Tamework will continue without generated asset patches."
-                );
-            }
         }
         boolean genericPersistenceNeeded = runtimeStartupPlan.isActive(
                 TameworkRuntimeModule.GENERIC_PERSISTENCE
