@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashSet;
@@ -160,27 +161,34 @@ class NeedsFoodTargetSearchServiceTest {
     }
 
     @Test
-    void boundedFoodSearchDoesNotWrapAtEitherIntegerExtreme() {
-        assertBounded(new NeedsFoodTargetSearchService.FoodRequest(
-                Integer.MAX_VALUE - 1.0 + 0.5, 64.0, 0.5, 1.0, 0, 2.0, 16, List.of("tw_berry")));
-        assertBounded(new NeedsFoodTargetSearchService.FoodRequest(
+    void upperIntegerEdgesAreRejectedBeforeFoodTraversal() {
+        assertFalse(new NeedsFoodTargetSearchService.FoodRequest(
+                Integer.MAX_VALUE - 1.0 + 0.5, 64.0, 0.5, 1.0, 0, 2.0, 16, List.of("tw_berry")
+        ).hasValidRange());
+        assertFalse(new NeedsFoodTargetSearchService.FoodRequest(
+                0.5, 64.0, Integer.MAX_VALUE - 1.0 + 0.5, 1.0, 0, 2.0, 16, List.of("tw_berry")
+        ).hasValidRange());
+        assertFalse(new NeedsFoodTargetSearchService.FoodRequest(
+                0.5, Integer.MAX_VALUE - 8.0 + 0.5, 0.5, 1.0, 8, 2.0, 16, List.of("tw_berry")
+        ).hasValidRange());
+    }
+
+    @Test
+    void lowerIntegerEdgesRemainValidAndTraverseBoundedly() {
+        assertLowerEdgeTraverses(new NeedsFoodTargetSearchService.FoodRequest(
                 Integer.MIN_VALUE + 1.0 + 0.5, 64.0, 0.5, 1.0, 0, 2.0, 16, List.of("tw_berry")));
-        assertBounded(new NeedsFoodTargetSearchService.FoodRequest(
-                0.5, 64.0, Integer.MAX_VALUE - 1.0 + 0.5, 1.0, 0, 2.0, 16, List.of("tw_berry")));
-        assertBounded(new NeedsFoodTargetSearchService.FoodRequest(
+        assertLowerEdgeTraverses(new NeedsFoodTargetSearchService.FoodRequest(
                 0.5, 64.0, Integer.MIN_VALUE + 1.0 + 0.5, 1.0, 0, 2.0, 16, List.of("tw_berry")));
-        assertBounded(new NeedsFoodTargetSearchService.FoodRequest(
-                0.5, Integer.MAX_VALUE - 8.0 + 0.5, 0.5, 1.0, 8, 2.0, 16, List.of("tw_berry")));
-        assertBounded(new NeedsFoodTargetSearchService.FoodRequest(
+        assertLowerEdgeTraverses(new NeedsFoodTargetSearchService.FoodRequest(
                 0.5, Integer.MIN_VALUE + 8.0 + 0.5, 0.5, 1.0, 8, 2.0, 16, List.of("tw_berry")));
     }
 
-    private static void assertBounded(NeedsFoodTargetSearchService.FoodRequest request) {
+    private static void assertLowerEdgeTraverses(NeedsFoodTargetSearchService.FoodRequest request) {
+        assertTrue(request.hasValidRange());
         FakeFoodAccess access = new FakeFoodAccess();
         access.maxSourceChecks = 256;
-        NeedsResourceCandidates.Snapshot snapshot = new NeedsFoodTargetSearchService().search(request, access);
-
-        assertTrue(snapshot.candidates().isEmpty());
+        new NeedsFoodTargetSearchService().search(request, access);
+        assertTrue(access.sourceChecks > 0);
         assertTrue(access.sourceChecks < access.maxSourceChecks);
     }
 

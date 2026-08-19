@@ -208,27 +208,34 @@ class NeedsWaterTargetSearchServiceTest {
     }
 
     @Test
-    void boundedWaterSearchDoesNotWrapAtEitherIntegerExtreme() {
-        assertBounded(new NeedsWaterTargetSearchService.WaterRequest(
-                Integer.MAX_VALUE - 1.0 + 0.5, 64.0, 0.5, 1.0, 0, 1.0, 16));
-        assertBounded(new NeedsWaterTargetSearchService.WaterRequest(
+    void upperIntegerEdgesAreRejectedBeforeWaterTraversal() {
+        assertFalse(new NeedsWaterTargetSearchService.WaterRequest(
+                Integer.MAX_VALUE - 1.0 + 0.5, 64.0, 0.5, 1.0, 0, 1.0, 16
+        ).hasValidRange());
+        assertFalse(new NeedsWaterTargetSearchService.WaterRequest(
+                0.5, 64.0, Integer.MAX_VALUE - 1.0 + 0.5, 1.0, 0, 1.0, 16
+        ).hasValidRange());
+        assertFalse(new NeedsWaterTargetSearchService.WaterRequest(
+                0.5, Integer.MAX_VALUE - 8.0 + 0.5, 0.5, 1.0, 8, 1.0, 16
+        ).hasValidRange());
+    }
+
+    @Test
+    void lowerIntegerEdgesRemainValidAndTraverseBoundedly() {
+        assertLowerEdgeTraverses(new NeedsWaterTargetSearchService.WaterRequest(
                 Integer.MIN_VALUE + 1.0 + 0.5, 64.0, 0.5, 1.0, 0, 1.0, 16));
-        assertBounded(new NeedsWaterTargetSearchService.WaterRequest(
-                0.5, 64.0, Integer.MAX_VALUE - 1.0 + 0.5, 1.0, 0, 1.0, 16));
-        assertBounded(new NeedsWaterTargetSearchService.WaterRequest(
+        assertLowerEdgeTraverses(new NeedsWaterTargetSearchService.WaterRequest(
                 0.5, 64.0, Integer.MIN_VALUE + 1.0 + 0.5, 1.0, 0, 1.0, 16));
-        assertBounded(new NeedsWaterTargetSearchService.WaterRequest(
-                0.5, Integer.MAX_VALUE - 8.0 + 0.5, 0.5, 1.0, 8, 1.0, 16));
-        assertBounded(new NeedsWaterTargetSearchService.WaterRequest(
+        assertLowerEdgeTraverses(new NeedsWaterTargetSearchService.WaterRequest(
                 0.5, Integer.MIN_VALUE + 8.0 + 0.5, 0.5, 1.0, 8, 1.0, 16));
     }
 
-    private static void assertBounded(NeedsWaterTargetSearchService.WaterRequest request) {
+    private static void assertLowerEdgeTraverses(NeedsWaterTargetSearchService.WaterRequest request) {
+        assertTrue(request.hasValidRange());
         FakeWaterAccess access = new FakeWaterAccess();
         access.maxAccessCalls = 256;
-        NeedsResourceCandidates.Snapshot snapshot = new NeedsWaterTargetSearchService().search(request, access);
-
-        assertTrue(snapshot.candidates().isEmpty());
+        new NeedsWaterTargetSearchService().search(request, access);
+        assertTrue(access.accessCalls > 0);
         assertTrue(access.accessCalls < access.maxAccessCalls);
     }
 
