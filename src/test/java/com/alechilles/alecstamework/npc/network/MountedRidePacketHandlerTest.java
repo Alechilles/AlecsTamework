@@ -5,7 +5,12 @@ import com.hypixel.hytale.protocol.packets.interaction.SyncInteractionChain;
 import com.hypixel.hytale.protocol.packets.interaction.SyncInteractionChains;
 import org.junit.jupiter.api.Test;
 
+import java.util.UUID;
+
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MountedRidePacketHandlerTest {
@@ -21,6 +26,52 @@ class MountedRidePacketHandlerTest {
         assertFalse(MountedRidePacketHandler.containsInitialUse(packet(primary)));
         assertFalse(MountedRidePacketHandler.containsInitialUse(packet(continuedUse)));
         assertFalse(MountedRidePacketHandler.containsInitialUse(packet()));
+    }
+
+    @Test
+    void staleSessionCleanupLeavesReplacementAliasesIntact() {
+        UUID playerUuid = UUID.randomUUID();
+        UUID riderUuid = UUID.randomUUID();
+        UUID firstMountUuid = UUID.randomUUID();
+        UUID replacementMountUuid = UUID.randomUUID();
+
+        MountedRidePacketHandler.registerRide(playerUuid, riderUuid, firstMountUuid, null);
+        MountedRidePacketHandler.RideSession oldSession =
+                MountedRidePacketHandler.currentRideSession(playerUuid);
+        MountedRidePacketHandler.registerRide(playerUuid, riderUuid, replacementMountUuid, null);
+        MountedRidePacketHandler.RideSession replacementSession =
+                MountedRidePacketHandler.currentRideSession(playerUuid);
+        try {
+            assertNotSame(oldSession, replacementSession);
+            assertFalse(oldSession.mailbox().offerMouseInteraction(
+                    new MountedRideInputMailbox.MouseInteractionSnapshot(true, true, 1, 1)
+            ));
+            assertFalse(MountedRidePacketHandler.unregisterRide(oldSession));
+            assertSame(replacementSession, MountedRidePacketHandler.currentRideSession(playerUuid));
+            assertSame(replacementSession, MountedRidePacketHandler.currentRideSession(riderUuid));
+        } finally {
+            if (replacementSession != null) {
+                MountedRidePacketHandler.unregisterRide(replacementSession);
+            }
+        }
+    }
+
+    @Test
+    void currentSessionCleanupRemovesEveryAlias() {
+        UUID playerUuid = UUID.randomUUID();
+        UUID riderUuid = UUID.randomUUID();
+        UUID mountUuid = UUID.randomUUID();
+
+        MountedRidePacketHandler.registerRide(playerUuid, riderUuid, mountUuid, null);
+        MountedRidePacketHandler.RideSession session =
+                MountedRidePacketHandler.currentRideSession(playerUuid);
+        try {
+            assertTrue(MountedRidePacketHandler.unregisterRide(session));
+            assertNull(MountedRidePacketHandler.currentRideSession(playerUuid));
+            assertNull(MountedRidePacketHandler.currentRideSession(riderUuid));
+        } finally {
+            MountedRidePacketHandler.unregisterRide(playerUuid);
+        }
     }
 
     private static SyncInteractionChain update(boolean initial, InteractionType type) {

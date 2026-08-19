@@ -2,14 +2,10 @@ package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
-import com.hypixel.hytale.protocol.MovementStates;
-import com.hypixel.hytale.protocol.Position;
-import com.hypixel.hytale.protocol.Vector3d;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 /**
  * Focused mounted-ride input probe for validating which rider axes survive the camera/mount setup.
@@ -22,10 +18,28 @@ public final class MountedRideInputProbeLogger {
     }
 
     public static void logClientMovement(@Nonnull TameworkRideMountComponent mount,
-                                         @Nullable Position rawWish,
-                                         @Nullable Vector3d rawVelocity,
-                                         @Nullable MovementStates movementStates,
-                                         @Nullable MovementStates riderMovementStates,
+                                         boolean hasWish,
+                                         double wishX,
+                                         double wishY,
+                                         double wishZ,
+                                         boolean hasVelocity,
+                                         double velocityX,
+                                         double velocityY,
+                                         double velocityZ,
+                                         boolean hasMovementStates,
+                                         boolean movementJumping,
+                                         boolean movementCrouching,
+                                         boolean movementSprinting,
+                                         boolean movementFlying,
+                                         boolean movementMounting,
+                                         boolean movementOnGround,
+                                         boolean hasRiderMovementStates,
+                                         boolean riderJumping,
+                                         boolean riderCrouching,
+                                         boolean riderSprinting,
+                                         boolean riderFlying,
+                                         boolean riderMounting,
+                                         boolean riderOnGround,
                                          boolean capturedMovementIntent) {
         if (!shouldLog("clientMovement")) {
             return;
@@ -33,11 +47,27 @@ public final class MountedRideInputProbeLogger {
         log(
                 "TameworkRide inputProbe source=clientMovement rawWish=%s rawVelocity=%s capturedMovement=%s " +
                         "movementStates=%s riderStates=%s snapshot=%s",
-                formatPosition(rawWish),
-                formatVector(rawVelocity),
+                hasWish ? formatTriple(wishX, wishY, wishZ) : "<none>",
+                hasVelocity ? formatTriple(velocityX, velocityY, velocityZ) : "<none>",
                 capturedMovementIntent,
-                formatStates(movementStates),
-                formatStates(riderMovementStates),
+                formatStates(
+                        hasMovementStates,
+                        movementJumping,
+                        movementCrouching,
+                        movementSprinting,
+                        movementFlying,
+                        movementMounting,
+                        movementOnGround
+                ),
+                formatStates(
+                        hasRiderMovementStates,
+                        riderJumping,
+                        riderCrouching,
+                        riderSprinting,
+                        riderFlying,
+                        riderMounting,
+                        riderOnGround
+                ),
                 formatSnapshot(mount)
         );
     }
@@ -85,28 +115,26 @@ public final class MountedRideInputProbeLogger {
         }
     }
 
-    private static String formatPosition(@Nullable Position position) {
-        return position == null ? "<none>" : formatTriple(position.x, position.y, position.z);
-    }
-
-    private static String formatVector(@Nullable Vector3d vector) {
-        return vector == null ? "<none>" : formatTriple(vector.x, vector.y, vector.z);
-    }
-
     private static String formatTriple(double x, double y, double z) {
         return x + "/" + y + "/" + z;
     }
 
-    private static String formatStates(@Nullable MovementStates states) {
-        if (states == null) {
+    private static String formatStates(boolean present,
+                                       boolean jumping,
+                                       boolean crouching,
+                                       boolean sprinting,
+                                       boolean flying,
+                                       boolean mounting,
+                                       boolean onGround) {
+        if (!present) {
             return "<none>";
         }
-        return "jump=" + states.jumping
-                + ",crouch=" + states.crouching
-                + ",sprint=" + states.sprinting
-                + ",fly=" + states.flying
-                + ",mounting=" + states.mounting
-                + ",ground=" + states.onGround;
+        return "jump=" + jumping
+                + ",crouch=" + crouching
+                + ",sprint=" + sprinting
+                + ",fly=" + flying
+                + ",mounting=" + mounting
+                + ",ground=" + onGround;
     }
 
     private static String formatSnapshot(@Nonnull TameworkRideMountComponent mount) {
