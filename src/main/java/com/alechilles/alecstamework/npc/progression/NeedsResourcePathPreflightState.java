@@ -22,6 +22,12 @@ final class NeedsResourcePathPreflightState {
             new LinkedHashMap<>(16, 0.75f, true);
     private final Map<AuthorityKey, AuthorityState> authorityStates = new HashMap<>();
     private final Map<AuthorityKey, AuthorityIndex> authorityIndex = new HashMap<>();
+    /**
+     * Maps the worldless invalidation identity to only the exact-world authorities that exist
+     * for that identity. This keeps compatibility invalidation independent of all other NPCs,
+     * resources, and target blocks.
+     */
+    private final Map<TargetAuthorityKey, Set<AuthorityKey>> worldlessAuthorityIndex = new HashMap<>();
     private final Object stateLock = new Object();
     private long cacheAdmissionWork;
     private int targetInvalidationBucketVisits;
@@ -35,7 +41,7 @@ final class NeedsResourcePathPreflightState {
     ComputationOperation registerOperationLocked(
             @Nonnull NeedsResourcePathPreflightService.PreflightKey key) {
         AuthorityKey authority = AuthorityKey.from(key);
-        authorityIndex.computeIfAbsent(authority, ignored -> new AuthorityIndex());
+        ensureAuthorityIndexLocked(authority);
         AuthorityState state = authorityStates.computeIfAbsent(authority, ignored -> new AuthorityState());
         ComputationOperation operation = new ComputationOperation(key, authority, state.generation);
         state.operations.add(operation);
@@ -182,13 +188,17 @@ final class NeedsResourcePathPreflightState {
             ));
             return;
         }
+        Set<AuthorityKey> indexedAuthorities = worldlessAuthorityIndex.get(
+                new TargetAuthorityKey(npcUuid, resourceType, targetX, targetY, targetZ)
+        );
+        if (indexedAuthorities == null || indexedAuthorities.isEmpty()) {
+            targetInvalidationBucketVisits = 0;
+            return;
+        }
         int inspected = 0;
-        for (AuthorityKey authority : new ArrayList<>(authorityIndex.keySet())) {
+        for (AuthorityKey authority : new ArrayList<>(indexedAuthorities)) {
             inspected++;
-            if (matchesTargetAuthority(
-                    authority, npcUuid, null, resourceType, targetX, targetY, targetZ)) {
-                invalidateAuthorityLocked(authority);
-            }
+            invalidateAuthorityLocked(authority);
         }
         targetInvalidationBucketVisits = inspected;
     }
@@ -215,6 +225,7 @@ final class NeedsResourcePathPreflightState {
         cache.clear();
         recentReadyTargets.clear();
         authorityIndex.clear();
+        worldlessAuthorityIndex.clear();
         authorityStates.clear();
         cacheAdmissionWork = 0L;
         targetInvalidationBucketVisits = 0;
@@ -326,6 +337,7 @@ final class NeedsResourcePathPreflightState {
                 && index.recentReadyKeys.isEmpty()
                 && !authorityStates.containsKey(authority)) {
             authorityIndex.remove(authority, index);
+            unlinkWorldlessAuthorityLocked(authority);
         }
     }
 
@@ -357,7 +369,27 @@ final class NeedsResourcePathPreflightState {
 
     @Nonnull
     private AuthorityIndex authorityIndexForLocked(@Nonnull AuthorityKey authority) {
-        return authorityIndex.computeIfAbsent(authority, ignored -> new AuthorityIndex());
+        return ensureAuthorityIndexLocked(authority);
+    }
+
+    @Nonnull
+    private AuthorityIndex ensureAuthorityIndexLocked(@Nonnull AuthorityKey authority) {
+        AuthorityIndex index = authorityIndex.computeIfAbsent(authority, ignored -> new AuthorityIndex());
+        worldlessAuthorityIndex
+                .computeIfAbsent(TargetAuthorityKey.from(authority), ignored -> new HashSet<>())
+                .add(authority);
+        return index;
+    }
+
+    private void unlinkWorldlessAuthorityLocked(@Nonnull AuthorityKey authority) {
+        TargetAuthorityKey targetAuthority = TargetAuthorityKey.from(authority);
+        Set<AuthorityKey> authorities = worldlessAuthorityIndex.get(targetAuthority);
+        if (authorities == null || !authorities.remove(authority)) {
+            return;
+        }
+        if (authorities.isEmpty()) {
+            worldlessAuthorityIndex.remove(targetAuthority, authorities);
+        }
     }
 
     @Nonnull
@@ -370,21 +402,6 @@ final class NeedsResourcePathPreflightState {
                 key.targetY(),
                 key.targetZ()
         );
-    }
-
-    private static boolean matchesTargetAuthority(@Nonnull AuthorityKey key,
-                                                   @Nonnull UUID npcUuid,
-                                                   @Nullable String worldName,
-                                                   @Nonnull String resourceType,
-                                                   int targetX,
-                                                   int targetY,
-                                                   int targetZ) {
-        return key.npcUuid().equals(npcUuid)
-                && (worldName == null || worldName.equals(key.worldName()))
-                && resourceType.equals(key.resourceType())
-                && key.targetX() == targetX
-                && key.targetY() == targetY
-                && key.targetZ() == targetZ;
     }
 
     record AuthorityKey(@Nonnull UUID npcUuid,
@@ -402,6 +419,23 @@ final class NeedsResourcePathPreflightState {
                     key.targetX(),
                     key.targetY(),
                     key.targetZ()
+            );
+        }
+    }
+
+    private record TargetAuthorityKey(@Nonnull UUID npcUuid,
+                                       @Nonnull String resourceType,
+                                       int targetX,
+                                       int targetY,
+                                       int targetZ) {
+        @Nonnull
+        private static TargetAuthorityKey from(@Nonnull AuthorityKey authority) {
+            return new TargetAuthorityKey(
+                    authority.npcUuid(),
+                    authority.resourceType(),
+                    authority.targetX(),
+                    authority.targetY(),
+                    authority.targetZ()
             );
         }
     }

@@ -10,8 +10,6 @@ import com.alechilles.alecstamework.npc.progression.NeedsResourceRequestTemplate
 import com.alechilles.alecstamework.npc.progression.NeedsResourceSearchCoordinator;
 import com.alechilles.alecstamework.npc.progression.NeedsSeekDiagnostics;
 import com.alechilles.alecstamework.npc.progression.NeedsTelemetryDiagnostics;
-import com.alechilles.alecstamework.npc.progression.PositionTargetRejectCache;
-import com.alechilles.alecstamework.npc.progression.PositionTargetReservationCache;
 import com.alechilles.alecstamework.npc.sensorinfo.TameworkTargetPositionInfo;
 import com.alechilles.alecstamework.npc.sensorinfo.TameworkTargetPositionInfoProvider;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkNeedsResourceTarget;
@@ -44,7 +42,6 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     private static final NeedsResourcePathPreflightService PATH_PREFLIGHT_SERVICE =
             NeedsResourcePathPreflightService.shared();
     private static final int MAX_ACTIVE_SEEK_VERTICAL_SCAN_RADIUS = 16;
-    private static final double PREFLIGHT_REJECT_TTL_SECONDS = 4.0;
     private static final double DEFAULT_APPROACH_RADIUS = 2.0;
     private static final double EPSILON = 0.000001;
     private static final SearchEligibility UNGATED_ELIGIBILITY =
@@ -170,7 +167,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                                 npcUuid,
                                 resourceType.kind,
                                 localTarget,
-                                PREFLIGHT_REJECT_TTL_SECONDS
+                                NeedsResourceTargetStateFacade.preflightRejectTtlSeconds()
                         );
                         targetCache.clearTarget(npcUuid, worldName, resourceType.kind, localTarget);
                     } else {
@@ -282,7 +279,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                             npcUuid,
                             resourceType.kind,
                             target,
-                            PREFLIGHT_REJECT_TTL_SECONDS
+                            NeedsResourceTargetStateFacade.preflightRejectTtlSeconds()
                     );
                     targetCache.clearTarget(npcUuid, worldName, resourceType.kind, target);
                 } else {
@@ -602,34 +599,6 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         return MAX_ACTIVE_SEEK_VERTICAL_SCAN_RADIUS;
     }
 
-    static long targetCacheTtlMs(boolean hasTarget) {
-        return NeedsResourceTargetCacheAdapter.targetCacheTtlMs(hasTarget);
-    }
-
-    static double preflightRejectTtlSecondsForTests() {
-        return PREFLIGHT_REJECT_TTL_SECONDS;
-    }
-
-    private static boolean shouldBypassPathPreflight(boolean fastModeActive, boolean hasTarget) {
-        return fastModeActive && hasTarget;
-    }
-
-    static boolean shouldBypassPathPreflightForTests(boolean fastModeActive, boolean hasTarget) {
-        return shouldBypassPathPreflight(fastModeActive, hasTarget);
-    }
-
-    @Nonnull
-    static String fastModeReasonForTests(@Nonnull String reason) {
-        return reason.endsWith("_fast_consume") ? reason : reason + "_fast_consume";
-    }
-
-    static boolean targetCacheBlockMatchesForTests(@Nonnull Vector3d cachedScanPosition,
-                                                   @Nonnull Vector3d currentPosition) {
-        return block(cachedScanPosition.x) == block(currentPosition.x)
-                && block(cachedScanPosition.y) == block(currentPosition.y)
-                && block(cachedScanPosition.z) == block(currentPosition.z);
-    }
-
     @Nonnull
     static String[] mergeItemIds(@Nullable String[] primary, @Nullable String[] secondary) {
         if (!hasAnyItemId(primary)) {
@@ -703,151 +672,40 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         return clamp(value, 0.0, 1.0);
     }
 
-    private static int block(double value) {
-        return (int) Math.floor(value);
-    }
-
     public static boolean rejectTarget(@Nullable UUID npcUuid,
                                        @Nullable String resourceType,
                                        @Nullable Vector3d target,
                                        double suppressSeconds) {
-        invalidatePreflightLeases(npcUuid, resourceType, target);
-        return NeedsResourceTargetCacheAdapter.rejectTarget(npcUuid, resourceType, target, suppressSeconds);
-    }
-
-    static boolean rejectTargetForTests(@Nullable UUID npcUuid,
-                                        @Nullable String resourceType,
-                                        @Nullable Vector3d target,
-                                        double suppressSeconds,
-                                        long nowMs) {
-        invalidatePreflightLeases(npcUuid, resourceType, target);
-        if (resourceType == null || resourceType.isBlank() || "auto".equalsIgnoreCase(resourceType.trim())) {
-            boolean water = NeedsResourceTargetCacheAdapter.rejectTarget(npcUuid, "water", target, suppressSeconds, nowMs);
-            boolean food = NeedsResourceTargetCacheAdapter.rejectTarget(npcUuid, "food_container", target, suppressSeconds, nowMs);
-            return water || food;
-        }
-        return NeedsResourceTargetCacheAdapter.rejectTarget(npcUuid, resourceType, target, suppressSeconds, nowMs);
-    }
-
-    private static void invalidatePreflightLeases(@Nullable UUID npcUuid,
-                                                  @Nullable String resourceType,
-                                                  @Nullable Vector3d target) {
-        if (resourceType == null || resourceType.isBlank() || "auto".equalsIgnoreCase(resourceType.trim())) {
-            PATH_PREFLIGHT_SERVICE.invalidateTarget(npcUuid, null, "Water", target);
-            PATH_PREFLIGHT_SERVICE.invalidateTarget(npcUuid, null, "FoodContainer", target);
-            return;
-        }
-        String normalized = resourceType.trim().toLowerCase(Locale.ROOT);
-        String label = normalized.equals("food")
-                || normalized.equals("foodcontainer")
-                || normalized.equals("food_container")
-                ? "FoodContainer"
-                : "Water";
-        PATH_PREFLIGHT_SERVICE.invalidateTarget(npcUuid, null, label, target);
-    }
-
-    static boolean isTargetRejectedForTests(@Nullable UUID npcUuid,
-                                            @Nullable String resourceType,
-                                            @Nullable Vector3d target,
-                                            long nowMs) {
-        return NeedsResourceTargetCacheAdapter.isTargetRejected(npcUuid, resourceType, target, nowMs);
-    }
-
-    static void clearRejectedTargetsForTests() {
-        PositionTargetRejectCache.clearForTests();
-    }
-
-    static int rejectedTargetCountForTests() {
-        return PositionTargetRejectCache.countForTests();
-    }
-
-    static int rejectedTargetMaxEntriesForTests() {
-        return PositionTargetRejectCache.MAX_ENTRIES;
-    }
-
-    static boolean reserveTargetForTests(@Nullable UUID npcUuid,
-                                         @Nullable String worldName,
-                                         @Nullable String resourceType,
-                                         @Nullable Vector3d target,
-                                         long nowMs) {
-        return NeedsResourceTargetCacheAdapter.reserveTarget(
-                npcUuid, worldName, resourceType, target, nowMs
+        return NeedsResourceTargetStateFacade.rejectTarget(
+                npcUuid, resourceType, target, suppressSeconds
         );
     }
 
-    static boolean isTargetReservedByOtherForTests(@Nullable UUID npcUuid,
-                                                   @Nullable String worldName,
-                                                   @Nullable String resourceType,
-                                                   @Nullable Vector3d target,
-                                                   long nowMs) {
-        return NeedsResourceTargetCacheAdapter.isReservedByOther(
-                npcUuid, worldName, resourceType, target, nowMs
+    /**
+     * Rejects a target and invalidates only the matching path-preflight authority in the given
+     * world. The worldless overload remains available for callers that do not have world context.
+     */
+    public static boolean rejectTarget(@Nullable UUID npcUuid,
+                                       @Nullable String worldName,
+                                       @Nullable String resourceType,
+                                       @Nullable Vector3d target,
+                                       double suppressSeconds) {
+        return NeedsResourceTargetStateFacade.rejectTarget(
+                npcUuid, worldName, resourceType, target, suppressSeconds
         );
-    }
-
-    static void releaseTargetForTests(@Nullable UUID npcUuid,
-                                      @Nullable String worldName,
-                                      @Nullable String resourceType,
-                                      @Nullable Vector3d target) {
-        NeedsResourceTargetCacheAdapter.releaseTarget(npcUuid, worldName, resourceType, target);
-    }
-
-    static void clearTargetReservationsForTests() {
-        PositionTargetReservationCache.clearForTests();
-    }
-
-    static void rememberFastConsumeTargetForTests(@Nullable UUID npcUuid,
-                                                  @Nullable String worldName,
-                                                  @Nullable String resourceType,
-                                                  @Nullable Vector3d target,
-                                                  long expiresAtMs) {
-        NeedsResourceTargetCacheAdapter.rememberFastConsumeTargetForTests(
-                npcUuid, worldName, resourceType, target, expiresAtMs
-        );
-    }
-
-    static boolean isFastConsumeTargetForTests(@Nullable UUID npcUuid,
-                                               @Nullable String worldName,
-                                               @Nullable String resourceType,
-                                               @Nullable Vector3d target,
-                                               long nowMs) {
-        return NeedsResourceTargetCacheAdapter.isFastConsumeTargetForTests(
-                npcUuid, worldName, resourceType, target, nowMs
-        );
-    }
-
-    static void clearFastConsumeTargetsForTests() {
-        NeedsResourceTargetCacheAdapter.clearFastConsumeTargetsForTests();
     }
 
     public static void releaseTarget(@Nullable Ref<EntityStore> npcRef,
                                      @Nullable Store<EntityStore> store,
                                      @Nullable String resourceType,
                                      @Nullable Vector3d target) {
-        NeedsResourceTargetCacheAdapter.releaseTarget(npcRef, store, resourceType, target);
+        NeedsResourceTargetStateFacade.releaseTarget(npcRef, store, resourceType, target);
     }
 
     public static boolean hasFastConsumeTarget(@Nullable Ref<EntityStore> npcRef,
                                                @Nullable Store<EntityStore> store,
                                                long nowMs) {
-        return NeedsResourceTargetCacheAdapter.hasFastConsumeTarget(npcRef, store, nowMs);
-    }
-
-    private record SearchEligibility(boolean allowed,
-                                     @Nonnull String reason,
-                                     double currentRatio,
-                                     @Nullable TwNeedsConfig needsConfig) {
-        @Nonnull
-        private static SearchEligibility allowed(double ratio, @Nullable TwNeedsConfig config) {
-            return new SearchEligibility(true, "eligible", ratio, config);
-        }
-
-        @Nonnull
-        private static SearchEligibility blocked(@Nonnull String reason,
-                                                 double ratio,
-                                                 @Nullable TwNeedsConfig config) {
-            return new SearchEligibility(false, reason, ratio, config);
-        }
+        return NeedsResourceTargetStateFacade.hasFastConsumeTarget(npcRef, store, nowMs);
     }
 
     private enum NeedType {

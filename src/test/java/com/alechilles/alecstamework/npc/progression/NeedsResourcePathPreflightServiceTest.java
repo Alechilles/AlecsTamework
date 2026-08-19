@@ -9,6 +9,8 @@ import com.alechilles.alecstamework.performance.RuntimePressureDomain;
 import com.alechilles.alecstamework.performance.TameworkRuntimePressureService;
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService.PathPreflightResult;
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService.PathPreflightStatus;
+import com.alechilles.alecstamework.npc.progression.PositionTargetRejectCache;
+import com.alechilles.alecstamework.npc.sensors.SensorTameworkNeedsResourceTarget;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -577,8 +579,24 @@ class NeedsResourcePathPreflightServiceTest {
         AtomicInteger factoryCalls = new AtomicInteger();
         service.preflight(worldA, () -> ready(factoryCalls), 1_000L);
         service.preflight(worldB, () -> ready(factoryCalls), 1_000L);
+        for (int i = 0; i < 48; i++) {
+            NeedsResourcePathPreflightService.PreflightKey unrelated = keyFor(
+                    new UUID(0L, 68_000L + i),
+                    "unrelated-world-" + i,
+                    "Water",
+                    new Vector3d(i, 64.0, 0.0),
+                    new Vector3d(100.0 + i, 64.0, 0.0)
+            );
+            service.preflight(
+                    unrelated,
+                    () -> new FakeComputation(PathPreflightStatus.READY),
+                    1_000L
+            );
+        }
 
         service.invalidateTarget(npc, null, "Water", target);
+
+        assertEquals(2, service.targetInvalidationBucketVisitsForTests());
 
         PathPreflightResult resultA = service.preflight(
                 worldA,
@@ -600,6 +618,57 @@ class NeedsResourcePathPreflightServiceTest {
         assertTrue(resultA.noPath());
         assertTrue(resultB.noPath());
         assertEquals(4, factoryCalls.get());
+    }
+
+    @Test
+    void publicWorldAwareSensorRejectionInvalidatesOnlyTheExactWorld() {
+        NeedsResourcePathPreflightService service = NeedsResourcePathPreflightService.shared();
+        service.clearForTests();
+        UUID npc = new UUID(0L, 68_100L);
+        Vector3d target = new Vector3d(4.25, 64.25, 8.25);
+        NeedsResourcePathPreflightService.PreflightKey worldA = keyFor(
+                npc, "world-a", "Water", new Vector3d(0.0, 64.0, 0.0), target
+        );
+        NeedsResourcePathPreflightService.PreflightKey worldB = keyFor(
+                npc, "world-b", "Water", new Vector3d(0.0, 64.0, 0.0), target
+        );
+        AtomicInteger factoryCalls = new AtomicInteger();
+        long nowMs = System.currentTimeMillis();
+
+        try {
+            service.preflight(worldA, () -> ready(factoryCalls), nowMs);
+            service.preflight(worldB, () -> ready(factoryCalls), nowMs);
+
+            assertTrue(SensorTameworkNeedsResourceTarget.rejectTarget(
+                    npc,
+                    "WORLD-A",
+                    "Water",
+                    target,
+                    30.0
+            ));
+
+            PathPreflightResult worldAResult = service.preflight(
+                    worldA,
+                    () -> {
+                        factoryCalls.incrementAndGet();
+                        return new FakeComputation(PathPreflightStatus.NO_PATH);
+                    },
+                    nowMs + 1L
+            );
+            PathPreflightResult worldBResult = service.preflight(
+                    worldB,
+                    () -> failComputation(factoryCalls),
+                    nowMs + 1L
+            );
+
+            assertTrue(worldAResult.noPath());
+            assertTrue(worldBResult.ready());
+            assertEquals(3, factoryCalls.get());
+            assertEquals(1, service.targetInvalidationBucketVisitsForTests());
+        } finally {
+            service.clearForTests();
+            PositionTargetRejectCache.clearForTests();
+        }
     }
 
     @Test
