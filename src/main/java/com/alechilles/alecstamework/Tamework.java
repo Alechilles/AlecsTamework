@@ -880,7 +880,11 @@ public class Tamework extends JavaPlugin {
                 ));
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
                 "command-hotswap-hud",
-                () -> new CommandHotswapHudService(commandItemRegistry, commandTargetInspector));
+                () -> new CommandHotswapHudService(
+                        commandItemRegistry,
+                        commandHotswapHudActivationTracker,
+                        commandTargetInspector
+                ));
 
         applyDebugConfigDefaults();
         settingsAnnouncementService = new TameworkSettingsAnnouncementService(this);

@@ -29,6 +29,7 @@
   unchanged prompt-cache writes.
 - Reduced command HUD world-tick work by reusing unchanged group status, sharing reticle target
   queries between the target and hotswap HUDs, and selecting bounded player batches.
+- Reduced command HUD server work when many players are online.
 
 ## 3.1.9 - Companion Spawn Safety Hotfix - 2026-08-16
 
