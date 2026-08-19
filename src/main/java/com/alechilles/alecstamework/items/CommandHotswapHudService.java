@@ -56,8 +56,8 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
     private final CommandTargetInspector targetInspector;
     private final CommandHotswapHudGroupStatusResolver groupStatusResolver =
             new CommandHotswapHudGroupStatusResolver(null, null, null);
-    private final Map<Store<EntityStore>, Map<UUID, HudState>> statesByStore = new IdentityHashMap<>();
-    private final Map<Store<EntityStore>, StoreTickState> storeTickStateByStore = new IdentityHashMap<>();
+    private final Object storesLock = new Object();
+    private final Map<Store<EntityStore>, StoreState> statesByStore = new IdentityHashMap<>();
 
     public CommandHotswapHudService(@Nonnull CommandItemRegistry registry) {
         this(registry, new CommandTargetHudActivationTracker(), new CommandTargetInspector());
@@ -110,7 +110,21 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
 
     @Nonnull
     private StoreTickState storeTickState(@Nonnull Store<EntityStore> store) {
-        return storeTickStateByStore.computeIfAbsent(store, ignored -> new StoreTickState());
+        return storeState(store).tickState();
+    }
+
+    @Nonnull
+    private StoreState storeState(@Nonnull Store<EntityStore> store) {
+        synchronized (storesLock) {
+            return statesByStore.computeIfAbsent(store, ignored -> new StoreState());
+        }
+    }
+
+    @Nullable
+    private StoreState existingStoreState(@Nonnull Store<EntityStore> store) {
+        synchronized (storesLock) {
+            return statesByStore.get(store);
+        }
     }
 
     private void processCandidatePlayers(@Nonnull Store<EntityStore> store, long nowMs) {
@@ -186,8 +200,8 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
                 nowMs
         );
         CommandHotswapHudViewModel model = resolveModel(player, activeCommand, nowMs);
-        Map<UUID, HudState> statesByPlayer = statesForStore(store);
-        HudState previous = statesByPlayer.get(playerUuid);
+        StoreState storeState = storeState(store);
+        HudState previous = storeState.stateForPlayer(playerUuid);
         if (!model.visible()) {
             removeHud(store, playerUuid, player, previous);
             return;
@@ -199,12 +213,12 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
         if (previous == null || previous.playerRef() != playerRef) {
             TameworkCommandHotswapHud hud = new TameworkCommandHotswapHud(playerRef, model);
             player.getHudManager().addCustomHud(playerRef, hud);
-            statesByPlayer.put(playerUuid, new HudState(playerRef, hud, model));
+            storeState.put(playerUuid, new HudState(playerRef, hud, model));
             return;
         }
         if (!previous.model().equals(model)) {
             previous.hud().refresh(model);
-            statesByPlayer.put(playerUuid, new HudState(playerRef, previous.hud(), model));
+            storeState.put(playerUuid, new HudState(playerRef, previous.hud(), model));
         }
     }
 
@@ -295,7 +309,6 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
                             @Nullable Player player,
                             @Nullable HudState previous) {
         if (previous == null) {
-            removeEmptyPlayerState(store, statesByStore.get(store));
             return;
         }
         if (player != null && player.getPlayerRef() != null && player.getHudManager() != null) {
@@ -305,9 +318,10 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
         } else {
             previous.hud().hideNow();
         }
-        Map<UUID, HudState> statesByPlayer = statesForStore(store);
-        statesByPlayer.remove(playerUuid);
-        removeEmptyPlayerState(store, statesByPlayer);
+        StoreState storeState = existingStoreState(store);
+        if (storeState != null) {
+            storeState.remove(playerUuid);
+        }
     }
 
     @Nullable
@@ -323,45 +337,64 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
         return new ActiveCommandItem(stack, stack.getItemId(), config);
     }
 
-    @Nonnull
-    private Map<UUID, HudState> statesForStore(@Nonnull Store<EntityStore> store) {
-        return statesByStore.computeIfAbsent(store, ignored -> new HashMap<>());
-    }
-
-    private void removeEmptyPlayerState(@Nonnull Store<EntityStore> store,
-                                         @Nullable Map<UUID, HudState> statesByPlayer) {
-        if (statesByPlayer != null && statesByPlayer.isEmpty()) {
-            statesByStore.remove(store, statesByPlayer);
-        }
-    }
-
     private void clearPlayerState(@Nonnull Store<EntityStore> store,
                                   @Nonnull UUID playerUuid) {
-        Map<UUID, HudState> statesByPlayer = statesByStore.get(store);
-        if (statesByPlayer == null) {
+        StoreState storeState = existingStoreState(store);
+        if (storeState == null) {
             return;
         }
-        HudState state = statesByPlayer.remove(playerUuid);
+        HudState state = storeState.remove(playerUuid);
         if (state != null) {
             state.hud().hideNow();
         }
-        removeEmptyPlayerState(store, statesByPlayer);
     }
 
     private void clearStoreState(@Nonnull Store<EntityStore> store) {
-        Map<UUID, HudState> statesByPlayer = statesByStore.remove(store);
-        if (statesByPlayer != null) {
+        StoreState storeState;
+        synchronized (storesLock) {
+            storeState = statesByStore.remove(store);
+        }
+        if (storeState != null) {
+            storeState.clear();
+        }
+    }
+
+    /** Serializes player HUD state within one store without locking unrelated stores. */
+    private static final class StoreState {
+        private final Map<UUID, HudState> statesByPlayer = new HashMap<>();
+        private final StoreTickState tickState = new StoreTickState();
+
+        @Nonnull
+        private synchronized StoreTickState tickState() {
+            return tickState;
+        }
+
+        @Nullable
+        private synchronized HudState stateForPlayer(@Nonnull UUID playerUuid) {
+            return statesByPlayer.get(playerUuid);
+        }
+
+        private synchronized void put(@Nonnull UUID playerUuid, @Nonnull HudState state) {
+            statesByPlayer.put(playerUuid, state);
+        }
+
+        @Nullable
+        private synchronized HudState remove(@Nonnull UUID playerUuid) {
+            return statesByPlayer.remove(playerUuid);
+        }
+
+        private synchronized void clear() {
             for (HudState state : statesByPlayer.values()) {
                 state.hud().hideNow();
             }
+            statesByPlayer.clear();
         }
-        storeTickStateByStore.remove(store);
     }
 
     /** Keeps scheduler deadlines separate for each entity store. */
     private static final class StoreTickState {
-        private long nextSweepAtMs;
-        private long nextFallbackDiscoveryAtMs;
+        private volatile long nextSweepAtMs;
+        private volatile long nextFallbackDiscoveryAtMs;
     }
 
     /** Carries a stable player identity with the live component resolved for this tick. */

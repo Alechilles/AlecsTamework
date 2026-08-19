@@ -344,8 +344,16 @@ public final class CommandTargetHudActivationTracker implements CommandHudDirtyS
                     continue;
                 }
                 activeQueue.addLast(playerUuid);
-                if (dirtyQueued.contains(playerUuid)
-                        || !isActiveDue(playerUuid, nowMs, activeRefreshIntervalMs)) {
+                boolean activeDue = isActiveDue(playerUuid, nowMs, activeRefreshIntervalMs);
+                if (dirtyQueued.contains(playerUuid)) {
+                    if (!activeDue) {
+                        continue;
+                    }
+                    // The active slot supersedes a stale fallback marker. Leave its queue node in
+                    // place; drainDirty will skip it in O(1) when it reaches the queue head.
+                    dirtyQueued.remove(playerUuid);
+                }
+                if (!activeDue) {
                     continue;
                 }
                 if (selectedSet.add(playerUuid)) {

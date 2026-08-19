@@ -170,10 +170,12 @@ class CommandTargetHudActivationTrackerTest {
     @Test
     void saturatedDirtyQueueReservesDueActiveRefreshCapacity() {
         CommandTargetHudActivationTracker tracker = new CommandTargetHudActivationTracker();
-        tracker.recordResolvedHand(PLAYER_UUID, "Tamework:CommandFlute", true, 1_000L);
         for (UUID playerUuid : MANY_PLAYER_UUIDS) {
+            tracker.recordResolvedHand(playerUuid, null, false, 1_000L);
             tracker.markDirty(playerUuid);
         }
+        tracker.recordResolvedHand(PLAYER_UUID, "Tamework:CommandFlute", true, 1_000L);
+        tracker.markDirty(PLAYER_UUID);
 
         CommandTargetHudActivationTracker.CandidateBatch batch =
                 tracker.selectCandidateBatchForTests(4, 1_200L, 200L, 1);

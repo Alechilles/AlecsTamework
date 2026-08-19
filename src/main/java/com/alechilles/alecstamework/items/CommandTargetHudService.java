@@ -495,7 +495,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                          long nowMs) {
         PlayerRef playerRef = player.getPlayerRef();
         if (playerRef == null || player.getHudManager() == null) {
-            hudStateStore.remove(playerUuid);
+            hudStateStore.remove(store, playerUuid);
             return;
         }
         String language = playerRef.getLanguage();
@@ -513,6 +513,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                     "refreshed hud; target=" + targetKey + ", item=" + activeItemId + ", display=" + model.status().displayName());
         }
         hudStateStore.put(
+                store,
                 playerUuid,
                 new CommandTargetHudStateStore.HudState(
                         store, targetKey, nowMs, hud, true, nowMs, activeItemId
@@ -526,20 +527,20 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         CommandTargetHudStateStore.HudState previous = hudStateStore.stateForStore(store, playerUuid);
         if (previous == null || previous.hud() == null) {
             debug(playerUuid, System.currentTimeMillis(), "hide-empty", "hide requested with no stored hud state");
-            hudStateStore.remove(playerUuid);
+            hudStateStore.remove(store, playerUuid);
             return;
         }
         if (player == null || player.getPlayerRef() == null || player.getHudManager() == null) {
             previous.hud().hideNow();
             debug(playerUuid, System.currentTimeMillis(), "hide-fallback",
                     "hide fallback clear; previousTarget=" + previous.targetKey());
-            hudStateStore.remove(playerUuid);
+            hudStateStore.remove(store, playerUuid);
             return;
         }
         player.getHudManager().removeCustomHud(player.getPlayerRef(), TameworkCommandTargetHud.HUD_KEY);
         debug(playerUuid, System.currentTimeMillis(), "hide-manager",
                 "removed hud through manager; previousTarget=" + previous.targetKey());
-        hudStateStore.remove(playerUuid);
+        hudStateStore.remove(store, playerUuid);
     }
 
     private void hideHudAndRememberNoTarget(@Nonnull Store<EntityStore> store,
@@ -560,6 +561,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             }
         }
         hudStateStore.put(
+                store,
                 playerUuid,
                 new CommandTargetHudStateStore.HudState(
                         store,
@@ -580,6 +582,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                               long nowMs) {
         if (previous == null) {
             hudStateStore.put(
+                    store,
                     playerUuid,
                     new CommandTargetHudStateStore.HudState(
                             store, null, 0L, null, false, nowMs, activeItemId
@@ -588,6 +591,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             return;
         }
         hudStateStore.put(
+                store,
                 playerUuid,
                 new CommandTargetHudStateStore.HudState(
                         store,
