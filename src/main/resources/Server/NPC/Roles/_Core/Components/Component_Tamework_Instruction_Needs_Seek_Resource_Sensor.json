@@ -95,10 +95,6 @@
             },
             {
               "Type": "TameworkNeedsResourceTarget",
-              "Need": "Hunger",
-              "RatioBelow": {
-                "Compute": "NeedsSeekWhenHungerBelowRatio"
-              },
               "ResourceType": "FoodContainer",
               "Range": {
                 "Compute": "NeedsSeekFoodSearchRange"
@@ -159,10 +155,6 @@
             },
             {
               "Type": "TameworkNeedsResourceTarget",
-              "Need": "Thirst",
-              "RatioBelow": {
-                "Compute": "NeedsSeekWhenThirstBelowRatio"
-              },
               "ResourceType": "Water",
               "Range": {
                 "Compute": "NeedsSeekWaterSearchRange"
@@ -215,10 +207,6 @@
             },
             {
               "Type": "TameworkNeedsResourceTarget",
-              "Need": "Thirst",
-              "RatioBelow": {
-                "Compute": "NeedsSeekWhenThirstBelowRatio"
-              },
               "ResourceType": "Water",
               "Range": {
                 "Compute": "NeedsSeekWaterSearchRange"
@@ -271,10 +259,6 @@
             },
             {
               "Type": "TameworkNeedsResourceTarget",
-              "Need": "Hunger",
-              "RatioBelow": {
-                "Compute": "NeedsSeekWhenHungerBelowRatio"
-              },
               "ResourceType": "FoodContainer",
               "Range": {
                 "Compute": "NeedsSeekFoodSearchRange"

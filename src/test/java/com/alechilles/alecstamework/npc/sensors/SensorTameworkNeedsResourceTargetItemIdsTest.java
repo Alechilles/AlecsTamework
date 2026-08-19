@@ -3,10 +3,8 @@ package com.alechilles.alecstamework.npc.sensors;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentService;
 import java.util.UUID;
 import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
@@ -70,33 +68,6 @@ class SensorTameworkNeedsResourceTargetItemIdsTest {
                 new Vector3d(10.2, 64.0, -3.8),
                 new Vector3d(11.0, 64.0, -3.8)
         ));
-    }
-
-    @Test
-    void foodConsumeRangeSearchResolvesToCurrentPosition() {
-        Vector3d currentPosition = new Vector3d(10.0, 64.0, 2.0);
-        CompanionNeedsEnvironmentService.FoodTargetSearchResult result =
-                new CompanionNeedsEnvironmentService.FoodTargetSearchResult(null, true, true);
-
-        assertEquals(
-                "food_already_in_consume_range",
-                SensorTameworkNeedsResourceTarget.resolveFoodSearchReasonForTests(result, currentPosition)
-        );
-        assertSame(
-                currentPosition,
-                SensorTameworkNeedsResourceTarget.resolveFoodSearchTargetForTests(result, currentPosition)
-        );
-    }
-
-    @Test
-    void foodSourceOutsideConsumeRangeStillReportsNoStandTarget() {
-        CompanionNeedsEnvironmentService.FoodTargetSearchResult result =
-                new CompanionNeedsEnvironmentService.FoodTargetSearchResult(null, true, false);
-
-        assertEquals(
-                "food_source_found_but_no_stand_target",
-                SensorTameworkNeedsResourceTarget.resolveFoodSearchReasonForTests(result, new Vector3d())
-        );
     }
 
     @Test

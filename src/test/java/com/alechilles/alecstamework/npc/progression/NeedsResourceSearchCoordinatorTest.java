@@ -319,6 +319,34 @@ class NeedsResourceSearchCoordinatorTest {
     }
 
     @Test
+    void invalidatingAllCachedCandidatesQueuesOneBoundedRefresh() {
+        try (TestEntityComponentStore store = newStore()) {
+            coordinator.clear(store);
+            NeedsResourceSearchCoordinator.Request request = request(675);
+            NeedsResourceCandidates.Snapshot snapshot = new NeedsResourceCandidates.Snapshot(
+                    List.of(new NeedsResourceCandidates.Candidate(4, 64, 4, 2.0)),
+                    true,
+                    false,
+                    10_000L
+            );
+            CountingExecutor executor = new CountingExecutor(snapshot);
+
+            coordinator.lookupOrEnqueue(store, uuid(675), request, NOW_MS);
+            assertEquals(1, coordinator.processOne(store, 1L, NOW_MS, executor));
+            assertEquals(HIT, coordinator.lookupOrEnqueue(store, uuid(676), request, NOW_MS + 1L).status());
+
+            assertTrue(coordinator.invalidateCandidates(store, request, candidate -> true, NOW_MS + 2L));
+            assertEquals(DEFERRED, coordinator.lookupOrEnqueue(store, uuid(676), request, NOW_MS + 2L).status());
+            assertEquals(1, coordinator.pendingCountForTests(store));
+            assertFalse(coordinator.invalidateCandidates(store, request, candidate -> true, NOW_MS + 2L));
+            assertEquals(1, coordinator.pendingCountForTests(store));
+            assertEquals(1, coordinator.processOne(store, 2L, NOW_MS + 2L, executor));
+            assertEquals(2, executor.calls());
+            assertEquals(HIT, coordinator.lookupOrEnqueue(store, uuid(676), request, NOW_MS + 3L).status());
+        }
+    }
+
+    @Test
     void foodIdentityUsesCollisionSafeNormalizedAreaKeys() {
         try (TestEntityComponentStore store = newStore()) {
             coordinator.clear(store);

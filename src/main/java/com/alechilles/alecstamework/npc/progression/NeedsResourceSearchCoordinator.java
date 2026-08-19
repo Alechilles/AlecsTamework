@@ -16,6 +16,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.function.Predicate;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -163,6 +164,22 @@ public final class NeedsResourceSearchCoordinator {
         WorldState state = statesByStore.get(store);
         Objects.requireNonNull(executor, "executor");
         return processState(store, state, ++state.nextWorldTick, nowMs, executor);
+    }
+
+    /**
+     * Invalidates selected candidates in one shared area snapshot. The next
+     * sensor lookup can enqueue a bounded refresh when no candidates remain.
+     */
+    public boolean invalidateCandidates(
+            @Nonnull Store<EntityStore> store,
+            @Nonnull Request request,
+            @Nonnull Predicate<NeedsResourceCandidates.Candidate> remove,
+            long nowMs) {
+        Objects.requireNonNull(store, "store");
+        Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(remove, "remove");
+        WorldState state = statesByStore.get(store);
+        return state.areaCache.invalidateCandidates(request.areaKey(), remove, nowMs);
     }
 
     /**

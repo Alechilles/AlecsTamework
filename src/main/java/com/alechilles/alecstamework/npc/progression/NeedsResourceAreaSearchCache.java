@@ -103,6 +103,43 @@ final class NeedsResourceAreaSearchCache {
         putInternal(key, snapshot, nowMs, null);
     }
 
+    /**
+     * Removes candidates that a world-thread caller proved unusable. The
+     * remaining immutable candidates keep the original expiry. An empty
+     * result is removed so the coordinator can queue a fresh bounded search.
+     */
+    boolean invalidateCandidates(@Nullable AreaKey key,
+                                  @Nonnull Predicate<NeedsResourceCandidates.Candidate> remove,
+                                  long nowMs) {
+        CachedAreaSearch cached = getCached(key, nowMs);
+        if (cached == null) {
+            return false;
+        }
+        NeedsResourceCandidates.Snapshot snapshot = cached.toSnapshot(nowMs);
+        List<NeedsResourceCandidates.Candidate> remaining = snapshot.candidates().stream()
+                .filter(remove.negate())
+                .toList();
+        if (remaining.size() == snapshot.candidates().size()) {
+            return false;
+        }
+        entries.remove(key, cached);
+        if (!remaining.isEmpty()) {
+            entries.put(
+                    key,
+                    CachedAreaSearch.from(
+                            new NeedsResourceCandidates.Snapshot(
+                                    remaining,
+                                    snapshot.foundSource(),
+                                    snapshot.sourceInConsumeRange(),
+                                    snapshot.ttlMs()
+                            ),
+                            nowMs
+                    )
+            );
+        }
+        return true;
+    }
+
     private void putInternal(@Nullable AreaKey key,
                              @Nonnull NeedsResourceCandidates.Snapshot snapshot,
                              long nowMs,

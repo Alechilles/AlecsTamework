@@ -80,6 +80,11 @@ class NeedsTelemetryDiagnosticsTest {
     }
 
     @Test
+    void deferredSearchIsNotReportedAsASeekFailure() {
+        assertFalse(NeedsTelemetryDiagnostics.isReportableSeekFailureReason("resource_search_deferred"));
+    }
+
+    @Test
     void groupsSeekFailuresByStageAndSourceCandidatePresence() {
         assertEquals(
                 "stand_target",

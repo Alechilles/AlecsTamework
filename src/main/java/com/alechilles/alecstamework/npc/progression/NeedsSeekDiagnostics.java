@@ -152,6 +152,11 @@ public final class NeedsSeekDiagnostics {
         return instance != null && instance.isDebugNeedsSeekDiagnosticsEnabled();
     }
 
+    /** Returns the cheap runtime toggle without resolving an NPC context. */
+    public static boolean isEnabled() {
+        return isRuntimeEnabled();
+    }
+
     @Nonnull
     private static String formatRatio(@Nullable Double value) {
         if (value == null || !Double.isFinite(value)) {

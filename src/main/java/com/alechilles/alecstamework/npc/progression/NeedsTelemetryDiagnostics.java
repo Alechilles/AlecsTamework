@@ -258,6 +258,11 @@ public final class NeedsTelemetryDiagnostics {
         return instance != null && instance.isDebugNeedsTelemetryDiagnosticsEnabled();
     }
 
+    /** Returns the cheap runtime toggle without resolving an NPC context. */
+    public static boolean isEnabled() {
+        return isRuntimeEnabled();
+    }
+
     private static boolean isThrottled(@Nonnull String eventName,
                                        @Nonnull String role,
                                        @Nonnull String resource,
