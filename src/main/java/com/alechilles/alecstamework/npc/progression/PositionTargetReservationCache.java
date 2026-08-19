@@ -12,9 +12,10 @@ import org.joml.Vector3d;
  */
 public final class PositionTargetReservationCache {
     public static final double DEFAULT_TTL_SECONDS = 24.0;
-    public static final int MAX_ENTRIES = 4096;
+    public static final int MAX_ENTRIES = 16_384;
 
     private static final ConcurrentHashMap<ReservationKey, Reservation> RESERVED_TARGETS = new ConcurrentHashMap<>();
+    private static final Object CAPACITY_LOCK = new Object();
 
     private PositionTargetReservationCache() {
     }
@@ -33,12 +34,17 @@ public final class PositionTargetReservationCache {
         while (true) {
             Reservation existing = RESERVED_TARGETS.get(key);
             if (existing == null) {
-                Reservation previous = RESERVED_TARGETS.putIfAbsent(key, new Reservation(ownerUuid, expiresAtMs));
-                if (previous == null) {
-                    cleanup(nowMs);
-                    return true;
+                synchronized (CAPACITY_LOCK) {
+                    if (RESERVED_TARGETS.containsKey(key)) {
+                        continue;
+                    }
+                    cleanupExpiredAtCapacity(nowMs);
+                    if (RESERVED_TARGETS.size() >= MAX_ENTRIES) {
+                        return false;
+                    }
+                    RESERVED_TARGETS.put(key, new Reservation(ownerUuid, expiresAtMs));
                 }
-                continue;
+                return true;
             }
             if (nowMs >= existing.expiresAtMs()) {
                 RESERVED_TARGETS.remove(key, existing);
@@ -47,9 +53,9 @@ public final class PositionTargetReservationCache {
             if (!existing.ownerUuid().equals(ownerUuid)) {
                 return false;
             }
-            RESERVED_TARGETS.put(key, new Reservation(ownerUuid, expiresAtMs));
-            cleanup(nowMs);
-            return true;
+            if (RESERVED_TARGETS.replace(key, existing, new Reservation(ownerUuid, expiresAtMs))) {
+                return true;
+            }
         }
     }
 
@@ -114,6 +120,12 @@ public final class PositionTargetReservationCache {
         RESERVED_TARGETS.clear();
     }
 
+    /** Removes reservations owned by one world during world teardown. */
+    public static void clearWorld(@Nullable String worldName) {
+        String normalizedWorld = normalizeWorldName(worldName);
+        RESERVED_TARGETS.keySet().removeIf(key -> key.worldName().equals(normalizedWorld));
+    }
+
     public static int countForTests() {
         return RESERVED_TARGETS.size();
     }
@@ -125,7 +137,7 @@ public final class PositionTargetReservationCache {
         return Math.max(1L, (long) Math.ceil(effectiveSeconds * 1000.0));
     }
 
-    private static void cleanup(long nowMs) {
+    private static void cleanupExpiredAtCapacity(long nowMs) {
         if (RESERVED_TARGETS.size() < MAX_ENTRIES) {
             return;
         }
@@ -133,18 +145,6 @@ public final class PositionTargetReservationCache {
                 || entry.getKey() == null
                 || entry.getValue() == null
                 || nowMs >= entry.getValue().expiresAtMs());
-        int excess = RESERVED_TARGETS.size() - MAX_ENTRIES;
-        if (excess <= 0) {
-            return;
-        }
-        for (ReservationKey key : RESERVED_TARGETS.keySet()) {
-            if (excess <= 0) {
-                return;
-            }
-            if (RESERVED_TARGETS.remove(key) != null) {
-                excess--;
-            }
-        }
     }
 
     @Nonnull

@@ -15,7 +15,6 @@ import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.inventory.transaction.ItemStackSlotTransaction;
-import com.hypixel.hytale.server.core.modules.collision.WorldUtil;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
@@ -25,6 +24,8 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -40,14 +41,14 @@ public final class CompanionNeedsEnvironmentService {
     private static final int DEFAULT_CONTAINER_VERTICAL_SCAN_RADIUS = 2;
     private static final int DEFAULT_WATER_VERTICAL_SCAN_RADIUS = 1;
     private static final int SEARCH_CACHE_MAX_ENTRIES = 8192;
-    private static final int[] STAND_HEIGHT_OFFSETS = {0, 1, -1};
-    private static final double STAND_POSITION_Y_OFFSET = 0.05;
     private static final double SOURCE_TARGET_CENTER_OFFSET = 0.5;
     private static final double DEFAULT_APPROACH_RADIUS = 2.0;
     private static final double SCORE_EPSILON = 0.000001;
     private static final boolean WATER_STAND_TARGETS_INCLUDE_SOURCE_BLOCK = false;
-    private static final ThreadLocal<NeedsResourceStandTargetSelector> STAND_TARGET_SELECTOR =
-            ThreadLocal.withInitial(NeedsResourceStandTargetSelector::new);
+    private static final NeedsWaterTargetSearchService WATER_TARGET_SEARCH_SERVICE =
+            new NeedsWaterTargetSearchService();
+    private static final NeedsFoodTargetSearchService FOOD_TARGET_SEARCH_SERVICE =
+            new NeedsFoodTargetSearchService();
     private static final ConcurrentHashMap<NeedsSearchCacheKey, CachedSearchResult> SEARCH_CACHE = new ConcurrentHashMap<>();
     private static final NeedsResourceAreaSearchCache AREA_SEARCH_CACHE =
             new NeedsResourceAreaSearchCache(SEARCH_CACHE_MAX_ENTRIES);
@@ -284,11 +285,6 @@ public final class CompanionNeedsEnvironmentService {
         if (!Double.isFinite(radius) || radius <= 0.0) {
             return false;
         }
-        ChunkStore chunkStore = world.getChunkStore();
-        Store<ChunkStore> chunkStoreStore = chunkStore.getStore();
-        if (chunkStoreStore == null) {
-            return false;
-        }
         Vector3d scanCenter = scanCenterOverride;
         if (scanCenter == null
                 || !Double.isFinite(scanCenter.x)
@@ -296,31 +292,17 @@ public final class CompanionNeedsEnvironmentService {
                 || !Double.isFinite(scanCenter.z)) {
             scanCenter = transform.getPosition();
         }
-        int blockX = (int) Math.floor(scanCenter.x);
-        int blockY = (int) Math.floor(scanCenter.y);
-        int blockZ = (int) Math.floor(scanCenter.z);
-        int searchRadius = Math.max(1, (int) Math.ceil(radius));
-        double radiusSq = radius * radius;
-        Map<Long, WorldChunk> chunkCache = new HashMap<>();
-        for (int y = blockY - verticalScanRadius; y <= blockY + verticalScanRadius; y++) {
-            for (int x = blockX - searchRadius; x <= blockX + searchRadius; x++) {
-                for (int z = blockZ - searchRadius; z <= blockZ + searchRadius; z++) {
-                    double dx = x - blockX;
-                    double dz = z - blockZ;
-                    if ((dx * dx) + (dz * dz) > radiusSq) {
-                        continue;
-                    }
-                    WorldChunk worldChunk = resolveWorldChunk(chunkStore, chunkStoreStore, x, z, chunkCache);
-                    if (worldChunk == null) {
-                        continue;
-                    }
-                    if (isConsumableWaterSourceAt(worldChunk, chunkStoreStore, x, y, z)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
+        NeedsWaterTargetSearchService.WaterRequest request =
+                new NeedsWaterTargetSearchService.WaterRequest(
+                        scanCenter.x,
+                        scanCenter.y,
+                        scanCenter.z,
+                        radius,
+                        verticalScanRadius,
+                        radius,
+                        0
+                );
+        return WATER_TARGET_SEARCH_SERVICE.search(store, npcRef, request).foundSource();
     }
 
     public boolean hasConsumableWaterSourceInRange(@Nullable Ref<EntityStore> npcRef,
@@ -338,35 +320,17 @@ public final class CompanionNeedsEnvironmentService {
         if (!Double.isFinite(radius) || radius <= 0.0) {
             return false;
         }
-        ChunkStore chunkStore = world.getChunkStore();
-        Store<ChunkStore> chunkStoreStore = chunkStore.getStore();
-        if (chunkStoreStore == null) {
-            return false;
-        }
-        int blockX = (int) Math.floor(transform.getPosition().x);
-        int blockY = (int) Math.floor(transform.getPosition().y);
-        int blockZ = (int) Math.floor(transform.getPosition().z);
-        int searchRadius = Math.max(1, (int) Math.ceil(radius));
-        double radiusSq = radius * radius;
-        int clampedVerticalRadius = Math.max(0, verticalScanRadius);
-        Map<Long, WorldChunk> chunkCache = new HashMap<>();
-        for (int yOffset = -clampedVerticalRadius; yOffset <= clampedVerticalRadius; yOffset++) {
-            int y = blockY + yOffset;
-            for (int x = blockX - searchRadius; x <= blockX + searchRadius; x++) {
-                for (int z = blockZ - searchRadius; z <= blockZ + searchRadius; z++) {
-                    double dx = x - blockX;
-                    double dz = z - blockZ;
-                    if ((dx * dx) + (dz * dz) > radiusSq) {
-                        continue;
-                    }
-                    WorldChunk worldChunk = resolveWorldChunk(chunkStore, chunkStoreStore, x, z, chunkCache);
-                    if (worldChunk != null && isConsumableWaterSourceAt(worldChunk, chunkStoreStore, x, y, z)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
+        NeedsWaterTargetSearchService.WaterRequest request =
+                new NeedsWaterTargetSearchService.WaterRequest(
+                        transform.getPosition().x,
+                        transform.getPosition().y,
+                        transform.getPosition().z,
+                        radius,
+                        verticalScanRadius,
+                        radius,
+                        0
+                );
+        return WATER_TARGET_SEARCH_SERVICE.search(store, npcRef, request).foundSource();
     }
 
     @Nullable
@@ -453,31 +417,46 @@ public final class CompanionNeedsEnvironmentService {
             return WaterTargetSearchResult.miss(false);
         }
         long nowMs = resolveCurrentTimeMs();
+        double boundedRadius = NeedsResourceSearchCachePolicy.boundedSearchRadius(radius);
+        int boundedVerticalRadius = NeedsResourceSearchCachePolicy.boundedVerticalScanRadius(verticalScanRadius);
+        double boundedConsumeRadius = NeedsResourceSearchCachePolicy.boundedConsumeRadius(consumeRadius);
+        double effectiveConsumeRadius = Double.isFinite(boundedConsumeRadius) && boundedConsumeRadius > 1.0
+                ? boundedConsumeRadius
+                : 1.0;
+        if (!NeedsResourceSearchCachePolicy.hasSafeOrigin(
+                transform.getPosition().x,
+                transform.getPosition().y,
+                transform.getPosition().z,
+                Math.max(1, (int) Math.ceil(boundedRadius)),
+                boundedVerticalRadius
+        )) {
+            return WaterTargetSearchResult.miss(false);
+        }
         NeedsSearchCacheKey cacheKey = buildSearchCacheKey(
                 npcRef,
                 store,
                 ResourceSearchKind.WATER,
                 transform.getPosition(),
-                radius,
-                verticalScanRadius,
-                consumeRadius,
+                boundedRadius,
+                boundedVerticalRadius,
+                effectiveConsumeRadius,
                 null
         );
         NeedsResourceAreaSearchCache.AreaKey areaCacheKey = buildAreaSearchCacheKey(
                 store,
                 ResourceSearchKind.WATER,
                 transform.getPosition(),
-                radius,
-                verticalScanRadius,
-                consumeRadius,
-                0
+                boundedRadius,
+                boundedVerticalRadius,
+                effectiveConsumeRadius,
+                List.of()
         );
         if (targetRejector == null) {
             WaterTargetSearchResult cachedResult = getCachedWaterSearchResult(
                     cacheKey,
                     transform.getPosition(),
-                    radius,
-                    verticalScanRadius,
+                    boundedRadius,
+                    boundedVerticalRadius,
                     nowMs
             );
             if (cachedResult != null) {
@@ -487,117 +466,66 @@ public final class CompanionNeedsEnvironmentService {
             WaterTargetSearchResult cachedResult = getCachedWaterSearchResult(
                     cacheKey,
                     transform.getPosition(),
-                    radius,
-                    verticalScanRadius,
+                    boundedRadius,
+                    boundedVerticalRadius,
                     nowMs
             );
             if (cachedResult != null
-                    && (cachedResult.target() == null || !targetRejector.rejects(cachedResult.target()))) {
+                    && (cachedResult.target() != null
+                    && !targetRejector.rejects(cachedResult.target())
+                    || (cachedResult.target() == null && !cachedResult.foundConsumableSource()))) {
                 return cachedResult;
             }
         }
         WaterTargetSearchResult areaCachedResult = getAreaCachedWaterSearchResult(
                 areaCacheKey,
                 transform.getPosition(),
-                radius,
-                verticalScanRadius,
+                boundedRadius,
+                boundedVerticalRadius,
                 targetRejector,
                 nowMs
         );
         if (areaCachedResult != null) {
-            cacheWaterSearchResult(cacheKey, areaCachedResult, nowMs);
+            if (targetRejector == null || shouldCacheRejectorWaterSearchResult(areaCachedResult)) {
+                cacheWaterSearchResult(cacheKey, areaCachedResult, nowMs);
+            }
             return areaCachedResult;
         }
-        ChunkStore chunkStore = world.getChunkStore();
-        Store<ChunkStore> chunkStoreStore = chunkStore.getStore();
-        if (chunkStoreStore == null) {
-            return WaterTargetSearchResult.miss(false);
-        }
-
-        int blockX = (int) Math.floor(transform.getPosition().x);
-        int blockY = (int) Math.floor(transform.getPosition().y);
-        int blockZ = (int) Math.floor(transform.getPosition().z);
-        int searchRadius = Math.max(1, (int) Math.ceil(radius));
-        double radiusSq = radius * radius;
-        int clampedVerticalRadius = Math.max(0, verticalScanRadius);
-        Map<Long, WorldChunk> chunkCache = new HashMap<>();
+        NeedsWaterTargetSearchService.WaterRequest request =
+                new NeedsWaterTargetSearchService.WaterRequest(
+                        transform.getPosition().x,
+                        transform.getPosition().y,
+                        transform.getPosition().z,
+                        boundedRadius,
+                        boundedVerticalRadius,
+                        effectiveConsumeRadius,
+                        NeedsResourceCandidates.MAX_CANDIDATES
+                );
         long startedNs = System.nanoTime();
-        WaterTargetSearchResult bestResult = findNearestWaterTarget(
-                chunkStore,
-                chunkStoreStore,
-                transform.getPosition(),
-                blockX,
-                blockY,
-                blockZ,
-                searchRadius,
-                clampedVerticalRadius,
-                1.0,
-                radiusSq,
-                chunkCache,
-                targetRejector
+        NeedsWaterTargetSearchService.CandidateFilter candidateFilter = targetRejector == null
+                ? null
+                : waterCandidateFilter(targetRejector);
+        NeedsResourceCandidates.Snapshot snapshot = WATER_TARGET_SEARCH_SERVICE.search(
+                store,
+                npcRef,
+                request,
+                candidateFilter
         );
-        if (shouldRunExpandedWaterSearch(bestResult, consumeRadius)) {
-            WaterTargetSearchResult expandedResult = findNearestWaterTarget(
-                    chunkStore,
-                    chunkStoreStore,
-                    transform.getPosition(),
-                    blockX,
-                    blockY,
-                    blockZ,
-                    searchRadius,
-                    clampedVerticalRadius,
-                    consumeRadius,
-                    radiusSq,
-                    chunkCache,
-                    targetRejector
-            );
-            bestResult = WaterTargetSearchResult.mergeMissMetadata(bestResult, expandedResult);
-        }
+        WaterTargetSearchResult bestResult = toWaterTargetResult(
+                snapshot,
+                transform.getPosition(),
+                boundedRadius,
+                boundedVerticalRadius,
+                null
+        );
         recordResourceSearchWork(startedNs, nowMs);
         if (targetRejector == null || shouldCacheRejectorWaterSearchResult(bestResult)) {
             cacheWaterSearchResult(cacheKey, bestResult, nowMs);
-            cacheAreaWaterSearchResult(areaCacheKey, bestResult, nowMs);
+        }
+        if (targetRejector == null) {
+            cacheAreaWaterSearchResult(areaCacheKey, snapshot, nowMs);
         }
         return bestResult;
-    }
-
-    @Nonnull
-    private static WaterTargetSearchResult findNearestWaterTarget(@Nonnull ChunkStore chunkStore,
-                                                                  @Nonnull Store<ChunkStore> chunkStoreStore,
-                                                                  @Nonnull Vector3d npcPosition,
-                                                                  int blockX,
-                                                                  int blockY,
-                                                                  int blockZ,
-                                                                  int searchRadius,
-                                                                  int verticalScanRadius,
-                                                                  double consumeRadius,
-                                                                  double radiusSq,
-                                                                  @Nonnull Map<Long, WorldChunk> chunkCache,
-                                                                  @Nullable TargetRejector targetRejector) {
-        boolean foundConsumableSource = false;
-        boolean foundConsumableSourceInConsumeRange = false;
-        for (int horizontalRadius = 0; horizontalRadius <= searchRadius; horizontalRadius++) {
-            WaterTargetSearchResult ringResult = findNearestWaterTargetInHorizontalRing(
-                    chunkStore,
-                    chunkStoreStore,
-                    npcPosition,
-                    blockX,
-                    blockY,
-                    blockZ,
-                    horizontalRadius,
-                    verticalScanRadius,
-                    consumeRadius,
-                    radiusSq,
-                    chunkCache,
-                    targetRejector
-            );
-            foundConsumableSource |= ringResult.foundConsumableSource();
-            foundConsumableSourceInConsumeRange |= ringResult.foundConsumableSourceInConsumeRange();
-            if (ringResult.target() != null) {
-                return ringResult;
-            }
-        }
-        return WaterTargetSearchResult.miss(foundConsumableSource, foundConsumableSourceInConsumeRange);
     }
 
     boolean consumeNearbyWaterTroughCharge(@Nullable Ref<EntityStore> npcRef,
@@ -848,15 +776,29 @@ public final class CompanionNeedsEnvironmentService {
             return FoodTargetSearchResult.miss(false);
         }
         long nowMs = resolveCurrentTimeMs();
-        double effectiveConsumeRadius = Double.isFinite(consumeRadius) && consumeRadius > 0.0 ? consumeRadius : 0.0;
-        int itemIdsHash = allowedFoods.hashCode();
+        double boundedRadius = NeedsResourceSearchCachePolicy.boundedSearchRadius(radius);
+        int boundedVerticalRadius = NeedsResourceSearchCachePolicy.boundedVerticalScanRadius(verticalScanRadius);
+        double boundedConsumeRadius = NeedsResourceSearchCachePolicy.boundedConsumeRadius(consumeRadius);
+        double effectiveConsumeRadius = Double.isFinite(boundedConsumeRadius) && boundedConsumeRadius > 0.0
+                ? boundedConsumeRadius
+                : 0.0;
+        if (!NeedsResourceSearchCachePolicy.hasSafeOrigin(
+                transform.getPosition().x,
+                transform.getPosition().y,
+                transform.getPosition().z,
+                Math.max(1, (int) Math.ceil(boundedRadius)),
+                boundedVerticalRadius
+        )) {
+            return FoodTargetSearchResult.miss(false);
+        }
+        List<String> canonicalFoodIds = new ArrayList<>(allowedFoods);
         NeedsSearchCacheKey cacheKey = buildSearchCacheKey(
                 npcRef,
                 store,
                 ResourceSearchKind.FOOD_CONTAINER,
                 transform.getPosition(),
-                radius,
-                verticalScanRadius,
+                boundedRadius,
+                boundedVerticalRadius,
                 effectiveConsumeRadius,
                 allowedFoods
         );
@@ -864,17 +806,17 @@ public final class CompanionNeedsEnvironmentService {
                 store,
                 ResourceSearchKind.FOOD_CONTAINER,
                 transform.getPosition(),
-                radius,
-                verticalScanRadius,
+                boundedRadius,
+                boundedVerticalRadius,
                 effectiveConsumeRadius,
-                itemIdsHash
+                canonicalFoodIds
         );
         if (targetRejector == null) {
             FoodTargetSearchResult cachedResult = getCachedFoodSearchResult(
                     cacheKey,
                     transform.getPosition(),
-                    radius,
-                    verticalScanRadius,
+                    boundedRadius,
+                    boundedVerticalRadius,
                     nowMs
             );
             if (cachedResult != null) {
@@ -884,73 +826,65 @@ public final class CompanionNeedsEnvironmentService {
             FoodTargetSearchResult cachedResult = getCachedFoodSearchResult(
                     cacheKey,
                     transform.getPosition(),
-                    radius,
-                    verticalScanRadius,
+                    boundedRadius,
+                    boundedVerticalRadius,
                     nowMs
             );
             if (cachedResult != null
-                    && (cachedResult.target() == null || !targetRejector.rejects(cachedResult.target()))) {
+                    && (cachedResult.target() != null
+                    && !targetRejector.rejects(cachedResult.target())
+                    || (cachedResult.target() == null && !cachedResult.foundConsumableSource()))) {
                 return cachedResult;
             }
         }
         FoodTargetSearchResult areaCachedResult = getAreaCachedFoodSearchResult(
                 areaCacheKey,
                 transform.getPosition(),
-                radius,
-                verticalScanRadius,
+                boundedRadius,
+                boundedVerticalRadius,
                 targetRejector,
                 nowMs
         );
         if (areaCachedResult != null) {
-            cacheFoodSearchResult(cacheKey, areaCachedResult, nowMs);
+            if (targetRejector == null || shouldCacheRejectorFoodSearchResult(areaCachedResult)) {
+                cacheFoodSearchResult(cacheKey, areaCachedResult, nowMs);
+            }
             return areaCachedResult;
         }
-        ChunkStore chunkStore = world.getChunkStore();
-        Store<ChunkStore> chunkStoreStore = chunkStore.getStore();
-        if (chunkStoreStore == null) {
-            return FoodTargetSearchResult.miss(false);
-        }
-
-        int blockX = (int) Math.floor(transform.getPosition().x);
-        int blockY = (int) Math.floor(transform.getPosition().y);
-        int blockZ = (int) Math.floor(transform.getPosition().z);
-        int searchRadius = Math.max(1, (int) Math.ceil(radius));
-        double radiusSq = radius * radius;
-        int clampedVerticalRadius = Math.max(0, verticalScanRadius);
-        Map<Long, WorldChunk> chunkCache = new HashMap<>();
-        boolean foundConsumableSource = false;
-        boolean foundConsumableSourceInConsumeRange = false;
-        FoodTargetSearchResult bestResult = null;
+        NeedsFoodTargetSearchService.FoodRequest request =
+                new NeedsFoodTargetSearchService.FoodRequest(
+                        transform.getPosition().x,
+                        transform.getPosition().y,
+                        transform.getPosition().z,
+                        boundedRadius,
+                        boundedVerticalRadius,
+                        effectiveConsumeRadius,
+                        NeedsResourceCandidates.MAX_CANDIDATES,
+                        canonicalFoodIds
+                );
         long startedNs = System.nanoTime();
-        for (int horizontalRadius = 0; horizontalRadius <= searchRadius && bestResult == null; horizontalRadius++) {
-            FoodTargetSearchResult ringResult = findNearestFoodTargetInHorizontalRing(
-                    chunkStore,
-                    chunkStoreStore,
-                    transform.getPosition(),
-                    blockX,
-                    blockY,
-                    blockZ,
-                    horizontalRadius,
-                    clampedVerticalRadius,
-                    radiusSq,
-                    effectiveConsumeRadius,
-                    allowedFoods,
-                    chunkCache,
-                    targetRejector
-            );
-            foundConsumableSource |= ringResult.foundConsumableSource();
-            foundConsumableSourceInConsumeRange |= ringResult.foundConsumableSourceInConsumeRange();
-            if (ringResult.target() != null) {
-                bestResult = ringResult;
-            }
-        }
-        if (bestResult == null) {
-            bestResult = FoodTargetSearchResult.miss(foundConsumableSource, foundConsumableSourceInConsumeRange);
-        }
+        NeedsFoodTargetSearchService.CandidateFilter candidateFilter = targetRejector == null
+                ? null
+                : foodCandidateFilter(targetRejector);
+        NeedsResourceCandidates.Snapshot snapshot = FOOD_TARGET_SEARCH_SERVICE.search(
+                store,
+                npcRef,
+                request,
+                candidateFilter
+        );
+        FoodTargetSearchResult bestResult = toFoodTargetResult(
+                snapshot,
+                transform.getPosition(),
+                boundedRadius,
+                boundedVerticalRadius,
+                null
+        );
         recordResourceSearchWork(startedNs, nowMs);
         if (targetRejector == null || shouldCacheRejectorFoodSearchResult(bestResult)) {
             cacheFoodSearchResult(cacheKey, bestResult, nowMs);
-            cacheAreaFoodSearchResult(areaCacheKey, bestResult, nowMs);
+        }
+        if (targetRejector == null) {
+            cacheAreaFoodSearchResult(areaCacheKey, snapshot, nowMs);
         }
         return bestResult;
     }
@@ -975,178 +909,20 @@ public final class CompanionNeedsEnvironmentService {
         if (!Double.isFinite(radius) || radius <= 0.0) {
             return false;
         }
-        ChunkStore chunkStore = world.getChunkStore();
-        Store<ChunkStore> chunkStoreStore = chunkStore.getStore();
-        if (chunkStoreStore == null) {
-            return false;
-        }
-        int blockX = (int) Math.floor(transform.getPosition().x);
-        int blockY = (int) Math.floor(transform.getPosition().y);
-        int blockZ = (int) Math.floor(transform.getPosition().z);
-        int searchRadius = Math.max(1, (int) Math.ceil(radius));
-        double radiusSq = radius * radius;
-        int clampedVerticalRadius = Math.max(0, verticalScanRadius);
-        Map<Long, WorldChunk> chunkCache = new HashMap<>();
-        for (int yOffset = -clampedVerticalRadius; yOffset <= clampedVerticalRadius; yOffset++) {
-            int y = blockY + yOffset;
-            for (int x = blockX - searchRadius; x <= blockX + searchRadius; x++) {
-                for (int z = blockZ - searchRadius; z <= blockZ + searchRadius; z++) {
-                    double dx = x - blockX;
-                    double dz = z - blockZ;
-                    if ((dx * dx) + (dz * dz) > radiusSq) {
-                        continue;
-                    }
-                    WorldChunk worldChunk = resolveWorldChunk(chunkStore, chunkStoreStore, x, z, chunkCache);
-                    if (worldChunk == null) {
-                        continue;
-                    }
-                    Object containerState = FeedTroughContainerCompat.resolveContainerState(
-                            worldChunk,
-                            chunkStoreStore,
-                            x,
-                            y,
-                            z
-                    );
-                    ItemContainer container = FeedTroughContainerCompat.getItemContainer(containerState);
-                    if (container != null && containsAllowedFood(container, allowedFoods)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-    @Nonnull
-    private static WaterTargetSearchResult findNearestWaterTargetInHorizontalRing(@Nonnull ChunkStore chunkStore,
-                                                                                  @Nonnull Store<ChunkStore> chunkStoreStore,
-                                                                                  @Nonnull Vector3d npcPosition,
-                                                                                  int blockX,
-                                                                                  int blockY,
-                                                                                  int blockZ,
-                                                                                  int horizontalRadius,
-                                                                                  int verticalScanRadius,
-                                                                                   double consumeRadius,
-                                                                                   double radiusSq,
-                                                                                   @Nonnull Map<Long, WorldChunk> chunkCache,
-                                                                                   @Nullable TargetRejector targetRejector) {
-        Vector3d bestTarget = null;
-        double bestDistanceSq = Double.MAX_VALUE;
-        boolean foundConsumableSource = false;
-        boolean foundConsumableSourceInConsumeRange = false;
-        double consumeRadiusSq = consumeRadius * consumeRadius;
-        for (int yOffset = -verticalScanRadius; yOffset <= verticalScanRadius; yOffset++) {
-            int y = blockY + yOffset;
-            for (int x = blockX - horizontalRadius; x <= blockX + horizontalRadius; x++) {
-                for (int z = blockZ - horizontalRadius; z <= blockZ + horizontalRadius; z++) {
-                    if (horizontalRadius > 0
-                            && x > blockX - horizontalRadius
-                            && x < blockX + horizontalRadius
-                            && z > blockZ - horizontalRadius
-                            && z < blockZ + horizontalRadius) {
-                        continue;
-                    }
-                    double dx = x - blockX;
-                    double dz = z - blockZ;
-                    if ((dx * dx) + (dz * dz) > radiusSq) {
-                        continue;
-                    }
-                    WorldChunk worldChunk = resolveWorldChunk(chunkStore, chunkStoreStore, x, z, chunkCache);
-                    if (worldChunk == null || !isConsumableWaterSourceAt(worldChunk, chunkStoreStore, x, y, z)) {
-                        continue;
-                    }
-                    foundConsumableSource = true;
-                    if ((dx * dx) + (dz * dz) <= consumeRadiusSq + SCORE_EPSILON) {
-                        foundConsumableSourceInConsumeRange = true;
-                    }
-                    Vector3d sourceTarget = sourceBlockTarget(x, y, z);
-                    if (targetRejector != null && targetRejector.rejects(sourceTarget)) {
-                        continue;
-                    }
-                    double distanceSq = distanceSquared(sourceTarget, npcPosition);
-                    if (Double.isFinite(distanceSq) && distanceSq < bestDistanceSq) {
-                        bestDistanceSq = distanceSq;
-                        bestTarget = sourceTarget;
-                    }
-                }
-            }
-        }
-        if (bestTarget != null) {
-            return WaterTargetSearchResult.target(bestTarget, foundConsumableSourceInConsumeRange, consumeRadius);
-        }
-        return WaterTargetSearchResult.miss(foundConsumableSource, foundConsumableSourceInConsumeRange);
-    }
-
-    @Nonnull
-    private static FoodTargetSearchResult findNearestFoodTargetInHorizontalRing(@Nonnull ChunkStore chunkStore,
-                                                                                @Nonnull Store<ChunkStore> chunkStoreStore,
-                                                                                @Nonnull Vector3d npcPosition,
-                                                                                int blockX,
-                                                                                int blockY,
-                                                                                int blockZ,
-                                                                                int horizontalRadius,
-                                                                                int verticalScanRadius,
-                                                                                double radiusSq,
-                                                                                double consumeRadius,
-                                                                                @Nonnull Set<String> allowedFoods,
-                                                                                @Nonnull Map<Long, WorldChunk> chunkCache,
-                                                                                @Nullable TargetRejector targetRejector) {
-        Vector3d bestTarget = null;
-        double bestDistanceSq = Double.MAX_VALUE;
-        boolean foundConsumableSource = false;
-        boolean foundConsumableSourceInConsumeRange = false;
-        double consumeRadiusSq = consumeRadius * consumeRadius;
-        for (int yOffset = -verticalScanRadius; yOffset <= verticalScanRadius; yOffset++) {
-            int y = blockY + yOffset;
-            for (int x = blockX - horizontalRadius; x <= blockX + horizontalRadius; x++) {
-                for (int z = blockZ - horizontalRadius; z <= blockZ + horizontalRadius; z++) {
-                    if (horizontalRadius > 0
-                            && x > blockX - horizontalRadius
-                            && x < blockX + horizontalRadius
-                            && z > blockZ - horizontalRadius
-                            && z < blockZ + horizontalRadius) {
-                        continue;
-                    }
-                    double dx = x - blockX;
-                    double dz = z - blockZ;
-                    if ((dx * dx) + (dz * dz) > radiusSq) {
-                        continue;
-                    }
-                    WorldChunk worldChunk = resolveWorldChunk(chunkStore, chunkStoreStore, x, z, chunkCache);
-                    if (worldChunk == null) {
-                        continue;
-                    }
-                    Object containerState = FeedTroughContainerCompat.resolveContainerState(
-                            worldChunk,
-                            chunkStoreStore,
-                            x,
-                            y,
-                            z
-                    );
-                    ItemContainer container = FeedTroughContainerCompat.getItemContainer(containerState);
-                    if (container == null || !containsAllowedFood(container, allowedFoods)) {
-                        continue;
-                    }
-                    foundConsumableSource = true;
-                    if (consumeRadius > SCORE_EPSILON && (dx * dx) + (dz * dz) <= consumeRadiusSq + SCORE_EPSILON) {
-                        foundConsumableSourceInConsumeRange = true;
-                    }
-                    Vector3d sourceTarget = sourceBlockTarget(x, y, z);
-                    if (targetRejector != null && targetRejector.rejects(sourceTarget)) {
-                        continue;
-                    }
-                    double distanceSq = distanceSquared(sourceTarget, npcPosition);
-                    if (Double.isFinite(distanceSq) && distanceSq < bestDistanceSq) {
-                        bestDistanceSq = distanceSq;
-                        bestTarget = sourceTarget;
-                    }
-                }
-            }
-        }
-        if (bestTarget != null) {
-            return FoodTargetSearchResult.target(bestTarget, foundConsumableSourceInConsumeRange, consumeRadius);
-        }
-        return FoodTargetSearchResult.miss(foundConsumableSource, foundConsumableSourceInConsumeRange);
+        return FOOD_TARGET_SEARCH_SERVICE.search(
+                store,
+                npcRef,
+                new NeedsFoodTargetSearchService.FoodRequest(
+                        transform.getPosition().x,
+                        transform.getPosition().y,
+                        transform.getPosition().z,
+                        radius,
+                        verticalScanRadius,
+                        radius,
+                        0,
+                        new ArrayList<>(allowedFoods)
+                )
+        ).foundSource();
     }
 
     @Nullable
@@ -1240,7 +1016,7 @@ public final class CompanionNeedsEnvironmentService {
                                                                                 double radius,
                                                                                 int verticalScanRadius,
                                                                                 double consumeRadius,
-                                                                                int itemIdsHash) {
+                                                                                @Nullable List<String> itemIds) {
         World world = resolveWorld(store);
         String worldName = world != null ? world.getName() : null;
         return NeedsResourceAreaSearchCache.AreaKey.from(
@@ -1250,7 +1026,7 @@ public final class CompanionNeedsEnvironmentService {
                 radius,
                 verticalScanRadius,
                 consumeRadius,
-                itemIdsHash
+                itemIds
         );
     }
 
@@ -1262,21 +1038,26 @@ public final class CompanionNeedsEnvironmentService {
             int verticalScanRadius,
             @Nullable TargetRejector targetRejector,
             long nowMs) {
-        NeedsResourceAreaSearchCache.AreaSearchSnapshot snapshot =
-                AREA_SEARCH_CACHE.get(cacheKey, currentPosition, radius, verticalScanRadius, nowMs);
+        NeedsResourceCandidates.Snapshot snapshot = AREA_SEARCH_CACHE.getSnapshot(cacheKey, nowMs);
         if (snapshot == null) {
             return null;
         }
-        Vector3d target = snapshot.target();
-        if (target != null && targetRejector != null && targetRejector.rejects(target)) {
+        if (snapshot.hasCandidates()
+                && selectCandidate(snapshot, currentPosition, radius, verticalScanRadius, null) == null) {
             return null;
         }
-        if (target != null) {
-            return WaterTargetSearchResult.target(target, snapshot.approachRadius());
+        if (targetRejector != null
+                && ((!snapshot.hasCandidates() && snapshot.foundSource())
+                || (snapshot.hasCandidates()
+                && selectCandidate(snapshot, currentPosition, radius, verticalScanRadius, targetRejector) == null))) {
+            return null;
         }
-        return WaterTargetSearchResult.miss(
-                snapshot.foundConsumableSource(),
-                snapshot.foundConsumableSourceInConsumeRange()
+        return toWaterTargetResult(
+                snapshot,
+                currentPosition,
+                radius,
+                verticalScanRadius,
+                targetRejector
         );
     }
 
@@ -1288,22 +1069,151 @@ public final class CompanionNeedsEnvironmentService {
             int verticalScanRadius,
             @Nullable TargetRejector targetRejector,
             long nowMs) {
-        NeedsResourceAreaSearchCache.AreaSearchSnapshot snapshot =
-                AREA_SEARCH_CACHE.get(cacheKey, currentPosition, radius, verticalScanRadius, nowMs);
+        NeedsResourceCandidates.Snapshot snapshot = AREA_SEARCH_CACHE.getSnapshot(cacheKey, nowMs);
         if (snapshot == null) {
             return null;
         }
-        Vector3d target = snapshot.target();
-        if (target != null && targetRejector != null && targetRejector.rejects(target)) {
+        if (snapshot.hasCandidates()
+                && selectCandidate(snapshot, currentPosition, radius, verticalScanRadius, null) == null) {
             return null;
         }
-        if (target != null) {
-            return FoodTargetSearchResult.target(target, snapshot.approachRadius());
+        if (targetRejector != null
+                && ((!snapshot.hasCandidates() && snapshot.foundSource())
+                || (snapshot.hasCandidates()
+                && selectCandidate(snapshot, currentPosition, radius, verticalScanRadius, targetRejector) == null))) {
+            return null;
         }
-        return FoodTargetSearchResult.miss(
-                snapshot.foundConsumableSource(),
-                snapshot.foundConsumableSourceInConsumeRange()
+        return toFoodTargetResult(
+                snapshot,
+                currentPosition,
+                radius,
+                verticalScanRadius,
+                targetRejector
         );
+    }
+
+    @Nonnull
+    private static WaterTargetSearchResult toWaterTargetResult(
+            @Nonnull NeedsResourceCandidates.Snapshot snapshot,
+            @Nullable Vector3d currentPosition,
+            double radius,
+            int verticalScanRadius,
+            @Nullable TargetRejector targetRejector) {
+        NeedsResourceCandidates.Candidate candidate = selectCandidate(
+                snapshot,
+                currentPosition,
+                radius,
+                verticalScanRadius,
+                targetRejector
+        );
+        if (candidate == null) {
+            return WaterTargetSearchResult.miss(
+                    snapshot.foundSource(),
+                    snapshot.sourceInConsumeRange()
+            );
+        }
+        return new WaterTargetSearchResult(
+                sourceBlockTarget(candidate.x(), candidate.y(), candidate.z()),
+                snapshot.foundSource(),
+                snapshot.sourceInConsumeRange(),
+                candidate.approachRadius()
+        );
+    }
+
+    @Nonnull
+    private static FoodTargetSearchResult toFoodTargetResult(
+            @Nonnull NeedsResourceCandidates.Snapshot snapshot,
+            @Nullable Vector3d currentPosition,
+            double radius,
+            int verticalScanRadius,
+            @Nullable TargetRejector targetRejector) {
+        NeedsResourceCandidates.Candidate candidate = selectCandidate(
+                snapshot,
+                currentPosition,
+                radius,
+                verticalScanRadius,
+                targetRejector
+        );
+        if (candidate == null) {
+            return FoodTargetSearchResult.miss(
+                    snapshot.foundSource(),
+                    snapshot.sourceInConsumeRange()
+            );
+        }
+        return new FoodTargetSearchResult(
+                sourceBlockTarget(candidate.x(), candidate.y(), candidate.z()),
+                snapshot.foundSource(),
+                snapshot.sourceInConsumeRange(),
+                candidate.approachRadius()
+        );
+    }
+
+    @Nonnull
+    private static NeedsWaterTargetSearchService.CandidateFilter waterCandidateFilter(
+            @Nonnull TargetRejector targetRejector) {
+        Vector3d probe = new Vector3d();
+        return (x, y, z) -> {
+            probe.set(
+                    x + SOURCE_TARGET_CENTER_OFFSET,
+                    y + SOURCE_TARGET_CENTER_OFFSET,
+                    z + SOURCE_TARGET_CENTER_OFFSET
+            );
+            return !targetRejector.rejects(probe);
+        };
+    }
+
+    @Nonnull
+    private static NeedsFoodTargetSearchService.CandidateFilter foodCandidateFilter(
+            @Nonnull TargetRejector targetRejector) {
+        Vector3d probe = new Vector3d();
+        return (x, y, z) -> {
+            probe.set(
+                    x + SOURCE_TARGET_CENTER_OFFSET,
+                    y + SOURCE_TARGET_CENTER_OFFSET,
+                    z + SOURCE_TARGET_CENTER_OFFSET
+            );
+            return !targetRejector.rejects(probe);
+        };
+    }
+
+    @Nullable
+    private static NeedsResourceCandidates.Candidate selectCandidate(
+            @Nonnull NeedsResourceCandidates.Snapshot snapshot,
+            @Nullable Vector3d currentPosition,
+            double radius,
+            int verticalScanRadius,
+            @Nullable TargetRejector targetRejector) {
+        if (currentPosition == null
+                || !Double.isFinite(currentPosition.x)
+                || !Double.isFinite(currentPosition.y)
+                || !Double.isFinite(currentPosition.z)
+                || !Double.isFinite(radius)
+                || radius <= 0.0) {
+            return null;
+        }
+        double radiusSq = radius * radius;
+        int maxVerticalDelta = Math.max(0, verticalScanRadius);
+        Vector3d rejectProbe = targetRejector == null ? null : new Vector3d();
+        for (NeedsResourceCandidates.Candidate candidate : snapshot.candidates()) {
+            double dx = candidate.x() + SOURCE_TARGET_CENTER_OFFSET - currentPosition.x;
+            double dz = candidate.z() + SOURCE_TARGET_CENTER_OFFSET - currentPosition.z;
+            if ((dx * dx) + (dz * dz) > radiusSq + SCORE_EPSILON
+                    || Math.abs(candidate.y() - Math.floor(currentPosition.y)) > maxVerticalDelta) {
+                continue;
+            }
+            if (targetRejector != null) {
+                rejectProbe.set(
+                        candidate.x() + SOURCE_TARGET_CENTER_OFFSET,
+                        candidate.y() + SOURCE_TARGET_CENTER_OFFSET,
+                        candidate.z() + SOURCE_TARGET_CENTER_OFFSET
+                );
+                if (targetRejector.rejects(rejectProbe)) {
+                    continue;
+                }
+            }
+            return candidate;
+        }
+        return null;
     }
 
     private static void cacheSearchTarget(@Nullable NeedsSearchCacheKey cacheKey,
@@ -1329,7 +1239,7 @@ public final class CompanionNeedsEnvironmentService {
     private static void cacheWaterSearchResult(@Nullable NeedsSearchCacheKey cacheKey,
                                                @Nonnull WaterTargetSearchResult result,
                                                long nowMs) {
-        if (cacheKey == null) {
+        if (cacheKey == null || (result.target() == null && result.foundConsumableSource())) {
             return;
         }
         long ttlMs = searchCacheTtlMs(result.target() != null, result.foundConsumableSource());
@@ -1347,41 +1257,29 @@ public final class CompanionNeedsEnvironmentService {
     }
 
     private static void cacheAreaWaterSearchResult(@Nullable NeedsResourceAreaSearchCache.AreaKey cacheKey,
-                                                   @Nonnull WaterTargetSearchResult result,
+                                                   @Nonnull NeedsResourceCandidates.Snapshot snapshot,
                                                    long nowMs) {
-        if (!NeedsResourceAreaSearchCache.shouldShareResult(
-                result.target() != null,
-                result.foundConsumableSource()
-        )) {
-            return;
-        }
-        long ttlMs = searchCacheTtlMs(result.target() != null, result.foundConsumableSource(), nowMs);
-        NeedsResourceAreaSearchCache.AreaSearchSnapshot snapshot = result.target() != null
-                ? NeedsResourceAreaSearchCache.AreaSearchSnapshot.hit(result.target(), result.approachRadius(), ttlMs)
-                : NeedsResourceAreaSearchCache.AreaSearchSnapshot.sourceAbsentMiss(ttlMs);
-        AREA_SEARCH_CACHE.put(cacheKey, snapshot, nowMs);
+        AREA_SEARCH_CACHE.put(
+                cacheKey,
+                NeedsResourceSearchCachePolicy.scaleSharedSnapshotTtl(snapshot, nowMs),
+                nowMs
+        );
     }
 
     private static void cacheAreaFoodSearchResult(@Nullable NeedsResourceAreaSearchCache.AreaKey cacheKey,
-                                                  @Nonnull FoodTargetSearchResult result,
+                                                  @Nonnull NeedsResourceCandidates.Snapshot snapshot,
                                                   long nowMs) {
-        if (!NeedsResourceAreaSearchCache.shouldShareResult(
-                result.target() != null,
-                result.foundConsumableSource()
-        )) {
-            return;
-        }
-        long ttlMs = searchCacheTtlMs(result.target() != null, result.foundConsumableSource(), nowMs);
-        NeedsResourceAreaSearchCache.AreaSearchSnapshot snapshot = result.target() != null
-                ? NeedsResourceAreaSearchCache.AreaSearchSnapshot.hit(result.target(), result.approachRadius(), ttlMs)
-                : NeedsResourceAreaSearchCache.AreaSearchSnapshot.sourceAbsentMiss(ttlMs);
-        AREA_SEARCH_CACHE.put(cacheKey, snapshot, nowMs);
+        AREA_SEARCH_CACHE.put(
+                cacheKey,
+                NeedsResourceSearchCachePolicy.scaleSharedSnapshotTtl(snapshot, nowMs),
+                nowMs
+        );
     }
 
     private static void cacheFoodSearchResult(@Nullable NeedsSearchCacheKey cacheKey,
                                               @Nonnull FoodTargetSearchResult result,
                                               long nowMs) {
-        if (cacheKey == null) {
+        if (cacheKey == null || (result.target() == null && result.foundConsumableSource())) {
             return;
         }
         long ttlMs = searchCacheTtlMs(result.target() != null, result.foundConsumableSource());
@@ -1407,7 +1305,7 @@ public final class CompanionNeedsEnvironmentService {
     }
 
     static long searchCacheTtlMs(boolean hasTarget, boolean foundConsumableSource, long nowMs) {
-        long baseTtlMs = NeedsResourceSearchCachePolicy.baseTtlMs(hasTarget, foundConsumableSource);
+        long baseTtlMs = NeedsResourceSearchCachePolicy.localBaseTtlMs(hasTarget, foundConsumableSource);
         return TameworkRuntimePressureService.getInstance().scaleTtlMs(
                 RuntimePressureDomain.NEEDS_RESOURCE_SEARCH,
                 baseTtlMs,
@@ -1473,10 +1371,6 @@ public final class CompanionNeedsEnvironmentService {
                 nowMs
         );
         return cachedResult != null ? cachedResult : FoodTargetSearchResult.miss(false);
-    }
-
-    private static NeedsResourceStandTargetSelector standTargetSelector() {
-        return STAND_TARGET_SELECTOR.get();
     }
 
     private static void recordResourceSearchWork(long startedNs, long nowMs) {
@@ -1628,18 +1522,6 @@ public final class CompanionNeedsEnvironmentService {
             );
         }
 
-        @Nonnull
-        private static WaterTargetSearchResult mergeMissMetadata(@Nonnull WaterTargetSearchResult primary,
-                                                                 @Nonnull WaterTargetSearchResult secondary) {
-            if (secondary.target() != null) {
-                return secondary;
-            }
-            return miss(
-                    primary.foundConsumableSource() || secondary.foundConsumableSource(),
-                    primary.foundConsumableSourceInConsumeRange()
-                            || secondary.foundConsumableSourceInConsumeRange()
-            );
-        }
     }
 
     public record FoodTargetSearchResult(@Nullable Vector3d target,
@@ -2155,151 +2037,6 @@ public final class CompanionNeedsEnvironmentService {
         return (int) Math.floor(value);
     }
 
-    @Nullable
-    private static Vector3d findNearestStandPositionAdjacentToBlock(@Nonnull ChunkStore chunkStore,
-                                                                    @Nonnull Store<ChunkStore> chunkStoreStore,
-                                                                    int sourceX,
-                                                                    int sourceY,
-                                                                    int sourceZ,
-                                                                    @Nonnull Vector3d npcPosition,
-                                                                    @Nonnull Map<Long, WorldChunk> chunkCache,
-                                                                    @Nullable NeedsResourceStandTargetSelector.CandidateProjector standProjector,
-                                                                    @Nullable TargetRejector targetRejector) {
-        if (standProjector != null) {
-            return standTargetSelector().findNearestProjectedTarget(
-                    sourceX,
-                    sourceY,
-                    sourceZ,
-                    npcPosition,
-                    NeedsResourceStandTargetSelector.MIN_ADJACENT_DISTANCE,
-                    false,
-                    standProjector,
-                    targetRejector
-            );
-        }
-        return findNearestStandPositionNearBlock(
-                chunkStore,
-                chunkStoreStore,
-                sourceX,
-                sourceY,
-                sourceZ,
-                npcPosition,
-                1.0,
-                chunkCache,
-                targetRejector
-        );
-    }
-
-    @Nullable
-    private static Vector3d findNearestStandPositionNearWaterSource(@Nonnull ChunkStore chunkStore,
-                                                                    @Nonnull Store<ChunkStore> chunkStoreStore,
-                                                                    int sourceX,
-                                                                    int sourceY,
-                                                                    int sourceZ,
-                                                                    @Nonnull Vector3d npcPosition,
-                                                                    double consumeRadius,
-                                                                    @Nonnull Map<Long, WorldChunk> chunkCache,
-                                                                    @Nullable NeedsResourceStandTargetSelector.CandidateProjector standProjector,
-                                                                    @Nullable TargetRejector targetRejector) {
-        if (standProjector != null) {
-            return standTargetSelector().findNearestProjectedTarget(
-                    sourceX,
-                    sourceY,
-                    sourceZ,
-                    npcPosition,
-                    Math.max(NeedsResourceStandTargetSelector.MIN_ADJACENT_DISTANCE, consumeRadius),
-                    WATER_STAND_TARGETS_INCLUDE_SOURCE_BLOCK,
-                    standProjector,
-                    targetRejector
-            );
-        }
-        return findNearestStandPositionNearBlock(
-                chunkStore,
-                chunkStoreStore,
-                sourceX,
-                sourceY,
-                sourceZ,
-                npcPosition,
-                Math.max(1.0, consumeRadius),
-                chunkCache,
-                targetRejector
-        );
-    }
-
-    @Nullable
-    private static Vector3d findNearestStandPositionNearBlock(@Nonnull ChunkStore chunkStore,
-                                                              @Nonnull Store<ChunkStore> chunkStoreStore,
-                                                              int sourceX,
-                                                              int sourceY,
-                                                              int sourceZ,
-                                                              @Nonnull Vector3d npcPosition,
-                                                              double maxDistance,
-                                                              @Nonnull Map<Long, WorldChunk> chunkCache,
-                                                              @Nullable TargetRejector targetRejector) {
-        Vector3d bestTarget = null;
-        double bestDistanceSq = Double.MAX_VALUE;
-        double normalizedMaxDistance = Double.isFinite(maxDistance) && maxDistance > 0.0 ? maxDistance : 1.0;
-        int standRadius = Math.max(1, (int) Math.ceil(normalizedMaxDistance));
-        double maxDistanceSq = normalizedMaxDistance * normalizedMaxDistance;
-        for (int candidateX = sourceX - standRadius; candidateX <= sourceX + standRadius; candidateX++) {
-            for (int candidateZ = sourceZ - standRadius; candidateZ <= sourceZ + standRadius; candidateZ++) {
-                double dx = candidateX - sourceX;
-                double dz = candidateZ - sourceZ;
-                if ((dx * dx) + (dz * dz) > maxDistanceSq) {
-                    continue;
-                }
-                for (int yOffset : STAND_HEIGHT_OFFSETS) {
-                    int candidateY = sourceY + yOffset;
-                    if (!canStandAt(chunkStore, chunkStoreStore, candidateX, candidateY, candidateZ, chunkCache)) {
-                        continue;
-                    }
-                    Vector3d target = new Vector3d(
-                            candidateX + 0.5,
-                            candidateY + STAND_POSITION_Y_OFFSET,
-                            candidateZ + 0.5
-                    );
-                    if (targetRejector != null && targetRejector.rejects(target)) {
-                        continue;
-                    }
-                    double distanceSq = distanceSquared(target, npcPosition);
-                    if (!Double.isFinite(distanceSq) || distanceSq >= bestDistanceSq) {
-                        continue;
-                    }
-                    bestDistanceSq = distanceSq;
-                    bestTarget = target;
-                }
-            }
-        }
-        return bestTarget;
-    }
-
-    private static boolean canStandAt(@Nonnull ChunkStore chunkStore,
-                                      @Nonnull Store<ChunkStore> chunkStoreStore,
-                                      int blockX,
-                                      int blockY,
-                                      int blockZ,
-                                      @Nonnull Map<Long, WorldChunk> chunkCache) {
-        WorldChunk worldChunk = resolveWorldChunk(chunkStore, chunkStoreStore, blockX, blockZ, chunkCache);
-        if (worldChunk == null) {
-            return false;
-        }
-
-        int feetFluid = worldChunk.getFluidId(blockX, blockY, blockZ);
-        int headFluid = worldChunk.getFluidId(blockX, blockY + 1, blockZ);
-        int groundFluid = worldChunk.getFluidId(blockX, blockY - 1, blockZ);
-        if (feetFluid != 0 || headFluid != 0) {
-            return false;
-        }
-
-        int feetBlockId = worldChunk.getBlock(blockX, blockY, blockZ);
-        int headBlockId = worldChunk.getBlock(blockX, blockY + 1, blockZ);
-        int groundBlockId = worldChunk.getBlock(blockX, blockY - 1, blockZ);
-        if (isSolidBlock(feetBlockId, feetFluid) || isSolidBlock(headBlockId, headFluid)) {
-            return false;
-        }
-        return isSolidBlock(groundBlockId, groundFluid);
-    }
-
     @Nonnull
     private static Vector3d sourceBlockTarget(int blockX, int blockY, int blockZ) {
         return new Vector3d(
@@ -2365,17 +2102,6 @@ public final class CompanionNeedsEnvironmentService {
     private static boolean resolveWaterTroughBlockId(int blockId) {
         BlockType blockType = BlockType.getAssetMap().getAsset(blockId);
         return FeedTroughWaterStateService.isWaterTroughBlockType(blockType);
-    }
-
-    private static boolean isSolidBlock(int blockId, int fluidId) {
-        if (blockId == 0) {
-            return false;
-        }
-        BlockType blockType = BlockType.getAssetMap().getAsset(blockId);
-        if (blockType == null || blockType == BlockType.UNKNOWN) {
-            return false;
-        }
-        return WorldUtil.isSolidOnlyBlock(blockType, fluidId);
     }
 
     private static boolean containsAllowedFood(@Nullable ItemContainer container,
@@ -2531,13 +2257,6 @@ public final class CompanionNeedsEnvironmentService {
             this.normalizedItemId = normalizedItemId;
             this.score = score;
         }
-    }
-
-    private static double distanceSquared(@Nonnull Vector3d left, @Nonnull Vector3d right) {
-        double dx = left.x - right.x;
-        double dy = left.y - right.y;
-        double dz = left.z - right.z;
-        return (dx * dx) + (dy * dy) + (dz * dz);
     }
 
     private static double distanceSquaredToBlockCenter(@Nonnull Vector3d origin,

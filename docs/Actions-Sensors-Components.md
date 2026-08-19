@@ -194,6 +194,13 @@ never set; the component's `Set: false` gate then remains open.
 - `TameworkNeedsResourceTarget`
 - `TameworkReachableBlockTarget` (finds a matching block set or exact block type, exposes a projected and path-preflighted approach position)
 
+`TameworkNeedsResourceTarget` reads short-lived local targets and shared area
+results before it requests new work. A cold lookup can return `false` for one
+or more world ticks while the bounded resource-search worker processes it.
+Later sensor checks use the shared result immediately. Equivalent requests from
+nearby NPCs share one cold search, while rejection and reservation filters stay
+specific to each NPC.
+
 `TameworkHook` context fields:
 - `HookId`
 - `HookPlayerId`

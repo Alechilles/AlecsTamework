@@ -30,6 +30,8 @@
 - Reduced command HUD world-tick work by reusing unchanged group status, sharing reticle target
   queries between the target and hotswap HUDs, and selecting bounded player batches.
 - Reduced command HUD server work when many players are online.
+- Large companion groups now spread due needs updates and cold food or water searches across world
+  ticks. Nearby companions share cached resource results instead of repeating the same search.
 
 ## 3.1.9 - Companion Spawn Safety Hotfix - 2026-08-16
 

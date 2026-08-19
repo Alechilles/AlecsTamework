@@ -5,9 +5,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.UUID;
 import org.joml.Vector3d;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 class PositionTargetReservationCacheTest {
+    @AfterEach
+    void clearReservations() {
+        PositionTargetReservationCache.clearForTests();
+    }
+
     @Test
     void activeReservationBlocksOtherNpcUntilReleasedOrExpired() {
         PositionTargetReservationCache.clearForTests();
@@ -38,5 +44,33 @@ class PositionTargetReservationCacheTest {
         assertTrue(PositionTargetReservationCache.isReservedByOther(other, "world-a", "FoodContainer", target, 1_001L));
         assertFalse(PositionTargetReservationCache.isReservedByOther(other, "world-b", "FoodContainer", target, 1_001L));
         assertFalse(PositionTargetReservationCache.isReservedByOther(other, "world-a", "Water", target, 1_001L));
+    }
+
+    @Test
+    void fullCacheRefusesNewReservationWithoutEvictingActiveOwner() {
+        PositionTargetReservationCache.clearForTests();
+        UUID originalOwner = new UUID(0L, 5L);
+        UUID other = new UUID(0L, 6L);
+        Vector3d originalTarget = new Vector3d(-10.5, 64.5, -10.5);
+        assertTrue(PositionTargetReservationCache.reserve(
+                originalOwner, "world-a", "Water", originalTarget, 120.0, 1_000L
+        ));
+        for (int i = 1; i < PositionTargetReservationCache.MAX_ENTRIES; i++) {
+            assertTrue(PositionTargetReservationCache.reserve(
+                    new UUID(7L, i),
+                    "world-a",
+                    "Water",
+                    new Vector3d(i, 64.5, 0.5),
+                    120.0,
+                    1_000L
+            ));
+        }
+
+        assertFalse(PositionTargetReservationCache.reserve(
+                other, "world-a", "Water", new Vector3d(99_999.5, 64.5, 0.5), 120.0, 1_001L
+        ));
+        assertTrue(PositionTargetReservationCache.isReservedByOther(
+                other, "world-a", "Water", originalTarget, 1_001L
+        ));
     }
 }

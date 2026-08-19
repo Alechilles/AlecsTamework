@@ -2,14 +2,135 @@ package com.alechilles.alecstamework.npc.progression;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
 
 class NeedsResourceAreaSearchCacheTest {
+    @Test
+    void oneRankedSnapshotLetsNpcPredicatesSelectDifferentCandidates() {
+        NeedsResourceCandidates.Snapshot snapshot = new NeedsResourceCandidates.Snapshot(
+                List.of(
+                        new NeedsResourceCandidates.Candidate(2, 64, 2, 1.5),
+                        new NeedsResourceCandidates.Candidate(4, 64, 2, 2.0)
+                ),
+                true,
+                false,
+                1_500L
+        );
+
+        NeedsResourceCandidates.Candidate firstNpc = snapshot.select(
+                new Vector3d(0.0, 64.0, 0.0),
+                8.0,
+                1,
+                candidate -> candidate.x() < 3
+        );
+        NeedsResourceCandidates.Candidate secondNpc = snapshot.select(
+                new Vector3d(0.0, 64.0, 0.0),
+                8.0,
+                1,
+                candidate -> candidate.x() >= 3
+        );
+
+        assertEquals(2, firstNpc.x());
+        assertEquals(4, secondNpc.x());
+    }
+
+    @Test
+    void snapshotCopiesInputAndCapsRankedCandidates() {
+        List<NeedsResourceCandidates.Candidate> input = new ArrayList<>();
+        for (int index = 0; index < 18; index++) {
+            input.add(new NeedsResourceCandidates.Candidate(index, 64, 0, 2.0));
+        }
+
+        NeedsResourceCandidates.Snapshot snapshot = new NeedsResourceCandidates.Snapshot(
+                input,
+                true,
+                false,
+                1_500L
+        );
+        input.clear();
+        input.add(new NeedsResourceCandidates.Candidate(99, 64, 99, 2.0));
+
+        assertEquals(16, snapshot.candidates().size());
+        assertEquals(0, snapshot.candidates().get(0).x());
+        assertEquals(15, snapshot.candidates().get(15).x());
+    }
+
+    @Test
+    void cacheRoundTripKeepsImmutableRankedSnapshot() {
+        NeedsResourceAreaSearchCache cache = new NeedsResourceAreaSearchCache(16);
+        NeedsResourceAreaSearchCache.AreaKey key = NeedsResourceAreaSearchCache.AreaKey.from(
+                "world", "water", new Vector3d(10.0, 64.0, 10.0), 16.0, 2, 3.0, 0);
+        List<NeedsResourceCandidates.Candidate> input = new ArrayList<>(List.of(
+                new NeedsResourceCandidates.Candidate(12, 64, 12, 2.0),
+                new NeedsResourceCandidates.Candidate(13, 64, 12, 2.0)
+        ));
+        NeedsResourceCandidates.Snapshot snapshot = new NeedsResourceCandidates.Snapshot(
+                input,
+                true,
+                true,
+                1_500L
+        );
+
+        cache.put(key, snapshot, 1_000L);
+        input.set(0, new NeedsResourceCandidates.Candidate(99, 64, 99, 2.0));
+
+        NeedsResourceCandidates.Snapshot cached = cache.getSnapshot(key, 1_100L);
+
+        assertEquals(12, cached.candidates().get(0).x());
+        assertEquals(13, cached.candidates().get(1).x());
+        assertTrue(cached.foundSource());
+        assertTrue(cached.sourceInConsumeRange());
+        assertEquals(1_400L, cached.ttlMs());
+    }
+
+    @Test
+    void legacyBlockCenteredTargetRoundTripKeepsFractionalCoordinates() {
+        NeedsResourceAreaSearchCache cache = new NeedsResourceAreaSearchCache(16);
+        NeedsResourceAreaSearchCache.AreaKey key = NeedsResourceAreaSearchCache.AreaKey.from(
+                "world", "water", new Vector3d(10.0, 64.0, 10.0), 16.0, 2, 3.0, 0);
+        Vector3d target = new Vector3d(12.5, 64.5, 12.5);
+
+        cache.put(key, NeedsResourceAreaSearchCache.AreaSearchSnapshot.hit(target, 2.0, 1_500L), 1_000L);
+
+        NeedsResourceAreaSearchCache.AreaSearchSnapshot cached = cache.get(
+                key,
+                new Vector3d(10.0, 64.0, 10.0),
+                16.0,
+                2,
+                1_100L
+        );
+
+        assertNotSame(target, cached.target());
+        assertEquals(target.x, cached.target().x, 0.000001);
+        assertEquals(target.y, cached.target().y, 0.000001);
+        assertEquals(target.z, cached.target().z, 0.000001);
+    }
+
+    @Test
+    void selectionRejectsCandidateWhosePublishedCenterIsOutsideHorizontalRange() {
+        NeedsResourceCandidates.Snapshot snapshot = new NeedsResourceCandidates.Snapshot(
+                List.of(new NeedsResourceCandidates.Candidate(1, 64, 0, 2.0)),
+                true,
+                true,
+                1_500L
+        );
+
+        assertNull(snapshot.select(
+                new Vector3d(0.0, 64.0, 0.0),
+                1.1,
+                0,
+                candidate -> true
+        ));
+    }
+
     @Test
     void nearbyPositionsShareAreaKeyWithoutNpcUuid() {
         NeedsResourceAreaSearchCache.AreaKey first = NeedsResourceAreaSearchCache.AreaKey.from(
@@ -69,6 +190,24 @@ class NeedsResourceAreaSearchCacheTest {
     }
 
     @Test
+    void coordinatorSnapshotKeepsSourcePresentConsumeMetadata() {
+        NeedsResourceAreaSearchCache cache = new NeedsResourceAreaSearchCache(16);
+        NeedsResourceAreaSearchCache.AreaKey key = NeedsResourceAreaSearchCache.AreaKey.from(
+                "world", "water", new Vector3d(10.0, 64.0, 10.0), 16.0, 2, 3.0, 0);
+        cache.put(
+                key,
+                new NeedsResourceCandidates.Snapshot(List.of(), true, true, 3_000L),
+                1_000L
+        );
+
+        NeedsResourceCandidates.Snapshot cached = cache.getSnapshot(key, 1_001L);
+
+        assertNotNull(cached);
+        assertTrue(cached.foundSource());
+        assertTrue(cached.sourceInConsumeRange());
+    }
+
+    @Test
     void hitAndSourceAbsentMissAreAreaReusable() {
         assertTrue(NeedsResourceAreaSearchCache.shouldShareResult(true, true));
         assertTrue(NeedsResourceAreaSearchCache.shouldShareResult(false, false));
@@ -82,6 +221,36 @@ class NeedsResourceAreaSearchCacheTest {
                 "world", "food_container", new Vector3d(10.0, 64.0, 10.0), 16.0, 2, 3.0, 456);
 
         assertFalse(beefKey.equals(wheatKey));
+    }
+
+    @Test
+    void scalarAreaKeyFactoryUsesCanonicalFoodIdentityWithoutVectorAllocation() {
+        NeedsResourceAreaSearchCache.AreaKey vectorKey = NeedsResourceAreaSearchCache.AreaKey.from(
+                "world",
+                "food_container",
+                new Vector3d(-0.1, 64.9, -4.1),
+                16.0,
+                2,
+                3.0,
+                List.of(" Food_Beef ", "FOOD_BEEF")
+        );
+        NeedsResourceAreaSearchCache.AreaKey scalarKey = NeedsResourceAreaSearchCache.AreaKey.from(
+                "world",
+                "food_container",
+                -0.1,
+                64.9,
+                -4.1,
+                16.0,
+                2,
+                3.0,
+                List.of("food_beef")
+        );
+
+        assertEquals(vectorKey, scalarKey);
+        assertEquals(List.of("food_beef"), scalarKey.normalizedItemIds());
+        assertEquals(-1, scalarKey.cellX());
+        assertEquals(16, scalarKey.cellY());
+        assertEquals(-2, scalarKey.cellZ());
     }
 
     @Test

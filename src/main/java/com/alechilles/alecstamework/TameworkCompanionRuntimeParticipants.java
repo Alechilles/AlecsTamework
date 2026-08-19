@@ -2,6 +2,11 @@ package com.alechilles.alecstamework;
 
 import com.alechilles.alecstamework.avatarflight.*;
 import com.alechilles.alecstamework.debug.PlayerInputDebugSystem;
+import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
+import com.alechilles.alecstamework.npc.progression.CompanionNeedsBatchRunner;
+import com.alechilles.alecstamework.npc.progression.CompanionNeedsRuntimeRegistry;
+import com.alechilles.alecstamework.npc.progression.NeedsResourceSearchCoordinator;
+import com.alechilles.alecstamework.npc.sensors.NeedsResourceTargetCacheAdapter;
 import com.alechilles.alecstamework.npc.systems.*;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationEntitySystem;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationOwnerChangeSystem;
@@ -23,7 +28,9 @@ import com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystem
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entity.player.PlayerInput;
 import com.hypixel.hytale.server.core.modules.physics.component.Velocity;
+import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.core.universe.world.events.RemoveWorldEvent;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.spawning.spawnmarkers.SpawnMarkerEntity;
 
@@ -183,6 +190,10 @@ public final class TameworkCompanionRuntimeParticipants {
             Tamework plugin,
             TameworkRuntimeParticipantRegistry participants
     ) {
+        CompanionNeedsRuntimeRegistry needsRegistry = new CompanionNeedsRuntimeRegistry();
+        CompanionNeedsBatchRunner needsRunner = new CompanionNeedsBatchRunner();
+        NeedsResourceSearchCoordinator needsSearchCoordinator =
+                NeedsResourceSearchCoordinator.getInstance();
         participants.entitySystem(TameworkRuntimeModule.DEBUG_SELF_TEST, "npcdebugdisplayresumeonloadsystem",
                 () -> new NpcDebugDisplayResumeOnLoadSystem(NPCEntity.getComponentType()));
         participants.entitySystem(TameworkRuntimeModule.TRAITS, "companiontraitstatsyncsystem",
@@ -226,9 +237,56 @@ public final class TameworkCompanionRuntimeParticipants {
                         plugin.getTamedComponentType(), plugin.getOwnerComponentType(),
                         plugin.resolveOptionalSpawnMarkerReferenceComponentType(),
                         plugin.resolveOptionalSpawnBeaconReferenceComponentType(), UUIDComponent.getComponentType()));
+        participants.entitySystem(TameworkRuntimeModule.NEEDS, "companionneedslifecyclesystem",
+                () -> new CompanionNeedsLifecycleSystem(needsRegistry, NPCEntity.getComponentType(),
+                        plugin.getTamedComponentType()));
+        participants.entitySystem(TameworkRuntimeModule.NEEDS, "companionneedstamedchangesystem",
+                () -> new CompanionNeedsTamedChangeSystem(needsRegistry, NPCEntity.getComponentType(),
+                        plugin.getTamedComponentType()));
         participants.entitySystem(TameworkRuntimeModule.NEEDS, "companionneedssystem",
-                CompanionNeedsSystem::new);
+                () -> new CompanionNeedsSystem(needsRegistry, needsRunner));
+        participants.entitySystem(TameworkRuntimeModule.NEEDS, "needsresourcesearchsystem",
+                () -> new NeedsResourceSearchSystem(needsSearchCoordinator));
+        participants.listener(
+                TameworkRuntimeModule.NEEDS,
+                "needsresourcesearchworldremoval",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        plugin,
+                        Short.MAX_VALUE,
+                        RemoveWorldEvent.class,
+                        event -> {
+                            if (event == null || event.getWorld() == null) {
+                                return;
+                            }
+                            World world = event.getWorld();
+                            if (world.isInThread()) {
+                                clearNeedsSearchState(needsSearchCoordinator, world);
+                            } else {
+                                world.execute(() -> clearNeedsSearchState(
+                                        needsSearchCoordinator, world));
+                            }
+                        },
+                        "needs resource search world cleanup"
+                )
+        );
         participants.entitySystem(TameworkRuntimeModule.BREEDING, "companionpassivebreedingsystem",
                 () -> new CompanionPassiveBreedingSystem(plugin.getBreedingPairAdmissionRegistry()));
+    }
+
+    /** Clears world-scoped needs state on the owning world thread. */
+    private static void clearNeedsSearchState(
+            NeedsResourceSearchCoordinator coordinator,
+            World world
+    ) {
+        NeedsResourceTargetCacheAdapter.clearWorld(world.getName());
+        EntityStore entityStore = world.getEntityStore();
+        if (entityStore == null) {
+            return;
+        }
+        var store = entityStore.getStore();
+        if (store == null) {
+            return;
+        }
+        coordinator.clear(store);
     }
 }

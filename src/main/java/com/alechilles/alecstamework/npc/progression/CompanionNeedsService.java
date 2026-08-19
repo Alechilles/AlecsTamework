@@ -196,33 +196,10 @@ public final class CompanionNeedsService {
         return runNeedsUpdate(npcRef, store, roleId, 0.0, 0.0, false, true, commandBuffer, null);
     }
 
-    public static boolean tickNeedsIfDue(@Nullable Ref<EntityStore> npcRef,
-                                         @Nullable Store<EntityStore> store,
-                                         @Nullable CommandBuffer<EntityStore> commandBuffer,
-                                         @Nullable String roleId,
-                                         long intervalMs) {
-        if (npcRef == null || store == null || !npcRef.isValid()) {
-            return false;
-        }
-        ComponentType<EntityStore, TameworkNeedsComponent> needsType = TameworkNeedsComponent.getComponentType();
-        if (needsType == null) {
-            return false;
-        }
-        TameworkNeedsComponent component = store.getComponent(npcRef, needsType);
-        TwNeedsConfig config = resolveNeedsConfig(npcRef, store, roleId, component);
-        if (!CompanionNeedsRuntimePolicy.isNeedsEnabled(config)) {
-            return removeNeedsRuntimeState(npcRef, store, commandBuffer, needsType, component);
-        }
-        component = ensureNeedsComponent(npcRef, store, commandBuffer, roleId);
-        if (component == null) {
-            return false;
-        }
-        long nowMs = resolveNowMs(config, store);
-        UUID npcId = resolveNpcUuid(npcRef, store);
-        long effectiveIntervalMs = NeedsSweepIntervalPolicy.intervalMs(component, config, intervalMs);
-        if (!NeedsSweepScheduler.shouldRunSweep(npcId, component.getLastPassiveSweepMs(), nowMs, effectiveIntervalMs)) {
-            return false;
-        }
+    /** Runs one scheduled needs update without a command buffer on the current world thread. */
+    public static boolean tickScheduledNeeds(@Nullable Ref<EntityStore> npcRef,
+                                              @Nullable Store<EntityStore> store,
+                                              @Nullable String roleId) {
         return runNeedsUpdate(
                 npcRef,
                 store,
@@ -231,7 +208,7 @@ public final class CompanionNeedsService {
                 0.0,
                 false,
                 true,
-                commandBuffer,
+                null,
                 null,
                 true
         );
@@ -935,15 +912,6 @@ public final class CompanionNeedsService {
             return 0L;
         }
         return Math.min(effectiveElapsedMs, MAX_LOADED_TICK_CATCH_UP_MS);
-    }
-
-    @Nullable
-    private static UUID resolveNpcUuid(@Nullable Ref<EntityStore> npcRef, @Nullable Store<EntityStore> store) {
-        if (npcRef == null || !npcRef.isValid() || store == null) {
-            return null;
-        }
-        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
-        return npc != null ? npc.getUuid() : null;
     }
 
     @Nullable
