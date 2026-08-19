@@ -10,6 +10,11 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
@@ -114,6 +119,74 @@ class CommandHudStoreLifecycleSystemTest {
                     tracker.candidatePlayerUuids(store).isEmpty(),
                     "Store removal during recovery must not recreate tracker state."
             );
+        }
+    }
+
+    @Test
+    void removalWaitsForBlockedRecoveryCallbackBeforeCleaningStore() throws Exception {
+        CountDownLatch recoveryEntered = new CountDownLatch(1);
+        CountDownLatch releaseRecovery = new CountDownLatch(1);
+        CountDownLatch removalStarted = new CountDownLatch(1);
+        CountDownLatch removalCompleted = new CountDownLatch(1);
+        List<UUID> recoveredPlayers = new ArrayList<>();
+        List<Store<EntityStore>> removedStores = new ArrayList<>();
+        CommandHudDirtySink sink = new CommandHudDirtySink() {
+            @Override
+            public void markDirty(UUID ignored) {
+            }
+
+            @Override
+            public void markRecovery(Store<EntityStore> store, UUID playerUuid) {
+                recoveryEntered.countDown();
+                try {
+                    Assertions.assertTrue(
+                            releaseRecovery.await(5, TimeUnit.SECONDS),
+                            "The test must release the blocked recovery callback."
+                    );
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    throw new AssertionError("Recovery callback was interrupted.", exception);
+                }
+                recoveredPlayers.add(playerUuid);
+            }
+
+            @Override
+            public void removeStore(Store<EntityStore> store) {
+                removedStores.add(store);
+            }
+        };
+        CommandHudStoreLifecycleSystem system = new CommandHudStoreLifecycleSystem(sink);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try (HytaleModuleScope ignored = HytaleModuleScope.install();
+             TestEntityComponentStore store = new TestEntityComponentStore(null)) {
+            addPlayer(store);
+            system.onSystemAddedToStore(store);
+
+            Future<?> tick = executor.submit(() -> system.tick(0.0f, 0, store));
+            Assertions.assertTrue(recoveryEntered.await(5, TimeUnit.SECONDS));
+
+            Future<?> removal = executor.submit(() -> {
+                removalStarted.countDown();
+                system.onSystemRemovedFromStore(store);
+                removalCompleted.countDown();
+            });
+            Assertions.assertTrue(removalStarted.await(5, TimeUnit.SECONDS));
+            Assertions.assertFalse(
+                    removalCompleted.await(250, TimeUnit.MILLISECONDS),
+                    "Store removal must wait for the active recovery callback."
+            );
+
+            releaseRecovery.countDown();
+            tick.get(5, TimeUnit.SECONDS);
+            removal.get(5, TimeUnit.SECONDS);
+
+            Assertions.assertEquals(List.of(PLAYER_UUID), recoveredPlayers);
+            Assertions.assertEquals(List.of(store), removedStores);
+        } finally {
+            releaseRecovery.countDown();
+            executor.shutdownNow();
+            Assertions.assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
         }
     }
 

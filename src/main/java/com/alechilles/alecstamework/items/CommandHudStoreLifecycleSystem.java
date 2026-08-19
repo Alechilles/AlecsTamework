@@ -57,8 +57,10 @@ public final class CommandHudStoreLifecycleSystem extends StoreSystem<EntityStor
                         for (int index = 0; index < chunk.size(); index++) {
                             Player player = chunk.getComponent(index, playerType);
                             UUID playerUuid = player != null ? player.getUuid() : null;
-                            if (isActiveScan(store)) {
-                                lifecycleSink.markRecovery(store, playerUuid);
+                            synchronized (lifecycleLock) {
+                                if (activeScanStores.contains(store)) {
+                                    lifecycleSink.markRecovery(store, playerUuid);
+                                }
                             }
                         }
                     }
@@ -84,12 +86,6 @@ public final class CommandHudStoreLifecycleSystem extends StoreSystem<EntityStor
         }
         if (cleanupNow) {
             lifecycleSink.removeStore(store);
-        }
-    }
-
-    private boolean isActiveScan(@Nonnull Store<EntityStore> store) {
-        synchronized (lifecycleLock) {
-            return activeScanStores.contains(store);
         }
     }
 
