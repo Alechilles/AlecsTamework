@@ -207,12 +207,39 @@ class NeedsWaterTargetSearchServiceTest {
         assertEquals(0, extremeOrigin.sectionReads);
     }
 
+    @Test
+    void boundedWaterSearchDoesNotWrapAtEitherIntegerExtreme() {
+        assertBounded(new NeedsWaterTargetSearchService.WaterRequest(
+                Integer.MAX_VALUE - 1.0 + 0.5, 64.0, 0.5, 1.0, 0, 1.0, 16));
+        assertBounded(new NeedsWaterTargetSearchService.WaterRequest(
+                Integer.MIN_VALUE + 1.0 + 0.5, 64.0, 0.5, 1.0, 0, 1.0, 16));
+        assertBounded(new NeedsWaterTargetSearchService.WaterRequest(
+                0.5, 64.0, Integer.MAX_VALUE - 1.0 + 0.5, 1.0, 0, 1.0, 16));
+        assertBounded(new NeedsWaterTargetSearchService.WaterRequest(
+                0.5, 64.0, Integer.MIN_VALUE + 1.0 + 0.5, 1.0, 0, 1.0, 16));
+        assertBounded(new NeedsWaterTargetSearchService.WaterRequest(
+                0.5, Integer.MAX_VALUE - 8.0 + 0.5, 0.5, 1.0, 8, 1.0, 16));
+        assertBounded(new NeedsWaterTargetSearchService.WaterRequest(
+                0.5, Integer.MIN_VALUE + 8.0 + 0.5, 0.5, 1.0, 8, 1.0, 16));
+    }
+
+    private static void assertBounded(NeedsWaterTargetSearchService.WaterRequest request) {
+        FakeWaterAccess access = new FakeWaterAccess();
+        access.maxAccessCalls = 256;
+        NeedsResourceCandidates.Snapshot snapshot = new NeedsWaterTargetSearchService().search(request, access);
+
+        assertTrue(snapshot.candidates().isEmpty());
+        assertTrue(access.accessCalls < access.maxAccessCalls);
+    }
+
     private static final class FakeWaterAccess implements NeedsWaterTargetSearchService.WaterSearchAccess {
         private final Map<String, Integer> fluidIds = new HashMap<>();
         private final Set<String> sourceCoordinates = new HashSet<>();
         private boolean emptySection;
         private int fluidReads;
         private int sectionReads;
+        private int accessCalls;
+        private int maxAccessCalls = Integer.MAX_VALUE;
 
         private void addFluid(int x, int y, int z) {
             fluidIds.put(key(x, y, z), 1);
@@ -220,6 +247,7 @@ class NeedsWaterTargetSearchServiceTest {
 
         @Override
         public NeedsWaterTargetSearchService.FluidSectionView sectionAt(int x, int y, int z) {
+            checkAccess();
             sectionReads++;
             return new FakeSection(emptySection);
         }
@@ -231,13 +259,21 @@ class NeedsWaterTargetSearchServiceTest {
 
         @Override
         public int fluidId(NeedsWaterTargetSearchService.FluidSectionView section, int x, int y, int z) {
+            checkAccess();
             fluidReads++;
             return fluidIds.getOrDefault(key(x, y, z), 0);
         }
 
         @Override
         public boolean hasConsumableTrough(int x, int y, int z) {
+            checkAccess();
             return sourceCoordinates.contains(key(x, y, z));
+        }
+
+        private void checkAccess() {
+            if (++accessCalls > maxAccessCalls) {
+                throw new AssertionError("search wrapped an integer coordinate");
+            }
         }
 
         private static String key(int x, int y, int z) {

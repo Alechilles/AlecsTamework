@@ -101,7 +101,7 @@ final class NeedsResourceSearchCachePolicy {
         }
         double floor = Math.floor(coordinate);
         return floor >= Integer.MIN_VALUE + (double) radius
-                && floor <= Integer.MAX_VALUE - (double) radius;
+                && floor < Integer.MAX_VALUE - (double) radius;
     }
 
     static boolean isCachedTargetUsable(@Nullable Vector3d currentPosition,

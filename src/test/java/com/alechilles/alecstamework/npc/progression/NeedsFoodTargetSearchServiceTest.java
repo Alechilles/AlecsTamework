@@ -159,10 +159,36 @@ class NeedsFoodTargetSearchServiceTest {
         assertEquals(0, extremeOrigin.sourceChecks);
     }
 
+    @Test
+    void boundedFoodSearchDoesNotWrapAtEitherIntegerExtreme() {
+        assertBounded(new NeedsFoodTargetSearchService.FoodRequest(
+                Integer.MAX_VALUE - 1.0 + 0.5, 64.0, 0.5, 1.0, 0, 2.0, 16, List.of("tw_berry")));
+        assertBounded(new NeedsFoodTargetSearchService.FoodRequest(
+                Integer.MIN_VALUE + 1.0 + 0.5, 64.0, 0.5, 1.0, 0, 2.0, 16, List.of("tw_berry")));
+        assertBounded(new NeedsFoodTargetSearchService.FoodRequest(
+                0.5, 64.0, Integer.MAX_VALUE - 1.0 + 0.5, 1.0, 0, 2.0, 16, List.of("tw_berry")));
+        assertBounded(new NeedsFoodTargetSearchService.FoodRequest(
+                0.5, 64.0, Integer.MIN_VALUE + 1.0 + 0.5, 1.0, 0, 2.0, 16, List.of("tw_berry")));
+        assertBounded(new NeedsFoodTargetSearchService.FoodRequest(
+                0.5, Integer.MAX_VALUE - 8.0 + 0.5, 0.5, 1.0, 8, 2.0, 16, List.of("tw_berry")));
+        assertBounded(new NeedsFoodTargetSearchService.FoodRequest(
+                0.5, Integer.MIN_VALUE + 8.0 + 0.5, 0.5, 1.0, 8, 2.0, 16, List.of("tw_berry")));
+    }
+
+    private static void assertBounded(NeedsFoodTargetSearchService.FoodRequest request) {
+        FakeFoodAccess access = new FakeFoodAccess();
+        access.maxSourceChecks = 256;
+        NeedsResourceCandidates.Snapshot snapshot = new NeedsFoodTargetSearchService().search(request, access);
+
+        assertTrue(snapshot.candidates().isEmpty());
+        assertTrue(access.sourceChecks < access.maxSourceChecks);
+    }
+
     private static final class FakeFoodAccess implements NeedsFoodTargetSearchService.FoodSearchAccess {
         private final Set<String> foodCoordinates = new HashSet<>();
         private Set<String> allowedIdsSeen = Set.of();
         private int sourceChecks;
+        private int maxSourceChecks = Integer.MAX_VALUE;
 
         private void addFood(int x, int y, int z) {
             foodCoordinates.add(key(x, y, z));
@@ -170,7 +196,9 @@ class NeedsFoodTargetSearchServiceTest {
 
         @Override
         public boolean hasAllowedFood(int x, int y, int z, Set<String> allowedIds) {
-            sourceChecks++;
+            if (++sourceChecks > maxSourceChecks) {
+                throw new AssertionError("search wrapped an integer coordinate");
+            }
             allowedIdsSeen = allowedIds;
             return foodCoordinates.contains(key(x, y, z)) && allowedIds.contains("tw_berry");
         }
