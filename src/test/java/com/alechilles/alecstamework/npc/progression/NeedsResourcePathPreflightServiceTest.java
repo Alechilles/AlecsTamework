@@ -172,6 +172,7 @@ class NeedsResourcePathPreflightServiceTest {
         assertEquals(1, computation.clearCalls());
         assertEquals(0, service.cacheSizeForTests());
         assertEquals(0, service.recentReadySizeForTests());
+        assertEquals(0, service.authorityIndexSizeForTests());
     }
 
     @Test
@@ -189,6 +190,38 @@ class NeedsResourcePathPreflightServiceTest {
         }
 
         assertTrue(service.cacheSizeForTests() <= maxEntries);
+        assertEquals(maxEntries, service.indexedCacheKeyCountForTests());
+        assertEquals(maxEntries, service.authorityIndexSizeForTests());
+    }
+
+    @Test
+    void repeatedComputingReplacementsAtCapacityUseBoundedAdmissionWork() {
+        NeedsResourcePathPreflightService service = new NeedsResourcePathPreflightService();
+        service.clearForTests();
+        int maxEntries = NeedsResourcePathPreflightService.PRECHECK_CACHE_MAX_ENTRIES;
+
+        for (int i = 0; i < maxEntries - 1; i++) {
+            service.preflight(
+                    keyFor(200_000 + i),
+                    () -> new FakeComputation(PathPreflightStatus.NO_PATH),
+                    100_000L + ((long) i / 16L) * 50L
+            );
+        }
+        NeedsResourcePathPreflightService.PreflightKey continuingKey = keyFor(300_000);
+        FakeComputation computation = new FakeComputation(PathPreflightStatus.COMPUTING);
+        service.preflight(continuingKey, () -> computation, 200_000L);
+
+        for (int i = 0; i < maxEntries; i++) {
+            PathPreflightResult result = service.preflight(
+                    continuingKey,
+                    () -> new FakeComputation(PathPreflightStatus.NO_PATH),
+                    200_001L
+            );
+            assertTrue(result.computing());
+        }
+
+        assertEquals(maxEntries, service.cacheSizeForTests());
+        assertEquals(0L, service.cacheAdmissionWorkForTests());
     }
 
     @Test
@@ -512,6 +545,7 @@ class NeedsResourcePathPreflightServiceTest {
 
         service.invalidateTarget(npc, "WORLD-A", "water", new Vector3d(10.99, 64.01, -2.01));
 
+        assertEquals(1, service.targetInvalidationBucketVisitsForTests());
         PathPreflightResult invalidated = service.preflight(
                 matchingProgress,
                 () -> {
@@ -625,7 +659,7 @@ class NeedsResourcePathPreflightServiceTest {
         int maxEntries = NeedsResourcePathPreflightService.PRECHECK_CACHE_MAX_ENTRIES;
 
         for (int i = 0; i < maxEntries + 25; i++) {
-            long nowMs = 1_000L + ((long) i / 512L) * 50L;
+            long nowMs = 1_000L + ((long) i / 16L) * 50L;
             NeedsResourcePathPreflightService.PreflightKey key = keyFor(
                     new UUID(0L, 100_000L + i),
                     "bound-world",
@@ -641,6 +675,8 @@ class NeedsResourcePathPreflightServiceTest {
         }
 
         assertTrue(service.recentReadySizeForTests() <= maxEntries);
+        assertEquals(maxEntries, service.indexedRecentReadyKeyCountForTests());
+        assertEquals(maxEntries, service.authorityIndexSizeForTests());
     }
 
     @Test
