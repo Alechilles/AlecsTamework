@@ -32,6 +32,11 @@ import org.joml.Vector3d;
 public final class CompanionPopulationSpatialIndex {
     private static final long SNAPSHOT_TTL_MS = 5_000L;
     private static final int CELL_SIZE = 8;
+    /**
+     * Maximum population-query radius in blocks. With eight-block cells this visits at most
+     * 61 cells on each axis, or 226,981 local cells, under the 262,144-cell work ceiling.
+     */
+    static final double MAX_POPULATION_QUERY_RADIUS = 240.0;
     private static final long MAX_CELL_VISITS = 262_144L;
     private static final AtomicLong GLOBAL_INVALIDATION_GENERATION = new AtomicLong();
     private static final CompanionPopulationSpatialIndex SHARED =
@@ -101,7 +106,7 @@ public final class CompanionPopulationSpatialIndex {
         return snapshot.countNearby(
                 sourceUuid,
                 sourcePosition,
-                radius,
+                effectiveQueryRadius(radius),
                 normalizedSourceType,
                 sourceBreedingConfig
         );
@@ -144,28 +149,60 @@ public final class CompanionPopulationSpatialIndex {
     /**
      * Plans the bounded part of a spatial query before it starts allocating cell keys.
      *
-     * <p>The product is saturated so extreme coordinates cannot overflow into a small loop.
-     * The occupied-bucket fallback is used only when the local Cartesian volume exceeds the
-     * bounded visit ceiling.</p>
+     * <p>The radius is capped before cell bounds are calculated. The product is saturated so
+     * extreme coordinates cannot overflow into a small loop.</p>
      */
     static QueryPlan planForQuery(@Nonnull Vector3d sourcePosition,
                                   double radius) {
-        long minX = cellCoordinate(sourcePosition.x - radius);
-        long minY = cellCoordinate(sourcePosition.y - radius);
-        long minZ = cellCoordinate(sourcePosition.z - radius);
-        long maxX = cellCoordinate(sourcePosition.x + radius);
-        long maxY = cellCoordinate(sourcePosition.y + radius);
-        long maxZ = cellCoordinate(sourcePosition.z + radius);
+        double effectiveRadius = effectiveQueryRadius(radius);
+        long cellOffset = cellOffsetForRadius(effectiveRadius);
+        long centerX = cellCoordinate(sourcePosition.x);
+        long centerY = cellCoordinate(sourcePosition.y);
+        long centerZ = cellCoordinate(sourcePosition.z);
+        long minX = saturatedSubtract(centerX, cellOffset);
+        long minY = saturatedSubtract(centerY, cellOffset);
+        long minZ = saturatedSubtract(centerZ, cellOffset);
+        long maxX = saturatedAdd(centerX, cellOffset);
+        long maxY = saturatedAdd(centerY, cellOffset);
+        long maxZ = saturatedAdd(centerZ, cellOffset);
         long xSpan = inclusiveSpan(minX, maxX);
         long ySpan = inclusiveSpan(minY, maxY);
         long zSpan = inclusiveSpan(minZ, maxZ);
         long localCellVisits = saturatedMultiply(
                 saturatedMultiply(xSpan, ySpan), zSpan);
-        boolean usesOccupiedBuckets = localCellVisits > MAX_CELL_VISITS;
         return new QueryPlan(
                 minX, minY, minZ, maxX, maxY, maxZ,
-                localCellVisits, usesOccupiedBuckets, MAX_CELL_VISITS
+                localCellVisits, MAX_CELL_VISITS
         );
+    }
+
+    private static double effectiveQueryRadius(double radius) {
+        if (Double.isNaN(radius) || radius <= 0.0) {
+            return 0.0;
+        }
+        if (!Double.isFinite(radius)) {
+            return MAX_POPULATION_QUERY_RADIUS;
+        }
+        return Math.min(radius, MAX_POPULATION_QUERY_RADIUS);
+    }
+
+    private static long cellOffsetForRadius(double radius) {
+        double offset = Math.ceil(radius / CELL_SIZE);
+        return offset >= Long.MAX_VALUE ? Long.MAX_VALUE : (long) offset;
+    }
+
+    private static long saturatedAdd(long value, long amount) {
+        if (amount <= 0L || value > Long.MAX_VALUE - amount) {
+            return amount <= 0L ? value : Long.MAX_VALUE;
+        }
+        return value + amount;
+    }
+
+    private static long saturatedSubtract(long value, long amount) {
+        if (amount <= 0L || value < Long.MIN_VALUE + amount) {
+            return amount <= 0L ? value : Long.MIN_VALUE;
+        }
+        return value - amount;
     }
 
     private static boolean isFinite(@Nonnull Vector3d position) {
@@ -313,12 +350,6 @@ public final class CompanionPopulationSpatialIndex {
                                 @Nullable TwBreedingConfig sourceBreedingConfig) {
             double radiusSquared = radius * radius;
             QueryPlan plan = planForQuery(sourcePosition, radius);
-            if (plan.usesOccupiedBuckets()) {
-                return countEntries(
-                        buckets.values(), sourceUuid, sourcePosition, radiusSquared,
-                        sourceTypeKey, sourceBreedingConfig
-                );
-            }
             int count = 0;
             for (long x = plan.minX(); ; x++) {
                 for (long y = plan.minY(); ; y++) {
@@ -378,34 +409,6 @@ public final class CompanionPopulationSpatialIndex {
             return distance * distance;
         }
 
-        private static int countEntries(@Nonnull Iterable<List<Entry>> buckets,
-                                        @Nullable UUID sourceUuid,
-                                        @Nonnull Vector3d sourcePosition,
-                                        double radiusSquared,
-                                        @Nonnull String sourceTypeKey,
-                                        @Nullable TwBreedingConfig sourceBreedingConfig) {
-            int count = 0;
-            for (List<Entry> entries : buckets) {
-                for (Entry entry : entries) {
-                    if (sourceUuid != null && sourceUuid.equals(entry.uuid())) {
-                        continue;
-                    }
-                    String candidateType = resolvePopulationTypeKey(entry.roleId(), sourceBreedingConfig);
-                    if (!sourceTypeKey.equals(candidateType)) {
-                        continue;
-                    }
-                    double dx = entry.x() - sourcePosition.x;
-                    double dy = entry.y() - sourcePosition.y;
-                    double dz = entry.z() - sourcePosition.z;
-                    double distanceSquared = dx * dx + dy * dy + dz * dz;
-                    if (Double.isFinite(distanceSquared) && distanceSquared <= radiusSquared) {
-                        count++;
-                    }
-                }
-            }
-            return count;
-        }
-
         private static int countEntries(@Nonnull List<Entry> entries,
                                         @Nullable UUID sourceUuid,
                                         @Nonnull Vector3d sourcePosition,
@@ -446,7 +449,6 @@ public final class CompanionPopulationSpatialIndex {
                             long maxY,
                             long maxZ,
                             long localCellVisits,
-                            boolean usesOccupiedBuckets,
                             long maxCellVisits) {
     }
 }

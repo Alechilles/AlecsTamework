@@ -16,7 +16,6 @@ import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies exact population queries over the store-scoped spatial snapshot. */
@@ -77,40 +76,48 @@ class CompanionPopulationSpatialIndexTest {
     }
 
     @Test
-    void largeRadiusUsesBoundedOccupiedBucketPlanAndKeepsExactCount() throws Exception {
+    void largeRadiusUsesEffectiveCapAndKeepsExactCount() throws Exception {
         try (HytaleModuleScope ignored = HytaleModuleScope.install()) {
             TwBreedingConfig breedingConfig = breedingConfig();
             UUID sourceId = UUID.randomUUID();
-            CompanionPopulationSpatialIndex.QueryPlan plan =
-                    CompanionPopulationSpatialIndex.planForQuery(
-                            new Vector3d(0.0, 0.0, 0.0), 1_024.0);
-
-            assertEquals(257L * 257L * 257L, plan.localCellVisits());
-            assertTrue(plan.localCellVisits() > plan.maxCellVisits());
-            assertTrue(plan.usesOccupiedBuckets());
-
-            CompanionPopulationSpatialIndex.QueryPlan smallPlan =
-                    CompanionPopulationSpatialIndex.planForQuery(
-                            new Vector3d(0.0, 0.0, 0.0), 8.0);
-            assertEquals(27L, smallPlan.localCellVisits());
-            assertFalse(smallPlan.usesOccupiedBuckets());
 
             try (TestEntityComponentStore store = new TestEntityComponentStore(new EntityStore(null))) {
                 addNpc(store, sourceId, "Cat_Adult", 0.0, 0.0, 0.0);
-                addNpc(store, UUID.randomUUID(), "Cat_Adult", 1_024.0, 0.0, 0.0);
+                addNpc(store, UUID.randomUUID(), "Cat_Adult",
+                        CompanionPopulationSpatialIndex.MAX_POPULATION_QUERY_RADIUS - 0.01,
+                        0.0, 0.0);
                 addNpc(store, UUID.randomUUID(), "Dog_Adult", 1.0, 0.0, 0.0);
-                addNpc(store, UUID.randomUUID(), "Cat_Adult", 1_024.01, 0.0, 0.0);
+                addNpc(store, UUID.randomUUID(), "Cat_Adult",
+                        CompanionPopulationSpatialIndex.MAX_POPULATION_QUERY_RADIUS + 0.01,
+                        0.0, 0.0);
 
                 assertEquals(1, index(() -> 1_000L).countNearby(
                         store,
                         sourceId,
                         new Vector3d(0.0, 0.0, 0.0),
-                        1_024.0,
+                        Double.MAX_VALUE,
                         "cat_adult",
                         breedingConfig
                 ));
             }
         }
+    }
+
+    @Test
+    void largeCoordinatesKeepCellPlanWithinWorkCeiling() {
+        double largeCoordinate = Math.scalb(1.0, 58);
+
+        CompanionPopulationSpatialIndex.QueryPlan positivePlan =
+                CompanionPopulationSpatialIndex.planForQuery(
+                        new Vector3d(largeCoordinate, largeCoordinate, largeCoordinate),
+                        Double.MAX_VALUE);
+        CompanionPopulationSpatialIndex.QueryPlan negativePlan =
+                CompanionPopulationSpatialIndex.planForQuery(
+                        new Vector3d(-largeCoordinate, -largeCoordinate, -largeCoordinate),
+                        Double.MAX_VALUE);
+
+        assertTrue(positivePlan.localCellVisits() <= positivePlan.maxCellVisits());
+        assertTrue(negativePlan.localCellVisits() <= negativePlan.maxCellVisits());
     }
 
     @Test
