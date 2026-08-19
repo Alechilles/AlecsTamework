@@ -417,34 +417,46 @@ public final class CompanionNeedsEnvironmentService {
             return WaterTargetSearchResult.miss(false);
         }
         long nowMs = resolveCurrentTimeMs();
-        double effectiveConsumeRadius = Double.isFinite(consumeRadius) && consumeRadius > 1.0
-                ? consumeRadius
+        double boundedRadius = NeedsResourceSearchCachePolicy.boundedSearchRadius(radius);
+        int boundedVerticalRadius = NeedsResourceSearchCachePolicy.boundedVerticalScanRadius(verticalScanRadius);
+        double boundedConsumeRadius = NeedsResourceSearchCachePolicy.boundedConsumeRadius(consumeRadius);
+        double effectiveConsumeRadius = Double.isFinite(boundedConsumeRadius) && boundedConsumeRadius > 1.0
+                ? boundedConsumeRadius
                 : 1.0;
+        if (!NeedsResourceSearchCachePolicy.hasSafeOrigin(
+                transform.getPosition().x,
+                transform.getPosition().y,
+                transform.getPosition().z,
+                Math.max(1, (int) Math.ceil(boundedRadius)),
+                boundedVerticalRadius
+        )) {
+            return WaterTargetSearchResult.miss(false);
+        }
         NeedsSearchCacheKey cacheKey = buildSearchCacheKey(
                 npcRef,
                 store,
                 ResourceSearchKind.WATER,
                 transform.getPosition(),
-                radius,
-                verticalScanRadius,
-                consumeRadius,
+                boundedRadius,
+                boundedVerticalRadius,
+                effectiveConsumeRadius,
                 null
         );
         NeedsResourceAreaSearchCache.AreaKey areaCacheKey = buildAreaSearchCacheKey(
                 store,
                 ResourceSearchKind.WATER,
                 transform.getPosition(),
-                radius,
-                verticalScanRadius,
-                consumeRadius,
+                boundedRadius,
+                boundedVerticalRadius,
+                effectiveConsumeRadius,
                 List.of()
         );
         if (targetRejector == null) {
             WaterTargetSearchResult cachedResult = getCachedWaterSearchResult(
                     cacheKey,
                     transform.getPosition(),
-                    radius,
-                    verticalScanRadius,
+                    boundedRadius,
+                    boundedVerticalRadius,
                     nowMs
             );
             if (cachedResult != null) {
@@ -454,20 +466,22 @@ public final class CompanionNeedsEnvironmentService {
             WaterTargetSearchResult cachedResult = getCachedWaterSearchResult(
                     cacheKey,
                     transform.getPosition(),
-                    radius,
-                    verticalScanRadius,
+                    boundedRadius,
+                    boundedVerticalRadius,
                     nowMs
             );
             if (cachedResult != null
-                    && (cachedResult.target() == null || !targetRejector.rejects(cachedResult.target()))) {
+                    && (cachedResult.target() != null
+                    && !targetRejector.rejects(cachedResult.target())
+                    || (cachedResult.target() == null && !cachedResult.foundConsumableSource()))) {
                 return cachedResult;
             }
         }
         WaterTargetSearchResult areaCachedResult = getAreaCachedWaterSearchResult(
                 areaCacheKey,
                 transform.getPosition(),
-                radius,
-                verticalScanRadius,
+                boundedRadius,
+                boundedVerticalRadius,
                 targetRejector,
                 nowMs
         );
@@ -482,25 +496,33 @@ public final class CompanionNeedsEnvironmentService {
                         transform.getPosition().x,
                         transform.getPosition().y,
                         transform.getPosition().z,
-                        radius,
-                        verticalScanRadius,
+                        boundedRadius,
+                        boundedVerticalRadius,
                         effectiveConsumeRadius,
                         NeedsResourceCandidates.MAX_CANDIDATES
                 );
         long startedNs = System.nanoTime();
-        NeedsResourceCandidates.Snapshot snapshot = WATER_TARGET_SEARCH_SERVICE.search(store, npcRef, request);
+        NeedsWaterTargetSearchService.CandidateFilter candidateFilter = targetRejector == null
+                ? null
+                : waterCandidateFilter(targetRejector);
+        NeedsResourceCandidates.Snapshot snapshot = WATER_TARGET_SEARCH_SERVICE.search(
+                store,
+                npcRef,
+                request,
+                candidateFilter
+        );
         WaterTargetSearchResult bestResult = toWaterTargetResult(
                 snapshot,
                 transform.getPosition(),
-                radius,
-                verticalScanRadius,
-                targetRejector
+                boundedRadius,
+                boundedVerticalRadius,
+                null
         );
         recordResourceSearchWork(startedNs, nowMs);
         if (targetRejector == null || shouldCacheRejectorWaterSearchResult(bestResult)) {
             cacheWaterSearchResult(cacheKey, bestResult, nowMs);
         }
-        if (targetRejector == null || bestResult.target() != null || !snapshot.foundSource()) {
+        if (targetRejector == null) {
             cacheAreaWaterSearchResult(areaCacheKey, snapshot, nowMs);
         }
         return bestResult;
@@ -754,15 +776,29 @@ public final class CompanionNeedsEnvironmentService {
             return FoodTargetSearchResult.miss(false);
         }
         long nowMs = resolveCurrentTimeMs();
-        double effectiveConsumeRadius = Double.isFinite(consumeRadius) && consumeRadius > 0.0 ? consumeRadius : 0.0;
+        double boundedRadius = NeedsResourceSearchCachePolicy.boundedSearchRadius(radius);
+        int boundedVerticalRadius = NeedsResourceSearchCachePolicy.boundedVerticalScanRadius(verticalScanRadius);
+        double boundedConsumeRadius = NeedsResourceSearchCachePolicy.boundedConsumeRadius(consumeRadius);
+        double effectiveConsumeRadius = Double.isFinite(boundedConsumeRadius) && boundedConsumeRadius > 0.0
+                ? boundedConsumeRadius
+                : 0.0;
+        if (!NeedsResourceSearchCachePolicy.hasSafeOrigin(
+                transform.getPosition().x,
+                transform.getPosition().y,
+                transform.getPosition().z,
+                Math.max(1, (int) Math.ceil(boundedRadius)),
+                boundedVerticalRadius
+        )) {
+            return FoodTargetSearchResult.miss(false);
+        }
         List<String> canonicalFoodIds = new ArrayList<>(allowedFoods);
         NeedsSearchCacheKey cacheKey = buildSearchCacheKey(
                 npcRef,
                 store,
                 ResourceSearchKind.FOOD_CONTAINER,
                 transform.getPosition(),
-                radius,
-                verticalScanRadius,
+                boundedRadius,
+                boundedVerticalRadius,
                 effectiveConsumeRadius,
                 allowedFoods
         );
@@ -770,8 +806,8 @@ public final class CompanionNeedsEnvironmentService {
                 store,
                 ResourceSearchKind.FOOD_CONTAINER,
                 transform.getPosition(),
-                radius,
-                verticalScanRadius,
+                boundedRadius,
+                boundedVerticalRadius,
                 effectiveConsumeRadius,
                 canonicalFoodIds
         );
@@ -779,8 +815,8 @@ public final class CompanionNeedsEnvironmentService {
             FoodTargetSearchResult cachedResult = getCachedFoodSearchResult(
                     cacheKey,
                     transform.getPosition(),
-                    radius,
-                    verticalScanRadius,
+                    boundedRadius,
+                    boundedVerticalRadius,
                     nowMs
             );
             if (cachedResult != null) {
@@ -790,20 +826,22 @@ public final class CompanionNeedsEnvironmentService {
             FoodTargetSearchResult cachedResult = getCachedFoodSearchResult(
                     cacheKey,
                     transform.getPosition(),
-                    radius,
-                    verticalScanRadius,
+                    boundedRadius,
+                    boundedVerticalRadius,
                     nowMs
             );
             if (cachedResult != null
-                    && (cachedResult.target() == null || !targetRejector.rejects(cachedResult.target()))) {
+                    && (cachedResult.target() != null
+                    && !targetRejector.rejects(cachedResult.target())
+                    || (cachedResult.target() == null && !cachedResult.foundConsumableSource()))) {
                 return cachedResult;
             }
         }
         FoodTargetSearchResult areaCachedResult = getAreaCachedFoodSearchResult(
                 areaCacheKey,
                 transform.getPosition(),
-                radius,
-                verticalScanRadius,
+                boundedRadius,
+                boundedVerticalRadius,
                 targetRejector,
                 nowMs
         );
@@ -818,26 +856,34 @@ public final class CompanionNeedsEnvironmentService {
                         transform.getPosition().x,
                         transform.getPosition().y,
                         transform.getPosition().z,
-                        radius,
-                        verticalScanRadius,
+                        boundedRadius,
+                        boundedVerticalRadius,
                         effectiveConsumeRadius,
                         NeedsResourceCandidates.MAX_CANDIDATES,
                         canonicalFoodIds
                 );
         long startedNs = System.nanoTime();
-        NeedsResourceCandidates.Snapshot snapshot = FOOD_TARGET_SEARCH_SERVICE.search(store, npcRef, request);
+        NeedsFoodTargetSearchService.CandidateFilter candidateFilter = targetRejector == null
+                ? null
+                : foodCandidateFilter(targetRejector);
+        NeedsResourceCandidates.Snapshot snapshot = FOOD_TARGET_SEARCH_SERVICE.search(
+                store,
+                npcRef,
+                request,
+                candidateFilter
+        );
         FoodTargetSearchResult bestResult = toFoodTargetResult(
                 snapshot,
                 transform.getPosition(),
-                radius,
-                verticalScanRadius,
-                targetRejector
+                boundedRadius,
+                boundedVerticalRadius,
+                null
         );
         recordResourceSearchWork(startedNs, nowMs);
         if (targetRejector == null || shouldCacheRejectorFoodSearchResult(bestResult)) {
             cacheFoodSearchResult(cacheKey, bestResult, nowMs);
         }
-        if (targetRejector == null || bestResult.target() != null || !snapshot.foundSource()) {
+        if (targetRejector == null) {
             cacheAreaFoodSearchResult(areaCacheKey, snapshot, nowMs);
         }
         return bestResult;
@@ -1000,6 +1046,12 @@ public final class CompanionNeedsEnvironmentService {
                 && selectCandidate(snapshot, currentPosition, radius, verticalScanRadius, null) == null) {
             return null;
         }
+        if (targetRejector != null
+                && ((!snapshot.hasCandidates() && snapshot.foundSource())
+                || (snapshot.hasCandidates()
+                && selectCandidate(snapshot, currentPosition, radius, verticalScanRadius, targetRejector) == null))) {
+            return null;
+        }
         return toWaterTargetResult(
                 snapshot,
                 currentPosition,
@@ -1023,6 +1075,12 @@ public final class CompanionNeedsEnvironmentService {
         }
         if (snapshot.hasCandidates()
                 && selectCandidate(snapshot, currentPosition, radius, verticalScanRadius, null) == null) {
+            return null;
+        }
+        if (targetRejector != null
+                && ((!snapshot.hasCandidates() && snapshot.foundSource())
+                || (snapshot.hasCandidates()
+                && selectCandidate(snapshot, currentPosition, radius, verticalScanRadius, targetRejector) == null))) {
             return null;
         }
         return toFoodTargetResult(
@@ -1090,6 +1148,34 @@ public final class CompanionNeedsEnvironmentService {
         );
     }
 
+    @Nonnull
+    private static NeedsWaterTargetSearchService.CandidateFilter waterCandidateFilter(
+            @Nonnull TargetRejector targetRejector) {
+        Vector3d probe = new Vector3d();
+        return (x, y, z) -> {
+            probe.set(
+                    x + SOURCE_TARGET_CENTER_OFFSET,
+                    y + SOURCE_TARGET_CENTER_OFFSET,
+                    z + SOURCE_TARGET_CENTER_OFFSET
+            );
+            return !targetRejector.rejects(probe);
+        };
+    }
+
+    @Nonnull
+    private static NeedsFoodTargetSearchService.CandidateFilter foodCandidateFilter(
+            @Nonnull TargetRejector targetRejector) {
+        Vector3d probe = new Vector3d();
+        return (x, y, z) -> {
+            probe.set(
+                    x + SOURCE_TARGET_CENTER_OFFSET,
+                    y + SOURCE_TARGET_CENTER_OFFSET,
+                    z + SOURCE_TARGET_CENTER_OFFSET
+            );
+            return !targetRejector.rejects(probe);
+        };
+    }
+
     @Nullable
     private static NeedsResourceCandidates.Candidate selectCandidate(
             @Nonnull NeedsResourceCandidates.Snapshot snapshot,
@@ -1153,7 +1239,7 @@ public final class CompanionNeedsEnvironmentService {
     private static void cacheWaterSearchResult(@Nullable NeedsSearchCacheKey cacheKey,
                                                @Nonnull WaterTargetSearchResult result,
                                                long nowMs) {
-        if (cacheKey == null) {
+        if (cacheKey == null || (result.target() == null && result.foundConsumableSource())) {
             return;
         }
         long ttlMs = searchCacheTtlMs(result.target() != null, result.foundConsumableSource());
@@ -1173,19 +1259,27 @@ public final class CompanionNeedsEnvironmentService {
     private static void cacheAreaWaterSearchResult(@Nullable NeedsResourceAreaSearchCache.AreaKey cacheKey,
                                                    @Nonnull NeedsResourceCandidates.Snapshot snapshot,
                                                    long nowMs) {
-        AREA_SEARCH_CACHE.put(cacheKey, snapshot, nowMs);
+        AREA_SEARCH_CACHE.put(
+                cacheKey,
+                NeedsResourceSearchCachePolicy.scaleSharedSnapshotTtl(snapshot, nowMs),
+                nowMs
+        );
     }
 
     private static void cacheAreaFoodSearchResult(@Nullable NeedsResourceAreaSearchCache.AreaKey cacheKey,
                                                   @Nonnull NeedsResourceCandidates.Snapshot snapshot,
                                                   long nowMs) {
-        AREA_SEARCH_CACHE.put(cacheKey, snapshot, nowMs);
+        AREA_SEARCH_CACHE.put(
+                cacheKey,
+                NeedsResourceSearchCachePolicy.scaleSharedSnapshotTtl(snapshot, nowMs),
+                nowMs
+        );
     }
 
     private static void cacheFoodSearchResult(@Nullable NeedsSearchCacheKey cacheKey,
                                               @Nonnull FoodTargetSearchResult result,
                                               long nowMs) {
-        if (cacheKey == null) {
+        if (cacheKey == null || (result.target() == null && result.foundConsumableSource())) {
             return;
         }
         long ttlMs = searchCacheTtlMs(result.target() != null, result.foundConsumableSource());
@@ -1211,7 +1305,7 @@ public final class CompanionNeedsEnvironmentService {
     }
 
     static long searchCacheTtlMs(boolean hasTarget, boolean foundConsumableSource, long nowMs) {
-        long baseTtlMs = NeedsResourceSearchCachePolicy.baseTtlMs(hasTarget, foundConsumableSource);
+        long baseTtlMs = NeedsResourceSearchCachePolicy.localBaseTtlMs(hasTarget, foundConsumableSource);
         return TameworkRuntimePressureService.getInstance().scaleTtlMs(
                 RuntimePressureDomain.NEEDS_RESOURCE_SEARCH,
                 baseTtlMs,

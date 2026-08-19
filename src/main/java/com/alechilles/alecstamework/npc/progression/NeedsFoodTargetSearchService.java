@@ -1,8 +1,6 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.items.FeedTroughContainerCompat;
-import com.alechilles.alecstamework.performance.RuntimePressureDomain;
-import com.alechilles.alecstamework.performance.TameworkRuntimePressureService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.util.ChunkUtil;
@@ -16,6 +14,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.TreeSet;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -39,6 +38,18 @@ public final class NeedsFoodTargetSearchService {
     public NeedsResourceCandidates.Snapshot search(@Nullable Store<EntityStore> store,
                                                    @Nullable Ref<EntityStore> npcRef,
                                                    @Nonnull FoodRequest request) {
+        return search(store, npcRef, request, null);
+    }
+
+    /**
+     * Searches with a value-only compatibility filter. The filter is used
+     * only during this synchronous traversal and is never stored in a result.
+     */
+    @Nonnull
+    public NeedsResourceCandidates.Snapshot search(@Nullable Store<EntityStore> store,
+                                                   @Nullable Ref<EntityStore> npcRef,
+                                                   @Nonnull FoodRequest request,
+                                                   @Nullable CandidateFilter candidateFilter) {
         if (store == null || npcRef == null || !npcRef.isValid() || request == null) {
             return emptySnapshot(false);
         }
@@ -50,7 +61,7 @@ public final class NeedsFoodTargetSearchService {
         if (chunkStoreStore == null) {
             return emptySnapshot(false);
         }
-        return search(request, new WorldSearchAccess(world.getChunkStore(), chunkStoreStore));
+        return search(request, new WorldSearchAccess(world.getChunkStore(), chunkStoreStore), candidateFilter);
     }
 
     /**
@@ -60,22 +71,35 @@ public final class NeedsFoodTargetSearchService {
     @Nonnull
     NeedsResourceCandidates.Snapshot search(@Nonnull FoodRequest request,
                                             @Nonnull FoodSearchAccess access) {
+        return search(request, access, null);
+    }
+
+    @Nonnull
+    NeedsResourceCandidates.Snapshot search(@Nonnull FoodRequest request,
+                                            @Nonnull FoodSearchAccess access,
+                                            @Nullable CandidateFilter candidateFilter) {
         if (request == null || access == null || !request.hasValidRange() || request.itemIds().isEmpty()) {
             return emptySnapshot(false);
         }
-        return scan(request, access);
+        return scan(request, access, candidateFilter);
     }
 
     private static NeedsResourceCandidates.Snapshot scan(@Nonnull FoodRequest request,
-                                                         @Nonnull FoodSearchAccess access) {
+                                                         @Nonnull FoodSearchAccess access,
+                                                         @Nullable CandidateFilter candidateFilter) {
         int blockX = floorBlock(request.originX());
         int blockY = floorBlock(request.originY());
         int blockZ = floorBlock(request.originZ());
         double radiusSquared = request.radius() * request.radius();
+        double consumeRadiusSquared = request.consumeRadius() * request.consumeRadius();
+        Set<String> allowedIds = Set.copyOf(request.itemIds());
+        boolean foundSource = false;
+        boolean foundSourceInConsumeRange = false;
         for (int horizontalRadius = 0; horizontalRadius <= request.searchRadius(); horizontalRadius++) {
-            CandidateBuffer candidates = new CandidateBuffer(request.maxCandidates(), request.approachRadius());
-            boolean foundSource = false;
-            boolean foundSourceInConsumeRange = false;
+            CandidateBuffer candidates = request.maxCandidates() == 0
+                    ? null
+                    : new CandidateBuffer(request.maxCandidates(), request.approachRadius());
+            boolean acceptedSource = false;
             for (int yOffset = -request.verticalScanRadius();
                  yOffset <= request.verticalScanRadius();
                  yOffset++) {
@@ -85,34 +109,41 @@ public final class NeedsFoodTargetSearchService {
                         if (!isHorizontalRingCell(blockX, blockZ, x, z, horizontalRadius)) {
                             continue;
                         }
-                        double dx = x - blockX;
-                        double dz = z - blockZ;
+                        double dx = x + 0.5 - request.originX();
+                        double dz = z + 0.5 - request.originZ();
                         double horizontalDistanceSquared = (dx * dx) + (dz * dz);
                         if (horizontalDistanceSquared > radiusSquared + SCORE_EPSILON) {
                             continue;
                         }
-                        if (!access.hasAllowedFood(x, y, z, request.itemIds())) {
+                        if (!access.hasAllowedFood(x, y, z, allowedIds)) {
                             continue;
                         }
                         foundSource = true;
                         if (request.consumeRadius() > SCORE_EPSILON
-                                && horizontalDistanceSquared <= request.consumeRadius() * request.consumeRadius()
+                                && horizontalDistanceSquared <= consumeRadiusSquared
                                 + SCORE_EPSILON) {
                             foundSourceInConsumeRange = true;
                         }
+                        if (request.maxCandidates() == 0) {
+                            return emptySnapshot(true, foundSourceInConsumeRange);
+                        }
+                        if (candidateFilter != null && !candidateFilter.accepts(x, y, z)) {
+                            continue;
+                        }
+                        acceptedSource = true;
                         candidates.add(x, y, z, request.originX(), request.originY(), request.originZ());
                     }
                 }
             }
-            if (foundSource) {
+            if (acceptedSource) {
                 return candidates.toSnapshot(
-                        true,
+                        foundSource,
                         foundSourceInConsumeRange,
-                        cacheTtlMs(candidates.count() > 0, true)
+                        cacheTtlMs(candidates.count() > 0, foundSource)
                 );
             }
         }
-        return emptySnapshot(false);
+        return emptySnapshot(foundSource, foundSourceInConsumeRange);
     }
 
     private static boolean isHorizontalRingCell(int originX,
@@ -128,20 +159,21 @@ public final class NeedsFoodTargetSearchService {
     }
 
     private static long cacheTtlMs(boolean hasTarget, boolean foundSource) {
-        long baseTtlMs = NeedsResourceSearchCachePolicy.baseTtlMs(hasTarget, foundSource);
-        return TameworkRuntimePressureService.getInstance().scaleTtlMs(
-                RuntimePressureDomain.NEEDS_RESOURCE_SEARCH,
-                baseTtlMs,
-                System.currentTimeMillis()
-        );
+        return NeedsResourceSearchCachePolicy.sharedBaseTtlMs(hasTarget, foundSource);
     }
 
     @Nonnull
     private static NeedsResourceCandidates.Snapshot emptySnapshot(boolean foundSource) {
+        return emptySnapshot(foundSource, false);
+    }
+
+    @Nonnull
+    private static NeedsResourceCandidates.Snapshot emptySnapshot(boolean foundSource,
+                                                                  boolean foundSourceInConsumeRange) {
         return new NeedsResourceCandidates.Snapshot(
                 List.of(),
                 foundSource,
-                false,
+                foundSourceInConsumeRange,
                 cacheTtlMs(false, foundSource)
         );
     }
@@ -159,7 +191,7 @@ public final class NeedsFoodTargetSearchService {
     }
 
     private static boolean containsAllowedFood(@Nullable ItemContainer container,
-                                               @Nonnull List<String> allowedIds) {
+                                               @Nonnull Set<String> allowedIds) {
         if (container == null || allowedIds.isEmpty()) {
             return false;
         }
@@ -173,11 +205,9 @@ public final class NeedsFoodTargetSearchService {
             if (itemId == null || itemId.isBlank()) {
                 continue;
             }
-            String trimmedItemId = itemId.trim();
-            for (String allowedId : allowedIds) {
-                if (allowedId.equalsIgnoreCase(trimmedItemId)) {
-                    return true;
-                }
+            String canonicalItemId = itemId.trim().toLowerCase(Locale.ROOT);
+            if (allowedIds.contains(canonicalItemId)) {
+                return true;
             }
         }
         return false;
@@ -196,7 +226,9 @@ public final class NeedsFoodTargetSearchService {
                               int maxCandidates,
                               List<String> itemIds) {
         public FoodRequest {
-            verticalScanRadius = Math.max(0, verticalScanRadius);
+            radius = NeedsResourceSearchCachePolicy.boundedSearchRadius(radius);
+            verticalScanRadius = NeedsResourceSearchCachePolicy.boundedVerticalScanRadius(verticalScanRadius);
+            consumeRadius = NeedsResourceSearchCachePolicy.boundedConsumeRadius(consumeRadius);
             maxCandidates = Math.max(0, Math.min(MAX_CANDIDATES, maxCandidates));
             itemIds = canonicalItemIds(itemIds);
         }
@@ -239,7 +271,14 @@ public final class NeedsFoodTargetSearchService {
                     && Double.isFinite(radius)
                     && radius > 0.0
                     && Double.isFinite(consumeRadius)
-                    && consumeRadius >= 0.0;
+                    && consumeRadius >= 0.0
+                    && NeedsResourceSearchCachePolicy.hasSafeOrigin(
+                            originX,
+                            originY,
+                            originZ,
+                            searchRadius(),
+                            verticalScanRadius
+                    );
         }
 
         int searchRadius() {
@@ -268,7 +307,12 @@ public final class NeedsFoodTargetSearchService {
 
     /** Supplies food-container state to one synchronous search. */
     interface FoodSearchAccess {
-        boolean hasAllowedFood(int x, int y, int z, @Nonnull List<String> allowedIds);
+        boolean hasAllowedFood(int x, int y, int z, @Nonnull Set<String> allowedIds);
+    }
+
+    @FunctionalInterface
+    interface CandidateFilter {
+        boolean accepts(int x, int y, int z);
     }
 
     private static final class WorldSearchAccess implements FoodSearchAccess {
@@ -283,7 +327,7 @@ public final class NeedsFoodTargetSearchService {
         }
 
         @Override
-        public boolean hasAllowedFood(int x, int y, int z, @Nonnull List<String> allowedIds) {
+        public boolean hasAllowedFood(int x, int y, int z, @Nonnull Set<String> allowedIds) {
             WorldChunk chunk = resolveChunk(x, z);
             if (chunk == null) {
                 return false;

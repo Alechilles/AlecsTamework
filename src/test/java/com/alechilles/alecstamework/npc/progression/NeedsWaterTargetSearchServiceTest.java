@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
@@ -37,7 +38,7 @@ class NeedsWaterTargetSearchServiceTest {
                 snapshot.candidates()
         );
         assertTrue(snapshot.foundSource());
-        assertTrue(snapshot.sourceInConsumeRange());
+        assertFalse(snapshot.sourceInConsumeRange());
     }
 
     @Test
@@ -103,6 +104,107 @@ class NeedsWaterTargetSearchServiceTest {
                 snapshot.candidates()
         );
         assertEquals(0, access.fluidReads);
+    }
+
+    @Test
+    void compatibilityFilterContinuesToAnAcceptedOuterRing() {
+        FakeWaterAccess access = new FakeWaterAccess();
+        access.addFluid(1, 64, 0);
+        access.addFluid(2, 64, 0);
+
+        NeedsResourceCandidates.Snapshot snapshot = new NeedsWaterTargetSearchService().search(
+                new NeedsWaterTargetSearchService.WaterRequest(0.5, 64.0, 0.5, 4.0, 0, 1.0, 16),
+                access,
+                (x, y, z) -> x != 1
+        );
+
+        assertEquals(
+                java.util.List.of(new NeedsResourceCandidates.Candidate(2, 64, 0, 1.0)),
+                snapshot.candidates()
+        );
+        assertTrue(snapshot.foundSource());
+    }
+
+    @Test
+    void scannerUsesPublishedBlockCentersAtPositiveAndNegativeBoundaries() {
+        FakeWaterAccess positiveBoundary = new FakeWaterAccess();
+        positiveBoundary.addFluid(1, 64, 0);
+        assertTrue(new NeedsWaterTargetSearchService().search(
+                new NeedsWaterTargetSearchService.WaterRequest(0.01, 64.0, 0.5, 1.0, 0, 1.0, 16),
+                positiveBoundary
+        ).candidates().isEmpty());
+
+        FakeWaterAccess positiveInside = new FakeWaterAccess();
+        positiveInside.addFluid(1, 64, 0);
+        assertEquals(1, new NeedsWaterTargetSearchService().search(
+                new NeedsWaterTargetSearchService.WaterRequest(0.51, 64.0, 0.5, 1.0, 0, 1.0, 16),
+                positiveInside
+        ).candidates().size());
+
+        FakeWaterAccess negativeBoundary = new FakeWaterAccess();
+        negativeBoundary.addFluid(0, 64, 0);
+        assertTrue(new NeedsWaterTargetSearchService().search(
+                new NeedsWaterTargetSearchService.WaterRequest(-0.99, 64.0, 0.5, 1.0, 0, 1.0, 16),
+                negativeBoundary
+        ).candidates().isEmpty());
+
+        FakeWaterAccess negativeInside = new FakeWaterAccess();
+        negativeInside.addFluid(0, 64, 0);
+        assertEquals(1, new NeedsWaterTargetSearchService().search(
+                new NeedsWaterTargetSearchService.WaterRequest(-0.49, 64.0, 0.5, 1.0, 0, 1.0, 16),
+                negativeInside
+        ).candidates().size());
+    }
+
+    @Test
+    void zeroCandidateSearchStopsAtFirstFoundSource() {
+        FakeWaterAccess access = new FakeWaterAccess();
+        access.addFluid(0, 64, 0);
+
+        NeedsResourceCandidates.Snapshot snapshot = new NeedsWaterTargetSearchService().search(
+                new NeedsWaterTargetSearchService.WaterRequest(0.5, 64.0, 0.5, 1.0, 0, 1.0, 0),
+                access
+        );
+
+        assertTrue(snapshot.foundSource());
+        assertTrue(snapshot.candidates().isEmpty());
+        assertEquals(1, access.sectionReads);
+        assertEquals(1, access.fluidReads);
+    }
+
+    @Test
+    void malformedWaterBoundsAreClampedOrRejectedBeforeTraversal() {
+        FakeWaterAccess bounded = new FakeWaterAccess();
+        NeedsResourceCandidates.Snapshot boundedSnapshot = new NeedsWaterTargetSearchService().search(
+                new NeedsWaterTargetSearchService.WaterRequest(
+                        0.5,
+                        64.0,
+                        0.5,
+                        1_000_000_000.0,
+                        Integer.MAX_VALUE,
+                        1_000_000_000.0,
+                        0
+                ),
+                bounded
+        );
+        assertTrue(boundedSnapshot.candidates().isEmpty());
+        assertTrue(bounded.sectionReads < 100_000);
+
+        FakeWaterAccess extremeOrigin = new FakeWaterAccess();
+        NeedsResourceCandidates.Snapshot invalidSnapshot = new NeedsWaterTargetSearchService().search(
+                new NeedsWaterTargetSearchService.WaterRequest(
+                        Double.MAX_VALUE,
+                        64.0,
+                        0.5,
+                        1.0,
+                        0,
+                        1.0,
+                        16
+                ),
+                extremeOrigin
+        );
+        assertTrue(invalidSnapshot.candidates().isEmpty());
+        assertEquals(0, extremeOrigin.sectionReads);
     }
 
     private static final class FakeWaterAccess implements NeedsWaterTargetSearchService.WaterSearchAccess {

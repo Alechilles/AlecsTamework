@@ -1,8 +1,5 @@
 package com.alechilles.alecstamework.npc.progression;
-
 import com.alechilles.alecstamework.items.FeedTroughWaterStateService;
-import com.alechilles.alecstamework.performance.RuntimePressureDomain;
-import com.alechilles.alecstamework.performance.TameworkRuntimePressureService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.util.ChunkUtil;
@@ -21,32 +18,24 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
-
-/**
- * Performs one bounded, world-thread water-source search.
- *
- * <p>The service returns source block coordinates, not mutable target vectors.
- * A request-local section cache resolves each fluid section once and checks
- * {@link FluidSection#isEmpty()} before reading any cell. Trough checks still
- * inspect block and state data when a fluid section is empty.
- */
+/** Performs one bounded water-source search and returns immutable block candidates. */
 public final class NeedsWaterTargetSearchService {
     private static final int MAX_CANDIDATES = NeedsResourceCandidates.MAX_CANDIDATES;
     private static final double SCORE_EPSILON = 0.000001;
     private static final double WATER_APPROACH_RADIUS = 1.0;
     private static final Map<Integer, Boolean> WATER_TROUGH_BLOCK_ID_CACHE =
             new ConcurrentHashMap<>();
-
-    /**
-     * Searches loaded world chunks on the current world thread.
-     *
-     * <p>The store, reference, world, chunk, and fluid objects are used only
-     * during this call. They are never copied into the immutable result.
-     */
     @Nonnull
     public NeedsResourceCandidates.Snapshot search(@Nullable Store<EntityStore> store,
                                                    @Nullable Ref<EntityStore> npcRef,
                                                    @Nonnull WaterRequest request) {
+        return search(store, npcRef, request, null);
+    }
+    @Nonnull
+    public NeedsResourceCandidates.Snapshot search(@Nullable Store<EntityStore> store,
+                                                   @Nullable Ref<EntityStore> npcRef,
+                                                   @Nonnull WaterRequest request,
+                                                   @Nullable CandidateFilter candidateFilter) {
         if (store == null || npcRef == null || !npcRef.isValid() || request == null) {
             return emptySnapshot(false);
         }
@@ -58,34 +47,39 @@ public final class NeedsWaterTargetSearchService {
         if (chunkStoreStore == null) {
             return emptySnapshot(false);
         }
-        return search(request, new WorldSearchAccess(world.getChunkStore(), chunkStoreStore));
+        return search(request, new WorldSearchAccess(world.getChunkStore(), chunkStoreStore), candidateFilter);
     }
-
-    /**
-     * Test seam for the traversal algorithm. The seam exposes only section and
-     * cell values, so tests do not need to construct an ECS world.
-     */
     @Nonnull
     NeedsResourceCandidates.Snapshot search(@Nonnull WaterRequest request,
                                              @Nonnull WaterSearchAccess access) {
+        return search(request, access, null);
+    }
+    @Nonnull
+    NeedsResourceCandidates.Snapshot search(@Nonnull WaterRequest request,
+                                             @Nonnull WaterSearchAccess access,
+                                             @Nullable CandidateFilter candidateFilter) {
         if (request == null || access == null || !request.hasValidRange()) {
             return emptySnapshot(false);
         }
-        return scan(request, access);
+        return scan(request, access, candidateFilter);
     }
-
     private static NeedsResourceCandidates.Snapshot scan(@Nonnull WaterRequest request,
-                                                         @Nonnull WaterSearchAccess access) {
+                                                         @Nonnull WaterSearchAccess access,
+                                                         @Nullable CandidateFilter candidateFilter) {
         int blockX = floorBlock(request.originX());
         int blockY = floorBlock(request.originY());
         int blockZ = floorBlock(request.originZ());
         int searchRadius = request.searchRadius();
         double radiusSquared = request.radius() * request.radius();
+        double consumeRadiusSquared = request.consumeRadius() * request.consumeRadius();
         SectionCache sectionCache = new SectionCache(access);
+        boolean foundSource = false;
+        boolean foundSourceInConsumeRange = false;
         for (int horizontalRadius = 0; horizontalRadius <= searchRadius; horizontalRadius++) {
-            CandidateBuffer candidates = new CandidateBuffer(request.maxCandidates());
-            boolean foundSource = false;
-            boolean foundSourceInConsumeRange = false;
+            CandidateBuffer candidates = request.maxCandidates() == 0
+                    ? null
+                    : new CandidateBuffer(request.maxCandidates());
+            boolean acceptedSource = false;
             for (int yOffset = -request.verticalScanRadius();
                  yOffset <= request.verticalScanRadius();
                  yOffset++) {
@@ -95,8 +89,8 @@ public final class NeedsWaterTargetSearchService {
                         if (!isHorizontalRingCell(blockX, blockZ, x, z, horizontalRadius)) {
                             continue;
                         }
-                        double dx = x - blockX;
-                        double dz = z - blockZ;
+                        double dx = x + 0.5 - request.originX();
+                        double dz = z + 0.5 - request.originZ();
                         double horizontalDistanceSquared = (dx * dx) + (dz * dz);
                         if (horizontalDistanceSquared > radiusSquared + SCORE_EPSILON) {
                             continue;
@@ -105,23 +99,30 @@ public final class NeedsWaterTargetSearchService {
                             continue;
                         }
                         foundSource = true;
-                        if (horizontalDistanceSquared <= request.consumeRadius() * request.consumeRadius()
+                        if (horizontalDistanceSquared <= consumeRadiusSquared
                                 + SCORE_EPSILON) {
                             foundSourceInConsumeRange = true;
                         }
+                        if (request.maxCandidates() == 0) {
+                            return emptySnapshot(true, foundSourceInConsumeRange);
+                        }
+                        if (candidateFilter != null && !candidateFilter.accepts(x, y, z)) {
+                            continue;
+                        }
+                        acceptedSource = true;
                         candidates.add(x, y, z, request.originX(), request.originY(), request.originZ());
                     }
                 }
             }
-            if (foundSource) {
+            if (acceptedSource) {
                 return candidates.toSnapshot(
-                        true,
+                        foundSource,
                         foundSourceInConsumeRange,
-                        cacheTtlMs(candidates.count() > 0, true)
+                        cacheTtlMs(candidates.count() > 0, foundSource)
                 );
             }
         }
-        return emptySnapshot(false);
+        return emptySnapshot(foundSource, foundSourceInConsumeRange);
     }
 
     private static boolean isConsumableSource(@Nonnull WaterSearchAccess access,
@@ -150,20 +151,21 @@ public final class NeedsWaterTargetSearchService {
     }
 
     private static long cacheTtlMs(boolean hasTarget, boolean foundSource) {
-        long baseTtlMs = NeedsResourceSearchCachePolicy.baseTtlMs(hasTarget, foundSource);
-        return TameworkRuntimePressureService.getInstance().scaleTtlMs(
-                RuntimePressureDomain.NEEDS_RESOURCE_SEARCH,
-                baseTtlMs,
-                System.currentTimeMillis()
-        );
+        return NeedsResourceSearchCachePolicy.sharedBaseTtlMs(hasTarget, foundSource);
     }
 
     @Nonnull
     private static NeedsResourceCandidates.Snapshot emptySnapshot(boolean foundSource) {
+        return emptySnapshot(foundSource, false);
+    }
+
+    @Nonnull
+    private static NeedsResourceCandidates.Snapshot emptySnapshot(boolean foundSource,
+                                                                  boolean foundSourceInConsumeRange) {
         return new NeedsResourceCandidates.Snapshot(
                 List.of(),
                 foundSource,
-                false,
+                foundSourceInConsumeRange,
                 cacheTtlMs(false, foundSource)
         );
     }
@@ -208,10 +210,7 @@ public final class NeedsWaterTargetSearchService {
         return FeedTroughWaterStateService.isWaterTroughBlockType(blockType);
     }
 
-    /**
-     * Value-only water search input. The vector constructor copies its three
-     * coordinates; no vector is retained by a request.
-     */
+    /** Immutable water search input; no vector is retained by a request. */
     public record WaterRequest(double originX,
                                double originY,
                                double originZ,
@@ -220,7 +219,9 @@ public final class NeedsWaterTargetSearchService {
                                double consumeRadius,
                                int maxCandidates) {
         public WaterRequest {
-            verticalScanRadius = Math.max(0, verticalScanRadius);
+            radius = NeedsResourceSearchCachePolicy.boundedSearchRadius(radius);
+            verticalScanRadius = NeedsResourceSearchCachePolicy.boundedVerticalScanRadius(verticalScanRadius);
+            consumeRadius = NeedsResourceSearchCachePolicy.boundedConsumeRadius(consumeRadius);
             maxCandidates = Math.max(0, Math.min(MAX_CANDIDATES, maxCandidates));
         }
 
@@ -255,7 +256,14 @@ public final class NeedsWaterTargetSearchService {
                     && Double.isFinite(radius)
                     && radius > 0.0
                     && Double.isFinite(consumeRadius)
-                    && consumeRadius >= 0.0;
+                    && consumeRadius >= 0.0
+                    && NeedsResourceSearchCachePolicy.hasSafeOrigin(
+                            originX,
+                            originY,
+                            originZ,
+                            searchRadius(),
+                            verticalScanRadius
+                    );
         }
 
         int searchRadius() {
@@ -263,14 +271,13 @@ public final class NeedsWaterTargetSearchService {
         }
     }
 
-    /** A fluid section view used by the request-local traversal seam. */
-    interface FluidSectionView {
+    @FunctionalInterface
+    interface CandidateFilter {
+        boolean accepts(int x, int y, int z);
     }
 
-    /**
-     * Supplies loaded water and trough values to one synchronous search.
-     * Implementations must not be retained after the search returns.
-     */
+    interface FluidSectionView {
+    }
     interface WaterSearchAccess {
         @Nullable
         FluidSectionView sectionAt(int x, int y, int z);

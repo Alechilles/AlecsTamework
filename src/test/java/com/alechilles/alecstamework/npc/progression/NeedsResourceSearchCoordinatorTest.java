@@ -81,6 +81,39 @@ class NeedsResourceSearchCoordinatorTest {
     }
 
     @Test
+    void sharedHitUsesTenSecondBaseTtl() {
+        try (TestEntityComponentStore store = newStore()) {
+            coordinator.clear(store);
+            NeedsResourceSearchCoordinator.Request request = request(2_100);
+            CountingExecutor executor = new CountingExecutor(hitSnapshot(1_500L));
+
+            coordinator.lookupOrEnqueue(store, uuid(2_100), request, NOW_MS);
+            assertEquals(1, coordinator.processOne(store, 8L, NOW_MS, executor));
+            assertEquals(HIT, coordinator.lookupOrEnqueue(store, uuid(2_101), request, NOW_MS + 9_999L).status());
+            assertEquals(DEFERRED, coordinator.lookupOrEnqueue(store, uuid(2_101), request, NOW_MS + 10_000L).status());
+        }
+    }
+
+    @Test
+    void sharedHitTtlScalesAfterExecutorWorkRaisesPressure() {
+        try (TestEntityComponentStore store = newStore()) {
+            coordinator.clear(store);
+            TameworkRuntimePressureService pressure = TameworkRuntimePressureService.getInstance();
+            for (int index = 0; index < 127; index++) {
+                pressure.recordWork(NEEDS_RESOURCE_SEARCH, 1_000L, NOW_MS);
+            }
+            NeedsResourceSearchCoordinator.Request request = request(2_102);
+            CountingExecutor executor = new CountingExecutor(hitSnapshot(10_000L));
+
+            coordinator.lookupOrEnqueue(store, uuid(2_102), request, NOW_MS);
+            assertEquals(1, coordinator.processOne(store, 8L, NOW_MS, executor));
+            assertEquals(WARM, pressure.level(NEEDS_RESOURCE_SEARCH, NOW_MS));
+            assertEquals(HIT, coordinator.lookupOrEnqueue(store, uuid(2_103), request, NOW_MS + 14_999L).status());
+            assertEquals(DEFERRED, coordinator.lookupOrEnqueue(store, uuid(2_103), request, NOW_MS + 15_000L).status());
+        }
+    }
+
+    @Test
     void pendingRequestCapDefersOnlyNewKeysAndExistingKeysStillDeduplicate() {
         try (TestEntityComponentStore store = newStore()) {
             coordinator.clear(store);
@@ -178,25 +211,25 @@ class NeedsResourceSearchCoordinatorTest {
         try (TestEntityComponentStore store = newStore()) {
             coordinator.clear(store);
             NeedsResourceSearchCoordinator.Request hitRequest = request(500);
-            CountingExecutor hitExecutor = new CountingExecutor(hitSnapshot(100L));
+            CountingExecutor hitExecutor = new CountingExecutor(hitSnapshot(10_000L));
             coordinator.lookupOrEnqueue(store, uuid(500), hitRequest, NOW_MS);
             coordinator.processOne(store, 8L, NOW_MS, hitExecutor);
 
-            assertEquals(HIT, coordinator.lookupOrEnqueue(store, uuid(501), hitRequest, NOW_MS + 99L).status());
-            assertEquals(DEFERRED, coordinator.lookupOrEnqueue(store, uuid(501), hitRequest, NOW_MS + 100L).status());
-            assertEquals(1, coordinator.processOne(store, 16L, NOW_MS + 100L, hitExecutor));
+            assertEquals(HIT, coordinator.lookupOrEnqueue(store, uuid(501), hitRequest, NOW_MS + 9_999L).status());
+            assertEquals(DEFERRED, coordinator.lookupOrEnqueue(store, uuid(501), hitRequest, NOW_MS + 10_000L).status());
+            assertEquals(1, coordinator.processOne(store, 16L, NOW_MS + 10_000L, hitExecutor));
 
             NeedsResourceSearchCoordinator.Request missRequest = request(501);
-            CountingExecutor missExecutor = new CountingExecutor(missSnapshot(100L));
+            CountingExecutor missExecutor = new CountingExecutor(missSnapshot(15_000L));
             coordinator.lookupOrEnqueue(store, uuid(502), missRequest, NOW_MS);
             coordinator.processOne(store, 24L, NOW_MS, missExecutor);
 
             NeedsResourceSearchCoordinator.Lookup miss =
-                    coordinator.lookupOrEnqueue(store, uuid(503), missRequest, NOW_MS + 99L);
+                    coordinator.lookupOrEnqueue(store, uuid(503), missRequest, NOW_MS + 14_999L);
             assertEquals(MISS, miss.status());
             assertNotNull(miss.snapshot());
             assertFalse(miss.snapshot().hasCandidates());
-            assertEquals(DEFERRED, coordinator.lookupOrEnqueue(store, uuid(503), missRequest, NOW_MS + 100L).status());
+            assertEquals(DEFERRED, coordinator.lookupOrEnqueue(store, uuid(503), missRequest, NOW_MS + 15_000L).status());
         }
     }
 

@@ -38,7 +38,7 @@ class NeedsFoodTargetSearchServiceTest {
         );
         assertTrue(snapshot.foundSource());
         assertTrue(snapshot.sourceInConsumeRange());
-        assertEquals(List.of("tw_berry", "tw_meat"), access.allowedIdsSeen);
+        assertEquals(Set.of("tw_berry", "tw_meat"), access.allowedIdsSeen);
     }
 
     @Test
@@ -67,18 +67,112 @@ class NeedsFoodTargetSearchServiceTest {
         );
     }
 
+    @Test
+    void compatibilityFilterContinuesToAnAcceptedOuterRing() {
+        FakeFoodAccess access = new FakeFoodAccess();
+        access.addFood(1, 64, 0);
+        access.addFood(2, 64, 0);
+
+        NeedsResourceCandidates.Snapshot snapshot = new NeedsFoodTargetSearchService().search(
+                new NeedsFoodTargetSearchService.FoodRequest(
+                        0.5,
+                        64.0,
+                        0.5,
+                        4.0,
+                        0,
+                        2.0,
+                        16,
+                        List.of("tw_berry")
+                ),
+                access,
+                (x, y, z) -> x != 1
+        );
+
+        assertEquals(
+                List.of(new NeedsResourceCandidates.Candidate(2, 64, 0, 2.0)),
+                snapshot.candidates()
+        );
+        assertTrue(snapshot.foundSource());
+    }
+
+    @Test
+    void scannerUsesPublishedBlockCentersAtPositiveAndNegativeBoundaries() {
+        FakeFoodAccess positiveBoundary = new FakeFoodAccess();
+        positiveBoundary.addFood(1, 64, 0);
+        assertTrue(new NeedsFoodTargetSearchService().search(
+                new NeedsFoodTargetSearchService.FoodRequest(
+                        0.01, 64.0, 0.5, 1.0, 0, 2.0, 16, List.of("tw_berry")),
+                positiveBoundary
+        ).candidates().isEmpty());
+
+        FakeFoodAccess negativeInside = new FakeFoodAccess();
+        negativeInside.addFood(0, 64, 0);
+        assertEquals(1, new NeedsFoodTargetSearchService().search(
+                new NeedsFoodTargetSearchService.FoodRequest(
+                        -0.49, 64.0, 0.5, 1.0, 0, 2.0, 16, List.of("tw_berry")),
+                negativeInside
+        ).candidates().size());
+    }
+
+    @Test
+    void zeroCandidateSearchStopsAtFirstFoundSource() {
+        FakeFoodAccess access = new FakeFoodAccess();
+        access.addFood(0, 64, 0);
+
+        NeedsResourceCandidates.Snapshot snapshot = new NeedsFoodTargetSearchService().search(
+                new NeedsFoodTargetSearchService.FoodRequest(
+                        0.5, 64.0, 0.5, 1.0, 0, 2.0, 0, List.of("tw_berry")),
+                access
+        );
+
+        assertTrue(snapshot.foundSource());
+        assertTrue(snapshot.candidates().isEmpty());
+        assertEquals(1, access.sourceChecks);
+    }
+
+    @Test
+    void malformedFoodBoundsAreClampedOrRejectedBeforeTraversal() {
+        FakeFoodAccess bounded = new FakeFoodAccess();
+        NeedsResourceCandidates.Snapshot boundedSnapshot = new NeedsFoodTargetSearchService().search(
+                new NeedsFoodTargetSearchService.FoodRequest(
+                        0.5,
+                        64.0,
+                        0.5,
+                        1_000_000_000.0,
+                        Integer.MAX_VALUE,
+                        1_000_000_000.0,
+                        0,
+                        List.of("tw_berry")
+                ),
+                bounded
+        );
+        assertTrue(boundedSnapshot.candidates().isEmpty());
+        assertTrue(bounded.sourceChecks < 100_000);
+
+        FakeFoodAccess extremeOrigin = new FakeFoodAccess();
+        NeedsResourceCandidates.Snapshot invalidSnapshot = new NeedsFoodTargetSearchService().search(
+                new NeedsFoodTargetSearchService.FoodRequest(
+                        Double.MAX_VALUE, 64.0, 0.5, 1.0, 0, 2.0, 16, List.of("tw_berry")),
+                extremeOrigin
+        );
+        assertTrue(invalidSnapshot.candidates().isEmpty());
+        assertEquals(0, extremeOrigin.sourceChecks);
+    }
+
     private static final class FakeFoodAccess implements NeedsFoodTargetSearchService.FoodSearchAccess {
         private final Set<String> foodCoordinates = new HashSet<>();
-        private List<String> allowedIdsSeen = List.of();
+        private Set<String> allowedIdsSeen = Set.of();
+        private int sourceChecks;
 
         private void addFood(int x, int y, int z) {
             foodCoordinates.add(key(x, y, z));
         }
 
         @Override
-        public boolean hasAllowedFood(int x, int y, int z, List<String> allowedIds) {
+        public boolean hasAllowedFood(int x, int y, int z, Set<String> allowedIds) {
+            sourceChecks++;
             allowedIdsSeen = allowedIds;
-            return foodCoordinates.contains(key(x, y, z));
+            return foodCoordinates.contains(key(x, y, z)) && allowedIds.contains("tw_berry");
         }
 
         private static String key(int x, int y, int z) {

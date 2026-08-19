@@ -138,7 +138,11 @@ public final class NeedsResourceSearchCoordinator {
             return 1;
         }
         recordSearchWork(startedNs, nowMs);
-        state.areaCache.put(pending.request.areaKey(), snapshot, nowMs);
+        state.areaCache.put(
+                pending.request.areaKey(),
+                NeedsResourceSearchCachePolicy.scaleSharedSnapshotTtl(snapshot, nowMs),
+                nowMs
+        );
         return 1;
     }
 
@@ -259,9 +263,15 @@ public final class NeedsResourceSearchCoordinator {
                         double consumeRadius) {
             this.resourceKind = normalizeResourceKind(resourceKind);
             this.areaKey = Objects.requireNonNull(areaKey, "areaKey");
-            this.radius = requirePositiveFinite(radius, "radius");
-            this.verticalRadius = Math.max(0, verticalRadius);
-            this.consumeRadius = requireNonNegativeFinite(consumeRadius, "consumeRadius");
+            this.radius = requirePositiveFinite(
+                    NeedsResourceSearchCachePolicy.boundedSearchRadius(radius),
+                    "radius"
+            );
+            this.verticalRadius = NeedsResourceSearchCachePolicy.boundedVerticalScanRadius(verticalRadius);
+            this.consumeRadius = requireNonNegativeFinite(
+                    NeedsResourceSearchCachePolicy.boundedConsumeRadius(consumeRadius),
+                    "consumeRadius"
+            );
             this.itemIds = areaKey.normalizedItemIds();
         }
 
@@ -279,9 +289,9 @@ public final class NeedsResourceSearchCoordinator {
                                       int verticalRadius,
                                       double consumeRadius,
                                       @Nonnull List<String> itemIds) {
-            NeedsResourceAreaSearchCache.AreaKey areaKey = NeedsResourceAreaSearchCache.AreaKey.from(
-                    worldName,
+            return createForArea(
                     resourceKind,
+                    worldName,
                     originX,
                     originY,
                     originZ,
@@ -290,15 +300,57 @@ public final class NeedsResourceSearchCoordinator {
                     consumeRadius,
                     itemIds
             );
+        }
+
+        /*
+         * The normalized values are calculated before AreaKey.from so a
+         * malformed finite request cannot widen the integer traversal.
+         */
+        private static Request createForArea(@Nonnull String resourceKind,
+                                             @Nonnull String worldName,
+                                             double originX,
+                                             double originY,
+                                             double originZ,
+                                             double radius,
+                                             int verticalRadius,
+                                             double consumeRadius,
+                                             @Nonnull List<String> itemIds) {
+            double normalizedRadius = NeedsResourceSearchCachePolicy.boundedSearchRadius(radius);
+            int normalizedVerticalRadius = NeedsResourceSearchCachePolicy.boundedVerticalScanRadius(verticalRadius);
+            double normalizedConsumeRadius = NeedsResourceSearchCachePolicy.boundedConsumeRadius(consumeRadius);
+            if (!Double.isFinite(normalizedRadius)
+                    || normalizedRadius <= 0.0
+                    || !Double.isFinite(normalizedConsumeRadius)
+                    || normalizedConsumeRadius < 0.0
+                    || !NeedsResourceSearchCachePolicy.hasSafeOrigin(
+                    originX,
+                    originY,
+                    originZ,
+                    Math.max(1, (int) Math.ceil(normalizedRadius)),
+                    normalizedVerticalRadius
+            )) {
+                throw new IllegalArgumentException("request bounds are invalid");
+            }
+            NeedsResourceAreaSearchCache.AreaKey areaKey = NeedsResourceAreaSearchCache.AreaKey.from(
+                    worldName,
+                    resourceKind,
+                    originX,
+                    originY,
+                    originZ,
+                    normalizedRadius,
+                    normalizedVerticalRadius,
+                    normalizedConsumeRadius,
+                    itemIds
+            );
             if (areaKey == null) {
                 throw new IllegalArgumentException("area key cannot be built from the supplied origin");
             }
             return new Request(
                     resourceKind,
                     areaKey,
-                    radius,
-                    verticalRadius,
-                    consumeRadius
+                    normalizedRadius,
+                    normalizedVerticalRadius,
+                    normalizedConsumeRadius
             );
         }
 
@@ -394,7 +446,6 @@ public final class NeedsResourceSearchCoordinator {
             }
             return value;
         }
-
     }
 
     /**
