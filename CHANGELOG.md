@@ -31,9 +31,9 @@
   queries between the target and hotswap HUDs, and selecting bounded player batches.
 - Reduced command HUD server work when many players are online.
 - Large companion groups now spread due needs updates and cold food or water searches across world
-  ticks. Nearby companions share resource targets, request data, source scans, and successful path
-  checks. Happiness population modifiers reuse one five-second world snapshot instead of scanning
-  every loaded NPC for each companion.
+  ticks. Nearby companions share resource and request snapshots, while each companion reuses its
+  own successful path checks. Happiness population modifiers reuse one five-second world snapshot
+  and cap their configured search radius at 240 blocks to keep each query local and bounded.
 
 ## 3.1.9 - Companion Spawn Safety Hotfix - 2026-08-16
 
