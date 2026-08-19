@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.npc.sensors;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentService.TargetRejector;
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService;
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService.PathPreflightResult;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceStandTargetSelector;
@@ -12,7 +11,6 @@ import com.alechilles.alecstamework.npc.sensorinfo.TameworkTargetPositionInfoPro
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkReachableBlockTarget;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.server.core.asset.type.blockset.config.BlockSet;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.modules.blockset.BlockSetModule;
@@ -29,7 +27,6 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -49,6 +46,10 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
             NeedsResourcePathPreflightService.shared();
     private static final ReachableBlockSourceCache SOURCE_CACHE =
             ReachableBlockSourceCache.shared();
+    private static final ReachableBlockTargetStateCache TARGET_STATE_CACHE =
+            ReachableBlockTargetStateCache.shared();
+    private static final TargetRejectLookup TARGET_REJECT_LOOKUP =
+            PositionTargetRejectCache::isRejected;
     private static final ThreadLocal<NeedsResourceStandTargetSelector> STAND_TARGET_SELECTOR =
             ThreadLocal.withInitial(NeedsResourceStandTargetSelector::new);
     private static final long DIAGNOSTIC_REPEAT_INTERVAL_MS = 2_000L;
@@ -72,7 +73,8 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
     private final TameworkTargetPositionInfo positionInfo = new TameworkTargetPositionInfo();
     private final TameworkTargetPositionInfoProvider infoProvider =
             new TameworkTargetPositionInfoProvider(null, positionInfo);
-    private final ReachableBlockTargetStateCache targetStateCache = new ReachableBlockTargetStateCache();
+    @Nonnull
+    private final ReachableBlockTargetStateCache.SensorAuthority targetAuthority;
 
     public SensorTameworkReachableBlockTarget(@Nonnull BuilderSensorTameworkReachableBlockTarget builder,
                                               @Nonnull BuilderSupport support) {
@@ -88,6 +90,13 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
         this.range = sanitizePositive(builder.getRange(support), 12.0);
         this.verticalRadius = sanitizeVerticalRadius(builder.getVerticalRadius(support));
         this.approachRadius = sanitizePositive(builder.getApproachRadius(support), DEFAULT_APPROACH_RADIUS);
+        this.targetAuthority = ReachableBlockTargetStateCache.SensorAuthority.from(
+                this.label,
+                this.sourceConfiguration,
+                this.range,
+                this.verticalRadius,
+                this.approachRadius
+        );
     }
 
     @Override
@@ -102,12 +111,12 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
         UUID npcUuid = resolveNpcUuid(ref, store);
         long nowMs = System.currentTimeMillis();
         ReachableBlockTargetStateCache.CachedTarget cached = npcUuid != null
-                ? targetStateCache.get(npcUuid, nowMs)
+                ? TARGET_STATE_CACHE.get(store, npcUuid, targetAuthority, nowMs)
                 : null;
         Vector3d cachedTarget = cached == null ? null : cached.target();
         if (cachedTarget != null
                 && PositionTargetRejectCache.isRejected(npcUuid, label, cachedTarget, nowMs)) {
-            targetStateCache.remove(npcUuid, cached);
+            TARGET_STATE_CACHE.remove(store, npcUuid, targetAuthority, cached);
             cached = null;
             cachedTarget = null;
         }
@@ -125,7 +134,7 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                             range,
                             verticalRadius
                     )) {
-                targetStateCache.remove(npcUuid, cached);
+                TARGET_STATE_CACHE.remove(store, npcUuid, targetAuthority, cached);
                 cached = null;
             } else if (cached.state() == ReachableBlockTargetStateCache.State.PENDING) {
                 TargetResolution resumed = resumePendingTarget(
@@ -138,8 +147,10 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                         nowMs
                 );
                 if (resumed.state() == ReachableBlockTargetStateCache.State.VALIDATED) {
-                    targetStateCache.put(
+                    TARGET_STATE_CACHE.put(
+                            store,
                             npcUuid,
+                            targetAuthority,
                             ReachableBlockTargetStateCache.State.VALIDATED,
                             resumed.target(),
                             resumed.source(),
@@ -150,8 +161,10 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                     return true;
                 }
                 if (resumed.state() == ReachableBlockTargetStateCache.State.PENDING) {
-                    targetStateCache.put(
+                    TARGET_STATE_CACHE.put(
+                            store,
                             npcUuid,
+                            targetAuthority,
                             ReachableBlockTargetStateCache.State.PENDING,
                             resumed.target(),
                             resumed.source(),
@@ -161,12 +174,14 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                     return false;
                 }
                 if (resumed.state() == ReachableBlockTargetStateCache.State.RETRY) {
-                    targetStateCache.remove(npcUuid, cached);
+                    TARGET_STATE_CACHE.remove(store, npcUuid, targetAuthority, cached);
                     cached = null;
                 } else {
                     if (resumed.cacheMiss()) {
-                        targetStateCache.put(
+                        TARGET_STATE_CACHE.put(
+                                store,
                                 npcUuid,
+                                targetAuthority,
                                 ReachableBlockTargetStateCache.State.MISS,
                                 null,
                                 null,
@@ -186,8 +201,10 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
         TargetResolution resolution = resolveTarget(ref, role, store, npcUuid, nowMs);
         if (resolution.state() == ReachableBlockTargetStateCache.State.MISS) {
             if (npcUuid != null && resolution.cacheMiss()) {
-                targetStateCache.put(
+                TARGET_STATE_CACHE.put(
+                        store,
                         npcUuid,
+                        targetAuthority,
                         ReachableBlockTargetStateCache.State.MISS,
                         null,
                         null,
@@ -199,8 +216,10 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
         }
         if (resolution.state() == ReachableBlockTargetStateCache.State.PENDING) {
             if (npcUuid != null) {
-                targetStateCache.put(
+                TARGET_STATE_CACHE.put(
+                        store,
                         npcUuid,
+                        targetAuthority,
                         ReachableBlockTargetStateCache.State.PENDING,
                         resolution.target(),
                         resolution.source(),
@@ -216,8 +235,10 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
             return false;
         }
         if (npcUuid != null) {
-            targetStateCache.put(
+            TARGET_STATE_CACHE.put(
+                    store,
                     npcUuid,
+                    targetAuthority,
                     ReachableBlockTargetStateCache.State.VALIDATED,
                     resolution.target(),
                     resolution.source(),
@@ -261,26 +282,22 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
         ReachableBlockSourceCache.Lookup lookup = SOURCE_CACHE.lookup(store, sourceKey, nowMs);
         ReachableBlockScanDiagnostics diagnostics = null;
         ReachableBlockSourceCache.Snapshot snapshot;
-        if (lookup.status() == ReachableBlockSourceCache.Lookup.Status.DEFERRED) {
-            return TargetResolution.deferred("source_scan_deferred");
-        }
-        if (lookup.status() == ReachableBlockSourceCache.Lookup.Status.ABSENT) {
-            ReachableBlockSourceCache.ColdScanStart start = SOURCE_CACHE.startColdScan(
-                    store,
-                    sourceKey,
-                    nowMs
-            );
+        ReachableBlockSourceCache.ColdScanStart start = switch (lookup.status()) {
+            case ABSENT -> SOURCE_CACHE.startColdScan(store, sourceKey, nowMs);
+            case DEFERRED -> SOURCE_CACHE.resumeColdScan(store, sourceKey, nowMs);
+            case HIT, MISS -> null;
+        };
+        if (start != null) {
             if (start.status() == ReachableBlockSourceCache.ColdScanStart.Status.DEFERRED) {
                 return TargetResolution.deferred("source_scan_deferred");
             }
             if (start.status() == ReachableBlockSourceCache.ColdScanStart.Status.ACQUIRED) {
                 diagnostics = isDiagnosticsEnabled() ? new ReachableBlockScanDiagnostics() : null;
-                ReachableBlockSourceCache.Snapshot scanned = ReachableBlockSourceCache.Snapshot.empty();
-                try {
-                    ChunkStore chunkStore = world.getChunkStore();
-                    Store<ChunkStore> chunkStoreStore = chunkStore == null ? null : chunkStore.getStore();
-                    if (chunkStore != null && chunkStoreStore != null) {
-                        ScanContext context = new ScanContext(
+                ChunkStore chunkStore = world.getChunkStore();
+                Store<ChunkStore> chunkStoreStore = chunkStore == null ? null : chunkStore.getStore();
+                ScanContext context = chunkStore == null || chunkStoreStore == null
+                        ? null
+                        : new ScanContext(
                                 ref,
                                 role,
                                 store,
@@ -292,18 +309,20 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                                 blockSetIndex == Integer.MIN_VALUE ? null : resolveBlockSetMembership(),
                                 diagnostics
                         );
-                        scanned = scanSources(context, start.permit().searchBounds(), sourceKey);
-                    }
-                } catch (RuntimeException ignored) {
-                    scanned = ReachableBlockSourceCache.Snapshot.empty();
-                }
-                ReachableBlockSourceCache.Lookup completed = SOURCE_CACHE.completeColdScan(
+                ReachableBlockSourceCache.Lookup completed = SOURCE_CACHE.scanColdSlice(
                         start.permit(),
-                        scanned,
+                        slice -> context == null
+                                ? ReachableBlockSourceCache.ScanResult.empty(slice.probeLimit())
+                                : ReachableBlockColdScanner.scan(
+                                        context,
+                                        slice,
+                                        blockSetIndex,
+                                        blockTypes
+                                ),
                         nowMs
                 );
                 if (completed.status() == ReachableBlockSourceCache.Lookup.Status.DEFERRED) {
-                    return TargetResolution.deferred(scanDetail(diagnostics, "source_scan_cleared"));
+                    return TargetResolution.deferred(scanDetail(diagnostics, "source_scan_deferred"));
                 }
                 snapshot = completed.snapshot();
             } else {
@@ -328,14 +347,12 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                 nowMs,
                 npcPosition,
                 projector,
-                PositionTargetRejectCache.hasRejectedTargetFor(npcUuid, label, nowMs)
-                        ? target -> PositionTargetRejectCache.isRejected(npcUuid, label, target, nowMs)
-                        : null,
                 diagnostics
         );
         ReachableBlockTargetCandidateSelector.Selection selection =
                 ReachableBlockTargetCandidateSelector.select(
                         snapshot,
+                        npcPosition,
                         source -> {
                             if (!isSourceInRange(source, npcPosition, range, verticalRadius)) {
                                 return CandidateResult.empty();
@@ -364,60 +381,6 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                         ? "source_limit_deferred"
                         : "source_candidates_rejected")
         );
-    }
-
-    @Nonnull
-    private ReachableBlockSourceCache.Snapshot scanSources(
-            @Nonnull ScanContext context,
-            @Nonnull ReachableBlockSourceCache.SearchBounds bounds,
-            @Nonnull ReachableBlockSourceCache.SourceKey sourceKey) {
-        ReachableBlockSourceCache.AuthoritySourceSelector sources =
-                new ReachableBlockSourceCache.AuthoritySourceSelector(
-                        bounds,
-                        sourceKey.authorityOriginX(),
-                        sourceKey.authorityOriginY(),
-                        sourceKey.authorityOriginZ(),
-                        range,
-                        verticalRadius
-                );
-        for (int y = bounds.minY(); ; y++) {
-            for (int x = bounds.minX(); ; x++) {
-                for (int z = bounds.minZ(); ; z++) {
-                    WorldChunk worldChunk = resolveWorldChunk(
-                            context.chunkStore(),
-                            context.chunkStoreStore(),
-                            x,
-                            z,
-                            context.chunkCache()
-                    );
-                    if (worldChunk != null
-                            && matchesConfiguredBlock(
-                                    worldChunk,
-                                    x,
-                                    y,
-                                    z,
-                                    blockSetIndex,
-                                    blockTypes,
-                                    context.blockSetMembership()
-                            )) {
-                        if (context.diagnostics() != null) {
-                            context.diagnostics().recordMatchingSource(x, y, z, worldChunk.getBlockType(x, y, z));
-                        }
-                        sources.offer(new ReachableBlockSourceCache.SourceCoordinate(x, y, z));
-                    }
-                    if (z == bounds.maxZ()) {
-                        break;
-                    }
-                }
-                if (x == bounds.maxX()) {
-                    break;
-                }
-            }
-            if (y == bounds.maxY()) {
-                break;
-            }
-        }
-        return new ReachableBlockSourceCache.Snapshot(sources.finish());
     }
 
     @Nonnull
@@ -471,11 +434,22 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                 false,
                 context.projector()
         );
-        if (target == null || (context.rejector() != null && context.rejector().rejects(target))) {
+        if (target == null) {
             if (context.diagnostics() != null) {
-                context.diagnostics().recordProjectionRejected(
-                        target == null ? "projection_failed" : "target_rejected"
-                );
+                context.diagnostics().recordProjectionRejected("projection_failed");
+            }
+            return CandidateResult.empty();
+        }
+        target = ReachableBlockTargetCandidateSelector.acceptIfNotRejected(
+                context.npcUuid(),
+                label,
+                target,
+                context.nowMs(),
+                TARGET_REJECT_LOOKUP
+        );
+        if (target == null) {
+            if (context.diagnostics() != null) {
+                context.diagnostics().recordProjectionRejected("target_rejected");
             }
             return CandidateResult.empty();
         }
@@ -659,26 +633,6 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
         return store.getExternalData().getWorld();
     }
 
-    @Nullable
-    private static WorldChunk resolveWorldChunk(@Nonnull ChunkStore chunkStore,
-                                                @Nonnull Store<ChunkStore> chunkStoreStore,
-                                                int blockX,
-                                                int blockZ,
-                                                @Nonnull Map<Long, WorldChunk> chunkCache) {
-        long chunkIndex = ChunkUtil.indexChunkFromBlock(blockX, blockZ);
-        if (chunkCache.containsKey(chunkIndex)) {
-            return chunkCache.get(chunkIndex);
-        }
-        Ref<ChunkStore> chunkRef = chunkStore.getChunkReference(chunkIndex);
-        if (chunkRef == null || !chunkRef.isValid()) {
-            chunkCache.put(chunkIndex, null);
-            return null;
-        }
-        WorldChunk worldChunk = chunkStoreStore.getComponent(chunkRef, WorldChunk.getComponentType());
-        chunkCache.put(chunkIndex, worldChunk);
-        return worldChunk;
-    }
-
     static boolean isSourceInRange(@Nonnull ReachableBlockSourceCache.SourceCoordinate source,
                                    @Nullable Vector3d npcPosition,
                                    double horizontalRange,
@@ -796,131 +750,4 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
         return instance != null && instance.isDebugNeedsSeekDiagnosticsEnabled();
     }
 
-}
-
-/** Carries one candidate result from projection and path preflight. */
-record CandidateResult(@Nullable Vector3d target, boolean deferred) {
-    @Nonnull
-    static CandidateResult hit(@Nonnull Vector3d target) {
-        return new CandidateResult(target, false);
-    }
-
-    @Nonnull
-    static CandidateResult empty() {
-        return new CandidateResult(null, false);
-    }
-
-    @Nonnull
-    static CandidateResult pending(@Nonnull Vector3d target) {
-        return new CandidateResult(target, true);
-    }
-}
-
-/** Applies bounded shared candidates and skips one invalidated source during retry. */
-final class ReachableBlockTargetCandidateSelector {
-    private ReachableBlockTargetCandidateSelector() {
-    }
-
-    @Nonnull
-    static Selection select(
-            @Nonnull ReachableBlockSourceCache.Snapshot snapshot,
-            @Nonnull CandidateResolver resolver) {
-        for (ReachableBlockSourceCache.SourceCoordinate source : snapshot.coordinates()) {
-            CandidateResult result = resolver.resolve(source);
-            if (result.deferred()) {
-                return Selection.pending(result.target(), source);
-            }
-            if (result.target() != null) {
-                return Selection.validated(result.target(), source);
-            }
-        }
-        return Selection.miss();
-    }
-
-    @FunctionalInterface
-    interface CandidateResolver {
-        @Nonnull
-        CandidateResult resolve(@Nonnull ReachableBlockSourceCache.SourceCoordinate source);
-    }
-
-    record Selection(@Nullable Vector3d target,
-                     @Nullable ReachableBlockSourceCache.SourceCoordinate source,
-                     boolean deferred) {
-        @Nonnull
-        static Selection validated(
-                @Nonnull Vector3d target,
-                @Nonnull ReachableBlockSourceCache.SourceCoordinate source) {
-            return new Selection(target, source, false);
-        }
-
-        @Nonnull
-        static Selection pending(
-                @Nullable Vector3d target,
-                @Nonnull ReachableBlockSourceCache.SourceCoordinate source) {
-            return new Selection(target, source, true);
-        }
-
-        @Nonnull
-        static Selection miss() {
-            return new Selection(null, null, false);
-        }
-
-        boolean validated() {
-            return target != null && !deferred;
-        }
-    }
-}
-
-/** Collects lazy, per-probe diagnostics without retaining live ECS state. */
-final class ReachableBlockScanDiagnostics {
-    private int matchingSources;
-    private int projectionFailures;
-    private int rejectedTargets;
-    @Nullable
-    private String firstSource;
-    @Nullable
-    private String lastPreflightReason;
-
-    void recordMatchingSource(int x, int y, int z, @Nullable BlockType blockType) {
-        matchingSources++;
-        if (firstSource == null) {
-            firstSource = String.format(
-                    Locale.ROOT,
-                    "%s@[%d,%d,%d]",
-                    blockType == null || blockType.getId() == null ? "<unknown>" : blockType.getId(),
-                    x,
-                    y,
-                    z
-            );
-        }
-    }
-
-    void recordProjectionRejected(@Nonnull String reason) {
-        if ("target_rejected".equals(reason)) {
-            rejectedTargets++;
-            return;
-        }
-        projectionFailures++;
-    }
-
-    void recordPreflight(@Nonnull String reason) {
-        lastPreflightReason = reason;
-    }
-
-    @Nonnull
-    String summary(@Nonnull String result) {
-        return String.format(
-                Locale.ROOT,
-                "%s sources=%d projectionFailures=%d rejectedTargets=%d firstSource=%s lastPreflight=%s",
-                result,
-                matchingSources,
-                projectionFailures,
-                rejectedTargets,
-                firstSource == null ? "<none>" : firstSource,
-                lastPreflightReason == null ? "<none>" : lastPreflightReason
-        );
-    }
-}
-
-record DiagnosticSnapshot(@Nonnull String signature, long loggedAtMs) {
 }

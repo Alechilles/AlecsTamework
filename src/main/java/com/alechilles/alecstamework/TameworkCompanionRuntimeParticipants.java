@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightSe
 import com.alechilles.alecstamework.npc.progression.NeedsResourceSearchCoordinator;
 import com.alechilles.alecstamework.npc.progression.ReachableBlockSourceCache;
 import com.alechilles.alecstamework.npc.sensors.NeedsResourceTargetCacheAdapter;
+import com.alechilles.alecstamework.npc.sensors.ReachableBlockTargetStateCache;
 import com.alechilles.alecstamework.npc.systems.*;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationEntitySystem;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationOwnerChangeSystem;
@@ -293,6 +294,7 @@ public final class TameworkCompanionRuntimeParticipants {
         }
         CompanionPopulationSpatialIndex.shared().remove(store);
         ReachableBlockSourceCache.shared().clear(store);
+        ReachableBlockTargetStateCache.shared().clear(store);
         coordinator.clear(store);
     }
 }

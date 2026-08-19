@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -29,6 +28,8 @@ import javax.annotation.Nullable;
 public final class ReachableBlockSourceCache {
     public static final int AREA_CELL_SIZE_BLOCKS = 4;
     public static final int MAX_SOURCE_CANDIDATES = 64;
+    public static final int MAX_BLOCK_PROBES_PER_PASS = 512;
+    public static final int MAX_SELECTOR_OFFERS_PER_PASS = 512;
     public static final int MAX_SNAPSHOTS_PER_STORE = 4_096;
     public static final long SNAPSHOT_TTL_MS = 3_000L;
 
@@ -116,40 +117,6 @@ public final class ReachableBlockSourceCache {
         );
     }
 
-    /**
-     * Looks up one snapshot or admits one bounded cold scan.
-     *
-     * <p>A deferred result has no snapshot. In particular, it is not stored as a negative result
-     * for an individual NPC.</p>
-     */
-    @Nonnull
-    public Lookup getOrScan(@Nonnull Store<EntityStore> store,
-                            @Nonnull SourceKey key,
-                            long nowMs,
-                            @Nonnull SourceScanner scanner) {
-        Objects.requireNonNull(store, "store");
-        Objects.requireNonNull(key, "key");
-        Objects.requireNonNull(scanner, "scanner");
-        Lookup existing = lookup(store, key, nowMs);
-        if (existing.status() != Lookup.Status.ABSENT) {
-            return existing;
-        }
-        ColdScanStart start = startColdScan(store, key, nowMs);
-        if (start.status() != ColdScanStart.Status.ACQUIRED) {
-            return start.asLookup();
-        }
-        Snapshot snapshot;
-        try {
-            snapshot = scanner.scan(start.permit().searchBounds());
-            if (snapshot == null) {
-                snapshot = Snapshot.empty();
-            }
-        } catch (RuntimeException ignored) {
-            snapshot = Snapshot.empty();
-        }
-        return completeColdScan(start.permit(), snapshot, nowMs);
-    }
-
     /** Looks up a snapshot without allocating or admitting a cold scanner. */
     @Nonnull
     public Lookup lookup(@Nonnull Store<EntityStore> store,
@@ -176,31 +143,100 @@ public final class ReachableBlockSourceCache {
             if (existing.status() != Lookup.Status.ABSENT) {
                 return ColdScanStart.from(existing);
             }
+            if (state.pendingScans.size() >= MAX_SNAPSHOTS_PER_STORE) {
+                Iterator<SourceKey> pendingIterator = state.pendingScans.keySet().iterator();
+                while (pendingIterator.hasNext()) {
+                    SourceKey pendingKey = pendingIterator.next();
+                    if (!state.activeScans.containsKey(pendingKey)) {
+                        pendingIterator.remove();
+                        break;
+                    }
+                }
+                if (state.pendingScans.size() >= MAX_SNAPSHOTS_PER_STORE) {
+                    return ColdScanStart.deferred();
+                }
+            }
             if (!admitColdScan(state, nowMs)) {
                 return ColdScanStart.deferred();
             }
+            state.pendingScans.put(
+                    key,
+                    new ReachableBlockScanSession(
+                            key.searchBounds(),
+                            key.authorityOriginX(),
+                            key.authorityOriginY(),
+                            key.authorityOriginZ(),
+                            key.horizontalRange(),
+                            key.verticalRadius()
+                    )
+            );
             ColdScanPermit permit = new ColdScanPermit(state, key, System.nanoTime());
             state.activeScans.put(key, permit);
             return ColdScanStart.acquired(permit);
         }
     }
 
-    /** Publishes one completed cold scan while keeping clear and publish atomic. */
+    /**
+     * Runs one bounded pass of an admitted scan. The scanner is called only for this pass and is
+     * never retained. A partial result keeps only the scalar cursor and selector state in the
+     * store-local pending scan.
+     */
     @Nonnull
-    public Lookup completeColdScan(@Nonnull ColdScanPermit permit,
-                                   @Nonnull Snapshot snapshot,
-                                   long nowMs) {
+    public Lookup scanColdSlice(@Nonnull ColdScanPermit permit,
+                                @Nonnull ScanSliceScanner scanner,
+                                long nowMs) {
         Objects.requireNonNull(permit, "permit");
-        Objects.requireNonNull(snapshot, "snapshot");
+        Objects.requireNonNull(scanner, "scanner");
+        ScanSlice slice;
         synchronized (permit.state()) {
-            ColdScanPermit active = permit.state().activeScans.get(permit.key());
-            if (permit.state().closed
-                    || permit.isConsumed()
-                    || active != permit) {
+            if (!isActivePermit(permit)) {
                 return Lookup.deferred();
+            }
+            if (permit.scanning) {
+                return Lookup.deferred();
+            }
+            ReachableBlockScanSession pending = permit.state().pendingScans.get(permit.key());
+            if (pending == null) {
+                return Lookup.deferred();
+            }
+            permit.scanning = true;
+            slice = pending.nextSlice();
+        }
+
+        ScanResult result;
+        try {
+            result = scanner.scan(slice);
+            if (result == null) {
+                result = ScanResult.empty(slice.probeLimit());
+            }
+        } catch (RuntimeException ignored) {
+            result = ScanResult.empty(slice.probeLimit());
+        }
+
+        synchronized (permit.state()) {
+            permit.scanning = false;
+            if (!isActivePermit(permit)) {
+                return Lookup.deferred();
+            }
+            ReachableBlockScanSession pending = permit.state().pendingScans.get(permit.key());
+            if (pending == null) {
+                permit.consume();
+                permit.state().activeScans.remove(permit.key(), permit);
+                return Lookup.deferred();
+            }
+            try {
+                pending.accept(result);
+            } catch (RuntimeException ignored) {
+                // A malformed scanner result must not leave a live permit or partial state.
+                pending.markComplete();
             }
             permit.consume();
             permit.state().activeScans.remove(permit.key(), permit);
+            if (!pending.complete()) {
+                return Lookup.deferred();
+            }
+            permit.state().pendingScans.remove(permit.key(), pending);
+            Snapshot snapshot = pending.snapshot();
             permit.state().put(
                     permit.key(),
                     snapshot,
@@ -208,13 +244,40 @@ public final class ReachableBlockSourceCache {
                     nowMs,
                     maxSnapshotsPerStore
             );
-            Lookup result = Lookup.from(snapshot);
             pressureService.recordWork(
                     RuntimePressureDomain.NEEDS_RESOURCE_SEARCH,
                     Math.max(0L, System.nanoTime() - permit.startedNs()),
                     nowMs
             );
-            return result;
+            return Lookup.from(snapshot);
+        }
+    }
+
+    /** Attempts to admit the next pass for a partial scan. */
+    @Nonnull
+    public ColdScanStart resumeColdScan(@Nonnull Store<EntityStore> store,
+                                        @Nonnull SourceKey key,
+                                        long nowMs) {
+        Objects.requireNonNull(store, "store");
+        Objects.requireNonNull(key, "key");
+        StoreState state = statesByStore.get(store);
+        synchronized (state) {
+            if (state.closed) {
+                return ColdScanStart.deferred();
+            }
+            Lookup existing = lookupLocked(state, key, nowMs);
+            if (existing.status() != Lookup.Status.DEFERRED) {
+                return ColdScanStart.from(existing);
+            }
+            if (state.activeScans.containsKey(key) || !state.pendingScans.containsKey(key)) {
+                return ColdScanStart.deferred();
+            }
+            if (!admitColdScan(state, nowMs)) {
+                return ColdScanStart.deferred();
+            }
+            ColdScanPermit permit = new ColdScanPermit(state, key, System.nanoTime());
+            state.activeScans.put(key, permit);
+            return ColdScanStart.acquired(permit);
         }
     }
 
@@ -235,6 +298,9 @@ public final class ReachableBlockSourceCache {
         if (state.activeScans.containsKey(key)) {
             return Lookup.deferred();
         }
+        if (state.pendingScans.containsKey(key)) {
+            return Lookup.deferred();
+        }
         return Lookup.absent();
     }
 
@@ -245,6 +311,7 @@ public final class ReachableBlockSourceCache {
         synchronized (state) {
             state.closed = true;
             state.snapshots.clear();
+            state.pendingScans.clear();
             for (ColdScanPermit permit : state.activeScans.values()) {
                 permit.consume();
             }
@@ -291,6 +358,8 @@ public final class ReachableBlockSourceCache {
     private static final class StoreState {
         private final LinkedHashMap<SourceKey, CachedSnapshot> snapshots = new LinkedHashMap<>();
         private final Map<SourceKey, ColdScanPermit> activeScans = new LinkedHashMap<>();
+        private final LinkedHashMap<SourceKey, ReachableBlockScanSession> pendingScans =
+                new LinkedHashMap<>();
         private long windowStartMs = Long.MIN_VALUE;
         private int coldScansInWindow;
         private boolean closed;
@@ -314,6 +383,12 @@ public final class ReachableBlockSourceCache {
         private void pruneExpired(long nowMs) {
             snapshots.entrySet().removeIf(entry -> nowMs >= entry.getValue().expiresAtMs());
         }
+    }
+
+    private boolean isActivePermit(@Nonnull ColdScanPermit permit) {
+        return !permit.state().closed
+                && !permit.isConsumed()
+                && permit.state().activeScans.get(permit.key()) == permit;
     }
 
     private record CachedSnapshot(@Nonnull Snapshot snapshot, long expiresAtMs) {
@@ -424,18 +499,47 @@ public final class ReachableBlockSourceCache {
     public record SearchBounds(int minX, int maxX, int minY, int maxY, int minZ, int maxZ) {
     }
 
-    /** Selects one best source for each of the 64 block authorities in one keyed cell. */
+    /** One bounded source-discovery pass. All fields are scalar scan state. */
+    public record ScanSlice(@Nonnull SearchBounds bounds,
+                             int startX,
+                             int startY,
+                             int startZ,
+                             int probeLimit) {
+        public ScanSlice {
+            Objects.requireNonNull(bounds, "bounds");
+            if (probeLimit <= 0 || probeLimit > MAX_BLOCK_PROBES_PER_PASS) {
+                throw new IllegalArgumentException("probeLimit outside cold scan budget");
+            }
+        }
+    }
+
+    /** Matching coordinates found by one bounded pass. Coordinates are transient scanner output. */
+    public record ScanResult(@Nonnull List<SourceCoordinate> matches, int probes) {
+        public ScanResult {
+            Objects.requireNonNull(matches, "matches");
+            if (probes < 0 || probes > MAX_BLOCK_PROBES_PER_PASS) {
+                throw new IllegalArgumentException("probes outside cold scan budget");
+            }
+            if (matches.size() > MAX_SELECTOR_OFFERS_PER_PASS) {
+                throw new IllegalArgumentException("matches outside selector offer budget");
+            }
+            matches = List.copyOf(matches);
+        }
+
+        @Nonnull
+        public static ScanResult empty(int probes) {
+            return new ScanResult(List.of(), probes);
+        }
+
+        @Nonnull
+        public static ScanResult of(@Nonnull List<SourceCoordinate> matches, int probes) {
+            return new ScanResult(matches, probes);
+        }
+    }
+
+    /** Compatibility facade for callers that use the public selector API. */
     public static final class AuthoritySourceSelector {
-        private static final double RANGE_EPSILON = 0.000001;
-        private final SearchBounds bounds;
-        private final int originX;
-        private final int originY;
-        private final int originZ;
-        private final double horizontalRange;
-        private final int verticalRadius;
-        private final SourceCoordinate[] representatives =
-                new SourceCoordinate[MAX_SOURCE_CANDIDATES];
-        private final double[] distances = new double[MAX_SOURCE_CANDIDATES];
+        private final ReachableBlockAuthoritySelector delegate;
 
         public AuthoritySourceSelector(@Nonnull SearchBounds bounds,
                                        int originX,
@@ -443,105 +547,23 @@ public final class ReachableBlockSourceCache {
                                        int originZ,
                                        double horizontalRange,
                                        int verticalRadius) {
-            this.bounds = Objects.requireNonNull(bounds, "bounds");
-            if (!Double.isFinite(horizontalRange) || horizontalRange <= 0.0) {
-                throw new IllegalArgumentException("horizontalRange must be finite and positive");
-            }
-            this.originX = originX;
-            this.originY = originY;
-            this.originZ = originZ;
-            this.horizontalRange = horizontalRange;
-            this.verticalRadius = Math.max(0, verticalRadius);
+            delegate = new ReachableBlockAuthoritySelector(
+                    bounds,
+                    originX,
+                    originY,
+                    originZ,
+                    horizontalRange,
+                    verticalRadius
+            );
         }
 
         public void offer(@Nonnull SourceCoordinate coordinate) {
-            Objects.requireNonNull(coordinate, "coordinate");
-            if (coordinate.x() < bounds.minX()
-                    || coordinate.x() > bounds.maxX()
-                    || coordinate.y() < bounds.minY()
-                    || coordinate.y() > bounds.maxY()
-                    || coordinate.z() < bounds.minZ()
-                    || coordinate.z() > bounds.maxZ()) {
-                return;
-            }
-            for (int xOffset = 0; xOffset < AREA_CELL_SIZE_BLOCKS; xOffset++) {
-                for (int yOffset = 0; yOffset < AREA_CELL_SIZE_BLOCKS; yOffset++) {
-                    for (int zOffset = 0; zOffset < AREA_CELL_SIZE_BLOCKS; zOffset++) {
-                        int authorityX = originX + xOffset;
-                        int authorityY = originY + yOffset;
-                        int authorityZ = originZ + zOffset;
-                        if (!isSourceInRangeForAuthority(
-                                coordinate,
-                                authorityX,
-                                authorityY,
-                                authorityZ,
-                                horizontalRange,
-                                verticalRadius
-                        )) {
-                            continue;
-                        }
-                        int index = authorityIndex(xOffset, yOffset, zOffset);
-                        double distance = distanceSquared(
-                                coordinate,
-                                authorityX,
-                                authorityY,
-                                authorityZ
-                        );
-                        SourceCoordinate current = representatives[index];
-                        if (current == null
-                                || isBetter(coordinate, distance, current, distances[index])) {
-                            representatives[index] = coordinate;
-                            distances[index] = distance;
-                        }
-                    }
-                }
-            }
+            delegate.offer(coordinate);
         }
 
         @Nonnull
         public List<SourceCoordinate> finish() {
-            LinkedHashSet<SourceCoordinate> selected = new LinkedHashSet<>(MAX_SOURCE_CANDIDATES);
-            for (SourceCoordinate representative : representatives) {
-                if (representative != null) {
-                    selected.add(representative);
-                }
-            }
-            return List.copyOf(selected);
-        }
-
-        private static int authorityIndex(int xOffset, int yOffset, int zOffset) {
-            return (xOffset * AREA_CELL_SIZE_BLOCKS * AREA_CELL_SIZE_BLOCKS)
-                    + (yOffset * AREA_CELL_SIZE_BLOCKS)
-                    + zOffset;
-        }
-
-        private static double distanceSquared(@Nonnull SourceCoordinate source,
-                                              int authorityX,
-                                              int authorityY,
-                                              int authorityZ) {
-            double dx = source.x() - authorityX;
-            double dy = source.y() - authorityY;
-            double dz = source.z() - authorityZ;
-            return (dx * dx) + (dy * dy) + (dz * dz);
-        }
-
-        private static boolean isBetter(@Nonnull SourceCoordinate candidate,
-                                        double candidateDistance,
-                                        @Nonnull SourceCoordinate current,
-                                        double currentDistance) {
-            if (candidateDistance < currentDistance - RANGE_EPSILON) {
-                return true;
-            }
-            if (Math.abs(candidateDistance - currentDistance) > RANGE_EPSILON) {
-                return false;
-            }
-            if (candidate.x() != current.x()) {
-                return candidate.x() < current.x();
-            }
-            if (candidate.y() != current.y()) {
-                return candidate.y() < current.y();
-            }
-            return candidate.z() < current.z();
+            return delegate.finish();
         }
     }
 
@@ -634,15 +656,6 @@ public final class ReachableBlockSourceCache {
             };
         }
 
-        @Nonnull
-        private Lookup asLookup() {
-            return switch (status) {
-                case HIT -> Lookup.from(snapshot == null ? Snapshot.empty() : snapshot);
-                case MISS -> Lookup.from(snapshot == null ? Snapshot.empty() : snapshot);
-                case DEFERRED, ACQUIRED -> Lookup.deferred();
-            };
-        }
-
         public enum Status {
             ACQUIRED,
             HIT,
@@ -657,6 +670,7 @@ public final class ReachableBlockSourceCache {
         private final SourceKey key;
         private final long startedNs;
         private boolean consumed;
+        private boolean scanning;
 
         private ColdScanPermit(@Nonnull StoreState state,
                                @Nonnull SourceKey key,
@@ -664,11 +678,6 @@ public final class ReachableBlockSourceCache {
             this.state = state;
             this.key = key;
             this.startedNs = startedNs;
-        }
-
-        @Nonnull
-        public SearchBounds searchBounds() {
-            return key.searchBounds();
         }
 
         private StoreState state() {
@@ -692,10 +701,10 @@ public final class ReachableBlockSourceCache {
         }
     }
 
-    /** Performs one transient source scan. The callback is never retained. */
+    /** Performs one bounded pass without retaining a world or ECS callback. */
     @FunctionalInterface
-    public interface SourceScanner {
-        @Nullable
-        Snapshot scan(@Nonnull SearchBounds bounds);
+    public interface ScanSliceScanner {
+        @Nonnull
+        ScanResult scan(@Nonnull ScanSlice slice);
     }
 }
