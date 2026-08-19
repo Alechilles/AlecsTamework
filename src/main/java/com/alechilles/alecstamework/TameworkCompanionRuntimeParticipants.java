@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.debug.PlayerInputDebugSystem;
 import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsBatchRunner;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsRuntimeRegistry;
+import com.alechilles.alecstamework.npc.progression.CompanionPopulationSpatialIndex;
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceSearchCoordinator;
 import com.alechilles.alecstamework.npc.progression.ReachableBlockSourceCache;
@@ -290,6 +291,7 @@ public final class TameworkCompanionRuntimeParticipants {
         if (store == null) {
             return;
         }
+        CompanionPopulationSpatialIndex.shared().remove(store);
         ReachableBlockSourceCache.shared().clear(store);
         coordinator.clear(store);
     }
