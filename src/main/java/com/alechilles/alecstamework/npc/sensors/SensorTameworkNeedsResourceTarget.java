@@ -120,6 +120,59 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                 return false;
             }
             Vector3d localTarget = local.target();
+            if (local.preflightRequired() && !local.fastConsume()) {
+                PathPreflightResult preflight = PATH_PREFLIGHT_SERVICE.preflight(
+                        ref,
+                        role,
+                        store,
+                        npcUuid,
+                        resourceType.label,
+                        localTarget,
+                        local.approachRadius(),
+                        nowMs
+                );
+                logPreflight(ref, store, preflight, local.reason(), local.approachRadius(), localTarget);
+                if (!preflight.ready()) {
+                    if (preflight.noPath()) {
+                        NeedsResourceSearchCoordinator.Request request = createRequest(
+                                eligibility.needsConfig() == null
+                                        ? resolveNeedsConfig(ref, store)
+                                        : eligibility.needsConfig(),
+                                worldName,
+                                originX,
+                                originY,
+                                originZ
+                        );
+                        if (request != null) {
+                            targetCache.invalidateCandidate(store, request, localTarget, nowMs);
+                        }
+                        targetCache.forgetRecentTarget(npcUuid, worldName, resourceType.kind, localTarget);
+                        NeedsResourceTargetCacheAdapter.rejectTarget(
+                                npcUuid,
+                                resourceType.kind,
+                                localTarget,
+                                PREFLIGHT_REJECT_TTL_SECONDS
+                        );
+                        targetCache.clearTarget(npcUuid, worldName, resourceType.kind, localTarget);
+                    } else {
+                        targetCache.keepPendingTarget(
+                                npcUuid,
+                                worldName,
+                                resourceType.kind,
+                                localTarget,
+                                nowMs
+                        );
+                    }
+                    log(ref, store, "miss", preflight.reason(), false, eligibility.currentRatio(), localTarget);
+                    return false;
+                }
+                if (!targetCache.promoteTarget(npcUuid, worldName, resourceType.kind, localTarget)) {
+                    log(ref, store, "miss", "path_preflight_target_changed", false,
+                            eligibility.currentRatio(), localTarget);
+                    return false;
+                }
+                targetCache.rememberRecentTarget(npcUuid, worldName, resourceType.kind, localTarget, nowMs);
+            }
             positionInfo.setTarget(localTarget.x, localTarget.y, localTarget.z);
             log(ref, store, "target_found", local.reason(), true, eligibility.currentRatio(), localTarget);
             return true;
@@ -206,9 +259,22 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                             target,
                             PREFLIGHT_REJECT_TTL_SECONDS
                     );
+                    targetCache.clearTarget(npcUuid, worldName, resourceType.kind, target);
+                } else {
+                    targetCache.keepPendingTarget(
+                            npcUuid,
+                            worldName,
+                            resourceType.kind,
+                            target,
+                            nowMs
+                    );
                 }
-                targetCache.clearTarget(npcUuid, worldName, resourceType.kind, target);
                 log(ref, store, "miss", preflight.reason(), false, eligibility.currentRatio(), target);
+                return false;
+            }
+            if (!targetCache.promoteTarget(npcUuid, worldName, resourceType.kind, target)) {
+                log(ref, store, "miss", "path_preflight_target_changed", false,
+                        eligibility.currentRatio(), target);
                 return false;
             }
         }

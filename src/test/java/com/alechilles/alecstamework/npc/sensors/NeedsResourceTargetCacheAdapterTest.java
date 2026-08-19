@@ -4,17 +4,24 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.npc.progression.NeedsResourceCandidates;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceSearchCoordinator;
+import com.alechilles.alecstamework.npc.progression.NeedsResourceTargetStateStore;
 import com.alechilles.alecstamework.performance.TameworkRuntimePressureService;
 import com.hypixel.hytale.component.TestEntityComponentStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.joml.Vector3d;
 import org.junit.jupiter.api.AfterEach;
@@ -234,9 +241,12 @@ class NeedsResourceTargetCacheAdapterTest {
             UUID npc = new UUID(0L, 10L);
             Vector3d target = new Vector3d(1.5, 64.5, 1.5);
             NeedsResourceTargetCacheAdapter adapter = new NeedsResourceTargetCacheAdapter(coordinator);
-            assertEquals(NeedsResourceTargetCacheAdapter.Status.TARGET,
-                    adapter.adoptTarget(npc, "world-a", "water", target, 0.75, request.radius(),
-                            request.verticalRadius(), 1_000L).status());
+            NeedsResourceTargetCacheAdapter.Result adopted = adapter.adoptTarget(
+                    npc, "world-a", "water", target, 0.75, request.radius(),
+                    request.verticalRadius(), 1_000L
+            );
+            assertEquals(NeedsResourceTargetCacheAdapter.Status.TARGET, adopted.status());
+            assertTrue(adopted.preflightRequired());
 
             NeedsResourceTargetCacheAdapter.Result result = adapter.resolve(
                     store, npc, request, "world-a", 0.0, 64.0, 0.0,
@@ -244,20 +254,27 @@ class NeedsResourceTargetCacheAdapterTest {
             );
             assertEquals(NeedsResourceTargetCacheAdapter.Status.TARGET, result.status());
             assertEquals(0.75, result.approachRadius(), 0.000001);
-            assertFalse(result.preflightRequired());
+            assertTrue(result.preflightRequired());
+            assertTrue(adapter.promoteTarget(npc, "world-a", "water", target));
+            NeedsResourceTargetCacheAdapter.Result validated = adapter.resolveLocal(
+                    npc, "world-a", "water", 0.0, 64.0, 0.0, 1_002L
+            );
+            assertNotNull(validated);
+            assertFalse(validated.preflightRequired());
             coordinator.clear(store);
         }
     }
 
     @Test
-    void localWarmHitNeedsNoSharedRequestOrPreflight() {
+    void localWarmHitRequiresPromotionAndReturnsDefensiveCopies() {
         NeedsResourceTargetCacheAdapter adapter = new NeedsResourceTargetCacheAdapter();
         UUID npc = new UUID(0L, 12L);
         Vector3d target = new Vector3d(2.5, 64.5, 2.5);
-        assertEquals(
-                NeedsResourceTargetCacheAdapter.Status.TARGET,
-                adapter.adoptTarget(npc, "world-a", "water", target, 1.5, 8.0, 2, 1_000L).status()
+        NeedsResourceTargetCacheAdapter.Result adopted = adapter.adoptTarget(
+                npc, "world-a", "water", target, 1.5, 8.0, 2, 1_000L
         );
+        assertEquals(NeedsResourceTargetCacheAdapter.Status.TARGET, adopted.status());
+        assertTrue(adopted.preflightRequired());
 
         NeedsResourceTargetCacheAdapter.Result warm = adapter.resolveLocal(
                 npc,
@@ -271,10 +288,20 @@ class NeedsResourceTargetCacheAdapterTest {
 
         assertNotNull(warm);
         assertEquals(NeedsResourceTargetCacheAdapter.Status.TARGET, warm.status());
-        assertFalse(warm.preflightRequired());
-        assertSame(warm, adapter.resolveLocal(
+        assertTrue(warm.preflightRequired());
+        warm.target().x = 99.0;
+        NeedsResourceTargetCacheAdapter.Result defensiveCopy = adapter.resolveLocal(
                 npc, "world-a", "water", 1.0, 64.0, 0.0, 1_002L
-        ));
+        );
+        assertNotNull(defensiveCopy);
+        assertNotSame(warm, defensiveCopy);
+        assertEquals(2.5, defensiveCopy.target().x, 0.000001);
+        assertTrue(adapter.promoteTarget(npc, "world-a", "water", target));
+        NeedsResourceTargetCacheAdapter.Result validated = adapter.resolveLocal(
+                npc, "world-a", "water", 1.0, 64.0, 0.0, 1_003L
+        );
+        assertNotNull(validated);
+        assertFalse(validated.preflightRequired());
     }
 
     @Test
@@ -348,6 +375,60 @@ class NeedsResourceTargetCacheAdapterTest {
     }
 
     @Test
+    void concurrentTargetAndRecentAdmissionStaysWithinHardCapacity() throws Exception {
+        NeedsResourceTargetStateStore stateStore = new NeedsResourceTargetStateStore();
+        int workers = 16;
+        int entriesPerWorker = 1_024;
+        ExecutorService executor = Executors.newFixedThreadPool(workers);
+        CountDownLatch ready = new CountDownLatch(workers);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<?>> futures = new ArrayList<>();
+        for (int worker = 0; worker < workers; worker++) {
+            final int workerId = worker;
+            futures.add(executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                for (int entry = 0; entry < entriesPerWorker; entry++) {
+                    UUID npc = new UUID(workerId + 10L, entry);
+                    Vector3d target = new Vector3d(entry + 0.5, 64.5, workerId + 0.5);
+                    stateStore.cache(npc, "world-a", "water", target, "water", 1.5,
+                            12.0, 2, 10_000L + entry, false,
+                            NeedsResourceTargetStateStore.PathState.VALIDATED);
+                    stateStore.rememberRecentTarget(npc, "world-a", "water", target, 1_000L);
+                }
+                return null;
+            }));
+        }
+        assertTrue(ready.await(10, TimeUnit.SECONDS));
+        start.countDown();
+        executor.shutdown();
+        assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
+        for (Future<?> future : futures) {
+            future.get();
+        }
+        assertTrue(stateStore.size("water") <= NeedsResourceTargetStateStore.MAX_ENTRIES_PER_RESOURCE);
+        assertTrue(stateStore.recentSize("water") <= NeedsResourceTargetStateStore.MAX_ENTRIES_PER_RESOURCE);
+    }
+
+    @Test
+    void pendingKeepaliveExtendsTargetLifetimeWithoutValidation() {
+        NeedsResourceTargetCacheAdapter adapter = new NeedsResourceTargetCacheAdapter();
+        UUID npc = new UUID(3L, 8L);
+        Vector3d target = new Vector3d(2.5, 64.5, 2.5);
+        NeedsResourceTargetCacheAdapter.Result adopted = adapter.adoptTarget(
+                npc, "world-a", "water", target, 1.5, 8.0, 2, 1_000L
+        );
+        assertTrue(adopted.preflightRequired());
+
+        assertTrue(adapter.keepPendingTarget(npc, "world-a", "water", target, 2_400L));
+        NeedsResourceTargetCacheAdapter.Result retained = adapter.resolveLocal(
+                npc, "world-a", "water", 0.0, 64.0, 0.0, 3_800L
+        );
+        assertNotNull(retained);
+        assertTrue(retained.preflightRequired());
+    }
+
+    @Test
     void fastConsumeTargetCacheStaysBounded() {
         int maxEntries = NeedsResourceTargetCacheAdapter.MAX_FAST_CONSUME_TARGETS;
         for (int i = 0; i < maxEntries + 25; i++) {
@@ -397,6 +478,102 @@ class NeedsResourceTargetCacheAdapterTest {
                 "water",
                 new Vector3d(1.5, 64.5, 1.5)
         ));
+    }
+
+    @Test
+    void sharedStateReleaseRemovesOnlyMatchingNpcResourceAndWorldTarget() {
+        NeedsResourceTargetStateStore stateStore = new NeedsResourceTargetStateStore();
+        UUID releasedNpc = new UUID(3L, 1L);
+        UUID retainedNpc = new UUID(3L, 2L);
+        Vector3d waterTarget = new Vector3d(2.5, 64.5, 2.5);
+        Vector3d foodTarget = new Vector3d(4.5, 64.5, 4.5);
+
+        stateStore.cache(releasedNpc, "world-a", "water", waterTarget, "water", 1.5,
+                8.0, 2, 10_000L, false, NeedsResourceTargetStateStore.PathState.VALIDATED);
+        stateStore.cache(retainedNpc, "world-a", "water", waterTarget, "water", 1.5,
+                8.0, 2, 10_000L, false, NeedsResourceTargetStateStore.PathState.VALIDATED);
+        stateStore.cache(releasedNpc, "world-a", "food_container", foodTarget, "food", 1.5,
+                8.0, 2, 10_000L, false, NeedsResourceTargetStateStore.PathState.VALIDATED);
+
+        assertTrue(stateStore.clear(releasedNpc, "world-a", "water", waterTarget, false));
+        assertNull(stateStore.resolve(releasedNpc, "world-a", "water", 0.0, 64.0, 0.0, 1_001L));
+        assertNotNull(stateStore.resolve(retainedNpc, "world-a", "water", 0.0, 64.0, 0.0, 1_001L));
+        assertNotNull(stateStore.resolve(releasedNpc, "world-a", "food_container", 0.0, 64.0, 0.0, 1_001L));
+    }
+
+    @Test
+    void rejectionWithoutWorldIdentityClearsMatchingBlockAcrossWorlds() {
+        NeedsResourceTargetStateStore stateStore = new NeedsResourceTargetStateStore();
+        UUID npc = new UUID(3L, 3L);
+        UUID otherWorldNpc = new UUID(3L, 6L);
+        Vector3d target = new Vector3d(2.5, 64.5, 2.5);
+        stateStore.cache(npc, "world-a", "water", target, "water", 1.5,
+                8.0, 2, 10_000L, false, NeedsResourceTargetStateStore.PathState.VALIDATED);
+        stateStore.cache(otherWorldNpc, "world-b", "water", target, "water", 1.5,
+                8.0, 2, 10_000L, false, NeedsResourceTargetStateStore.PathState.VALIDATED);
+
+        assertTrue(stateStore.clear(npc, null, "water", target, true));
+        assertNull(stateStore.resolve(npc, "world-a", "water", 0.0, 64.0, 0.0, 1_001L));
+        assertNotNull(stateStore.resolve(otherWorldNpc, "world-b", "water", 0.0, 64.0, 0.0, 1_001L));
+    }
+
+    @Test
+    void pendingTargetIsReturnedForPreflightThenPromotedOnlyWhenBlockMatches() {
+        NeedsResourceTargetStateStore stateStore = new NeedsResourceTargetStateStore();
+        UUID npc = new UUID(3L, 4L);
+        Vector3d target = new Vector3d(2.5, 64.5, 2.5);
+        stateStore.cache(npc, "world-a", "water", target, "water", 1.5,
+                8.0, 2, 10_000L, false, NeedsResourceTargetStateStore.PathState.PENDING);
+
+        NeedsResourceTargetStateStore.TargetState pending = stateStore.resolve(
+                npc, "world-a", "water", 0.0, 64.0, 0.0, 1_001L);
+        assertNotNull(pending);
+        assertEquals(NeedsResourceTargetStateStore.PathState.PENDING, pending.pathState());
+        assertFalse(stateStore.promote(npc, "world-a", "water", new Vector3d(3.5, 64.5, 2.5)));
+        assertEquals(NeedsResourceTargetStateStore.PathState.PENDING,
+                stateStore.resolve(npc, "world-a", "water", 0.0, 64.0, 0.0, 1_002L).pathState());
+
+        assertTrue(stateStore.promote(npc, "world-a", "water", target));
+        NeedsResourceTargetStateStore.TargetState validated = stateStore.resolve(
+                npc, "world-a", "water", 0.0, 64.0, 0.0, 1_003L);
+        assertNotNull(validated);
+        assertEquals(NeedsResourceTargetStateStore.PathState.VALIDATED, validated.pathState());
+    }
+
+    @Test
+    void adapterExposesPendingPreflightThenValidatedLocalResult() {
+        NeedsResourceTargetStateStore stateStore = NeedsResourceTargetStateStore.shared();
+        NeedsResourceTargetCacheAdapter adapter = new NeedsResourceTargetCacheAdapter();
+        UUID npc = new UUID(3L, 7L);
+        Vector3d target = new Vector3d(2.5, 64.5, 2.5);
+        stateStore.cache(npc, "world-a", "water", target, "resource_target_search_shared", 1.5,
+                8.0, 2, 10_000L, false, NeedsResourceTargetStateStore.PathState.PENDING);
+
+        NeedsResourceTargetCacheAdapter.Result pending = adapter.resolveLocal(
+                npc, "world-a", "water", 0.0, 64.0, 0.0, 1_001L);
+        assertNotNull(pending);
+        assertTrue(pending.preflightRequired());
+        assertTrue(adapter.promoteTarget(npc, "world-a", "water", target));
+
+        NeedsResourceTargetCacheAdapter.Result validated = adapter.resolveLocal(
+                npc, "world-a", "water", 0.0, 64.0, 0.0, 1_002L);
+        assertNotNull(validated);
+        assertFalse(validated.preflightRequired());
+    }
+
+    @Test
+    void clearingWithDifferentBlockDoesNotChangeCachedTarget() {
+        NeedsResourceTargetStateStore stateStore = new NeedsResourceTargetStateStore();
+        UUID npc = new UUID(3L, 5L);
+        Vector3d target = new Vector3d(2.5, 64.5, 2.5);
+        stateStore.cache(npc, "world-a", "water", target, "water", 1.5,
+                8.0, 2, 10_000L, false, NeedsResourceTargetStateStore.PathState.PENDING);
+
+        assertFalse(stateStore.clear(npc, "world-a", "water", new Vector3d(2.5, 64.5, 3.5), false));
+        NeedsResourceTargetStateStore.TargetState retained = stateStore.resolve(
+                npc, "world-a", "water", 0.0, 64.0, 0.0, 1_001L);
+        assertNotNull(retained);
+        assertEquals(NeedsResourceTargetStateStore.PathState.PENDING, retained.pathState());
     }
 
     private static NeedsResourceSearchCoordinator.Request request(String worldName) {

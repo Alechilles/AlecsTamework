@@ -1,8 +1,8 @@
 package com.alechilles.alecstamework.npc.sensors;
 
-import com.alechilles.alecstamework.npc.progression.NeedsRecentTargetCache;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceCandidates;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceSearchCoordinator;
+import com.alechilles.alecstamework.npc.progression.NeedsResourceTargetStateStore;
 import com.alechilles.alecstamework.npc.progression.PositionTargetRejectCache;
 import com.alechilles.alecstamework.npc.progression.PositionTargetReservationCache;
 import com.hypixel.hytale.component.Ref;
@@ -11,11 +11,8 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 
-import java.util.Collections;
 import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
-import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.ToLongFunction;
 
@@ -34,25 +31,22 @@ public final class NeedsResourceTargetCacheAdapter {
     static final long TARGET_CACHE_HIT_TTL_MS = 1_500L;
     static final long TARGET_CACHE_MISS_TTL_MS = 1_000L;
     static final double TARGET_RESERVATION_TTL_SECONDS = PositionTargetReservationCache.DEFAULT_TTL_SECONDS;
-    static final int MAX_LOCAL_TARGETS = 8_192;
+    static final int MAX_LOCAL_TARGETS = NeedsResourceTargetStateStore.MAX_ENTRIES_PER_RESOURCE;
     static final int MAX_FAST_CONSUME_TARGETS = 8_192;
     private static final double EPSILON = 0.000001;
     private static final ThreadLocal<Vector3d> CANDIDATE_PROBE =
             ThreadLocal.withInitial(Vector3d::new);
     private static final ConcurrentHashMap<UUID, FastConsumeTarget> FAST_CONSUME_TARGETS =
             new ConcurrentHashMap<>();
-    private static final Map<NeedsResourceTargetCacheAdapter, Boolean> LIVE_ADAPTERS =
-            Collections.synchronizedMap(new WeakHashMap<>());
+    private static final NeedsResourceTargetStateStore TARGET_STATE =
+            NeedsResourceTargetStateStore.shared();
     private final NeedsResourceSearchCoordinator coordinator;
-    private final ConcurrentHashMap<UUID, CachedTarget> cachedTargetsByNpcId = new ConcurrentHashMap<>();
-    private final NeedsRecentTargetCache recentTargetCache = new NeedsRecentTargetCache();
     /** Creates an adapter backed by the process-wide search coordinator. */
     public NeedsResourceTargetCacheAdapter() {
         this(NeedsResourceSearchCoordinator.getInstance());
     }
     NeedsResourceTargetCacheAdapter(@Nonnull NeedsResourceSearchCoordinator coordinator) {
         this.coordinator = coordinator;
-        LIVE_ADAPTERS.put(this, Boolean.TRUE);
     }
 
     /**
@@ -67,9 +61,7 @@ public final class NeedsResourceTargetCacheAdapter {
                                double originY,
                                double originZ,
                                long nowMs) {
-        ConcurrentHashMap<UUID, CachedTarget> targets = targetCache(resourceKind);
-        CachedTarget cached = getCachedTarget(
-                targets,
+        NeedsResourceTargetStateStore.TargetState cached = TARGET_STATE.resolve(
                 npcUuid,
                 worldName,
                 resourceKind,
@@ -81,10 +73,17 @@ public final class NeedsResourceTargetCacheAdapter {
         if (cached == null) {
             return null;
         }
-        if (cached.target() == null) {
-            return cached.localResult();
+        Vector3d target = cached.target() == null ? null : cached.target().toVector();
+        if (target != null && isTargetRejected(npcUuid, cached.resourceKind(), target, nowMs)) {
+            TARGET_STATE.clear(npcUuid, null, cached.resourceKind(), target, true);
+            return null;
         }
-        return cached.localResult();
+        if (target != null && cached.pathState() == NeedsResourceTargetStateStore.PathState.VALIDATED
+                && !reserveTarget(npcUuid, cached.worldName(), cached.resourceKind(), target, nowMs)) {
+            TARGET_STATE.clear(npcUuid, cached.worldName(), cached.resourceKind(), target, false);
+            return null;
+        }
+        return toResult(cached);
     }
 
     /**
@@ -127,7 +126,10 @@ public final class NeedsResourceTargetCacheAdapter {
             if (snapshot.foundConsumableSourceInConsumeRange()) {
                 Vector3d current = new Vector3d(originX, originY, originZ);
                 cacheTarget(npcUuid, worldName, request.resourceKind(), current, "resource_already_in_consume_range",
-                        2.0, radius, verticalRadius, nowMs, fastModeActive);
+                        2.0, radius, verticalRadius, nowMs, fastModeActive,
+                        fastModeActive
+                                ? NeedsResourceTargetStateStore.PathState.VALIDATED
+                                : NeedsResourceTargetStateStore.PathState.PENDING);
                 if (fastModeActive) {
                     rememberFastConsumeTarget(
                             npcUuid,
@@ -148,7 +150,8 @@ public final class NeedsResourceTargetCacheAdapter {
                 );
             }
             cacheTarget(npcUuid, worldName, request.resourceKind(), null, "resource_target_not_found", 2.0,
-                    radius, verticalRadius, nowMs, false);
+                    radius, verticalRadius, nowMs, false,
+                    NeedsResourceTargetStateStore.PathState.VALIDATED);
             return Result.miss("resource_target_not_found", false);
         }
         Selection selection = selectCandidate(snapshot, npcUuid, worldName, request.resourceKind(), originX, originY,
@@ -172,7 +175,10 @@ public final class NeedsResourceTargetCacheAdapter {
         }
         String reason = "resource_target_search_shared";
         cacheTarget(npcUuid, worldName, request.resourceKind(), target, reason, candidate.approachRadius(),
-                radius, verticalRadius, nowMs, fastModeActive);
+                radius, verticalRadius, nowMs, fastModeActive,
+                fastModeActive
+                        ? NeedsResourceTargetStateStore.PathState.VALIDATED
+                        : NeedsResourceTargetStateStore.PathState.PENDING);
         if (fastModeActive) {
             rememberFastConsumeTarget(
                     npcUuid,
@@ -187,7 +193,7 @@ public final class NeedsResourceTargetCacheAdapter {
                 reason,
                 candidate.approachRadius(),
                 fastModeActive,
-                true,
+                !fastModeActive,
                 candidate,
                 !fastModeActive
         );
@@ -206,7 +212,8 @@ public final class NeedsResourceTargetCacheAdapter {
             return Result.reserved();
         }
         cacheTarget(npcUuid, worldName, resourceKind, target, "resource_target_search_recent", approachRadius,
-                radius, verticalRadius, nowMs, false);
+                radius, verticalRadius, nowMs, false,
+                NeedsResourceTargetStateStore.PathState.PENDING);
         return Result.target(
                 target,
                 "resource_target_search_recent",
@@ -216,6 +223,30 @@ public final class NeedsResourceTargetCacheAdapter {
                 null,
                 true
         );
+    }
+
+    /** Keeps a pending target and its reservation alive during non-terminal preflight. */
+    public boolean keepPendingTarget(@Nullable UUID npcUuid,
+                                     @Nullable String worldName,
+                                     @Nullable String resourceKind,
+                                     @Nullable Vector3d target,
+                                     long nowMs) {
+        if (!TARGET_STATE.keepPending(
+                npcUuid,
+                worldName,
+                resourceKind,
+                target,
+                nowMs,
+                TARGET_CACHE_HIT_TTL_MS
+        )) {
+            return false;
+        }
+        String normalizedResource = normalizeResourceKind(resourceKind);
+        if (reserveTarget(npcUuid, worldName, normalizedResource, target, nowMs)) {
+            return true;
+        }
+        TARGET_STATE.clear(npcUuid, worldName, normalizedResource, target, false);
+        return false;
     }
     /** Removes one globally unusable candidate from a shared snapshot. */
     public void invalidateCandidate(@Nonnull Store<EntityStore> store,
@@ -233,7 +264,7 @@ public final class NeedsResourceTargetCacheAdapter {
                                      @Nonnull String resourceKind,
                                      @Nullable Vector3d target,
                                      long nowMs) {
-        recentTargetCache(resourceKind).remember(npcUuid, worldName, target, nowMs);
+        TARGET_STATE.rememberRecentTarget(npcUuid, worldName, resourceKind, target, nowMs);
     }
     /** Resolves a recent destination without invoking a world search. */
     @Nullable
@@ -242,14 +273,22 @@ public final class NeedsResourceTargetCacheAdapter {
                                         @Nonnull String resourceKind,
                                         @Nullable Vector3d currentPosition,
                                         long nowMs) {
-        return recentTargetCache(resourceKind).resolve(npcUuid, worldName, currentPosition, nowMs);
+        return TARGET_STATE.resolveRecentTarget(npcUuid, worldName, resourceKind, currentPosition, nowMs);
     }
     /** Forgets a recent destination after a path or consume failure. */
     public void forgetRecentTarget(@Nullable UUID npcUuid,
                                    @Nullable String worldName,
                                    @Nonnull String resourceKind,
                                    @Nullable Vector3d target) {
-        recentTargetCache(resourceKind).forget(npcUuid, worldName, target);
+        TARGET_STATE.forgetRecentTarget(npcUuid, worldName, resourceKind, target);
+    }
+
+    /** Promotes one matching pending target after a successful path preflight. */
+    public boolean promoteTarget(@Nullable UUID npcUuid,
+                                 @Nullable String worldName,
+                                 @Nullable String resourceKind,
+                                 @Nullable Vector3d target) {
+        return TARGET_STATE.promote(npcUuid, worldName, resourceKind, target);
     }
     /** Clears one NPC's local target and reservation marker. */
     public void clearTarget(@Nullable UUID npcUuid,
@@ -257,11 +296,7 @@ public final class NeedsResourceTargetCacheAdapter {
                             @Nullable String resourceKind,
                             @Nullable Vector3d target) {
         if (npcUuid != null) {
-            ConcurrentHashMap<UUID, CachedTarget> targets = targetCache(resourceKind);
-            CachedTarget cached = targets.get(npcUuid);
-            if (cached != null && (target == null || sameBlock(cached.target(), target))) {
-                targets.remove(npcUuid, cached);
-            }
+            TARGET_STATE.clear(npcUuid, worldName, resourceKind, target, false);
         }
         releaseTarget(npcUuid, worldName, resourceKind, target);
     }
@@ -306,44 +341,22 @@ public final class NeedsResourceTargetCacheAdapter {
                 considered > 0 && rejected + reserved == considered
         );
     }
-    @Nullable
-    private CachedTarget getCachedTarget(@Nonnull ConcurrentHashMap<UUID, CachedTarget> targets,
-                                         @Nonnull UUID npcUuid,
-                                         @Nullable String worldName,
-                                         @Nonnull String resourceKind,
-                                         double originX,
-                                         double originY,
-                                         double originZ,
-                                         long nowMs) {
-        CachedTarget cached = targets.get(npcUuid);
-        if (cached == null) {
-            return null;
-        }
-        if (!cached.worldName().equals(normalizeWorldName(worldName))
-                || !cached.resourceKind().equals(normalizeResourceKind(resourceKind))) {
-            targets.remove(npcUuid, cached);
-            return null;
-        }
-        if (nowMs >= cached.expiresAtMs()) {
-            targets.remove(npcUuid, cached);
-            return null;
-        }
+    @Nonnull
+    private static Result toResult(@Nonnull NeedsResourceTargetStateStore.TargetState cached) {
         if (cached.target() == null) {
-            return cached;
+            return Result.miss(cached.reason(), true);
         }
-        if (!isUsable(
-                cached.target(),
-                originX,
-                originY,
-                originZ,
-                cached.searchRadius(),
-                cached.verticalRadius()
-        )) {
-            targets.remove(npcUuid, cached);
-            return null;
-        }
-        return cached;
+        return Result.target(
+                cached.target().toVector(),
+                cached.reason(),
+                cached.approachRadius(),
+                cached.fastConsume(),
+                true,
+                null,
+                cached.pathState() == NeedsResourceTargetStateStore.PathState.PENDING
+        );
     }
+
     private void cacheTarget(@Nonnull UUID npcUuid,
                              @Nullable String worldName,
                              @Nonnull String resourceKind,
@@ -353,23 +366,21 @@ public final class NeedsResourceTargetCacheAdapter {
                              double searchRadius,
                              int verticalRadius,
                              long nowMs,
-                             boolean fastConsume) {
-        ConcurrentHashMap<UUID, CachedTarget> targets = targetCache(resourceKind);
-        pruneBounded(targets, nowMs, MAX_LOCAL_TARGETS, CachedTarget::expiresAtMs);
-        double safeApproachRadius = sanitizeApproachRadius(approachRadius);
-        double safeSearchRadius = sanitizeSearchRadius(searchRadius);
-        Result localResult = target == null
-                ? Result.miss(reason, true)
-                : Result.target(target, reason, safeApproachRadius, fastConsume, true, null, false);
-        targets.put(npcUuid, new CachedTarget(
-                normalizeWorldName(worldName),
-                normalizeResourceKind(resourceKind),
+                             boolean fastConsume,
+                             @Nonnull NeedsResourceTargetStateStore.PathState pathState) {
+        TARGET_STATE.cache(
+                npcUuid,
+                worldName,
+                resourceKind,
                 target,
-                safeSearchRadius,
-                Math.max(0, verticalRadius),
+                reason,
+                approachRadius,
+                searchRadius,
+                verticalRadius,
                 nowMs + (target == null ? TARGET_CACHE_MISS_TTL_MS : TARGET_CACHE_HIT_TTL_MS),
-                localResult
-        ));
+                fastConsume,
+                pathState
+        );
     }
     private static boolean isUsable(@Nonnull Vector3d target,
                                     double originX,
@@ -434,14 +445,6 @@ public final class NeedsResourceTargetCacheAdapter {
     }
     private static double sanitizeSearchRadius(double value) {
         return Double.isFinite(value) && value > EPSILON ? value : 12.0;
-    }
-    @Nonnull
-    private ConcurrentHashMap<UUID, CachedTarget> targetCache(@Nullable String resourceKind) {
-        return cachedTargetsByNpcId;
-    }
-    @Nonnull
-    private NeedsRecentTargetCache recentTargetCache(@Nullable String resourceKind) {
-        return recentTargetCache;
     }
     private static <T> void pruneBounded(@Nonnull ConcurrentHashMap<UUID, T> values,
                                          long nowMs,
@@ -553,16 +556,11 @@ public final class NeedsResourceTargetCacheAdapter {
         FAST_CONSUME_TARGETS.clear();
     }
     static void clearAllTargetsForTests() {
-        synchronized (LIVE_ADAPTERS) {
-            for (NeedsResourceTargetCacheAdapter adapter : LIVE_ADAPTERS.keySet()) {
-                adapter.cachedTargetsByNpcId.clear();
-                adapter.recentTargetCache.clear();
-            }
-        }
+        TARGET_STATE.clear();
         FAST_CONSUME_TARGETS.clear();
     }
     int localTargetCountForTests() {
-        return cachedTargetsByNpcId.size();
+        return TARGET_STATE.size("water") + TARGET_STATE.size("food_container");
     }
     static int fastConsumeTargetCountForTests() {
         return FAST_CONSUME_TARGETS.size();
@@ -571,14 +569,7 @@ public final class NeedsResourceTargetCacheAdapter {
     /** Clears all adapter-owned values associated with one removed world. */
     public static void clearWorld(@Nullable String worldName) {
         String normalizedWorld = normalizeWorldName(worldName);
-        synchronized (LIVE_ADAPTERS) {
-            for (NeedsResourceTargetCacheAdapter adapter : LIVE_ADAPTERS.keySet()) {
-                adapter.cachedTargetsByNpcId.entrySet().removeIf(
-                        entry -> entry.getValue().worldName().equals(normalizedWorld)
-                );
-                adapter.recentTargetCache.clearWorld(worldName);
-            }
-        }
+        TARGET_STATE.clearWorld(worldName);
         FAST_CONSUME_TARGETS.entrySet().removeIf(
                 entry -> entry.getValue().worldName().equals(normalizedWorld)
         );
@@ -593,19 +584,7 @@ public final class NeedsResourceTargetCacheAdapter {
         if (npcUuid == null) {
             return;
         }
-        String normalizedWorld = normalizeWorldName(worldName);
-        synchronized (LIVE_ADAPTERS) {
-            for (NeedsResourceTargetCacheAdapter adapter : LIVE_ADAPTERS.keySet()) {
-                CachedTarget cached = adapter.cachedTargetsByNpcId.get(npcUuid);
-                if (cached == null
-                        || !cached.resourceKind().equals(resourceKind)
-                        || (!anyWorld && !cached.worldName().equals(normalizedWorld))
-                        || (target != null && !sameBlock(cached.target(), target))) {
-                    continue;
-                }
-                adapter.cachedTargetsByNpcId.remove(npcUuid, cached);
-            }
-        }
+        TARGET_STATE.clear(npcUuid, worldName, resourceKind, target, anyWorld);
     }
     @Nonnull
     private static String normalizeResourceKind(@Nullable String raw) {
@@ -657,13 +636,6 @@ public final class NeedsResourceTargetCacheAdapter {
             FAST_CONSUME_TARGETS.remove(npcUuid, marker);
         }
     }
-    private record CachedTarget(@Nonnull String worldName,
-                                @Nonnull String resourceKind,
-                                @Nullable Vector3d target,
-                                double searchRadius,
-                                int verticalRadius,
-                                long expiresAtMs,
-                                @Nonnull Result localResult) { }
     /** Candidate selection status used by the sensor and focused tests. */
     public record Selection(@Nullable NeedsResourceCandidates.Candidate candidate,
                             boolean allRejected,
