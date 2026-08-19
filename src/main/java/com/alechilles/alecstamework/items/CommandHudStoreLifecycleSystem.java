@@ -19,9 +19,13 @@ import javax.annotation.Nonnull;
 public final class CommandHudStoreLifecycleSystem extends StoreSystem<EntityStore>
         implements TickableSystem<EntityStore> {
     private final CommandHudDirtySink lifecycleSink;
-    private final Set<Store<EntityStore>> pendingStores = Collections.synchronizedSet(
-            Collections.newSetFromMap(new IdentityHashMap<>())
-    );
+    private final Object lifecycleLock = new Object();
+    private final Set<Store<EntityStore>> pendingStores =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+    private final Set<Store<EntityStore>> activeScanStores =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+    private final Set<Store<EntityStore>> removedDuringScan =
+            Collections.newSetFromMap(new IdentityHashMap<>());
 
     public CommandHudStoreLifecycleSystem(@Nonnull CommandHudDirtySink lifecycleSink) {
         this.lifecycleSink = lifecycleSink;
@@ -29,33 +33,74 @@ public final class CommandHudStoreLifecycleSystem extends StoreSystem<EntityStor
 
     @Override
     public void onSystemAddedToStore(@Nonnull Store<EntityStore> store) {
-        pendingStores.add(store);
+        synchronized (lifecycleLock) {
+            pendingStores.add(store);
+        }
     }
 
     @Override
     public void tick(float ignoredDt, int ignoredSystemIndex, @Nonnull Store<EntityStore> store) {
-        if (!pendingStores.remove(store)) {
-            return;
+        synchronized (lifecycleLock) {
+            if (!pendingStores.remove(store)) {
+                return;
+            }
+            activeScanStores.add(store);
         }
-        ComponentType<EntityStore, Player> playerType = Player.getComponentType();
-        if (playerType == null) {
-            return;
-        }
-        store.forEachChunk(
-                Query.and(playerType),
-                (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> ignored) -> {
-                    for (int index = 0; index < chunk.size(); index++) {
-                        Player player = chunk.getComponent(index, playerType);
-                        UUID playerUuid = player != null ? player.getUuid() : null;
-                        lifecycleSink.markRecovery(store, playerUuid);
+        try {
+            ComponentType<EntityStore, Player> playerType = Player.getComponentType();
+            if (playerType == null) {
+                return;
+            }
+            store.forEachChunk(
+                    Query.and(playerType),
+                    (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> ignored) -> {
+                        for (int index = 0; index < chunk.size(); index++) {
+                            Player player = chunk.getComponent(index, playerType);
+                            UUID playerUuid = player != null ? player.getUuid() : null;
+                            if (isActiveScan(store)) {
+                                lifecycleSink.markRecovery(store, playerUuid);
+                            }
+                        }
                     }
-                }
-        );
+            );
+        } finally {
+            finishScan(store);
+        }
     }
 
     @Override
     public void onSystemRemovedFromStore(@Nonnull Store<EntityStore> store) {
-        pendingStores.remove(store);
-        lifecycleSink.removeStore(store);
+        boolean cleanupNow;
+        synchronized (lifecycleLock) {
+            pendingStores.remove(store);
+            if (activeScanStores.remove(store)) {
+                removedDuringScan.add(store);
+                cleanupNow = false;
+            } else if (removedDuringScan.remove(store)) {
+                cleanupNow = false;
+            } else {
+                cleanupNow = true;
+            }
+        }
+        if (cleanupNow) {
+            lifecycleSink.removeStore(store);
+        }
+    }
+
+    private boolean isActiveScan(@Nonnull Store<EntityStore> store) {
+        synchronized (lifecycleLock) {
+            return activeScanStores.contains(store);
+        }
+    }
+
+    private void finishScan(@Nonnull Store<EntityStore> store) {
+        boolean cleanup;
+        synchronized (lifecycleLock) {
+            activeScanStores.remove(store);
+            cleanup = removedDuringScan.remove(store);
+        }
+        if (cleanup) {
+            lifecycleSink.removeStore(store);
+        }
     }
 }

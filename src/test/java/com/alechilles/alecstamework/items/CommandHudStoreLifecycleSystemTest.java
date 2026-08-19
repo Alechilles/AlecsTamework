@@ -78,6 +78,45 @@ class CommandHudStoreLifecycleSystemTest {
         }
     }
 
+    @Test
+    void removalDuringStartupScanDoesNotRecreateStoreState() throws Exception {
+        CommandTargetHudActivationTracker tracker = new CommandTargetHudActivationTracker();
+        CommandHudDirtySink sink = new CommandHudDirtySink() {
+            @Override
+            public void markDirty(UUID playerUuid) {
+                tracker.markDirty(playerUuid);
+            }
+
+            @Override
+            public void markRecovery(Store<EntityStore> store, UUID playerUuid) {
+                tracker.markRecovery(store, playerUuid);
+            }
+
+            @Override
+            public void removeStore(Store<EntityStore> store) {
+                tracker.removeStore(store);
+            }
+        };
+        CommandHudStoreLifecycleSystem system = new CommandHudStoreLifecycleSystem(sink);
+
+        try (HytaleModuleScope ignored = HytaleModuleScope.install();
+             TestEntityComponentStore store = new TestEntityComponentStore(null)) {
+            Ref<EntityStore> playerReference = store.createReference();
+            RemovalPlayer player = allocate(RemovalPlayer.class);
+            player.system = system;
+            player.store = store;
+            store.put(playerReference, Player.getComponentType(), player);
+
+            system.onSystemAddedToStore(store);
+            system.tick(0.0f, 0, store);
+
+            Assertions.assertTrue(
+                    tracker.candidatePlayerUuids(store).isEmpty(),
+                    "Store removal during recovery must not recreate tracker state."
+            );
+        }
+    }
+
     private static void addPlayer(TestEntityComponentStore store) throws Exception {
         Ref<EntityStore> playerReference = store.createReference();
         Player player = allocate(Player.class);
@@ -101,6 +140,21 @@ class CommandHudStoreLifecycleSystemTest {
         @Override
         public void removeStore(Store<EntityStore> store) {
             removedStores.add(store);
+        }
+    }
+
+    private static final class RemovalPlayer extends Player {
+        private CommandHudStoreLifecycleSystem system;
+        private Store<EntityStore> store;
+        private boolean removalRequested;
+
+        @Override
+        public UUID getUuid() {
+            if (!removalRequested) {
+                removalRequested = true;
+                system.onSystemRemovedFromStore(store);
+            }
+            return PLAYER_UUID;
         }
     }
 
