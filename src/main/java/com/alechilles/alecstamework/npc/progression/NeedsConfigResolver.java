@@ -8,6 +8,7 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -20,6 +21,7 @@ import javax.annotation.Nullable;
 public final class NeedsConfigResolver {
     private static final ConcurrentHashMap<String, NeedsSensorConfig> SENSOR_CONFIG_BY_ROLE = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, NeedsSensorConfig> SENSOR_CONFIG_BY_ID = new ConcurrentHashMap<>();
+    private static final AtomicLong SENSOR_CONFIG_GENERATION = new AtomicLong();
 
     private NeedsConfigResolver() {
     }
@@ -62,6 +64,54 @@ public final class NeedsConfigResolver {
         );
     }
 
+    /**
+     * Resolves the stable configured sensor values without applying the
+     * mutable runtime enable switch or retaining an ECS value.
+     */
+    @Nullable
+    public static NeedsSensorConfig resolveCompiledSensorConfig(
+            @Nullable String roleId,
+            @Nullable String configId) {
+        if (roleId != null && !roleId.isBlank()) {
+            String normalizedRoleId = normalizeKey(roleId);
+            NeedsSensorConfig cached = SENSOR_CONFIG_BY_ROLE.get(normalizedRoleId);
+            if (cached != null) {
+                return cached;
+            }
+            TwNeedsConfig byRole = TwNeedsConfig.resolveForRole(roleId);
+            if (byRole != null) {
+                NeedsSensorConfig resolved = createSensorConfig(byRole);
+                SENSOR_CONFIG_BY_ROLE.put(normalizedRoleId, resolved);
+                return resolved;
+            }
+        }
+
+        if (configId != null && !configId.isBlank()) {
+            String normalizedConfigId = normalizeKey(configId);
+            NeedsSensorConfig cached = SENSOR_CONFIG_BY_ID.get(normalizedConfigId);
+            if (cached != null) {
+                return cached;
+            }
+            TwNeedsConfig byId = TwNeedsConfig.resolveById(configId);
+            if (byId != null) {
+                NeedsSensorConfig resolved = createSensorConfig(byId);
+                SENSOR_CONFIG_BY_ID.put(normalizedConfigId, resolved);
+                return resolved;
+            }
+        }
+        return null;
+    }
+
+    /** Returns the generation used to invalidate sensor-local compiled values. */
+    public static long sensorConfigGeneration() {
+        return SENSOR_CONFIG_GENERATION.get();
+    }
+
+    /** Applies the current runtime switch without creating another config value. */
+    public static boolean isRuntimeEnabled(@Nullable NeedsSensorConfig config) {
+        return config != null && isRuntimeEnabled(config.enabled());
+    }
+
     public static boolean isRuntimeEnabled(@Nullable TwNeedsConfig config) {
         return isRuntimeEnabled(config, TameworkRuntimeSettings.currentOrNull());
     }
@@ -81,6 +131,7 @@ public final class NeedsConfigResolver {
     public static void clearCache() {
         SENSOR_CONFIG_BY_ROLE.clear();
         SENSOR_CONFIG_BY_ID.clear();
+        SENSOR_CONFIG_GENERATION.incrementAndGet();
     }
 
     @Nullable
@@ -88,35 +139,8 @@ public final class NeedsConfigResolver {
                                                              @Nullable Store<EntityStore> store,
                                                              @Nullable TameworkNeedsComponent component) {
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
-        if (roleId != null && !roleId.isBlank()) {
-            String normalizedRoleId = normalizeKey(roleId);
-            NeedsSensorConfig cached = SENSOR_CONFIG_BY_ROLE.get(normalizedRoleId);
-            if (cached != null) {
-                return cached;
-            }
-            TwNeedsConfig byRole = TwNeedsConfig.resolveForRole(roleId);
-            if (byRole != null) {
-                NeedsSensorConfig resolved = createSensorConfig(byRole);
-                SENSOR_CONFIG_BY_ROLE.put(normalizedRoleId, resolved);
-                return resolved;
-            }
-        }
-
         String configId = component != null ? component.getConfigId() : null;
-        if (configId != null && !configId.isBlank()) {
-            String normalizedConfigId = normalizeKey(configId);
-            NeedsSensorConfig cached = SENSOR_CONFIG_BY_ID.get(normalizedConfigId);
-            if (cached != null) {
-                return cached;
-            }
-            TwNeedsConfig byId = TwNeedsConfig.resolveById(configId);
-            if (byId != null) {
-                NeedsSensorConfig resolved = createSensorConfig(byId);
-                SENSOR_CONFIG_BY_ID.put(normalizedConfigId, resolved);
-                return resolved;
-            }
-        }
-        return null;
+        return resolveCompiledSensorConfig(roleId, configId);
     }
 
     @Nonnull

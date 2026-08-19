@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.npc.progression.NeedsResourceCandidates;
+import com.alechilles.alecstamework.npc.progression.NeedsResourceHotPathDiagnostics;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceSearchCoordinator;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceTargetStateStore;
 import com.alechilles.alecstamework.performance.TameworkRuntimePressureService;
@@ -34,6 +35,91 @@ class NeedsResourceTargetCacheAdapterTest {
         com.alechilles.alecstamework.npc.progression.PositionTargetReservationCache.clearForTests();
         com.alechilles.alecstamework.npc.progression.PositionTargetRejectCache.clearForTests();
         TameworkRuntimePressureService.getInstance().clearForTests();
+        NeedsResourceHotPathDiagnostics.resetForTests();
+    }
+
+    @Test
+    void validatedTargetLeaseRenewsWhileTheNpcStillUsesIt() {
+        NeedsResourceTargetCacheAdapter adapter = new NeedsResourceTargetCacheAdapter();
+        UUID activeNpc = new UUID(0L, 101L);
+        UUID idleNpc = new UUID(0L, 102L);
+        Vector3d activeTarget = new Vector3d(2.5, 64.5, 2.5);
+        Vector3d idleTarget = new Vector3d(3.5, 64.5, 3.5);
+        adapter.adoptTarget(activeNpc, "world-a", "water", activeTarget, 1.5, 8.0, 2, 1_000L);
+        adapter.adoptTarget(idleNpc, "world-a", "water", idleTarget, 1.5, 8.0, 2, 1_000L);
+
+        assertTrue(adapter.promoteTarget(activeNpc, "world-a", "water", activeTarget, 1_001L));
+        assertTrue(adapter.promoteTarget(idleNpc, "world-a", "water", idleTarget, 1_001L));
+        assertNotNull(adapter.resolveLocal(
+                activeNpc, "world-a", "water", 0.0, 64.0, 0.0, 9_000L
+        ));
+
+        NeedsResourceTargetCacheAdapter.Result renewed = adapter.resolveLocal(
+                activeNpc, "world-a", "water", 0.0, 64.0, 0.0, 12_000L
+        );
+
+        assertNotNull(renewed);
+        assertFalse(renewed.preflightRequired());
+        assertNull(adapter.resolveLocal(
+                idleNpc, "world-a", "water", 0.0, 64.0, 0.0, 12_000L
+        ));
+    }
+
+    @Test
+    void fastConsumeTargetExpiresWithItsFastModeMarker() {
+        try (TestEntityComponentStore store = newStore()) {
+            NeedsResourceSearchCoordinator coordinator = NeedsResourceSearchCoordinator.getInstance();
+            coordinator.clear(store);
+            NeedsResourceSearchCoordinator.Request request = request("world-a");
+            UUID npc = new UUID(0L, 104L);
+            warm(coordinator, store, npc, request, oneCandidateSnapshot(), 1_000L);
+            NeedsResourceTargetCacheAdapter adapter = new NeedsResourceTargetCacheAdapter(coordinator);
+
+            NeedsResourceTargetCacheAdapter.Result fast = adapter.resolve(
+                    store, npc, request, "world-a", 0.0, 64.0, 0.0,
+                    request.radius(), request.verticalRadius(), true, 1_001L
+            );
+
+            assertTrue(fast.fastConsume());
+            assertTrue(NeedsResourceTargetCacheAdapter.isFastConsumeTargetForTests(
+                    npc, "world-a", "water", fast.target(), 2_000L
+            ));
+            assertNull(adapter.resolveLocal(
+                    npc, "world-a", "water", 0.0, 64.0, 0.0, 2_502L
+            ));
+            assertFalse(NeedsResourceTargetCacheAdapter.isFastConsumeTargetForTests(
+                    npc, "world-a", "water", fast.target(), 2_502L
+            ));
+            coordinator.clear(store);
+        }
+    }
+
+    @Test
+    void repeatedDeferredRequestWaitsForTheCoordinatorRetryWindow() {
+        try (TestEntityComponentStore store = newStore()) {
+            NeedsResourceSearchCoordinator coordinator = NeedsResourceSearchCoordinator.getInstance();
+            coordinator.clear(store);
+            NeedsResourceHotPathDiagnostics.setEnabledForTests(true);
+            NeedsResourceTargetCacheAdapter adapter = new NeedsResourceTargetCacheAdapter(coordinator);
+            NeedsResourceSearchCoordinator.Request request = request("world-a");
+            UUID npc = new UUID(0L, 103L);
+
+            assertEquals(NeedsResourceTargetCacheAdapter.Status.DEFERRED,
+                    adapter.resolve(store, npc, request, "world-a", 0.0, 64.0, 0.0,
+                            request.radius(), request.verticalRadius(), false, 1_000L).status());
+            assertEquals(NeedsResourceTargetCacheAdapter.Status.DEFERRED,
+                    adapter.resolve(store, npc, request, "world-a", 0.0, 64.0, 0.0,
+                            request.radius(), request.verticalRadius(), false, 1_020L).status());
+            assertEquals(NeedsResourceTargetCacheAdapter.Status.DEFERRED,
+                    adapter.resolve(store, npc, request, "world-a", 0.0, 64.0, 0.0,
+                            request.radius(), request.verticalRadius(), false, 1_051L).status());
+
+            NeedsResourceHotPathDiagnostics.Snapshot snapshot =
+                    NeedsResourceHotPathDiagnostics.snapshot();
+            assertEquals(2L, snapshot.coordinatorLookups());
+            assertEquals(1L, snapshot.coordinatorRetriesSuppressed());
+            coordinator.clear(store);
+        }
     }
 
     @Test

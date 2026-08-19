@@ -22,6 +22,7 @@ public final class SensorTameworkNeedBelow extends TameworkSensorBase {
 
     private final NeedType needType;
     private final double ratioBelow;
+    private final NeedsSensorConfigMemo configMemo = new NeedsSensorConfigMemo();
 
     public SensorTameworkNeedBelow(@Nonnull BuilderSensorTameworkNeedBelow builder,
                                    @Nonnull BuilderSupport support) {
@@ -47,8 +48,11 @@ public final class SensorTameworkNeedBelow extends TameworkSensorBase {
             return false;
         }
 
-        NeedsConfigResolver.NeedsSensorConfig config = NeedsConfigResolver.resolveSensorConfig(ref, store, needs);
-        if (config == null || !config.enabled()) {
+        NeedsConfigResolver.NeedsSensorConfig config = configMemo.resolve(
+                role.getRoleName(),
+                needs.getConfigId()
+        );
+        if (!NeedsConfigResolver.isRuntimeEnabled(config)) {
             return false;
         }
         double min = needType == NeedType.THIRST ? config.thirstMin() : config.hungerMin();

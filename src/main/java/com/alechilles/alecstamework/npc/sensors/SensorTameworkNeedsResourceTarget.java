@@ -182,7 +182,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                     log(ref, store, "miss", preflight.reason(), false, eligibility.currentRatio(), localTarget);
                     return false;
                 }
-                if (!targetCache.promoteTarget(npcUuid, worldName, resourceType.kind, localTarget)) {
+                if (!targetCache.promoteTarget(npcUuid, worldName, resourceType.kind, localTarget, nowMs)) {
                     log(ref, store, "miss", "path_preflight_target_changed", false,
                             eligibility.currentRatio(), localTarget);
                     return false;
@@ -294,7 +294,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                 log(ref, store, "miss", preflight.reason(), false, eligibility.currentRatio(), target);
                 return false;
             }
-            if (!targetCache.promoteTarget(npcUuid, worldName, resourceType.kind, target)) {
+            if (!targetCache.promoteTarget(npcUuid, worldName, resourceType.kind, target, nowMs)) {
                 log(ref, store, "miss", "path_preflight_target_changed", false,
                         eligibility.currentRatio(), target);
                 return false;

@@ -129,6 +129,8 @@ public final class NeedsResourcePathPreflightService {
     private PathPreflightResult publishImmediateReady(@Nonnull PreflightKey key,
                                                        @Nonnull String reason,
                                                        long nowMs) {
+        NeedsResourceHotPathDiagnostics.recordPreflightRequest();
+        NeedsResourceHotPathDiagnostics.recordPreflightLeaseMiss();
         synchronized (state.lock()) {
             NeedsResourcePathPreflightState.ComputationOperation operation = state.registerOperationLocked(key);
             if (!state.isCurrentOperationLocked(operation)) {
@@ -150,6 +152,7 @@ public final class NeedsResourcePathPreflightService {
     PathPreflightResult preflight(@Nonnull PreflightKey key,
                                   @Nonnull PathComputationFactory computationFactory,
                                   long nowMs) {
+        NeedsResourceHotPathDiagnostics.recordPreflightRequest();
         NeedsResourcePathPreflightState.ComputationOperation operation;
         boolean createComputation = false;
         synchronized (state.lock()) {
@@ -157,19 +160,24 @@ public final class NeedsResourcePathPreflightService {
                     state.resolveRecentReadyLocked(key, nowMs);
             if (recentReady != null
                     && NeedsResourcePreflightPolicy.canReuseRecentReady(recentReady.key(), key)) {
+                NeedsResourceHotPathDiagnostics.recordPreflightLeaseHit();
                 return PathPreflightResult.ready("path_preflight_recent_ready_target");
             }
             NeedsResourcePathPreflightState.CachedPreflight cached = state.cacheEntryLocked(key);
             if (cached != null && nowMs < cached.expiresAtMs()) {
                 if (cached.status() == PathPreflightStatus.READY) {
+                    NeedsResourceHotPathDiagnostics.recordPreflightLeaseHit();
                     return PathPreflightResult.ready(cached.reason());
                 }
                 if (cached.status() == PathPreflightStatus.NO_PATH) {
+                    NeedsResourceHotPathDiagnostics.recordPreflightLeaseMiss();
+                    NeedsResourceHotPathDiagnostics.recordPreflightNoPathResult();
                     return PathPreflightResult.noPath(cached.reason());
                 }
                 operation = cached.operation();
                 if (state.isCurrentOperationLocked(operation)) {
                     if (operation.computing) {
+                        NeedsResourceHotPathDiagnostics.recordPreflightLeaseMiss();
                         return PathPreflightResult.computing("path_preflight_computing");
                     }
                 } else {
@@ -189,11 +197,14 @@ public final class NeedsResourcePathPreflightService {
                 operation = state.registerOperationLocked(key);
                 createComputation = true;
             } else if (operation.computation == null) {
+                NeedsResourceHotPathDiagnostics.recordPreflightLeaseMiss();
                 return PathPreflightResult.computing("path_preflight_computing");
             }
         }
 
+        NeedsResourceHotPathDiagnostics.recordPreflightLeaseMiss();
         if (createComputation) {
+            NeedsResourceHotPathDiagnostics.recordPreflightComputation();
             PathComputation computation;
             try {
                 computation = computationFactory.create();
@@ -233,6 +244,7 @@ public final class NeedsResourcePathPreflightService {
             }
             budget = claimGlobalBudget(nowMs, MAX_NODES_PER_SENSOR_PASS);
             if (budget <= 0) {
+                NeedsResourceHotPathDiagnostics.recordPreflightBudgetDeferral();
                 state.cacheComputingLocked(
                         operation.key,
                         operation,
@@ -264,6 +276,7 @@ public final class NeedsResourcePathPreflightService {
                 return PathPreflightResult.unavailable("path_preflight_invalidated");
             }
             if (failed) {
+                NeedsResourceHotPathDiagnostics.recordPreflightNoPathResult();
                 state.clearOperationLocked(operation);
                 state.cacheTerminalResultLocked(
                         operation.key,
@@ -288,6 +301,7 @@ public final class NeedsResourcePathPreflightService {
                 return PathPreflightResult.ready("path_preflight_ready");
             }
             if (status == PathPreflightStatus.NO_PATH) {
+                NeedsResourceHotPathDiagnostics.recordPreflightNoPathResult();
                 state.clearOperationLocked(operation);
                 state.cacheTerminalResultLocked(
                         operation.key,
@@ -368,6 +382,7 @@ public final class NeedsResourcePathPreflightService {
         int targetX = (int) Math.floor(target.x);
         int targetY = (int) Math.floor(target.y);
         int targetZ = (int) Math.floor(target.z);
+        NeedsResourceHotPathDiagnostics.recordPreflightInvalidation();
         synchronized (state.lock()) {
             state.invalidateTargetLocked(
                     npcUuid,

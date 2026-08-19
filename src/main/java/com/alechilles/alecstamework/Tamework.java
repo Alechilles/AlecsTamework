@@ -174,6 +174,7 @@ import com.alechilles.alecstamework.npc.components.TameworkTranquilizerPeakCompo
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.OwnerPresenceTimelineService;
 import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
+import com.alechilles.alecstamework.npc.progression.NeedsResourceHotPathDiagnostics;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.persistence.facade.ReplacementNpcProfilesApi;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
@@ -3483,12 +3484,12 @@ public class Tamework extends JavaPlugin {
 
     public boolean setDebugNeedsSeekDiagnosticsEnabled(boolean enabled) {
         debugNeedsSeekDiagnosticsLogs = enabled;
+        refreshNeedsResourceHotPathDiagnostics();
         return debugNeedsSeekDiagnosticsLogs;
     }
 
     public boolean toggleDebugNeedsSeekDiagnosticsEnabled() {
-        debugNeedsSeekDiagnosticsLogs = !debugNeedsSeekDiagnosticsLogs;
-        return debugNeedsSeekDiagnosticsLogs;
+        return setDebugNeedsSeekDiagnosticsEnabled(!debugNeedsSeekDiagnosticsLogs);
     }
 
     public boolean isDebugNeedsTelemetryDiagnosticsEnabled() {
@@ -3497,12 +3498,18 @@ public class Tamework extends JavaPlugin {
 
     public boolean setDebugNeedsTelemetryDiagnosticsEnabled(boolean enabled) {
         debugNeedsTelemetryDiagnostics = enabled;
+        refreshNeedsResourceHotPathDiagnostics();
         return debugNeedsTelemetryDiagnostics;
     }
 
     public boolean toggleDebugNeedsTelemetryDiagnosticsEnabled() {
-        debugNeedsTelemetryDiagnostics = !debugNeedsTelemetryDiagnostics;
-        return debugNeedsTelemetryDiagnostics;
+        return setDebugNeedsTelemetryDiagnosticsEnabled(!debugNeedsTelemetryDiagnostics);
+    }
+
+    private void refreshNeedsResourceHotPathDiagnostics() {
+        NeedsResourceHotPathDiagnostics.setEnabled(
+                debugNeedsSeekDiagnosticsLogs || debugNeedsTelemetryDiagnostics
+        );
     }
 
     public boolean isDebugHarvestEnabled() {

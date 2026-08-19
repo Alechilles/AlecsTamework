@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.sensors;
 
 import com.alechilles.alecstamework.npc.progression.NeedsResourceCandidates;
+import com.alechilles.alecstamework.npc.progression.NeedsResourceHotPathDiagnostics;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceSearchCoordinator;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceTargetStateStore;
 import com.alechilles.alecstamework.npc.progression.PositionTargetRejectCache;
@@ -29,7 +30,9 @@ import org.joml.Vector3d;
  */
 public final class NeedsResourceTargetCacheAdapter {
     static final long TARGET_CACHE_HIT_TTL_MS = 1_500L;
+    static final long VALIDATED_TARGET_TTL_MS = 10_000L;
     static final long TARGET_CACHE_MISS_TTL_MS = 1_000L;
+    static final long DEFERRED_LOOKUP_RETRY_MS = 50L;
     static final double TARGET_RESERVATION_TTL_SECONDS = PositionTargetReservationCache.DEFAULT_TTL_SECONDS;
     static final int MAX_LOCAL_TARGETS = NeedsResourceTargetStateStore.MAX_ENTRIES_PER_RESOURCE;
     static final int MAX_FAST_CONSUME_TARGETS = 8_192;
@@ -41,6 +44,11 @@ public final class NeedsResourceTargetCacheAdapter {
     private static final NeedsResourceTargetStateStore TARGET_STATE =
             NeedsResourceTargetStateStore.shared();
     private final NeedsResourceSearchCoordinator coordinator;
+    @Nullable
+    private UUID deferredNpcUuid;
+    @Nullable
+    private NeedsResourceSearchCoordinator.Request deferredRequest;
+    private long deferredLookupUntilMs;
     /** Creates an adapter backed by the process-wide search coordinator. */
     public NeedsResourceTargetCacheAdapter() {
         this(NeedsResourceSearchCoordinator.getInstance());
@@ -68,7 +76,8 @@ public final class NeedsResourceTargetCacheAdapter {
                 originX,
                 originY,
                 originZ,
-                nowMs
+                nowMs,
+                VALIDATED_TARGET_TTL_MS
         );
         if (cached == null) {
             return null;
@@ -112,12 +121,20 @@ public final class NeedsResourceTargetCacheAdapter {
                 nowMs
         );
         if (local != null) {
+            clearDeferredLookup();
             return local;
         }
-        NeedsResourceSearchCoordinator.Lookup lookup = coordinator.lookupOrEnqueue(store, npcUuid, request, nowMs);
-        if (lookup.status() == NeedsResourceSearchCoordinator.Lookup.Status.DEFERRED) {
+        if (isDeferredLookupMemoized(npcUuid, request, nowMs)) {
+            NeedsResourceHotPathDiagnostics.recordCoordinatorRetrySuppressed();
             return Result.deferred();
         }
+        NeedsResourceHotPathDiagnostics.recordCoordinatorLookup();
+        NeedsResourceSearchCoordinator.Lookup lookup = coordinator.lookupOrEnqueue(store, npcUuid, request, nowMs);
+        if (lookup.status() == NeedsResourceSearchCoordinator.Lookup.Status.DEFERRED) {
+            rememberDeferredLookup(npcUuid, request, nowMs);
+            return Result.deferred();
+        }
+        clearDeferredLookup();
         NeedsResourceCandidates.Snapshot snapshot = lookup.snapshot();
         if (snapshot == null) {
             return Result.miss("resource_snapshot_missing", false);
@@ -290,6 +307,22 @@ public final class NeedsResourceTargetCacheAdapter {
                                  @Nullable Vector3d target) {
         return TARGET_STATE.promote(npcUuid, worldName, resourceKind, target);
     }
+
+    /** Promotes one target and starts its renewable validated lease. */
+    public boolean promoteTarget(@Nullable UUID npcUuid,
+                                 @Nullable String worldName,
+                                 @Nullable String resourceKind,
+                                 @Nullable Vector3d target,
+                                 long nowMs) {
+        return TARGET_STATE.promote(
+                npcUuid,
+                worldName,
+                resourceKind,
+                target,
+                nowMs,
+                VALIDATED_TARGET_TTL_MS
+        );
+    }
     /** Clears one NPC's local target and reservation marker. */
     public void clearTarget(@Nullable UUID npcUuid,
                             @Nullable String worldName,
@@ -377,10 +410,46 @@ public final class NeedsResourceTargetCacheAdapter {
                 approachRadius,
                 searchRadius,
                 verticalRadius,
-                nowMs + (target == null ? TARGET_CACHE_MISS_TTL_MS : TARGET_CACHE_HIT_TTL_MS),
+                nowMs + targetTtlMs(target, fastConsume, pathState),
                 fastConsume,
                 pathState
         );
+    }
+
+    private static long targetTtlMs(
+            @Nullable Vector3d target,
+            boolean fastConsume,
+            @Nonnull NeedsResourceTargetStateStore.PathState pathState) {
+        if (target == null) {
+            return TARGET_CACHE_MISS_TTL_MS;
+        }
+        return pathState == NeedsResourceTargetStateStore.PathState.VALIDATED && !fastConsume
+                ? VALIDATED_TARGET_TTL_MS
+                : TARGET_CACHE_HIT_TTL_MS;
+    }
+
+    private boolean isDeferredLookupMemoized(
+            @Nonnull UUID npcUuid,
+            @Nonnull NeedsResourceSearchCoordinator.Request request,
+            long nowMs) {
+        return npcUuid.equals(deferredNpcUuid)
+                && request == deferredRequest
+                && nowMs < deferredLookupUntilMs;
+    }
+
+    private void rememberDeferredLookup(
+            @Nonnull UUID npcUuid,
+            @Nonnull NeedsResourceSearchCoordinator.Request request,
+            long nowMs) {
+        deferredNpcUuid = npcUuid;
+        deferredRequest = request;
+        deferredLookupUntilMs = nowMs + DEFERRED_LOOKUP_RETRY_MS;
+    }
+
+    private void clearDeferredLookup() {
+        deferredNpcUuid = null;
+        deferredRequest = null;
+        deferredLookupUntilMs = 0L;
     }
     private static boolean isUsable(@Nonnull Vector3d target,
                                     double originX,

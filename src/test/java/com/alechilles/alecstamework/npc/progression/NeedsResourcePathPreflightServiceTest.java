@@ -25,6 +25,46 @@ class NeedsResourcePathPreflightServiceTest {
     @AfterEach
     void clearRuntimePressure() {
         TameworkRuntimePressureService.getInstance().clearForTests();
+        NeedsResourceHotPathDiagnostics.resetForTests();
+    }
+
+    @Test
+    void diagnosticsClassifyLeaseReuseAndNewComputations() {
+        NeedsResourceHotPathDiagnostics.setEnabledForTests(true);
+        NeedsResourcePathPreflightService service = new NeedsResourcePathPreflightService();
+        NeedsResourcePathPreflightService.PreflightKey readyKey = keyFor(90_000);
+        NeedsResourcePathPreflightService.PreflightKey noPathKey = keyFor(90_001);
+
+        assertTrue(service.preflight(
+                readyKey,
+                () -> new FakeComputation(PathPreflightStatus.READY),
+                1_000L
+        ).ready());
+        assertTrue(service.preflight(
+                readyKey,
+                () -> new FakeComputation(PathPreflightStatus.NO_PATH),
+                1_001L
+        ).ready());
+        assertTrue(service.preflight(
+                noPathKey,
+                () -> new FakeComputation(PathPreflightStatus.NO_PATH),
+                1_001L
+        ).noPath());
+        service.invalidateTarget(
+                readyKey.npcUuid(),
+                readyKey.worldName(),
+                readyKey.resourceType(),
+                new Vector3d(readyKey.targetX() + 0.5, readyKey.targetY() + 0.5, readyKey.targetZ() + 0.5)
+        );
+
+        NeedsResourceHotPathDiagnostics.Snapshot snapshot =
+                NeedsResourceHotPathDiagnostics.snapshot();
+        assertEquals(3L, snapshot.preflightRequests());
+        assertEquals(1L, snapshot.preflightLeaseHits());
+        assertEquals(2L, snapshot.preflightLeaseMisses());
+        assertEquals(2L, snapshot.preflightComputations());
+        assertEquals(1L, snapshot.preflightNoPathResults());
+        assertEquals(1L, snapshot.preflightInvalidations());
     }
 
     @Test

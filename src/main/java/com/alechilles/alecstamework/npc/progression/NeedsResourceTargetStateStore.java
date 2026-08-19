@@ -94,6 +94,31 @@ public final class NeedsResourceTargetStateStore {
                                double originY,
                                double originZ,
                                long nowMs) {
+        return resolve(
+                npcUuid,
+                worldName,
+                resourceKind,
+                originX,
+                originY,
+                originZ,
+                nowMs,
+                0L
+        );
+    }
+
+    /**
+     * Resolves a target and renews a live validated target for the supplied
+     * duration. Pending targets and cached misses retain their original TTL.
+     */
+    @Nullable
+    public TargetState resolve(@Nullable UUID npcUuid,
+                               @Nullable String worldName,
+                               @Nullable String resourceKind,
+                               double originX,
+                               double originY,
+                               double originZ,
+                               long nowMs,
+                               long validatedTtlMs) {
         if (npcUuid == null) {
             return null;
         }
@@ -113,6 +138,26 @@ public final class NeedsResourceTargetStateStore {
             targets.remove(npcUuid, state);
             return null;
         }
+        if (state.target() != null
+                && state.pathState() == PathState.VALIDATED
+                && !state.fastConsume()
+                && validatedTtlMs > 0L
+                && state.expiresAtMs() - nowMs <= validatedTtlMs / 2L) {
+            TargetState renewed = state.withExpiresAt(nowMs + validatedTtlMs);
+            if (targets.replace(npcUuid, state, renewed)) {
+                return renewed;
+            }
+            return resolve(
+                    npcUuid,
+                    worldName,
+                    resourceKind,
+                    originX,
+                    originY,
+                    originZ,
+                    nowMs,
+                    0L
+            );
+        }
         return state;
     }
 
@@ -121,6 +166,16 @@ public final class NeedsResourceTargetStateStore {
                            @Nullable String worldName,
                            @Nullable String resourceKind,
                            @Nullable Vector3d target) {
+        return promote(npcUuid, worldName, resourceKind, target, 0L, 0L);
+    }
+
+    /** Promotes and starts a validated lease from the supplied game time. */
+    public boolean promote(@Nullable UUID npcUuid,
+                           @Nullable String worldName,
+                           @Nullable String resourceKind,
+                           @Nullable Vector3d target,
+                           long nowMs,
+                           long validatedTtlMs) {
         if (npcUuid == null || target == null || !isFinite(target)) {
             return false;
         }
@@ -133,7 +188,14 @@ public final class NeedsResourceTargetStateStore {
                 || !sameBlock(state.target(), target)) {
             return false;
         }
-        return targets.replace(npcUuid, state, state.withPathState(PathState.VALIDATED));
+        long expiresAtMs = validatedTtlMs > 0L
+                ? nowMs + validatedTtlMs
+                : state.expiresAtMs();
+        return targets.replace(
+                npcUuid,
+                state,
+                state.with(PathState.VALIDATED, expiresAtMs)
+        );
     }
 
     /** Extends a matching pending target while a non-terminal preflight runs. */
