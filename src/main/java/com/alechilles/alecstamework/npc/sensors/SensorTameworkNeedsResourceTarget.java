@@ -104,6 +104,26 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             log(ref, store, "miss", "world_missing", false, eligibility.currentRatio(), null);
             return false;
         }
+        long nowMs = System.currentTimeMillis();
+        NeedsResourceTargetCacheAdapter.Result local = targetCache.resolveLocal(
+                npcUuid,
+                worldName,
+                resourceType.kind,
+                originX,
+                originY,
+                originZ,
+                nowMs
+        );
+        if (local != null) {
+            if (local.status() != NeedsResourceTargetCacheAdapter.Status.TARGET || local.target() == null) {
+                log(ref, store, "miss", local.reason(), true, eligibility.currentRatio(), null);
+                return false;
+            }
+            Vector3d localTarget = local.target();
+            positionInfo.setTarget(localTarget.x, localTarget.y, localTarget.z);
+            log(ref, store, "target_found", local.reason(), true, eligibility.currentRatio(), localTarget);
+            return true;
+        }
         TwNeedsConfig needsConfig = eligibility.needsConfig();
         if (needsConfig == null) {
             needsConfig = resolveNeedsConfig(ref, store);
@@ -119,7 +139,6 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             log(ref, store, "miss", "resource_request_invalid", false, eligibility.currentRatio(), null);
             return false;
         }
-        long nowMs = System.currentTimeMillis();
         NeedsResourceTargetCacheAdapter.Result result = targetCache.resolve(
                 store,
                 npcUuid,
@@ -142,6 +161,8 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                 && "resource_target_not_found".equals(result.reason())) {
             Vector3d recent = targetCache.resolveRecentTarget(
                     npcUuid,
+                    worldName,
+                    resourceType.kind,
                     new Vector3d(originX, originY, originZ),
                     nowMs
             );
@@ -163,7 +184,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             log(ref, store, "miss", result.reason(), result.cacheHit(), eligibility.currentRatio(), null);
             return false;
         }
-        if (!result.fastConsume()) {
+        if (result.preflightRequired() && !result.fastConsume()) {
             PathPreflightResult preflight = PATH_PREFLIGHT_SERVICE.preflight(
                     ref,
                     role,
@@ -178,7 +199,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             if (!preflight.ready()) {
                 if (preflight.noPath()) {
                     targetCache.invalidateCandidate(store, request, target, nowMs);
-                    targetCache.forgetRecentTarget(npcUuid, target);
+                    targetCache.forgetRecentTarget(npcUuid, worldName, resourceType.kind, target);
                     NeedsResourceTargetCacheAdapter.rejectTarget(
                             npcUuid,
                             resourceType.kind,
@@ -191,7 +212,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                 return false;
             }
         }
-        targetCache.rememberRecentTarget(npcUuid, target, nowMs);
+        targetCache.rememberRecentTarget(npcUuid, worldName, resourceType.kind, target, nowMs);
         positionInfo.setTarget(target.x, target.y, target.z);
         log(ref, store, "target_found", result.reason(), result.cacheHit(), eligibility.currentRatio(), target);
         return true;

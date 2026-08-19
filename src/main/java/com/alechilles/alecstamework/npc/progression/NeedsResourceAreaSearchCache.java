@@ -100,7 +100,7 @@ final class NeedsResourceAreaSearchCache {
     void put(@Nullable AreaKey key,
              @Nonnull NeedsResourceCandidates.Snapshot snapshot,
              long nowMs) {
-        putInternal(key, snapshot, nowMs, null);
+        putInternal(key, snapshot, nowMs, null, false);
     }
 
     /**
@@ -143,8 +143,10 @@ final class NeedsResourceAreaSearchCache {
     private void putInternal(@Nullable AreaKey key,
                              @Nonnull NeedsResourceCandidates.Snapshot snapshot,
                              long nowMs,
-                             @Nullable LegacyTargetCoordinates legacyTarget) {
-        if (key == null || !shouldShareResult(snapshot.hasCandidates(), snapshot.foundSource())) {
+                             @Nullable LegacyTargetCoordinates legacyTarget,
+                             boolean requireLegacyReusableResult) {
+        if (key == null || requireLegacyReusableResult
+                && !shouldShareResult(snapshot.hasCandidates(), snapshot.foundSource())) {
             return;
         }
         pruneExpired(nowMs);
@@ -168,7 +170,8 @@ final class NeedsResourceAreaSearchCache {
                             snapshot.ttlMs()
                     ),
                     nowMs,
-                    null
+                    null,
+                    true
             );
             return;
         }
@@ -185,7 +188,8 @@ final class NeedsResourceAreaSearchCache {
                         snapshot.ttlMs()
                 ),
                 nowMs,
-                new LegacyTargetCoordinates(snapshot.target().x(), snapshot.target().y(), snapshot.target().z())
+                new LegacyTargetCoordinates(snapshot.target().x(), snapshot.target().y(), snapshot.target().z()),
+                true
         );
     }
 

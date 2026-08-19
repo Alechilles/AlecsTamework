@@ -114,6 +114,12 @@ public final class PositionTargetReservationCache {
         RESERVED_TARGETS.clear();
     }
 
+    /** Removes reservations owned by one world during world teardown. */
+    public static void clearWorld(@Nullable String worldName) {
+        String normalizedWorld = normalizeWorldName(worldName);
+        RESERVED_TARGETS.keySet().removeIf(key -> key.worldName().equals(normalizedWorld));
+    }
+
     public static int countForTests() {
         return RESERVED_TARGETS.size();
     }

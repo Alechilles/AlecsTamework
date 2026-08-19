@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.progression;
 
+import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
@@ -13,6 +14,7 @@ import org.joml.Vector3d;
 public final class NeedsRecentTargetCache {
     static final long DEFAULT_TTL_MS = 60_000L;
     static final double DEFAULT_MAX_DISTANCE = 48.0;
+    public static final int MAX_ENTRIES = 8_192;
     private static final double SAME_TARGET_DISTANCE_SQ = 0.25;
 
     private final ConcurrentHashMap<UUID, RecentTarget> targetsByNpcId = new ConcurrentHashMap<>();
@@ -32,14 +34,33 @@ public final class NeedsRecentTargetCache {
     }
 
     public void remember(@Nullable UUID npcUuid, @Nullable Vector3d target, long nowMs) {
+        remember(npcUuid, null, target, nowMs);
+    }
+
+    public void remember(@Nullable UUID npcUuid,
+                         @Nullable String worldName,
+                         @Nullable Vector3d target,
+                         long nowMs) {
         if (npcUuid == null || !isFinite(target)) {
             return;
         }
-        targetsByNpcId.put(npcUuid, new RecentTarget(new Vector3d(target), nowMs + ttlMs));
+        pruneBounded(nowMs);
+        targetsByNpcId.put(
+                npcUuid,
+                new RecentTarget(normalizeWorldName(worldName), new Vector3d(target), nowMs + ttlMs)
+        );
     }
 
     @Nullable
     public Vector3d resolve(@Nullable UUID npcUuid, @Nullable Vector3d currentPosition, long nowMs) {
+        return resolve(npcUuid, null, currentPosition, nowMs);
+    }
+
+    @Nullable
+    public Vector3d resolve(@Nullable UUID npcUuid,
+                            @Nullable String worldName,
+                            @Nullable Vector3d currentPosition,
+                            long nowMs) {
         if (npcUuid == null || !isFinite(currentPosition)) {
             return null;
         }
@@ -51,6 +72,9 @@ public final class NeedsRecentTargetCache {
             targetsByNpcId.remove(npcUuid, target);
             return null;
         }
+        if (!target.worldName().equals(normalizeWorldName(worldName))) {
+            return null;
+        }
         double distanceSq = target.target().distanceSquared(currentPosition);
         if (!Double.isFinite(distanceSq) || distanceSq > maxDistanceSq) {
             return null;
@@ -59,17 +83,38 @@ public final class NeedsRecentTargetCache {
     }
 
     public void forget(@Nullable UUID npcUuid, @Nullable Vector3d target) {
+        forget(npcUuid, null, target);
+    }
+
+    public void forget(@Nullable UUID npcUuid,
+                       @Nullable String worldName,
+                       @Nullable Vector3d target) {
         if (npcUuid == null || !isFinite(target)) {
             return;
         }
         RecentTarget cached = targetsByNpcId.get(npcUuid);
-        if (cached != null && cached.target().distanceSquared(target) <= SAME_TARGET_DISTANCE_SQ) {
+        if (cached != null
+                && cached.worldName().equals(normalizeWorldName(worldName))
+                && cached.target().distanceSquared(target) <= SAME_TARGET_DISTANCE_SQ) {
             targetsByNpcId.remove(npcUuid, cached);
         }
     }
 
-    void clearForTests() {
+    /** Removes all recent targets owned by one world. */
+    public void clearWorld(@Nullable String worldName) {
+        String normalizedWorld = normalizeWorldName(worldName);
+        targetsByNpcId.entrySet().removeIf(
+                entry -> entry.getValue().worldName().equals(normalizedWorld)
+        );
+    }
+
+    /** Clears all entries for a lifecycle owner or focused test. */
+    public void clear() {
         targetsByNpcId.clear();
+    }
+
+    void clearForTests() {
+        clear();
     }
 
     int countForTests() {
@@ -83,7 +128,28 @@ public final class NeedsRecentTargetCache {
                 && Double.isFinite(value.z);
     }
 
-    private record RecentTarget(@Nonnull Vector3d target,
+    @Nonnull
+    private static String normalizeWorldName(@Nullable String worldName) {
+        return worldName == null || worldName.isBlank()
+                ? "global"
+                : worldName.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private void pruneBounded(long nowMs) {
+        if (targetsByNpcId.size() < MAX_ENTRIES) {
+            return;
+        }
+        targetsByNpcId.entrySet().removeIf(entry -> nowMs >= entry.getValue().expiresAtMs());
+        while (targetsByNpcId.size() >= MAX_ENTRIES) {
+            var keys = targetsByNpcId.keySet().iterator();
+            if (!keys.hasNext() || targetsByNpcId.remove(keys.next()) == null) {
+                return;
+            }
+        }
+    }
+
+    private record RecentTarget(@Nonnull String worldName,
+                                @Nonnull Vector3d target,
                                 long expiresAtMs) {
     }
 }

@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsBatchRunner;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsRuntimeRegistry;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceSearchCoordinator;
+import com.alechilles.alecstamework.npc.sensors.NeedsResourceTargetCacheAdapter;
 import com.alechilles.alecstamework.npc.systems.*;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationEntitySystem;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationOwnerChangeSystem;
@@ -277,6 +278,7 @@ public final class TameworkCompanionRuntimeParticipants {
             NeedsResourceSearchCoordinator coordinator,
             World world
     ) {
+        NeedsResourceTargetCacheAdapter.clearWorld(world.getName());
         EntityStore entityStore = world.getEntityStore();
         if (entityStore == null) {
             return;

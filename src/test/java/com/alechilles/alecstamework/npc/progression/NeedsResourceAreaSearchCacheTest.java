@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.progression;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -186,6 +187,24 @@ class NeedsResourceAreaSearchCacheTest {
     @Test
     void sourcePresentMissIsNotAreaReusable() {
         assertFalse(NeedsResourceAreaSearchCache.shouldShareResult(false, true));
+    }
+
+    @Test
+    void coordinatorSnapshotKeepsSourcePresentConsumeMetadata() {
+        NeedsResourceAreaSearchCache cache = new NeedsResourceAreaSearchCache(16);
+        NeedsResourceAreaSearchCache.AreaKey key = NeedsResourceAreaSearchCache.AreaKey.from(
+                "world", "water", new Vector3d(10.0, 64.0, 10.0), 16.0, 2, 3.0, 0);
+        cache.put(
+                key,
+                new NeedsResourceCandidates.Snapshot(List.of(), true, true, 3_000L),
+                1_000L
+        );
+
+        NeedsResourceCandidates.Snapshot cached = cache.getSnapshot(key, 1_001L);
+
+        assertNotNull(cached);
+        assertTrue(cached.foundSource());
+        assertTrue(cached.sourceInConsumeRange());
     }
 
     @Test
