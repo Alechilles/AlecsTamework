@@ -128,16 +128,16 @@ public final class NeedsResourceSearchCoordinator {
         long startedNs = System.nanoTime();
         NeedsResourceCandidates.Snapshot snapshot;
         try {
-            snapshot = Objects.requireNonNull(
-                    executor.search(store, pending.request, waiters),
-                    "search result"
-            );
+            snapshot = executor.search(store, pending.request, waiters);
         } catch (RuntimeException exception) {
             recordSearchWork(startedNs, nowMs);
             recoverFromSearchFailure(store, state, pending, waiters, nowMs, exception);
             return 1;
         }
         recordSearchWork(startedNs, nowMs);
+        if (snapshot == null) {
+            return 1;
+        }
         state.areaCache.put(
                 pending.request.areaKey(),
                 NeedsResourceSearchCachePolicy.scaleSharedSnapshotTtl(snapshot, nowMs),
@@ -489,10 +489,13 @@ public final class NeedsResourceSearchCoordinator {
 
     /**
      * Runs one synchronous cold search on the current world thread.
+     *
+     * <p>A null result intentionally discards a request whose waiter no longer
+     * exists. The coordinator records the attempt but does not cache a miss.
      */
     @FunctionalInterface
     public interface SearchExecutor {
-        @Nonnull
+        @Nullable
         NeedsResourceCandidates.Snapshot search(@Nonnull Store<EntityStore> store,
                                                 @Nonnull Request request,
                                                 @Nonnull List<UUID> waiterIds);

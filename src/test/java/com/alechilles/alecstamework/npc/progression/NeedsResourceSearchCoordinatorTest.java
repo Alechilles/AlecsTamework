@@ -166,6 +166,34 @@ class NeedsResourceSearchCoordinatorTest {
     }
 
     @Test
+    void pressureLevelsBoundSearchesAcrossEightWorldTicks() {
+        for (PressureCase pressureCase : PressureCase.values()) {
+            try (TestEntityComponentStore store = newStore()) {
+                coordinator.clear(store);
+                TameworkRuntimePressureService pressure = TameworkRuntimePressureService.getInstance();
+                pressure.clearForTests();
+                pressureCase.seed(pressure);
+
+                CountingExecutor executor = new CountingExecutor(hitSnapshot(1_500L));
+                for (int index = 0; index < 8; index++) {
+                    coordinator.lookupOrEnqueue(
+                            store,
+                            uuid(260_000L + pressureCase.ordinal() * 100L + index),
+                            request(260_000 + pressureCase.ordinal() * 100 + index),
+                            NOW_MS
+                    );
+                }
+
+                for (long worldTick = 1L; worldTick <= 8L; worldTick++) {
+                    coordinator.processOne(store, worldTick, NOW_MS, executor);
+                }
+
+                assertEquals(pressureCase.expectedCalls, executor.calls(), pressureCase.name());
+            }
+        }
+    }
+
+    @Test
     void oldestPendingKeysCompleteFirst() {
         try (TestEntityComponentStore store = newStore()) {
             coordinator.clear(store);
@@ -258,7 +286,7 @@ class NeedsResourceSearchCoordinatorTest {
     }
 
     @Test
-    void nullSearchResultConsumesTickBudgetAndCanRetryAfterShortMiss() {
+    void nullSearchResultConsumesTickBudgetWithoutCachingAndCanRetry() {
         try (TestEntityComponentStore store = newStore()) {
             coordinator.clear(store);
             UUID firstNpc = uuid(650);
@@ -276,12 +304,14 @@ class NeedsResourceSearchCoordinatorTest {
             assertEquals(1, executor.calls());
             assertEquals(1, coordinator.pendingCountForTests(store));
 
+            assertEquals(
+                    DEFERRED,
+                    coordinator.lookupOrEnqueue(store, firstNpc, firstRequest, NOW_MS + 1L).status()
+            );
+            assertEquals(2, coordinator.pendingCountForTests(store));
+
             assertEquals(1, coordinator.processOne(store, -7L, NOW_MS, executor));
-            long retryAt = NOW_MS + new NeedsResourceSearchAdmissionPolicy().deferredTtlMs(firstNpc);
-            assertEquals(MISS, coordinator.lookupOrEnqueue(store, firstNpc, firstRequest, retryAt - 1L).status());
-            assertEquals(DEFERRED, coordinator.lookupOrEnqueue(store, firstNpc, firstRequest, retryAt).status());
-            assertEquals(1, coordinator.processOne(store, 0L, retryAt, executor));
-            assertEquals(HIT, coordinator.lookupOrEnqueue(store, firstNpc, firstRequest, retryAt + 1L).status());
+            assertEquals(2, executor.calls());
         }
     }
 
@@ -476,6 +506,27 @@ class NeedsResourceSearchCoordinatorTest {
 
         private List<List<UUID>> waiters() {
             return List.copyOf(waiters);
+        }
+    }
+
+    private enum PressureCase {
+        NORMAL(8, 0),
+        WARM(4, 128),
+        HOT(2, 512),
+        EMERGENCY(1, 1_024);
+
+        private final int expectedCalls;
+        private final int seedOperations;
+
+        PressureCase(int expectedCalls, int seedOperations) {
+            this.expectedCalls = expectedCalls;
+            this.seedOperations = seedOperations;
+        }
+
+        private void seed(TameworkRuntimePressureService pressure) {
+            for (int index = 0; index < seedOperations; index++) {
+                pressure.recordWork(NEEDS_RESOURCE_SEARCH, 0L, NOW_MS);
+            }
         }
     }
 

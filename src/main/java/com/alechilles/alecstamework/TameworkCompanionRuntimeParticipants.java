@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.avatarflight.*;
 import com.alechilles.alecstamework.debug.PlayerInputDebugSystem;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsBatchRunner;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsRuntimeRegistry;
+import com.alechilles.alecstamework.npc.progression.NeedsResourceSearchCoordinator;
 import com.alechilles.alecstamework.npc.systems.*;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationEntitySystem;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationOwnerChangeSystem;
@@ -238,6 +239,8 @@ public final class TameworkCompanionRuntimeParticipants {
                         plugin.getTamedComponentType()));
         participants.entitySystem(TameworkRuntimeModule.NEEDS, "companionneedssystem",
                 () -> new CompanionNeedsSystem(needsRegistry, needsRunner));
+        participants.entitySystem(TameworkRuntimeModule.NEEDS, "needsresourcesearchsystem",
+                () -> new NeedsResourceSearchSystem(NeedsResourceSearchCoordinator.getInstance()));
         participants.entitySystem(TameworkRuntimeModule.BREEDING, "companionpassivebreedingsystem",
                 () -> new CompanionPassiveBreedingSystem(plugin.getBreedingPairAdmissionRegistry()));
     }
