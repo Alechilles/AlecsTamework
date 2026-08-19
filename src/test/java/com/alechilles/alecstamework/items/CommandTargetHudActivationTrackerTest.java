@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.hypixel.hytale.component.TestEntityComponentStore;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -164,6 +165,46 @@ class CommandTargetHudActivationTrackerTest {
         tracker.recordResolvedHand(PLAYER_UUID, null, false, 1_001L);
 
         Assertions.assertTrue(tracker.selectCandidateBatch(4).playerUuids().isEmpty());
+    }
+
+    @Test
+    void saturatedDirtyQueueReservesDueActiveRefreshCapacity() {
+        CommandTargetHudActivationTracker tracker = new CommandTargetHudActivationTracker();
+        tracker.recordResolvedHand(PLAYER_UUID, "Tamework:CommandFlute", true, 1_000L);
+        for (UUID playerUuid : MANY_PLAYER_UUIDS) {
+            tracker.markDirty(playerUuid);
+        }
+
+        CommandTargetHudActivationTracker.CandidateBatch batch =
+                tracker.selectCandidateBatchForTests(4, 1_200L, 200L, 1);
+
+        Assertions.assertEquals(4, batch.playerUuids().size());
+        Assertions.assertTrue(
+                batch.playerUuids().contains(PLAYER_UUID),
+                "A saturated recovery queue must not starve a due active refresh."
+        );
+    }
+
+    @Test
+    void dirtyCandidatesRemainOwnedByTheirStore() {
+        UUID storeAPlayer = MANY_PLAYER_UUIDS.get(0);
+        UUID storeBPlayer = MANY_PLAYER_UUIDS.get(1);
+        CommandTargetHudActivationTracker tracker = new CommandTargetHudActivationTracker();
+
+        try (TestEntityComponentStore storeA = new TestEntityComponentStore(null);
+             TestEntityComponentStore storeB = new TestEntityComponentStore(null)) {
+            tracker.markDirty(storeA, storeAPlayer);
+            tracker.markDirty(storeB, storeBPlayer);
+
+            Assertions.assertEquals(
+                    List.of(storeAPlayer),
+                    tracker.selectCandidateBatch(storeA, 1).playerUuids()
+            );
+            Assertions.assertEquals(
+                    List.of(storeBPlayer),
+                    tracker.selectCandidateBatch(storeB, 1).playerUuids()
+            );
+        }
     }
 
     @Test

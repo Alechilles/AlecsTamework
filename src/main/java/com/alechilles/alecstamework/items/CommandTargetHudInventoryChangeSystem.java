@@ -42,6 +42,6 @@ public final class CommandTargetHudInventoryChangeSystem extends EntityEventSyst
         }
         Player player = archetypeChunk.getComponent(index, Player.getComponentType());
         UUID playerUuid = player != null ? player.getUuid() : null;
-        dirtySink.markDirty(playerUuid);
+        dirtySink.markDirty(store, playerUuid);
     }
 }

@@ -32,6 +32,7 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
     private static final long REFRESH_INTERVAL_MS = 200L;
     private static final long FALLBACK_DISCOVERY_INTERVAL_MS = 1_500L;
     private static final int MAX_CANDIDATES_PER_PASS = 16;
+    private static final int RESERVED_ACTIVE_CANDIDATES = 1;
     private static final CommandHotswapHudViewModel HIDDEN_MODEL = new CommandHotswapHudViewModel(
             CommandHotswapHudViewModel.Slot.hidden("LMB"),
             CommandHotswapHudViewModel.Slot.hidden("RMB"),
@@ -55,7 +56,7 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
     private final CommandTargetInspector targetInspector;
     private final CommandHotswapHudGroupStatusResolver groupStatusResolver =
             new CommandHotswapHudGroupStatusResolver(null, null, null);
-    private final Map<UUID, HudState> statesByPlayer = new HashMap<>();
+    private final Map<Store<EntityStore>, Map<UUID, HudState>> statesByStore = new IdentityHashMap<>();
     private final Map<Store<EntityStore>, StoreTickState> storeTickStateByStore = new IdentityHashMap<>();
 
     public CommandHotswapHudService(@Nonnull CommandItemRegistry registry) {
@@ -78,6 +79,17 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
         this.registry = registry;
         this.activationTracker = activationTracker;
         this.targetInspector = targetInspector;
+        activationTracker.addLifecycleListener(new CommandTargetHudActivationTracker.LifecycleListener() {
+            @Override
+            public void onPlayerRemoved(@Nonnull Store<EntityStore> store, @Nonnull UUID playerUuid) {
+                clearPlayerState(store, playerUuid);
+            }
+
+            @Override
+            public void onStoreRemoved(@Nonnull Store<EntityStore> store) {
+                clearStoreState(store);
+            }
+        });
     }
 
     @Override
@@ -103,13 +115,19 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
 
     private void processCandidatePlayers(@Nonnull Store<EntityStore> store, long nowMs) {
         CommandTargetHudActivationTracker.CandidateBatch batch =
-                activationTracker.selectCandidateBatch(MAX_CANDIDATES_PER_PASS);
+                activationTracker.selectCandidateBatch(
+                        store,
+                        MAX_CANDIDATES_PER_PASS,
+                        nowMs,
+                        REFRESH_INTERVAL_MS,
+                        RESERVED_ACTIVE_CANDIDATES
+                );
         for (UUID playerUuid : batch.playerUuids()) {
             PlayerCandidate candidate = resolvePlayerCandidate(playerUuid, store);
             if (candidate == null) {
                 continue;
             }
-            updatePlayer(candidate.playerUuid(), candidate.player(), nowMs);
+            updatePlayer(store, candidate.playerUuid(), candidate.player(), nowMs);
         }
     }
 
@@ -121,17 +139,18 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
         store.forEachChunk(
                 Query.and(playerType),
                 (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> ignored) ->
-                        seedCandidateChunk(chunk, playerType)
+                        seedCandidateChunk(chunk, playerType, store)
         );
     }
 
     private void seedCandidateChunk(@Nonnull ArchetypeChunk<EntityStore> chunk,
-                                    @Nonnull ComponentType<EntityStore, Player> playerType) {
+                                    @Nonnull ComponentType<EntityStore, Player> playerType,
+                                    @Nonnull Store<EntityStore> store) {
         for (int index = 0; index < chunk.size(); index++) {
             Player player = chunk.getComponent(index, playerType);
             UUID playerUuid = player != null ? player.getUuid() : null;
             if (playerUuid != null) {
-                activationTracker.markDirty(playerUuid);
+                activationTracker.markDirty(store, playerUuid);
             }
         }
     }
@@ -151,18 +170,26 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
         return player != null ? new PlayerCandidate(playerUuid, player) : null;
     }
 
-    private void updatePlayer(@Nonnull UUID playerUuid,
+    private void updatePlayer(@Nonnull Store<EntityStore> store,
+                              @Nonnull UUID playerUuid,
                               @Nullable Player player,
                               long nowMs) {
         if (playerUuid == null) {
             return;
         }
-        String activeItemId = resolveActiveCommandItemId(player);
-        activationTracker.recordResolvedHand(playerUuid, activeItemId, activeItemId != null, nowMs);
-        CommandHotswapHudViewModel model = resolveModel(player, nowMs);
+        ActiveCommandItem activeCommand = resolveActiveCommand(player);
+        activationTracker.recordResolvedHand(
+                store,
+                playerUuid,
+                activeCommand != null ? activeCommand.itemId() : null,
+                activeCommand != null,
+                nowMs
+        );
+        CommandHotswapHudViewModel model = resolveModel(player, activeCommand, nowMs);
+        Map<UUID, HudState> statesByPlayer = statesForStore(store);
         HudState previous = statesByPlayer.get(playerUuid);
         if (!model.visible()) {
-            removeHud(playerUuid, player, previous);
+            removeHud(store, playerUuid, player, previous);
             return;
         }
         PlayerRef playerRef = player.getPlayerRef();
@@ -182,15 +209,14 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
     }
 
     @Nonnull
-    private CommandHotswapHudViewModel resolveModel(@Nullable Player player, long nowMs) {
-        ItemStack stack = PlayerInventoryAccess.getActiveHotbarItem(player);
-        if (stack == null || stack.isEmpty() || stack.getItemId() == null || registry == null) {
+    private CommandHotswapHudViewModel resolveModel(@Nullable Player player,
+                                                    @Nullable ActiveCommandItem activeCommand,
+                                                    long nowMs) {
+        if (player == null || activeCommand == null) {
             return hiddenModel();
         }
-        TwCommandItemConfig config = registry.get(stack.getItemId());
-        if (config == null || !config.isEnabled()) {
-            return hiddenModel();
-        }
+        ItemStack stack = activeCommand.stack();
+        TwCommandItemConfig config = activeCommand.config();
         return new CommandHotswapHudViewModel(
                 resolvePrimarySlot(player, stack, config, nowMs),
                 OPEN_MENU_SLOT,
@@ -264,10 +290,12 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
         return HIDDEN_MODEL;
     }
 
-    private void removeHud(@Nonnull UUID playerUuid,
-                           @Nullable Player player,
-                           @Nullable HudState previous) {
+    private void removeHud(@Nonnull Store<EntityStore> store,
+                            @Nonnull UUID playerUuid,
+                            @Nullable Player player,
+                            @Nullable HudState previous) {
         if (previous == null) {
+            removeEmptyPlayerState(store, statesByStore.get(store));
             return;
         }
         if (player != null && player.getPlayerRef() != null && player.getHudManager() != null) {
@@ -277,17 +305,57 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
         } else {
             previous.hud().hideNow();
         }
+        Map<UUID, HudState> statesByPlayer = statesForStore(store);
         statesByPlayer.remove(playerUuid);
+        removeEmptyPlayerState(store, statesByPlayer);
     }
 
     @Nullable
-    private String resolveActiveCommandItemId(@Nullable Player player) {
+    private ActiveCommandItem resolveActiveCommand(@Nullable Player player) {
         ItemStack stack = PlayerInventoryAccess.getActiveHotbarItem(player);
         if (stack == null || stack.isEmpty() || stack.getItemId() == null || registry == null) {
             return null;
         }
         TwCommandItemConfig config = registry.get(stack.getItemId());
-        return config != null && config.isEnabled() ? stack.getItemId() : null;
+        if (config == null || !config.isEnabled()) {
+            return null;
+        }
+        return new ActiveCommandItem(stack, stack.getItemId(), config);
+    }
+
+    @Nonnull
+    private Map<UUID, HudState> statesForStore(@Nonnull Store<EntityStore> store) {
+        return statesByStore.computeIfAbsent(store, ignored -> new HashMap<>());
+    }
+
+    private void removeEmptyPlayerState(@Nonnull Store<EntityStore> store,
+                                         @Nullable Map<UUID, HudState> statesByPlayer) {
+        if (statesByPlayer != null && statesByPlayer.isEmpty()) {
+            statesByStore.remove(store, statesByPlayer);
+        }
+    }
+
+    private void clearPlayerState(@Nonnull Store<EntityStore> store,
+                                  @Nonnull UUID playerUuid) {
+        Map<UUID, HudState> statesByPlayer = statesByStore.get(store);
+        if (statesByPlayer == null) {
+            return;
+        }
+        HudState state = statesByPlayer.remove(playerUuid);
+        if (state != null) {
+            state.hud().hideNow();
+        }
+        removeEmptyPlayerState(store, statesByPlayer);
+    }
+
+    private void clearStoreState(@Nonnull Store<EntityStore> store) {
+        Map<UUID, HudState> statesByPlayer = statesByStore.remove(store);
+        if (statesByPlayer != null) {
+            for (HudState state : statesByPlayer.values()) {
+                state.hud().hideNow();
+            }
+        }
+        storeTickStateByStore.remove(store);
     }
 
     /** Keeps scheduler deadlines separate for each entity store. */
@@ -299,6 +367,12 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
     /** Carries a stable player identity with the live component resolved for this tick. */
     private record PlayerCandidate(@Nonnull UUID playerUuid,
                                    @Nonnull Player player) {
+    }
+
+    /** Holds one resolved active command stack so activation and HUD rendering share the lookup. */
+    private record ActiveCommandItem(@Nonnull ItemStack stack,
+                                     @Nonnull String itemId,
+                                     @Nonnull TwCommandItemConfig config) {
     }
 
     private record HudState(@Nonnull PlayerRef playerRef,

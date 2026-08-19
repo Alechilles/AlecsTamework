@@ -104,6 +104,8 @@ import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.items.CommandHotswapHudService;
 import com.alechilles.alecstamework.items.CommandNpcRelocationService;
 import com.alechilles.alecstamework.items.CommandHudDirtySink;
+import com.alechilles.alecstamework.items.CommandHudPlayerLifecycleSystem;
+import com.alechilles.alecstamework.items.CommandHudStoreLifecycleSystem;
 import com.alechilles.alecstamework.items.CommandTargetHudActivationTracker;
 import com.alechilles.alecstamework.items.CommandTargetHudActiveSlotSystem;
 import com.alechilles.alecstamework.items.CommandTargetHudInventoryChangeSystem;
@@ -885,6 +887,12 @@ public class Tamework extends JavaPlugin {
                         commandHotswapHudActivationTracker,
                         commandTargetInspector
                 ));
+        deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
+                "command-hud-player-lifecycle",
+                () -> new CommandHudPlayerLifecycleSystem(commandHudDirtySink));
+        deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
+                "command-hud-store-lifecycle",
+                () -> new CommandHudStoreLifecycleSystem(commandHudDirtySink));
 
         applyDebugConfigDefaults();
         settingsAnnouncementService = new TameworkSettingsAnnouncementService(this);
