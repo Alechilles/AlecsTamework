@@ -139,6 +139,5 @@ final class CommandTargetHudStateStore {
     /** Keeps scheduler deadlines separate for each entity store. */
     static final class StoreTickState {
         volatile long nextSweepAtMs;
-        volatile long nextFallbackDiscoveryAtMs;
     }
 }

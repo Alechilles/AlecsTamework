@@ -1,11 +1,17 @@
 package com.alechilles.alecstamework.items;
 
+import com.hypixel.hytale.component.ArchetypeChunk;
+import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.StoreSystem;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 
-/** Removes store-scoped command HUD state when an entity store unloads. */
+/** Seeds one initial recovery round and removes store-scoped HUD state on store unload. */
 public final class CommandHudStoreLifecycleSystem extends StoreSystem<EntityStore> {
     private final CommandHudDirtySink lifecycleSink;
 
@@ -15,7 +21,20 @@ public final class CommandHudStoreLifecycleSystem extends StoreSystem<EntityStor
 
     @Override
     public void onSystemAddedToStore(@Nonnull Store<EntityStore> store) {
-        // State is created lazily by the HUD services on their first sweep.
+        ComponentType<EntityStore, Player> playerType = Player.getComponentType();
+        if (playerType == null) {
+            return;
+        }
+        store.forEachChunk(
+                Query.and(playerType),
+                (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> ignored) -> {
+                    for (int index = 0; index < chunk.size(); index++) {
+                        Player player = chunk.getComponent(index, playerType);
+                        UUID playerUuid = player != null ? player.getUuid() : null;
+                        lifecycleSink.markRecovery(store, playerUuid);
+                    }
+                }
+        );
     }
 
     @Override

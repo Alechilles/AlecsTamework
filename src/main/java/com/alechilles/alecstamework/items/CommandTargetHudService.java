@@ -13,12 +13,9 @@ import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentServ
 import com.alechilles.alecstamework.npc.progression.TranquilizerStackDisplayService;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.TameworkCommandTargetHud;
-import com.hypixel.hytale.component.ArchetypeChunk;
-import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.TickingSystem;
 import com.hypixel.hytale.server.core.asset.type.model.config.Model;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -39,7 +36,6 @@ import javax.annotation.Nullable;
  */
 public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     private static final long SWEEP_INTERVAL_MS = 100L;
-    private static final long FALLBACK_DISCOVERY_INTERVAL_MS = 1_500L;
     private static final long TARGET_SCAN_INTERVAL_MS = 200L;
     private static final long REFRESH_INTERVAL_MS = 5_000L;
     private static final long STATIC_DISPLAY_CACHE_MS = 30_000L;
@@ -98,10 +94,6 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         }
         tickState.nextSweepAtMs = nowMs + SWEEP_INTERVAL_MS;
 
-        if (nowMs >= tickState.nextFallbackDiscoveryAtMs) {
-            tickState.nextFallbackDiscoveryAtMs = nowMs + FALLBACK_DISCOVERY_INTERVAL_MS;
-            seedCandidatesFromPlayerSweep(store);
-        }
         processCandidatePlayers(store, nowMs);
     }
 
@@ -118,35 +110,10 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             PlayerCandidate candidate = resolvePlayerCandidate(playerUuid, store);
             if (candidate == null) {
                 debugMissingFromStore(playerUuid, nowMs);
+                activationTracker.remove(store, playerUuid);
                 continue;
             }
             updatePlayer(candidate.playerUuid(), candidate.player(), candidate.playerRef(), store, nowMs);
-        }
-    }
-
-    private void seedCandidatesFromPlayerSweep(@Nonnull Store<EntityStore> store) {
-        ComponentType<EntityStore, Player> playerType = Player.getComponentType();
-        if (playerType == null) {
-            return;
-        }
-        store.forEachChunk(
-                Query.and(playerType),
-                (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> ignored) ->
-                        seedCandidateChunk(chunk, playerType, store)
-        );
-    }
-
-    private void seedCandidateChunk(@Nonnull ArchetypeChunk<EntityStore> chunk,
-                                    @Nonnull ComponentType<EntityStore, Player> playerType,
-                                    @Nonnull Store<EntityStore> store) {
-        int size = chunk.size();
-        for (int i = 0; i < size; i++) {
-            Player player = chunk.getComponent(i, playerType);
-            UUID playerUuid = player != null ? player.getUuid() : null;
-            if (playerUuid == null) {
-                continue;
-            }
-            activationTracker.markDirty(store, playerUuid);
         }
     }
 
@@ -610,7 +577,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             return;
         }
         debug(playerUuid, nowMs, "missing-from-store",
-                "candidate was not present in this world store; keeping any existing hud state");
+                "candidate was not present in this world store; dropping any stale hud state");
     }
 
     private void debug(@Nonnull UUID playerUuid,

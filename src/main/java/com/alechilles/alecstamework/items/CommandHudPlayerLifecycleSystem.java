@@ -12,7 +12,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 
-/** Removes command HUD activation and presentation state when a player leaves one store. */
+/** Seeds command HUD work when a player joins and clears its state when the player leaves. */
 public final class CommandHudPlayerLifecycleSystem extends RefSystem<EntityStore> {
     private final CommandHudDirtySink lifecycleSink;
 
@@ -25,7 +25,9 @@ public final class CommandHudPlayerLifecycleSystem extends RefSystem<EntityStore
                               @Nonnull AddReason reason,
                               @Nonnull Store<EntityStore> store,
                               @Nonnull CommandBuffer<EntityStore> commandBuffer) {
-        // Player cleanup is only needed when the entity leaves the store.
+        Player player = store.getComponent(reference, Player.getComponentType());
+        UUID playerUuid = player != null ? player.getUuid() : null;
+        lifecycleSink.markDirty(store, playerUuid);
     }
 
     @Override

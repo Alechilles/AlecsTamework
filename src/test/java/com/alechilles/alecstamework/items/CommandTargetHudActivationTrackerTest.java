@@ -53,24 +53,6 @@ class CommandTargetHudActivationTrackerTest {
     }
 
     @Test
-    void inactivePlayersStillGetLowFrequencySanityChecks() {
-        Assertions.assertFalse(CommandTargetHudActivationTracker.shouldInspectForTests(
-                false,
-                false,
-                1_000L,
-                1_500L,
-                1_000L
-        ));
-        Assertions.assertTrue(CommandTargetHudActivationTracker.shouldInspectForTests(
-                false,
-                false,
-                1_000L,
-                2_000L,
-                1_000L
-        ));
-    }
-
-    @Test
     void commandItemPlayersStayEligibleForTargetScanning() {
         CommandTargetHudActivationTracker tracker = new CommandTargetHudActivationTracker();
         tracker.recordResolvedHand(PLAYER_UUID, "Tamework:CommandFlute", true, 1_000L);
@@ -97,7 +79,7 @@ class CommandTargetHudActivationTrackerTest {
     }
 
     @Test
-    void inactivePlayersKeepPendingDirtyCandidatesUntilSelection() {
+    void inactiveRecoveryWaitsForItsCadenceAfterDirtySelection() {
         CommandTargetHudActivationTracker tracker = new CommandTargetHudActivationTracker();
         tracker.markDirty(PLAYER_UUID);
 
@@ -106,9 +88,17 @@ class CommandTargetHudActivationTrackerTest {
         Assertions.assertTrue(tracker.candidatePlayerUuids().contains(PLAYER_UUID));
         Assertions.assertEquals(
                 List.of(PLAYER_UUID),
-                tracker.selectCandidateBatch(1).playerUuids()
+                tracker.selectCandidateBatchForTests(1, 1_000L, 0L, 0).playerUuids()
         );
-        Assertions.assertTrue(tracker.candidatePlayerUuids().isEmpty());
+        Assertions.assertTrue(
+                tracker.selectCandidateBatchForTests(1, 5_999L, 0L, 0).playerUuids().isEmpty(),
+                "Inactive recovery must wait for its per-player cadence."
+        );
+        Assertions.assertEquals(
+                List.of(PLAYER_UUID),
+                tracker.selectCandidateBatchForTests(1, 6_000L, 0L, 0).playerUuids(),
+                "Inactive recovery must become selectable at its deadline."
+        );
     }
 
     @Test
@@ -139,7 +129,7 @@ class CommandTargetHudActivationTrackerTest {
         tracker.recordResolvedHand(dirty, "Tamework:CommandFlute", true, 1_001L);
 
         Assertions.assertEquals(
-                List.of(regularB, dirty),
+                List.of(regularB, regularA),
                 tracker.selectCandidateBatch(2).playerUuids()
         );
     }
@@ -159,12 +149,98 @@ class CommandTargetHudActivationTrackerTest {
     }
 
     @Test
-    void inactiveResolutionRemovesQueuedRegularCandidate() {
+    void inactiveResolutionWaitsForRecoveryCadence() {
         CommandTargetHudActivationTracker tracker = new CommandTargetHudActivationTracker();
         tracker.recordResolvedHand(PLAYER_UUID, "Tamework:CommandFlute", true, 1_000L);
         tracker.recordResolvedHand(PLAYER_UUID, null, false, 1_001L);
 
-        Assertions.assertTrue(tracker.selectCandidateBatch(4).playerUuids().isEmpty());
+        Assertions.assertTrue(
+                tracker.selectCandidateBatchForTests(4, 5_999L, 0L, 0).playerUuids().isEmpty()
+        );
+        Assertions.assertEquals(
+                List.of(PLAYER_UUID),
+                tracker.selectCandidateBatchForTests(4, 6_001L, 0L, 0).playerUuids()
+        );
+    }
+
+    @Test
+    void explicitDirtyEventPromotesPlayerOutOfFarBackRecoveryQueue() {
+        CommandTargetHudActivationTracker tracker = new CommandTargetHudActivationTracker();
+        for (UUID playerUuid : MANY_PLAYER_UUIDS) {
+            tracker.markRecovery(playerUuid);
+        }
+        tracker.markRecovery(PLAYER_UUID);
+
+        tracker.markDirty(PLAYER_UUID);
+
+        Assertions.assertEquals(
+                List.of(PLAYER_UUID),
+                tracker.selectCandidateBatch(1).playerUuids()
+        );
+    }
+
+    @Test
+    void inactiveRecoveryRotatesInBoundedBatches() {
+        CommandTargetHudActivationTracker tracker = new CommandTargetHudActivationTracker();
+        for (UUID playerUuid : MANY_PLAYER_UUIDS) {
+            tracker.markRecovery(playerUuid);
+        }
+
+        List<UUID> firstBatch = tracker.selectCandidateBatch(2).playerUuids();
+        Assertions.assertEquals(2, firstBatch.size());
+        for (UUID playerUuid : firstBatch) {
+            tracker.recordResolvedHand(playerUuid, null, false, 1_000L);
+        }
+
+        List<UUID> secondBatch = tracker.selectCandidateBatch(2).playerUuids();
+        Assertions.assertEquals(2, secondBatch.size());
+        Assertions.assertNotEquals(firstBatch, secondBatch);
+    }
+
+    @Test
+    void repeatedDeactivateReactivateKeepsOneActiveQueueCandidate() {
+        CommandTargetHudActivationTracker tracker = new CommandTargetHudActivationTracker();
+        UUID otherPlayer = MANY_PLAYER_UUIDS.get(0);
+        tracker.recordResolvedHand(PLAYER_UUID, "Tamework:CommandFlute", true, 1_000L);
+        tracker.recordResolvedHand(otherPlayer, "Tamework:CommandFlute", true, 1_000L);
+        for (int cycle = 0; cycle < 20; cycle++) {
+            tracker.recordResolvedHand(PLAYER_UUID, null, false, 1_001L + cycle);
+            tracker.recordResolvedHand(PLAYER_UUID, "Tamework:CommandFlute", true, 1_002L + cycle);
+        }
+
+        List<UUID> first = tracker.selectCandidateBatchForTests(1, 2_000L, 0L, 0).playerUuids();
+        List<UUID> second = tracker.selectCandidateBatchForTests(1, 2_001L, 0L, 0).playerUuids();
+        Assertions.assertNotEquals(first, second);
+        Assertions.assertEquals(
+                java.util.Set.of(PLAYER_UUID, otherPlayer),
+                java.util.Set.of(first.get(0), second.get(0)),
+                "Repeated reactivation must keep one bounded candidate per active rotation."
+        );
+    }
+
+    @Test
+    void storeScopedRemovalClearsCandidatesAndNotifiesListeners() {
+        CommandTargetHudActivationTracker tracker = new CommandTargetHudActivationTracker();
+        UUID playerUuid = MANY_PLAYER_UUIDS.get(0);
+        AtomicReference<UUID> removedPlayer = new AtomicReference<>();
+        try (TestEntityComponentStore store = new TestEntityComponentStore(null)) {
+            tracker.addLifecycleListener(new CommandTargetHudActivationTracker.LifecycleListener() {
+                @Override
+                public void onPlayerRemoved(com.hypixel.hytale.component.Store<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> ignored,
+                                             UUID removedUuid) {
+                    removedPlayer.set(removedUuid);
+                }
+
+                @Override
+                public void onStoreRemoved(com.hypixel.hytale.component.Store<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> ignored) {
+                }
+            });
+            tracker.markRecovery(store, playerUuid);
+            tracker.remove(store, playerUuid);
+
+            Assertions.assertTrue(tracker.selectCandidateBatch(store, 1).playerUuids().isEmpty());
+            Assertions.assertEquals(playerUuid, removedPlayer.get());
+        }
     }
 
     @Test
@@ -185,6 +261,25 @@ class CommandTargetHudActivationTrackerTest {
                 batch.playerUuids().contains(PLAYER_UUID),
                 "A saturated recovery queue must not starve a due active refresh."
         );
+    }
+
+    @Test
+    void dueRecoveryKeepsItsReservedSlotAlongsideSaturatedActiveRefresh() {
+        CommandTargetHudActivationTracker tracker = new CommandTargetHudActivationTracker();
+        UUID recoveryPlayer = MANY_PLAYER_UUIDS.get(0);
+        tracker.markRecovery(recoveryPlayer);
+        for (int index = 1; index < MANY_PLAYER_UUIDS.size(); index++) {
+            tracker.markDirty(MANY_PLAYER_UUIDS.get(index));
+        }
+        tracker.recordResolvedHand(PLAYER_UUID, "Tamework:CommandFlute", true, 1_000L);
+        tracker.markDirty(PLAYER_UUID);
+
+        CommandTargetHudActivationTracker.CandidateBatch batch =
+                tracker.selectCandidateBatchForTests(4, 1_200L, 200L, 1);
+
+        Assertions.assertEquals(4, batch.playerUuids().size());
+        Assertions.assertTrue(batch.playerUuids().contains(recoveryPlayer));
+        Assertions.assertTrue(batch.playerUuids().contains(PLAYER_UUID));
     }
 
     @Test

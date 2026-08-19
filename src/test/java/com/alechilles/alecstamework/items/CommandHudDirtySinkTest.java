@@ -21,6 +21,27 @@ class CommandHudDirtySinkTest {
     }
 
     @Test
+    void fanOutPreservesLowPriorityRecoverySignals() {
+        UUID playerUuid = UUID.fromString("c5b0ce9e-75c0-41b0-a66d-5de54ebe5466");
+        CommandTargetHudActivationTracker target = new CommandTargetHudActivationTracker();
+        CommandTargetHudActivationTracker hotswap = new CommandTargetHudActivationTracker();
+        CommandHudDirtySink sink = CommandHudDirtySink.fanOut(target, hotswap);
+
+        try (TestEntityComponentStore store = new TestEntityComponentStore(null)) {
+            sink.markRecovery(store, playerUuid);
+
+            Assertions.assertEquals(
+                    List.of(playerUuid),
+                    target.selectCandidateBatch(store, 1).playerUuids()
+            );
+            Assertions.assertEquals(
+                    List.of(playerUuid),
+                    hotswap.selectCandidateBatch(store, 1).playerUuids()
+            );
+        }
+    }
+
+    @Test
     void fanOutForwardsStoreScopedLifecycleCleanup() {
         UUID playerUuid = UUID.fromString("c5b0ce9e-75c0-41b0-a66d-5de54ebe5466");
         CommandTargetHudActivationTracker target = new CommandTargetHudActivationTracker();

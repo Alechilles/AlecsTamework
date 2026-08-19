@@ -17,6 +17,10 @@ public interface CommandHudDirtySink {
         markDirty(playerUuid);
     }
 
+    /** Marks a known player for bounded low-priority recovery inspection. */
+    default void markRecovery(@Nullable Store<EntityStore> store, @Nullable UUID playerUuid) {
+    }
+
     /** Removes one player from store-scoped HUD activation state. */
     default void remove(@Nullable Store<EntityStore> store, @Nullable UUID playerUuid) {
     }
@@ -44,6 +48,16 @@ public interface CommandHudDirtySink {
                 for (CommandHudDirtySink sink : copy) {
                     if (sink != null) {
                         sink.markDirty(store, playerUuid);
+                    }
+                }
+            }
+
+            @Override
+            public void markRecovery(@Nullable Store<EntityStore> store,
+                                     @Nullable UUID playerUuid) {
+                for (CommandHudDirtySink sink : copy) {
+                    if (sink != null) {
+                        sink.markRecovery(store, playerUuid);
                     }
                 }
             }

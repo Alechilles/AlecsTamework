@@ -7,13 +7,10 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEnt
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.items.CommandHotswapAssignmentStore.Slot;
 import com.alechilles.alecstamework.ui.TameworkCommandHotswapHud;
-import com.hypixel.hytale.component.ArchetypeChunk;
-import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.codec.Codec;
-import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.TickingSystem;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
@@ -30,7 +27,6 @@ import javax.annotation.Nullable;
 public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
     private static final long SWEEP_INTERVAL_MS = 100L;
     private static final long REFRESH_INTERVAL_MS = 200L;
-    private static final long FALLBACK_DISCOVERY_INTERVAL_MS = 1_500L;
     private static final int MAX_CANDIDATES_PER_PASS = 16;
     private static final int RESERVED_ACTIVE_CANDIDATES = 1;
     private static final CommandHotswapHudViewModel HIDDEN_MODEL = new CommandHotswapHudViewModel(
@@ -101,10 +97,6 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
         }
         tickState.nextSweepAtMs = nowMs + SWEEP_INTERVAL_MS;
 
-        if (nowMs >= tickState.nextFallbackDiscoveryAtMs) {
-            tickState.nextFallbackDiscoveryAtMs = nowMs + FALLBACK_DISCOVERY_INTERVAL_MS;
-            seedCandidatesFromPlayerSweep(store);
-        }
         processCandidatePlayers(store, nowMs);
     }
 
@@ -139,33 +131,10 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
         for (UUID playerUuid : batch.playerUuids()) {
             PlayerCandidate candidate = resolvePlayerCandidate(playerUuid, store);
             if (candidate == null) {
+                activationTracker.remove(store, playerUuid);
                 continue;
             }
             updatePlayer(store, candidate.playerUuid(), candidate.player(), nowMs);
-        }
-    }
-
-    private void seedCandidatesFromPlayerSweep(@Nonnull Store<EntityStore> store) {
-        ComponentType<EntityStore, Player> playerType = Player.getComponentType();
-        if (playerType == null) {
-            return;
-        }
-        store.forEachChunk(
-                Query.and(playerType),
-                (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> ignored) ->
-                        seedCandidateChunk(chunk, playerType, store)
-        );
-    }
-
-    private void seedCandidateChunk(@Nonnull ArchetypeChunk<EntityStore> chunk,
-                                    @Nonnull ComponentType<EntityStore, Player> playerType,
-                                    @Nonnull Store<EntityStore> store) {
-        for (int index = 0; index < chunk.size(); index++) {
-            Player player = chunk.getComponent(index, playerType);
-            UUID playerUuid = player != null ? player.getUuid() : null;
-            if (playerUuid != null) {
-                activationTracker.markDirty(store, playerUuid);
-            }
         }
     }
 
@@ -394,7 +363,6 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
     /** Keeps scheduler deadlines separate for each entity store. */
     private static final class StoreTickState {
         private volatile long nextSweepAtMs;
-        private volatile long nextFallbackDiscoveryAtMs;
     }
 
     /** Carries a stable player identity with the live component resolved for this tick. */
