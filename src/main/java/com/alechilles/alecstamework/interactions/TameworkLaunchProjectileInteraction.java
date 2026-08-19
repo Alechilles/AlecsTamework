@@ -30,6 +30,8 @@ import com.hypixel.hytale.server.core.modules.interaction.interaction.CooldownHa
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.SimpleInstantInteraction;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.util.InteractionTarget;
 import com.hypixel.hytale.server.core.modules.physics.util.PhysicsMath;
+import com.hypixel.hytale.server.core.modules.projectile.config.BallisticData;
+import com.hypixel.hytale.server.core.modules.projectile.config.BallisticDataProvider;
 import com.hypixel.hytale.server.core.modules.time.TimeResource;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.util.TargetUtil;
@@ -44,7 +46,7 @@ import javax.annotation.Nullable;
 /**
  * Custom interaction that launches a projectile using a solved high-angle ballistic arc.
  */
-public class TameworkLaunchProjectileInteraction extends SimpleInstantInteraction {
+public class TameworkLaunchProjectileInteraction extends SimpleInstantInteraction implements BallisticDataProvider {
     private static final double MIN_HORIZONTAL_DISTANCE = 1.0e-4;
     private static final double MIN_POSITIVE_VALUE = 1.0e-6;
 
@@ -182,6 +184,12 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
 
     public TameworkLaunchProjectileInteraction(String id) {
         super(id);
+    }
+
+    @Nullable
+    @Override
+    public BallisticData getBallisticData() {
+        return Projectile.getAssetMap().getAsset(this.projectileId);
     }
 
     @Nonnull
