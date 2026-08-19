@@ -106,7 +106,14 @@ public final class NeedsResourceSearchCoordinator {
                           @Nonnull SearchExecutor executor) {
         Objects.requireNonNull(store, "store");
         Objects.requireNonNull(executor, "executor");
-        WorldState state = statesByStore.get(store);
+        return processState(store, statesByStore.get(store), worldTick, nowMs, executor);
+    }
+
+    private int processState(@Nonnull Store<EntityStore> store,
+                             @Nonnull WorldState state,
+                             long worldTick,
+                             long nowMs,
+                             @Nonnull SearchExecutor executor) {
         if (state.pending.isEmpty()) {
             return 0;
         }
@@ -154,7 +161,8 @@ public final class NeedsResourceSearchCoordinator {
                            @Nonnull SearchExecutor executor) {
         Objects.requireNonNull(store, "store");
         WorldState state = statesByStore.get(store);
-        return processOne(store, ++state.nextWorldTick, nowMs, executor);
+        Objects.requireNonNull(executor, "executor");
+        return processState(store, state, ++state.nextWorldTick, nowMs, executor);
     }
 
     /**
@@ -262,9 +270,6 @@ public final class NeedsResourceSearchCoordinator {
         private final String resourceKind;
         @Nonnull
         private final NeedsResourceAreaSearchCache.AreaKey areaKey;
-        private final int queuedCellX;
-        private final int queuedCellY;
-        private final int queuedCellZ;
         private final double radius;
         private final int verticalRadius;
         private final double consumeRadius;
@@ -273,17 +278,11 @@ public final class NeedsResourceSearchCoordinator {
 
         private Request(@Nonnull String resourceKind,
                         @Nonnull NeedsResourceAreaSearchCache.AreaKey areaKey,
-                        double originX,
-                        double originY,
-                        double originZ,
                         double radius,
                         int verticalRadius,
                         double consumeRadius) {
             this.resourceKind = normalizeResourceKind(resourceKind);
             this.areaKey = Objects.requireNonNull(areaKey, "areaKey");
-            this.queuedCellX = quantizedQueuedCell(originX);
-            this.queuedCellY = quantizedQueuedCell(originY);
-            this.queuedCellZ = quantizedQueuedCell(originZ);
             this.radius = requirePositiveFinite(
                     NeedsResourceSearchCachePolicy.boundedSearchRadius(radius),
                     "radius"
@@ -369,9 +368,6 @@ public final class NeedsResourceSearchCoordinator {
             return new Request(
                     resourceKind,
                     areaKey,
-                    originX,
-                    originY,
-                    originZ,
                     normalizedRadius,
                     normalizedVerticalRadius,
                     normalizedConsumeRadius
@@ -408,14 +404,9 @@ public final class NeedsResourceSearchCoordinator {
             return radius;
         }
 
-        /** Returns whether a current waiter position remains in the queued 2-block cell. */
+        /** Returns whether a current waiter position remains in the queued area cell. */
         public boolean isInQueuedArea(double positionX, double positionY, double positionZ) {
-            return isValidQueuedCoordinate(positionX)
-                    && isValidQueuedCoordinate(positionY)
-                    && isValidQueuedCoordinate(positionZ)
-                    && quantizedQueuedCell(positionX) == queuedCellX
-                    && quantizedQueuedCell(positionY) == queuedCellY
-                    && quantizedQueuedCell(positionZ) == queuedCellZ;
+            return areaKey.containsPosition(positionX, positionY, positionZ);
         }
 
         @Nonnull
@@ -474,19 +465,6 @@ public final class NeedsResourceSearchCoordinator {
             return normalized;
         }
 
-        private static boolean isValidQueuedCoordinate(double coordinate) {
-            return Double.isFinite(coordinate)
-                    && coordinate >= Integer.MIN_VALUE
-                    && coordinate <= Integer.MAX_VALUE;
-        }
-
-        private static int quantizedQueuedCell(double coordinate) {
-            return Math.floorDiv(
-                    (int) Math.floor(coordinate),
-                    NeedsResourceSearchCachePolicy.POSITION_CACHE_CELL_SIZE_BLOCKS
-            );
-        }
-
         private static double requirePositiveFinite(double value, @Nonnull String name) {
             if (!Double.isFinite(value) || value <= 0.0) {
                 throw new IllegalArgumentException(name + " must be finite and positive");
@@ -500,6 +478,7 @@ public final class NeedsResourceSearchCoordinator {
             }
             return value;
         }
+
     }
 
     /**

@@ -415,6 +415,16 @@ final class NeedsResourceAreaSearchCache {
             return List.copyOf(normalized);
         }
 
+        /** Returns whether scalar coordinates still map to this shared area cell. */
+        boolean containsPosition(double positionX, double positionY, double positionZ) {
+            return Double.isFinite(positionX)
+                    && Double.isFinite(positionY)
+                    && Double.isFinite(positionZ)
+                    && quantizedCell(positionX) == cellX
+                    && quantizedCell(positionY) == cellY
+                    && quantizedCell(positionZ) == cellZ;
+        }
+
         private static boolean isValidBaseInput(@Nullable String worldName,
                                                 @Nonnull String resourceKind,
                                                 double positionX,

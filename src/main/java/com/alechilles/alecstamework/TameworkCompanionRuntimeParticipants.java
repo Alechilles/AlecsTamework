@@ -27,6 +27,7 @@ import com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystem
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entity.player.PlayerInput;
 import com.hypixel.hytale.server.core.modules.physics.component.Velocity;
+import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.universe.world.events.RemoveWorldEvent;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -253,17 +254,37 @@ public final class TameworkCompanionRuntimeParticipants {
                         Short.MAX_VALUE,
                         RemoveWorldEvent.class,
                         event -> {
-                            if (event == null || event.getWorld() == null
-                                    || event.getWorld().getEntityStore() == null) {
+                            if (event == null || event.getWorld() == null) {
                                 return;
                             }
-                            needsSearchCoordinator.clear(
-                                    event.getWorld().getEntityStore().getStore());
+                            World world = event.getWorld();
+                            if (world.isInThread()) {
+                                clearNeedsSearchState(needsSearchCoordinator, world);
+                            } else {
+                                world.execute(() -> clearNeedsSearchState(
+                                        needsSearchCoordinator, world));
+                            }
                         },
                         "needs resource search world cleanup"
                 )
         );
         participants.entitySystem(TameworkRuntimeModule.BREEDING, "companionpassivebreedingsystem",
                 () -> new CompanionPassiveBreedingSystem(plugin.getBreedingPairAdmissionRegistry()));
+    }
+
+    /** Clears world-scoped needs state on the owning world thread. */
+    private static void clearNeedsSearchState(
+            NeedsResourceSearchCoordinator coordinator,
+            World world
+    ) {
+        EntityStore entityStore = world.getEntityStore();
+        if (entityStore == null) {
+            return;
+        }
+        var store = entityStore.getStore();
+        if (store == null) {
+            return;
+        }
+        coordinator.clear(store);
     }
 }

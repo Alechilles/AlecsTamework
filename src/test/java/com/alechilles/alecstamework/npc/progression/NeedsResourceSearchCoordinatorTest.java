@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -456,13 +458,21 @@ class NeedsResourceSearchCoordinatorTest {
                 "water", 1.99, 64.99, -0.01, List.of());
 
         assertTrue(request.isInQueuedArea(1.0, 64.0, -0.99));
-        assertFalse(request.isInQueuedArea(2.0, 64.0, -0.99));
-        assertFalse(request.isInQueuedArea(1.0, 66.0, -0.99));
+        assertTrue(request.isInQueuedArea(2.0, 64.0, -0.99));
+        assertTrue(request.isInQueuedArea(3.99, 64.0, -0.99));
+        assertFalse(request.isInQueuedArea(4.0, 64.0, -0.99));
+        assertFalse(request.isInQueuedArea(1.0, 68.0, -0.99));
 
         NeedsResourceSearchCoordinator.Request negativeBoundary = requestAt(
                 "water", -0.01, 64.0, -0.01, List.of());
-        assertTrue(negativeBoundary.isInQueuedArea(-1.99, 64.0, -1.99));
-        assertFalse(negativeBoundary.isInQueuedArea(0.0, 64.0, -1.99));
+        assertTrue(negativeBoundary.isInQueuedArea(-3.99, 64.0, -3.99));
+        assertTrue(negativeBoundary.isInQueuedArea(-0.01, 64.0, -0.01));
+        assertFalse(negativeBoundary.isInQueuedArea(0.0, 64.0, -0.01));
+
+        NeedsResourceSearchCoordinator.Request negativeCellBoundary = requestAt(
+                "water", -4.01, 64.0, -4.01, List.of());
+        assertTrue(negativeCellBoundary.isInQueuedArea(-7.99, 64.0, -7.99));
+        assertFalse(negativeCellBoundary.isInQueuedArea(-4.0, 64.0, -4.0));
     }
 
     @Test
@@ -471,6 +481,30 @@ class NeedsResourceSearchCoordinatorTest {
                 IllegalArgumentException.class,
                 () -> requestAt("lava", 0.0, 64.0, 0.0, List.of())
         );
+    }
+
+    @Test
+    void clearDetachesAnInFlightSearchState() throws Exception {
+        try (TestEntityComponentStore store = newStore()) {
+            coordinator.clear(store);
+            BlockingExecutor executor = new BlockingExecutor(hitSnapshot(1_500L));
+            coordinator.lookupOrEnqueue(store, uuid(960), request(960), NOW_MS);
+
+            Thread worker = new Thread(
+                    () -> coordinator.processNext(store, NOW_MS, executor),
+                    "needs-resource-clear-test"
+            );
+            worker.start();
+            assertTrue(executor.started.await(2L, TimeUnit.SECONDS));
+
+            coordinator.clear(store);
+            coordinator.lookupOrEnqueue(store, uuid(961), request(961), NOW_MS);
+            executor.release.countDown();
+            worker.join(2_000L);
+
+            assertFalse(worker.isAlive());
+            assertEquals(1, coordinator.pendingCountForTests(store));
+        }
     }
 
     @Test
@@ -591,6 +625,33 @@ class NeedsResourceSearchCoordinatorTest {
 
         private List<List<UUID>> waiters() {
             return List.copyOf(waiters);
+        }
+    }
+
+    private static final class BlockingExecutor implements NeedsResourceSearchCoordinator.SearchExecutor {
+        private final NeedsResourceCandidates.Snapshot result;
+        private final CountDownLatch started = new CountDownLatch(1);
+        private final CountDownLatch release = new CountDownLatch(1);
+
+        private BlockingExecutor(NeedsResourceCandidates.Snapshot result) {
+            this.result = result;
+        }
+
+        @Override
+        public NeedsResourceCandidates.Snapshot search(
+                Store<EntityStore> store,
+                NeedsResourceSearchCoordinator.Request request,
+                List<UUID> waiterIds) {
+            started.countDown();
+            try {
+                if (!release.await(2L, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("test search release timed out");
+                }
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("test search interrupted", exception);
+            }
+            return result;
         }
     }
 
