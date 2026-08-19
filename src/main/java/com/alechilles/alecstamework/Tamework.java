@@ -103,6 +103,7 @@ import com.alechilles.alecstamework.items.CommandDirectLiveCoopSystem;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.items.CommandHotswapHudService;
 import com.alechilles.alecstamework.items.CommandNpcRelocationService;
+import com.alechilles.alecstamework.items.CommandHudDirtySink;
 import com.alechilles.alecstamework.items.CommandTargetHudActivationTracker;
 import com.alechilles.alecstamework.items.CommandTargetHudActiveSlotSystem;
 import com.alechilles.alecstamework.items.CommandTargetHudInventoryChangeSystem;
@@ -858,13 +859,18 @@ public class Tamework extends JavaPlugin {
                 "command-linked-npc-inventory-canonicalization",
                 () -> new CommandLinkedNpcInventoryCanonicalizationSystem(commandItemFeatureHandler));
         CommandTargetHudActivationTracker commandTargetHudActivationTracker = new CommandTargetHudActivationTracker();
+        CommandTargetHudActivationTracker commandHotswapHudActivationTracker = new CommandTargetHudActivationTracker();
+        CommandHudDirtySink commandHudDirtySink = CommandHudDirtySink.fanOut(
+                commandTargetHudActivationTracker,
+                commandHotswapHudActivationTracker
+        );
         CommandTargetInspector commandTargetInspector = new CommandTargetInspector();
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
                 "command-target-hud-active-slot",
-                () -> new CommandTargetHudActiveSlotSystem(commandTargetHudActivationTracker));
+                () -> new CommandTargetHudActiveSlotSystem(commandHudDirtySink));
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
                 "command-target-hud-inventory-change",
-                () -> new CommandTargetHudInventoryChangeSystem(commandTargetHudActivationTracker));
+                () -> new CommandTargetHudInventoryChangeSystem(commandHudDirtySink));
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
                 "command-target-hud",
                 () -> new CommandTargetHudService(

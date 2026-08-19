@@ -17,11 +17,11 @@ import javax.annotation.Nullable;
  * Marks the command-target HUD activation cache dirty when a player's selected hotbar slot changes.
  */
 public final class CommandTargetHudActiveSlotSystem extends EntityEventSystem<EntityStore, InventorySetActiveSlotEvent> {
-    private final CommandTargetHudActivationTracker activationTracker;
+    private final CommandHudDirtySink dirtySink;
 
-    public CommandTargetHudActiveSlotSystem(@Nonnull CommandTargetHudActivationTracker activationTracker) {
+    public CommandTargetHudActiveSlotSystem(@Nonnull CommandHudDirtySink dirtySink) {
         super(InventorySetActiveSlotEvent.class);
-        this.activationTracker = activationTracker;
+        this.dirtySink = dirtySink;
     }
 
     @Nullable
@@ -41,6 +41,6 @@ public final class CommandTargetHudActiveSlotSystem extends EntityEventSystem<En
         }
         Player player = archetypeChunk.getComponent(index, Player.getComponentType());
         UUID playerUuid = player != null ? player.getUuid() : null;
-        activationTracker.markDirty(playerUuid);
+        dirtySink.markDirty(playerUuid);
     }
 }

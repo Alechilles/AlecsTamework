@@ -17,11 +17,11 @@ import javax.annotation.Nullable;
  * Marks the command-target HUD activation cache dirty when the player's hotbar contents change.
  */
 public final class CommandTargetHudInventoryChangeSystem extends EntityEventSystem<EntityStore, InventoryChangeEvent> {
-    private final CommandTargetHudActivationTracker activationTracker;
+    private final CommandHudDirtySink dirtySink;
 
-    public CommandTargetHudInventoryChangeSystem(@Nonnull CommandTargetHudActivationTracker activationTracker) {
+    public CommandTargetHudInventoryChangeSystem(@Nonnull CommandHudDirtySink dirtySink) {
         super(InventoryChangeEvent.class);
-        this.activationTracker = activationTracker;
+        this.dirtySink = dirtySink;
     }
 
     @Nullable
@@ -42,6 +42,6 @@ public final class CommandTargetHudInventoryChangeSystem extends EntityEventSyst
         }
         Player player = archetypeChunk.getComponent(index, Player.getComponentType());
         UUID playerUuid = player != null ? player.getUuid() : null;
-        activationTracker.markDirty(playerUuid);
+        dirtySink.markDirty(playerUuid);
     }
 }

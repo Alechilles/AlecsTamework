@@ -16,7 +16,7 @@ import javax.annotation.Nullable;
  * Event systems and the HUD tick service may touch this tracker from different runtime paths, so
  * access is synchronized around the shared hand-state map and candidate queues.
  */
-public final class CommandTargetHudActivationTracker {
+public final class CommandTargetHudActivationTracker implements CommandHudDirtySink {
     private static final long INACTIVE_SANITY_SCAN_INTERVAL_MS = 1_000L;
 
     private final Map<UUID, HandState> statesByPlayer = new HashMap<>();
@@ -59,7 +59,8 @@ public final class CommandTargetHudActivationTracker {
         return state == null || state.dirty();
     }
 
-    synchronized void markDirty(@Nullable UUID playerUuid) {
+    @Override
+    public synchronized void markDirty(@Nullable UUID playerUuid) {
         if (playerUuid == null) {
             return;
         }
