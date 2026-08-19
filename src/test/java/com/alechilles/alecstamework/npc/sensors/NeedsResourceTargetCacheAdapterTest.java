@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.npc.progression.NeedsResourceCandidates;
@@ -152,8 +153,7 @@ class NeedsResourceTargetCacheAdapterTest {
             assertEquals(NeedsResourceTargetCacheAdapter.Status.TARGET, first.status());
             assertEquals(2, (int) Math.floor(first.target().x));
 
-            com.alechilles.alecstamework.npc.progression.PositionTargetReservationCache.release(
-                    npc, "world-a", "water", first.target());
+            NeedsResourceTargetCacheAdapter.releaseTarget(npc, "world-a", "water", first.target());
             assertTrue(NeedsResourceTargetCacheAdapter.reserveTarget(
                     otherNpc, "world-a", "water", first.target(), 1_100L
             ));
@@ -272,6 +272,34 @@ class NeedsResourceTargetCacheAdapterTest {
         assertNotNull(warm);
         assertEquals(NeedsResourceTargetCacheAdapter.Status.TARGET, warm.status());
         assertFalse(warm.preflightRequired());
+        assertSame(warm, adapter.resolveLocal(
+                npc, "world-a", "water", 1.0, 64.0, 0.0, 1_002L
+        ));
+    }
+
+    @Test
+    void releaseAndRejectInvalidateLocalTargetsImmediately() {
+        NeedsResourceTargetCacheAdapter adapter = new NeedsResourceTargetCacheAdapter();
+        UUID releasedNpc = new UUID(0L, 16L);
+        UUID rejectedNpc = new UUID(0L, 17L);
+        Vector3d releasedTarget = new Vector3d(2.5, 64.5, 2.5);
+        Vector3d rejectedTarget = new Vector3d(3.5, 64.5, 3.5);
+        adapter.adoptTarget(releasedNpc, "world-a", "water", releasedTarget, 1.5, 8.0, 2, 1_000L);
+        adapter.adoptTarget(rejectedNpc, "world-a", "water", rejectedTarget, 1.5, 8.0, 2, 1_000L);
+
+        NeedsResourceTargetCacheAdapter.releaseTarget(
+                releasedNpc, "world-a", "water", releasedTarget
+        );
+        NeedsResourceTargetCacheAdapter.rejectTarget(
+                rejectedNpc, "water", rejectedTarget, 4.0, 1_001L
+        );
+
+        assertNull(adapter.resolveLocal(
+                releasedNpc, "world-a", "water", 0.0, 64.0, 0.0, 1_002L
+        ));
+        assertNull(adapter.resolveLocal(
+                rejectedNpc, "world-a", "water", 0.0, 64.0, 0.0, 1_002L
+        ));
     }
 
     @Test
