@@ -9,6 +9,7 @@ import static com.alechilles.alecstamework.performance.RuntimePressureLevel.WARM
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.performance.TameworkRuntimePressureService;
@@ -404,6 +405,75 @@ class NeedsResourceSearchCoordinatorTest {
     }
 
     @Test
+    void clearResetsTheStoreScopedWorldTick() {
+        try (TestEntityComponentStore store = newStore()) {
+            coordinator.clear(store);
+            TameworkRuntimePressureService pressure = TameworkRuntimePressureService.getInstance();
+            for (int index = 0; index < 128; index++) {
+                pressure.recordWork(NEEDS_RESOURCE_SEARCH, 0L, NOW_MS);
+            }
+            CountingExecutor executor = new CountingExecutor(hitSnapshot(1_500L));
+
+            coordinator.lookupOrEnqueue(store, uuid(950), request(950), NOW_MS);
+            assertEquals(0, coordinator.processNext(store, NOW_MS, executor));
+            assertEquals(1, coordinator.processNext(store, NOW_MS, executor));
+
+            coordinator.clear(store);
+
+            coordinator.lookupOrEnqueue(store, uuid(951), request(951), NOW_MS);
+            assertEquals(0, coordinator.processNext(store, NOW_MS, executor));
+            assertEquals(1, coordinator.processNext(store, NOW_MS, executor));
+            assertEquals(2, executor.calls());
+        }
+    }
+
+    @Test
+    void processNextKeepsWorldTicksIndependentPerStore() {
+        try (TestEntityComponentStore firstStore = newStore();
+             TestEntityComponentStore secondStore = newStore()) {
+            coordinator.clear(firstStore);
+            coordinator.clear(secondStore);
+            TameworkRuntimePressureService pressure = TameworkRuntimePressureService.getInstance();
+            for (int index = 0; index < 128; index++) {
+                pressure.recordWork(NEEDS_RESOURCE_SEARCH, 0L, NOW_MS);
+            }
+            CountingExecutor executor = new CountingExecutor(hitSnapshot(1_500L));
+            NeedsResourceSearchCoordinator.Request request = request(952);
+            coordinator.lookupOrEnqueue(firstStore, uuid(952), request, NOW_MS);
+            coordinator.lookupOrEnqueue(secondStore, uuid(953), request, NOW_MS);
+
+            assertEquals(0, coordinator.processNext(firstStore, NOW_MS, executor));
+            assertEquals(0, coordinator.processNext(secondStore, NOW_MS, executor));
+            assertEquals(1, coordinator.processNext(firstStore, NOW_MS, executor));
+            assertEquals(1, coordinator.processNext(secondStore, NOW_MS, executor));
+            assertEquals(2, executor.calls());
+        }
+    }
+
+    @Test
+    void requestWaiterMustRemainInItsQueuedTwoBlockCell() {
+        NeedsResourceSearchCoordinator.Request request = requestAt(
+                "water", 1.99, 64.99, -0.01, List.of());
+
+        assertTrue(request.isInQueuedArea(1.0, 64.0, -0.99));
+        assertFalse(request.isInQueuedArea(2.0, 64.0, -0.99));
+        assertFalse(request.isInQueuedArea(1.0, 66.0, -0.99));
+
+        NeedsResourceSearchCoordinator.Request negativeBoundary = requestAt(
+                "water", -0.01, 64.0, -0.01, List.of());
+        assertTrue(negativeBoundary.isInQueuedArea(-1.99, 64.0, -1.99));
+        assertFalse(negativeBoundary.isInQueuedArea(0.0, 64.0, -1.99));
+    }
+
+    @Test
+    void requestRejectsUnknownResourceKindsBeforeAdmission() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> requestAt("lava", 0.0, 64.0, 0.0, List.of())
+        );
+    }
+
+    @Test
     void requestCopiesItemIdsAndDoesNotRetainMutableInput() {
         try (TestEntityComponentStore store = newStore()) {
             coordinator.clear(store);
@@ -435,12 +505,27 @@ class NeedsResourceSearchCoordinatorTest {
 
     private static NeedsResourceSearchCoordinator.Request request(
             String resourceKind, int index, List<String> itemIds) {
-        return NeedsResourceSearchCoordinator.Request.forArea(
+        return requestAt(
                 resourceKind,
-                "test-world",
                 index * 4.0,
                 64.0,
                 0.0,
+                itemIds
+        );
+    }
+
+    private static NeedsResourceSearchCoordinator.Request requestAt(
+            String resourceKind,
+            double originX,
+            double originY,
+            double originZ,
+            List<String> itemIds) {
+        return NeedsResourceSearchCoordinator.Request.forArea(
+                resourceKind,
+                "test-world",
+                originX,
+                originY,
+                originZ,
                 16.0,
                 1,
                 3.0,

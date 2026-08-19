@@ -28,6 +28,8 @@ import javax.annotation.Nullable;
  */
 public final class NeedsResourceSearchCoordinator {
     public static final int MAX_PENDING_REQUESTS = 8_192;
+    public static final String RESOURCE_KIND_WATER = "water";
+    public static final String RESOURCE_KIND_FOOD_CONTAINER = "food_container";
 
     private static final long WARNING_THROTTLE_MS = 5_000L;
     private static final NeedsResourceSearchCoordinator INSTANCE =
@@ -146,6 +148,15 @@ public final class NeedsResourceSearchCoordinator {
         return 1;
     }
 
+    /** Advances the store-owned tick and attempts one admitted search. */
+    public int processNext(@Nonnull Store<EntityStore> store,
+                           long nowMs,
+                           @Nonnull SearchExecutor executor) {
+        Objects.requireNonNull(store, "store");
+        WorldState state = statesByStore.get(store);
+        return processOne(store, ++state.nextWorldTick, nowMs, executor);
+    }
+
     /**
      * Removes all queued and cached state owned by one world store.
      *
@@ -220,6 +231,7 @@ public final class NeedsResourceSearchCoordinator {
                 new NeedsResourceAreaSearchCache(MAX_PENDING_REQUESTS);
         private final LinkedHashMap<RequestKey, PendingRequest> pending = new LinkedHashMap<>();
         private long lastFailureWarningMs = Long.MIN_VALUE;
+        private long nextWorldTick;
         private boolean attemptedTickInitialized;
         private long lastAttemptedWorldTick;
     }
@@ -250,6 +262,9 @@ public final class NeedsResourceSearchCoordinator {
         private final String resourceKind;
         @Nonnull
         private final NeedsResourceAreaSearchCache.AreaKey areaKey;
+        private final int queuedCellX;
+        private final int queuedCellY;
+        private final int queuedCellZ;
         private final double radius;
         private final int verticalRadius;
         private final double consumeRadius;
@@ -258,11 +273,17 @@ public final class NeedsResourceSearchCoordinator {
 
         private Request(@Nonnull String resourceKind,
                         @Nonnull NeedsResourceAreaSearchCache.AreaKey areaKey,
+                        double originX,
+                        double originY,
+                        double originZ,
                         double radius,
                         int verticalRadius,
                         double consumeRadius) {
             this.resourceKind = normalizeResourceKind(resourceKind);
             this.areaKey = Objects.requireNonNull(areaKey, "areaKey");
+            this.queuedCellX = quantizedQueuedCell(originX);
+            this.queuedCellY = quantizedQueuedCell(originY);
+            this.queuedCellZ = quantizedQueuedCell(originZ);
             this.radius = requirePositiveFinite(
                     NeedsResourceSearchCachePolicy.boundedSearchRadius(radius),
                     "radius"
@@ -348,6 +369,9 @@ public final class NeedsResourceSearchCoordinator {
             return new Request(
                     resourceKind,
                     areaKey,
+                    originX,
+                    originY,
+                    originZ,
                     normalizedRadius,
                     normalizedVerticalRadius,
                     normalizedConsumeRadius
@@ -382,6 +406,16 @@ public final class NeedsResourceSearchCoordinator {
 
         public double searchRadius() {
             return radius;
+        }
+
+        /** Returns whether a current waiter position remains in the queued 2-block cell. */
+        public boolean isInQueuedArea(double positionX, double positionY, double positionZ) {
+            return isValidQueuedCoordinate(positionX)
+                    && isValidQueuedCoordinate(positionY)
+                    && isValidQueuedCoordinate(positionZ)
+                    && quantizedQueuedCell(positionX) == queuedCellX
+                    && quantizedQueuedCell(positionY) == queuedCellY
+                    && quantizedQueuedCell(positionZ) == queuedCellZ;
         }
 
         @Nonnull
@@ -430,7 +464,27 @@ public final class NeedsResourceSearchCoordinator {
 
         @Nonnull
         private static String normalizeResourceKind(@Nonnull String value) {
-            return Objects.requireNonNull(value, "resourceKind").trim().toLowerCase(Locale.ROOT);
+            String normalized = Objects.requireNonNull(value, "resourceKind")
+                    .trim()
+                    .toLowerCase(Locale.ROOT);
+            if (!RESOURCE_KIND_WATER.equals(normalized)
+                    && !RESOURCE_KIND_FOOD_CONTAINER.equals(normalized)) {
+                throw new IllegalArgumentException("unsupported resource kind: " + value);
+            }
+            return normalized;
+        }
+
+        private static boolean isValidQueuedCoordinate(double coordinate) {
+            return Double.isFinite(coordinate)
+                    && coordinate >= Integer.MIN_VALUE
+                    && coordinate <= Integer.MAX_VALUE;
+        }
+
+        private static int quantizedQueuedCell(double coordinate) {
+            return Math.floorDiv(
+                    (int) Math.floor(coordinate),
+                    NeedsResourceSearchCachePolicy.POSITION_CACHE_CELL_SIZE_BLOCKS
+            );
         }
 
         private static double requirePositiveFinite(double value, @Nonnull String name) {

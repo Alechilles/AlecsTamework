@@ -4,7 +4,6 @@ import com.alechilles.alecstamework.npc.progression.NeedsFoodTargetSearchService
 import com.alechilles.alecstamework.npc.progression.NeedsResourceCandidates;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceSearchCoordinator;
 import com.alechilles.alecstamework.npc.progression.NeedsWaterTargetSearchService;
-import com.alechilles.alecstamework.util.StoreScopedState;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.system.tick.TickingSystem;
@@ -32,8 +31,6 @@ public final class NeedsResourceSearchSystem extends TickingSystem<EntityStore> 
 
     private final NeedsResourceSearchCoordinator coordinator;
     private final NeedsResourceSearchCoordinator.SearchExecutor searchExecutor;
-    private final StoreScopedState<TickState> statesByStore =
-            new StoreScopedState<>(TickState::new);
 
     /** Creates a worker with the supplied coordinator and scanner dispatcher. */
     public NeedsResourceSearchSystem(
@@ -50,9 +47,7 @@ public final class NeedsResourceSearchSystem extends TickingSystem<EntityStore> 
 
     @Override
     public void tick(float dt, int systemIndex, @Nonnull Store<EntityStore> store) {
-        TickState tickState = statesByStore.get(store);
-        long worldTick = ++tickState.worldTick;
-        coordinator.processOne(store, worldTick, System.currentTimeMillis(), searchExecutor);
+        coordinator.processNext(store, System.currentTimeMillis(), searchExecutor);
     }
 
     @Nullable
@@ -60,38 +55,31 @@ public final class NeedsResourceSearchSystem extends TickingSystem<EntityStore> 
             @Nonnull Store<EntityStore> store,
             @Nonnull NeedsResourceSearchCoordinator.Request request,
             @Nonnull List<UUID> waiterIds) {
-        Ref<EntityStore> context = resolveFirstValidWaiter(store, waiterIds);
+        SearchContext context = resolveFirstValidWaiter(store, request, waiterIds);
         if (context == null) {
             return null;
         }
-        TransformComponent transform = store.getComponent(context, TransformComponent.getComponentType());
-        if (transform == null || transform.getPosition() == null) {
-            return null;
-        }
-        double originX = transform.getPosition().x;
-        double originY = transform.getPosition().y;
-        double originZ = transform.getPosition().z;
         return switch (request.resourceKind()) {
-            case "water" -> WATER_SEARCH_SERVICE.search(
+            case NeedsResourceSearchCoordinator.RESOURCE_KIND_WATER -> WATER_SEARCH_SERVICE.search(
                     store,
-                    context,
+                    context.reference(),
                     new NeedsWaterTargetSearchService.WaterRequest(
-                            originX,
-                            originY,
-                            originZ,
+                            context.originX(),
+                            context.originY(),
+                            context.originZ(),
                             request.radius(),
                             request.verticalScanRadius(),
                             request.consumeRadius(),
                             NeedsResourceCandidates.MAX_CANDIDATES
                     )
             );
-            case "food_container" -> FOOD_SEARCH_SERVICE.search(
+            case NeedsResourceSearchCoordinator.RESOURCE_KIND_FOOD_CONTAINER -> FOOD_SEARCH_SERVICE.search(
                     store,
-                    context,
+                    context.reference(),
                     new NeedsFoodTargetSearchService.FoodRequest(
-                            originX,
-                            originY,
-                            originZ,
+                            context.originX(),
+                            context.originY(),
+                            context.originZ(),
                             request.radius(),
                             request.verticalScanRadius(),
                             request.consumeRadius(),
@@ -104,8 +92,9 @@ public final class NeedsResourceSearchSystem extends TickingSystem<EntityStore> 
     }
 
     @Nullable
-    private static Ref<EntityStore> resolveFirstValidWaiter(
+    private static SearchContext resolveFirstValidWaiter(
             @Nonnull Store<EntityStore> store,
+            @Nonnull NeedsResourceSearchCoordinator.Request request,
             @Nonnull List<UUID> waiterIds) {
         if (store.getExternalData() == null) {
             return null;
@@ -119,14 +108,26 @@ public final class NeedsResourceSearchSystem extends TickingSystem<EntityStore> 
                 continue;
             }
             Ref<EntityStore> reference = world.getEntityRef(waiterId);
-            if (reference != null && reference.isValid() && reference.getStore() == store) {
-                return reference;
+            if (reference == null || !reference.isValid() || reference.getStore() != store) {
+                continue;
+            }
+            TransformComponent transform = store.getComponent(reference, TransformComponent.getComponentType());
+            if (transform == null || transform.getPosition() == null) {
+                continue;
+            }
+            double originX = transform.getPosition().x;
+            double originY = transform.getPosition().y;
+            double originZ = transform.getPosition().z;
+            if (request.isInQueuedArea(originX, originY, originZ)) {
+                return new SearchContext(reference, originX, originY, originZ);
             }
         }
         return null;
     }
 
-    private static final class TickState {
-        private long worldTick;
+    private record SearchContext(Ref<EntityStore> reference,
+                                 double originX,
+                                 double originY,
+                                 double originZ) {
     }
 }
