@@ -42,7 +42,7 @@ import org.joml.Vector3d;
  */
 public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase {
     private static final NeedsResourcePathPreflightService PATH_PREFLIGHT_SERVICE =
-            new NeedsResourcePathPreflightService();
+            NeedsResourcePathPreflightService.shared();
     private static final int MAX_ACTIVE_SEEK_VERTICAL_SCAN_RADIUS = 16;
     private static final double PREFLIGHT_REJECT_TTL_SECONDS = 4.0;
     private static final double DEFAULT_APPROACH_RADIUS = 2.0;
@@ -147,6 +147,12 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                 logPreflight(ref, store, preflight, local.reason(), local.approachRadius(), localTarget);
                 if (!preflight.ready()) {
                     if (preflight.noPath()) {
+                        PATH_PREFLIGHT_SERVICE.invalidateTarget(
+                                npcUuid,
+                                worldName,
+                                resourceType.label,
+                                localTarget
+                        );
                         NeedsResourceSearchCoordinator.Request request = createRequest(
                                 eligibility.needsConfig() == null
                                         ? resolveNeedsConfig(ref, store)
@@ -264,6 +270,12 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             logPreflight(ref, store, preflight, result.reason(), result.approachRadius(), target);
             if (!preflight.ready()) {
                 if (preflight.noPath()) {
+                    PATH_PREFLIGHT_SERVICE.invalidateTarget(
+                            npcUuid,
+                            worldName,
+                            resourceType.label,
+                            target
+                    );
                     targetCache.invalidateCandidate(store, request, target, nowMs);
                     targetCache.forgetRecentTarget(npcUuid, worldName, resourceType.kind, target);
                     NeedsResourceTargetCacheAdapter.rejectTarget(
@@ -699,6 +711,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                                        @Nullable String resourceType,
                                        @Nullable Vector3d target,
                                        double suppressSeconds) {
+        invalidatePreflightLeases(npcUuid, resourceType, target);
         return NeedsResourceTargetCacheAdapter.rejectTarget(npcUuid, resourceType, target, suppressSeconds);
     }
 
@@ -707,12 +720,30 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                                         @Nullable Vector3d target,
                                         double suppressSeconds,
                                         long nowMs) {
+        invalidatePreflightLeases(npcUuid, resourceType, target);
         if (resourceType == null || resourceType.isBlank() || "auto".equalsIgnoreCase(resourceType.trim())) {
             boolean water = NeedsResourceTargetCacheAdapter.rejectTarget(npcUuid, "water", target, suppressSeconds, nowMs);
             boolean food = NeedsResourceTargetCacheAdapter.rejectTarget(npcUuid, "food_container", target, suppressSeconds, nowMs);
             return water || food;
         }
         return NeedsResourceTargetCacheAdapter.rejectTarget(npcUuid, resourceType, target, suppressSeconds, nowMs);
+    }
+
+    private static void invalidatePreflightLeases(@Nullable UUID npcUuid,
+                                                  @Nullable String resourceType,
+                                                  @Nullable Vector3d target) {
+        if (resourceType == null || resourceType.isBlank() || "auto".equalsIgnoreCase(resourceType.trim())) {
+            PATH_PREFLIGHT_SERVICE.invalidateTarget(npcUuid, null, "Water", target);
+            PATH_PREFLIGHT_SERVICE.invalidateTarget(npcUuid, null, "FoodContainer", target);
+            return;
+        }
+        String normalized = resourceType.trim().toLowerCase(Locale.ROOT);
+        String label = normalized.equals("food")
+                || normalized.equals("foodcontainer")
+                || normalized.equals("food_container")
+                ? "FoodContainer"
+                : "Water";
+        PATH_PREFLIGHT_SERVICE.invalidateTarget(npcUuid, null, label, target);
     }
 
     static boolean isTargetRejectedForTests(@Nullable UUID npcUuid,

@@ -43,7 +43,8 @@ import org.joml.Vector3d;
 public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase {
     public static final double DEFAULT_APPROACH_RADIUS = NeedsResourceStandTargetSelector.MIN_ADJACENT_DISTANCE;
     private static final Logger LOGGER = Logger.getLogger(SensorTameworkReachableBlockTarget.class.getName());
-    private static final NeedsResourcePathPreflightService PATH_PREFLIGHT_SERVICE = new NeedsResourcePathPreflightService();
+    private static final NeedsResourcePathPreflightService PATH_PREFLIGHT_SERVICE =
+            NeedsResourcePathPreflightService.shared();
     private static final ThreadLocal<NeedsResourceStandTargetSelector> STAND_TARGET_SELECTOR =
             ThreadLocal.withInitial(NeedsResourceStandTargetSelector::new);
     private static final long TARGET_CACHE_HIT_TTL_MS = 1_500L;
@@ -279,6 +280,13 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
             return CandidateResult.hit(target);
         }
         if (preflight.noPath()) {
+            World world = resolveWorld(context.store());
+            PATH_PREFLIGHT_SERVICE.invalidateTarget(
+                    context.npcUuid(),
+                    world == null ? null : world.getName(),
+                    label,
+                    target
+            );
             PositionTargetRejectCache.reject(
                     context.npcUuid(),
                     label,
