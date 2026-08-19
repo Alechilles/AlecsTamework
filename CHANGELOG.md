@@ -21,6 +21,8 @@
   that the shaded Patchwork descriptor is incomplete.
 - Reduced world-tick work for companion needs by reusing parsed runtime settings instead of rebuilding
   the same damage and tick-policy objects for each companion check.
+- Large companion groups now spread due needs updates and cold food or water searches across world
+  ticks. Nearby companions share cached resource results instead of repeating the same search.
 
 ## 3.1.9 - Companion Spawn Safety Hotfix - 2026-08-16
 
