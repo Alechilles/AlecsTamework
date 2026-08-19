@@ -1,15 +1,42 @@
 # Changelog
 
-## 3.1.10 - Embedded Patchwork Telemetry Fix - 2026-08-18
+## 3.2.0 - Runtime Activation and Performance Update - 2026-08-19
 
 ### Changed
 
+- Tamework now builds one startup activation plan from effective content,
+  dependency requirements, public capability requests, and durable recovery
+  evidence. Unused modules install no runtime systems, feature listeners,
+  workers, or persistence runtime.
+- `/tw activation` now reports module states, reasons, passive work counters,
+  and whether changed content requires a restart. Reloads do not change the
+  live system topology.
+- Generic and bonded persistence now use separate read-only startup probes.
+  Empty servers do not create their databases, while pending durable work
+  keeps its required recovery authority active.
+- Moved enabled Tamework sample NPCs, items, progression configs,
+  translations, and example-only art into a separate disabled-by-default
+  `Alec's Tamework! Examples` asset pack. Bundled examples no longer activate
+  Tamework runtime modules on servers that do not install the pack.
+- Reusable avatar-flight, tranquilizer, and attachment-display assets no
+  longer count as active gameplay by themselves. Library-only servers do not
+  register their avatar-flight, mount, projectile-hazard, attachment, movement,
+  or companion-core tick systems.
+- Active companion attachment, movement, flight-control, and despawn sweeps
+  now reuse per-world scratch collections instead of allocating new candidate
+  lists and sets on every pass.
 - Captured spawner tooltips now show a compact companion summary, level and maximum level, trait
   names with color-coded values, and a separate appearance section. Gender markers use pink
   for female companions and blue for male companions.
 
 ### Fixed
 
+- Restored the shared Nametag and Soul Lantern models, textures, icons,
+  particles, and audio to the main Tamework pack. Dependent mods no longer
+  require the optional examples pack to validate these reusable assets.
+- Preserved system declaration order inside each active runtime module. Avatar
+  Flight no longer fails startup when its HUD registers before its movement
+  dependency.
 - Tamework now registers its NPC builders before generic persistence starts. If another process
   owns the persistence lock, Tamework and dependent Animal Husbandry NPC assets still load while
   saved-state features remain safely unavailable.
@@ -32,39 +59,16 @@
 - Reduced command HUD server work when many players are online.
 - Large companion groups now spread due needs updates and cold food or water searches across world
   ticks. Nearby companions share cached resource results instead of repeating the same search.
+- Command HUD cleanup now stays on the world thread and completes in order when players or stores
+  unload. This prevents stale HUD state and unload races.
+- Cache-first needs resource sensors can omit the duplicate need gate, so dependent NPC assets load
+  without repeating the Hunger or Thirst condition.
+- Projectile launch interactions now provide ballistic data to Hytale's NPC aiming logic, so ranged
+  NPC attacks no longer fall back to close-combat aiming.
 
 ## 3.1.9 - Companion Spawn Safety Hotfix - 2026-08-16
 
-### Changed
-- Tamework now builds one startup activation plan from effective content,
-  dependency requirements, public capability requests, and durable recovery
-  evidence. Unused modules install no runtime systems, feature listeners,
-  workers, or persistence runtime.
-- `/tw activation` now reports module states, reasons, passive work counters,
-  and whether changed content requires a restart. Reloads do not change the
-  live system topology.
-- Generic and bonded persistence now use separate read-only startup probes.
-  Empty servers do not create their databases, while pending durable work
-  keeps its required recovery authority active.
-- Moved enabled Tamework sample NPCs, items, progression configs,
-  translations, and example-only art into a separate disabled-by-default
-  `Alec's Tamework! Examples` asset pack. Bundled examples no longer activate
-  Tamework runtime modules on servers that do not install the pack.
-- Reusable avatar-flight, tranquilizer, and attachment-display assets no
-  longer count as active gameplay by themselves. Library-only servers do not
-  register their avatar-flight, mount, projectile-hazard, attachment, movement,
-  or companion-core tick systems.
-- Active companion attachment, movement, flight-control, and despawn sweeps
-  now reuse per-world scratch collections instead of allocating new candidate
-  lists and sets on every pass.
-
 ### Fixed
-- Restored the shared Nametag and Soul Lantern models, textures, icons,
-  particles, and audio to the main Tamework pack. Dependent mods no longer
-  require the optional examples pack to validate these reusable assets.
-- Preserved system declaration order inside each active runtime module. Avatar
-  Flight no longer fails startup when its HUD registers before its movement
-  dependency.
 - Newly spawned companion projections now clear stale fall distance and
   velocity and receive brief fall-damage protection. Bonded summons and NPCs
   released from capture items no longer die from invalid spawn-time falls.
