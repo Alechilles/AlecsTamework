@@ -8,6 +8,7 @@ import com.hypixel.hytale.server.npc.asset.builder.holder.DoubleHolder;
 import com.hypixel.hytale.server.npc.asset.builder.holder.StringArrayHolder;
 import com.hypixel.hytale.server.npc.asset.builder.holder.StringHolder;
 import com.hypixel.hytale.server.npc.asset.builder.validators.StringNotEmptyValidator;
+import com.hypixel.hytale.server.npc.asset.builder.validators.StringNullOrNotEmptyValidator;
 import com.hypixel.hytale.server.npc.instructions.Sensor;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -70,7 +71,7 @@ public final class BuilderSensorTameworkNeedsResourceTarget extends TameworkSens
                 "Need",
                 this.need,
                 null,
-                StringNotEmptyValidator.get(),
+                StringNullOrNotEmptyValidator.get(),
                 BuilderDescriptorState.Stable,
                 "Optional need type gate: Hunger or Thirst.",
                 null
