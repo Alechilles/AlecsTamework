@@ -9,6 +9,7 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.IPositionProvider;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
+import com.hypixel.hytale.server.core.universe.world.World;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
@@ -49,9 +50,25 @@ public final class ActionTameworkNeedsResourceRejectTarget extends TameworkActio
         }
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
         UUID npcUuid = npc != null ? npc.getUuid() : null;
-        boolean rejected = SensorTameworkNeedsResourceTarget.rejectTarget(npcUuid, resourceType, target, suppressSeconds);
+        boolean rejected = SensorTameworkNeedsResourceTarget.rejectTarget(
+                npcUuid,
+                resolveWorldName(store),
+                resourceType,
+                target,
+                suppressSeconds
+        );
         SensorTameworkNeedsResourceTarget.releaseTarget(npcRef, store, resourceType, target);
         return rejected;
+    }
+
+    @Nullable
+    private static String resolveWorldName(@Nullable Store<EntityStore> store) {
+        if (store == null || store.getExternalData() == null || store.getExternalData().getWorld() == null) {
+            return null;
+        }
+        World world = store.getExternalData().getWorld();
+        String worldName = world.getName();
+        return worldName == null || worldName.isBlank() ? null : worldName;
     }
 
     @Nullable

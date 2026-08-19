@@ -5,8 +5,12 @@ import com.alechilles.alecstamework.debug.PlayerInputDebugSystem;
 import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsBatchRunner;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsRuntimeRegistry;
+import com.alechilles.alecstamework.npc.progression.CompanionPopulationSpatialIndex;
+import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceSearchCoordinator;
+import com.alechilles.alecstamework.npc.progression.ReachableBlockSourceCache;
 import com.alechilles.alecstamework.npc.sensors.NeedsResourceTargetCacheAdapter;
+import com.alechilles.alecstamework.npc.sensors.ReachableBlockTargetStateCache;
 import com.alechilles.alecstamework.npc.systems.*;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationEntitySystem;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationOwnerChangeSystem;
@@ -278,6 +282,7 @@ public final class TameworkCompanionRuntimeParticipants {
             NeedsResourceSearchCoordinator coordinator,
             World world
     ) {
+        NeedsResourcePathPreflightService.shared().clearWorld(world.getName());
         NeedsResourceTargetCacheAdapter.clearWorld(world.getName());
         EntityStore entityStore = world.getEntityStore();
         if (entityStore == null) {
@@ -287,6 +292,9 @@ public final class TameworkCompanionRuntimeParticipants {
         if (store == null) {
             return;
         }
+        CompanionPopulationSpatialIndex.shared().remove(store);
+        ReachableBlockSourceCache.shared().clear(store);
+        ReachableBlockTargetStateCache.shared().clear(store);
         coordinator.clear(store);
     }
 }

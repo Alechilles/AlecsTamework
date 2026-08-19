@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.progression;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
@@ -291,8 +292,8 @@ final class NeedsResourceAreaSearchCache {
                    @Nonnull List<String> normalizedItemIds,
                    boolean legacyItemIdsHash) {
         AreaKey {
-            worldName = worldName.trim().toLowerCase(Locale.ROOT);
-            resourceKind = resourceKind.trim().toLowerCase(Locale.ROOT);
+            worldName = normalizeIdentifier(worldName);
+            resourceKind = normalizeIdentifier(resourceKind);
             normalizedItemIds = List.copyOf(normalizedItemIds);
         }
 
@@ -350,6 +351,38 @@ final class NeedsResourceAreaSearchCache {
                     verticalScanRadius,
                     consumeRadius,
                     itemIdsHash
+            );
+        }
+
+        /**
+         * Builds a key from a template's already canonical values. The list is
+         * immutable and is retained without sorting or per-area normalization.
+         */
+        @Nullable
+        static AreaKey fromCanonical(@Nullable String worldName,
+                                     @Nonnull String resourceKind,
+                                     double positionX,
+                                     double positionY,
+                                     double positionZ,
+                                     double radius,
+                                     int verticalScanRadius,
+                                     double consumeRadius,
+                                     @Nonnull List<String> canonicalItemIds) {
+            if (!isValidBaseInput(worldName, resourceKind, positionX, positionY, positionZ, radius)) {
+                return null;
+            }
+            return new AreaKey(
+                    worldName,
+                    resourceKind,
+                    quantizedCell(positionX),
+                    quantizedCell(positionY),
+                    quantizedCell(positionZ),
+                    Math.max(1, (int) Math.ceil(radius * 10.0)),
+                    Math.max(0, verticalScanRadius),
+                    Math.max(0, (int) Math.ceil(consumeRadius * 10.0)),
+                    canonicalItemIds.hashCode(),
+                    canonicalItemIds,
+                    false
             );
         }
 
@@ -456,6 +489,11 @@ final class NeedsResourceAreaSearchCache {
             return List.copyOf(normalized);
         }
 
+        @Nonnull
+        static String normalizeWorldName(@Nonnull String worldName) {
+            return normalizeIdentifier(worldName);
+        }
+
         /** Returns whether scalar coordinates still map to this shared area cell. */
         boolean containsPosition(double positionX, double positionY, double positionZ) {
             return Double.isFinite(positionX)
@@ -485,6 +523,30 @@ final class NeedsResourceAreaSearchCache {
 
         private static int quantizedCell(double coordinate) {
             return Math.floorDiv(blockCoordinate(coordinate), POSITION_CACHE_CELL_SIZE_BLOCKS);
+        }
+
+        static int cellFor(double coordinate) {
+            return quantizedCell(coordinate);
+        }
+
+        @Nonnull
+        private static String normalizeIdentifier(@Nonnull String value) {
+            Objects.requireNonNull(value, "value");
+            String trimmed = value.trim();
+            boolean alreadyNormalized = trimmed == value;
+            if (alreadyNormalized) {
+                for (int index = 0; index < trimmed.length(); index++) {
+                    char character = trimmed.charAt(index);
+                    if (Character.toLowerCase(character) != character) {
+                        alreadyNormalized = false;
+                        break;
+                    }
+                }
+            }
+            if (alreadyNormalized) {
+                return value;
+            }
+            return trimmed.toLowerCase(Locale.ROOT);
         }
 
         private static int blockCoordinate(double coordinate) {

@@ -6,11 +6,10 @@ import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceFastModePolicy;
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService;
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService.PathPreflightResult;
+import com.alechilles.alecstamework.npc.progression.NeedsResourceRequestTemplate;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceSearchCoordinator;
 import com.alechilles.alecstamework.npc.progression.NeedsSeekDiagnostics;
 import com.alechilles.alecstamework.npc.progression.NeedsTelemetryDiagnostics;
-import com.alechilles.alecstamework.npc.progression.PositionTargetRejectCache;
-import com.alechilles.alecstamework.npc.progression.PositionTargetReservationCache;
 import com.alechilles.alecstamework.npc.sensorinfo.TameworkTargetPositionInfo;
 import com.alechilles.alecstamework.npc.sensorinfo.TameworkTargetPositionInfoProvider;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkNeedsResourceTarget;
@@ -27,10 +26,8 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
@@ -43,9 +40,8 @@ import org.joml.Vector3d;
  */
 public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase {
     private static final NeedsResourcePathPreflightService PATH_PREFLIGHT_SERVICE =
-            new NeedsResourcePathPreflightService();
+            NeedsResourcePathPreflightService.shared();
     private static final int MAX_ACTIVE_SEEK_VERTICAL_SCAN_RADIUS = 16;
-    private static final double PREFLIGHT_REJECT_TTL_SECONDS = 4.0;
     private static final double DEFAULT_APPROACH_RADIUS = 2.0;
     private static final double EPSILON = 0.000001;
     private static final SearchEligibility UNGATED_ELIGIBILITY =
@@ -62,7 +58,21 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     private final TameworkTargetPositionInfoProvider infoProvider =
             new TameworkTargetPositionInfoProvider(null, positionInfo);
     private final NeedsResourceTargetCacheAdapter targetCache = new NeedsResourceTargetCacheAdapter();
-    private final ConcurrentHashMap<FoodItemIdsCacheKey, String[]> foodItemIdsByConfig = new ConcurrentHashMap<>();
+    private final NeedsResourceRequestTemplate.AreaRequestMemo areaRequestMemo =
+            new NeedsResourceRequestTemplate.AreaRequestMemo();
+    @Nullable
+    private NeedsResourceRequestTemplate requestTemplate;
+    @Nullable
+    private TwNeedsConfig requestTemplateConfig;
+    @Nullable
+    private String[] requestTemplatePassiveItemIds;
+    private double requestTemplateRadius;
+    private int requestTemplateVerticalRadius;
+    private double requestTemplateConsumeRadius;
+    private double requestTemplateConfiguredSearchRadius;
+    private int requestTemplateConfiguredVerticalRadius;
+    private double requestTemplateConfiguredConsumeRadius;
+    private boolean requestTemplateSignatureInitialized;
 
     public SensorTameworkNeedsResourceTarget(@Nonnull BuilderSensorTameworkNeedsResourceTarget builder,
                                              @Nonnull BuilderSupport support) {
@@ -120,6 +130,65 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                 return false;
             }
             Vector3d localTarget = local.target();
+            if (local.preflightRequired() && !local.fastConsume()) {
+                PathPreflightResult preflight = PATH_PREFLIGHT_SERVICE.preflight(
+                        ref,
+                        role,
+                        store,
+                        npcUuid,
+                        resourceType.label,
+                        localTarget,
+                        local.approachRadius(),
+                        nowMs
+                );
+                logPreflight(ref, store, preflight, local.reason(), local.approachRadius(), localTarget);
+                if (!preflight.ready()) {
+                    if (preflight.noPath()) {
+                        PATH_PREFLIGHT_SERVICE.invalidateTarget(
+                                npcUuid,
+                                worldName,
+                                resourceType.label,
+                                localTarget
+                        );
+                        NeedsResourceSearchCoordinator.Request request = createRequest(
+                                eligibility.needsConfig() == null
+                                        ? resolveNeedsConfig(ref, store)
+                                        : eligibility.needsConfig(),
+                                worldName,
+                                originX,
+                                originY,
+                                originZ
+                        );
+                        if (request != null) {
+                            targetCache.invalidateCandidate(store, request, localTarget, nowMs);
+                        }
+                        targetCache.forgetRecentTarget(npcUuid, worldName, resourceType.kind, localTarget);
+                        NeedsResourceTargetCacheAdapter.rejectTarget(
+                                npcUuid,
+                                resourceType.kind,
+                                localTarget,
+                                NeedsResourceTargetStateFacade.preflightRejectTtlSeconds()
+                        );
+                        targetCache.clearTarget(npcUuid, worldName, resourceType.kind, localTarget);
+                    } else {
+                        targetCache.keepPendingTarget(
+                                npcUuid,
+                                worldName,
+                                resourceType.kind,
+                                localTarget,
+                                nowMs
+                        );
+                    }
+                    log(ref, store, "miss", preflight.reason(), false, eligibility.currentRatio(), localTarget);
+                    return false;
+                }
+                if (!targetCache.promoteTarget(npcUuid, worldName, resourceType.kind, localTarget)) {
+                    log(ref, store, "miss", "path_preflight_target_changed", false,
+                            eligibility.currentRatio(), localTarget);
+                    return false;
+                }
+                targetCache.rememberRecentTarget(npcUuid, worldName, resourceType.kind, localTarget, nowMs);
+            }
             positionInfo.setTarget(localTarget.x, localTarget.y, localTarget.z);
             log(ref, store, "target_found", local.reason(), true, eligibility.currentRatio(), localTarget);
             return true;
@@ -198,17 +267,36 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             logPreflight(ref, store, preflight, result.reason(), result.approachRadius(), target);
             if (!preflight.ready()) {
                 if (preflight.noPath()) {
+                    PATH_PREFLIGHT_SERVICE.invalidateTarget(
+                            npcUuid,
+                            worldName,
+                            resourceType.label,
+                            target
+                    );
                     targetCache.invalidateCandidate(store, request, target, nowMs);
                     targetCache.forgetRecentTarget(npcUuid, worldName, resourceType.kind, target);
                     NeedsResourceTargetCacheAdapter.rejectTarget(
                             npcUuid,
                             resourceType.kind,
                             target,
-                            PREFLIGHT_REJECT_TTL_SECONDS
+                            NeedsResourceTargetStateFacade.preflightRejectTtlSeconds()
+                    );
+                    targetCache.clearTarget(npcUuid, worldName, resourceType.kind, target);
+                } else {
+                    targetCache.keepPendingTarget(
+                            npcUuid,
+                            worldName,
+                            resourceType.kind,
+                            target,
+                            nowMs
                     );
                 }
-                targetCache.clearTarget(npcUuid, worldName, resourceType.kind, target);
                 log(ref, store, "miss", preflight.reason(), false, eligibility.currentRatio(), target);
+                return false;
+            }
+            if (!targetCache.promoteTarget(npcUuid, worldName, resourceType.kind, target)) {
+                log(ref, store, "miss", "path_preflight_target_changed", false,
+                        eligibility.currentRatio(), target);
                 return false;
             }
         }
@@ -229,46 +317,124 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                                                                  double originX,
                                                                  double originY,
                                                                  double originZ) {
-        double searchRadius = range;
-        int verticalRadius = 8;
-        double consumeRadius = 0.0;
-        List<String> effectiveItemIds = List.of();
-        if (config != null) {
-            TwNeedsConfig.PassiveRefillSettings passive = config.getPassiveRefill();
-            if (resourceType == ResourceType.WATER) {
-                searchRadius = Math.max(searchRadius, passive.getWaterSearchRadius());
-                verticalRadius = activeSeekVerticalScanRadius(passive.getWaterVerticalScanRadius(), searchRadius);
-                consumeRadius = passive.getWaterConsumeRadius();
-            } else {
-                searchRadius = Math.max(searchRadius, passive.getContainerSearchRadius());
-                verticalRadius = activeSeekVerticalScanRadius(passive.getContainerVerticalScanRadius(), searchRadius);
-                consumeRadius = passive.getContainerConsumeRadius();
-                String[] ids = resolveFoodItemIds(config);
-                if (ids == null || ids.length == 0) {
-                    return null;
-                }
-                effectiveItemIds = Arrays.asList(ids);
-            }
-        } else if (resourceType == ResourceType.FOOD_CONTAINER && !hasConfiguredItemIds) {
+        NeedsResourceRequestTemplate template = resolveRequestTemplate(config);
+        if (template == null) {
             return null;
-        } else if (resourceType == ResourceType.FOOD_CONTAINER) {
-            effectiveItemIds = Arrays.asList(itemIds);
         }
         try {
-            return NeedsResourceSearchCoordinator.Request.forArea(
-                    resourceType.kind,
-                    worldName,
-                    originX,
-                    originY,
-                    originZ,
-                    searchRadius,
-                    verticalRadius,
-                    consumeRadius,
-                    effectiveItemIds
-            );
+            return areaRequestMemo.resolve(template, worldName, originX, originY, originZ);
         } catch (IllegalArgumentException ignored) {
             return null;
         }
+    }
+
+    @Nullable
+    private NeedsResourceRequestTemplate resolveRequestTemplate(@Nullable TwNeedsConfig config) {
+        double searchRadius = range;
+        int verticalRadius = 8;
+        double consumeRadius = 0.0;
+        double configuredSearchRadius = Double.NaN;
+        int configuredVerticalRadius = -1;
+        double configuredConsumeRadius = Double.NaN;
+        String[] passiveItemIds = null;
+        if (config != null) {
+            TwNeedsConfig.PassiveRefillSettings passive = config.getPassiveRefill();
+            if (resourceType == ResourceType.WATER) {
+                configuredSearchRadius = passive.getWaterSearchRadius();
+                configuredVerticalRadius = passive.getWaterVerticalScanRadius();
+                configuredConsumeRadius = passive.getWaterConsumeRadius();
+                searchRadius = Math.max(searchRadius, configuredSearchRadius);
+                verticalRadius = activeSeekVerticalScanRadius(configuredVerticalRadius, searchRadius);
+                consumeRadius = configuredConsumeRadius;
+            } else {
+                configuredSearchRadius = passive.getContainerSearchRadius();
+                configuredVerticalRadius = passive.getContainerVerticalScanRadius();
+                configuredConsumeRadius = passive.getContainerConsumeRadius();
+                searchRadius = Math.max(searchRadius, configuredSearchRadius);
+                verticalRadius = activeSeekVerticalScanRadius(configuredVerticalRadius, searchRadius);
+                consumeRadius = configuredConsumeRadius;
+                passiveItemIds = passive.getContainerFoodItemIds();
+            }
+        }
+
+        if (resourceType == ResourceType.FOOD_CONTAINER
+                && !hasConfiguredItemIds
+                && !hasAnyItemId(passiveItemIds)) {
+            return null;
+        }
+
+        if (requestTemplateSignatureMatches(
+                config,
+                passiveItemIds,
+                searchRadius,
+                verticalRadius,
+                consumeRadius,
+                configuredSearchRadius,
+                configuredVerticalRadius,
+                configuredConsumeRadius
+        )) {
+            return requestTemplate;
+        }
+
+        String[] effectiveItemIds = resourceType == ResourceType.WATER
+                ? new String[0]
+                : resolveEffectiveFoodItemIds(passiveItemIds);
+        NeedsResourceRequestTemplate next = NeedsResourceRequestTemplate.from(
+                resourceType.kind,
+                searchRadius,
+                verticalRadius,
+                consumeRadius,
+                effectiveItemIds
+        );
+        requestTemplate = next;
+        requestTemplateConfig = config;
+        requestTemplatePassiveItemIds = passiveItemIds == null
+                ? null
+                : Arrays.copyOf(passiveItemIds, passiveItemIds.length);
+        requestTemplateRadius = searchRadius;
+        requestTemplateVerticalRadius = verticalRadius;
+        requestTemplateConsumeRadius = consumeRadius;
+        requestTemplateConfiguredSearchRadius = configuredSearchRadius;
+        requestTemplateConfiguredVerticalRadius = configuredVerticalRadius;
+        requestTemplateConfiguredConsumeRadius = configuredConsumeRadius;
+        requestTemplateSignatureInitialized = true;
+        return next;
+    }
+
+    private boolean requestTemplateSignatureMatches(@Nullable TwNeedsConfig config,
+                                                     @Nullable String[] passiveItemIds,
+                                                     double searchRadius,
+                                                     int verticalRadius,
+                                                     double consumeRadius,
+                                                     double configuredSearchRadius,
+                                                     int configuredVerticalRadius,
+                                                     double configuredConsumeRadius) {
+        if (!requestTemplateSignatureInitialized
+                || requestTemplate == null
+                || requestTemplateConfig != config
+                || Double.compare(requestTemplateRadius, searchRadius) != 0
+                || requestTemplateVerticalRadius != verticalRadius
+                || Double.compare(requestTemplateConsumeRadius, consumeRadius) != 0
+                || Double.compare(requestTemplateConfiguredSearchRadius, configuredSearchRadius) != 0
+                || requestTemplateConfiguredVerticalRadius != configuredVerticalRadius
+                || Double.compare(requestTemplateConfiguredConsumeRadius, configuredConsumeRadius) != 0) {
+            return false;
+        }
+        if (resourceType != ResourceType.FOOD_CONTAINER || config == null) {
+            return true;
+        }
+        return Arrays.equals(requestTemplatePassiveItemIds, passiveItemIds);
+    }
+
+    @Nonnull
+    private String[] resolveEffectiveFoodItemIds(@Nullable String[] passiveItemIds) {
+        if (!hasConfiguredItemIds) {
+            return sanitizeItemIds(passiveItemIds);
+        }
+        if (!hasAnyItemId(passiveItemIds)) {
+            return itemIds;
+        }
+        return mergeItemIds(itemIds, passiveItemIds);
     }
 
     @Nullable
@@ -280,11 +446,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         if (hasConfiguredItemIds && passiveItemIds.length == 0) {
             return itemIds;
         }
-        FoodItemIdsCacheKey key = FoodItemIdsCacheKey.from(needsConfig, passiveItemIds, hasConfiguredItemIds);
-        return foodItemIdsByConfig.computeIfAbsent(
-                key,
-                ignored -> hasConfiguredItemIds ? mergeItemIds(itemIds, passiveItemIds) : passiveItemIds
-        );
+        return hasConfiguredItemIds ? mergeItemIds(itemIds, passiveItemIds) : passiveItemIds;
     }
 
     private SearchEligibility resolveSearchEligibility(@Nonnull Ref<EntityStore> ref,
@@ -437,34 +599,6 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         return MAX_ACTIVE_SEEK_VERTICAL_SCAN_RADIUS;
     }
 
-    static long targetCacheTtlMs(boolean hasTarget) {
-        return NeedsResourceTargetCacheAdapter.targetCacheTtlMs(hasTarget);
-    }
-
-    static double preflightRejectTtlSecondsForTests() {
-        return PREFLIGHT_REJECT_TTL_SECONDS;
-    }
-
-    private static boolean shouldBypassPathPreflight(boolean fastModeActive, boolean hasTarget) {
-        return fastModeActive && hasTarget;
-    }
-
-    static boolean shouldBypassPathPreflightForTests(boolean fastModeActive, boolean hasTarget) {
-        return shouldBypassPathPreflight(fastModeActive, hasTarget);
-    }
-
-    @Nonnull
-    static String fastModeReasonForTests(@Nonnull String reason) {
-        return reason.endsWith("_fast_consume") ? reason : reason + "_fast_consume";
-    }
-
-    static boolean targetCacheBlockMatchesForTests(@Nonnull Vector3d cachedScanPosition,
-                                                   @Nonnull Vector3d currentPosition) {
-        return block(cachedScanPosition.x) == block(currentPosition.x)
-                && block(cachedScanPosition.y) == block(currentPosition.y)
-                && block(cachedScanPosition.z) == block(currentPosition.z);
-    }
-
     @Nonnull
     static String[] mergeItemIds(@Nullable String[] primary, @Nullable String[] secondary) {
         if (!hasAnyItemId(primary)) {
@@ -538,148 +672,40 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         return clamp(value, 0.0, 1.0);
     }
 
-    private static int block(double value) {
-        return (int) Math.floor(value);
-    }
-
     public static boolean rejectTarget(@Nullable UUID npcUuid,
                                        @Nullable String resourceType,
                                        @Nullable Vector3d target,
                                        double suppressSeconds) {
-        return NeedsResourceTargetCacheAdapter.rejectTarget(npcUuid, resourceType, target, suppressSeconds);
-    }
-
-    static boolean rejectTargetForTests(@Nullable UUID npcUuid,
-                                        @Nullable String resourceType,
-                                        @Nullable Vector3d target,
-                                        double suppressSeconds,
-                                        long nowMs) {
-        if (resourceType == null || resourceType.isBlank() || "auto".equalsIgnoreCase(resourceType.trim())) {
-            boolean water = NeedsResourceTargetCacheAdapter.rejectTarget(npcUuid, "water", target, suppressSeconds, nowMs);
-            boolean food = NeedsResourceTargetCacheAdapter.rejectTarget(npcUuid, "food_container", target, suppressSeconds, nowMs);
-            return water || food;
-        }
-        return NeedsResourceTargetCacheAdapter.rejectTarget(npcUuid, resourceType, target, suppressSeconds, nowMs);
-    }
-
-    static boolean isTargetRejectedForTests(@Nullable UUID npcUuid,
-                                            @Nullable String resourceType,
-                                            @Nullable Vector3d target,
-                                            long nowMs) {
-        return NeedsResourceTargetCacheAdapter.isTargetRejected(npcUuid, resourceType, target, nowMs);
-    }
-
-    static void clearRejectedTargetsForTests() {
-        PositionTargetRejectCache.clearForTests();
-    }
-
-    static int rejectedTargetCountForTests() {
-        return PositionTargetRejectCache.countForTests();
-    }
-
-    static int rejectedTargetMaxEntriesForTests() {
-        return PositionTargetRejectCache.MAX_ENTRIES;
-    }
-
-    static boolean reserveTargetForTests(@Nullable UUID npcUuid,
-                                         @Nullable String worldName,
-                                         @Nullable String resourceType,
-                                         @Nullable Vector3d target,
-                                         long nowMs) {
-        return NeedsResourceTargetCacheAdapter.reserveTarget(
-                npcUuid, worldName, resourceType, target, nowMs
+        return NeedsResourceTargetStateFacade.rejectTarget(
+                npcUuid, resourceType, target, suppressSeconds
         );
     }
 
-    static boolean isTargetReservedByOtherForTests(@Nullable UUID npcUuid,
-                                                   @Nullable String worldName,
-                                                   @Nullable String resourceType,
-                                                   @Nullable Vector3d target,
-                                                   long nowMs) {
-        return NeedsResourceTargetCacheAdapter.isReservedByOther(
-                npcUuid, worldName, resourceType, target, nowMs
+    /**
+     * Rejects a target and invalidates only the matching path-preflight authority in the given
+     * world. The worldless overload remains available for callers that do not have world context.
+     */
+    public static boolean rejectTarget(@Nullable UUID npcUuid,
+                                       @Nullable String worldName,
+                                       @Nullable String resourceType,
+                                       @Nullable Vector3d target,
+                                       double suppressSeconds) {
+        return NeedsResourceTargetStateFacade.rejectTarget(
+                npcUuid, worldName, resourceType, target, suppressSeconds
         );
-    }
-
-    static void releaseTargetForTests(@Nullable UUID npcUuid,
-                                      @Nullable String worldName,
-                                      @Nullable String resourceType,
-                                      @Nullable Vector3d target) {
-        NeedsResourceTargetCacheAdapter.releaseTarget(npcUuid, worldName, resourceType, target);
-    }
-
-    static void clearTargetReservationsForTests() {
-        PositionTargetReservationCache.clearForTests();
-    }
-
-    static void rememberFastConsumeTargetForTests(@Nullable UUID npcUuid,
-                                                  @Nullable String worldName,
-                                                  @Nullable String resourceType,
-                                                  @Nullable Vector3d target,
-                                                  long expiresAtMs) {
-        NeedsResourceTargetCacheAdapter.rememberFastConsumeTargetForTests(
-                npcUuid, worldName, resourceType, target, expiresAtMs
-        );
-    }
-
-    static boolean isFastConsumeTargetForTests(@Nullable UUID npcUuid,
-                                               @Nullable String worldName,
-                                               @Nullable String resourceType,
-                                               @Nullable Vector3d target,
-                                               long nowMs) {
-        return NeedsResourceTargetCacheAdapter.isFastConsumeTargetForTests(
-                npcUuid, worldName, resourceType, target, nowMs
-        );
-    }
-
-    static void clearFastConsumeTargetsForTests() {
-        NeedsResourceTargetCacheAdapter.clearFastConsumeTargetsForTests();
     }
 
     public static void releaseTarget(@Nullable Ref<EntityStore> npcRef,
                                      @Nullable Store<EntityStore> store,
                                      @Nullable String resourceType,
                                      @Nullable Vector3d target) {
-        NeedsResourceTargetCacheAdapter.releaseTarget(npcRef, store, resourceType, target);
+        NeedsResourceTargetStateFacade.releaseTarget(npcRef, store, resourceType, target);
     }
 
     public static boolean hasFastConsumeTarget(@Nullable Ref<EntityStore> npcRef,
                                                @Nullable Store<EntityStore> store,
                                                long nowMs) {
-        return NeedsResourceTargetCacheAdapter.hasFastConsumeTarget(npcRef, store, nowMs);
-    }
-
-    private record SearchEligibility(boolean allowed,
-                                     @Nonnull String reason,
-                                     double currentRatio,
-                                     @Nullable TwNeedsConfig needsConfig) {
-        @Nonnull
-        private static SearchEligibility allowed(double ratio, @Nullable TwNeedsConfig config) {
-            return new SearchEligibility(true, "eligible", ratio, config);
-        }
-
-        @Nonnull
-        private static SearchEligibility blocked(@Nonnull String reason,
-                                                 double ratio,
-                                                 @Nullable TwNeedsConfig config) {
-            return new SearchEligibility(false, reason, ratio, config);
-        }
-    }
-
-    private record FoodItemIdsCacheKey(@Nonnull String configId,
-                                       @Nonnull List<String> passiveItemIds,
-                                       boolean hasConfiguredItemIds) {
-        @Nonnull
-        private static FoodItemIdsCacheKey from(@Nonnull TwNeedsConfig config,
-                                                @Nonnull String[] itemIds,
-                                                boolean hasConfiguredItemIds) {
-            String id = config.getId();
-            return new FoodItemIdsCacheKey(
-                    id == null || id.isBlank() ? "<default>" : id.trim().toLowerCase(Locale.ROOT),
-                    List.of(itemIds),
-                    hasConfiguredItemIds
-            );
-        }
+        return NeedsResourceTargetStateFacade.hasFastConsumeTarget(npcRef, store, nowMs);
     }
 
     private enum NeedType {

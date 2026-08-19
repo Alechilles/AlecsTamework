@@ -540,7 +540,7 @@ class NeedsResourceSearchCoordinatorTest {
         try (TestEntityComponentStore store = newStore()) {
             coordinator.clear(store);
             List<String> itemIds = new ArrayList<>(List.of("Food_Beef", "Food_Wheat"));
-            NeedsResourceSearchCoordinator.Request request = request(800, itemIds);
+            NeedsResourceSearchCoordinator.Request request = request("food_container", 800, itemIds);
             itemIds.clear();
             assertEquals(List.of("food_beef", "food_wheat"), request.itemIds());
 

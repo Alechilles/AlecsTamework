@@ -32,6 +32,20 @@ public final class NeedsResourceSearchCoordinator {
     public static final String RESOURCE_KIND_WATER = "water";
     public static final String RESOURCE_KIND_FOOD_CONTAINER = "food_container";
 
+    @Nonnull
+    static String normalizeResourceKind(@Nonnull String value) {
+        if (value == null) {
+            throw new IllegalArgumentException("resourceKind cannot be null");
+        }
+        String normalized = value.trim()
+                .toLowerCase(Locale.ROOT);
+        if (!RESOURCE_KIND_WATER.equals(normalized)
+                && !RESOURCE_KIND_FOOD_CONTAINER.equals(normalized)) {
+            throw new IllegalArgumentException("unsupported resource kind: " + value);
+        }
+        return normalized;
+    }
+
     private static final long WARNING_THROTTLE_MS = 5_000L;
     private static final NeedsResourceSearchCoordinator INSTANCE =
             new NeedsResourceSearchCoordinator();
@@ -293,23 +307,48 @@ public final class NeedsResourceSearchCoordinator {
         @Nonnull
         private final List<String> itemIds;
 
-        private Request(@Nonnull String resourceKind,
-                        @Nonnull NeedsResourceAreaSearchCache.AreaKey areaKey,
-                        double radius,
-                        int verticalRadius,
-                        double consumeRadius) {
-            this.resourceKind = normalizeResourceKind(resourceKind);
+        private Request(@Nonnull NeedsResourceRequestTemplate template,
+                        @Nonnull NeedsResourceAreaSearchCache.AreaKey areaKey) {
+            this.resourceKind = template.resourceKind();
             this.areaKey = Objects.requireNonNull(areaKey, "areaKey");
-            this.radius = requirePositiveFinite(
-                    NeedsResourceSearchCachePolicy.boundedSearchRadius(radius),
-                    "radius"
-            );
-            this.verticalRadius = NeedsResourceSearchCachePolicy.boundedVerticalScanRadius(verticalRadius);
-            this.consumeRadius = requireNonNegativeFinite(
-                    NeedsResourceSearchCachePolicy.boundedConsumeRadius(consumeRadius),
-                    "consumeRadius"
-            );
-            this.itemIds = areaKey.normalizedItemIds();
+            this.radius = template.radius();
+            this.verticalRadius = template.verticalRadius();
+            this.consumeRadius = template.consumeRadius();
+            this.itemIds = template.itemIds();
+        }
+
+        @Nonnull
+        static Request fromTemplate(@Nonnull NeedsResourceRequestTemplate template,
+                                    @Nonnull String worldName,
+                                    double originX,
+                                    double originY,
+                                    double originZ) {
+            Objects.requireNonNull(template, "template");
+            if (!NeedsResourceSearchCachePolicy.hasSafeOrigin(
+                    originX,
+                    originY,
+                    originZ,
+                    Math.max(1, (int) Math.ceil(template.radius())),
+                    template.verticalRadius()
+            )) {
+                throw new IllegalArgumentException("request bounds are invalid");
+            }
+            NeedsResourceAreaSearchCache.AreaKey areaKey =
+                    NeedsResourceAreaSearchCache.AreaKey.fromCanonical(
+                            worldName,
+                            template.resourceKind(),
+                            originX,
+                            originY,
+                            originZ,
+                            template.radius(),
+                            template.verticalRadius(),
+                            template.consumeRadius(),
+                            template.itemIds()
+                    );
+            if (areaKey == null) {
+                throw new IllegalArgumentException("area key cannot be built from the supplied origin");
+            }
+            return new Request(template, areaKey);
         }
 
         /**
@@ -340,7 +379,7 @@ public final class NeedsResourceSearchCoordinator {
         }
 
         /*
-         * The normalized values are calculated before AreaKey.from so a
+         * The template bounds values before the trusted area-key path so a
          * malformed finite request cannot widen the integer traversal.
          */
         private static Request createForArea(@Nonnull String resourceKind,
@@ -352,43 +391,14 @@ public final class NeedsResourceSearchCoordinator {
                                              int verticalRadius,
                                              double consumeRadius,
                                              @Nonnull List<String> itemIds) {
-            double normalizedRadius = NeedsResourceSearchCachePolicy.boundedSearchRadius(radius);
-            int normalizedVerticalRadius = NeedsResourceSearchCachePolicy.boundedVerticalScanRadius(verticalRadius);
-            double normalizedConsumeRadius = NeedsResourceSearchCachePolicy.boundedConsumeRadius(consumeRadius);
-            if (!Double.isFinite(normalizedRadius)
-                    || normalizedRadius <= 0.0
-                    || !Double.isFinite(normalizedConsumeRadius)
-                    || normalizedConsumeRadius < 0.0
-                    || !NeedsResourceSearchCachePolicy.hasSafeOrigin(
-                    originX,
-                    originY,
-                    originZ,
-                    Math.max(1, (int) Math.ceil(normalizedRadius)),
-                    normalizedVerticalRadius
-            )) {
-                throw new IllegalArgumentException("request bounds are invalid");
-            }
-            NeedsResourceAreaSearchCache.AreaKey areaKey = NeedsResourceAreaSearchCache.AreaKey.from(
-                    worldName,
+            NeedsResourceRequestTemplate template = NeedsResourceRequestTemplate.from(
                     resourceKind,
-                    originX,
-                    originY,
-                    originZ,
-                    normalizedRadius,
-                    normalizedVerticalRadius,
-                    normalizedConsumeRadius,
+                    radius,
+                    verticalRadius,
+                    consumeRadius,
                     itemIds
             );
-            if (areaKey == null) {
-                throw new IllegalArgumentException("area key cannot be built from the supplied origin");
-            }
-            return new Request(
-                    resourceKind,
-                    areaKey,
-                    normalizedRadius,
-                    normalizedVerticalRadius,
-                    normalizedConsumeRadius
-            );
+            return fromTemplate(template, worldName, originX, originY, originZ);
         }
 
         @Nonnull
@@ -468,32 +478,6 @@ public final class NeedsResourceSearchCoordinator {
                     + ", consumeRadius=" + consumeRadius
                     + ", itemIds=" + itemIds
                     + "]";
-        }
-
-        @Nonnull
-        private static String normalizeResourceKind(@Nonnull String value) {
-            String normalized = Objects.requireNonNull(value, "resourceKind")
-                    .trim()
-                    .toLowerCase(Locale.ROOT);
-            if (!RESOURCE_KIND_WATER.equals(normalized)
-                    && !RESOURCE_KIND_FOOD_CONTAINER.equals(normalized)) {
-                throw new IllegalArgumentException("unsupported resource kind: " + value);
-            }
-            return normalized;
-        }
-
-        private static double requirePositiveFinite(double value, @Nonnull String name) {
-            if (!Double.isFinite(value) || value <= 0.0) {
-                throw new IllegalArgumentException(name + " must be finite and positive");
-            }
-            return value;
-        }
-
-        private static double requireNonNegativeFinite(double value, @Nonnull String name) {
-            if (!Double.isFinite(value) || value < 0.0) {
-                throw new IllegalArgumentException(name + " must be finite and non-negative");
-            }
-            return value;
         }
 
     }

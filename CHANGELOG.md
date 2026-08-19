@@ -58,7 +58,9 @@
   queries between the target and hotswap HUDs, and selecting bounded player batches.
 - Reduced command HUD server work when many players are online.
 - Large companion groups now spread due needs updates and cold food or water searches across world
-  ticks. Nearby companions share cached resource results instead of repeating the same search.
+  ticks. Nearby companions share resource and request snapshots, while each companion reuses its
+  own successful path checks. Happiness population modifiers reuse one five-second world snapshot
+  and cap their configured search radius at 240 blocks to keep each query local and bounded.
 - Command HUD cleanup now stays on the world thread and completes in order when players or stores
   unload. This prevents stale HUD state and unload races.
 - Cache-first needs resource sensors can omit the duplicate need gate, so dependent NPC assets load

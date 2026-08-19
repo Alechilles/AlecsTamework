@@ -48,23 +48,23 @@ class SensorTameworkNeedsResourceTargetItemIdsTest {
 
     @Test
     void targetMissCacheIsShortEnoughForMovingNpcs() {
-        assertTrue(SensorTameworkNeedsResourceTarget.targetCacheTtlMs(false) > 0L);
-        assertTrue(SensorTameworkNeedsResourceTarget.targetCacheTtlMs(false) <= 1_000L);
+        assertTrue(NeedsResourceTargetStateFacade.targetCacheTtlMs(false) > 0L);
+        assertTrue(NeedsResourceTargetStateFacade.targetCacheTtlMs(false) <= 1_000L);
     }
 
     @Test
     void preflightRejectCacheIsShorterThanMovementFailureSuppression() {
-        assertTrue(SensorTameworkNeedsResourceTarget.preflightRejectTtlSecondsForTests() > 0.0);
-        assertTrue(SensorTameworkNeedsResourceTarget.preflightRejectTtlSecondsForTests() < 10.0);
+        assertTrue(NeedsResourceTargetStateFacade.preflightRejectTtlSecondsForTests() > 0.0);
+        assertTrue(NeedsResourceTargetStateFacade.preflightRejectTtlSecondsForTests() < 10.0);
     }
 
     @Test
     void targetCacheIsScopedToNpcBlockPosition() {
-        assertTrue(SensorTameworkNeedsResourceTarget.targetCacheBlockMatchesForTests(
+        assertTrue(NeedsResourceTargetStateFacade.targetCacheBlockMatchesForTests(
                 new Vector3d(10.2, 64.0, -3.8),
                 new Vector3d(10.9, 64.9, -3.1)
         ));
-        assertFalse(SensorTameworkNeedsResourceTarget.targetCacheBlockMatchesForTests(
+        assertFalse(NeedsResourceTargetStateFacade.targetCacheBlockMatchesForTests(
                 new Vector3d(10.2, 64.0, -3.8),
                 new Vector3d(11.0, 64.0, -3.8)
         ));
@@ -72,30 +72,30 @@ class SensorTameworkNeedsResourceTargetItemIdsTest {
 
     @Test
     void rejectedNeedsTargetIsNpcResourceSpecificAndExpires() {
-        SensorTameworkNeedsResourceTarget.clearRejectedTargetsForTests();
+        NeedsResourceTargetStateFacade.clearRejectedTargetsForTests();
         UUID npc = new UUID(0L, 42L);
         Vector3d target = new Vector3d(10.25, 64.05, -3.75);
 
-        assertTrue(SensorTameworkNeedsResourceTarget.rejectTargetForTests(
+        assertTrue(NeedsResourceTargetStateFacade.rejectTargetForTests(
                 npc,
                 "FoodContainer",
                 target,
                 5.0,
                 1_000L
         ));
-        assertTrue(SensorTameworkNeedsResourceTarget.isTargetRejectedForTests(
+        assertTrue(NeedsResourceTargetStateFacade.isTargetRejectedForTests(
                 npc,
                 "FoodContainer",
                 new Vector3d(10.75, 64.95, -3.25),
                 5_999L
         ));
-        assertFalse(SensorTameworkNeedsResourceTarget.isTargetRejectedForTests(
+        assertFalse(NeedsResourceTargetStateFacade.isTargetRejectedForTests(
                 npc,
                 "Water",
                 target,
                 5_999L
         ));
-        assertFalse(SensorTameworkNeedsResourceTarget.isTargetRejectedForTests(
+        assertFalse(NeedsResourceTargetStateFacade.isTargetRejectedForTests(
                 npc,
                 "FoodContainer",
                 target,
@@ -105,12 +105,12 @@ class SensorTameworkNeedsResourceTargetItemIdsTest {
 
     @Test
     void rejectedNeedsTargetCacheStaysBounded() {
-        SensorTameworkNeedsResourceTarget.clearRejectedTargetsForTests();
+        NeedsResourceTargetStateFacade.clearRejectedTargetsForTests();
         UUID npc = new UUID(0L, 84L);
-        int maxEntries = SensorTameworkNeedsResourceTarget.rejectedTargetMaxEntriesForTests();
+        int maxEntries = NeedsResourceTargetStateFacade.rejectedTargetMaxEntriesForTests();
 
         for (int i = 0; i < maxEntries + 25; i++) {
-            assertTrue(SensorTameworkNeedsResourceTarget.rejectTargetForTests(
+            assertTrue(NeedsResourceTargetStateFacade.rejectTargetForTests(
                     npc,
                     "FoodContainer",
                     new Vector3d(i, 64.0, 0.0),
@@ -119,16 +119,16 @@ class SensorTameworkNeedsResourceTargetItemIdsTest {
             ));
         }
 
-        assertTrue(SensorTameworkNeedsResourceTarget.rejectedTargetCountForTests() <= maxEntries);
+        assertTrue(NeedsResourceTargetStateFacade.rejectedTargetCountForTests() <= maxEntries);
     }
 
     @Test
     void autoRejectedNeedsTargetAppliesToFoodAndWater() {
-        SensorTameworkNeedsResourceTarget.clearRejectedTargetsForTests();
+        NeedsResourceTargetStateFacade.clearRejectedTargetsForTests();
         UUID npc = new UUID(0L, 126L);
         Vector3d target = new Vector3d(3.0, 64.0, 9.0);
 
-        assertTrue(SensorTameworkNeedsResourceTarget.rejectTargetForTests(
+        assertTrue(NeedsResourceTargetStateFacade.rejectTargetForTests(
                 npc,
                 "Auto",
                 target,
@@ -136,18 +136,18 @@ class SensorTameworkNeedsResourceTargetItemIdsTest {
                 1_000L
         ));
 
-        assertTrue(SensorTameworkNeedsResourceTarget.isTargetRejectedForTests(npc, "Water", target, 1_001L));
-        assertTrue(SensorTameworkNeedsResourceTarget.isTargetRejectedForTests(npc, "FoodContainer", target, 1_001L));
+        assertTrue(NeedsResourceTargetStateFacade.isTargetRejectedForTests(npc, "Water", target, 1_001L));
+        assertTrue(NeedsResourceTargetStateFacade.isTargetRejectedForTests(npc, "FoodContainer", target, 1_001L));
     }
 
     @Test
     void reservedNeedsTargetSuppressesOtherNpcUntilReleased() {
-        SensorTameworkNeedsResourceTarget.clearTargetReservationsForTests();
+        NeedsResourceTargetStateFacade.clearTargetReservationsForTests();
         UUID owner = new UUID(0L, 200L);
         UUID other = new UUID(0L, 201L);
         Vector3d target = new Vector3d(-776.5, 122.65, 459.5);
 
-        assertTrue(SensorTameworkNeedsResourceTarget.reserveTargetForTests(
+        assertTrue(NeedsResourceTargetStateFacade.reserveTargetForTests(
                 owner,
                 "test-world",
                 "Water",
@@ -155,14 +155,14 @@ class SensorTameworkNeedsResourceTargetItemIdsTest {
                 1_000L
         ));
 
-        assertFalse(SensorTameworkNeedsResourceTarget.isTargetReservedByOtherForTests(
+        assertFalse(NeedsResourceTargetStateFacade.isTargetReservedByOtherForTests(
                 owner,
                 "test-world",
                 "Water",
                 target,
                 1_001L
         ));
-        assertTrue(SensorTameworkNeedsResourceTarget.isTargetReservedByOtherForTests(
+        assertTrue(NeedsResourceTargetStateFacade.isTargetReservedByOtherForTests(
                 other,
                 "test-world",
                 "Water",
@@ -170,8 +170,8 @@ class SensorTameworkNeedsResourceTargetItemIdsTest {
                 1_001L
         ));
 
-        SensorTameworkNeedsResourceTarget.releaseTargetForTests(owner, "test-world", "Water", target);
-        assertFalse(SensorTameworkNeedsResourceTarget.isTargetReservedByOtherForTests(
+        NeedsResourceTargetStateFacade.releaseTargetForTests(owner, "test-world", "Water", target);
+        assertFalse(NeedsResourceTargetStateFacade.isTargetReservedByOtherForTests(
                 other,
                 "test-world",
                 "Water",

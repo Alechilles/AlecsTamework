@@ -20,7 +20,6 @@ import com.hypixel.hytale.server.npc.role.Role;
 import java.util.EnumSet;
 import java.util.Locale;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nonnull;
@@ -44,12 +43,18 @@ public final class NeedsResourcePathPreflightService {
     private static final long GLOBAL_BUDGET_WINDOW_MS = 50L;
     private static final double DEFAULT_STOP_DISTANCE = 2.0;
     private static final double EPSILON = 0.000001;
+    private static final NeedsResourcePathPreflightService SHARED =
+            new NeedsResourcePathPreflightService();
     private static final AtomicLong budgetWindowMs = new AtomicLong();
     private static final AtomicInteger budgetUsedNodes = new AtomicInteger();
 
-    private final ConcurrentHashMap<PreflightKey, CachedPreflight> cache = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<RecentReadyKey, RecentReadyPreflight> recentReadyTargets =
-            new ConcurrentHashMap<>();
+    private final NeedsResourcePathPreflightState state = new NeedsResourcePathPreflightState();
+
+    /** Returns the process-wide preflight owner shared by all resource sensors. */
+    @Nonnull
+    public static NeedsResourcePathPreflightService shared() {
+        return SHARED;
+    }
 
     @Nonnull
     public PathPreflightResult preflight(@Nonnull Ref<EntityStore> ref,
@@ -102,8 +107,7 @@ public final class NeedsResourcePathPreflightService {
             return PathPreflightResult.unavailable("path_preflight_key_unavailable");
         }
         if (isWithinStopDistance(start, target, effectiveStopDistance, motionController)) {
-            cacheTerminalResult(key, PathPreflightStatus.READY, "path_preflight_already_in_range", nowMs);
-            return PathPreflightResult.ready("path_preflight_already_in_range");
+            return publishImmediateReady(key, "path_preflight_already_in_range", nowMs);
         }
         return preflight(
                 key,
@@ -122,79 +126,269 @@ public final class NeedsResourcePathPreflightService {
     }
 
     @Nonnull
+    private PathPreflightResult publishImmediateReady(@Nonnull PreflightKey key,
+                                                       @Nonnull String reason,
+                                                       long nowMs) {
+        synchronized (state.lock()) {
+            NeedsResourcePathPreflightState.ComputationOperation operation = state.registerOperationLocked(key);
+            if (!state.isCurrentOperationLocked(operation)) {
+                state.clearOperationLocked(operation);
+                return PathPreflightResult.unavailable("path_preflight_invalidated");
+            }
+            state.cacheTerminalResultLocked(
+                    key,
+                    PathPreflightStatus.READY,
+                    reason,
+                    nowMs + terminalTtlMs(PathPreflightStatus.READY, nowMs)
+            );
+            state.removeOperationLocked(operation);
+            return PathPreflightResult.ready(reason);
+        }
+    }
+
+    @Nonnull
     PathPreflightResult preflight(@Nonnull PreflightKey key,
                                   @Nonnull PathComputationFactory computationFactory,
                                   long nowMs) {
-        PathPreflightResult recentReady = resolveRecentReady(key, nowMs);
-        if (recentReady != null) {
-            return recentReady;
-        }
-        CachedPreflight cached = cache.get(key);
-        if (cached != null && nowMs < cached.expiresAtMs()) {
-            if (cached.status() == PathPreflightStatus.READY) {
-                return PathPreflightResult.ready(cached.reason());
+        NeedsResourcePathPreflightState.ComputationOperation operation;
+        boolean createComputation = false;
+        synchronized (state.lock()) {
+            NeedsResourcePathPreflightState.RecentReadyPreflight recentReady =
+                    state.resolveRecentReadyLocked(key, nowMs);
+            if (recentReady != null
+                    && NeedsResourcePreflightPolicy.canReuseRecentReady(recentReady.key(), key)) {
+                return PathPreflightResult.ready("path_preflight_recent_ready_target");
             }
-            if (cached.status() == PathPreflightStatus.NO_PATH) {
-                return PathPreflightResult.noPath(cached.reason());
+            NeedsResourcePathPreflightState.CachedPreflight cached = state.cacheEntryLocked(key);
+            if (cached != null && nowMs < cached.expiresAtMs()) {
+                if (cached.status() == PathPreflightStatus.READY) {
+                    return PathPreflightResult.ready(cached.reason());
+                }
+                if (cached.status() == PathPreflightStatus.NO_PATH) {
+                    return PathPreflightResult.noPath(cached.reason());
+                }
+                operation = cached.operation();
+                if (state.isCurrentOperationLocked(operation)) {
+                    if (operation.computing) {
+                        return PathPreflightResult.computing("path_preflight_computing");
+                    }
+                } else {
+                    state.removeCacheEntryLocked(key, cached);
+                    operation = null;
+                }
+            } else {
+                if (cached != null) {
+                    state.removeCacheEntryLocked(key, cached);
+                }
+                operation = null;
             }
-        } else if (cached != null) {
-            removeEntry(key, cached);
-            cached = null;
+            if (operation == null) {
+                operation = state.findActiveOperationLocked(key);
+            }
+            if (operation == null) {
+                operation = state.registerOperationLocked(key);
+                createComputation = true;
+            } else if (operation.computation == null) {
+                return PathPreflightResult.computing("path_preflight_computing");
+            }
         }
 
-        PathComputation computation = cached != null ? cached.computation() : null;
-        if (computation == null) {
-            computation = computationFactory.create();
-            if (computation == null) {
-                return PathPreflightResult.unavailable("path_preflight_create_failed");
+        if (createComputation) {
+            PathComputation computation;
+            try {
+                computation = computationFactory.create();
+            } catch (RuntimeException failure) {
+                synchronized (state.lock()) {
+                    state.cancelOperationLocked(operation);
+                }
+                throw failure;
+            }
+            synchronized (state.lock()) {
+                operation.computation = computation;
+                if (!state.isCurrentOperationLocked(operation)) {
+                    state.clearOperationLocked(operation);
+                    return PathPreflightResult.unavailable("path_preflight_invalidated");
+                }
+                if (computation == null) {
+                    state.clearOperationLocked(operation);
+                    return PathPreflightResult.unavailable("path_preflight_create_failed");
+                }
             }
         }
+        return runOperation(operation, nowMs);
+    }
 
-        int budget = claimGlobalBudget(nowMs, MAX_NODES_PER_SENSOR_PASS);
-        if (budget <= 0) {
-            cacheComputing(key, computation, "path_preflight_budget_deferred", nowMs);
-            return PathPreflightResult.computing("path_preflight_budget_deferred");
+    @Nonnull
+    private PathPreflightResult runOperation(
+            @Nonnull NeedsResourcePathPreflightState.ComputationOperation operation,
+            long nowMs) {
+        int budget;
+        synchronized (state.lock()) {
+            if (!state.isCurrentOperationLocked(operation) || operation.computation == null) {
+                state.clearOperationLocked(operation);
+                return PathPreflightResult.unavailable("path_preflight_invalidated");
+            }
+            if (operation.computing) {
+                return PathPreflightResult.computing("path_preflight_computing");
+            }
+            budget = claimGlobalBudget(nowMs, MAX_NODES_PER_SENSOR_PASS);
+            if (budget <= 0) {
+                state.cacheComputingLocked(
+                        operation.key,
+                        operation,
+                        "path_preflight_budget_deferred",
+                        nowMs
+                );
+                return state.isCurrentOperationLocked(operation)
+                        ? PathPreflightResult.computing("path_preflight_budget_deferred")
+                        : PathPreflightResult.unavailable("path_preflight_invalidated");
+            }
+            operation.computing = true;
         }
 
         PathPreflightStatus status;
+        boolean failed = false;
         long startedNs = System.nanoTime();
         try {
-            status = computation.compute(budget);
+            status = operation.computation.compute(budget);
         } catch (RuntimeException ignored) {
-            recordPathPreflightWork(startedNs, nowMs);
-            clearComputation(computation);
-            cacheTerminalResult(key, PathPreflightStatus.NO_PATH, "path_preflight_exception", nowMs);
-            return PathPreflightResult.noPath("path_preflight_exception");
+            failed = true;
+            status = PathPreflightStatus.NO_PATH;
         }
         recordPathPreflightWork(startedNs, nowMs);
 
-        if (status == PathPreflightStatus.READY) {
-            clearComputation(computation);
-            cacheTerminalResult(key, PathPreflightStatus.READY, "path_preflight_ready", nowMs);
-            cacheRecentReady(key, nowMs);
-            return PathPreflightResult.ready("path_preflight_ready");
+        synchronized (state.lock()) {
+            operation.computing = false;
+            if (!state.isCurrentOperationLocked(operation)) {
+                state.clearOperationLocked(operation);
+                return PathPreflightResult.unavailable("path_preflight_invalidated");
+            }
+            if (failed) {
+                state.clearOperationLocked(operation);
+                state.cacheTerminalResultLocked(
+                        operation.key,
+                        PathPreflightStatus.NO_PATH,
+                        "path_preflight_exception",
+                        nowMs + terminalTtlMs(PathPreflightStatus.NO_PATH, nowMs)
+                );
+                return PathPreflightResult.noPath("path_preflight_exception");
+            }
+            if (status == PathPreflightStatus.READY) {
+                state.clearOperationLocked(operation);
+                state.cacheTerminalResultLocked(
+                        operation.key,
+                        PathPreflightStatus.READY,
+                        "path_preflight_ready",
+                        nowMs + terminalTtlMs(PathPreflightStatus.READY, nowMs)
+                );
+                state.cacheRecentReadyLocked(
+                        operation.key,
+                        nowMs + NeedsResourcePreflightPolicy.RECENT_READY_TTL_MS
+                );
+                return PathPreflightResult.ready("path_preflight_ready");
+            }
+            if (status == PathPreflightStatus.NO_PATH) {
+                state.clearOperationLocked(operation);
+                state.cacheTerminalResultLocked(
+                        operation.key,
+                        PathPreflightStatus.NO_PATH,
+                        "path_preflight_no_path",
+                        nowMs + terminalTtlMs(PathPreflightStatus.NO_PATH, nowMs)
+                );
+                return PathPreflightResult.noPath("path_preflight_no_path");
+            }
+            state.cacheComputingLocked(operation.key, operation, "path_preflight_computing", nowMs);
+            return state.isCurrentOperationLocked(operation)
+                    ? PathPreflightResult.computing("path_preflight_computing")
+                    : PathPreflightResult.unavailable("path_preflight_invalidated");
         }
-        if (status == PathPreflightStatus.NO_PATH) {
-            clearComputation(computation);
-            cacheTerminalResult(key, PathPreflightStatus.NO_PATH, "path_preflight_no_path", nowMs);
-            return PathPreflightResult.noPath("path_preflight_no_path");
-        }
-        cacheComputing(key, computation, "path_preflight_computing", nowMs);
-        return PathPreflightResult.computing("path_preflight_computing");
     }
 
     void clearForTests() {
-        for (CachedPreflight value : cache.values()) {
-            clearComputation(value.computation());
+        synchronized (state.lock()) {
+            state.clearForTestsLocked();
         }
-        cache.clear();
-        recentReadyTargets.clear();
         budgetWindowMs.set(0L);
         budgetUsedNodes.set(0);
     }
 
     int cacheSizeForTests() {
-        return cache.size();
+        synchronized (state.lock()) {
+            return state.cacheSizeLocked();
+        }
+    }
+
+    int recentReadySizeForTests() {
+        synchronized (state.lock()) {
+            return state.recentReadySizeLocked();
+        }
+    }
+
+    int indexedCacheKeyCountForTests() {
+        synchronized (state.lock()) {
+            return state.indexedCacheKeyCountLocked();
+        }
+    }
+
+    int indexedRecentReadyKeyCountForTests() {
+        synchronized (state.lock()) {
+            return state.indexedRecentReadyKeyCountLocked();
+        }
+    }
+
+    int authorityIndexSizeForTests() {
+        synchronized (state.lock()) {
+            return state.authorityIndexSizeLocked();
+        }
+    }
+
+    long cacheAdmissionWorkForTests() {
+        synchronized (state.lock()) {
+            return state.cacheAdmissionWorkLocked();
+        }
+    }
+
+    int targetInvalidationBucketVisitsForTests() {
+        synchronized (state.lock()) {
+            return state.targetInvalidationBucketVisitsLocked();
+        }
+    }
+
+    /** Removes all entries for one NPC, resource, and target block authority. */
+    public void invalidateTarget(@Nullable UUID npcUuid,
+                                @Nullable String worldName,
+                                @Nullable String resourceType,
+                                @Nullable Vector3d target) {
+        if (npcUuid == null || resourceType == null || resourceType.isBlank()
+                || target == null || !isFinite(target)) {
+            return;
+        }
+        String normalizedResource = normalizeResourceType(resourceType);
+        String normalizedWorld = normalizeWorldNameForMatch(worldName);
+        int targetX = (int) Math.floor(target.x);
+        int targetY = (int) Math.floor(target.y);
+        int targetZ = (int) Math.floor(target.z);
+        synchronized (state.lock()) {
+            state.invalidateTargetLocked(
+                    npcUuid,
+                    normalizedWorld,
+                    normalizedResource,
+                    targetX,
+                    targetY,
+                    targetZ
+            );
+        }
+    }
+
+    /** Removes all cache and lease entries for one normalized world. */
+    public void clearWorld(@Nullable String worldName) {
+        String normalizedWorld = normalizeWorldNameForMatch(worldName);
+        if (normalizedWorld == null) {
+            return;
+        }
+        synchronized (state.lock()) {
+            state.clearWorldLocked(normalizedWorld);
+        }
     }
 
     private PathComputation createPathComputation(@Nonnull Ref<EntityStore> ref,
@@ -227,27 +421,6 @@ public final class NeedsResourcePathPreflightService {
         );
     }
 
-    private void cacheComputing(@Nonnull PreflightKey key,
-                                @Nonnull PathComputation computation,
-                                @Nonnull String reason,
-                                long nowMs) {
-        cache.put(key, new CachedPreflight(
-                PathPreflightStatus.COMPUTING,
-                reason,
-                nowMs + COMPUTING_TTL_MS,
-                computation
-        ));
-        cleanupCache(nowMs);
-    }
-
-    private void cacheTerminalResult(@Nonnull PreflightKey key,
-                                     @Nonnull PathPreflightStatus status,
-                                     @Nonnull String reason,
-                                     long nowMs) {
-        cache.put(key, new CachedPreflight(status, reason, nowMs + terminalTtlMs(status, nowMs), null));
-        cleanupCache(nowMs);
-    }
-
     private static long terminalTtlMs(@Nonnull PathPreflightStatus status) {
         return terminalTtlMs(status, System.currentTimeMillis());
     }
@@ -275,46 +448,6 @@ public final class NeedsResourcePathPreflightService {
                 elapsedNs,
                 nowMs
         );
-    }
-
-    private void cleanupCache(long nowMs) {
-        if (cache.size() < PRECHECK_CACHE_MAX_ENTRIES) {
-            return;
-        }
-        cache.entrySet().removeIf(entry -> {
-            CachedPreflight value = entry == null ? null : entry.getValue();
-            boolean remove = entry == null || entry.getKey() == null || value == null || nowMs >= value.expiresAtMs();
-            if (remove && value != null) {
-                clearComputation(value.computation());
-            }
-            return remove;
-        });
-        int excess = cache.size() - PRECHECK_CACHE_MAX_ENTRIES;
-        if (excess <= 0) {
-            return;
-        }
-        for (PreflightKey key : cache.keySet()) {
-            if (excess <= 0) {
-                return;
-            }
-            CachedPreflight removed = cache.remove(key);
-            if (removed != null) {
-                clearComputation(removed.computation());
-                excess--;
-            }
-        }
-    }
-
-    private void removeEntry(@Nonnull PreflightKey key, @Nonnull CachedPreflight value) {
-        if (cache.remove(key, value)) {
-            clearComputation(value.computation());
-        }
-    }
-
-    private static void clearComputation(@Nullable PathComputation computation) {
-        if (computation != null) {
-            computation.clear();
-        }
     }
 
     private static int claimGlobalBudget(long nowMs, int requestedNodes) {
@@ -359,6 +492,19 @@ public final class NeedsResourcePathPreflightService {
 
     private static boolean isFinite(@Nonnull Vector3d vector) {
         return Double.isFinite(vector.x) && Double.isFinite(vector.y) && Double.isFinite(vector.z);
+    }
+
+    @Nonnull
+    private static String normalizeResourceType(@Nonnull String resourceType) {
+        String normalized = resourceType.trim().toLowerCase(Locale.ROOT);
+        return normalized.isBlank() ? "<unknown>" : normalized;
+    }
+
+    @Nullable
+    private static String normalizeWorldNameForMatch(@Nullable String worldName) {
+        return worldName == null || worldName.isBlank()
+                ? null
+                : worldName.trim().toLowerCase(Locale.ROOT);
     }
 
     public enum PathPreflightStatus {
@@ -466,62 +612,6 @@ public final class NeedsResourcePathPreflightService {
         PathPreflightStatus compute(int maxNodes);
 
         void clear();
-    }
-
-    private record CachedPreflight(@Nonnull PathPreflightStatus status,
-                                    @Nonnull String reason,
-                                    long expiresAtMs,
-                                    @Nullable PathComputation computation) {
-    }
-
-    @Nullable
-    private PathPreflightResult resolveRecentReady(@Nonnull PreflightKey key, long nowMs) {
-        RecentReadyKey recentKey = RecentReadyKey.from(key);
-        RecentReadyPreflight recent = recentReadyTargets.get(recentKey);
-        if (recent == null) {
-            return null;
-        }
-        if (nowMs >= recent.expiresAtMs()) {
-            recentReadyTargets.remove(recentKey, recent);
-            return null;
-        }
-        if (!NeedsResourcePreflightPolicy.canReuseRecentReady(recent.key(), key)) {
-            return null;
-        }
-        return PathPreflightResult.ready("path_preflight_recent_ready_target");
-    }
-
-    private void cacheRecentReady(@Nonnull PreflightKey key, long nowMs) {
-        recentReadyTargets.put(
-                RecentReadyKey.from(key),
-                new RecentReadyPreflight(key, nowMs + NeedsResourcePreflightPolicy.RECENT_READY_TTL_MS)
-        );
-    }
-
-    private record RecentReadyKey(@Nonnull UUID npcUuid,
-                                  @Nonnull String worldName,
-                                  @Nonnull String resourceType,
-                                  @Nonnull String motionControllerType,
-                                  int targetX,
-                                  int targetY,
-                                  int targetZ,
-                                  int stopDistanceKey) {
-        @Nonnull
-        static RecentReadyKey from(@Nonnull PreflightKey key) {
-            return new RecentReadyKey(
-                    key.npcUuid(),
-                    key.worldName(),
-                    key.resourceType(),
-                    key.motionControllerType(),
-                    key.targetX(),
-                    key.targetY(),
-                    key.targetZ(),
-                    key.stopDistanceKey()
-            );
-        }
-    }
-
-    private record RecentReadyPreflight(@Nonnull PreflightKey key, long expiresAtMs) {
     }
 
     private static final class HytalePathComputation implements PathComputation {
