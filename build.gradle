@@ -41,6 +41,14 @@ configurations {
     }
 }
 
+if (rootProject.findProject(':alecstelemetry:runtime') != null) {
+    configurations.configureEach {
+        resolutionStrategy.dependencySubstitution {
+            substitute module('com.alechilles:alecstelemetry-runtime') using project(':alecstelemetry:runtime')
+        }
+    }
+}
+
 dependencies {
     compileOnly files(property('nameplatebuilder_jar_path'))
     implementation telemetryCoordinates
@@ -86,6 +94,9 @@ tasks.register('prepareEmbeddedAssetPack', Sync) {
     group = 'hytale'
     dependsOn(tasks.named('createManifestIfMissing'))
     dependsOn(tasks.named('updatePluginManifest'))
+    if (rootProject.findProject(':alecstelemetry:runtime') != null) {
+        dependsOn(':alecstelemetry:runtime:jar')
+    }
     from(layout.projectDirectory.dir('src/main/resources'))
     from({ configurations.telemetryAssetPack.collect { zipTree(it) } }) {
         include 'Common/**'
