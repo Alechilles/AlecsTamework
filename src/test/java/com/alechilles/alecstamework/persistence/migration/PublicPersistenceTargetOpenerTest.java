@@ -5,6 +5,10 @@ import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionF
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV2Manager;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceFiles;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceSchemaStatus;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
+import com.alechilles.alecstamework.persistence.kernel.StorageFailure;
+import com.alechilles.alecstamework.persistence.kernel.StorageFailureKind;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -17,6 +21,8 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.LongSupplier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -48,6 +54,110 @@ class PublicPersistenceTargetOpenerTest {
                 )).verify()
         );
         assertNoCreatingAttempts();
+    }
+
+    @Test
+    void unknownExistingInitializationUsesExactV2Readback() {
+        PublicPersistenceTarget fresh =
+                new PublicPersistenceTargetOpener(() -> -100).open(tempDir);
+        AtomicInteger initializeCalls = new AtomicInteger();
+        PublicPersistenceTargetOpener.ExistingSchemaBoundary boundary =
+                new PublicPersistenceTargetOpener.ExistingSchemaBoundary() {
+                    @Override
+                    public PersistenceTransactionResult<PersistenceSchemaStatus>
+                    initialize(Path target, LongSupplier clock) {
+                        initializeCalls.incrementAndGet();
+                        return new PersistenceTransactionResult.Unknown<>(
+                                new StorageFailure(
+                                        StorageFailureKind.UNKNOWN,
+                                        "commit_return_unobserved",
+                                        "schema_initialize",
+                                        false,
+                                        null
+                                )
+                        );
+                    }
+                };
+
+        PublicPersistenceTarget existing =
+                new PublicPersistenceTargetOpener(() -> -100, boundary)
+                        .open(tempDir);
+
+        assertEquals(PublicPersistenceTarget.Origin.EXISTING,
+                existing.origin());
+        assertEquals(1, initializeCalls.get());
+        assertInstanceOf(
+                PersistenceReadResult.Found.class,
+                new SqliteSchemaV2Manager(new SqliteConnectionFactory(
+                        fresh.databasePath()
+                )).verify()
+        );
+    }
+
+    @Test
+    void unknownExistingInitializationWithFailedReadbackFailsClosed() {
+        new PublicPersistenceTargetOpener(() -> -100).open(tempDir);
+        PublicPersistenceTargetOpener.ExistingSchemaBoundary boundary =
+                new PublicPersistenceTargetOpener.ExistingSchemaBoundary() {
+                    @Override
+                    public PersistenceTransactionResult<PersistenceSchemaStatus>
+                    initialize(Path target, LongSupplier clock) {
+                        return new PersistenceTransactionResult.Unknown<>(
+                                new StorageFailure(
+                                        StorageFailureKind.UNKNOWN,
+                                        "commit_return_unobserved",
+                                        "schema_initialize",
+                                        false,
+                                        null
+                                )
+                        );
+                    }
+
+                    @Override
+                    public PersistenceReadResult<PersistenceSchemaStatus>
+                    verify(Path target) {
+                        return PersistenceReadResult.failed(new StorageFailure(
+                                StorageFailureKind.SCHEMA,
+                                "schema_readback_unavailable",
+                                "schema_verify",
+                                false,
+                                null
+                        ));
+                    }
+                };
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> new PublicPersistenceTargetOpener(() -> -100, boundary)
+                        .open(tempDir)
+        );
+    }
+
+    @Test
+    void rolledBackExistingInitializationFailsClosed() {
+        new PublicPersistenceTargetOpener(() -> -100).open(tempDir);
+        PublicPersistenceTargetOpener.ExistingSchemaBoundary boundary =
+                new PublicPersistenceTargetOpener.ExistingSchemaBoundary() {
+                    @Override
+                    public PersistenceTransactionResult<PersistenceSchemaStatus>
+                    initialize(Path target, LongSupplier clock) {
+                        return new PersistenceTransactionResult.RolledBack<>(
+                                new StorageFailure(
+                                        StorageFailureKind.SCHEMA,
+                                        "schema_initialization_rejected",
+                                        "schema_initialize",
+                                        false,
+                                        null
+                                )
+                        );
+                    }
+                };
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> new PublicPersistenceTargetOpener(() -> -100, boundary)
+                        .open(tempDir)
+        );
     }
 
     @Test

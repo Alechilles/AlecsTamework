@@ -22,7 +22,30 @@ import javax.annotation.Nonnull;
  * boundary. Unsupported development sources are refused before target creation.</p>
  */
 public final class PublicPersistenceTargetOpener {
+    interface ExistingSchemaBoundary {
+        default PersistenceTransactionResult<PersistenceSchemaStatus> initialize(
+                Path target,
+                LongSupplier clock
+        ) {
+            return new SqliteSchemaV2Manager(
+                    new SqliteConnectionFactory(target), clock
+            ).initialize();
+        }
+
+        default PersistenceReadResult<PersistenceSchemaStatus> verify(
+                Path target
+        ) {
+            return new SqliteSchemaV2Manager(
+                    new SqliteConnectionFactory(target)
+            ).verify();
+        }
+    }
+
+    private static final ExistingSchemaBoundary V2_SCHEMA_BOUNDARY =
+            new ExistingSchemaBoundary() {
+            };
     private final LongSupplier clock;
+    private final ExistingSchemaBoundary existingSchema;
     private final PublicPersistenceImporter importer;
     private final LegacyDatPersistenceImporter datImporter;
     private final FreshReplacementTargetCreator fresh;
@@ -35,10 +58,23 @@ public final class PublicPersistenceTargetOpener {
     }
 
     public PublicPersistenceTargetOpener(@Nonnull LongSupplier clock) {
+        this(clock, V2_SCHEMA_BOUNDARY);
+    }
+
+    PublicPersistenceTargetOpener(
+            @Nonnull LongSupplier clock,
+            @Nonnull ExistingSchemaBoundary existingSchema
+    ) {
         if (clock == null) {
             throw new IllegalArgumentException("Target open clock is required");
         }
+        if (existingSchema == null) {
+            throw new IllegalArgumentException(
+                    "Existing schema boundary is required"
+            );
+        }
         this.clock = clock;
+        this.existingSchema = existingSchema;
         importer = new PublicPersistenceImporter(clock);
         datImporter = new LegacyDatPersistenceImporter(clock);
         fresh = new FreshReplacementTargetCreator(clock);
@@ -160,11 +196,15 @@ public final class PublicPersistenceTargetOpener {
     }
 
     private void initializeExistingTarget(Path target) {
-        SqliteSchemaV2Manager schemas = new SqliteSchemaV2Manager(
-                new SqliteConnectionFactory(target), clock
-        );
         PersistenceTransactionResult<PersistenceSchemaStatus> initialized =
-                schemas.initialize();
+                existingSchema.initialize(target, clock);
+        if (initialized instanceof PersistenceTransactionResult.Unknown<?>) {
+            requireVerifiedV2(
+                    target,
+                    "existing_replacement_schema_unknown_readback_failed"
+            );
+            return;
+        }
         if (!(initialized instanceof
                 PersistenceTransactionResult.Committed<PersistenceSchemaStatus>
                 committed)
@@ -175,15 +215,20 @@ public final class PublicPersistenceTargetOpener {
                     "existing_replacement_schema_initialization_failed"
             );
         }
+        requireVerifiedV2(
+                target,
+                "existing_replacement_schema_verification_failed"
+        );
+    }
+
+    private void requireVerifiedV2(Path target, String failureCode) {
         PersistenceReadResult<PersistenceSchemaStatus> verified =
-                schemas.verify();
+                existingSchema.verify(target);
         if (!(verified instanceof PersistenceReadResult.Found<
                 PersistenceSchemaStatus> found)
                 || found.value().version() != SqliteSchemaV2Manager.VERSION
                 || !found.value().integrityVerified()) {
-            throw new IllegalStateException(
-                    "existing_replacement_schema_verification_failed"
-            );
+            throw new IllegalStateException(failureCode);
         }
     }
 }
