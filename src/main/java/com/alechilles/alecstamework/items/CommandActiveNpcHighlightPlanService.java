@@ -9,7 +9,7 @@ import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Builds the finite highlight emissions for active generic command links. */
+/** Builds the desired persistent highlights for active generic command links. */
 final class CommandActiveNpcHighlightPlanService {
     private static final String UNGROUPED_COLOR = "#C9A653";
 
