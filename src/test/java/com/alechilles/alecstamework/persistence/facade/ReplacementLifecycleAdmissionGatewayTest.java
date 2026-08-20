@@ -4,10 +4,14 @@ import com.alechilles.alecstamework.api.PopulationAdmissionForcePolicy;
 import com.alechilles.alecstamework.api.PopulationAdmissionIdentity;
 import com.alechilles.alecstamework.api.PopulationAdmissionLocation;
 import com.alechilles.alecstamework.api.PopulationAdmissionOperation;
+import com.alechilles.alecstamework.api.PopulationAdmissionProviderDecision;
+import com.alechilles.alecstamework.api.PopulationAdmissionProviderStatus;
 import com.alechilles.alecstamework.api.PopulationAdmissionRequest;
 import com.alechilles.alecstamework.api.PopulationAdmissionRequestV2;
 import com.alechilles.alecstamework.api.PopulationCompanionLifecycle;
+import com.alechilles.alecstamework.api.PopulationDomainClaim;
 import com.alechilles.alecstamework.api.internal.AdmissionProviderRegistry;
+import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
@@ -19,6 +23,8 @@ import com.alechilles.alecstamework.config.assets.TwManagedActivityConfig;
 import com.alechilles.alecstamework.config.assets.TwPopulationGroupConfig;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegistry;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionIdentityStore;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
@@ -30,9 +36,14 @@ import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceWorldRe
 import com.hypixel.hytale.codec.ExtraInfo;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -71,6 +82,70 @@ class ReplacementLifecycleAdmissionGatewayTest {
                     .toCompletableFuture().join();
 
             assertEquals(LifecycleAdmissionEvidence.Status.MANAGED, evidence.status());
+            assertTrue(evidence.payload().domains().isEmpty());
+        }
+    }
+
+    @Test
+    void capturedReleaseAcceptsCurrentAssignmentFromEarlierLifecycle()
+            throws Exception {
+        try (PersistenceBootstrap persistence = new PersistenceBootstrap(configuration());
+             AdmissionProviderRegistry providers = new AdmissionProviderRegistry()) {
+            assertTrue(persistence.start().toCompletableFuture().join().complete());
+            PopulationGroupConfigRegistry groups = new PopulationGroupConfigRegistry();
+            assertTrue(groups.replace(List.of(groupConfig()), 1L).applied());
+            ManagedActivityConfigRegistry managed =
+                    new ManagedActivityConfigRegistry(groups);
+            assertTrue(managed.replace(List.of(managedConfig()), 1L).applied());
+            providers.register("runeteria:provider", 1, ignored ->
+                    CompletableFuture.completedFuture(providerDecision(
+                            managed.snapshot().revision()
+                    )));
+            seedEarlierAssignment(
+                    persistence,
+                    groups.snapshot().resolvePoliciesForRole("managed-role")
+                            .getFirst().policyRevision()
+            );
+            ReplacementLifecycleAdmissionGateway gateway =
+                    new ReplacementLifecycleAdmissionGateway(
+                            persistence, managed, groups, providers, () -> -50L
+                    );
+
+            LifecycleAdmissionEvidence evidence = gateway.authorize(
+                    capturedReleaseRequest(new OwnerId(OWNER))
+            ).toCompletableFuture().join();
+
+            assertEquals(LifecycleAdmissionEvidence.Status.MANAGED, evidence.status());
+            assertEquals(new LifecycleRevision(1),
+                    evidence.payload().expectedLifecycleRevision());
+            assertEquals(new LifecycleRevision(1),
+                    evidence.composition().groupRequest().before().revision());
+        }
+    }
+
+    @Test
+    void unownedReleaseKeepsDestinationSeparateFromOwnerWorld()
+            throws Exception {
+        try (PersistenceBootstrap persistence = new PersistenceBootstrap(configuration());
+             AdmissionProviderRegistry providers = new AdmissionProviderRegistry()) {
+            assertTrue(persistence.start().toCompletableFuture().join().complete());
+            PopulationGroupConfigRegistry groups = new PopulationGroupConfigRegistry();
+            assertTrue(groups.replace(List.of(groupConfig()), 1L).applied());
+            ManagedActivityConfigRegistry managed =
+                    new ManagedActivityConfigRegistry(groups);
+            assertTrue(managed.replace(List.of(managedConfig()), 1L).applied());
+            ReplacementLifecycleAdmissionGateway gateway =
+                    new ReplacementLifecycleAdmissionGateway(
+                            persistence, managed, groups, providers, () -> -50L
+                    );
+
+            LifecycleAdmissionEvidence evidence = gateway.authorize(
+                    capturedReleaseRequest(null)
+            ).toCompletableFuture().join();
+
+            assertEquals(LifecycleAdmissionEvidence.Status.MANAGED, evidence.status());
+            assertEquals(null, evidence.payload().ownerId());
+            assertEquals(null, evidence.payload().ownerWorldKey());
             assertTrue(evidence.payload().domains().isEmpty());
         }
     }
@@ -116,6 +191,108 @@ class ReplacementLifecycleAdmissionGatewayTest {
                 LifecycleState.CAPTURED,
                 new OwnerId(OWNER),
                 "world"
+        );
+    }
+
+    private LifecycleAdmissionRequest capturedReleaseRequest(OwnerId owner) {
+        LifecycleRevision revision = new LifecycleRevision(1);
+        CompanionLifecycle source = new CompanionLifecycle(
+                PROFILE,
+                owner,
+                LifecycleState.CAPTURED,
+                LifecycleLocation.keyed(
+                        com.alechilles.alecstamework.companion.lifecycle
+                                .LifecycleLocationKind.CAPTURE_ITEM,
+                        "50000000-0000-0000-0000-000000000413"
+                ),
+                revision,
+                null,
+                -60L,
+                ReconciliationGeneration.INITIAL,
+                null,
+                owner == null ? null : "world"
+        );
+        PopulationAdmissionRequest admission = new PopulationAdmissionRequest(
+                new PopulationAdmissionIdentity(PROFILE.toString(), null, null),
+                owner == null
+                        ? UUID.fromString("50000000-0000-0000-0000-000000000412")
+                        : null,
+                revision.value(),
+                owner == null ? null : owner.value(),
+                owner == null ? null : owner.value(),
+                owner == null ? null : new PopulationAdmissionLocation("world", 0, 0),
+                new PopulationAdmissionLocation("world-two", 0, 0),
+                owner == null
+                        ? PopulationAdmissionOperation.LIFECYCLE_CHANGE
+                        : PopulationAdmissionOperation.RESTORE,
+                1,
+                PopulationAdmissionForcePolicy.ENFORCE,
+                PopulationCompanionLifecycle.ACTIVE
+        );
+        return LifecycleAdmissionRequest.managed(
+                OperationId.parse("60000000-0000-0000-0000-000000000413"),
+                UUID.fromString("70000000-0000-0000-0000-000000000413"),
+                "managed-role",
+                new PopulationAdmissionRequestV2(admission, "managed-role", "world-two"),
+                source,
+                LifecycleState.CAPTURED,
+                LifecycleState.ACTIVE,
+                owner,
+                owner == null ? null : "world"
+        );
+    }
+
+    private void seedEarlierAssignment(
+            PersistenceBootstrap persistence,
+            long policyRevision
+    ) throws Exception {
+        SqliteConnectionFactory connections = new SqliteConnectionFactory(
+                persistence.databasePath().orElseThrow()
+        );
+        try (Connection connection = connections.openWriterConnection()) {
+            connection.setAutoCommit(false);
+            assertTrue(new SqliteCompanionIdentityStore(connection).createProfile(
+                    new CompanionIdentity(
+                            PROFILE, "Captured", "managed-role", null, null,
+                            "world", -100, -100, -100, 0
+                    )
+            ).applied());
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO population_group_classification(
+                        profile_id, role_id, policy_revision,
+                        source_metadata_revision, source_lifecycle_revision,
+                        assignment_revision, assigned_at_ms
+                    ) VALUES (?, 'managed-role', ?, 0, 0, 1, -100)
+                    """)) {
+                statement.setString(1, PROFILE.toString());
+                statement.setLong(2, policyRevision);
+                statement.executeUpdate();
+            }
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO population_group_membership(
+                        profile_id, group_id, scope_kind
+                    ) VALUES (?, 'runeteria:livestock', 'GLOBAL')
+                    """)) {
+                statement.setString(1, PROFILE.toString());
+                statement.executeUpdate();
+            }
+            connection.commit();
+        }
+    }
+
+    private PopulationAdmissionProviderDecision providerDecision(
+            long configRevision
+    ) {
+        return new PopulationAdmissionProviderDecision(
+                PopulationAdmissionProviderStatus.ALLOW,
+                "allowed",
+                Set.of(
+                        new PopulationDomainClaim("runeteria:owned", 1, true, false),
+                        new PopulationDomainClaim("runeteria:deployable", 1, false, true)
+                ),
+                Map.of("runeteria:owned", 10, "runeteria:deployable", 10),
+                1,
+                configRevision
         );
     }
 

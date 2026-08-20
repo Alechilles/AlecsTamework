@@ -128,8 +128,8 @@ public final class SqliteCompanionCaptureReleaseOperations {
     ) {
         CompletionStage<OperationWorkflowResult> completion = singleFlight.submit(
                 CompanionCaptureReleaseDefinition.KIND,
-                operationId,
-                idempotencyKey,
+                operationId, idempotencyKey,
+                CompanionCaptureReleaseDefinition.INSTANCE.encode(requested),
                 () -> admission.resolve(
                                 operationId, idempotencyKey, requested
                         )

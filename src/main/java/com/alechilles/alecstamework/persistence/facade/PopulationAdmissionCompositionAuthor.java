@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.companion.population.domain.ManagedAdmission
 import com.alechilles.alecstamework.companion.population.domain.PopulationAdmissionComposition;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignment;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupMembership;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupPolicy;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionRequest;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
@@ -25,6 +26,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
 import java.util.List;
 import java.util.Objects;
+import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import javax.annotation.Nonnull;
@@ -77,14 +79,43 @@ final class PopulationAdmissionCompositionAuthor {
                     PopulationGroupAssignment assignment = found.value().stream()
                             .filter(value -> value.profileId().equals(source.profileId()))
                             .findFirst().orElse(null);
-                    if (assignment == null
-                            || !assignment.sourceLifecycleRevision().equals(source.revision())) {
+                    if (!currentAssignment(
+                            request, source, assignment
+                    )) {
                         return unavailable("population-admission-group-source-stale");
                     }
                     return CompletableFuture.completedFuture(
                             composition(request, source, payload, operationId, assignment)
                     );
                 });
+    }
+
+    private boolean currentAssignment(
+            PopulationAdmissionRequestV3 request,
+            CompanionLifecycle source,
+            PopulationGroupAssignment assignment
+    ) {
+        if (assignment == null
+                || !assignment.profileId().equals(source.profileId())
+                || assignment.sourceLifecycleRevision().value()
+                > source.revision().value()
+                || !Objects.equals(
+                assignment.roleId(), request.request().targetRoleId()
+        )) {
+            return false;
+        }
+        List<PopulationGroupPolicy> policies = groups.snapshot()
+                .resolvePoliciesForRole(request.request().targetRoleId());
+        TreeSet<PopulationGroupMembership> memberships = new TreeSet<>();
+        for (PopulationGroupPolicy policy : policies) {
+            if (policy.policyRevision() != assignment.policyRevision()) {
+                return false;
+            }
+            memberships.add(new PopulationGroupMembership(
+                    policy.groupId(), policy.scope()
+            ));
+        }
+        return memberships.equals(new TreeSet<>(assignment.memberships()));
     }
 
     private PopulationAdmissionComposition newProfileComposition(

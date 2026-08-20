@@ -337,7 +337,8 @@ public final class ManagedAdmissionEvidenceAuthor {
         ProfileId profile = ManagedAdmissionEvidenceSupport.profileId(admission);
         LifecycleState target = afterState;
         LifecycleState before = beforeState;
-        String world = ManagedAdmissionEvidenceSupport.targetWorld(request);
+        String world = owner == null
+                ? null : ManagedAdmissionEvidenceSupport.targetWorld(request);
         ManagedActivityProfile profileConfig = resolution.profile();
         PopulationGroupConfigDefinition group = populationGroups.snapshot()
                 .getDefinition(resolution.family().groupId())

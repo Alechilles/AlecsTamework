@@ -140,6 +140,7 @@ public final class SqliteCompanionCaptureOperations {
                 CompanionCaptureDefinition.KIND,
                 operationId,
                 idempotencyKey,
+                CompanionCaptureDefinition.INSTANCE.encode(requested),
                 () -> lifecycleAdmission.resolve(
                                 operationId, idempotencyKey, requested
                         )

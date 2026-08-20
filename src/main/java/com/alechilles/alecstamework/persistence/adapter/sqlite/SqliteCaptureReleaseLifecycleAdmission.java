@@ -158,7 +158,7 @@ final class SqliteCaptureReleaseLifecycleAdmission {
             CompanionCaptureReleaseRequest requested,
             OperationId operationId
     ) {
-        return sourceReader.findByProfile(requested.profileId()).thenCompose(read -> {
+        return sourceReader.findForRelease(requested).thenCompose(read -> {
             if (read instanceof PersistenceReadResult.Absent<?>) {
                 return failed("capture_source_profile_absent");
             }

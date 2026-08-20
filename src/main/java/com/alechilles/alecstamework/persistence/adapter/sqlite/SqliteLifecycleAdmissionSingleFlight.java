@@ -20,12 +20,14 @@ final class SqliteLifecycleAdmissionSingleFlight {
             @Nonnull OperationKind kind,
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull String payloadJson,
             @Nonnull Supplier<? extends CompletionStage<T>> work
     ) {
-        if (kind == null || operationId == null || idempotencyKey == null || work == null) {
+        if (kind == null || operationId == null || idempotencyKey == null
+                || payloadJson == null || work == null) {
             throw new IllegalArgumentException("Complete admission flight key and work are required");
         }
-        Key key = new Key(kind, operationId, idempotencyKey);
+        Key key = new Key(kind, operationId, idempotencyKey, payloadJson);
         CompletableFuture<T> shared = new CompletableFuture<>();
         CompletableFuture<?> existing = flights.putIfAbsent(key, shared);
         if (existing != null) {
@@ -56,7 +58,8 @@ final class SqliteLifecycleAdmissionSingleFlight {
     private record Key(
             OperationKind kind,
             OperationId operationId,
-            IdempotencyKey idempotencyKey
+            IdempotencyKey idempotencyKey,
+            String payloadJson
     ) {
     }
 }

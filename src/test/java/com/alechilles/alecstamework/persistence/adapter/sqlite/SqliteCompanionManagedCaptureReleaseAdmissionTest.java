@@ -233,6 +233,74 @@ class SqliteCompanionManagedCaptureReleaseAdmissionTest {
         assertEquals(1, liveCalls.get());
     }
 
+    @Test
+    void concurrentDifferentReleaseDoesNotSharePublishedResult()
+            throws Exception {
+        CompanionCaptureReleaseRequest firstRequest = request(OWNER);
+        CompanionCaptureReleaseRequest differentRequest = withSpawnReceipt(
+                firstRequest, "different-spawn-receipt"
+        );
+        SqliteLifecycleAdmissionSingleFlight flights =
+                new SqliteLifecycleAdmissionSingleFlight();
+        AtomicInteger workCalls = new AtomicInteger();
+        CompletableFuture<String> firstWork = new CompletableFuture<>();
+
+        CompletionStage<String> first = flights.submit(
+                CompanionCaptureReleaseDefinition.KIND,
+                operationId(21),
+                new IdempotencyKey("capture-release-21"),
+                CompanionCaptureReleaseDefinition.INSTANCE.encode(firstRequest),
+                () -> {
+                    workCalls.incrementAndGet();
+                    return firstWork;
+                }
+        );
+        CompletionStage<String> different = flights.submit(
+                CompanionCaptureReleaseDefinition.KIND,
+                operationId(21),
+                new IdempotencyKey("capture-release-21"),
+                CompanionCaptureReleaseDefinition.INSTANCE.encode(differentRequest),
+                () -> {
+                    workCalls.incrementAndGet();
+                    return CompletableFuture.completedFuture("different");
+                }
+        );
+
+        assertEquals("different", different.toCompletableFuture()
+                .get(10, TimeUnit.SECONDS));
+        firstWork.complete("first");
+        assertEquals("first", first.toCompletableFuture()
+                .get(10, TimeUnit.SECONDS));
+        assertEquals(2, workCalls.get());
+    }
+
+    @Test
+    void staleCanonicalAliasFailsBeforeAdmissionProvider() throws Exception {
+        try (Connection connection = connections.openWriterConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     UPDATE companion_alias
+                     SET alias_state = 'RETIRED', retired_at_ms = -1
+                     WHERE npc_uuid = ?
+                     """)) {
+            statement.setString(1, SOURCE_ALIAS.toString());
+            assertEquals(1, statement.executeUpdate());
+        }
+        AtomicInteger liveCalls = new AtomicInteger();
+
+        OperationWorkflowResult result = submit(
+                22,
+                ownedSourceRequest(),
+                (request, operation) -> {
+                    liveCalls.incrementAndGet();
+                    return LiveOperationResult.confirmed("unexpected").completed();
+                }
+        );
+
+        assertEquals(OperationWorkflowResult.Status.PREPARE_FAILED, result.status());
+        assertEquals(0, admissionCalls);
+        assertEquals(0, liveCalls.get());
+    }
+
     private CompletionStage<LifecycleAdmissionEvidence> authorizeAdmission(
             LifecycleAdmissionRequest request
     ) {
@@ -345,6 +413,26 @@ class SqliteCompanionManagedCaptureReleaseAdmissionTest {
                 base.placement(),
                 base.inventoryReceiptKey(),
                 base.spawnReceiptKey(),
+                base.requestedAtMs()
+        );
+    }
+
+    private CompanionCaptureReleaseRequest withSpawnReceipt(
+            CompanionCaptureReleaseRequest base,
+            String spawnReceipt
+    ) {
+        return new CompanionCaptureReleaseRequest(
+                base.profileId(),
+                base.expectedLifecycleRevision(),
+                base.sourceSnapshot(),
+                base.sourceAlias(),
+                base.projection(),
+                base.source(),
+                base.targetAlias(),
+                base.ownerAssignment(),
+                base.placement(),
+                base.inventoryReceiptKey(),
+                spawnReceipt,
                 base.requestedAtMs()
         );
     }
