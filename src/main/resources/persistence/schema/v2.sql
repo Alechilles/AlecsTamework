@@ -517,6 +517,9 @@ CREATE TABLE projection_outbox (
 CREATE INDEX idx_projection_outbox_aggregate
     ON projection_outbox(aggregate_id, aggregate_revision);
 
+CREATE INDEX idx_projection_outbox_type_sequence
+    ON projection_outbox(event_type, event_sequence);
+
 CREATE TABLE projection_checkpoint (
     consumer_id TEXT PRIMARY KEY,
     acknowledged_sequence INTEGER NOT NULL CHECK (acknowledged_sequence >= 0),

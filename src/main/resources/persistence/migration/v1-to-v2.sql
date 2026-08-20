@@ -24,6 +24,9 @@ FROM schema_history_v2;
 
 DROP TABLE schema_history_v2;
 
+CREATE INDEX idx_projection_outbox_type_sequence
+    ON projection_outbox(event_type, event_sequence);
+
 CREATE TABLE population_domain_reservation (
     operation_id TEXT NOT NULL,
     profile_id TEXT NOT NULL,

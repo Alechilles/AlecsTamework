@@ -27,6 +27,7 @@ final class LinkedNpcPanelPresentationSupport {
     static String sort(Supplier<String> supplier) { return value(supplier, TameworkCommandSelectionPage.PANEL_SORT_DEFAULT); }
     static String filterMode(Supplier<String> supplier) { return value(supplier, TameworkCommandSelectionPage.PANEL_FILTER_NONE); }
     static boolean autoLink(Supplier<Boolean> supplier) { return supplier == null || !Boolean.FALSE.equals(supplier.get()); }
+    static boolean activeHighlight(Supplier<Boolean> supplier) { return supplier != null && Boolean.TRUE.equals(supplier.get()); }
     static boolean nearby(Supplier<String> supplier) { return TameworkCommandSelectionPage.PANEL_MODE_NEARBY.equalsIgnoreCase(mode(supplier)); }
     static boolean showFilter(Supplier<String> supplier) { return !TameworkCommandSelectionPage.PANEL_FILTER_NONE.equalsIgnoreCase(filterMode(supplier)); }
     static String input(Supplier<String> supplier) { return supplier == null || supplier.get() == null ? "" : supplier.get(); }

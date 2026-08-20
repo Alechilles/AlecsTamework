@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.persistence.projection.ProjectionApplyOutcom
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumerId;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEvent;
+import com.alechilles.alecstamework.persistence.projection.ProjectionSubscription;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -12,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import javax.annotation.Nonnull;
 
 /** Rebuildable synchronous lookup derived from canonical extension rows. */
@@ -29,6 +31,13 @@ public final class ProfileExtensionProjectionIndex
     @Nonnull
     public ProjectionConsumerId consumerId() {
         return CONSUMER_ID;
+    }
+
+    @Override
+    public ProjectionSubscription subscription() {
+        return ProjectionSubscription.events(Set.of(
+                ProfileExtensionMutationEventCodec.EVENT_TYPE
+        ));
     }
 
     @Override

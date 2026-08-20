@@ -171,7 +171,7 @@ public final class PersistenceDiagnosticExporter {
                 .replace("-", "");
         LinkedHashMap<String, byte[]> members = new LinkedHashMap<>();
         members.put("operational-status.json", json(statusJson(status)));
-        members.put("metrics.json", json(metrics));
+        members.put("metrics.json", metricsJson(metrics));
         members.put("diagnostic-detail.json", json(found.value()));
         BondedCompanionDiagnosticContributor contributor =
                 bondedContributor.get();
@@ -207,6 +207,13 @@ public final class PersistenceDiagnosticExporter {
             );
         }
         members.put(entry.name(), entry.content());
+    }
+
+    /** Serializes only the bounded public metrics model for support bundles. */
+    static byte[] metricsJson(
+            @Nonnull PublicPersistenceMetricsSnapshot metrics
+    ) {
+        return json(Objects.requireNonNull(metrics, "metrics"));
     }
 
     static ExportResult writeBundle(

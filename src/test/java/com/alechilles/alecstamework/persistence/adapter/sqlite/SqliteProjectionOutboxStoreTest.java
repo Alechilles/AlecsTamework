@@ -13,9 +13,11 @@ import com.alechilles.alecstamework.persistence.projection.ProjectionEvent;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
 import com.alechilles.alecstamework.persistence.projection.ProjectionSequence;
+import com.alechilles.alecstamework.persistence.projection.ProjectionSubscription;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -112,6 +114,62 @@ class SqliteProjectionOutboxStoreTest {
             SqliteProjectionOutboxStore store = new SqliteProjectionOutboxStore(connection);
             assertEquals(ProjectionSequence.ORIGIN, store.head());
             assertTrue(store.findCheckpoint(CONSUMER).isEmpty());
+        }
+    }
+
+    @Test
+    void subscribedReadsFilterEventTypesAndHonorTheBoundedTarget() throws Exception {
+        try (Connection connection = transaction()) {
+            createOperation(connection);
+            SqliteProjectionOutboxStore store = new SqliteProjectionOutboxStore(connection);
+            ProjectionEvent first = store.append(new ProjectionEventDraft(
+                    OPERATION,
+                    new ProjectionEventType("profile_extension_mutated"),
+                    "profile-a",
+                    1,
+                    1,
+                    "{}",
+                    -9_000
+            )).value();
+            ProjectionEvent second = store.append(draft(2, "{}", -8_000)).value();
+            ProjectionEvent third = store.append(new ProjectionEventDraft(
+                    OPERATION,
+                    new ProjectionEventType("profile_extension_mutated"),
+                    "profile-a",
+                    3,
+                    1,
+                    "{}",
+                    -7_000
+            )).value();
+
+            assertEquals(
+                    List.of(second),
+                    store.readSubscribedAfter(
+                            ProjectionSequence.ORIGIN,
+                            second.sequence(),
+                            ProjectionSubscription.events(Set.of(EVENT_TYPE)),
+                            10
+                    )
+            );
+            assertEquals(
+                    List.of(first, second),
+                    store.readSubscribedAfter(
+                            ProjectionSequence.ORIGIN,
+                            second.sequence(),
+                            ProjectionSubscription.allEvents(),
+                            10
+                    )
+            );
+            assertEquals(
+                    List.of(second),
+                    store.readSubscribedAfter(
+                            first.sequence(),
+                            third.sequence(),
+                            ProjectionSubscription.events(Set.of(EVENT_TYPE)),
+                            10
+                    )
+            );
+            connection.commit();
         }
     }
 

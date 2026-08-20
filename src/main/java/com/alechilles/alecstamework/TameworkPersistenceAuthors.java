@@ -3,7 +3,6 @@ package com.alechilles.alecstamework;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.items.CommandRestorationCompletionListener;
-import com.alechilles.alecstamework.items.CompanionProfileSnapshotSink;
 import com.alechilles.alecstamework.items.CompanionRevivePolicy;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService;
 import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex;
@@ -64,23 +63,26 @@ final class TameworkPersistenceAuthors {
         Objects.requireNonNull(identityIndex, "identityIndex");
         Objects.requireNonNull(facades, "facades");
 
-        CompanionProfileSnapshotSink profileSnapshots =
+        ReplacementProfileSnapshotSink profileSnapshots =
                 profileSnapshots(logger, facades);
         ExactCheckpointCompanionRecallRecovery exactRecallRecovery =
                 new ExactCheckpointCompanionRecallRecovery(
                         facades, identityIndex, retirementType, logger
                 );
+        ReplacementCompanionEntityCheckpointSink checkpointSink =
+                new ReplacementCompanionEntityCheckpointSink(
+                        facades,
+                        detail -> logger.at(Level.WARNING).log(detail),
+                        identityIndex,
+                        exactRecallRecovery::recoverReturnedOriginal,
+                        exactRecallRecovery::suppressesCheckpoint,
+                        facades.throughputMetrics()
+                );
         CommandLinkedNpcStateSnapshotService stateSnapshots =
                 new CommandLinkedNpcStateSnapshotService(
                         profileSnapshots,
                         identityIndex,
-                        new ReplacementCompanionEntityCheckpointSink(
-                                facades,
-                                detail -> logger.at(Level.WARNING).log(detail),
-                                identityIndex,
-                                exactRecallRecovery::recoverReturnedOriginal,
-                                exactRecallRecovery::suppressesCheckpoint
-                        )
+                        checkpointSink
                 );
         TameworkFullStateSnapshotReader snapshots =
                 new TameworkFullStateSnapshotReader(
@@ -95,6 +97,8 @@ final class TameworkPersistenceAuthors {
 
         return new Bundle(
                 stateSnapshots,
+                profileSnapshots,
+                checkpointSink,
                 captureAuthor(
                         facades,
                         events,
@@ -119,7 +123,7 @@ final class TameworkPersistenceAuthors {
         );
     }
 
-    private static CompanionProfileSnapshotSink profileSnapshots(
+    private static ReplacementProfileSnapshotSink profileSnapshots(
             HytaleLogger logger,
             PersistenceDomainFacades facades
     ) {
@@ -127,7 +131,8 @@ final class TameworkPersistenceAuthors {
                 facades.queries(),
                 facades.operations(),
                 System::currentTimeMillis,
-                detail -> logger.at(Level.WARNING).log(detail)
+                detail -> logger.at(Level.WARNING).log(detail),
+                facades.throughputMetrics()
         );
     }
 
@@ -197,6 +202,8 @@ final class TameworkPersistenceAuthors {
     /** Released gameplay boundaries built over one immutable facade reference. */
     record Bundle(
             CommandLinkedNpcStateSnapshotService snapshots,
+            ReplacementProfileSnapshotSink profileSink,
+            ReplacementCompanionEntityCheckpointSink checkpointSink,
             SpawnerCaptureAuthor captureAuthor,
             SpawnerCapturedArtifactReleaseAuthor releaseAuthor,
             FreeCompanionRestorationAuthor restorationAuthor,
@@ -207,6 +214,8 @@ final class TameworkPersistenceAuthors {
     ) {
         Bundle {
             Objects.requireNonNull(snapshots, "snapshots");
+            Objects.requireNonNull(profileSink, "profileSink");
+            Objects.requireNonNull(checkpointSink, "checkpointSink");
             Objects.requireNonNull(captureAuthor, "captureAuthor");
             Objects.requireNonNull(releaseAuthor, "releaseAuthor");
             Objects.requireNonNull(restorationAuthor, "restorationAuthor");

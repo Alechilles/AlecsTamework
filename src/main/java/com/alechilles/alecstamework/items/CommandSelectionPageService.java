@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import static com.alechilles.alecstamework.items.CommandSelectionCallbackGuards.*;
+
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
@@ -8,6 +10,7 @@ import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
 import com.alechilles.alecstamework.ui.LinkedNpcPanelFeatureAction;
 import com.alechilles.alecstamework.ui.LinkedPanelRefreshSignalSource;
 import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
+import com.alechilles.alecstamework.ui.CommandActiveHighlightBinding;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -362,6 +365,13 @@ final class CommandSelectionPageService {
                 panelCallbacks.assignGroup(), npcCallbacks.selectCommand(),
                 context.refreshSignals()
         );
+        page.configureActiveHighlight(new CommandActiveHighlightBinding(
+                context.genericRosterActions()
+                        ? () -> toolInventoryService.resolvePanelActiveHighlightEnabledForTool(
+                                context.player(), context.toolId())
+                        : () -> false,
+                panelCallbacks.setActiveHighlightEnabled()
+        ));
         page.configureShoulderRideCallback(shoulderRideCallback(context));
         page.configureHotswapAssignments(
                 () -> toolInventoryService.findActiveToolStack(context.player(), context.toolId()),
@@ -485,6 +495,9 @@ final class CommandSelectionPageService {
                 context.genericRosterActions() ? guardedBoolean(genericAuthority,
                         enabled -> panelActionService.applySetAutoLinkEnabled(
                                 player, toolId, context.config(), enabled)) : ignoredBoolean,
+                context.genericRosterActions() ? guardedBoolean(genericAuthority,
+                        enabled -> panelActionService.applySetActiveHighlightEnabled(
+                                player, toolId, context.config(), enabled)) : ignoredBoolean,
                 guardedAction(genericAuthority, () -> panelActionService.applyAdjustPanelRadius(
                         player, toolId, context.config(), false)),
                 guardedAction(genericAuthority, () -> panelActionService.applyAdjustPanelRadius(
@@ -506,51 +519,6 @@ final class CommandSelectionPageService {
                         (uuid, group) -> groupAssignPageService.applyGroupAssignment(
                                 player, toolId, context.config(), uuid, group))
                         : (ignoredUuid, ignoredGroup) -> { });
-    }
-
-    private static Consumer<UUID> guardedUuid(BooleanSupplier authority,
-                                               Consumer<UUID> callback) {
-        return uuid -> {
-            if (authority.getAsBoolean()) {
-                callback.accept(uuid);
-            }
-        };
-    }
-
-    private static Consumer<Boolean> guardedBoolean(BooleanSupplier authority,
-                                                     Consumer<Boolean> callback) {
-        return value -> {
-            if (authority.getAsBoolean()) {
-                callback.accept(value);
-            }
-        };
-    }
-
-    private static Consumer<String> guardedString(BooleanSupplier authority,
-                                                   Consumer<String> callback) {
-        return value -> {
-            if (authority.getAsBoolean()) {
-                callback.accept(value);
-            }
-        };
-    }
-
-    private static BiConsumer<UUID, String> guardedPair(
-            BooleanSupplier authority, BiConsumer<UUID, String> callback) {
-        return (uuid, value) -> {
-            if (authority.getAsBoolean()) {
-                callback.accept(uuid, value);
-            }
-        };
-    }
-
-    private static Runnable guardedAction(BooleanSupplier authority,
-                                          Runnable callback) {
-        return () -> {
-            if (authority.getAsBoolean()) {
-                callback.run();
-            }
-        };
     }
 
     private void applyFeatureAction(
@@ -751,6 +719,7 @@ final class CommandSelectionPageService {
     private record PanelCallbacks(
             Consumer<String> setMode,
             Consumer<Boolean> setAutoLinkEnabled,
+            Consumer<Boolean> setActiveHighlightEnabled,
             Runnable decreaseRadius,
             Runnable increaseRadius,
             Runnable manageGroups,

@@ -25,6 +25,8 @@ import javax.annotation.Nonnull;
 public final class SqliteSchemaV2Manager implements PersistenceSchemaManager {
     public static final int VERSION = 2;
     public static final String LINEAGE = "tamework-state";
+    public static final String ROUTED_READ_INDEX =
+            "idx_projection_outbox_type_sequence";
     private static final String RESOURCE = "/persistence/schema/v2.sql";
     private static final Set<String> V1_TABLES = SqliteSchemaV1Manager.requiredTables();
     private static final Set<String> NEW_TABLES = Set.of(
@@ -55,7 +57,8 @@ public final class SqliteSchemaV2Manager implements PersistenceSchemaManager {
             V1_INDEXES,
             Set.of(
                     "idx_population_domain_reservation_scope",
-                    "idx_companion_output_claim_owner"
+                    "idx_companion_output_claim_owner",
+                    ROUTED_READ_INDEX
             )
     );
     private static final Set<SqliteSchemaDefinitionCatalog.SchemaObject> V1_OBJECTS =

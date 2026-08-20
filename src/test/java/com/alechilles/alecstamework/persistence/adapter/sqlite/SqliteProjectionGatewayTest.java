@@ -10,11 +10,16 @@ import com.alechilles.alecstamework.persistence.projection.ProjectionConsumerId;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEvent;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
+import com.alechilles.alecstamework.persistence.projection.ProjectionSubscription;
+import com.alechilles.alecstamework.persistence.runtime.PersistenceThroughputMetrics;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -78,7 +83,51 @@ class SqliteProjectionGatewayTest {
         assertEquals(List.of(first), found.value().events());
     }
 
+    @Test
+    void routedMetricsIncludeTrailingBypassedSequencePositions()
+            throws Exception {
+        ProjectionEvent relevant = append(1, "profile_changed");
+        ProjectionEvent trailing = append(2, "lifecycle_changed");
+        AtomicLong sequencePositions = new AtomicLong();
+        AtomicInteger relevantRows = new AtomicInteger();
+        SqliteProjectionGateway gateway = new SqliteProjectionGateway(
+                reads,
+                new SqliteUnitOfWorkRunner(writer, reads),
+                new PersistenceThroughputMetrics() {
+                    @Override
+                    public void projectionBatchLoaded(
+                            long positions,
+                            int rows
+                    ) {
+                        sequencePositions.set(positions);
+                        relevantRows.set(rows);
+                    }
+                }
+        );
+
+        PersistenceReadResult<ProjectionBatch> result = gateway.load(
+                CONSUMER,
+                ProjectionSubscription.events(Set.of(
+                        new ProjectionEventType("profile_changed")
+                )),
+                trailing.sequence(),
+                10
+        ).toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        PersistenceReadResult.Found<ProjectionBatch> found = assertInstanceOf(
+                PersistenceReadResult.Found.class, result
+        );
+        assertEquals(List.of(relevant), found.value().events());
+        assertEquals(2, sequencePositions.get());
+        assertEquals(1, relevantRows.get());
+    }
+
     private ProjectionEvent append(long revision) throws Exception {
+        return append(revision, "profile_changed");
+    }
+
+    private ProjectionEvent append(long revision, String eventType)
+            throws Exception {
         OperationId operationId = OperationId.parse(String.format(
                 "40000000-0000-0000-0000-%012d", revision
         ));
@@ -100,7 +149,7 @@ class SqliteProjectionGatewayTest {
             ProjectionEvent event = new SqliteProjectionOutboxStore(connection)
                     .append(new ProjectionEventDraft(
                             operationId,
-                            new ProjectionEventType("profile_changed"),
+                            new ProjectionEventType(eventType),
                             "profile-" + revision,
                             revision,
                             1,

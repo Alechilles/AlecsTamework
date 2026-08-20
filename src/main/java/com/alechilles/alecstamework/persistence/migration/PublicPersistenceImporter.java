@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.migration;
 
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV2Manager;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
@@ -268,17 +269,19 @@ public final class PublicPersistenceImporter {
             }
             checkpoint(connection);
         } catch (Exception failure) {
-            if (commitAttempted && committedReadback(temporary, plan, manifest)) {
+            if (commitAttempted && committedV1Readback(temporary, plan, manifest)) {
+                migrateSchema(connections);
                 checkpointAfterUnknownCommit(temporary);
                 return;
             }
             throw failure;
         }
+        migrateSchema(connections);
         verifyPublishedTarget(temporary, plan, manifest);
     }
 
     private void initializeSchema(SqliteConnectionFactory connections) throws Exception {
-        SqliteSchemaV2Manager schema = new SqliteSchemaV2Manager(connections, clock);
+        SqliteSchemaV1Manager schema = new SqliteSchemaV1Manager(connections, clock);
         PersistenceTransactionResult<?> result = schema.initialize();
         if (result instanceof PersistenceTransactionResult.Committed<?>) {
             return;
@@ -288,6 +291,19 @@ public final class PublicPersistenceImporter {
             return;
         }
         throw new IllegalStateException("replacement_schema_initialization_failed");
+    }
+
+    private void migrateSchema(SqliteConnectionFactory connections) throws Exception {
+        SqliteSchemaV2Manager schema = new SqliteSchemaV2Manager(connections, clock);
+        PersistenceTransactionResult<?> result = schema.initialize();
+        if (result instanceof PersistenceTransactionResult.Committed<?>) {
+            return;
+        }
+        if (result instanceof PersistenceTransactionResult.Unknown<?>
+                && schema.verify() instanceof PersistenceReadResult.Found<?>) {
+            return;
+        }
+        throw new IllegalStateException("replacement_schema_migration_failed");
     }
 
     private void verifyPublishedTarget(
@@ -305,13 +321,21 @@ public final class PublicPersistenceImporter {
         }
     }
 
-    private boolean committedReadback(
+    private boolean committedV1Readback(
             Path target,
             PublicImportPlan plan,
             PublicImportManifest manifest
     ) {
         try {
-            verifyPublishedTarget(target, plan, manifest);
+            SqliteConnectionFactory connections =
+                    new SqliteConnectionFactory(target);
+            if (!(new SqliteSchemaV1Manager(connections).verify()
+                    instanceof PersistenceReadResult.Found<?>)) {
+                return false;
+            }
+            try (Connection connection = connections.openReadConnection()) {
+                verifier.verify(connection, plan, manifest);
+            }
             return true;
         } catch (Exception failure) {
             return false;
@@ -379,6 +403,24 @@ public final class PublicPersistenceImporter {
             } catch (Exception ignored) {
                 // Owned temporary targets are ignored by bootstrap and can be diagnosed manually.
             }
+        }
+        Path parent = target.getParent();
+        if (parent == null) {
+            return;
+        }
+        String backupPrefix = target.getFileName() + ".v1-backup.";
+        try (var files = Files.list(parent)) {
+            files.filter(path -> path.getFileName().toString()
+                            .startsWith(backupPrefix))
+                    .forEach(path -> {
+                        try {
+                            Files.deleteIfExists(path);
+                        } catch (Exception ignored) {
+                            // This backup belongs only to the temporary import attempt.
+                        }
+                    });
+        } catch (Exception ignored) {
+            // A failed cleanup cannot publish or select a temporary target.
         }
     }
 }

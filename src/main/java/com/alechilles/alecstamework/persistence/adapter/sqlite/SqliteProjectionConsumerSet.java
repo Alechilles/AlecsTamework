@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegist
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumerId;
+import com.alechilles.alecstamework.persistence.projection.ProjectionSubscription;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +20,24 @@ final class SqliteProjectionConsumerSet {
             PersistenceFeatureRegistry registry,
             List<ProjectionConsumer> consumers
     ) {
+        if (registry == null || consumers == null) {
+            throw new IllegalArgumentException(
+                    "Projection registry and consumers are required"
+            );
+        }
+        for (ProjectionConsumer consumer : consumers) {
+            if (consumer == null || consumer.consumerId() == null) {
+                throw new IllegalArgumentException(
+                        "Projection consumer IDs are required"
+                );
+            }
+            ProjectionSubscription subscription = consumer.subscription();
+            if (subscription == null) {
+                throw new IllegalArgumentException(
+                        "Projection consumer subscriptions are required"
+                );
+            }
+        }
         this.registry = registry;
         this.consumers = consumers.stream().collect(
                 java.util.stream.Collectors.toUnmodifiableMap(

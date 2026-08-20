@@ -11,16 +11,23 @@ import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.items.CompanionProfileSnapshotSink;
+import com.alechilles.alecstamework.items.persistence.maintenance.LatestWorkCoordinator;
+import com.alechilles.alecstamework.items.persistence.maintenance.MaintenanceDrainResult;
+import com.alechilles.alecstamework.items.persistence.maintenance.MaintenanceMetricsSnapshot;
+import com.alechilles.alecstamework.items.persistence.maintenance.MaintenanceThroughputReporter;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
+import com.alechilles.alecstamework.persistence.kernel.StorageFailure;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.operation.PublicOperationSubmission;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceOperations;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceQueries;
+import com.alechilles.alecstamework.persistence.runtime.PersistenceThroughputMetrics;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -29,8 +36,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
@@ -51,10 +59,9 @@ public final class ReplacementProfileSnapshotSink
     private final PublicPersistenceOperations operations;
     private final LongSupplier clock;
     private final Consumer<String> warnings;
-    private final ConcurrentHashMap<UUID, CompletableFuture<Void>> inFlight =
-            new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<UUID, LiveSnapshot> pending =
-            new ConcurrentHashMap<>();
+    private final LatestWorkCoordinator<UUID, LiveSnapshot> coordinator;
+    private final MaintenanceThroughputReporter<UUID, LiveSnapshot>
+            throughputReporter;
 
     public ReplacementProfileSnapshotSink(
             @Nonnull PublicPersistenceQueries queries,
@@ -62,8 +69,25 @@ public final class ReplacementProfileSnapshotSink
             @Nonnull LongSupplier clock,
             @Nonnull Consumer<String> warnings
     ) {
+        this(
+                queries,
+                operations,
+                clock,
+                warnings,
+                PersistenceThroughputMetrics.NO_OP
+        );
+    }
+
+    /** Builds the profile sink with passive maintenance measurements. */
+    public ReplacementProfileSnapshotSink(
+            @Nonnull PublicPersistenceQueries queries,
+            @Nonnull PublicPersistenceOperations operations,
+            @Nonnull LongSupplier clock,
+            @Nonnull Consumer<String> warnings,
+            @Nonnull PersistenceThroughputMetrics throughputMetrics
+    ) {
         if (queries == null || operations == null || clock == null
-                || warnings == null) {
+                || warnings == null || throughputMetrics == null) {
             throw new IllegalArgumentException(
                     "Complete replacement profile snapshot dependencies are required"
             );
@@ -72,46 +96,88 @@ public final class ReplacementProfileSnapshotSink
         this.operations = operations;
         this.clock = clock;
         this.warnings = warnings;
+        this.coordinator = new LatestWorkCoordinator<>(
+                16,
+                this::resolveWithWarning
+        );
+        this.throughputReporter = new MaintenanceThroughputReporter<>(
+                coordinator, throughputMetrics::profileMaintenance
+        );
     }
 
     @Override
-    public void publish(
+    @Nonnull
+    public CompletionStage<Void> publish(
             @Nonnull CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot snapshot,
             @Nonnull String worldKey
     ) {
         if (snapshot == null || snapshot.npcUuid() == null
                 || worldKey == null || worldKey.isBlank()) {
-            return;
+            return CompletableFuture.completedFuture(null);
         }
-        UUID npcUuid = snapshot.npcUuid();
-        pending.put(npcUuid, new LiveSnapshot(snapshot, worldKey.trim()));
-        drain(npcUuid);
+        CompletionStage<Void> result = coordinator.submit(
+                snapshot.npcUuid(),
+                new LiveSnapshot(snapshot, worldKey.trim())
+        );
+        throughputReporter.sampleAdmission();
+        result.whenComplete(
+                (ignored, failure) -> throughputReporter.recordIfIdle()
+        );
+        return result;
     }
 
-    private void drain(UUID npcUuid) {
-        CompletableFuture<Void> marker = new CompletableFuture<>();
-        if (inFlight.putIfAbsent(npcUuid, marker) != null) {
-            return;
-        }
-        LiveSnapshot snapshot =
-                pending.remove(npcUuid);
-        if (snapshot == null) {
-            inFlight.remove(npcUuid, marker);
-            return;
-        }
-        resolve(snapshot).whenComplete((ignored, failure) -> {
-            if (failure != null) {
-                warn("profile_snapshot_publication_failed:"
-                        + failure.getClass().getSimpleName());
-                marker.completeExceptionally(failure);
-            } else {
-                marker.complete(null);
+    @Override
+    @Nonnull
+    public CompletionStage<Void> flush(@Nonnull UUID npcUuid) {
+        CompletionStage<Void> result = coordinator.flush(
+                Objects.requireNonNull(npcUuid, "npcUuid")
+        );
+        result.whenComplete(
+                (ignored, failure) -> throughputReporter.record()
+        );
+        return result;
+    }
+
+    @Override
+    @Nonnull
+    public MaintenanceMetricsSnapshot metrics() {
+        MaintenanceMetricsSnapshot snapshot = coordinator.metrics();
+        throughputReporter.record(snapshot);
+        return snapshot;
+    }
+
+    @Override
+    @Nonnull
+    public MaintenanceDrainResult shutdown(@Nonnull Duration timeout) {
+        MaintenanceDrainResult result = coordinator.shutdown(
+                Objects.requireNonNull(timeout, "timeout")
+        );
+        throughputReporter.record();
+        return result;
+    }
+
+    private CompletionStage<Void> resolveWithWarning(
+            UUID npcUuid,
+            LiveSnapshot snapshot
+    ) {
+        try {
+            CompletionStage<Void> result = resolve(snapshot);
+            if (result == null) {
+                throw new NullPointerException(
+                        "Profile snapshot resolution returned no completion"
+                );
             }
-            inFlight.remove(npcUuid, marker);
-            if (pending.containsKey(npcUuid)) {
-                drain(npcUuid);
-            }
-        });
+            return result.whenComplete((ignored, failure) -> {
+                if (failure != null) {
+                    warn("profile_snapshot_publication_failed:npc="
+                            + npcUuid + ':' + failureMessage(failure));
+                }
+            });
+        } catch (Throwable failure) {
+            warn("profile_snapshot_publication_failed:npc="
+                    + npcUuid + ':' + failureMessage(failure));
+            return CompletableFuture.failedFuture(failure);
+        }
     }
 
     private CompletionStage<Void> resolve(
@@ -127,8 +193,11 @@ public final class ReplacementProfileSnapshotSink
                         found.value(), alias, snapshot, observed.worldKey()
                 );
             }
-            if (read instanceof PersistenceReadResult.Failed<?>) {
-                return failed("profile_snapshot_alias_read_failed");
+            if (read instanceof PersistenceReadResult.Failed<?> failed) {
+                return failedStorage(
+                        "profile_snapshot_alias_read_failed",
+                        failed.failure()
+                );
             }
             ProfileId fallback = new ProfileId(snapshot.npcUuid());
             return queries.findProfile(fallback).thenCompose(byProfile -> {
@@ -138,8 +207,12 @@ public final class ReplacementProfileSnapshotSink
                             found.value(), alias, snapshot, observed.worldKey()
                     );
                 }
-                if (byProfile instanceof PersistenceReadResult.Failed<?>) {
-                    return failed("profile_snapshot_profile_read_failed");
+                if (byProfile instanceof PersistenceReadResult.Failed<?>
+                        failed) {
+                    return failedStorage(
+                            "profile_snapshot_profile_read_failed",
+                            failed.failure()
+                    );
                 }
                 return adopt(fallback, alias, snapshot, observed.worldKey());
             });
@@ -311,8 +384,11 @@ public final class ReplacementProfileSnapshotSink
                     == OperationWorkflowResult.Status.PUBLISHED) {
                 return CompletableFuture.completedFuture(null);
             }
-            return failed(context + "_" + result.status().name()
-                    .toLowerCase(Locale.ROOT));
+            return failed(
+                    context + "_" + result.status().name()
+                            .toLowerCase(Locale.ROOT),
+                    result.failure()
+            );
         });
     }
 
@@ -405,8 +481,22 @@ public final class ReplacementProfileSnapshotSink
     }
 
     private <T> CompletionStage<T> failed(String code) {
+        return failed(code, null);
+    }
+
+    private <T> CompletionStage<T> failed(String code, Throwable cause) {
         return CompletableFuture.failedFuture(
-                new IllegalStateException(code)
+                new IllegalStateException(code, cause)
+        );
+    }
+
+    private <T> CompletionStage<T> failedStorage(
+            String context,
+            StorageFailure failure
+    ) {
+        return failed(
+                context + ':' + failure.code(),
+                failure.cause()
         );
     }
 
@@ -425,6 +515,35 @@ public final class ReplacementProfileSnapshotSink
         } catch (RuntimeException ignored) {
             // Diagnostics must never break ECS snapshot publication.
         }
+    }
+
+    private static String failureMessage(Throwable failure) {
+        Throwable current = failure;
+        List<String> messages = new ArrayList<>();
+        while (current != null) {
+            if (current.getMessage() != null
+                    && !current.getMessage().isBlank()) {
+                messages.add(current.getMessage());
+            }
+            current = current.getCause();
+            while ((current instanceof CompletionException
+                    || current instanceof ExecutionException)
+                    && current.getCause() != null) {
+                current = current.getCause();
+            }
+        }
+        if (messages.isEmpty()) {
+            return failure.getClass().getSimpleName();
+        }
+        if (messages.size() == 1) {
+            return messages.get(0);
+        }
+        String deepest = messages.get(messages.size() - 1);
+        return deepest + " (cause-chain: "
+                + String.join(
+                        " -> ", messages.subList(0, messages.size() - 1)
+                )
+                + ')';
     }
 
     private record LiveSnapshot(

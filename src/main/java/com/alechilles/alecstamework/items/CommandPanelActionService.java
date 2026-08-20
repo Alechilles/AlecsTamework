@@ -247,6 +247,26 @@ final class CommandPanelActionService {
         }
     }
 
+    void applySetActiveHighlightEnabled(Player player,
+                                        String toolId,
+                                        TwCommandItemConfig config,
+                                        boolean enabled) {
+        if (!CommandRosterStorageBoundary.allowsGenericRosterActions(config)) {
+            return;
+        }
+        boolean updated = toolInventoryService.mutateToolStack(
+                player,
+                toolId,
+                stack -> panelPreferenceService.setActiveHighlightEnabled(stack, enabled)
+        );
+        if (!updated && player != null) {
+            feedbackService.showWarningKey(
+                    player,
+                    "tamework.ui.notifications.command.panel.activeHighlightUpdateFailed"
+            );
+        }
+    }
+
     void applyAdjustPanelRadius(Player player,
                                 String toolId,
                                 TwCommandItemConfig config,

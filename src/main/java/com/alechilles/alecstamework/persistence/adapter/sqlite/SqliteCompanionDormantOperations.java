@@ -54,13 +54,22 @@ public final class SqliteCompanionDormantOperations {
             @Nonnull LongSupplier clock,
             @Nonnull List<? extends ProjectionConsumer> requiredConsumers
     ) {
-        if (operations == null || evidence == null || projections == null
-                || clock == null || requiredConsumers == null) {
+        this(
+                new SqliteDatabaseOperationCoordinator(
+                        operations, evidence, projections, clock
+                ),
+                requiredConsumers
+        );
+    }
+
+    SqliteCompanionDormantOperations(
+            @Nonnull SqliteDatabaseOperationCoordinator workflow,
+            @Nonnull List<? extends ProjectionConsumer> requiredConsumers
+    ) {
+        if (workflow == null || requiredConsumers == null) {
             throw new IllegalArgumentException("Companion dormant dependencies are required");
         }
-        workflow = new SqliteDatabaseOperationCoordinator(
-                operations, evidence, projections, clock
-        );
+        this.workflow = workflow;
         this.requiredConsumers = List.copyOf(requiredConsumers);
     }
 

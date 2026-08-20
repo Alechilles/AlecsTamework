@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.diagnostics;
 
+import com.alechilles.alecstamework.persistence.control.PersistenceFeatureId;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Instant;
@@ -7,6 +8,8 @@ import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.Set;
 import java.util.zip.ZipFile;
+import com.alechilles.alecstamework.persistence.runtime.PersistenceThroughputSnapshot;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceMetricsSnapshot;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -142,5 +145,43 @@ class PersistenceDiagnosticExporterTest {
                     names
             );
         }
+    }
+
+    @Test
+    void metricsExportContainsCountsAndNoCompanionIdentity() {
+        PublicPersistenceMetricsSnapshot metrics =
+                new PublicPersistenceMetricsSnapshot(
+                        0,
+                        0,
+                        0,
+                        0,
+                        null,
+                        Map.of(
+                                new PersistenceFeatureId("test"),
+                                new PublicPersistenceMetricsSnapshot.FeatureMetrics(
+                                        "test", 0, 0, 0, 0, 0
+                                )
+                        ),
+                        new PersistenceThroughputSnapshot.Values(
+                                1,
+                                10_000,
+                                1,
+                                0,
+                                0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0
+                        )
+                );
+
+        String json = new String(
+                PersistenceDiagnosticExporter.metricsJson(metrics),
+                StandardCharsets.UTF_8
+        );
+
+        assertTrue(json.contains("projectionSequencePositionsBypassed"));
+        assertTrue(json.contains("10000"));
+        assertFalse(json.contains("profileId"));
+        assertFalse(json.contains("ownerId"));
+        assertFalse(json.contains("npcUuid"));
     }
 }

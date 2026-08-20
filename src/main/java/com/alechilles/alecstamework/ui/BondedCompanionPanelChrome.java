@@ -17,6 +17,7 @@ final class BondedCompanionPanelChrome {
             return;
         }
         commands.set("#TameworkLinkedPanelAutoLinkControls.Visible", false);
+        commands.set("#TameworkLinkedPanelActiveHighlightControls.Visible", false);
         commands.set("#TameworkLinkedPanelModeDropdown.Visible", false);
         commands.set("#TameworkLinkedPanelSubtitleRow.Visible", false);
         commands.set("#TameworkLinkedPanelGroupAssignOverlay.Visible", false);

@@ -11,11 +11,13 @@ import com.alechilles.alecstamework.persistence.projection.ProjectionApplyOutcom
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumerId;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEvent;
+import com.alechilles.alecstamework.persistence.projection.ProjectionSubscription;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 
@@ -49,6 +51,14 @@ public final class CompanionProfileObserverProjection implements ProjectionConsu
     @Nonnull
     public ProjectionConsumerId consumerId() {
         return CONSUMER_ID;
+    }
+
+    @Override
+    @Nonnull
+    public ProjectionSubscription subscription() {
+        return ProjectionSubscription.events(Set.of(
+                CompanionProfileProjectionChangeCodec.EVENT_TYPE
+        ));
     }
 
     @Override

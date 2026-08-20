@@ -120,14 +120,14 @@ final class SqlitePublicOperationSet {
         SqliteOperationPublisher publisher = new SqliteOperationPublisher(
                 engine,
                 evidence,
-                projections.coordinator(),
+                projections.publicationScheduler(),
                 clock
         );
         SqliteDatabaseOperationCoordinator database =
                 new SqliteDatabaseOperationCoordinator(
                         engine,
                         evidence,
-                        projections.coordinator(),
+                        projections.publicationScheduler(),
                         clock
                 );
         Function<OperationKind, List<ProjectionConsumer>> consumers =
@@ -245,10 +245,7 @@ final class SqlitePublicOperationSet {
                 )
         );
         dormant = new SqliteCompanionDormantOperations(
-                engine,
-                evidence,
-                projections.coordinator(),
-                clock,
+                database,
                 consumers.apply(
                         CompanionDormantTransitionDefinition.INSTANCE.kind()
                 )

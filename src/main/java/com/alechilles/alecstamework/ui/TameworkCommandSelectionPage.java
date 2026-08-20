@@ -2,9 +2,7 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
-import com.alechilles.alecstamework.items.CommandHotswapAssignmentStore;
 import com.alechilles.alecstamework.items.CommandHotswapAssignmentStore.Slot;
-import com.alechilles.alecstamework.items.CommandHotswapAction;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
@@ -14,14 +12,12 @@ import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
-import com.hypixel.hytale.server.core.ui.LocalizableString;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -68,6 +64,8 @@ public final class TameworkCommandSelectionPage
     private final Supplier<String> panelEmptyStateKeySupplier;
     private final Supplier<String> panelModeValueSupplier;
     private final Supplier<Boolean> panelAutoLinkEnabledSupplier;
+    private CommandActiveHighlightBinding activeHighlightBinding =
+            new CommandActiveHighlightBinding(() -> false, ignored -> { });
     private final Supplier<String> panelRadiusLabelSupplier;
     private final Supplier<String> panelSortValueSupplier;
     private final Supplier<String> panelFilterModeValueSupplier;
@@ -85,9 +83,7 @@ public final class TameworkCommandSelectionPage
     private UUID pendingUnlinkNpcUuid;
     private final String selectedCommandId;
     private final Consumer<String> selectionCallback;
-    private Supplier<com.hypixel.hytale.server.core.inventory.ItemStack> hotswapStackSupplier;
-    private BiConsumer<Slot, String> hotswapAssignmentCallback;
-    private final CommandHotswapAssignmentStore hotswapAssignments = new CommandHotswapAssignmentStore();
+    private final CommandSelectionHotswapController hotswapController;
     private final Consumer<UUID> linkCallback;
     private final Consumer<UUID> unlinkCallback;
     private final Consumer<UUID> toggleActiveCallback;
@@ -284,6 +280,7 @@ public final class TameworkCommandSelectionPage
         super(playerRef, CustomPageLifetime.CanDismiss, CommandSelectionEventData.CODEC);
         this.playerUuid = playerRef.getUuid();
         this.config = config;
+        this.hotswapController = new CommandSelectionHotswapController(config, this::resolveLanguage);
         this.linkedPanelGeneration = NEXT_LINKED_PANEL_GENERATION.incrementAndGet();
         markLinkedPanelOwner();
         this.options = CommandSelectionOptionSource.build(
@@ -369,6 +366,11 @@ public final class TameworkCommandSelectionPage
         this.pendingFilterTextInput = null;
     }
 
+    /** Configures the generic-roster active highlight preference. */
+    public void configureActiveHighlight(@Nonnull CommandActiveHighlightBinding binding) {
+        this.activeHighlightBinding = binding;
+    }
+
     @Override
     public void build(@Nonnull Ref<EntityStore> ref, @Nonnull UICommandBuilder commandBuilder,
                       @Nonnull UIEventBuilder eventBuilder, @Nonnull Store<EntityStore> store) {
@@ -386,7 +388,7 @@ public final class TameworkCommandSelectionPage
                             options, selectedCommandId, resolveLanguage()
                     )
             );
-            buildHotswapControls(commandBuilder);
+            hotswapController.build(commandBuilder);
             commandBuilder.set("#TameworkLinkedPanelRoot.Visible", true);
             commandBuilder.set("#TameworkLinkedPanelTitle.Text", LinkedNpcPanelPresentationSupport.title(panelModeValueSupplier, linkedNpcEntries, resolveLanguage()));
             commandBuilder.set("#TameworkLinkedPanelGroupSelectorDropdown.Entries", LinkedNpcPanelPresentationSupport.entries(panelGroupActivationEntriesSupplier));
@@ -394,6 +396,7 @@ public final class TameworkCommandSelectionPage
             commandBuilder.set("#TameworkLinkedPanelModeDropdown.Entries", CommandSelectionPanelOptions.resolveModeDropdownEntries(resolveLanguage()));
             commandBuilder.set("#TameworkLinkedPanelModeDropdown.Value", LinkedNpcPanelPresentationSupport.mode(panelModeValueSupplier));
             commandBuilder.set("#TameworkLinkedPanelAutoLinkCheck.Value", LinkedNpcPanelPresentationSupport.autoLink(panelAutoLinkEnabledSupplier));
+            commandBuilder.set("#TameworkLinkedPanelActiveHighlightCheck.Value", LinkedNpcPanelPresentationSupport.activeHighlight(activeHighlightBinding.enabledSupplier()));
             commandBuilder.set("#TameworkLinkedPanelSubtitleRadiusControls.Visible", LinkedNpcPanelPresentationSupport.nearby(panelModeValueSupplier));
             commandBuilder.set("#TameworkLinkedPanelRadiusValue.Text", LinkedNpcPanelPresentationSupport.radius(panelRadiusLabelSupplier, resolveLanguage()));
             commandBuilder.set("#TameworkLinkedPanelSortDropdown.Entries", CommandSelectionPanelOptions.resolveSortDropdownEntries(resolveLanguage()));
@@ -439,15 +442,15 @@ public final class TameworkCommandSelectionPage
                                 @Nonnull Store<EntityStore> store,
                                 @Nonnull CommandSelectionEventData data) {
         if (data.hotswapQValue != null) {
-            applyHotswapAssignment(Slot.Q, data.hotswapQValue);
+            hotswapController.apply(Slot.Q, data.hotswapQValue);
             return;
         }
         if (data.hotswapEValue != null) {
-            applyHotswapAssignment(Slot.E, data.hotswapEValue);
+            hotswapController.apply(Slot.E, data.hotswapEValue);
             return;
         }
         if (data.hotswapRValue != null) {
-            applyHotswapAssignment(Slot.R, data.hotswapRValue);
+            hotswapController.apply(Slot.R, data.hotswapRValue);
             return;
         }
         String receivedCommandId = data.commandId == null ? "" : data.commandId.trim();
@@ -558,6 +561,13 @@ public final class TameworkCommandSelectionPage
             }
             pendingUnlinkNpcUuid = null;
             refreshLinkedNpcEntries();
+            sendCardRefreshUpdate();
+            return;
+        }
+        if (data.panelActiveHighlightEnabled != null) {
+            cancelPendingFilterTextApply();
+            activeHighlightBinding.setEnabledCallback().accept(data.panelActiveHighlightEnabled);
+            pendingUnlinkNpcUuid = null;
             sendCardRefreshUpdate();
             return;
         }
@@ -815,44 +825,7 @@ public final class TameworkCommandSelectionPage
     public void configureHotswapAssignments(
             @Nonnull Supplier<com.hypixel.hytale.server.core.inventory.ItemStack> stackSupplier,
             @Nonnull BiConsumer<Slot, String> assignmentCallback) {
-        hotswapStackSupplier = stackSupplier;
-        hotswapAssignmentCallback = assignmentCallback;
-    }
-
-    private void buildHotswapControls(UICommandBuilder commands) {
-        List<DropdownEntryInfo> entries = new ArrayList<>();
-        entries.add(new DropdownEntryInfo(LocalizableString.fromString("Unassigned"), ""));
-        if (!config.usesBondedCompanionRoster()) {
-            entries.add(new DropdownEntryInfo(
-                    LocalizableString.fromString("Cycle Group"),
-                    CommandHotswapAction.CYCLE_GROUP
-            ));
-        }
-        for (CommandSelectionOptionSource.Option option : CommandSelectionOptionSource.build(
-                config, null, resolveLanguage(), Integer.MAX_VALUE)) {
-            entries.add(new DropdownEntryInfo(LocalizableString.fromString(option.label()), option.id()));
-        }
-        commands.set("#TameworkCommandHotswapQ.Entries", entries);
-        commands.set("#TameworkCommandHotswapE.Entries", entries);
-        commands.set("#TameworkCommandHotswapR.Entries", entries);
-        com.hypixel.hytale.server.core.inventory.ItemStack stack = hotswapStackSupplier == null
-                ? null : hotswapStackSupplier.get();
-        commands.set("#TameworkCommandHotswapQ.Value", valueFor(stack, Slot.Q));
-        commands.set("#TameworkCommandHotswapE.Value", valueFor(stack, Slot.E));
-        commands.set("#TameworkCommandHotswapR.Value", valueFor(stack, Slot.R));
-    }
-
-    private String valueFor(com.hypixel.hytale.server.core.inventory.ItemStack stack, Slot slot) {
-        String value = hotswapAssignments.read(stack, slot);
-        return value == null ? "" : value;
-    }
-
-    private void applyHotswapAssignment(Slot slot, String commandId) {
-        if (hotswapAssignmentCallback == null) return;
-        String value = commandId == null ? "" : commandId.trim();
-        if (!value.isEmpty() && !CommandHotswapAction.isCycleGroup(value)
-                && config.findCommandById(value) == null) return;
-        hotswapAssignmentCallback.accept(slot, value);
+        hotswapController.configure(stackSupplier, assignmentCallback);
     }
 
     private boolean handleBondedFlightToggle(
@@ -1048,6 +1021,7 @@ public final class TameworkCommandSelectionPage
         candidateValues.set(commandBuilder, "#TameworkLinkedPanelModeDropdown.Entries", CommandSelectionPanelOptions.resolveModeDropdownEntries(resolveLanguage()));
         candidateValues.set(commandBuilder, "#TameworkLinkedPanelModeDropdown.Value", LinkedNpcPanelPresentationSupport.mode(panelModeValueSupplier));
         candidateValues.set(commandBuilder, "#TameworkLinkedPanelAutoLinkCheck.Value", LinkedNpcPanelPresentationSupport.autoLink(panelAutoLinkEnabledSupplier));
+        candidateValues.set(commandBuilder, "#TameworkLinkedPanelActiveHighlightCheck.Value", LinkedNpcPanelPresentationSupport.activeHighlight(activeHighlightBinding.enabledSupplier()));
         candidateValues.set(commandBuilder, "#TameworkLinkedPanelSubtitleRadiusControls.Visible", LinkedNpcPanelPresentationSupport.nearby(panelModeValueSupplier));
         candidateValues.set(commandBuilder, "#TameworkLinkedPanelRadiusValue.Text", LinkedNpcPanelPresentationSupport.radius(panelRadiusLabelSupplier, resolveLanguage()));
         candidateValues.set(commandBuilder, "#TameworkLinkedPanelSortDropdown.Entries", CommandSelectionPanelOptions.resolveSortDropdownEntries(resolveLanguage()));
@@ -1120,7 +1094,8 @@ public final class TameworkCommandSelectionPage
     private void seedRefreshValues() {
         LinkedNpcPanelRefreshValueSeeder.seed(refreshTransaction.values(), resolveLanguage(), linkedNpcEntries,
                 pendingFilterTextInput, panelEmptyStateKeySupplier, panelModeValueSupplier,
-                panelAutoLinkEnabledSupplier, panelRadiusLabelSupplier, panelSortValueSupplier,
+                panelAutoLinkEnabledSupplier, activeHighlightBinding.enabledSupplier(),
+                panelRadiusLabelSupplier, panelSortValueSupplier,
                 panelFilterModeValueSupplier, panelFilterInputValueSupplier,
                 panelGroupActivationEntriesSupplier, panelGroupActivationValueSupplier);
     }

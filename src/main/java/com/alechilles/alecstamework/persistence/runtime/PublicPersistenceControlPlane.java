@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.persistence.control.PersistenceFeatureId;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceOperationAdmissionGate;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupCoordinator;
+import com.alechilles.alecstamework.items.persistence.maintenance.MaintenanceMetricsSnapshot;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceKernelMetrics;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadKind;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
@@ -31,7 +32,8 @@ import java.util.concurrent.atomic.LongAdder;
 final class PublicPersistenceControlPlane
         implements PersistenceKernelMetrics,
         PersistenceOperationAdmissionGate,
-        PersistenceContainmentListener {
+        PersistenceContainmentListener,
+        PersistenceThroughputMetrics {
     private final PersistenceFeatureRegistry registry;
     private final Map<PersistenceFeatureId, FeatureCounters> features;
     private final LongAdder readsCompleted = new LongAdder();
@@ -56,6 +58,17 @@ final class PublicPersistenceControlPlane
     private final AtomicInteger maximumReadDepth = new AtomicInteger();
     private final AtomicLong checkpointLogFrames = new AtomicLong();
     private final AtomicLong checkpointedFrames = new AtomicLong();
+    private final LongAdder projectionRelevantRows = new LongAdder();
+    private final LongAdder projectionSequencePositionsBypassed =
+            new LongAdder();
+    private final LongAdder projectionBatchAcknowledgements = new LongAdder();
+    private final LongAdder projectionPublicationMerges = new LongAdder();
+    private final LongAdder criticalFlushFailures = new LongAdder();
+    private final LongAdder readSaturationFailures = new LongAdder();
+    private volatile MaintenanceMetricsSnapshot checkpointMaintenance =
+            emptyMaintenanceMetrics();
+    private volatile MaintenanceMetricsSnapshot profileMaintenance =
+            emptyMaintenanceMetrics();
     private volatile PersistenceStartupCoordinator startup;
 
     PublicPersistenceControlPlane(PersistenceFeatureRegistry registry) {
@@ -181,6 +194,9 @@ final class PublicPersistenceControlPlane
         readsCompleted.increment();
         if (result instanceof PersistenceReadResult.Failed<?> failed) {
             readsFailed.increment();
+            if ("read_executor_saturated".equals(failed.failure().code())) {
+                readSaturationFailures.increment();
+            }
             if (globalFailure(failed.failure())) {
                 enterGlobal(failed.failure());
             }
@@ -251,6 +267,49 @@ final class PublicPersistenceControlPlane
         shutdownDrain.observe(elapsedNanos);
     }
 
+    @Override
+    public void projectionBatchLoaded(
+            long sequencePositions,
+            int relevantRows
+    ) {
+        if (sequencePositions < 0 || relevantRows < 0) {
+            return;
+        }
+        projectionRelevantRows.add(relevantRows);
+        projectionSequencePositionsBypassed.add(
+                Math.max(0L, sequencePositions - relevantRows)
+        );
+    }
+
+    @Override
+    public void projectionBatchAcknowledged() {
+        projectionBatchAcknowledgements.increment();
+    }
+
+    @Override
+    public void projectionPublicationMerged() {
+        projectionPublicationMerges.increment();
+    }
+
+    @Override
+    public void checkpointMaintenance(MaintenanceMetricsSnapshot snapshot) {
+        if (snapshot != null) {
+            checkpointMaintenance = snapshot;
+        }
+    }
+
+    @Override
+    public void profileMaintenance(MaintenanceMetricsSnapshot snapshot) {
+        if (snapshot != null) {
+            profileMaintenance = snapshot;
+        }
+    }
+
+    @Override
+    public void criticalFlushFailed() {
+        criticalFlushFailures.increment();
+    }
+
     void startupNodeTimed(
             com.alechilles.alecstamework.persistence.control
                     .PersistenceStartupNode node,
@@ -259,7 +318,8 @@ final class PublicPersistenceControlPlane
         startupTimings.get(node).observe(elapsedNanos);
     }
 
-    PublicPersistenceMetricsSnapshot snapshot() {
+    @Override
+    public PublicPersistenceMetricsSnapshot snapshot() {
         HashMap<PersistenceFeatureId,
                 PublicPersistenceMetricsSnapshot.FeatureMetrics> result =
                 new HashMap<>();
@@ -271,7 +331,8 @@ final class PublicPersistenceControlPlane
                 checkpointFailures.sum(),
                 shutdownTimeouts.sum(),
                 lastGlobalFailure.get(),
-                result
+                result,
+                throughputSnapshot()
         );
     }
 
@@ -301,6 +362,42 @@ final class PublicPersistenceControlPlane
                 walBytes,
                 Math.toIntExact(checkpointLogFrames.get()),
                 Math.toIntExact(checkpointedFrames.get())
+        );
+    }
+
+    private PersistenceThroughputSnapshot throughputSnapshot() {
+        MaintenanceMetricsSnapshot checkpoint = checkpointMaintenance;
+        MaintenanceMetricsSnapshot profile = profileMaintenance;
+        return new PersistenceThroughputSnapshot.Values(
+                projectionRelevantRows.sum(),
+                projectionSequencePositionsBypassed.sum(),
+                projectionBatchAcknowledgements.sum(),
+                projectionPublicationMerges.sum(),
+                checkpoint.submissions(),
+                checkpoint.replacements(),
+                checkpoint.failures(),
+                checkpoint.pendingKeys(),
+                checkpoint.pendingWork(),
+                checkpoint.inFlightWork(),
+                checkpoint.maximumInFlightWork(),
+                checkpoint.oldestPendingAgeNanos(),
+                profile.submissions(),
+                profile.replacements(),
+                profile.failures(),
+                profile.pendingKeys(),
+                profile.pendingWork(),
+                profile.inFlightWork(),
+                profile.maximumInFlightWork(),
+                profile.oldestPendingAgeNanos(),
+                criticalFlushFailures.sum(),
+                readSaturationFailures.sum(),
+                maximumWriterDepth.get()
+        );
+    }
+
+    private static MaintenanceMetricsSnapshot emptyMaintenanceMetrics() {
+        return new MaintenanceMetricsSnapshot(
+                0, 0, 0, 0, 0, 0, 0, 0, 0
         );
     }
 

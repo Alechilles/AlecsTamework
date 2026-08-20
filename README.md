@@ -25,7 +25,7 @@ Tamework also aims to establish a shared standard for tameable NPCs in Hytale so
 ## This Is a Library
 Tamework is a framework dependency for other mods. It does not add a standalone gameplay expansion by itself.
 
-If you are a player looking for gameplay built on Tamework, start with [Alec's Animal Husbandry](https://www.curseforge.com/hytale/mods/alecs-animal-husbandry) or the wiki for the specific mod you are using.
+If you are a player looking for gameplay built on Tamework, start with [Alec's Animal Husbandry](https://www.curseforge.com/hytale/mods/alecs-animal-husbandry) or [Alec's Cats](https://www.curseforge.com/hytale/mods/alecs-cats), or see the wiki for the specific mod you are using.
 
 ## Why Tamework
 - **No Java required for most integrations**: the main integration path is built around JSON assets, templates, role wiring, and `Tw*Config` files rather than custom Java systems.

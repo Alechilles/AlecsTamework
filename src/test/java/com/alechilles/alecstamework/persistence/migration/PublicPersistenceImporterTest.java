@@ -63,7 +63,7 @@ class PublicPersistenceImporterTest {
                     count(testCase.target(), "companion_profile"));
             assertEquals(fixture.getValue().longValue(),
                     count(testCase.target(), "companion_lifecycle"));
-            assertEquals(1, count(testCase.target(), "schema_history"));
+            assertEquals(2, count(testCase.target(), "schema_history"));
             assertEquals(1, count(testCase.target(), "import_manifest"));
             assertEquals("ok", queryString(testCase.target(), "PRAGMA integrity_check"));
             assertEquals(0, rowCount(testCase.target(), "PRAGMA foreign_key_check"));
