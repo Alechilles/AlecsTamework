@@ -27,7 +27,7 @@
   ],
   "Particle": {
     "Texture": "Particles/Textures/Basic/Glow_Star.png",
-    "FrameSize": { "Width": 64, "Height": 64 },
+    "FrameSize": { "Width": 32, "Height": 32 },
     "ScaleRatioConstraint": "OneToOne",
     "UVOption": "RandomFlipU",
     "Animation": {
