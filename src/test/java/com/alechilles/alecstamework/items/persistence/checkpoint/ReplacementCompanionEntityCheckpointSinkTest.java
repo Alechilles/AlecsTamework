@@ -557,7 +557,7 @@ class ReplacementCompanionEntityCheckpointSinkTest {
                     () -> stage.toCompletableFuture().join());
             assertTrue(await(() -> !warnings.isEmpty()));
             assertTrue(warnings.get(0).contains("read_executor_closed"));
-            assertEquals(1, criticalFailures.get());
+            assertTrue(await(() -> criticalFailures.get() == 1));
             assertTrue(sink.shutdown(Duration.ofSeconds(1)).drained());
         }
     }
