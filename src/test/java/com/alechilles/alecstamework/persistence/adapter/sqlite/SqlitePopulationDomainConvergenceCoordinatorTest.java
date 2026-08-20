@@ -23,6 +23,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
+import com.alechilles.alecstamework.persistence.operation.PreparedOperationDetail;
 import com.alechilles.alecstamework.persistence.operation.TimedDurableOperationWork;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
@@ -200,6 +201,7 @@ class SqlitePopulationDomainConvergenceCoordinatorTest {
                     new SqlitePopulationDomainConvergenceParticipant(
                             supersedingPlan
                     );
+            AtomicInteger secondLiveCalls = new AtomicInteger();
             TimedDurableOperationWork<String> secondDurable =
                     (transaction, operation, payload, committedAtMs) ->
                             convergence.decorate((current, envelope) -> {
@@ -223,28 +225,110 @@ class SqlitePopulationDomainConvergenceCoordinatorTest {
                     definition,
                     secondRequest,
                     convergence,
-                    (payload, operation) ->
-                            LiveOperationResult.confirmed("second_live").completed(),
+                    (payload, operation) -> {
+                        secondLiveCalls.incrementAndGet();
+                        return LiveOperationResult.confirmed("second_live").completed();
+                    },
                     secondDurable,
                     List.of(),
                     "c1_second"
             ).completion().toCompletableFuture().get();
             assertEquals(OperationWorkflowResult.Status.PUBLISHED, second.status());
 
+            OperationId thirdId = OperationId.parse(
+                    "40000000-0000-0000-0000-000000005003"
+            );
+            OperationRequest<String> thirdRequest = new OperationRequest<>(
+                    thirdId, new IdempotencyKey("c1:third"), "payload",
+                    "c1_convergence", new LifecycleRevision(1),
+                    List.of(OperationScope.profile(PROFILE), OperationScope.owner(OWNER)),
+                    -50
+            );
+            PopulationDomainReservation reactivationTarget =
+                    new PopulationDomainReservation(
+                            thirdId, PROFILE, new LifecycleRevision(1), BUCKET,
+                            0, 1, 1, 4, 4, 1, 1, 1, -40
+                    );
+            SqlitePopulationDomainParticipant reactivationAdmission =
+                    new SqlitePopulationDomainParticipant(
+                            List.of(reactivationTarget), true
+                    );
+            PopulationDomainConvergencePlan reactivationPlan;
+            try (Connection connection = connections.openWriterConnection()) {
+                SqlitePersistenceTransactionContext transaction =
+                        new SqlitePersistenceTransactionContext(connection);
+                reactivationPlan = PopulationDomainConvergencePlanner.plan(
+                        PROFILE, new LifecycleRevision(1), OWNER, "world-one",
+                        LifecycleState.CAPTURED, OWNER, "world-one",
+                        LifecycleState.ACTIVE,
+                        transaction.populationDomains().profileEvidence(
+                                PROFILE, null
+                        ).committed(),
+                        List.of(reactivationTarget)
+                );
+            }
+            SqlitePopulationDomainConvergenceParticipant reactivation =
+                    new SqlitePopulationDomainConvergenceParticipant(
+                            reactivationPlan
+                    );
+            TimedDurableOperationWork<String> thirdDurable =
+                    (transaction, operation, payload, committedAtMs) ->
+                            reactivation.decorate(
+                                    reactivationAdmission.decorate(
+                                            (current, envelope) -> {
+                                                transitionLifecycle(
+                                                        transaction, operation,
+                                                        LifecycleState.ACTIVE,
+                                                        LifecycleLocation.liveEntity(
+                                                                "npc-one", "world-one"
+                                                        )
+                                                );
+                                                return List.of(new ProjectionEventDraft(
+                                                        operation.operationId(),
+                                                        new ProjectionEventType("c1_third"),
+                                                        PROFILE.toString(), 1, 1, "{}",
+                                                        committedAtMs
+                                                ));
+                                            }
+                                    )
+                            ).execute(transaction, operation);
+            OperationWorkflowResult third = coordinator.execute(
+                    definition,
+                    thirdRequest,
+                    PreparedOperationDetail.compose(
+                            reactivationAdmission, reactivation
+                    ),
+                    (payload, operation) ->
+                            LiveOperationResult.confirmed("third_live").completed(),
+                    thirdDurable,
+                    List.of(),
+                    "c1_third"
+            ).completion().toCompletableFuture().get();
+            assertEquals(OperationWorkflowResult.Status.PUBLISHED, third.status());
+
+            try (Connection connection = connections.openWriterConnection()) {
+                SqlitePersistenceTransactionContext transaction =
+                        new SqlitePersistenceTransactionContext(connection);
+                assertEquals(1, transaction.populationDomains()
+                        .counts(BUCKET).committedOwned());
+                assertEquals(1, transaction.populationDomains()
+                        .counts(BUCKET).committedDeployable());
+            }
             OperationWorkflowResult replay = coordinator.execute(
                     definition,
-                    firstRequest,
-                    retained,
+                    secondRequest,
+                    convergence,
                     (payload, operation) -> {
-                        liveCalls.incrementAndGet();
+                        secondLiveCalls.incrementAndGet();
                         return LiveOperationResult.confirmed("must_not_run").completed();
                     },
-                    firstDurable,
+                    secondDurable,
                     List.of(),
-                    "c1_first_replay"
+                    "c1_second_replay"
             ).completion().toCompletableFuture().get();
             assertEquals(OperationWorkflowResult.Status.PUBLISHED, replay.status());
             assertEquals(1, liveCalls.get());
+            assertEquals(1, secondLiveCalls.get());
         } finally {
             writer.shutdown(Duration.ofSeconds(5));
             reads.shutdown(Duration.ofSeconds(5));

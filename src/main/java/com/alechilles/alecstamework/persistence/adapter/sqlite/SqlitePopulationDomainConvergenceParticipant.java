@@ -158,10 +158,11 @@ public final class SqlitePopulationDomainConvergenceParticipant
                 operation.operationId()
         ).isEmpty()
                 && residualIdentityMatches(
-                transaction.populationDomains().profileEvidence(
-                        plan.profileId(), operation.operationId()
-                )
-        );
+                        transaction.populationDomains().profileEvidence(
+                                plan.profileId(), operation.operationId()
+                        ),
+                        current.revision().value()
+                );
     }
 
     private boolean residualMatches(
@@ -183,12 +184,11 @@ public final class SqlitePopulationDomainConvergenceParticipant
     }
 
     private boolean residualIdentityMatches(
-            PopulationDomainPort.ProfileEvidence evidence
+            PopulationDomainPort.ProfileEvidence evidence,
+            long currentLifecycleRevision
     ) {
         if (!evidence.currentOperationPending().isEmpty()
-                || !evidence.foreignPending().isEmpty()
-                || evidence.committed().size()
-                > plan.sourceRows().size() + plan.targetReservations().size()) {
+                || !evidence.foreignPending().isEmpty()) {
             return false;
         }
         ArrayList<PopulationDomainReservation> allowed = new ArrayList<>();
@@ -198,6 +198,18 @@ public final class SqlitePopulationDomainConvergenceParticipant
         allowed.addAll(plan.targetReservations());
         boolean[] matched = new boolean[allowed.size()];
         for (PopulationDomainReservation actual : evidence.committed()) {
+            if (!actual.profileId().equals(plan.profileId())) {
+                return false;
+            }
+            if (actual.expectedLifecycleRevision() != null
+                    && actual.expectedLifecycleRevision().value()
+                    > plan.sourceLifecycleRevision().value()) {
+                if (actual.expectedLifecycleRevision().value()
+                        > currentLifecycleRevision) {
+                    return false;
+                }
+                continue;
+            }
             boolean found = false;
             for (int index = 0; index < allowed.size(); index++) {
                 if (!matched[index]
