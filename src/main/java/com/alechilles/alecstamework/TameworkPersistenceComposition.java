@@ -395,6 +395,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 .resolveAndInitializeDataPathLayout(pluginDataDirectory);
         PersistenceBootstrap bootstrap = new PersistenceBootstrap(
                 configuration(
+                        plugin,
                         paths,
                         events,
                         identityBootstrap,
@@ -484,6 +485,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
     }
 
     private static PublicPersistenceRuntimeConfiguration configuration(
+            Tamework plugin,
             TameworkDataPathLayout paths,
             TameworkEventBus events,
             LoadedNpcIdentityBootstrapService identityBootstrap,
@@ -509,7 +511,8 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                         captureSourceReceipts,
                         coopReceipts,
                         retirement,
-                        inventoryReceipts
+                        inventoryReceipts,
+                        plugin::managedBatchAdmissions
                 ),
                 HytalePublicPersistenceWorldReconciliation.factory(
                         identityBootstrap,

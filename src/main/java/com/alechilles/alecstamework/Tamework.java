@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.api.TameworkConfigFamily;
 import com.alechilles.alecstamework.api.TameworkProgressionTimeScales;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
+import com.alechilles.alecstamework.api.internal.ManagedBatchAdmissionAuthority;
 import com.alechilles.alecstamework.api.internal.BondedOnlyTameworkApi;
 import com.alechilles.alecstamework.api.internal.ReplacementTameworkApiFactory;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
@@ -1421,6 +1422,13 @@ public class Tamework extends JavaPlugin {
         Runnable initializer = runtimeServiceInitializer;
         runtimeServiceInitializer = null;
         initializer.run();
+    }
+
+    @Nullable
+    ManagedBatchAdmissionAuthority managedBatchAdmissions() {
+        return apiComposition == null
+                ? null
+                : apiComposition.managedBatchAdmissions();
     }
 
     /** Validates setup-declared factories before persistence can mutate state. */

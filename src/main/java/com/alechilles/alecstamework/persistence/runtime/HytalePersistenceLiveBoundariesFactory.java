@@ -25,11 +25,14 @@ import com.alechilles.alecstamework.items.CoopEffectService;
 import com.alechilles.alecstamework.items.HytaleCompanionProjectionSpawnExecutor;
 import com.alechilles.alecstamework.items.persistence.TameworkSnapshotCodecs;
 import com.alechilles.alecstamework.npc.components.TameworkPersistenceRetirementComponent;
+import com.alechilles.alecstamework.npc.actions.HytaleBreedingLitterBoundary;
+import com.alechilles.alecstamework.api.internal.ManagedBatchAdmissionAuthority;
 import com.alechilles.alecstamework.persistence.runtime.player.TameworkInventoryOperationReceiptsComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import javax.annotation.Nonnull;
+import java.util.function.Supplier;
 
 /**
  * Creates every Hytale live boundary around one codec registry and projection executor.
@@ -57,10 +60,41 @@ public final class HytalePersistenceLiveBoundariesFactory {
                     TameworkInventoryOperationReceiptsComponent
                     > inventoryReceiptsType
     ) {
+        return create(
+                captureSourceReceiptsType,
+                coopCaptureReceiptsType,
+                retirementType,
+                inventoryReceiptsType,
+                ManagedBatchAdmissionAuthority::unavailable
+        );
+    }
+
+    @Nonnull
+    public static PublicPersistenceLiveBoundaries create(
+            @Nonnull ComponentType<
+                    EntityStore,
+                    TameworkCaptureSourceReceiptsComponent
+                    > captureSourceReceiptsType,
+            @Nonnull ComponentType<
+                    ChunkStore,
+                    TameworkCoopCaptureReceiptsComponent
+                    > coopCaptureReceiptsType,
+            @Nonnull ComponentType<
+                    EntityStore,
+                    TameworkPersistenceRetirementComponent
+                    > retirementType,
+            @Nonnull ComponentType<
+                    EntityStore,
+                    TameworkInventoryOperationReceiptsComponent
+                    > inventoryReceiptsType,
+            @Nonnull Supplier<ManagedBatchAdmissionAuthority>
+                    breedingAdmissions
+    ) {
         if (captureSourceReceiptsType == null
                 || coopCaptureReceiptsType == null
                 || retirementType == null
-                || inventoryReceiptsType == null) {
+                || inventoryReceiptsType == null
+                || breedingAdmissions == null) {
             throw new IllegalArgumentException(
                     "Persistence receipt component types are required"
             );
@@ -121,7 +155,8 @@ public final class HytalePersistenceLiveBoundariesFactory {
                         new HytalePaidRevivalCanonicalCleanupBoundary(
                                 inventoryReceiptsType
                         )
-                )
+                ),
+                new HytaleBreedingLitterBoundary(breedingAdmissions)
         );
     }
 }
