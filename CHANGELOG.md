@@ -36,6 +36,9 @@
 
 ### Fixed
 
+- Active NPC highlights no longer crash Update 5 world threads when they build
+  model-attached indicator packets. Update 6-only particle cleanup options now
+  pass through the dual-version compatibility layer.
 - World transfers no longer disconnect players who have the command hotswap HUD active.
 - Reduced persistence stalls with large companion populations. Spawner
   releases and Recall no longer wait behind unrelated projection events or

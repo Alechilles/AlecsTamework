@@ -121,6 +121,12 @@ descriptors from `Vector3d` to `Vector3dc`. Tamework now routes vector-based
 particle effects and spatial searches through cached compatibility bindings. Calls
 that use the unchanged coordinate overloads stay direct.
 
+Update 6 also adds `ModelParticle.setClearParticlesOnRemove(...)` and the
+`CancelParticleSystems` packet. Active command indicators bind these additions
+only on Update 6. Update 5 keeps its native model-particle behavior without
+linking either absent API, so indicator emission and state changes cannot crash
+the world thread.
+
 ### Build and manifest
 
 The branch targets `0.6.0-pre.11` from the prerelease dependency line. The generated

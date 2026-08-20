@@ -39,6 +39,11 @@ configurations {
         canBeResolved = true
         transitive = false
     }
+    update5ServerRuntime {
+        canBeConsumed = false
+        canBeResolved = true
+        transitive = false
+    }
 }
 
 if (rootProject.findProject(':alecstelemetry:runtime') != null) {
@@ -58,6 +63,7 @@ dependencies {
     implementation "org.xerial:sqlite-jdbc:${property('sqlite_jdbc_version')}"
     implementation "org.slf4j:slf4j-api:${property('slf4j_version')}"
     implementation "org.slf4j:slf4j-nop:${property('slf4j_version')}"
+    update5ServerRuntime 'com.hypixel.hytale:Server:0.5.7'
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.2'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
@@ -159,6 +165,7 @@ tasks.withType(Test).configureEach {
     useJUnitPlatform()
     workingDir projectDir
     systemProperty 'java.util.logging.manager', 'com.hypixel.hytale.logger.backend.HytaleLogManager'
+    systemProperty 'tamework.update5ServerJar', configurations.update5ServerRuntime.singleFile.absolutePath
 }
 
 tasks.named('test') {

@@ -1,11 +1,11 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.compat.HytaleModelParticleAccess;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.Color;
 import com.hypixel.hytale.protocol.ToClientPacket;
 import com.hypixel.hytale.protocol.packets.entities.SpawnModelParticles;
-import com.hypixel.hytale.protocol.packets.world.CancelParticleSystems;
 import com.hypixel.hytale.server.core.asset.type.model.config.ModelParticle;
 import com.hypixel.hytale.server.core.modules.entity.tracker.NetworkId;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -43,7 +43,7 @@ final class CommandActiveNpcHighlightEmitter {
         modelParticle.setTargetNodeName(anchor.targetNodeName());
         modelParticle.setPositionOffset(new Vector3f(offset));
         modelParticle.setDetachedFromModel(false);
-        modelParticle.setClearParticlesOnRemove(true);
+        HytaleModelParticleAccess.enableClearParticlesOnRemove(modelParticle);
         com.hypixel.hytale.protocol.ModelParticle packetParticle = modelParticle.toPacket();
         packetParticle.color = parseColor(colorHex);
         return packetSink.send(
@@ -61,14 +61,13 @@ final class CommandActiveNpcHighlightEmitter {
         if (viewerRef == null || !viewerRef.isValid()) {
             return false;
         }
+        ToClientPacket packet = HytaleModelParticleAccess.createCancelPacket(PARTICLE_SYSTEM_ID);
+        if (packet == null) {
+            return false;
+        }
         return packetSink.send(
                 viewerRef,
-                new CancelParticleSystems(
-                        null,
-                        null,
-                        new String[]{PARTICLE_SYSTEM_ID},
-                        true
-                ),
+                packet,
                 store
         );
     }
