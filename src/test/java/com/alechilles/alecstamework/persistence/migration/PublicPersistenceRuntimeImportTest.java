@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.persistence.migration;
 
 import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV2Manager;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
@@ -43,6 +45,12 @@ class PublicPersistenceRuntimeImportTest {
                 runtime.queries().findProfile(ProfileId.parse(
                         "20000000-0000-0000-0000-000000000002"
                 )).toCompletableFuture().join()
+        );
+        assertInstanceOf(
+                PersistenceReadResult.Found.class,
+                new SqliteSchemaV2Manager(new SqliteConnectionFactory(
+                        runtime.databasePath().orElseThrow()
+                )).verify()
         );
         assertArrayEquals(before, Files.readAllBytes(source));
         assertTrue(runtime.shutdown(Duration.ofSeconds(5)).terminal());

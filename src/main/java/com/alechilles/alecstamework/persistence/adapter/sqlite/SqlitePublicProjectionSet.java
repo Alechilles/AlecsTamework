@@ -30,7 +30,8 @@ import com.alechilles.alecstamework.persistence.projection
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
 import com.alechilles.alecstamework.persistence.projection
         .ProjectionPublicationContext;
-import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;
+import com.alechilles.alecstamework.persistence.projection.ProjectionPublicationScheduler;
+import com.alechilles.alecstamework.persistence.runtime.PersistenceThroughputMetrics;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -38,10 +39,10 @@ import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
-
 /** Registry-checked projection composition shared by public work and recovery. */
 final class SqlitePublicProjectionSet {
     private final ProjectionCoordinator coordinator;
+    private final ProjectionPublicationScheduler publicationScheduler;
     private final CompanionProfileObserverProjection profileObserver;
     private final ReplacementPublicSemanticEventProjection
             publicEventObserver;
@@ -62,22 +63,21 @@ final class SqlitePublicProjectionSet {
             @Nonnull SqlitePersistenceKernel kernel,
             @Nonnull LongSupplier clock,
             @Nonnull Consumer<NpcProfileChangedEvent> profileListener,
-            @Nonnull ReplacementPublicApiEventSink publicEventSink
+            @Nonnull ReplacementPublicApiEventSink publicEventSink,
+            @Nonnull PersistenceThroughputMetrics throughputMetrics
     ) {
         if (registry == null || kernel == null || clock == null
-                || profileListener == null || publicEventSink == null) {
+                || profileListener == null || publicEventSink == null
+                || throughputMetrics == null) {
             throw new IllegalArgumentException(
                     "Public projection dependencies are required"
             );
         }
-        this.coordinator = new ProjectionCoordinator(
-                new SqliteProjectionGateway(
-                        kernel.reads(),
-                        kernel.units()
-                ),
-                ProjectionRetryPolicy.DEFAULT,
-                clock
+        SqliteProjectionRuntime runtime = SqliteProjectionRuntime.create(
+                kernel, clock, throughputMetrics
         );
+        this.coordinator = runtime.coordinator();
+        this.publicationScheduler = runtime.publicationScheduler();
         this.profileObserver =
                 new CompanionProfileObserverProjection(profileListener);
         this.publicEventObserver =
@@ -114,8 +114,8 @@ final class SqlitePublicProjectionSet {
         ));
     }
     @Nonnull
-    ProjectionCoordinator coordinator() {
-        return coordinator;
+    ProjectionPublicationScheduler publicationScheduler() {
+        return publicationScheduler;
     }
     @Nonnull
     CoopResidencyProjectionIndex coopIndex() {
@@ -494,5 +494,4 @@ final class SqlitePublicProjectionSet {
                 "canonical_" + authority + "_rebuild_read_absent"
         );
     }
-
 }

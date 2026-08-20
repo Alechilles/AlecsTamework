@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.migration;
 
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV2Manager;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import java.nio.file.Files;
@@ -268,12 +269,14 @@ public final class PublicPersistenceImporter {
             }
             checkpoint(connection);
         } catch (Exception failure) {
-            if (commitAttempted && committedReadback(temporary, plan, manifest)) {
+            if (commitAttempted && committedV1Readback(temporary, plan, manifest)) {
+                migrateSchema(connections);
                 checkpointAfterUnknownCommit(temporary);
                 return;
             }
             throw failure;
         }
+        migrateSchema(connections);
         verifyPublishedTarget(temporary, plan, manifest);
     }
 
@@ -290,13 +293,26 @@ public final class PublicPersistenceImporter {
         throw new IllegalStateException("replacement_schema_initialization_failed");
     }
 
+    private void migrateSchema(SqliteConnectionFactory connections) throws Exception {
+        SqliteSchemaV2Manager schema = new SqliteSchemaV2Manager(connections, clock);
+        PersistenceTransactionResult<?> result = schema.initialize();
+        if (result instanceof PersistenceTransactionResult.Committed<?>) {
+            return;
+        }
+        if (result instanceof PersistenceTransactionResult.Unknown<?>
+                && schema.verify() instanceof PersistenceReadResult.Found<?>) {
+            return;
+        }
+        throw new IllegalStateException("replacement_schema_migration_failed");
+    }
+
     private void verifyPublishedTarget(
             Path target,
             PublicImportPlan plan,
             PublicImportManifest manifest
     ) throws Exception {
         SqliteConnectionFactory connections = new SqliteConnectionFactory(target);
-        if (!(new SqliteSchemaV1Manager(connections).verify()
+        if (!(new SqliteSchemaV2Manager(connections).verify()
                 instanceof PersistenceReadResult.Found<?>)) {
             throw new IllegalStateException("published_schema_verification_failed");
         }
@@ -305,13 +321,21 @@ public final class PublicPersistenceImporter {
         }
     }
 
-    private boolean committedReadback(
+    private boolean committedV1Readback(
             Path target,
             PublicImportPlan plan,
             PublicImportManifest manifest
     ) {
         try {
-            verifyPublishedTarget(target, plan, manifest);
+            SqliteConnectionFactory connections =
+                    new SqliteConnectionFactory(target);
+            if (!(new SqliteSchemaV1Manager(connections).verify()
+                    instanceof PersistenceReadResult.Found<?>)) {
+                return false;
+            }
+            try (Connection connection = connections.openReadConnection()) {
+                verifier.verify(connection, plan, manifest);
+            }
             return true;
         } catch (Exception failure) {
             return false;

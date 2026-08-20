@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.migration;
 
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV2Manager;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -178,6 +179,14 @@ public final class LegacySourceClassifier {
             SqliteReadOnlySnapshotter.Snapshot snapshot,
             Set<String> tables
     ) {
+        PersistenceReadResult<?> version2 =
+                new SqliteSchemaV2Manager(
+                        new SqliteConnectionFactory(snapshot.path())
+                ).verify();
+        if (version2 instanceof PersistenceReadResult.Found<?>) {
+            return result(LegacySourceKind.REPLACEMENT_V1, 2,
+                    "REPLACEMENT_V2", Optional.of(snapshot.fingerprint()), tables);
+        }
         PersistenceReadResult<?> verification =
                 new SqliteSchemaV1Manager(new SqliteConnectionFactory(snapshot.path())).verify();
         if (verification instanceof PersistenceReadResult.Found<?>) {

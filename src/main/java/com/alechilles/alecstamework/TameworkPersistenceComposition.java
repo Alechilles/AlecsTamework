@@ -19,6 +19,8 @@ import com.alechilles.alecstamework.items.persistence
 import com.alechilles.alecstamework.items.persistence
         .PositiveEvidenceDormantAuthor;
 import com.alechilles.alecstamework.items.persistence
+        .ReplacementProfileSnapshotSink;
+import com.alechilles.alecstamework.items.persistence
         .SpawnerCaptureAuthor;
 import com.alechilles.alecstamework.items.persistence
         .SpawnerCapturedArtifactReleaseAuthor;
@@ -27,6 +29,8 @@ import com.alechilles.alecstamework.items.persistence
 import com.alechilles.alecstamework.items.coop.DirectLiveCoopAuthor;
 import com.alechilles.alecstamework.items.coop.DirectLiveCoopProjectionView;
 import com.alechilles.alecstamework.items.persistence.checkpoint.ExactCheckpointCompanionRecallRecovery;
+import com.alechilles.alecstamework.items.persistence.checkpoint.ReplacementCompanionEntityCheckpointSink;
+import com.alechilles.alecstamework.items.persistence.maintenance.MaintenanceDrainResult;
 import com.alechilles.alecstamework.npc.components
         .TameworkPersistenceRetirementComponent;
 import com.alechilles.alecstamework.lifecycle
@@ -98,6 +102,8 @@ final class TameworkPersistenceComposition implements AutoCloseable {
     private final PersistenceDiagnosticExporter diagnosticsExporter;
     private final PersistenceDomainFacades facades;
     private final CommandLinkedNpcStateSnapshotService snapshots;
+    private final ReplacementProfileSnapshotSink profileSink;
+    private final ReplacementCompanionEntityCheckpointSink checkpointSink;
     private final SpawnerCaptureAuthor captureAuthor;
     private final SpawnerCapturedArtifactReleaseAuthor releaseAuthor;
     private final FreeCompanionRestorationAuthor restorationAuthor;
@@ -115,6 +121,8 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             PersistenceDiagnosticExporter diagnosticsExporter,
             PersistenceDomainFacades facades,
             CommandLinkedNpcStateSnapshotService snapshots,
+            ReplacementProfileSnapshotSink profileSink,
+            ReplacementCompanionEntityCheckpointSink checkpointSink,
             SpawnerCaptureAuthor captureAuthor,
             SpawnerCapturedArtifactReleaseAuthor releaseAuthor,
             FreeCompanionRestorationAuthor restorationAuthor,
@@ -130,6 +138,12 @@ final class TameworkPersistenceComposition implements AutoCloseable {
         this.diagnosticsExporter = diagnosticsExporter;
         this.facades = facades;
         this.snapshots = snapshots;
+        this.profileSink = Objects.requireNonNull(
+                profileSink, "profileSink"
+        );
+        this.checkpointSink = Objects.requireNonNull(
+                checkpointSink, "checkpointSink"
+        );
         this.captureAuthor = captureAuthor;
         this.releaseAuthor = releaseAuthor;
         this.restorationAuthor = restorationAuthor;
@@ -451,6 +465,8 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 diagnosticsExporter,
                 facades,
                 authors.snapshots(),
+                authors.profileSink(),
+                authors.checkpointSink(),
                 authors.captureAuthor(),
                 authors.releaseAuthor(),
                 authors.restorationAuthor(),
@@ -596,6 +612,11 @@ final class TameworkPersistenceComposition implements AutoCloseable {
         return snapshots;
     }
 
+    @Nonnull
+    ReplacementCompanionEntityCheckpointSink checkpointSink() {
+        return checkpointSink;
+    }
+
     ExactCheckpointCompanionRecallRecovery exactRecallRecovery() {
         return exactRecallRecovery;
     }
@@ -645,7 +666,49 @@ final class TameworkPersistenceComposition implements AutoCloseable {
     PublicPersistenceShutdownReport shutdown() {
         startupResumer.close();
         restoredFeatures.close();
-        return bootstrap.shutdown(SHUTDOWN_TIMEOUT);
+        long startedAtNanos = System.nanoTime();
+        MaintenanceDrainResult profileDrain = profileSink.shutdown(
+                remainingShutdownTimeout(startedAtNanos)
+        );
+        if (!profileDrain.drained()) {
+            logger.at(Level.WARNING).log(
+                    "Profile maintenance did not drain before persistence "
+                            + "shutdown deadline: pendingKeys=%d, "
+                            + "pendingWork=%d, inFlight=%d",
+                    profileDrain.pendingKeys(),
+                    profileDrain.pendingWork(),
+                    profileDrain.inFlightWork()
+            );
+        }
+        MaintenanceDrainResult checkpointDrain = checkpointSink.shutdown(
+                remainingShutdownTimeout(startedAtNanos)
+        );
+        if (!checkpointDrain.drained()) {
+            logger.at(Level.WARNING).log(
+                    "Checkpoint maintenance did not drain before persistence "
+                            + "shutdown deadline: pendingKeys=%d, "
+                            + "pendingWork=%d, inFlight=%d",
+                    checkpointDrain.pendingKeys(),
+                    checkpointDrain.pendingWork(),
+                    checkpointDrain.inFlightWork()
+            );
+        }
+        return bootstrap.shutdown(remainingShutdownTimeout(startedAtNanos));
+    }
+
+    private Duration remainingShutdownTimeout(long startedAtNanos) {
+        long elapsed = System.nanoTime() - startedAtNanos;
+        if (elapsed <= 0) {
+            return SHUTDOWN_TIMEOUT;
+        }
+        long total;
+        try {
+            total = SHUTDOWN_TIMEOUT.toNanos();
+        } catch (ArithmeticException overflow) {
+            return SHUTDOWN_TIMEOUT;
+        }
+        long remaining = total - elapsed;
+        return remaining <= 0 ? Duration.ZERO : Duration.ofNanos(remaining);
     }
 
     @Override

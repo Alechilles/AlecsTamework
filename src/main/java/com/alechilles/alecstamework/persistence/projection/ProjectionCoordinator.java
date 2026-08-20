@@ -43,7 +43,9 @@ public final class ProjectionCoordinator {
             int batchSize
     ) {
         requireConsumerAndBatch(consumer, batchSize);
-        return gateway.load(consumer.consumerId(), batchSize)
+        return gateway.loadToHead(
+                consumer.consumerId(), consumer.subscription(), batchSize
+        )
                 .thenCompose(read -> startFromRead(
                         consumer,
                         ProjectionPublicationContext.RECOVERY_CONVERGENCE,
@@ -120,7 +122,7 @@ public final class ProjectionCoordinator {
     ) {
         if (read instanceof PersistenceReadResult.Found<ProjectionBatch> found) {
             ProjectionBatch batch = found.value();
-            if (batch.checkpoint().acknowledgedSequence().compareTo(batch.head()) >= 0) {
+            if (batch.checkpoint().acknowledgedSequence().compareTo(batch.target()) >= 0) {
                 return completedSuccess(
                         consumer.consumerId(),
                         batch.checkpoint().acknowledgedSequence(),
@@ -128,7 +130,7 @@ public final class ProjectionCoordinator {
                 );
             }
             return processBatch(
-                    consumer, context, batch, batch.head(), batchSize, 0
+                    consumer, context, batch, batch.target(), batchSize, 0
             );
         }
         Throwable failure = readFailure(read, "projection_startup_read_absent");
@@ -148,7 +150,9 @@ public final class ProjectionCoordinator {
             int batchSize,
             int delivered
     ) {
-        return gateway.load(consumer.consumerId(), batchSize).thenCompose(read -> {
+        return gateway.load(
+                consumer.consumerId(), consumer.subscription(), target, batchSize
+        ).thenCompose(read -> {
             if (!(read instanceof PersistenceReadResult.Found<ProjectionBatch> found)) {
                 return completedFailure(
                         consumer.consumerId(),
@@ -177,40 +181,83 @@ public final class ProjectionCoordinator {
             int batchSize,
             int delivered
     ) {
-        List<ProjectionEvent> eligible = batch.events().stream()
-                .filter(event -> event.sequence().compareTo(target) <= 0)
-                .toList();
-        if (eligible.isEmpty()) {
-            return completedFailure(
-                    consumer.consumerId(),
-                    ProjectionCatchUpResult.Status.READ_FAILED,
+        List<ProjectionEvent> events = batch.events();
+        if (events.isEmpty()) {
+            return acknowledgeBoundary(
+                    consumer,
+                    target,
                     batch.checkpoint().acknowledgedSequence(),
-                    delivered,
-                    new IllegalStateException("projection_sequence_gap")
+                    delivered
             );
         }
         return applySequentially(
                 consumer,
                 context,
-                eligible,
-                0,
+                events,
                 batch.checkpoint().acknowledgedSequence(),
                 delivered
         ).thenCompose(result -> {
             if (result.status() != ProjectionCatchUpResult.Status.CAUGHT_UP) {
                 return CompletableFuture.completedFuture(result);
             }
-            if (result.acknowledged().compareTo(target) >= 0) {
-                return completedSuccess(
-                        consumer.consumerId(), result.acknowledged(), result.deliveredCount()
+            ProjectionSequence boundary = events.getLast().sequence();
+            ProjectionSequence acknowledgement = events.size() >= batchSize
+                    ? boundary
+                    : target;
+            return acknowledgeBoundary(
+                    consumer,
+                    acknowledgement,
+                    batch.checkpoint().acknowledgedSequence(),
+                    result.deliveredCount()
+            ).thenCompose(acknowledged -> {
+                if (acknowledged.status()
+                        != ProjectionCatchUpResult.Status.CAUGHT_UP) {
+                    return CompletableFuture.completedFuture(acknowledged);
+                }
+                if (acknowledged.acknowledged().compareTo(target) >= 0) {
+                    return completedSuccess(
+                            consumer.consumerId(),
+                            acknowledged.acknowledged(),
+                            acknowledged.deliveredCount()
+                    );
+                }
+                return catchUpThrough(
+                        consumer,
+                        context,
+                        target,
+                        batchSize,
+                        acknowledged.deliveredCount()
+                );
+            });
+        });
+    }
+
+    private CompletionStage<ProjectionCatchUpResult> acknowledgeBoundary(
+            ProjectionConsumer consumer,
+            ProjectionSequence boundary,
+            ProjectionSequence previous,
+            int delivered
+    ) {
+        if (boundary.compareTo(previous) <= 0) {
+            return completedSuccess(consumer.consumerId(), previous, delivered);
+        }
+        return gateway.acknowledge(
+                consumer.consumerId(), boundary, clock.getAsLong()
+        ).completion().thenCompose(result -> {
+            if (!(result instanceof PersistenceTransactionResult.Committed<?> committed)
+                    || !(committed.value() instanceof ProjectionCheckpoint checkpoint)) {
+                return completedFailure(
+                        consumer.consumerId(),
+                        ProjectionCatchUpResult.Status.CHECKPOINT_FAILED,
+                        previous,
+                        delivered,
+                        checkpointFailure(result)
                 );
             }
-            return catchUpThrough(
-                    consumer,
-                    context,
-                    target,
-                    batchSize,
-                    result.deliveredCount()
+            return completedSuccess(
+                    consumer.consumerId(),
+                    checkpoint.acknowledgedSequence(),
+                    delivered
             );
         });
     }
@@ -219,53 +266,30 @@ public final class ProjectionCoordinator {
             ProjectionConsumer consumer,
             ProjectionPublicationContext context,
             List<ProjectionEvent> events,
-            int index,
             ProjectionSequence acknowledged,
             int delivered
     ) {
-        if (index >= events.size()) {
-            return completedSuccess(consumer.consumerId(), acknowledged, delivered);
-        }
-        ProjectionEvent event = events.get(index);
-        try {
-            ProjectionApplyOutcome outcome = consumer.apply(event, context);
-            if (outcome == null) {
-                throw new IllegalStateException("projection_consumer_returned_null");
-            }
-        } catch (Exception failure) {
-            return completedFailure(
-                    consumer.consumerId(),
-                    ProjectionCatchUpResult.Status.CONSUMER_FAILED,
-                    acknowledged,
-                    delivered,
-                    failure
-            );
-        }
-        return gateway.acknowledge(
-                consumer.consumerId(),
-                event.operationId(),
-                event.sequence(),
-                clock.getAsLong()
-        ).completion().thenCompose(result -> {
-            if (!(result instanceof PersistenceTransactionResult.Committed<?> committed)
-                    || !(committed.value() instanceof ProjectionCheckpoint checkpoint)) {
+        int applied = delivered;
+        for (ProjectionEvent event : events) {
+            try {
+                ProjectionApplyOutcome outcome = consumer.apply(event, context);
+                if (outcome == null) {
+                    throw new IllegalStateException("projection_consumer_returned_null");
+                }
+                if (outcome != ProjectionApplyOutcome.IRRELEVANT) {
+                    applied++;
+                }
+            } catch (Exception failure) {
                 return completedFailure(
                         consumer.consumerId(),
-                        ProjectionCatchUpResult.Status.CHECKPOINT_FAILED,
+                        ProjectionCatchUpResult.Status.CONSUMER_FAILED,
                         acknowledged,
-                        delivered + 1,
-                        checkpointFailure(result)
+                        applied,
+                        failure
                 );
             }
-            return applySequentially(
-                    consumer,
-                    context,
-                    events,
-                    index + 1,
-                    checkpoint.acknowledgedSequence(),
-                    delivered + 1
-            );
-        });
+        }
+        return completedSuccess(consumer.consumerId(), acknowledged, applied);
     }
 
     private CompletionStage<ProjectionCatchUpResult> completedSuccess(

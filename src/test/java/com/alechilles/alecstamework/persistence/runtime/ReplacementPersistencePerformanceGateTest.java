@@ -10,14 +10,38 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteOperationStore;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteProjectionGateway;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteProjectionOutboxStore;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteReadExecutor;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV2Manager;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSingleWriter;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteUnitOfWorkRunner;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.alechilles.alecstamework.persistence.operation.OperationKind;
+import com.alechilles.alecstamework.persistence.operation.PreparedOperation;
+import com.alechilles.alecstamework.persistence.projection.ProjectionApplyOutcome;
+import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
+import com.alechilles.alecstamework.persistence.projection.ProjectionConsumerId;
+import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
+import com.alechilles.alecstamework.persistence.projection.ProjectionCatchUpResult;
+import com.alechilles.alecstamework.persistence.projection.ProjectionEvent;
+import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
+import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
+import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;
+import com.alechilles.alecstamework.persistence.projection.ProjectionSubscription;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.sql.Connection;
 import java.time.Duration;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -95,6 +119,115 @@ class ReplacementPersistencePerformanceGateTest {
         assertTrue(
                 closed.lastCheckpointedFrames()
                         <= closed.lastCheckpointLogFrames()
+        );
+    }
+
+    @Test
+    void routedProjectionMetricsCountBypassedWorkInsteadOfPayloads() throws Exception {
+        long startedAtNanos = System.nanoTime();
+        SqliteConnectionFactory connections = new SqliteConnectionFactory(
+                tempDir.resolve("routed-metrics.sqlite")
+        );
+        new SqliteSchemaV2Manager(connections, () -> -10_000).initialize();
+        PublicPersistenceControlPlane metrics =
+                new PublicPersistenceControlPlane(
+                        PublicPersistenceFeatureRegistry.create()
+                );
+        SqliteSingleWriter writer = new SqliteSingleWriter(
+                connections,
+                com.alechilles.alecstamework.persistence.adapter.sqlite
+                        .SqliteWriterConfiguration.DEFAULT,
+                com.alechilles.alecstamework.persistence.kernel
+                        .PersistenceCheckpointHook.NO_OP,
+                metrics
+        );
+        SqliteReadExecutor reads = new SqliteReadExecutor(
+                connections,
+                com.alechilles.alecstamework.persistence.adapter.sqlite
+                        .SqliteReadExecutorConfiguration.DEFAULT,
+                metrics
+        );
+        try {
+            ProjectionEvent target;
+            try (Connection connection = connections.openWriterConnection()) {
+                connection.setAutoCommit(false);
+                OperationId operationId = OperationId.parse(
+                        "50000000-0000-0000-0000-000000000001"
+                );
+                new SqliteOperationStore(connection).prepare(
+                        new PreparedOperation(
+                                operationId,
+                                new IdempotencyKey("routed-metrics"),
+                                new OperationKind("routed_metrics"),
+                                1,
+                                "{}",
+                                "test",
+                                null,
+                                List.of(),
+                                -10_000
+                        )
+                );
+                SqliteProjectionOutboxStore outbox =
+                        new SqliteProjectionOutboxStore(connection);
+                for (int revision = 1; revision <= 10_000; revision++) {
+                    outbox.append(new ProjectionEventDraft(
+                            operationId,
+                            new ProjectionEventType(
+                                    "profile_extension_mutated"
+                            ),
+                            "profile-routed",
+                            revision,
+                            1,
+                            "{\"revision\":" + revision + "}",
+                            -10_000 + revision
+                    ));
+                }
+                target = outbox.append(new ProjectionEventDraft(
+                        operationId,
+                        new ProjectionEventType("lifecycle_changed"),
+                        "profile-routed",
+                        10_001,
+                        1,
+                        "{\"revision\":10001}",
+                        1
+                )).value();
+                connection.commit();
+            }
+            ProjectionCoordinator coordinator = new ProjectionCoordinator(
+                    new SqliteProjectionGateway(
+                            reads,
+                            new SqliteUnitOfWorkRunner(writer, reads),
+                            metrics
+                    ),
+                    ProjectionRetryPolicy.DEFAULT,
+                    () -> -5_000
+            );
+            CountingRoutedConsumer consumer = new CountingRoutedConsumer();
+            var result = coordinator.afterCommit(
+                    consumer, target.sequence(), 10_000
+            ).toCompletableFuture().join();
+
+            assertEquals(ProjectionCatchUpResult.Status.CAUGHT_UP, result.status());
+            assertEquals(target.sequence(), result.acknowledged());
+            assertEquals(1, consumer.applyCalls.get());
+            assertEquals(1, result.deliveredCount());
+            var throughput = metrics.snapshot();
+            assertTrue(
+                    throughput.projectionSequencePositionsBypassed()
+                            >= 10_000
+            );
+            assertEquals(1, throughput.projectionBatchAcknowledgements());
+            assertTrue(throughput.writerMaximumDepth() < 64);
+            assertEquals(0, throughput.readSaturationFailures());
+        } finally {
+            writer.shutdown(Duration.ofSeconds(5));
+            reads.shutdown(Duration.ofSeconds(5));
+        }
+        long elapsedNanos = System.nanoTime() - startedAtNanos;
+        assertTrue(
+                elapsedNanos <= Duration.ofSeconds(10).toNanos(),
+                () -> "Routed projection gate exceeded 10 seconds: "
+                        + Duration.ofNanos(elapsedNanos)
         );
     }
 
@@ -184,5 +317,28 @@ class ReplacementPersistencePerformanceGateTest {
                 java.util.List.of(),
                 now
         );
+    }
+
+    private static final class CountingRoutedConsumer
+            implements ProjectionConsumer {
+        private final AtomicInteger applyCalls = new AtomicInteger();
+
+        @Override
+        public ProjectionConsumerId consumerId() {
+            return new ProjectionConsumerId("routed_metrics_consumer");
+        }
+
+        @Override
+        public ProjectionSubscription subscription() {
+            return ProjectionSubscription.events(Set.of(
+                    new ProjectionEventType("lifecycle_changed")
+            ));
+        }
+
+        @Override
+        public ProjectionApplyOutcome apply(ProjectionEvent event) {
+            applyCalls.incrementAndGet();
+            return ProjectionApplyOutcome.APPLIED;
+        }
     }
 }

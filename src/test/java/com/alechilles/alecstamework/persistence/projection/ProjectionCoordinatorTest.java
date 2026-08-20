@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
@@ -188,6 +189,84 @@ class ProjectionCoordinatorTest {
     }
 
     @Test
+    void routedConsumerSkipsLargeIrrelevantBacklog() throws Exception {
+        ProjectionEvent target = appendRoutedBacklog();
+        RoutedConsumer consumer = new RoutedConsumer();
+
+        ProjectionCatchUpResult result = coordinator.afterCommit(
+                consumer, target.sequence(), 10_000
+        ).toCompletableFuture().get(30, TimeUnit.SECONDS);
+
+        assertEquals(ProjectionCatchUpResult.Status.CAUGHT_UP, result.status());
+        assertEquals(target.sequence(), result.acknowledged());
+        assertEquals(1, consumer.applyCalls.get());
+        assertEquals(1, result.deliveredCount());
+        assertEquals(List.of(target.sequence()), consumer.appliedSequences);
+    }
+
+    @Test
+    void emptyRelevantRangeAdvancesWithoutConsumerCalls() throws Exception {
+        ProjectionEvent target = appendIrrelevantEvent();
+        RoutedConsumer consumer = new RoutedConsumer();
+
+        ProjectionCatchUpResult result = coordinator.afterCommit(
+                consumer, target.sequence(), 10
+        ).toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(ProjectionCatchUpResult.Status.CAUGHT_UP, result.status());
+        assertEquals(target.sequence(), result.acknowledged());
+        assertEquals(0, consumer.applyCalls.get());
+        assertEquals(0, result.deliveredCount());
+    }
+
+    @Test
+    void consumerFailureDoesNotAcknowledgeUnappliedBatchEvents() throws Exception {
+        List<ProjectionEvent> events = appendEvents();
+        FailingBatchConsumer consumer = new FailingBatchConsumer(2);
+
+        ProjectionCatchUpResult result = coordinator.afterCommit(
+                consumer, events.getLast().sequence(), 10
+        ).toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(ProjectionCatchUpResult.Status.CONSUMER_FAILED, result.status());
+        assertEquals(ProjectionSequence.ORIGIN, result.acknowledged());
+        assertEquals(1, result.deliveredCount());
+        assertEquals(2, consumer.applyCalls.get());
+        assertEquals(List.of(events.getFirst().sequence()), consumer.appliedSequences);
+    }
+
+    @Test
+    void batchLimitAcknowledgesOnlyTheCompletedBatch() throws Exception {
+        List<ProjectionEvent> events = appendEvents();
+        FailingBatchConsumer consumer = new FailingBatchConsumer(2);
+
+        ProjectionCatchUpResult result = coordinator.afterCommit(
+                consumer, events.getLast().sequence(), 1
+        ).toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(ProjectionCatchUpResult.Status.CONSUMER_FAILED, result.status());
+        assertEquals(events.getFirst().sequence(), result.acknowledged());
+        assertEquals(1, result.deliveredCount());
+        assertEquals(2, consumer.applyCalls.get());
+    }
+
+    @Test
+    void appliesTenThousandRelevantEventsWithoutStackOverflow() throws Exception {
+        ProjectionEvent target = appendLargeRelevantBatch();
+        RoutedConsumer consumer = new RoutedConsumer();
+
+        ProjectionCatchUpResult result = coordinator.afterCommit(
+                consumer, target.sequence(), 10_000
+        ).toCompletableFuture().get(30, TimeUnit.SECONDS);
+
+        assertEquals(ProjectionCatchUpResult.Status.CAUGHT_UP, result.status());
+        assertEquals(target.sequence(), result.acknowledged());
+        assertEquals(10_000, consumer.applyCalls.get());
+        assertEquals(10_000, result.deliveredCount());
+        assertEquals(target.sequence(), consumer.appliedSequences.getLast());
+    }
+
+    @Test
     void canonicalRebuildComparisonIsExplicit() {
         assertEquals(
                 ProjectionRebuildResult.Status.EQUIVALENT,
@@ -249,6 +328,71 @@ class ProjectionCoordinatorTest {
             ProjectionEvent event = store.append(draft(1)).value();
             connection.commit();
             return List.of(event);
+        }
+    }
+
+    private ProjectionEvent appendIrrelevantEvent() throws Exception {
+        try (Connection connection = transaction()) {
+            SqliteProjectionOutboxStore store = createOperationAndStore(connection);
+            ProjectionEvent event = store.append(new ProjectionEventDraft(
+                    OPERATION,
+                    new ProjectionEventType("profile_extension_mutated"),
+                    "profile-a",
+                    1,
+                    1,
+                    "{\"revision\":1}",
+                    -9_000
+            )).value();
+            connection.commit();
+            return event;
+        }
+    }
+
+    private ProjectionEvent appendLargeRelevantBatch() throws Exception {
+        try (Connection connection = transaction()) {
+            SqliteProjectionOutboxStore store = createOperationAndStore(connection);
+            ProjectionEvent target = null;
+            for (int revision = 1; revision <= 10_000; revision++) {
+                target = store.append(new ProjectionEventDraft(
+                        OPERATION,
+                        new ProjectionEventType("lifecycle_changed"),
+                        "profile-a",
+                        revision,
+                        1,
+                        "{\"revision\":" + revision + "}",
+                        -10_000 + revision
+                )).value();
+            }
+            connection.commit();
+            return target;
+        }
+    }
+
+    private ProjectionEvent appendRoutedBacklog() throws Exception {
+        try (Connection connection = transaction()) {
+            SqliteProjectionOutboxStore store = createOperationAndStore(connection);
+            for (int revision = 1; revision <= 10_000; revision++) {
+                store.append(new ProjectionEventDraft(
+                        OPERATION,
+                        new ProjectionEventType("profile_extension_mutated"),
+                        "profile-a",
+                        revision,
+                        1,
+                        "{\"revision\":" + revision + "}",
+                        -10_000 + revision
+                ));
+            }
+            ProjectionEvent target = store.append(new ProjectionEventDraft(
+                    OPERATION,
+                    new ProjectionEventType("lifecycle_changed"),
+                    "profile-a",
+                    10_001,
+                    1,
+                    "{\"revision\":10001}",
+                    1
+            )).value();
+            connection.commit();
+            return target;
         }
     }
 
@@ -363,6 +507,55 @@ class ProjectionCoordinatorTest {
                 ProjectionPublicationContext context
         ) {
             contexts.add(context);
+            return ProjectionApplyOutcome.APPLIED;
+        }
+    }
+
+    private static final class RoutedConsumer implements ProjectionConsumer {
+        private final AtomicInteger applyCalls = new AtomicInteger();
+        private final List<ProjectionSequence> appliedSequences = new ArrayList<>();
+
+        @Override
+        public ProjectionConsumerId consumerId() {
+            return new ProjectionConsumerId("routed_lifecycle_consumer");
+        }
+
+        @Override
+        public ProjectionSubscription subscription() {
+            return ProjectionSubscription.events(Set.of(
+                    new ProjectionEventType("lifecycle_changed")
+            ));
+        }
+
+        @Override
+        public ProjectionApplyOutcome apply(ProjectionEvent event) {
+            applyCalls.incrementAndGet();
+            appliedSequences.add(event.sequence());
+            return ProjectionApplyOutcome.APPLIED;
+        }
+    }
+
+    private static final class FailingBatchConsumer implements ProjectionConsumer {
+        private final int failOnCall;
+        private final AtomicInteger applyCalls = new AtomicInteger();
+        private final List<ProjectionSequence> appliedSequences = new ArrayList<>();
+
+        private FailingBatchConsumer(int failOnCall) {
+            this.failOnCall = failOnCall;
+        }
+
+        @Override
+        public ProjectionConsumerId consumerId() {
+            return new ProjectionConsumerId("failing_batch_consumer");
+        }
+
+        @Override
+        public ProjectionApplyOutcome apply(ProjectionEvent event) {
+            int call = applyCalls.incrementAndGet();
+            if (call == failOnCall) {
+                throw new IllegalStateException("injected batch failure");
+            }
+            appliedSequences.add(event.sequence());
             return ProjectionApplyOutcome.APPLIED;
         }
     }

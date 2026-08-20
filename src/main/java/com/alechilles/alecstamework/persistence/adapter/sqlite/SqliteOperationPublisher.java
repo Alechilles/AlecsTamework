@@ -6,15 +6,16 @@ import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResul
 import com.alechilles.alecstamework.persistence.operation.DurableCommitEvidence;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
-import com.alechilles.alecstamework.persistence.projection.ProjectionCatchUpResult;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumerId;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
+import com.alechilles.alecstamework.persistence.projection.ContextualProjectionConsumer;
+import com.alechilles.alecstamework.persistence.projection.ProjectionPublicationContext;
+import com.alechilles.alecstamework.persistence.projection.ProjectionPublicationScheduler;
 import com.alechilles.alecstamework.persistence.projection.ProjectionSequence;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
@@ -30,7 +31,7 @@ public final class SqliteOperationPublisher {
 
     private final SqliteOperationEngine operations;
     private final SqliteOperationEvidenceReader evidence;
-    private final ProjectionCoordinator projections;
+    private final ProjectionPublicationScheduler publicationScheduler;
     private final LongSupplier clock;
 
     public SqliteOperationPublisher(
@@ -39,12 +40,27 @@ public final class SqliteOperationPublisher {
             @Nonnull ProjectionCoordinator projections,
             @Nonnull LongSupplier clock
     ) {
-        if (operations == null || evidence == null || projections == null || clock == null) {
+        this(
+                operations,
+                evidence,
+                new ProjectionPublicationScheduler(projections),
+                clock
+        );
+    }
+
+    SqliteOperationPublisher(
+            @Nonnull SqliteOperationEngine operations,
+            @Nonnull SqliteOperationEvidenceReader evidence,
+            @Nonnull ProjectionPublicationScheduler publicationScheduler,
+            @Nonnull LongSupplier clock
+    ) {
+        if (operations == null || evidence == null
+                || publicationScheduler == null || clock == null) {
             throw new IllegalArgumentException("Operation publisher dependencies are required");
         }
         this.operations = operations;
         this.evidence = evidence;
-        this.projections = projections;
+        this.publicationScheduler = publicationScheduler;
         this.clock = clock;
     }
 
@@ -84,7 +100,12 @@ public final class SqliteOperationPublisher {
         }
         List<ProjectionConsumer> consumers = validateConsumers(requiredConsumers);
         ProjectionSequence target = durable.outboxHead();
-        return publishNext(consumers, 0, target).thenCompose(publication -> {
+        return publicationScheduler.publishRequired(
+                consumers,
+                publicationContext(consumers),
+                target,
+                PROJECTION_BATCH_SIZE
+        ).thenCompose(publication -> {
             if (publication != null) {
                 return SqliteOperationResults.completed(SqliteOperationResults.failed(
                         OperationWorkflowResult.Status.PUBLICATION_PENDING,
@@ -188,30 +209,26 @@ public final class SqliteOperationPublisher {
         });
     }
 
-    private CompletionStage<Throwable> publishNext(
-            List<ProjectionConsumer> consumers,
-            int index,
-            ProjectionSequence target
+    private ProjectionPublicationContext publicationContext(
+            List<ProjectionConsumer> consumers
     ) {
-        if (index >= consumers.size()) {
-            return CompletableFuture.completedFuture(null);
-        }
-        return projections.afterCommit(
-                consumers.get(index),
-                target,
-                PROJECTION_BATCH_SIZE
-        ).thenCompose(result -> {
-            if (result.status() != ProjectionCatchUpResult.Status.CAUGHT_UP) {
-                return CompletableFuture.completedFuture(
-                        result.failure() == null
-                                ? new IllegalStateException(
-                                "projection_" + result.status().name().toLowerCase()
-                        )
-                                : result.failure()
+        ProjectionPublicationContext resolved = null;
+        for (ProjectionConsumer consumer : consumers) {
+            ProjectionPublicationContext candidate =
+                    consumer instanceof ContextualProjectionConsumer contextual
+                            ? contextual.context()
+                            : ProjectionPublicationContext.LIVE_COMMIT;
+            if (resolved == null) {
+                resolved = candidate;
+            } else if (resolved != candidate) {
+                throw new IllegalArgumentException(
+                        "Required projection consumers must share a publication context"
                 );
             }
-            return publishNext(consumers, index + 1, target);
-        });
+        }
+        return resolved == null
+                ? ProjectionPublicationContext.LIVE_COMMIT
+                : resolved;
     }
 
     private Throwable readFailure(

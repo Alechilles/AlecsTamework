@@ -23,15 +23,19 @@ import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceRuntime
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceWorldReconciliation;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.CompletionException;
 import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ReplacementProfileSnapshotSinkTest {
@@ -221,6 +225,102 @@ class ReplacementProfileSnapshotSinkTest {
                         )
                 );
             }));
+        }
+    }
+
+    @Test
+    void publishesFiveHundredDistinctObservationsWithinTheBound()
+            throws Exception {
+        AtomicLong clock = new AtomicLong(-100L);
+        List<String> warnings = new ArrayList<>();
+        try (PersistenceBootstrap persistence =
+                     new PersistenceBootstrap(configuration(clock))) {
+            assertTrue(persistence.start().toCompletableFuture().join().complete());
+            var facades = persistence.facades();
+            ReplacementProfileSnapshotSink sink =
+                    new ReplacementProfileSnapshotSink(
+                            facades.queries(),
+                            facades.operations(),
+                            clock::get,
+                            warnings::add
+                    );
+            List<java.util.concurrent.CompletionStage<Void>> publications =
+                    new ArrayList<>(500);
+            for (int index = 0; index < 500; index++) {
+                UUID npcUuid = UUID.fromString(String.format(
+                        "10000000-0000-0000-0000-%012d", index + 1
+                ));
+                publications.add(sink.publish(
+                        snapshot(npcUuid, UUID.randomUUID(), "Newest-" + index),
+                        "world"
+                ));
+            }
+
+            java.util.concurrent.CompletableFuture.allOf(
+                    publications.stream()
+                            .map(stage -> stage.toCompletableFuture())
+                            .toArray(java.util.concurrent.CompletableFuture[]::new)
+            ).get(30, java.util.concurrent.TimeUnit.SECONDS);
+
+            assertEquals(500, facades.queries().projectedProfileSnapshot().size());
+            assertTrue(sink.metrics().maximumInFlightWork() <= 16);
+            assertFalse(warnings.stream().anyMatch(
+                    warning -> warning.contains("read_executor_saturated")
+            ));
+            for (int index = 0; index < 500; index++) {
+                UUID npcUuid = UUID.fromString(String.format(
+                        "10000000-0000-0000-0000-%012d", index + 1
+                ));
+                var projected = facades.queries().projectedProfile(
+                        new NpcAlias(npcUuid)
+                );
+                assertEquals(
+                        "Newest-" + index,
+                        projected.orElseThrow().customName()
+                );
+            }
+            assertTrue(sink.shutdown(Duration.ofSeconds(5)).drained());
+        }
+    }
+
+    @Test
+    void failedReadWarningIncludesTheTypedStorageCode() throws Exception {
+        AtomicLong clock = new AtomicLong(-100L);
+        List<String> warnings = new ArrayList<>();
+        try (PersistenceBootstrap persistence =
+                     new PersistenceBootstrap(configuration(clock))) {
+            assertTrue(persistence.start().toCompletableFuture().join().complete());
+            var facades = persistence.facades();
+            persistence.shutdown(Duration.ofSeconds(1));
+            ReplacementProfileSnapshotSink sink =
+                    new ReplacementProfileSnapshotSink(
+                            facades.queries(),
+                            facades.operations(),
+                            clock::get,
+                            warnings::add
+                    );
+
+            var publication = sink.publish(
+                    snapshot(
+                            UUID.fromString(
+                                    "10000000-0000-0000-0000-000000000999"
+                            ),
+                            UUID.fromString(
+                                    "20000000-0000-0000-0000-000000000999"
+                            ),
+                            "Closed"
+                    ),
+                    "world"
+            );
+
+            assertThrows(
+                    CompletionException.class,
+                    () -> publication.toCompletableFuture().join()
+            );
+            assertTrue(warnings.stream().anyMatch(
+                    warning -> warning.contains("read_executor_closed")
+            ));
+            assertTrue(sink.shutdown(Duration.ofSeconds(1)).drained());
         }
     }
 

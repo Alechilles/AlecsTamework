@@ -15,8 +15,11 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.bson.BsonDocument;
 import org.joml.Vector3d;
 
@@ -34,14 +37,15 @@ public final class CompanionEntityCheckpointCaptureService {
     }
 
     /** Captures one owned tamed NPC without carrying live ECS objects. */
-    public void capture(
+    @Nullable
+    public CompanionEntityCheckpointCapture capture(
             Ref<EntityStore> reference,
             Store<EntityStore> store,
             CompanionEntityCheckpoint.CaptureBoundary boundary
     ) {
         if (reference == null || !reference.isValid() || store == null
                 || boundary == null) {
-            return;
+            return null;
         }
         try {
             store.assertThread();
@@ -49,12 +53,12 @@ public final class CompanionEntityCheckpointCaptureService {
             Vector3d position = position(reference, store);
             String worldKey = worldKey(store);
             if (identity == null || position == null || worldKey == null) {
-                return;
+                return null;
             }
             Holder<EntityStore> holder =
                     store.copySerializableEntity(reference);
             BsonDocument serialized = EntityStore.REGISTRY.serialize(holder);
-            sink.publish(new CompanionEntityCheckpointCapture(
+            return new CompanionEntityCheckpointCapture(
                     new NpcAlias(identity.npcUuid()),
                     new OwnerId(identity.ownerUuid()),
                     worldKey,
@@ -64,10 +68,21 @@ public final class CompanionEntityCheckpointCaptureService {
                     boundary,
                     clock.getAsLong(),
                     serialized
-            ));
+            );
         } catch (RuntimeException | LinkageError ignored) {
             // Canonical gameplay continues if a best-effort checkpoint fails.
+            return null;
         }
+    }
+
+    /** Publishes only the immutable state returned by world-thread capture. */
+    @Nonnull
+    public CompletionStage<Void> publish(
+            @Nullable CompanionEntityCheckpointCapture capture
+    ) {
+        return capture == null
+                ? CompletableFuture.completedFuture(null)
+                : sink.publish(capture);
     }
 
     private static CapturedIdentity identity(
