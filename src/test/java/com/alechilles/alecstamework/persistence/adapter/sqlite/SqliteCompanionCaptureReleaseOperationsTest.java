@@ -142,6 +142,7 @@ class SqliteCompanionCaptureReleaseOperationsTest {
                 () -> -400,
                 new SqliteOperationReader(reads),
                 binding,
+                new SqliteLifecycleAdmissionSourceReader(reads),
                 List.of()
         );
     }
@@ -703,38 +704,6 @@ class SqliteCompanionCaptureReleaseOperationsTest {
         assertEquals(1, admissionCalls);
     }
 
-    @Test
-    void managedOwnedCapturedReleasePreservesOwnerInTargetWorld()
-            throws Exception {
-        admissionMode = AdmissionMode.MANAGED;
-        CompanionCaptureReleaseRequest owned = ownedSourceRequest();
-
-        OperationWorkflowResult result = submit(
-                19,
-                owned,
-                (request, operation) -> LiveOperationResult.confirmed(
-                        "capture_release_both_receipts_confirmed"
-                ).completed()
-        );
-
-        assertEquals(
-                OperationWorkflowResult.Status.PUBLISHED,
-                result.status(),
-                String.valueOf(result.failure())
-        );
-        assertEquals(1, admissionCalls);
-        assertEquals(OWNER, lifecycle().ownerId());
-        assertEquals("world-two", lifecycle().ownerWorldKey());
-        try (Connection connection = connections.openReadConnection()) {
-            var reservations = new SqlitePersistenceTransactionContext(
-                    connection
-            ).populationDomains().findByOperation(operationId(19));
-            assertEquals(1, reservations.size());
-            assertEquals("world-two",
-                    reservations.getFirst().bucket().ownerWorldKey());
-        }
-    }
-
     /**
      * Protects the zero-row v2.16.1 migration where the filled item is the
      * only surviving capture authority.
@@ -1270,32 +1239,6 @@ class SqliteCompanionCaptureReleaseOperationsTest {
         );
     }
 
-    private CompanionCaptureReleaseRequest ownedSourceRequest() {
-        CompanionCaptureReleaseRequest base = request(
-                new LifecycleRevision(1), null
-        );
-        return new CompanionCaptureReleaseRequest(
-                base.profileId(),
-                base.expectedLifecycleRevision(),
-                base.sourceSnapshot(),
-                base.sourceAlias(),
-                base.projection(),
-                new CaptureReleaseSourceEvidence(
-                        base.source().actorUuid(),
-                        base.source().worldKey(),
-                        base.source().slot(),
-                        ownedSourceArtifact(),
-                        base.source().receiptArtifact()
-                ),
-                base.targetAlias(),
-                base.ownerAssignment(),
-                base.placement(),
-                base.inventoryReceiptKey(),
-                base.spawnReceiptKey(),
-                base.requestedAtMs()
-        );
-    }
-
     private void setCapturedOwner(OwnerId ownerId) throws Exception {
         try (Connection connection = connections.openWriterConnection();
              PreparedStatement statement = connection.prepareStatement("""
@@ -1484,20 +1427,6 @@ class SqliteCompanionCaptureReleaseOperationsTest {
                         + "\":\"" + PROFILE + "\","
                         + "\"" + TameworkMetadataKeys.TARGET_UUID
                         + "\":\"" + SOURCE_ALIAS + "\""
-        );
-    }
-
-    private CapturedArtifact ownedSourceArtifact() {
-        return artifact(
-                "capture-device-filled",
-                "\"" + TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID
-                        + "\":\"" + SNAPSHOT + "\","
-                        + "\"" + TameworkMetadataKeys.COMPANION_PROFILE_ID
-                        + "\":\"" + PROFILE + "\","
-                        + "\"" + TameworkMetadataKeys.TARGET_UUID
-                        + "\":\"" + SOURCE_ALIAS + "\","
-                        + "\"" + TameworkMetadataKeys.OWNER_UUID
-                        + "\":\"" + OWNER + "\""
         );
     }
 

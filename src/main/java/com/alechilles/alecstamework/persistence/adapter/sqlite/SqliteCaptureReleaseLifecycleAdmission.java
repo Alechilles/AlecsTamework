@@ -15,41 +15,45 @@ import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
-import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
-import com.alechilles.alecstamework.config.TameworkMetadataKeys;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainConvergencePlan;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainConvergencePlanner;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
 import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionRequest;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Objects;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import javax.annotation.Nonnull;
-import org.bson.BsonDocument;
-import org.bson.BsonValue;
 
 /** Reads and authors exact managed evidence for captured-artifact release. */
 final class SqliteCaptureReleaseLifecycleAdmission {
     private final SqliteOperationReader reader;
     private final SqliteLifecycleAdmissionBinding gateway;
+    @Nonnull
+    private final SqliteLifecycleAdmissionSourceReader sourceReader;
 
     SqliteCaptureReleaseLifecycleAdmission(
             @Nonnull SqliteOperationReader reader,
-            @Nonnull SqliteLifecycleAdmissionBinding gateway
+            @Nonnull SqliteLifecycleAdmissionBinding gateway,
+            @Nonnull SqliteLifecycleAdmissionSourceReader sourceReader
     ) {
-        if (reader == null || gateway == null) {
+        if (reader == null || gateway == null || sourceReader == null) {
             throw new IllegalArgumentException(
                     "Capture release admission dependencies are required"
             );
         }
         this.reader = reader;
         this.gateway = gateway;
+        this.sourceReader = sourceReader;
     }
 
     @Nonnull
@@ -154,29 +158,62 @@ final class SqliteCaptureReleaseLifecycleAdmission {
             CompanionCaptureReleaseRequest requested,
             OperationId operationId
     ) {
-        CompanionLifecycle source = sourceLifecycle(requested);
-        OwnerId targetOwner = requested.ownerAssignment() == null
-                ? source.ownerId() : requested.ownerAssignment();
-        String roleId = artifactRole(requested);
+        return sourceReader.findByProfile(requested.profileId()).thenCompose(read -> {
+            if (read instanceof PersistenceReadResult.Absent<?>) {
+                return failed("capture_source_profile_absent");
+            }
+            if (read instanceof PersistenceReadResult.Failed<
+                    SqliteLifecycleAdmissionSourceReader.SourceReadModel> failed) {
+                return CompletableFuture.failedFuture(
+                        failed.failure().cause() == null
+                                ? new IllegalStateException("capture_source_read_failed")
+                                : failed.failure().cause()
+                );
+            }
+            SqliteLifecycleAdmissionSourceReader.SourceReadModel source =
+                    ((PersistenceReadResult.Found<
+                            SqliteLifecycleAdmissionSourceReader.SourceReadModel>) read)
+                            .value();
+            return authorizeCanonical(requested, operationId, source);
+        });
+    }
+
+    private CompletionStage<CompanionCaptureReleaseRequest> authorizeCanonical(
+            CompanionCaptureReleaseRequest requested,
+            OperationId operationId,
+            SqliteLifecycleAdmissionSourceReader.SourceReadModel sourceModel
+    ) {
+        CompanionLifecycle source = sourceModel.lifecycle();
+        requireCapturedSource(requested, source);
+        if (source.ownerId() != null && requested.ownerAssignment() != null) {
+            return failed("capture_release_owner_assignment_conflict");
+        }
+        OwnerId targetOwner = source.ownerId() == null
+                ? requested.ownerAssignment() : source.ownerId();
+        String targetWorld = targetOwner == null
+                ? null : requested.targetWorldKey();
+        String roleId = sourceModel.canonicalRoleId();
+        PopulationAdmissionOperation operation = targetOwner == null
+                ? PopulationAdmissionOperation.LIFECYCLE_CHANGE
+                : PopulationAdmissionOperation.RESTORE;
+        PopulationAdmissionLocation destination = new PopulationAdmissionLocation(
+                requested.targetWorldKey(), 0, 0
+        );
         PopulationAdmissionRequestV2 candidate = new PopulationAdmissionRequestV2(
                 new PopulationAdmissionRequest(
                         new PopulationAdmissionIdentity(
                                 requested.profileId().toString(), null, null
                         ),
-                        requested.sourceAlias().value(),
-                        requested.expectedLifecycleRevision().value(),
-                        source.ownerId() == null
-                                ? null : source.ownerId().value(),
+                        targetOwner == null ? requested.sourceAlias().value() : null,
+                        source.revision().value(),
+                        source.ownerId() == null ? null : source.ownerId().value(),
                         targetOwner == null ? null : targetOwner.value(),
-                        new PopulationAdmissionLocation(
-                                requested.source().worldKey(), 0, 0
+                        source.ownerId() == null ? null
+                                : new PopulationAdmissionLocation(
+                                source.ownerWorldKey(), 0, 0
                         ),
-                        new PopulationAdmissionLocation(
-                                requested.targetWorldKey(), 0, 0
-                        ),
-                        targetOwner == null
-                                ? PopulationAdmissionOperation.LIFECYCLE_CHANGE
-                                : PopulationAdmissionOperation.RESTORE,
+                        destination,
+                        operation,
                         1,
                         PopulationAdmissionForcePolicy.ENFORCE,
                         PopulationCompanionLifecycle.ACTIVE
@@ -184,7 +221,7 @@ final class SqliteCaptureReleaseLifecycleAdmission {
                 roleId,
                 requested.targetWorldKey()
         );
-        LifecycleAdmissionRequest request = LifecycleAdmissionRequest.managed(
+        LifecycleAdmissionRequest admission = LifecycleAdmissionRequest.managed(
                 operationId,
                 reservationId(operationId),
                 roleId,
@@ -195,53 +232,99 @@ final class SqliteCaptureReleaseLifecycleAdmission {
                 source.ownerId(),
                 source.ownerWorldKey()
         );
-        return gateway.authorize(request).thenApply(
-                requested::withAdmissionEvidence
-        );
+        return gateway.authorize(admission).thenApply(evidence -> attachConvergence(
+                requested, evidence, sourceModel, targetOwner, targetWorld,
+                operationId
+        ));
     }
 
-    private CompanionLifecycle sourceLifecycle(
-            CompanionCaptureReleaseRequest release
+    private void requireCapturedSource(
+            CompanionCaptureReleaseRequest release,
+            CompanionLifecycle source
     ) {
         String snapshotId = (release.modernRecovery() == null
                 ? release.sourceSnapshot()
                 : release.modernRecovery().supersededSnapshot())
                 .snapshotId().toString();
-        OwnerId owner = sourceOwner(release);
-        return new CompanionLifecycle(
-                release.profileId(),
-                owner,
-                LifecycleState.CAPTURED,
-                LifecycleLocation.keyed(
-                        LifecycleLocationKind.CAPTURE_ITEM, snapshotId
-                ),
-                release.expectedLifecycleRevision(),
-                null,
-                release.requestedAtMs(),
-                release.modernRecovery() == null
-                        ? ReconciliationGeneration.INITIAL
-                        : release.modernRecovery().reconciliationGeneration(),
-                null,
-                owner == null ? null : release.source().worldKey()
-        );
+        if (!source.profileId().equals(release.profileId())
+                || source.revision().value()
+                != release.expectedLifecycleRevision().value()
+                || source.state() != LifecycleState.CAPTURED
+                || source.activeOperationId() != null
+                || source.quarantined()
+                || !source.location().equals(LifecycleLocation.keyed(
+                LifecycleLocationKind.CAPTURE_ITEM, snapshotId
+        ))) {
+            throw new IllegalStateException("capture_release_canonical_source_mismatch");
+        }
+    }
+
+    private static <T> CompletionStage<T> failed(String message) {
+        return CompletableFuture.failedFuture(new IllegalStateException(message));
     }
 
     static OwnerId sourceOwner(CompanionCaptureReleaseRequest release) {
-        BsonValue owner = BsonDocument.parse(
-                release.source().sourceArtifact().metadataExtendedJson()
-        ).get(TameworkMetadataKeys.OWNER_UUID);
-        return owner == null || owner.isNull()
-                ? null : OwnerId.parse(owner.asString().getValue());
+        LifecycleAdmissionEvidence evidence = release.admissionEvidence();
+        return evidence != null
+                && evidence.status() == LifecycleAdmissionEvidence.Status.MANAGED
+                && evidence.payload() != null
+                ? evidence.payload().sourceOwnerId()
+                : null;
     }
 
-    private String artifactRole(CompanionCaptureReleaseRequest release) {
-        BsonValue role = BsonDocument.parse(
-                release.source().sourceArtifact().metadataExtendedJson()
-        ).get(TameworkMetadataKeys.CAPTURE_ROLE_ID);
-        return role != null && role.isString()
-                && !role.asString().getValue().isBlank()
-                ? role.asString().getValue()
-                : "legacy:" + release.sourceAlias();
+    private static CompanionCaptureReleaseRequest attachConvergence(
+            CompanionCaptureReleaseRequest requested,
+            LifecycleAdmissionEvidence evidence,
+            SqliteLifecycleAdmissionSourceReader.SourceReadModel source,
+            OwnerId targetOwner,
+            String targetWorld,
+            OperationId operationId
+    ) {
+        if (evidence == null) {
+            throw new IllegalStateException("Lifecycle admission returned no evidence");
+        }
+        if (evidence.status() != LifecycleAdmissionEvidence.Status.MANAGED) {
+            return requested.withAdmissionEvidence(evidence);
+        }
+        var payload = evidence.payload();
+        if (payload == null
+                || !payload.profileId().equals(requested.profileId())
+                || !Objects.equals(
+                payload.expectedLifecycleRevision(), source.lifecycle().revision()
+        )
+                || payload.sourceLifecycle() != source.lifecycle().state()
+                || !Objects.equals(payload.sourceOwnerId(), source.lifecycle().ownerId())
+                || !Objects.equals(
+                payload.sourceWorldKey(), source.lifecycle().ownerWorldKey()
+        )
+                || payload.targetLifecycle() != LifecycleState.ACTIVE
+                || !Objects.equals(payload.ownerId(), targetOwner)
+                || !Objects.equals(payload.ownerWorldKey(), targetWorld)) {
+            throw new IllegalStateException(
+                    "lifecycle_admission_canonical_evidence_mismatch"
+            );
+        }
+        PopulationDomainConvergencePlan plan = PopulationDomainConvergencePlanner.plan(
+                requested.profileId(),
+                source.lifecycle().revision(),
+                source.lifecycle().ownerId(),
+                source.lifecycle().ownerWorldKey(),
+                source.lifecycle().state(),
+                targetOwner,
+                targetWorld,
+                LifecycleState.ACTIVE,
+                source.committedDomainRows(),
+                payload.reservations(operationId)
+        );
+        if (evidence.convergencePlan() != null
+                && !evidence.convergencePlan().equals(plan)) {
+            throw new IllegalStateException(
+                    "lifecycle_admission_convergence_evidence_mismatch"
+            );
+        }
+        return requested.withAdmissionEvidence(LifecycleAdmissionEvidence.managed(
+                payload, evidence.composition(), plan
+        ));
     }
 
     @Nonnull
@@ -265,7 +348,9 @@ final class SqliteCaptureReleaseLifecycleAdmission {
             OperationEnvelope operation,
             CompanionCaptureReleaseRequest release
     ) {
-        return release.ownerAssignment() == null
+        OwnerId owner = release.ownerAssignment() == null
+                ? sourceOwner(release) : release.ownerAssignment();
+        return owner == null
                 ? List.of(
                         OperationScope.operation(operation.operationId()),
                         OperationScope.profile(release.profileId())
@@ -273,7 +358,7 @@ final class SqliteCaptureReleaseLifecycleAdmission {
                 : List.of(
                         OperationScope.operation(operation.operationId()),
                         OperationScope.profile(release.profileId()),
-                        OperationScope.owner(release.ownerAssignment())
+                        OperationScope.owner(owner)
                 );
     }
 

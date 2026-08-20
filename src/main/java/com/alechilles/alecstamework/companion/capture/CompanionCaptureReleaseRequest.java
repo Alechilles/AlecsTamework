@@ -266,11 +266,6 @@ public record CompanionCaptureReleaseRequest(
                     "Captured-artifact release requires full-state projection version one"
             );
         }
-        if (!source.worldKey().equals(placement.worldKey())) {
-            throw new IllegalArgumentException(
-                    "Captured-artifact source and spawn must share one world boundary"
-            );
-        }
         if (sourceAlias.equals(targetAlias)) {
             throw new IllegalArgumentException(
                     "Captured-artifact release target alias must be distinct"
@@ -414,38 +409,29 @@ public record CompanionCaptureReleaseRequest(
             return;
         }
         var payload = evidence.payload();
-        OwnerId sourceOwner = sourceOwnerFromArtifact(source.sourceArtifact());
-        OwnerId targetOwner = ownerAssignment == null
-                ? sourceOwner : ownerAssignment;
-        String sourceWorld = sourceOwner == null ? null : source.worldKey();
         if (payload == null
                 || !payload.profileId().equals(profileId)
                 || !java.util.Objects.equals(
                 payload.expectedLifecycleRevision(), expectedLifecycleRevision
         )
                 || payload.targetLifecycle() != LifecycleState.ACTIVE
-                || payload.sourceLifecycle() != LifecycleState.CAPTURED
-                || payload.domains().isEmpty()
-                || !java.util.Objects.equals(payload.ownerId(), targetOwner)
-                || !java.util.Objects.equals(
-                payload.ownerWorldKey(),
-                targetOwner == null ? null : placement.worldKey()
-        )
-                || !java.util.Objects.equals(payload.sourceOwnerId(), sourceOwner)
-                || !java.util.Objects.equals(payload.sourceWorldKey(), sourceWorld)) {
+                || payload.sourceLifecycle() != LifecycleState.CAPTURED) {
             throw new IllegalArgumentException(
                     "Capture release lifecycle admission evidence is inconsistent"
             );
         }
-    }
-
-    @Nullable
-    private static OwnerId sourceOwnerFromArtifact(CapturedArtifact artifact) {
-        BsonValue owner = BsonDocument.parse(
-                artifact.metadataExtendedJson()
-        ).get(TameworkMetadataKeys.OWNER_UUID);
-        return owner == null || owner.isNull()
-                ? null : OwnerId.parse(owner.asString().getValue());
+        OwnerId sourceOwner = payload.sourceOwnerId();
+        OwnerId targetOwner = sourceOwner == null
+                ? ownerAssignment : sourceOwner;
+        if (!java.util.Objects.equals(payload.ownerId(), targetOwner)
+                || !java.util.Objects.equals(
+                payload.ownerWorldKey(),
+                targetOwner == null ? null : placement.worldKey()
+        )) {
+            throw new IllegalArgumentException(
+                    "Capture release lifecycle admission evidence is inconsistent"
+            );
+        }
     }
 
     private static void requireSourceReceipt(

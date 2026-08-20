@@ -44,6 +44,8 @@ public final class SqliteCompanionCaptureReleaseOperations {
     private final LongSupplier clock;
     @Nullable
     private final SqliteCaptureReleaseLifecycleAdmission admission;
+    private final SqliteLifecycleAdmissionSingleFlight singleFlight =
+            new SqliteLifecycleAdmissionSingleFlight();
     private final List<ProjectionConsumer> requiredConsumers;
 
     public SqliteCompanionCaptureReleaseOperations(
@@ -58,6 +60,7 @@ public final class SqliteCompanionCaptureReleaseOperations {
                 clock,
                 null,
                 null,
+                null,
                 requiredConsumers
         );
     }
@@ -68,6 +71,7 @@ public final class SqliteCompanionCaptureReleaseOperations {
             @Nonnull LongSupplier clock,
             @Nullable SqliteOperationReader reader,
             @Nullable SqliteLifecycleAdmissionBinding lifecycleAdmission,
+            @Nullable SqliteLifecycleAdmissionSourceReader sourceReader,
             @Nonnull List<? extends ProjectionConsumer> requiredConsumers
     ) {
         if (operations == null || publisher == null || clock == null
@@ -84,13 +88,13 @@ public final class SqliteCompanionCaptureReleaseOperations {
         this.operations = operations;
         this.clock = clock;
         this.admission = reader == null || lifecycleAdmission == null
+                || sourceReader == null
                 ? null
                 : new SqliteCaptureReleaseLifecycleAdmission(
-                reader, lifecycleAdmission
+                reader, lifecycleAdmission, sourceReader
         );
         this.requiredConsumers = List.copyOf(requiredConsumers);
     }
-
     /** Starts or resumes one exact inventory- and spawn-receipt-correlated release. */
     @Nonnull
     public Submission submit(
@@ -122,17 +126,20 @@ public final class SqliteCompanionCaptureReleaseOperations {
             CompanionCaptureReleaseRequest requested,
             CompanionCaptureReleaseLiveBoundary liveBoundary
     ) {
-        CompletionStage<SqliteCaptureReleaseLifecycleAdmission.ResolvedRelease>
-                resolved = admission.resolve(
-                operationId, idempotencyKey, requested
+        CompletionStage<OperationWorkflowResult> completion = singleFlight.submit(
+                CompanionCaptureReleaseDefinition.KIND,
+                operationId,
+                idempotencyKey,
+                () -> admission.resolve(
+                                operationId, idempotencyKey, requested
+                        )
+                        .thenCompose(value -> execute(
+                                value.operationId(),
+                                idempotencyKey,
+                                value.payload(),
+                                liveBoundary
+                        ).completion())
         );
-        CompletionStage<OperationWorkflowResult> completion = resolved
-                .thenCompose(value -> execute(
-                        value.operationId(),
-                        idempotencyKey,
-                        value.payload(),
-                        liveBoundary
-                ).completion());
         return new Submission(
                 SqliteSingleWriter.WriteAcceptance.ACCEPTED,
                 completion.exceptionally(failure ->
@@ -325,9 +332,8 @@ public final class SqliteCompanionCaptureReleaseOperations {
             CompanionCaptureReleaseRequest release,
             long releasedAtMs
     ) {
-        OwnerId ownerId = release.ownerAssignment() == null
-                ? fenced.ownerId()
-                : release.ownerAssignment();
+        OwnerId ownerId = fenced.ownerId() == null
+                ? release.ownerAssignment() : fenced.ownerId();
         return new CompanionLifecycle(
                 release.profileId(),
                 ownerId,

@@ -240,6 +240,7 @@ final class SqlitePublicOperationSet {
                 clock,
                 operationReader,
                 lifecycleAdmission,
+                lifecycleSources,
                 consumers.apply(
                         CompanionCaptureReleaseDefinition.INSTANCE.kind()
                 )
