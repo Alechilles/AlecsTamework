@@ -9,17 +9,24 @@ import java.time.Duration;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -27,11 +34,14 @@ import javax.annotation.Nullable;
 public final class AdmissionProviderRegistry implements AdmissionProviderApi, AutoCloseable {
     private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(2);
     private static final int MAX_CALLBACK_WORKERS = 4;
+    private static final int MAX_PENDING_CALLBACKS = 8;
 
     private final Duration timeout;
-    private final ExecutorService callbacks;
+    private final ThreadPoolExecutor callbacks;
     private final ScheduledExecutorService timers;
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final Set<ProviderInvocation> invocations =
+            ConcurrentHashMap.newKeySet();
     private final ConcurrentMap<String, Registration> registrations =
             new ConcurrentHashMap<>();
 
@@ -44,13 +54,16 @@ public final class AdmissionProviderRegistry implements AdmissionProviderApi, Au
             throw new IllegalArgumentException("Provider timeout must be positive");
         }
         this.timeout = timeout;
-        this.callbacks = Executors.newFixedThreadPool(
+        this.callbacks = new ThreadPoolExecutor(
                 MAX_CALLBACK_WORKERS,
-                daemonFactory("tamework-admission-provider")
+                MAX_CALLBACK_WORKERS,
+                0L,
+                TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<>(MAX_PENDING_CALLBACKS),
+                daemonFactory("tamework-admission-provider"),
+                new ThreadPoolExecutor.AbortPolicy()
         );
-        this.timers = Executors.newSingleThreadScheduledExecutor(
-                daemonFactory("tamework-admission-timeout")
-        );
+        this.timers = timeoutExecutor();
     }
 
     @Override
@@ -77,6 +90,11 @@ public final class AdmissionProviderRegistry implements AdmissionProviderApi, Au
         Registration existing = registrations.putIfAbsent(id, registration);
         if (existing != null) {
             throw new IllegalStateException("Provider is already registered: " + id);
+        }
+        if (closed.get()) {
+            registration.active.set(false);
+            registrations.remove(id, registration);
+            throw new IllegalStateException("Admission provider registry is closed");
         }
         return new RegistrationHandle(id, registration);
     }
@@ -148,68 +166,21 @@ public final class AdmissionProviderRegistry implements AdmissionProviderApi, Au
                     unavailable("provider-not-ready")
             );
         }
-        CompletableFuture<PopulationAdmissionProviderDecision> result =
-                new CompletableFuture<>();
-        java.util.concurrent.ScheduledFuture<?> timeoutTask = timers.schedule(
-                () -> result.complete(unavailable("provider-timeout")),
-                timeout.toNanos(),
-                java.util.concurrent.TimeUnit.NANOSECONDS
+        ProviderInvocation invocation = new ProviderInvocation(
+                registration, request
         );
+        invocations.add(invocation);
         try {
-            callbacks.execute(() -> invoke(
-                    registration,
-                    request,
-                    result,
-                    timeoutTask
-            ));
+            invocation.scheduleTimeout();
+            invocation.submit();
+        } catch (RejectedExecutionException saturated) {
+            invocation.failClosed(
+                    closed.get() ? "provider-closed" : "provider-saturated"
+            );
         } catch (Throwable failure) {
-            timeoutTask.cancel(false);
-            result.complete(unavailable("provider-exception"));
+            invocation.failClosed("provider-exception");
         }
-        return result;
-    }
-
-    private void invoke(
-            Registration registration,
-            PopulationAdmissionProviderRequest request,
-            CompletableFuture<PopulationAdmissionProviderDecision> result,
-            java.util.concurrent.ScheduledFuture<?> timeoutTask
-    ) {
-        if (result.isDone() || !registration.active.get() || closed.get()) {
-            timeoutTask.cancel(false);
-            result.complete(unavailable("provider-closed"));
-            return;
-        }
-        CompletionStage<PopulationAdmissionProviderDecision> stage;
-        try {
-            stage = registration.provider.evaluate(request);
-        } catch (Throwable failure) {
-            timeoutTask.cancel(false);
-            result.complete(unavailable("provider-exception"));
-            return;
-        }
-        if (stage == null) {
-            timeoutTask.cancel(false);
-            result.complete(unavailable("provider-null-stage"));
-            return;
-        }
-        try {
-            stage.whenComplete((decision, failure) -> {
-                timeoutTask.cancel(false);
-                if (!registration.active.get() || closed.get()) {
-                    result.complete(unavailable("provider-closed"));
-                } else if (failure != null) {
-                    result.complete(unavailable("provider-exception"));
-                } else if (decision == null) {
-                    result.complete(unavailable("provider-null-decision"));
-                } else {
-                    result.complete(decision);
-                }
-            });
-        } catch (Throwable failure) {
-            timeoutTask.cancel(false);
-            result.complete(unavailable("provider-exception"));
-        }
+        return invocation.result;
     }
 
     @Override
@@ -217,8 +188,16 @@ public final class AdmissionProviderRegistry implements AdmissionProviderApi, Au
         if (closed.compareAndSet(false, true)) {
             registrations.values().forEach(registration -> registration.active.set(false));
             registrations.clear();
+            invocations.forEach(invocation -> invocation.failClosed("provider-closed"));
             callbacks.shutdownNow();
             timers.shutdownNow();
+            try {
+                callbacks.awaitTermination(250, TimeUnit.MILLISECONDS);
+                timers.awaitTermination(250, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+            invocations.clear();
         }
     }
 
@@ -232,8 +211,118 @@ public final class AdmissionProviderRegistry implements AdmissionProviderApi, Au
         };
     }
 
+    private static ScheduledExecutorService timeoutExecutor() {
+        ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(
+                1,
+                daemonFactory("tamework-admission-timeout")
+        );
+        executor.setRemoveOnCancelPolicy(true);
+        return executor;
+    }
+
     private static PopulationAdmissionProviderDecision unavailable(String reason) {
         return PopulationAdmissionProviderDecision.unavailable(reason);
+    }
+
+    private final class ProviderInvocation implements Runnable {
+        private final Registration registration;
+        private final PopulationAdmissionProviderRequest request;
+        private final CompletableFuture<PopulationAdmissionProviderDecision> result =
+                new CompletableFuture<>();
+        private final AtomicReference<Future<?>> submitted = new AtomicReference<>();
+        private final AtomicReference<ScheduledFuture<?>> timeoutTask =
+                new AtomicReference<>();
+
+        private ProviderInvocation(
+                Registration registration,
+                PopulationAdmissionProviderRequest request
+        ) {
+            this.registration = registration;
+            this.request = request;
+        }
+
+        private void scheduleTimeout() {
+            ScheduledFuture<?> timeout = timers.schedule(
+                    () -> failClosed("provider-timeout"),
+                    AdmissionProviderRegistry.this.timeout.toNanos(),
+                    TimeUnit.NANOSECONDS
+            );
+            timeoutTask.set(timeout);
+            if (result.isDone()) {
+                timeout.cancel(false);
+            }
+        }
+
+        private void submit() {
+            Future<?> future = callbacks.submit(this);
+            submitted.set(future);
+            if (result.isDone()) {
+                future.cancel(true);
+            }
+        }
+
+        @Override
+        public void run() {
+            if (result.isDone()) {
+                invocations.remove(this);
+                return;
+            }
+            if (closed.get() || !registration.active.get()) {
+                failClosed("provider-closed");
+                return;
+            }
+            CompletionStage<PopulationAdmissionProviderDecision> stage;
+            try {
+                stage = registration.provider.evaluate(request);
+            } catch (Throwable failure) {
+                failClosed("provider-exception");
+                return;
+            }
+            if (stage == null) {
+                failClosed("provider-null-stage");
+                return;
+            }
+            try {
+                stage.whenComplete((decision, failure) -> {
+                    if (closed.get() || !registration.active.get()) {
+                        failClosed("provider-closed");
+                    } else if (failure != null) {
+                        failClosed("provider-exception");
+                    } else if (decision == null) {
+                        failClosed("provider-null-decision");
+                    } else {
+                        complete(decision);
+                    }
+                });
+            } catch (Throwable failure) {
+                failClosed("provider-exception");
+            }
+        }
+
+        private void complete(PopulationAdmissionProviderDecision decision) {
+            ScheduledFuture<?> timeout = timeoutTask.get();
+            if (timeout != null) {
+                timeout.cancel(false);
+            }
+            result.complete(decision);
+            invocations.remove(this);
+        }
+
+        private void failClosed(String reason) {
+            ScheduledFuture<?> timeout = timeoutTask.get();
+            if (timeout != null) {
+                timeout.cancel(false);
+            }
+            result.complete(unavailable(reason));
+            Future<?> future = submitted.get();
+            if (future != null) {
+                future.cancel(true);
+                if (future instanceof Runnable task) {
+                    callbacks.remove(task);
+                }
+            }
+            invocations.remove(this);
+        }
     }
 
     private static String canonical(String providerId) {

@@ -12,15 +12,20 @@ import com.alechilles.alecstamework.api.PopulationAdmissionRequest;
 import com.alechilles.alecstamework.api.PopulationAdmissionRequestV2;
 import com.alechilles.alecstamework.api.PopulationAdmissionRequestV3;
 import com.alechilles.alecstamework.api.PopulationCompanionLifecycle;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.time.Duration;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Protects provider identity, failure translation, and registration lifecycle. */
 class AdmissionProviderRegistryTest {
@@ -67,7 +72,8 @@ class AdmissionProviderRegistryTest {
     }
 
     @Test
-    void callbackOutcomesAreTranslatedAndBlockingCallbacksTimeOut() {
+    void callbackOutcomesAreTranslatedAndBlockingCallbacksTimeOut()
+            throws Exception {
         try (AdmissionProviderRegistry registry = new AdmissionProviderRegistry(
                 Duration.ofMillis(40)
         )) {
@@ -92,10 +98,12 @@ class AdmissionProviderRegistryTest {
                 failed.completeExceptionally(new IllegalStateException("bad"));
                 return failed;
             });
+            CountDownLatch blockingInterrupted = new CountDownLatch(1);
             registry.register("blocking", 1, ignored -> {
                 try {
                     Thread.sleep(500);
                 } catch (InterruptedException interrupted) {
+                    blockingInterrupted.countDown();
                     Thread.currentThread().interrupt();
                 }
                 return CompletableFuture.completedFuture(
@@ -121,7 +129,109 @@ class AdmissionProviderRegistryTest {
             assertEquals("provider-timeout",
                     registry.evaluate("blocking", request("blocking"))
                             .toCompletableFuture().join().messageKey());
+            assertTrue(blockingInterrupted.await(1, TimeUnit.SECONDS));
         }
+    }
+
+    @Test
+    void workerAndQueueSaturationFailsClosedWithoutUnboundedBacklog()
+            throws Exception {
+        try (AdmissionProviderRegistry registry = new AdmissionProviderRegistry(
+                Duration.ofSeconds(5)
+        )) {
+            CountDownLatch workersStarted = new CountDownLatch(4);
+            CountDownLatch releaseWorkers = new CountDownLatch(1);
+            PopulationAdmissionProviderDecision allowed =
+                    new PopulationAdmissionProviderDecision(
+                            PopulationAdmissionProviderStatus.ALLOW,
+                            "allowed",
+                            Set.of(),
+                            Map.of(),
+                            7,
+                            9
+                    );
+            registry.register("saturated", 1, ignored -> {
+                workersStarted.countDown();
+                try {
+                    releaseWorkers.await();
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+                return CompletableFuture.completedFuture(allowed);
+            });
+
+            List<CompletableFuture<PopulationAdmissionProviderDecision>> results =
+                    new ArrayList<>();
+            for (int index = 0; index < 4; index++) {
+                results.add(registry.evaluate("saturated", request("saturated"))
+                        .toCompletableFuture());
+            }
+            assertTrue(workersStarted.await(1, TimeUnit.SECONDS));
+            for (int index = 0; index < 32; index++) {
+                results.add(registry.evaluate("saturated", request("saturated"))
+                        .toCompletableFuture());
+            }
+
+            long saturated = results.stream()
+                    .filter(CompletableFuture::isDone)
+                    .map(CompletableFuture::join)
+                    .filter(result -> "provider-saturated".equals(
+                            result.messageKey()
+                    ))
+                    .count();
+            assertTrue(saturated > 0);
+
+            releaseWorkers.countDown();
+            results.forEach(CompletableFuture::join);
+        }
+    }
+
+    @Test
+    void closeCancelsQueuedAndRunningProviderWork() throws Exception {
+        AdmissionProviderRegistry registry = new AdmissionProviderRegistry(
+                Duration.ofSeconds(5)
+        );
+        CountDownLatch workersStarted = new CountDownLatch(4);
+        CountDownLatch workersInterrupted = new CountDownLatch(4);
+        PopulationAdmissionProviderDecision allowed =
+                new PopulationAdmissionProviderDecision(
+                        PopulationAdmissionProviderStatus.ALLOW,
+                        "allowed",
+                        Set.of(),
+                        Map.of(),
+                        7,
+                        9
+                );
+        registry.register("close", 1, ignored -> {
+            workersStarted.countDown();
+            try {
+                new CountDownLatch(1).await();
+            } catch (InterruptedException interrupted) {
+                workersInterrupted.countDown();
+                Thread.currentThread().interrupt();
+            }
+            return CompletableFuture.completedFuture(allowed);
+        });
+
+        List<CompletableFuture<PopulationAdmissionProviderDecision>> results =
+                new ArrayList<>();
+        for (int index = 0; index < 4; index++) {
+            results.add(registry.evaluate("close", request("close"))
+                    .toCompletableFuture());
+        }
+        assertTrue(workersStarted.await(1, TimeUnit.SECONDS));
+        results.add(registry.evaluate("close", request("close"))
+                .toCompletableFuture());
+
+        registry.close();
+
+        results.forEach(result -> assertEquals(
+                "provider-closed", result.join().messageKey()
+        ));
+        assertTrue(workersInterrupted.await(1, TimeUnit.SECONDS));
+        assertEquals("provider-not-ready",
+                registry.evaluate("close", request("close"))
+                        .toCompletableFuture().join().messageKey());
     }
 
     @Test
