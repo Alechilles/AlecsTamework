@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.persistence.operation.OperationId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -18,8 +19,8 @@ import javax.annotation.Nullable;
  *
  * <p>The source rows are the complete committed rows observed before live work.
  * Each row carries the old persisted deltas and the exact residual to keep after
- * the lifecycle transition. The plan does not contain a target admission; a
- * positive target participant remains the owner of that concern.</p>
+ * the lifecycle transition. Target rows, when present, are the exact pending
+ * rows owned by the current operation.</p>
  */
 public record PopulationDomainConvergencePlan(
         @Nonnull ProfileId profileId,
@@ -30,13 +31,42 @@ public record PopulationDomainConvergencePlan(
         @Nullable OwnerId targetOwner,
         @Nullable String targetWorldKey,
         @Nonnull LifecycleState targetState,
-        @Nonnull List<SourceRow> sourceRows
+        @Nonnull List<SourceRow> sourceRows,
+        @Nonnull List<PopulationDomainReservation> targetReservations
 ) {
+    /** Compatibility constructor for source-only convergence plans. */
+    public PopulationDomainConvergencePlan(
+            ProfileId profileId,
+            LifecycleRevision sourceLifecycleRevision,
+            OwnerId sourceOwner,
+            String sourceWorldKey,
+            LifecycleState sourceState,
+            OwnerId targetOwner,
+            String targetWorldKey,
+            LifecycleState targetState,
+            List<SourceRow> sourceRows
+    ) {
+        this(
+                profileId,
+                sourceLifecycleRevision,
+                sourceOwner,
+                sourceWorldKey,
+                sourceState,
+                targetOwner,
+                targetWorldKey,
+                targetState,
+                sourceRows,
+                List.of()
+        );
+    }
+
     public PopulationDomainConvergencePlan {
         if (profileId == null || sourceLifecycleRevision == null
                 || sourceState == null || targetState == null
                 || sourceRows == null
-                || sourceRows.stream().anyMatch(Objects::isNull)) {
+                || sourceRows.stream().anyMatch(Objects::isNull)
+                || targetReservations == null
+                || targetReservations.stream().anyMatch(Objects::isNull)) {
             throw new IllegalArgumentException(
                     "Complete population-domain convergence evidence is required"
             );
@@ -68,6 +98,59 @@ public record PopulationDomainConvergencePlan(
                 )
                 .thenComparing(row -> row.expected().bucket()));
         sourceRows = List.copyOf(sorted);
+
+        PopulationDomainLifecycleClassifier.Classification targetClassification =
+                PopulationDomainLifecycleClassifier.classify(targetState);
+        if (targetOwner == null && !targetReservations.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "An unowned target cannot retain domain rows"
+            );
+        }
+        Set<RowIdentity> targetIdentities = new HashSet<>();
+        OperationId targetOperationId = null;
+        ArrayList<PopulationDomainReservation> sortedTargets =
+                new ArrayList<>(targetReservations.size());
+        for (PopulationDomainReservation target : targetReservations) {
+            PopulationDomainBucket bucket = target.bucket();
+            boolean worldMatches = bucket.scope() == PopulationDomainScope.GLOBAL
+                    ? bucket.ownerWorldKey() == null
+                    : Objects.equals(
+                    bucket.ownerWorldKey(), normalizeWorld(
+                            targetOwner, targetWorldKey
+                    )
+            );
+            if (!target.profileId().equals(profileId)
+                    || !bucket.ownerId().equals(targetOwner)
+                    || !worldMatches
+                    || target.ownedDelta() < 0
+                    || target.deployableDelta() < 0
+                    || (target.ownedDelta() == 0 && target.deployableDelta() == 0)
+                    || (target.ownedDelta() > 0 && !targetClassification.owned())
+                    || (target.deployableDelta() > 0
+                    && !targetClassification.deployable())) {
+                throw new IllegalArgumentException(
+                        "Target rows must match the target lifecycle"
+                );
+            }
+            if (!targetIdentities.add(RowIdentity.of(target))) {
+                throw new IllegalArgumentException(
+                        "Target rows must have unique operation and bucket identity"
+                );
+            }
+            if (targetOperationId == null) {
+                targetOperationId = target.operationId();
+            } else if (!targetOperationId.equals(target.operationId())) {
+                throw new IllegalArgumentException(
+                        "Target rows must belong to one current operation"
+                );
+            }
+            sortedTargets.add(target);
+        }
+        sortedTargets.sort(Comparator.comparing(
+                        (PopulationDomainReservation row) -> row.operationId().toString()
+                )
+                .thenComparing(PopulationDomainReservation::bucket));
+        targetReservations = List.copyOf(sortedTargets);
     }
 
     /** Returns whether at least one source row needs a persisted change. */

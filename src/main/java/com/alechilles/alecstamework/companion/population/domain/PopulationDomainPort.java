@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationId;
 import java.util.List;
 import java.util.Optional;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /** Connection-bound authority for weighted named-domain usage and reservations. */
 public interface PopulationDomainPort {
@@ -22,30 +23,11 @@ public interface PopulationDomainPort {
             @Nonnull OperationId operationId
     );
 
-    /** Returns every committed row retained by one profile. */
+    /** Reads one exact phase-aware profile evidence set on the current connection. */
     @Nonnull
-    List<PopulationDomainReservation> findCommittedByProfile(
-            @Nonnull ProfileId profileId
-    );
-
-    /** Returns committed rows for one profile and one complete bucket. */
-    @Nonnull
-    List<PopulationDomainReservation> findCommittedByProfileAndBucket(
+    ProfileEvidence profileEvidence(
             @Nonnull ProfileId profileId,
-            @Nonnull PopulationDomainBucket bucket
-    );
-
-    /** Returns pending rows for one profile and bucket. */
-    @Nonnull
-    List<PopulationDomainReservation> findPendingByProfileAndBucket(
-            @Nonnull ProfileId profileId,
-            @Nonnull PopulationDomainBucket bucket
-    );
-
-    /** Returns all non-committed rows retained by one profile. */
-    @Nonnull
-    List<PopulationDomainReservation> findPendingByProfile(
-            @Nonnull ProfileId profileId
+            @Nullable OperationId currentOperationId
     );
 
     @Nonnull
@@ -60,4 +42,27 @@ public interface PopulationDomainPort {
 
     /** Applies one frozen source-row convergence plan with exact old-value fences. */
     boolean convergeExact(@Nonnull PopulationDomainConvergencePlan plan);
+
+    /**
+     * Complete rows for one profile, split by operation phase and current operation identity.
+     * Pending rows from every other operation remain visible so callers can fail closed.
+     */
+    record ProfileEvidence(
+            @Nonnull List<PopulationDomainReservation> committed,
+            @Nonnull List<PopulationDomainReservation> currentOperationPending,
+            @Nonnull List<PopulationDomainReservation> foreignPending
+    ) {
+        public ProfileEvidence {
+            if (committed == null || currentOperationPending == null
+                    || foreignPending == null
+                    || committed.stream().anyMatch(java.util.Objects::isNull)
+                    || currentOperationPending.stream().anyMatch(java.util.Objects::isNull)
+                    || foreignPending.stream().anyMatch(java.util.Objects::isNull)) {
+                throw new IllegalArgumentException("Complete profile evidence is required");
+            }
+            committed = List.copyOf(committed);
+            currentOperationPending = List.copyOf(currentOperationPending);
+            foreignPending = List.copyOf(foreignPending);
+        }
+    }
 }

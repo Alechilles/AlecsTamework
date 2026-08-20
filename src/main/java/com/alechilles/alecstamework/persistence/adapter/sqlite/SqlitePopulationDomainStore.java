@@ -105,36 +105,12 @@ public final class SqlitePopulationDomainStore implements PopulationDomainPort {
 
     @Override
     @Nonnull
-    public List<PopulationDomainReservation> findCommittedByProfile(
-            @Nonnull ProfileId profileId
-    ) {
-        return convergence.findCommittedByProfile(profileId);
-    }
-
-    @Override
-    @Nonnull
-    public List<PopulationDomainReservation> findCommittedByProfileAndBucket(
+    public PopulationDomainPort.ProfileEvidence profileEvidence(
             @Nonnull ProfileId profileId,
-            @Nonnull PopulationDomainBucket bucket
+            OperationId currentOperationId
     ) {
-        return convergence.findCommittedByProfileAndBucket(profileId, bucket);
-    }
-
-    @Override
-    @Nonnull
-    public List<PopulationDomainReservation> findPendingByProfileAndBucket(
-            @Nonnull ProfileId profileId,
-            @Nonnull PopulationDomainBucket bucket
-    ) {
-        return convergence.findPendingByProfileAndBucket(profileId, bucket);
-    }
-
-    @Override
-    @Nonnull
-    public List<PopulationDomainReservation> findPendingByProfile(
-            @Nonnull ProfileId profileId
-    ) {
-        return convergence.findPendingByProfile(profileId);
+        require(profileId, "Profile ID");
+        return convergence.profileEvidence(profileId, currentOperationId);
     }
 
     @Override

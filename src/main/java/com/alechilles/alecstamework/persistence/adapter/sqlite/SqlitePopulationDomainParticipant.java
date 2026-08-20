@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
+import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmission;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainReservation;
 import com.alechilles.alecstamework.persistence.operation.DurableOperationWork;
@@ -74,7 +75,8 @@ public final class SqlitePopulationDomainParticipant
             if (!retainCommitted) {
                 return actual.isEmpty();
             }
-            return sameReservations(actual);
+            return sameReservations(actual)
+                    || matchesCanonicalSupersession(transaction, operation, actual);
         }
         if (actual.size() != reservations.size()) {
             return false;
@@ -159,6 +161,80 @@ public final class SqlitePopulationDomainParticipant
             }
         }
         return true;
+    }
+
+    /**
+     * Accepts only a later canonical lifecycle revision with durable evidence.
+     * Existing rows, when any, must still be exact residuals of this participant's
+     * original identities; unknown or foreign rows do not prove supersession.
+     */
+    private boolean matchesCanonicalSupersession(
+            SqlitePersistenceTransactionContext transaction,
+            OperationEnvelope operation,
+            List<PopulationDomainReservation> actual
+    ) {
+        if (reservations.isEmpty()
+                || transaction.outbox().findByOperation(operation.operationId()).isEmpty()) {
+            return false;
+        }
+        long expectedRevision = reservations.getFirst()
+                .expectedLifecycleRevision() == null
+                ? Long.MIN_VALUE
+                : reservations.getFirst().expectedLifecycleRevision().value();
+        if (expectedRevision == Long.MIN_VALUE
+                || reservations.stream().anyMatch(reservation ->
+                !reservation.profileId().equals(reservations.getFirst().profileId())
+                        || reservation.expectedLifecycleRevision() == null
+                        || reservation.expectedLifecycleRevision().value()
+                        != expectedRevision)) {
+            return false;
+        }
+        CompanionLifecycle current = transaction.lifecycles()
+                .findByProfile(reservations.getFirst().profileId())
+                .orElse(null);
+        if (current == null
+                || current.revision().value() <= expectedRevision
+                || current.activeOperationId() != null
+                || current.quarantined()
+                || actual.size() > reservations.size()) {
+            return false;
+        }
+        boolean[] matched = new boolean[reservations.size()];
+        for (PopulationDomainReservation row : actual) {
+            boolean found = false;
+            for (int index = 0; index < reservations.size(); index++) {
+                if (!matched[index]
+                        && sameResidualIdentity(row, reservations.get(index))) {
+                    matched[index] = true;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean sameResidualIdentity(
+            PopulationDomainReservation actual,
+            PopulationDomainReservation expected
+    ) {
+        return actual.operationId().equals(expected.operationId())
+                && actual.profileId().equals(expected.profileId())
+                && java.util.Objects.equals(
+                actual.expectedLifecycleRevision(),
+                expected.expectedLifecycleRevision()
+        )
+                && actual.bucket().equals(expected.bucket())
+                && actual.weight() == expected.weight()
+                && actual.snapshottedMaxOwned()
+                == expected.snapshottedMaxOwned()
+                && actual.snapshottedMaxDeployable()
+                == expected.snapshottedMaxDeployable()
+                && actual.policyRevision() == expected.policyRevision()
+                && actual.createdAtMs() == expected.createdAtMs();
     }
 
     private void requireOperation(OperationEnvelope operation) {

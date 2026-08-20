@@ -31,11 +31,40 @@ public final class PopulationDomainConvergencePlanner {
             @Nonnull LifecycleState targetState,
             @Nonnull List<PopulationDomainReservation> committedRows
     ) {
+        return plan(
+                profileId,
+                sourceLifecycleRevision,
+                sourceOwner,
+                sourceWorldKey,
+                sourceState,
+                targetOwner,
+                targetWorldKey,
+                targetState,
+                committedRows,
+                List.of()
+        );
+    }
+
+    /** Builds a plan with the exact pending target rows owned by the current operation. */
+    @Nonnull
+    public static PopulationDomainConvergencePlan plan(
+            @Nonnull ProfileId profileId,
+            @Nonnull LifecycleRevision sourceLifecycleRevision,
+            @Nullable OwnerId sourceOwner,
+            @Nullable String sourceWorldKey,
+            @Nonnull LifecycleState sourceState,
+            @Nullable OwnerId targetOwner,
+            @Nullable String targetWorldKey,
+            @Nonnull LifecycleState targetState,
+            @Nonnull List<PopulationDomainReservation> committedRows,
+            @Nonnull List<PopulationDomainReservation> targetReservations
+    ) {
         require(profileId, "Profile ID");
         require(sourceLifecycleRevision, "Source lifecycle revision");
         require(sourceState, "Source lifecycle state");
         require(targetState, "Target lifecycle state");
         require(committedRows, "Committed domain rows");
+        require(targetReservations, "Target domain rows");
         if (committedRows.stream().anyMatch(Objects::isNull)) {
             throw new IllegalArgumentException("Committed domain rows cannot be null");
         }
@@ -84,7 +113,8 @@ public final class PopulationDomainConvergencePlanner {
                 targetOwner,
                 targetWorldKey,
                 targetState,
-                rows
+                rows,
+                targetReservations
         );
     }
 

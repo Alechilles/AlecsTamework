@@ -5,10 +5,12 @@ import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainBucket;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainConvergencePlan;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainPort;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainReservation;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainScope;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceStoreException;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -19,6 +21,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /** Exact-row SQLite authority for retained population-domain convergence. */
 final class SqlitePopulationDomainConvergenceStore {
@@ -33,8 +36,6 @@ final class SqlitePopulationDomainConvergenceStore {
             reservation.created_at_ms
             """;
 
-    private static final String COMMITTED_PHASES = "IN ('DURABLE', 'PUBLISHED')";
-
     private final Connection connection;
 
     SqlitePopulationDomainConvergenceStore(@Nonnull Connection connection) {
@@ -47,33 +48,50 @@ final class SqlitePopulationDomainConvergenceStore {
     }
 
     @Nonnull
-    List<PopulationDomainReservation> findCommittedByProfile(
-            @Nonnull ProfileId profileId
-    ) {
-        return findRows(profileId, null, COMMITTED_PHASES);
-    }
-
-    @Nonnull
-    List<PopulationDomainReservation> findCommittedByProfileAndBucket(
+    PopulationDomainPort.ProfileEvidence profileEvidence(
             @Nonnull ProfileId profileId,
-            @Nonnull PopulationDomainBucket bucket
+            @Nullable OperationId currentOperationId
     ) {
-        return findRows(profileId, bucket, COMMITTED_PHASES);
-    }
-
-    @Nonnull
-    List<PopulationDomainReservation> findPendingByProfileAndBucket(
-            @Nonnull ProfileId profileId,
-            @Nonnull PopulationDomainBucket bucket
-    ) {
-        return findRows(profileId, bucket, "NOT IN ('DURABLE', 'PUBLISHED')");
-    }
-
-    @Nonnull
-    List<PopulationDomainReservation> findPendingByProfile(
-            @Nonnull ProfileId profileId
-    ) {
-        return findRows(profileId, null, "NOT IN ('DURABLE', 'PUBLISHED')");
+        if (profileId == null) {
+            throw new IllegalArgumentException("Profile ID is required");
+        }
+        ArrayList<PopulationDomainReservation> committed = new ArrayList<>();
+        ArrayList<PopulationDomainReservation> currentPending = new ArrayList<>();
+        ArrayList<PopulationDomainReservation> foreignPending = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT " + COLUMNS + ", envelope.phase AS operation_phase " + """
+                        FROM population_domain_reservation reservation
+                        JOIN operation_envelope envelope
+                          ON envelope.operation_id = reservation.operation_id
+                        WHERE reservation.profile_id = ?
+                        ORDER BY reservation.operation_id, reservation.owner_uuid,
+                                 reservation.domain_id, reservation.scope_kind,
+                                 reservation.owner_world_key
+                        """)) {
+            statement.setString(1, profileId.toString());
+            try (ResultSet rows = statement.executeQuery()) {
+                while (rows.next()) {
+                    PopulationDomainReservation reservation = read(rows);
+                    OperationPhase phase = OperationPhase.valueOf(
+                            rows.getString("operation_phase")
+                    );
+                    if (phase == OperationPhase.DURABLE
+                            || phase == OperationPhase.PUBLISHED) {
+                        committed.add(reservation);
+                    } else if (currentOperationId != null
+                            && reservation.operationId().equals(currentOperationId)) {
+                        currentPending.add(reservation);
+                    } else {
+                        foreignPending.add(reservation);
+                    }
+                }
+            }
+        } catch (SQLException | RuntimeException failure) {
+            throw storeFailure("population_domain_profile_evidence", failure);
+        }
+        return new PopulationDomainPort.ProfileEvidence(
+                committed, currentPending, foreignPending
+        );
     }
 
     boolean convergeExact(@Nonnull PopulationDomainConvergencePlan plan) {
@@ -133,8 +151,13 @@ final class SqlitePopulationDomainConvergenceStore {
     }
 
     private boolean validateSourceRows(PopulationDomainConvergencePlan plan) {
-        List<PopulationDomainReservation> actual =
-                findCommittedByProfile(plan.profileId());
+        OperationId currentOperationId = plan.targetReservations().isEmpty()
+                ? null
+                : plan.targetReservations().getFirst().operationId();
+        PopulationDomainPort.ProfileEvidence evidence = profileEvidence(
+                plan.profileId(), currentOperationId
+        );
+        List<PopulationDomainReservation> actual = evidence.committed();
         List<PopulationDomainReservation> expected = plan.sourceRows().stream()
                 .map(PopulationDomainConvergencePlan.SourceRow::expected)
                 .sorted(Comparator.comparing(
@@ -150,14 +173,16 @@ final class SqlitePopulationDomainConvergenceStore {
                 return false;
             }
         }
-        for (PopulationDomainBucket bucket : plan.sourceBuckets()) {
-            if (!findPendingByProfileAndBucket(plan.profileId(), bucket).isEmpty()) {
-                return false;
-            }
-        }
-        return plan.sourceRows().isEmpty()
-                ? findPendingByProfile(plan.profileId()).isEmpty()
-                : true;
+        List<PopulationDomainReservation> expectedTargets = plan.targetReservations()
+                .stream()
+                .sorted(Comparator.comparing(
+                                (PopulationDomainReservation row) -> row.operationId().toString()
+                        )
+                        .thenComparing(PopulationDomainReservation::bucket))
+                .toList();
+        return samePersistedRows(
+                sorted(evidence.currentOperationPending()), expectedTargets
+        ) && evidence.foreignPending().isEmpty();
     }
 
     private int deleteExact(PopulationDomainReservation expected)
@@ -228,49 +253,15 @@ final class SqlitePopulationDomainConvergenceStore {
         statement.setLong(start + 13, reservation.createdAtMs());
     }
 
-    private List<PopulationDomainReservation> findRows(
-            ProfileId profile,
-            PopulationDomainBucket bucket,
-            String phasePredicate
+    private List<PopulationDomainReservation> sorted(
+            List<PopulationDomainReservation> rows
     ) {
-        if (profile == null || phasePredicate == null) {
-            throw new IllegalArgumentException("Domain convergence query is incomplete");
-        }
-        StringBuilder sql = new StringBuilder("SELECT ")
-                .append(COLUMNS)
-                .append(" FROM population_domain_reservation reservation")
-                .append(" JOIN operation_envelope envelope")
-                .append(" ON envelope.operation_id = reservation.operation_id")
-                .append(" WHERE reservation.profile_id = ?")
-                .append(" AND envelope.phase ")
-                .append(phasePredicate);
-        if (bucket != null) {
-            sql.append(" AND reservation.owner_uuid = ?")
-                    .append(" AND reservation.domain_id = ?")
-                    .append(" AND reservation.scope_kind = ?")
-                    .append(" AND reservation.owner_world_key = ?");
-        }
-        sql.append(" ORDER BY reservation.operation_id, reservation.owner_uuid,")
-                .append(" reservation.domain_id, reservation.scope_kind,")
-                .append(" reservation.owner_world_key");
-        try (PreparedStatement statement = connection.prepareStatement(sql.toString())) {
-            statement.setString(1, profile.toString());
-            if (bucket != null) {
-                statement.setString(2, bucket.ownerId().toString());
-                statement.setString(3, bucket.domainId());
-                statement.setString(4, bucket.scope().name());
-                statement.setString(5, bucket.storedWorldKey());
-            }
-            ArrayList<PopulationDomainReservation> result = new ArrayList<>();
-            try (ResultSet rows = statement.executeQuery()) {
-                while (rows.next()) {
-                    result.add(read(rows));
-                }
-            }
-            return List.copyOf(result);
-        } catch (SQLException | RuntimeException failure) {
-            throw storeFailure("population_domain_convergence_find", failure);
-        }
+        return rows.stream()
+                .sorted(Comparator.comparing(
+                                (PopulationDomainReservation row) -> row.operationId().toString()
+                        )
+                        .thenComparing(PopulationDomainReservation::bucket))
+                .toList();
     }
 
     private boolean samePersisted(
@@ -292,6 +283,21 @@ final class SqlitePopulationDomainConvergenceStore {
                 == expected.snapshottedMaxDeployable()
                 && actual.policyRevision() == expected.policyRevision()
                 && actual.createdAtMs() == expected.createdAtMs();
+    }
+
+    private boolean samePersistedRows(
+            List<PopulationDomainReservation> actual,
+            List<PopulationDomainReservation> expected
+    ) {
+        if (actual.size() != expected.size()) {
+            return false;
+        }
+        for (int index = 0; index < actual.size(); index++) {
+            if (!samePersisted(actual.get(index), expected.get(index))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private PersistenceStoreException storeFailure(String operation, Throwable failure) {

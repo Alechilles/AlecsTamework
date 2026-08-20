@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
-import com.alechilles.alecstamework.companion.population.domain.PopulationDomainBucket;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainConvergencePlan;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainPort;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainReservation;
@@ -44,7 +43,7 @@ public final class SqlitePopulationDomainConvergenceParticipant
             @Nonnull OperationEnvelope operation
     ) {
         requireOperation(operation);
-        if (!sourceMatches(transaction.populationDomains())) {
+        if (!sourceMatches(transaction.populationDomains(), operation)) {
             throw new IllegalStateException(
                     "population_domain_convergence_source_mismatch"
             );
@@ -58,10 +57,13 @@ public final class SqlitePopulationDomainConvergenceParticipant
     ) {
         requireOperation(operation);
         return switch (operation.phase()) {
-            case DURABLE, PUBLISHED -> durableMatches(transaction);
-            case COMPENSATED, FAILED, PREPARED, LIVE_APPLYING, RETRYABLE,
-                    UNKNOWN, COMPENSATING -> sourceMatches(
-                    transaction.populationDomains()
+            case DURABLE, PUBLISHED -> durableMatches(transaction, operation);
+            case COMPENSATED, FAILED -> terminalRollbackMatches(
+                    transaction.populationDomains(), operation
+            );
+            case PREPARED, LIVE_APPLYING, RETRYABLE, UNKNOWN, COMPENSATING ->
+                    sourceMatches(
+                    transaction.populationDomains(), operation
             );
         };
     }
@@ -76,7 +78,7 @@ public final class SqlitePopulationDomainConvergenceParticipant
         }
         return (transaction, operation) -> {
             requireOperation(operation);
-            if (!sourceMatches(transaction.populationDomains())) {
+            if (!sourceMatches(transaction.populationDomains(), operation)) {
                 throw new IllegalStateException(
                         "population_domain_convergence_source_mismatch"
                 );
@@ -99,62 +101,137 @@ public final class SqlitePopulationDomainConvergenceParticipant
         return plan;
     }
 
-    private boolean sourceMatches(PopulationDomainPort domains) {
-        List<PopulationDomainReservation> actual =
-                sorted(domains.findCommittedByProfile(plan.profileId()));
+    private boolean sourceMatches(
+            PopulationDomainPort domains,
+            OperationEnvelope operation
+    ) {
+        PopulationDomainPort.ProfileEvidence evidence = domains.profileEvidence(
+                plan.profileId(), operation.operationId()
+        );
+        List<PopulationDomainReservation> actual = sorted(evidence.committed());
         List<PopulationDomainReservation> expected = sorted(plan.sourceRows().stream()
                 .map(PopulationDomainConvergencePlan.SourceRow::expected)
                 .toList());
-        if (!samePersisted(actual, expected)) {
-            return false;
-        }
-        if (plan.sourceRows().isEmpty()) {
-            return domains.findPendingByProfile(plan.profileId()).isEmpty();
-        }
-        for (PopulationDomainBucket bucket : plan.sourceBuckets()) {
-            if (!domains.findPendingByProfileAndBucket(
-                    plan.profileId(), bucket
-            ).isEmpty()) {
-                return false;
-            }
-        }
-        return true;
+        return samePersisted(actual, expected)
+                && samePersisted(
+                sorted(evidence.currentOperationPending()),
+                sorted(plan.targetReservations())
+        )
+                && evidence.foreignPending().isEmpty();
     }
 
-    private boolean durableMatches(SqlitePersistenceTransactionContext transaction) {
-        if (!plan.mutatesSourceRows()) {
+    private boolean terminalRollbackMatches(
+            PopulationDomainPort domains,
+            OperationEnvelope operation
+    ) {
+        PopulationDomainPort.ProfileEvidence evidence = domains.profileEvidence(
+                plan.profileId(), operation.operationId()
+        );
+        List<PopulationDomainReservation> expected = sorted(plan.sourceRows().stream()
+                .map(PopulationDomainConvergencePlan.SourceRow::expected)
+                .toList());
+        return samePersisted(sorted(evidence.committed()), expected)
+                && evidence.currentOperationPending().isEmpty()
+                && evidence.foreignPending().isEmpty();
+    }
+
+    private boolean durableMatches(
+            SqlitePersistenceTransactionContext transaction,
+            OperationEnvelope operation
+    ) {
+        if (residualMatches(transaction.populationDomains(), operation)) {
             return true;
         }
-        if (residualMatches(transaction.populationDomains())) {
-            return true;
+        if (operation.phase() != OperationPhase.DURABLE
+                && operation.phase() != OperationPhase.PUBLISHED) {
+            return false;
         }
         CompanionLifecycle current = transaction.lifecycles()
                 .findByProfile(plan.profileId())
                 .orElse(null);
         return current != null
                 && current.revision().value()
-                > plan.sourceLifecycleRevision().value();
+                > plan.sourceLifecycleRevision().value()
+                && current.activeOperationId() == null
+                && !current.quarantined()
+                && !transaction.outbox().findByOperation(
+                operation.operationId()
+        ).isEmpty()
+                && residualIdentityMatches(
+                transaction.populationDomains().profileEvidence(
+                        plan.profileId(), operation.operationId()
+                )
+        );
     }
 
-    private boolean residualMatches(PopulationDomainPort domains) {
-        for (PopulationDomainBucket bucket : plan.sourceBuckets()) {
-            List<PopulationDomainReservation> expected = plan.sourceRows().stream()
-                    .filter(row -> row.expected().bucket().equals(bucket))
-                    .map(PopulationDomainConvergencePlan.SourceRow::residualOrNull)
-                    .filter(Objects::nonNull)
-                    .toList();
-            List<PopulationDomainReservation> actual =
-                    domains.findCommittedByProfileAndBucket(
-                            plan.profileId(), bucket
-                    );
-            if (!samePersisted(sorted(actual), sorted(expected))
-                    || !domains.findPendingByProfileAndBucket(
-                    plan.profileId(), bucket
-            ).isEmpty()) {
+    private boolean residualMatches(
+            PopulationDomainPort domains,
+            OperationEnvelope operation
+    ) {
+        PopulationDomainPort.ProfileEvidence evidence = domains.profileEvidence(
+                plan.profileId(), operation.operationId()
+        );
+        ArrayList<PopulationDomainReservation> expected = new ArrayList<>();
+        plan.sourceRows().stream()
+                .map(PopulationDomainConvergencePlan.SourceRow::residualOrNull)
+                .filter(Objects::nonNull)
+                .forEach(expected::add);
+        expected.addAll(plan.targetReservations());
+        return samePersisted(sorted(evidence.committed()), sorted(expected))
+                && evidence.currentOperationPending().isEmpty()
+                && evidence.foreignPending().isEmpty();
+    }
+
+    private boolean residualIdentityMatches(
+            PopulationDomainPort.ProfileEvidence evidence
+    ) {
+        if (!evidence.currentOperationPending().isEmpty()
+                || !evidence.foreignPending().isEmpty()
+                || evidence.committed().size()
+                > plan.sourceRows().size() + plan.targetReservations().size()) {
+            return false;
+        }
+        ArrayList<PopulationDomainReservation> allowed = new ArrayList<>();
+        plan.sourceRows().stream()
+                .map(PopulationDomainConvergencePlan.SourceRow::expected)
+                .forEach(allowed::add);
+        allowed.addAll(plan.targetReservations());
+        boolean[] matched = new boolean[allowed.size()];
+        for (PopulationDomainReservation actual : evidence.committed()) {
+            boolean found = false;
+            for (int index = 0; index < allowed.size(); index++) {
+                if (!matched[index]
+                        && sameResidualIdentity(actual, allowed.get(index))) {
+                    matched[index] = true;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
                 return false;
             }
         }
         return true;
+    }
+
+    private boolean sameResidualIdentity(
+            PopulationDomainReservation actual,
+            PopulationDomainReservation expected
+    ) {
+        return actual.operationId().equals(expected.operationId())
+                && actual.profileId().equals(expected.profileId())
+                && Objects.equals(
+                actual.expectedLifecycleRevision(),
+                expected.expectedLifecycleRevision()
+        )
+                && actual.bucket().equals(expected.bucket())
+                && actual.weight() == expected.weight()
+                && actual.snapshottedMaxOwned()
+                == expected.snapshottedMaxOwned()
+                && actual.snapshottedMaxDeployable()
+                == expected.snapshottedMaxDeployable()
+                && actual.policyRevision() == expected.policyRevision()
+                && actual.createdAtMs() == expected.createdAtMs();
     }
 
     private void requireOperation(OperationEnvelope operation) {

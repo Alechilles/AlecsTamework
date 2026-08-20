@@ -21,6 +21,8 @@ import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationTransition;
 import com.alechilles.alecstamework.persistence.operation.PreparedOperation;
+import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
+import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.util.List;
@@ -73,7 +75,8 @@ class SqlitePopulationDomainConvergenceParticipantTest {
                     .execute(transaction, operation);
 
             PopulationDomainReservation retained = transaction.populationDomains()
-                    .findCommittedByProfile(PROFILE).getFirst();
+                    .profileEvidence(PROFILE, operation.operationId())
+                    .committed().getFirst();
             assertEquals(1, retained.ownedDelta());
             assertEquals(0, retained.deployableDelta());
             connection.commit();
@@ -102,8 +105,116 @@ class SqlitePopulationDomainConvergenceParticipantTest {
                     .execute(transaction, operation);
 
             assertTrue(transaction.populationDomains()
-                    .findCommittedByProfile(PROFILE).isEmpty());
+                    .profileEvidence(PROFILE, operation.operationId())
+                    .committed().isEmpty());
             connection.commit();
+        }
+    }
+
+    @Test
+    void sameBucketReactivationAcceptsExactCurrentTargetWithoutDuplicatingUsage() throws Exception {
+        try (Connection connection = open("reactivation.sqlite")) {
+            connection.setAutoCommit(false);
+            SqlitePersistenceTransactionContext transaction =
+                    new SqlitePersistenceTransactionContext(connection);
+            PopulationDomainReservation source = seedCommittedSource(transaction);
+            OperationEnvelope capture = prepareOperation(
+                    transaction, "reactivation-capture", LifecycleRevision.INITIAL
+            );
+            SqlitePopulationDomainConvergenceParticipant captureParticipant =
+                    new SqlitePopulationDomainConvergenceParticipant(plan(
+                            transaction, LifecycleState.ACTIVE, OWNER, "world-one",
+                            LifecycleState.CAPTURED, OWNER, "world-one", source
+                    ));
+            captureParticipant.prepare(transaction, capture);
+            captureParticipant.decorate((current, envelope) -> List.of())
+                    .execute(transaction, capture);
+            transition(transaction, capture, OperationPhase.DURABLE, -70);
+            assertEquals(1, transaction.populationDomains()
+                    .counts(BUCKET).committedOwned());
+            assertEquals(0, transaction.populationDomains()
+                    .counts(BUCKET).committedDeployable());
+
+            OperationEnvelope reactivate = prepareOperation(
+                    transaction, "reactivation-active", new LifecycleRevision(1)
+            );
+            PopulationDomainReservation target = new PopulationDomainReservation(
+                    reactivate.operationId(), PROFILE, new LifecycleRevision(1),
+                    BUCKET, 0, 1, 1, 4, 4, 1, 1, 1, -50
+            );
+            new SqlitePopulationDomainParticipant(List.of(target), true)
+                    .prepare(transaction, reactivate);
+            PopulationDomainConvergencePlan reactivationPlan =
+                    PopulationDomainConvergencePlanner.plan(
+                            PROFILE, new LifecycleRevision(1), OWNER, "world-one",
+                            LifecycleState.CAPTURED, OWNER, "world-one",
+                            LifecycleState.ACTIVE,
+                            transaction.populationDomains().profileEvidence(
+                                    PROFILE, reactivate.operationId()
+                            ).committed(),
+                            List.of(target)
+                    );
+            SqlitePopulationDomainConvergenceParticipant reactivation =
+                    new SqlitePopulationDomainConvergenceParticipant(
+                            reactivationPlan
+                    );
+            reactivation.prepare(transaction, reactivate);
+            reactivation.decorate((current, envelope) -> List.of())
+                    .execute(transaction, reactivate);
+            transition(transaction, reactivate, OperationPhase.DURABLE, -40);
+
+            assertEquals(1, transaction.populationDomains()
+                    .counts(BUCKET).committedOwned());
+            assertEquals(1, transaction.populationDomains()
+                    .counts(BUCKET).committedDeployable());
+            assertEquals(2, transaction.populationDomains()
+                    .profileEvidence(PROFILE, reactivate.operationId())
+                    .committed().size());
+            assertTrue(reactivation.matches(transaction, transaction.operations()
+                    .find(reactivate.operationId()).orElseThrow()));
+            connection.rollback();
+        }
+    }
+
+    @Test
+    void foreignPendingRowInAnotherBucketFailsBeforeDelegatedWork() throws Exception {
+        try (Connection connection = open("foreign-pending.sqlite")) {
+            connection.setAutoCommit(false);
+            SqlitePersistenceTransactionContext transaction =
+                    new SqlitePersistenceTransactionContext(connection);
+            PopulationDomainReservation source = seedCommittedSource(transaction);
+            OperationEnvelope foreignOperation = prepareOperation(
+                    transaction, "foreign-pending", LifecycleRevision.INITIAL
+            );
+            PopulationDomainReservation foreign = new PopulationDomainReservation(
+                    foreignOperation.operationId(), PROFILE,
+                    LifecycleRevision.INITIAL,
+                    new PopulationDomainBucket(
+                            OWNER, "runeteria:other", PopulationDomainScope.PER_WORLD,
+                            "world-one"
+                    ),
+                    1, 0, 1, 4, 4, 1, 1, 1, -50
+            );
+            new SqlitePopulationDomainParticipant(List.of(foreign))
+                    .prepare(transaction, foreignOperation);
+            OperationEnvelope operation = prepareOperation(
+                    transaction, "foreign-pending-current", LifecycleRevision.INITIAL
+            );
+            SqlitePopulationDomainConvergenceParticipant participant =
+                    new SqlitePopulationDomainConvergenceParticipant(plan(
+                            transaction, LifecycleState.ACTIVE, OWNER, "world-one",
+                            LifecycleState.CAPTURED, OWNER, "world-one", source
+                    ));
+
+            assertThrows(IllegalStateException.class, () ->
+                    participant.prepare(transaction, operation));
+            assertEquals(1, transaction.populationDomains()
+                    .profileEvidence(PROFILE, operation.operationId())
+                    .committed().getFirst().ownedDelta());
+            assertEquals(1, transaction.populationDomains()
+                    .profileEvidence(PROFILE, operation.operationId())
+                    .foreignPending().size());
+            connection.rollback();
         }
     }
 
@@ -144,7 +255,57 @@ class SqlitePopulationDomainConvergenceParticipantTest {
                     participant.prepare(transaction, operation));
             assertFalse(delegated.get());
             assertEquals(1, transaction.populationDomains()
-                    .findCommittedByProfile(PROFILE).getFirst().ownedDelta());
+                    .profileEvidence(PROFILE, operation.operationId())
+                    .committed().getFirst().ownedDelta());
+            connection.rollback();
+        }
+    }
+
+    @Test
+    void compensatedReplayAcceptsRetiredCurrentTargetAndExactSource() throws Exception {
+        try (Connection connection = open("compensated-replay.sqlite")) {
+            connection.setAutoCommit(false);
+            SqlitePersistenceTransactionContext transaction =
+                    new SqlitePersistenceTransactionContext(connection);
+            PopulationDomainReservation source = seedCommittedSource(transaction);
+            OperationEnvelope operation = prepareOperation(
+                    transaction, "compensated-replay", LifecycleRevision.INITIAL
+            );
+            PopulationDomainReservation target = new PopulationDomainReservation(
+                    operation.operationId(), PROFILE, LifecycleRevision.INITIAL,
+                    BUCKET, 1, 0, 1, 4, 4, 1, 1, 1, -50
+            );
+            SqlitePopulationDomainParticipant targetParticipant =
+                    new SqlitePopulationDomainParticipant(List.of(target), true);
+            targetParticipant.prepare(transaction, operation);
+            PopulationDomainConvergencePlan plan =
+                    PopulationDomainConvergencePlanner.plan(
+                            PROFILE, LifecycleRevision.INITIAL, OWNER, "world-one",
+                            LifecycleState.ACTIVE, OWNER, "world-one",
+                            LifecycleState.CAPTURED,
+                            transaction.populationDomains().profileEvidence(
+                                    PROFILE, operation.operationId()
+                            ).committed(),
+                            List.of(target)
+                    );
+            SqlitePopulationDomainConvergenceParticipant participant =
+                    new SqlitePopulationDomainConvergenceParticipant(plan);
+            participant.prepare(transaction, operation);
+            targetParticipant.retirePrepared(transaction, operation);
+            OperationEnvelope applying = transition(
+                    transaction, operation, OperationPhase.LIVE_APPLYING, -40
+            );
+            OperationEnvelope compensating = transition(
+                    transaction, applying, OperationPhase.COMPENSATING, -30
+            );
+            OperationEnvelope compensated = transition(
+                    transaction, compensating, OperationPhase.COMPENSATED, -20
+            );
+
+            assertTrue(participant.matches(transaction, compensated));
+            assertTrue(transaction.populationDomains()
+                    .profileEvidence(PROFILE, operation.operationId())
+                    .currentOperationPending().isEmpty());
             connection.rollback();
         }
     }
@@ -172,7 +333,8 @@ class SqlitePopulationDomainConvergenceParticipantTest {
                         throw new IllegalStateException("live_failure");
                     }).execute(transaction, operation));
             PopulationDomainReservation retained = transaction.populationDomains()
-                    .findCommittedByProfile(PROFILE).getFirst();
+                    .profileEvidence(PROFILE, operation.operationId())
+                    .committed().getFirst();
             assertEquals(1, retained.ownedDelta());
             assertEquals(1, retained.deployableDelta());
             connection.rollback();
@@ -220,10 +382,15 @@ class SqlitePopulationDomainConvergenceParticipantTest {
             OperationEnvelope durableCapture = transition(
                     transaction, capture, OperationPhase.DURABLE, -70
             );
+            transaction.outbox().append(new ProjectionEventDraft(
+                    capture.operationId(), new ProjectionEventType("test_capture"),
+                    PROFILE.toString(), 1, 1, "{}", -70
+            ));
             assertTrue(captureParticipant.matches(transaction, durableCapture));
 
             PopulationDomainReservation captured = transaction.populationDomains()
-                    .findCommittedByProfile(PROFILE).getFirst();
+                    .profileEvidence(PROFILE, capture.operationId())
+                    .committed().getFirst();
             PopulationDomainConvergencePlan releasePlan = planAt(
                     transaction, new LifecycleRevision(1),
                     LifecycleState.CAPTURED, OWNER, "world-one",
@@ -245,6 +412,173 @@ class SqlitePopulationDomainConvergenceParticipantTest {
 
             assertTrue(captureParticipant.matches(transaction, durableCapture));
             connection.rollback();
+        }
+    }
+
+    @Test
+    void retainedAdmissionRejectsChangedRowsWithoutCanonicalSupersession() throws Exception {
+        try (Connection connection = open("retained-replay-mismatch.sqlite")) {
+            connection.setAutoCommit(false);
+            SqlitePersistenceTransactionContext transaction =
+                    new SqlitePersistenceTransactionContext(connection);
+            PopulationDomainReservation source = seedCommittedSource(transaction);
+            OperationEnvelope sourceOperation = transaction.operations()
+                    .find(source.operationId()).orElseThrow();
+            SqlitePopulationDomainParticipant retained =
+                    new SqlitePopulationDomainParticipant(List.of(source), true);
+            try (var statement = connection.prepareStatement("""
+                    UPDATE population_domain_reservation
+                    SET owned_delta = 2
+                    WHERE operation_id = ?
+                    """)) {
+                statement.setString(1, source.operationId().toString());
+                assertEquals(1, statement.executeUpdate());
+            }
+            assertFalse(retained.matches(transaction, sourceOperation));
+            connection.rollback();
+        }
+    }
+
+    @Test
+    void retainedSupersessionRejectsRowsFromAnotherProfile() throws Exception {
+        try (Connection connection = open("retained-mixed-profile.sqlite")) {
+            connection.setAutoCommit(false);
+            SqlitePersistenceTransactionContext transaction =
+                    new SqlitePersistenceTransactionContext(connection);
+            transaction.identities().createProfile(new CompanionIdentity(
+                    PROFILE, "Companion", "role", null, null, "world-one",
+                    -100, -100, -100, 0
+            ));
+            transaction.lifecycles().create(new CompanionLifecycle(
+                    PROFILE, OWNER, LifecycleState.ACTIVE,
+                    LifecycleLocation.liveEntity("npc-one", "world-one"),
+                    LifecycleRevision.INITIAL, null, -100,
+                    ReconciliationGeneration.INITIAL, null, "world-one"
+            ));
+            PopulationDomainReservation source = seedCommittedSource(transaction);
+            PopulationDomainReservation otherProfile = new PopulationDomainReservation(
+                    source.operationId(), ProfileId.parse(
+                            "20000000-0000-0000-0000-000000000422"
+                    ), source.expectedLifecycleRevision(), source.bucket(),
+                    source.ownedDelta(), source.deployableDelta(), source.weight(),
+                    source.snapshottedMaxOwned(), source.snapshottedMaxDeployable(),
+                    source.providerSnapshotRevision(), source.managedConfigRevision(),
+                    source.policyRevision(), source.createdAtMs()
+            );
+            SqlitePopulationDomainParticipant retained =
+                    new SqlitePopulationDomainParticipant(
+                            List.of(source, otherProfile), true
+                    );
+            OperationEnvelope sourceOperation = transaction.operations()
+                    .find(source.operationId()).orElseThrow();
+            transitionLifecycle(
+                    transaction, sourceOperation, LifecycleState.CAPTURED,
+                    LifecycleLocation.keyed(
+                            com.alechilles.alecstamework.companion.lifecycle
+                                    .LifecycleLocationKind.CAPTURE_ITEM,
+                            "mixed-profile-capture"
+                    )
+            );
+
+            assertFalse(retained.matches(transaction, sourceOperation));
+            connection.rollback();
+        }
+    }
+
+    @Test
+    void delegatedWritesRollbackWhenConvergenceFails() throws Exception {
+        SqliteConnectionFactory connections = new SqliteConnectionFactory(
+                tempDir.resolve("rollback-after-writes.sqlite")
+        );
+        assertTrue(new SqliteSchemaV2Manager(connections, () -> -10_000)
+                .initialize() instanceof com.alechilles.alecstamework.persistence.kernel
+                .PersistenceTransactionResult.Committed<?>);
+        OperationId operationId;
+        try (Connection connection = connections.openWriterConnection()) {
+            connection.setAutoCommit(false);
+            SqlitePersistenceTransactionContext transaction =
+                    new SqlitePersistenceTransactionContext(connection);
+            transaction.identities().createProfile(new CompanionIdentity(
+                    PROFILE, "Companion", "role", null, null, "world-one",
+                    -100, -100, -100, 0
+            ));
+            transaction.lifecycles().create(new CompanionLifecycle(
+                    PROFILE, OWNER, LifecycleState.ACTIVE,
+                    LifecycleLocation.liveEntity("npc-one", "world-one"),
+                    LifecycleRevision.INITIAL, null, -100,
+                    ReconciliationGeneration.INITIAL, null, "world-one"
+            ));
+            PopulationDomainReservation source = seedCommittedSource(transaction);
+            OperationEnvelope operation = prepareOperation(
+                    transaction, "rollback-after-writes-op", LifecycleRevision.INITIAL
+            );
+            operationId = operation.operationId();
+            SqlitePopulationDomainConvergenceParticipant participant =
+                    new SqlitePopulationDomainConvergenceParticipant(plan(
+                            transaction, LifecycleState.ACTIVE, OWNER, "world-one",
+                            LifecycleState.CAPTURED, OWNER, "world-one", source
+                    ));
+            participant.prepare(transaction, operation);
+            connection.commit();
+
+            SqlitePersistenceTransactionContext liveTransaction =
+                    new SqlitePersistenceTransactionContext(connection);
+            OperationEnvelope prepared = liveTransaction.operations()
+                    .find(operationId).orElseThrow();
+            SqlitePopulationDomainConvergenceParticipant liveParticipant =
+                    new SqlitePopulationDomainConvergenceParticipant(participant.plan());
+            liveParticipant.prepare(liveTransaction, prepared);
+            assertThrows(IllegalStateException.class, () ->
+                    liveParticipant.decorate((current, envelope) -> {
+                        transitionLifecycle(
+                                liveTransaction, prepared, LifecycleState.CAPTURED,
+                                LifecycleLocation.keyed(
+                                        com.alechilles.alecstamework.companion.lifecycle
+                                                .LifecycleLocationKind.CAPTURE_ITEM,
+                                        "rollback-capture"
+                                )
+                        );
+                        ProjectionEventDraft event = new ProjectionEventDraft(
+                                prepared.operationId(),
+                                new ProjectionEventType("test_rollback"),
+                                PROFILE.toString(), 1, 1, "{}", -40
+                        );
+                        liveTransaction.outbox().append(event);
+                        OperationEnvelope foreignOperation = prepareOperation(
+                                liveTransaction, "rollback-foreign-op",
+                                LifecycleRevision.INITIAL
+                        );
+                        PopulationDomainReservation foreign =
+                                new PopulationDomainReservation(
+                                        foreignOperation.operationId(), PROFILE,
+                                        LifecycleRevision.INITIAL, BUCKET,
+                                        1, 0, 1, 4, 4, 1, 1, 1, -30
+                                );
+                        new SqlitePopulationDomainParticipant(List.of(foreign))
+                                .prepare(liveTransaction, foreignOperation);
+                        return List.of(event);
+                    }).execute(liveTransaction, prepared));
+            connection.rollback();
+        }
+
+        try (Connection connection = connections.openWriterConnection()) {
+            SqlitePersistenceTransactionContext transaction =
+                    new SqlitePersistenceTransactionContext(connection);
+            assertEquals(1, transaction.populationDomains()
+                    .profileEvidence(PROFILE, operationId).committed()
+                    .getFirst().ownedDelta());
+            assertEquals(1, transaction.populationDomains()
+                    .profileEvidence(PROFILE, operationId).committed()
+                    .getFirst().deployableDelta());
+            CompanionLifecycle lifecycle = transaction.lifecycles()
+                    .findByProfile(PROFILE).orElseThrow();
+            assertEquals(LifecycleState.ACTIVE, lifecycle.state());
+            assertEquals(LifecycleRevision.INITIAL, lifecycle.revision());
+            assertEquals(OperationPhase.PREPARED, transaction.operations()
+                    .find(operationId).orElseThrow().phase());
+            assertTrue(transaction.outbox().findByOperation(operationId).isEmpty());
+            assertTrue(transaction.populationDomains()
+                    .profileEvidence(PROFILE, operationId).foreignPending().isEmpty());
         }
     }
 
@@ -289,6 +623,10 @@ class SqlitePopulationDomainConvergenceParticipantTest {
                 transaction, sourceOperation, OperationPhase.LIVE_APPLYING, -80
         );
         transition(transaction, applying, OperationPhase.DURABLE, -70);
+        transaction.outbox().append(new ProjectionEventDraft(
+                sourceOperation.operationId(), new ProjectionEventType("test_source"),
+                PROFILE.toString(), 1, 1, "{}", -70
+        ));
         return source;
     }
 
@@ -322,7 +660,9 @@ class SqlitePopulationDomainConvergenceParticipantTest {
         return PopulationDomainConvergencePlanner.plan(
                 PROFILE, sourceRevision, sourceOwner, sourceWorld,
                 sourceState, targetOwner, targetWorld, targetState,
-                transaction.populationDomains().findCommittedByProfile(PROFILE)
+                transaction.populationDomains().profileEvidence(
+                        PROFILE, null
+                ).committed()
         );
     }
 
@@ -368,7 +708,7 @@ class SqlitePopulationDomainConvergenceParticipantTest {
                 state,
                 location,
                 current.revision().next(),
-                operation.operationId(),
+                null,
                 -60,
                 current.lastReconciledGeneration(),
                 null,
