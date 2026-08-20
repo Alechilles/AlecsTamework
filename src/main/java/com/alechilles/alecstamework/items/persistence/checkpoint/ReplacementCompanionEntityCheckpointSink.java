@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex;
 import com.alechilles.alecstamework.items.persistence.maintenance.LatestWorkCoordinator;
 import com.alechilles.alecstamework.items.persistence.maintenance.MaintenanceDrainResult;
 import com.alechilles.alecstamework.items.persistence.maintenance.MaintenanceMetricsSnapshot;
+import com.alechilles.alecstamework.items.persistence.maintenance.MaintenanceWorkOutcome;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.kernel.StorageFailure;
@@ -22,13 +23,22 @@ import com.alechilles.alecstamework.persistence.operation.PublicOperationSubmiss
 import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import javax.annotation.Nonnull;
@@ -52,8 +62,12 @@ public final class ReplacementCompanionEntityCheckpointSink
     private final LoadedNpcIdentityIndex identities;
     private final Consumer<CompanionEntityCheckpoint> published;
     private final Predicate<NpcAlias> suppressed;
-    private final LatestWorkCoordinator<UUID, CompanionEntityCheckpointCapture>
+    private final LatestWorkCoordinator<UUID, CheckpointWork>
             coordinator;
+    private final Object schedulerLock = new Object();
+    private final ScheduledThreadPoolExecutor deferralScheduler;
+    private final Set<ScheduledFuture<?>> deferralTimers = new HashSet<>();
+    private volatile boolean closing;
 
     public ReplacementCompanionEntityCheckpointSink(
             @Nonnull PersistenceDomainFacades persistence,
@@ -79,9 +93,24 @@ public final class ReplacementCompanionEntityCheckpointSink
         this.identities = identities;
         this.published = Objects.requireNonNull(published, "published");
         this.suppressed = Objects.requireNonNull(suppressed, "suppressed");
+        this.deferralScheduler = new ScheduledThreadPoolExecutor(
+                1,
+                runnable -> {
+                    Thread thread = new Thread(
+                            runnable, "tamework-checkpoint-deferral"
+                    );
+                    thread.setDaemon(true);
+                    return thread;
+                }
+        );
+        this.deferralScheduler.setRemoveOnCancelPolicy(true);
+        this.deferralScheduler.setExecuteExistingDelayedTasksAfterShutdownPolicy(
+                false
+        );
         this.coordinator = new LatestWorkCoordinator<>(
                 4,
-                (alias, capture) -> persistWithWarning(alias, capture)
+                (alias, work) -> persistWithWarning(alias, work),
+                this::scheduleResume
         );
     }
 
@@ -94,7 +123,16 @@ public final class ReplacementCompanionEntityCheckpointSink
         if (suppressed.test(capture.alias())) {
             return CompletableFuture.completedFuture(null);
         }
-        return coordinator.submit(capture.alias().value(), capture);
+        CheckpointWork work = new CheckpointWork(capture);
+        UUID alias = capture.alias().value();
+        if (critical(capture.boundary())) {
+            return coordinator.submitPriority(
+                    alias,
+                    work,
+                    ReplacementCompanionEntityCheckpointSink::selectCritical
+            );
+        }
+        return coordinator.submit(alias, work);
     }
 
     /** Waits until the newest accepted checkpoint for one alias is durable. */
@@ -114,105 +152,131 @@ public final class ReplacementCompanionEntityCheckpointSink
     /** Stops admission and drains retained checkpoint work by the deadline. */
     @Nonnull
     public MaintenanceDrainResult shutdown(@Nonnull Duration timeout) {
-        return coordinator.shutdown(Objects.requireNonNull(timeout, "timeout"));
+        Duration checked = Objects.requireNonNull(timeout, "timeout");
+        if (checked.isNegative()) {
+            throw new IllegalArgumentException(
+                    "Shutdown timeout must be non-negative"
+            );
+        }
+        long startedAtNanos = System.nanoTime();
+        synchronized (schedulerLock) {
+            closing = true;
+            for (ScheduledFuture<?> timer : deferralTimers) {
+                timer.cancel(false);
+            }
+            deferralTimers.clear();
+        }
+        MaintenanceDrainResult result = coordinator.shutdown(
+                remainingTimeout(checked, startedAtNanos)
+        );
+        deferralScheduler.shutdown();
+        awaitSchedulerTermination(
+                remainingTimeout(checked, startedAtNanos)
+        );
+        return result;
     }
 
-    private CompletionStage<Void> persistWithWarning(
+    private CompletionStage<? extends MaintenanceWorkOutcome<CheckpointWork>>
+    persistWithWarning(
             UUID alias,
-            CompanionEntityCheckpointCapture capture
+            CheckpointWork work
     ) {
-        CompletionStage<Void> persistence;
+        CompletionStage<MaintenanceWorkOutcome<CheckpointWork>> persistence;
         try {
-            persistence = persist(capture, 0);
+            persistence = persist(work);
         } catch (Throwable failure) {
             warnFailure(alias, failure);
-            return CompletableFuture.failedFuture(failure);
+            return CompletableFuture.completedFuture(
+                    MaintenanceWorkOutcome.failed(failure)
+            );
         }
         if (persistence == null) {
             NullPointerException failure = new NullPointerException(
                     "Checkpoint persistence returned no completion"
             );
             warnFailure(alias, failure);
-            return CompletableFuture.failedFuture(failure);
+            return CompletableFuture.completedFuture(
+                    MaintenanceWorkOutcome.failed(failure)
+            );
         }
-        return persistence.whenComplete((ignored, failure) -> {
+        return persistence.handle((outcome, failure) -> {
             if (failure != null) {
                 warnFailure(alias, failure);
+                return MaintenanceWorkOutcome.failed(failure);
             }
+            if (outcome instanceof MaintenanceWorkOutcome.Failed<CheckpointWork>
+                    failed) {
+                warnFailure(alias, failed.failure());
+            }
+            return outcome;
         });
     }
 
-    private CompletionStage<Void> persist(
-            CompanionEntityCheckpointCapture capture,
-            int returnedIdentityAttempt
+    private CompletionStage<MaintenanceWorkOutcome<CheckpointWork>> persist(
+            CheckpointWork work
     ) {
+        CompanionEntityCheckpointCapture capture = work.capture();
         return persistence.queries().findProfile(capture.alias())
                 .thenCompose(read -> {
                     if (read instanceof PersistenceReadResult.Failed<
                             CompanionProfileReadModel> failed) {
-                        return failedStorage(failed.failure());
+                        return failedOutcome(storageFailure(failed.failure()));
                     }
                     if (!(read instanceof PersistenceReadResult.Found<
                             CompanionProfileReadModel> found)) {
-                        return CompletableFuture.completedFuture(null);
+                        return durableOutcome();
                     }
                     CompanionEntityCheckpoint checkpoint = author.author(
                             found.value(), capture
                     );
                     if (checkpoint != null) {
-                        return submitAndPublish(checkpoint);
+                        return durableAfter(submitAndPublish(checkpoint));
                     }
-                    return persistReturned(
-                            found.value(), capture, returnedIdentityAttempt
-                    );
+                    return persistReturned(found.value(), work);
                 });
     }
 
-    private CompletionStage<Void> persistReturned(
+    private CompletionStage<MaintenanceWorkOutcome<CheckpointWork>>
+    persistReturned(
             CompanionProfileReadModel profile,
-            CompanionEntityCheckpointCapture capture,
-            int returnedIdentityAttempt
+            CheckpointWork work
     ) {
+        CompanionEntityCheckpointCapture capture = work.capture();
         if (identities == null || profile.currentAlias() == null) {
-            return CompletableFuture.completedFuture(null);
+            return durableOutcome();
         }
         LoadedNpcIdentityIndex.ProbeStatus currentStatus = identities.probe(
                 profile.currentAlias().alias().value()
         ).status();
         if (currentStatus == LoadedNpcIdentityIndex.ProbeStatus.UNKNOWN) {
-            if (returnedIdentityAttempt >= RETURNED_IDENTITY_RETRIES) {
-                warnings.accept(
-                        "Returned companion reconciliation timed out waiting "
-                                + "for complete loaded identity evidence: npc="
-                                + capture.alias()
-                );
-                return CompletableFuture.completedFuture(null);
+            if (closing || work.attempt() >= RETURNED_IDENTITY_RETRIES) {
+                return failedOutcome(new IllegalStateException(
+                        closing
+                                ? "returned_identity_unknown_during_shutdown"
+                                : "returned_identity_unknown_retry_limit"
+                ));
             }
-            return CompletableFuture.runAsync(
-                    () -> { },
-                    CompletableFuture.delayedExecutor(
-                            500, TimeUnit.MILLISECONDS
-                    )
-            ).thenCompose(ignored -> persist(
-                    capture, returnedIdentityAttempt + 1
-            ));
+            work.incrementAttempt();
+            return CompletableFuture.completedFuture(
+                    MaintenanceWorkOutcome.deferred()
+            );
         }
         boolean currentSafeToReplace = currentStatus
                 == LoadedNpcIdentityIndex.ProbeStatus.ABSENT
                 || currentStatus
                 == LoadedNpcIdentityIndex.ProbeStatus.ONE_LOCATION;
         if (!currentSafeToReplace) {
-            return CompletableFuture.completedFuture(null);
+            return durableOutcome();
         }
         return persistence.queries().findAlias(capture.alias())
                 .thenCompose(read -> {
                     if (read instanceof PersistenceReadResult.Failed<
                             CompanionAlias> failed) {
-                        return failedStorage(failed.failure());
+                        return failedOutcome(storageFailure(failed.failure()));
                     }
                     if (!(read instanceof PersistenceReadResult.Found<
                             CompanionAlias> found)) {
-                        return CompletableFuture.completedFuture(null);
+                        return durableOutcome();
                     }
                     CompanionEntityCheckpoint checkpoint =
                             returnedAuthor.author(
@@ -222,9 +286,118 @@ public final class ReplacementCompanionEntityCheckpointSink
                                     true
                             );
                     return checkpoint == null
-                            ? CompletableFuture.completedFuture(null)
-                            : submitAndPublish(checkpoint);
+                            ? durableOutcome()
+                            : durableAfter(submitAndPublish(checkpoint));
                 });
+    }
+
+    private static CompletionStage<MaintenanceWorkOutcome<CheckpointWork>>
+    durableOutcome() {
+        return CompletableFuture.completedFuture(
+                MaintenanceWorkOutcome.durable()
+        );
+    }
+
+    private static CompletionStage<MaintenanceWorkOutcome<CheckpointWork>>
+    failedOutcome(Throwable failure) {
+        return CompletableFuture.completedFuture(
+                MaintenanceWorkOutcome.failed(failure)
+        );
+    }
+
+    private static CompletionStage<MaintenanceWorkOutcome<CheckpointWork>>
+    durableAfter(CompletionStage<Void> persistence) {
+        return persistence.thenApply(ignored ->
+                MaintenanceWorkOutcome.durable()
+        );
+    }
+
+    private void scheduleResume(Runnable resume) {
+        Objects.requireNonNull(resume, "resume");
+        AtomicReference<ScheduledFuture<?>> reference =
+                new AtomicReference<>();
+        Runnable guarded = () -> {
+            synchronized (schedulerLock) {
+                ScheduledFuture<?> timer = reference.get();
+                if (timer != null) {
+                    deferralTimers.remove(timer);
+                }
+                if (!closing) {
+                    resume.run();
+                }
+            }
+        };
+        synchronized (schedulerLock) {
+            if (closing) {
+                throw new RejectedExecutionException(
+                        "Checkpoint deferral scheduler is closed"
+                );
+            }
+            ScheduledFuture<?> timer = deferralScheduler.schedule(
+                    guarded, 500L, TimeUnit.MILLISECONDS
+            );
+            reference.set(timer);
+            deferralTimers.add(timer);
+        }
+    }
+
+    private void awaitSchedulerTermination(Duration timeout) {
+        long nanos;
+        try {
+            nanos = timeout.toNanos();
+        } catch (ArithmeticException overflow) {
+            nanos = Long.MAX_VALUE;
+        }
+        try {
+            deferralScheduler.awaitTermination(
+                    Math.max(0L, nanos), TimeUnit.NANOSECONDS
+            );
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static Duration remainingTimeout(
+            Duration timeout,
+            long startedAtNanos
+    ) {
+        long total;
+        try {
+            total = timeout.toNanos();
+        } catch (ArithmeticException overflow) {
+            return timeout;
+        }
+        long elapsed = System.nanoTime() - startedAtNanos;
+        if (elapsed <= 0L) {
+            return timeout;
+        }
+        long remaining = total - elapsed;
+        return remaining <= 0L ? Duration.ZERO : Duration.ofNanos(remaining);
+    }
+
+    private static boolean critical(
+            CompanionEntityCheckpoint.CaptureBoundary boundary
+    ) {
+        return boundary == CompanionEntityCheckpoint.CaptureBoundary.UNLOAD
+                || boundary
+                == CompanionEntityCheckpoint.CaptureBoundary.DESTRUCTIVE_REMOVE;
+    }
+
+    private static CheckpointWork selectCritical(
+            CheckpointWork existing,
+            CheckpointWork candidate
+    ) {
+        int existingRank = criticalRank(existing.capture().boundary());
+        int candidateRank = criticalRank(candidate.capture().boundary());
+        return candidateRank >= existingRank ? candidate : existing;
+    }
+
+    private static int criticalRank(
+            CompanionEntityCheckpoint.CaptureBoundary boundary
+    ) {
+        return boundary
+                == CompanionEntityCheckpoint.CaptureBoundary.DESTRUCTIVE_REMOVE
+                ? 2 : 1;
     }
 
     private CompletionStage<Void> submitAndPublish(
@@ -342,38 +515,81 @@ public final class ReplacementCompanionEntityCheckpointSink
         return candidate == CompanionEntityCheckpoint.CaptureBoundary.LOADED
                 ? current == CompanionEntityCheckpoint.CaptureBoundary.LOADED
                 || current == CompanionEntityCheckpoint.CaptureBoundary.UNLOAD
+                || current == CompanionEntityCheckpoint.CaptureBoundary
+                .DESTRUCTIVE_REMOVE
                 : current == candidate;
     }
 
     private static <T> CompletionStage<T> failedStorage(
             StorageFailure failure
     ) {
-        Throwable cause = failure.cause();
-        return CompletableFuture.failedFuture(
-                new IllegalStateException(failure.code(), cause)
-        );
+        return CompletableFuture.failedFuture(storageFailure(failure));
+    }
+
+    private static IllegalStateException storageFailure(
+            StorageFailure failure
+    ) {
+        return new IllegalStateException(failure.code(), failure.cause());
     }
 
     private void warnFailure(UUID alias, Throwable failure) {
-        Throwable unwrapped = unwrap(failure);
-        String message = unwrapped.getMessage();
-        if (message == null || message.isBlank()) {
-            message = unwrapped.getClass().getSimpleName();
-        }
+        String message = failureMessage(failure);
         warnings.accept(
                 "Companion checkpoint persistence failed for npc="
                         + alias + ": " + message
         );
     }
 
-    private static Throwable unwrap(Throwable failure) {
+    private static String failureMessage(Throwable failure) {
         Throwable current = failure;
-        while ((current instanceof CompletionException
-                || current instanceof ExecutionException)
-                && current.getCause() != null) {
-            current = current.getCause();
+        List<String> messages = new ArrayList<>();
+        while (current != null) {
+            if (current.getMessage() != null
+                    && !current.getMessage().isBlank()) {
+                messages.add(current.getMessage());
+            }
+            Throwable cause = current.getCause();
+            if (cause == null) {
+                break;
+            }
+            current = cause;
+            while ((current instanceof CompletionException
+                    || current instanceof ExecutionException)
+                    && current.getCause() != null) {
+                current = current.getCause();
+            }
         }
-        return current;
+        if (messages.isEmpty()) {
+            return failure.getClass().getSimpleName();
+        }
+        if (messages.size() == 1) {
+            return messages.get(0);
+        }
+        String deepest = messages.get(messages.size() - 1);
+        return deepest + " (cause-chain: "
+                + String.join(" -> ", messages.subList(0, messages.size() - 1))
+                + ")";
+    }
+
+    private static final class CheckpointWork {
+        private final CompanionEntityCheckpointCapture capture;
+        private final AtomicInteger attempts = new AtomicInteger();
+
+        private CheckpointWork(CompanionEntityCheckpointCapture capture) {
+            this.capture = Objects.requireNonNull(capture, "capture");
+        }
+
+        private CompanionEntityCheckpointCapture capture() {
+            return capture;
+        }
+
+        private int attempt() {
+            return attempts.get();
+        }
+
+        private void incrementAttempt() {
+            attempts.incrementAndGet();
+        }
     }
 
     /** Returns the stable extension key for one alias checkpoint. */
