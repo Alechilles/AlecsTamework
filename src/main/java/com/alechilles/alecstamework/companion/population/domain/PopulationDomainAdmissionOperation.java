@@ -168,6 +168,14 @@ public final class PopulationDomainAdmissionOperation {
         return durable(operationId, canceled, null, null);
     }
 
+    /** Cancels a locally preclaimed token before world mutation is authorized. */
+    @Nonnull
+    public CompletionStage<OperationWorkflow> cancelPreclaimed(
+            @Nonnull OperationId operationId
+    ) {
+        return durable(operationId, true, null, null, true);
+    }
+
     @Nonnull
     public CompletionStage<OperationWorkflow> commitBatch(
             @Nonnull OperationId operationId,
@@ -275,13 +283,28 @@ public final class PopulationDomainAdmissionOperation {
             java.util.Set<Integer> settledOrdinals,
             java.util.Map<Integer, UUID> actualChildIds
     ) {
+        return durable(
+                operationId, canceled, settledOrdinals, actualChildIds, false
+        );
+    }
+
+    private CompletionStage<OperationWorkflow> durable(
+            OperationId operationId,
+            boolean canceled,
+            java.util.Set<Integer> settledOrdinals,
+            java.util.Map<Integer, UUID> actualChildIds,
+            boolean allowLiveCancellation
+    ) {
         return read(operationId).thenCompose(operation -> {
             if (operation.phase() == OperationPhase.DURABLE
                     || operation.phase() == OperationPhase.PUBLISHED) {
                 return publisher.resume(operation, consumers)
                         .thenApply(result -> new OperationWorkflow(result, operation));
             }
-            boolean preparingCancel = canceled && operation.phase() == OperationPhase.PREPARED;
+            boolean preparingCancel = canceled
+                    && (operation.phase() == OperationPhase.PREPARED
+                    || allowLiveCancellation
+                    && operation.phase() == OperationPhase.LIVE_APPLYING);
             boolean committing = !canceled && operation.phase() == OperationPhase.LIVE_APPLYING;
             if (!preparingCancel && !committing) {
                 return CompletableFuture.failedFuture(new IllegalStateException(

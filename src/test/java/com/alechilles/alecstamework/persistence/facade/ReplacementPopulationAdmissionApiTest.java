@@ -20,6 +20,9 @@ import com.alechilles.alecstamework.config.assets.TwPopulationGroupConfig;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegistry;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
+import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
+import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceRuntimeConfiguration;
@@ -33,7 +36,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -117,6 +125,11 @@ class ReplacementPopulationAdmissionApiTest {
                     .toCompletableFuture().join();
             assertEquals(PopulationAdmissionDecision.Status.RESERVED,
                     single.status(), single.reason());
+            assertEquals(OperationPhase.LIVE_APPLYING,
+                    persistence.facades().operations().populationDomainAdmission()
+                            .findByIdempotency(new IdempotencyKey(
+                                    "population-domain:facade-test"
+                            )).toCompletableFuture().join().orElseThrow().phase());
             assertEquals(PopulationAdmissionDecision.Status.CANCELED,
                     api.cancel(single.token()).toCompletableFuture().join().status());
 
@@ -166,6 +179,175 @@ class ReplacementPopulationAdmissionApiTest {
             assertEquals(PopulationAdmissionDecision.Status.CANCELED,
                     api.cancel(afterRollback.token()).toCompletableFuture().join().status());
         }
+    }
+
+    @Test
+    void claimForApplyIsInMemoryAndSingleUseUnderConcurrency() throws Exception {
+        try (PersistenceBootstrap persistence = new PersistenceBootstrap(configuration());
+             AdmissionProviderRegistry providers = new AdmissionProviderRegistry()) {
+            assertTrue(persistence.start().toCompletableFuture().join().complete());
+            PopulationGroupConfigRegistry groups = new PopulationGroupConfigRegistry();
+            assertTrue(groups.replace(List.of(groupConfig(2)), 1L).applied());
+            ManagedActivityConfigRegistry managed =
+                    new ManagedActivityConfigRegistry(groups);
+            assertTrue(managed.replace(List.of(managedConfig()), 1L).applied());
+            providers.register("runeteria:provider", 1, ignored ->
+                    CompletableFuture.completedFuture(providerDecision(
+                            2, managed.snapshot().revision()
+                    )));
+            ReplacementPopulationAdmissionApi api =
+                    new ReplacementPopulationAdmissionApi(
+                            persistence,
+                            persistence.facades().operations(),
+                            managed,
+                            groups,
+                            providers,
+                            () -> -50L
+                    );
+
+            PopulationAdmissionDecision reserved = api.tryAdmitV3(request())
+                    .toCompletableFuture().join();
+            assertEquals(PopulationAdmissionDecision.Status.RESERVED,
+                    reserved.status(), reserved.reason());
+            persistence.close();
+
+            ExecutorService executor = Executors.newFixedThreadPool(8);
+            try {
+                List<Future<PopulationAdmissionDecision>> attempts =
+                        new java.util.ArrayList<>();
+                for (int i = 0; i < 8; i++) {
+                    attempts.add(executor.submit(
+                            () -> api.claimForApply(reserved.token())
+                    ));
+                }
+                assertTrue(executor.awaitTermination(2, TimeUnit.SECONDS)
+                        || shutdownAndAwait(executor));
+                int applying = 0;
+                int unavailable = 0;
+                for (Future<PopulationAdmissionDecision> attempt : attempts) {
+                    PopulationAdmissionDecision result = attempt.get(
+                            2, TimeUnit.SECONDS
+                    );
+                    if (result.status()
+                            == PopulationAdmissionDecision.Status.APPLYING) {
+                        applying++;
+                    } else if (result.status()
+                            == PopulationAdmissionDecision.Status.UNAVAILABLE) {
+                        unavailable++;
+                    }
+                }
+                assertEquals(1, applying);
+                assertEquals(7, unavailable);
+            } finally {
+                executor.shutdownNow();
+            }
+        }
+    }
+
+    @Test
+    void restartedLiveApplyingTokenCannotCancelAsUnused() throws Exception {
+        try (PersistenceBootstrap persistence = new PersistenceBootstrap(configuration());
+             AdmissionProviderRegistry providers = new AdmissionProviderRegistry()) {
+            assertTrue(persistence.start().toCompletableFuture().join().complete());
+            PopulationGroupConfigRegistry groups = new PopulationGroupConfigRegistry();
+            assertTrue(groups.replace(List.of(groupConfig(2)), 1L).applied());
+            ManagedActivityConfigRegistry managed =
+                    new ManagedActivityConfigRegistry(groups);
+            assertTrue(managed.replace(List.of(managedConfig()), 1L).applied());
+            providers.register("runeteria:provider", 1, ignored ->
+                    CompletableFuture.completedFuture(providerDecision(
+                            2, managed.snapshot().revision()
+                    )));
+            ReplacementPopulationAdmissionApi api =
+                    new ReplacementPopulationAdmissionApi(
+                            persistence,
+                            persistence.facades().operations(),
+                            managed,
+                            groups,
+                            providers,
+                            () -> -50L
+                    );
+            PopulationAdmissionDecision reserved = api.tryAdmitV3(request())
+                    .toCompletableFuture().join();
+            assertEquals(PopulationAdmissionDecision.Status.RESERVED,
+                    reserved.status(), reserved.reason());
+
+            ReplacementPopulationAdmissionApi restarted =
+                    new ReplacementPopulationAdmissionApi(
+                            persistence,
+                            persistence.facades().operations(),
+                            managed,
+                            groups,
+                            providers,
+                            () -> -50L
+                    );
+            PopulationAdmissionDecision canceled = restarted.cancel(
+                    reserved.token()
+            ).toCompletableFuture().join();
+
+            assertEquals(PopulationAdmissionDecision.Status.UNAVAILABLE,
+                    canceled.status());
+            assertEquals(OperationPhase.LIVE_APPLYING,
+                    persistence.facades().operations().populationDomainAdmission()
+                            .findByIdempotency(new IdempotencyKey(
+                                    "population-domain:facade-test"
+                            )).toCompletableFuture().join().orElseThrow().phase());
+        }
+    }
+
+    @Test
+    void cleanupRetainsExpiredApplyingTokenWhenContainmentFails() throws Exception {
+        try (PersistenceBootstrap persistence = new PersistenceBootstrap(configuration());
+             AdmissionProviderRegistry providers = new AdmissionProviderRegistry()) {
+            assertTrue(persistence.start().toCompletableFuture().join().complete());
+            PopulationGroupConfigRegistry groups = new PopulationGroupConfigRegistry();
+            assertTrue(groups.replace(List.of(groupConfig(2)), 1L).applied());
+            ManagedActivityConfigRegistry managed =
+                    new ManagedActivityConfigRegistry(groups);
+            assertTrue(managed.replace(List.of(managedConfig()), 1L).applied());
+            providers.register("runeteria:provider", 1, ignored ->
+                    CompletableFuture.completedFuture(providerDecision(
+                            2, managed.snapshot().revision()
+                    )));
+
+            var operations = persistence.facades().operations()
+                    .populationDomainAdmission();
+            AtomicLong monotonic = new AtomicLong(0L);
+            PopulationAdmissionStaging staging = new PopulationAdmissionStaging(
+                    operations,
+                    () -> -50L,
+                    monotonic::get
+            );
+            ManagedAdmissionEvidenceAuthor author =
+                    new ManagedAdmissionEvidenceAuthor(
+                            managed, groups, providers, () -> -50L
+                    );
+            PopulationAdmissionStaging.Identity identity = staging.identity(request());
+            ManagedAdmissionEvidenceAuthor.Authoring evidence = author.author(
+                    new OperationId(identity.operationId()),
+                    identity.reservationId(),
+                    request()
+            ).toCompletableFuture().join();
+            PopulationAdmissionDecision reserved = staging.prepareOrReuse(
+                    identity, evidence
+            ).toCompletableFuture().join();
+            assertEquals(PopulationAdmissionDecision.Status.RESERVED,
+                    reserved.status(), reserved.reason());
+            assertEquals(PopulationAdmissionDecision.Status.APPLYING,
+                    staging.claimForApply(reserved.token()).status());
+
+            monotonic.set(Long.MAX_VALUE);
+            persistence.close();
+
+            assertEquals(1, staging.cleanupExpired().toCompletableFuture().join());
+            assertEquals(1, staging.cleanupExpired().toCompletableFuture().join());
+        }
+    }
+
+    private boolean shutdownAndAwait(ExecutorService executor)
+            throws InterruptedException {
+        executor.shutdown();
+        return executor.awaitTermination(2, TimeUnit.SECONDS);
     }
 
     private PopulationAdmissionProviderDecision providerDecision(
