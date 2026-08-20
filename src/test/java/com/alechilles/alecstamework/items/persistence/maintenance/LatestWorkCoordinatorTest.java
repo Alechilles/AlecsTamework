@@ -7,10 +7,12 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.Test;
 
@@ -127,11 +129,13 @@ class LatestWorkCoordinatorTest {
     }
 
     @Test
-    void flushWaitsForTheNewestValueAtTheTimeOfTheCall() {
+    void flushFenceSharesAReplacementAcceptedAfterTheFlushCall() {
+        List<Integer> calls = Collections.synchronizedList(new ArrayList<>());
         BlockingQueue<Invocation<Integer>> invocations =
                 new LinkedBlockingQueue<>();
         LatestWorkCoordinator<String, Integer> coordinator =
                 new LatestWorkCoordinator<>(1, (key, value) -> {
+                    calls.add(value);
                     Invocation<Integer> invocation = new Invocation<>(value);
                     invocations.add(invocation);
                     return invocation.completion;
@@ -140,14 +144,64 @@ class LatestWorkCoordinatorTest {
         coordinator.submit("cow", 1);
         coordinator.submit("cow", 2);
         CompletionStage<Void> flush = coordinator.flush("cow");
+        CompletionStage<Void> replacement = coordinator.submit("cow", 3);
 
         assertFalse(flush.toCompletableFuture().isDone());
         take(invocations).completion.complete(null);
         await(() -> invocations.size() == 1);
+        assertEquals(List.of(1, 3), calls);
         assertFalse(flush.toCompletableFuture().isDone());
 
         take(invocations).completion.complete(null);
         assertTrue(flush.toCompletableFuture().isDone());
+        assertTrue(replacement.toCompletableFuture().isDone());
+    }
+
+    @Test
+    void callbackRegistrationFailureFailsWaitersReleasesSlotAndDrains() throws Exception {
+        BlockingQueue<Invocation<Integer>> invocations =
+                new LinkedBlockingQueue<>();
+        CountDownLatch handlerEntered = new CountDownLatch(1);
+        CountDownLatch releaseHandler = new CountDownLatch(1);
+        RuntimeException registrationFailure =
+                new RuntimeException("completion registration failed");
+        AtomicReference<CompletionStage<Void>> firstStage =
+                new AtomicReference<>();
+        LatestWorkCoordinator<String, Integer> coordinator =
+                new LatestWorkCoordinator<>(1, (key, value) -> {
+                    if (value == 1) {
+                        handlerEntered.countDown();
+                        awaitLatch(releaseHandler);
+                        return new RegistrationFailureStage(registrationFailure);
+                    }
+                    Invocation<Integer> invocation = new Invocation<>(value);
+                    invocations.add(invocation);
+                    return invocation.completion;
+                });
+
+        Thread submitter = new Thread(
+                () -> firstStage.set(coordinator.submit("cow", 1)),
+                "latest-work-coordinator-registration-test"
+        );
+        submitter.start();
+        awaitLatch(handlerEntered);
+        CompletionStage<Void> flush = coordinator.flush("cow");
+        CompletionStage<Void> retained = coordinator.submit("cow", 2);
+        releaseHandler.countDown();
+        submitter.join(TimeUnit.SECONDS.toMillis(5));
+
+        assertFalse(submitter.isAlive());
+        assertNotNull(firstStage.get());
+        assertThrows(RuntimeException.class, () -> firstStage.get().toCompletableFuture().join());
+        assertThrows(RuntimeException.class, () -> flush.toCompletableFuture().join());
+        assertEquals(1, coordinator.metrics().inFlightWork());
+
+        take(invocations).completion.complete(null);
+        assertTrue(retained.toCompletableFuture().isDone());
+        assertTrue(coordinator.shutdown(Duration.ofSeconds(1)).drained());
+        assertEquals(1, coordinator.metrics().failures());
+        assertEquals(1, coordinator.metrics().completions());
+        assertEquals(0, coordinator.metrics().inFlightWork());
     }
 
     @Test
@@ -255,12 +309,37 @@ class LatestWorkCoordinatorTest {
         }
     }
 
+    private static void awaitLatch(CountDownLatch latch) {
+        try {
+            assertTrue(latch.await(5, TimeUnit.SECONDS));
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("Interrupted while waiting for test handler", interrupted);
+        }
+    }
+
     private static final class Invocation<T> {
         private final T value;
         private final CompletableFuture<Void> completion = new CompletableFuture<>();
 
         private Invocation(T value) {
             this.value = value;
+        }
+    }
+
+    private static final class RegistrationFailureStage
+            extends CompletableFuture<Void> {
+        private final RuntimeException failure;
+
+        private RegistrationFailureStage(RuntimeException failure) {
+            this.failure = failure;
+        }
+
+        @Override
+        public CompletableFuture<Void> whenComplete(
+                BiConsumer<? super Void, ? super Throwable> action
+        ) {
+            throw failure;
         }
     }
 }

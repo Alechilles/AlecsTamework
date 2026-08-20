@@ -79,7 +79,8 @@ public final class LatestWorkCoordinator<K, V> {
 
     /**
      * Waits for the newest value currently accepted for a key.
-     * A missing key is already flushed.
+     * A later pending replacement may satisfy this call-time fence because it
+     * supersedes the value observed by the flush. A missing key is flushed.
      */
     @Nonnull
     public CompletionStage<Void> flush(@Nonnull K key) {
@@ -126,6 +127,8 @@ public final class LatestWorkCoordinator<K, V> {
     /**
      * Stops admission, starts retained work, and waits for the given deadline.
      * This coordinator owns no executor, so shutdown never interrupts work.
+     * Handlers must return their completion stage promptly; the coordinator
+     * cannot preempt a handler blocked inside {@code apply}.
      */
     @Nonnull
     public MaintenanceDrainResult shutdown(@Nonnull Duration timeout) {
@@ -229,7 +232,11 @@ public final class LatestWorkCoordinator<K, V> {
             complete(launch, failure);
             return;
         }
-        completion.whenComplete((ignored, failure) -> complete(launch, failure));
+        try {
+            completion.whenComplete((ignored, failure) -> complete(launch, failure));
+        } catch (Throwable failure) {
+            complete(launch, failure);
+        }
     }
 
     private void complete(Launch<K, V> launch, Throwable failure) {
