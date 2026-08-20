@@ -4,6 +4,7 @@ import static com.alechilles.alecstamework.items.CommandSelectionCallbackGuards.
 
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.compat.HytaleApiLevel;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
@@ -366,6 +367,7 @@ final class CommandSelectionPageService {
                 context.refreshSignals()
         );
         page.configureActiveHighlight(new CommandActiveHighlightBinding(
+                context.genericRosterActions() && HytaleApiLevel.isUpdate6OrLater(),
                 context.genericRosterActions()
                         ? () -> toolInventoryService.resolvePanelActiveHighlightEnabledForTool(
                                 context.player(), context.toolId())

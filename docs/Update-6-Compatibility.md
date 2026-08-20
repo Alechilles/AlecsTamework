@@ -123,9 +123,9 @@ that use the unchanged coordinate overloads stay direct.
 
 Update 6 also adds `ModelParticle.setClearParticlesOnRemove(...)` and the
 `CancelParticleSystems` packet. Active command indicators bind these additions
-only on Update 6. Update 5 keeps its native model-particle behavior without
-linking either absent API, so indicator emission and state changes cannot crash
-the world thread.
+only on Update 6. Update 5 does not register or emit the indicator system
+because it has no safe way to cancel a persistent client particle. This also
+prevents either absent API from linking on an Update 5 world thread.
 
 ### Build and manifest
 

@@ -63,7 +63,8 @@ restoration, or spawn decisions.
 - Active-NPC indicators are sent only to the controlling player. Each loaded
   target is emitted once per stable tool and roster state. A roster, color,
   setting, or equipped-tool change cancels the old indicator set before the
-  current set is sent.
+  current set is sent. This subsystem registers only on Update 6 because
+  Update 5 cannot cancel persistent particle systems.
 
 ## Related Pages
 - [Persistence, SQLite, and Data Paths](/mod/alecs-tamework/persistence-sqlite-and-data-paths)

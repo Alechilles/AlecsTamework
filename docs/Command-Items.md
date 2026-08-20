@@ -231,7 +231,8 @@ Linked panel supports:
   heads in their group color. Ungrouped NPCs use neutral gold. The indicator
   clears when the setting is disabled or the equipped command tool changes.
   This setting starts disabled and applies only to generic item-metadata
-  rosters.
+  rosters on Update 6. Update 5 does not run the indicator system because its
+  client protocol cannot cancel persistent particle systems.
 - Group active selector: `All`, `None`, or one configured group
 - Breeding enable/disable row toggles (default: disabled)
 - Group assignment overlay per row

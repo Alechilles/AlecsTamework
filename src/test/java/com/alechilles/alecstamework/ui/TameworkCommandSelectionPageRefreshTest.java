@@ -51,6 +51,23 @@ class TameworkCommandSelectionPageRefreshTest {
     }
 
     @Test
+    void unsupportedActiveHighlightsAreHiddenFromTheGenericPanel() throws Exception {
+        TameworkCommandSelectionPage page = page(
+                new CapturedPackets(),
+                new AtomicReference<>(feature(4, false)),
+                new NavigationFixture(),
+                genericConfig()
+        );
+        UICommandBuilder commands = new UICommandBuilder();
+
+        page.build(null, commands, new UIEventBuilder(), null);
+
+        assertTrue(java.util.Arrays.stream(commands.getCommands()).anyMatch(command ->
+                "#TameworkLinkedPanelActiveHighlightControls.Visible".equals(command.selector)
+                        && command.data.contains("false")));
+    }
+
+    @Test
     void genericPagesKeepTheirOwnStableActivationEntries() throws Exception {
         Object service = genericActivationService();
         CapturedPackets englishPackets = new CapturedPackets();

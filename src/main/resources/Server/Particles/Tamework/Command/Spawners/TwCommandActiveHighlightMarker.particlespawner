@@ -6,8 +6,8 @@
   "LightInfluence": 0,
   "MaxConcurrentParticles": 1,
   "ParticleLifeSpan": {
-    "Min": 604800,
-    "Max": 604800
+    "Min": 2.4,
+    "Max": 2.4
   },
   "Particle": {
     "Texture": "Particles/Textures/Tamework/Command/TwCommandActiveMarker.png",
@@ -20,6 +20,13 @@
         "Scale": {
           "X": { "Min": 0.94, "Max": 0.94 },
           "Y": { "Min": 0.94, "Max": 0.94 }
+        }
+      },
+      "50": {
+        "Opacity": 1,
+        "Scale": {
+          "X": { "Min": 1.03, "Max": 1.03 },
+          "Y": { "Min": 1.03, "Max": 1.03 }
         }
       },
       "100": {
@@ -38,7 +45,16 @@
       }
     }
   },
-  "TotalParticles": { "Min": 1, "Max": 1 },
+  "InitialVelocity": {
+    "Speed": { "Min": 0.12, "Max": 0.12 },
+    "Pitch": { "Min": 90, "Max": 90 }
+  },
+  "Attractors": [
+    {
+      "LinearAcceleration": { "Y": -0.1 }
+    }
+  ],
   "SpawnRate": { "Min": 1, "Max": 1 },
-  "SpawnBurst": true
+  "SpawnBurst": true,
+  "WaveDelay": { "Min": 2.4, "Max": 2.4 }
 }

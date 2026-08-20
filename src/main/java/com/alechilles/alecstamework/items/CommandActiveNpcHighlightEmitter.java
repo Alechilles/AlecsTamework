@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.compat.HytaleApiLevel;
 import com.alechilles.alecstamework.compat.HytaleModelParticleAccess;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -34,7 +35,8 @@ final class CommandActiveNpcHighlightEmitter {
                  @Nullable String colorHex,
                  @Nonnull CommandActiveNpcHighlightAnchor anchor,
                  @Nullable Store<EntityStore> store) {
-        if (networkId == null || viewerRef == null || !viewerRef.isValid()) {
+        if (!HytaleApiLevel.isUpdate6OrLater()
+                || networkId == null || viewerRef == null || !viewerRef.isValid()) {
             return false;
         }
         Vector3f offset = anchor.positionOffset();
@@ -58,7 +60,8 @@ final class CommandActiveNpcHighlightEmitter {
 
     boolean cancel(@Nullable Ref<EntityStore> viewerRef,
                    @Nullable Store<EntityStore> store) {
-        if (viewerRef == null || !viewerRef.isValid()) {
+        if (!HytaleApiLevel.isUpdate6OrLater()
+                || viewerRef == null || !viewerRef.isValid()) {
             return false;
         }
         ToClientPacket packet = HytaleModelParticleAccess.createCancelPacket(PARTICLE_SYSTEM_ID);

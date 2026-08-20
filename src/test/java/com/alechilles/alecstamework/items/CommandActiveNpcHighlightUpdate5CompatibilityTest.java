@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.items;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.URL;
@@ -22,7 +21,7 @@ class CommandActiveNpcHighlightUpdate5CompatibilityTest {
             "com.alechilles.alecstamework.items.CommandActiveNpcHighlightAnchor";
 
     @Test
-    void emissionLinksAndBuildsTheExpectedPacketOnUpdate5() throws Exception {
+    void emissionIsDisabledOnUpdate5() throws Exception {
         URL mainClasses = CommandActiveNpcHighlightEmitter.class
                 .getProtectionDomain()
                 .getCodeSource()
@@ -75,16 +74,8 @@ class CommandActiveNpcHighlightUpdate5CompatibilityTest {
                     storeType
             );
             emit.setAccessible(true);
-            assertTrue((boolean) emit.invoke(emitter, networkId, viewerRef, "#112233", anchor, null));
-
-            assertEquals(1, packets.size());
-            Object packet = packets.getFirst();
-            assertEquals(42, publicField(packet, "entityId"));
-            Object[] modelParticles = (Object[]) publicField(packet, "modelParticles");
-            assertEquals(1, modelParticles.length);
-            assertEquals(CommandActiveNpcHighlightEmitter.PARTICLE_SYSTEM_ID,
-                    publicField(modelParticles[0], "systemId"));
-            assertEquals("Head", publicField(modelParticles[0], "targetNodeName"));
+            assertEquals(false, emit.invoke(emitter, networkId, viewerRef, "#112233", anchor, null));
+            assertTrue(packets.isEmpty());
         }
     }
 
@@ -126,11 +117,6 @@ class CommandActiveNpcHighlightUpdate5CompatibilityTest {
             assertEquals(false, cancel.invoke(emitter, viewerRef, null));
             assertTrue(packets.isEmpty());
         }
-    }
-
-    private static Object publicField(Object target, String name) throws ReflectiveOperationException {
-        Field field = target.getClass().getField(name);
-        return field.get(target);
     }
 
     private static final class Update5ClassLoader extends URLClassLoader {

@@ -6,6 +6,7 @@ import javax.annotation.Nonnull;
 
 /** Supplies and changes the active-NPC highlight preference for one command panel. */
 public record CommandActiveHighlightBinding(
+        boolean supported,
         @Nonnull Supplier<Boolean> enabledSupplier,
         @Nonnull Consumer<Boolean> setEnabledCallback
 ) {

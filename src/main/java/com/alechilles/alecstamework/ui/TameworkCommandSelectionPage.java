@@ -65,7 +65,7 @@ public final class TameworkCommandSelectionPage
     private final Supplier<String> panelModeValueSupplier;
     private final Supplier<Boolean> panelAutoLinkEnabledSupplier;
     private CommandActiveHighlightBinding activeHighlightBinding =
-            new CommandActiveHighlightBinding(() -> false, ignored -> { });
+            new CommandActiveHighlightBinding(false, () -> false, ignored -> { });
     private final Supplier<String> panelRadiusLabelSupplier;
     private final Supplier<String> panelSortValueSupplier;
     private final Supplier<String> panelFilterModeValueSupplier;
@@ -396,6 +396,8 @@ public final class TameworkCommandSelectionPage
             commandBuilder.set("#TameworkLinkedPanelModeDropdown.Entries", CommandSelectionPanelOptions.resolveModeDropdownEntries(resolveLanguage()));
             commandBuilder.set("#TameworkLinkedPanelModeDropdown.Value", LinkedNpcPanelPresentationSupport.mode(panelModeValueSupplier));
             commandBuilder.set("#TameworkLinkedPanelAutoLinkCheck.Value", LinkedNpcPanelPresentationSupport.autoLink(panelAutoLinkEnabledSupplier));
+            commandBuilder.set("#TameworkLinkedPanelActiveHighlightControls.Visible",
+                    activeHighlightBinding.supported());
             commandBuilder.set("#TameworkLinkedPanelActiveHighlightCheck.Value", LinkedNpcPanelPresentationSupport.activeHighlight(activeHighlightBinding.enabledSupplier()));
             commandBuilder.set("#TameworkLinkedPanelSubtitleRadiusControls.Visible", LinkedNpcPanelPresentationSupport.nearby(panelModeValueSupplier));
             commandBuilder.set("#TameworkLinkedPanelRadiusValue.Text", LinkedNpcPanelPresentationSupport.radius(panelRadiusLabelSupplier, resolveLanguage()));
@@ -564,7 +566,7 @@ public final class TameworkCommandSelectionPage
             sendCardRefreshUpdate();
             return;
         }
-        if (data.panelActiveHighlightEnabled != null) {
+        if (data.panelActiveHighlightEnabled != null && activeHighlightBinding.supported()) {
             cancelPendingFilterTextApply();
             activeHighlightBinding.setEnabledCallback().accept(data.panelActiveHighlightEnabled);
             pendingUnlinkNpcUuid = null;
