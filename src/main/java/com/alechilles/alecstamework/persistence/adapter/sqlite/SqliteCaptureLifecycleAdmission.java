@@ -187,6 +187,10 @@ final class SqliteCaptureLifecycleAdmission {
         PopulationAdmissionOperation operation = operation(
                 source, targetOwner
         );
+        String targetRoleId = requested.tameAndCommandLink()
+                ? requested.tameAndLinkEvidence().live().targetRoleId()
+                : sourceModel.canonicalRoleId();
+        requireSourceRole(requested, sourceModel.canonicalRoleId());
         PopulationAdmissionRequestV2 candidate = new PopulationAdmissionRequestV2(
                 new PopulationAdmissionRequest(
                         new PopulationAdmissionIdentity(
@@ -207,13 +211,13 @@ final class SqliteCaptureLifecycleAdmission {
                         PopulationAdmissionForcePolicy.ENFORCE,
                         PopulationCompanionLifecycle.valueOf(targetState.name())
                 ),
-                sourceModel.canonicalRoleId(),
+                targetRoleId,
                 targetWorld == null ? source.location().worldKey() : targetWorld
         );
         LifecycleAdmissionRequest admission = LifecycleAdmissionRequest.managed(
                 operationId,
                 reservationId(operationId),
-                sourceModel.canonicalRoleId(),
+                targetRoleId,
                 candidate,
                 source,
                 source.state(),
@@ -291,6 +295,18 @@ final class SqliteCaptureLifecycleAdmission {
                 || !capture.targetAlias().toString().equals(source.location().key())
                 || !capture.targetWorldKey().equals(source.location().worldKey())) {
             throw new IllegalStateException("capture_canonical_source_mismatch");
+        }
+    }
+
+    private void requireSourceRole(
+            CompanionCaptureRequest capture,
+            String canonicalRoleId
+    ) {
+        if (capture.tameAndCommandLink()
+                && !canonicalRoleId.equalsIgnoreCase(
+                capture.tameAndLinkEvidence().expectedIdentity().roleId()
+        )) {
+            throw new IllegalStateException("capture_canonical_role_mismatch");
         }
     }
 

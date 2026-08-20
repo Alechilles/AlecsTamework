@@ -89,7 +89,8 @@ final class SqliteCaptureCompensation {
         if (actual == null
                 || !actual.delivered()
                 || !sameClaim(expected, actual)
-                || lifecycle == null) {
+                || lifecycle == null
+                || managedRowsRemain(transaction, operation, capture)) {
             return false;
         }
         if (capture.failedAttempt()) {
@@ -314,8 +315,10 @@ final class SqliteCaptureCompensation {
                         "capture_compensation_lifecycle_rejected"
                 );
             }
-            if (capture.tameAndCommandLink()) {
-                retireTameReservations(transaction, operation);
+            if (managed != null) {
+                managed.retirePrepared(transaction, operation);
+            } else if (capture.tameAndCommandLink()) {
+                retireLegacyTameReservations(transaction, operation);
             }
         }
 
@@ -453,14 +456,10 @@ final class SqliteCaptureCompensation {
             }
         }
 
-        private void retireTameReservations(
+        private void retireLegacyTameReservations(
                 SqlitePersistenceTransactionContext transaction,
                 OperationEnvelope operation
         ) {
-            if (managed != null) {
-                managed.retirePrepared(transaction, operation);
-                return;
-            }
             var evidence = capture.tameAndLinkEvidence();
             if (!transaction.population().retireExact(
                     operation.operationId(),
@@ -476,5 +475,24 @@ final class SqliteCaptureCompensation {
                 );
             }
         }
+    }
+
+    private static boolean managedRowsRemain(
+            SqlitePersistenceTransactionContext transaction,
+            OperationEnvelope operation,
+            CompanionCaptureRequest capture
+    ) {
+        if (capture.admissionEvidence() == null
+                || capture.admissionEvidence().status()
+                != com.alechilles.alecstamework.persistence.runtime
+                .LifecycleAdmissionEvidence.Status.MANAGED) {
+            return false;
+        }
+        return !transaction.populationDomains()
+                .findByOperation(operation.operationId()).isEmpty()
+                || !transaction.population()
+                .findByOperation(operation.operationId()).isEmpty()
+                || !transaction.populationGroups()
+                .findReservations(operation.operationId()).isEmpty();
     }
 }

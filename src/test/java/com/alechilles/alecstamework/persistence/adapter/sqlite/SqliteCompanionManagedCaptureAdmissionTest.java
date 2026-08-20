@@ -67,6 +67,7 @@ class SqliteCompanionManagedCaptureAdmissionTest {
     private SqliteCompanionCaptureOperations captures;
     private AtomicInteger admissionCalls;
     private AdmissionMode admissionMode;
+    private boolean positiveTarget;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -79,6 +80,7 @@ class SqliteCompanionManagedCaptureAdmissionTest {
         reads = new SqliteReadExecutor(connections);
         admissionCalls = new AtomicInteger();
         admissionMode = AdmissionMode.NEUTRAL;
+        positiveTarget = false;
         SqliteUnitOfWorkRunner units = new SqliteUnitOfWorkRunner(writer, reads);
         SqliteOperationEngine engine = new SqliteOperationEngine(
                 new OperationDefinitionRegistry(
@@ -251,6 +253,37 @@ class SqliteCompanionManagedCaptureAdmissionTest {
         assertEquals(OperationWorkflowResult.Status.PREPARE_FAILED, result.status());
         assertEquals(0, admissionCalls.get());
         assertEquals(0, liveCalls.get());
+    }
+    @Test
+    void compensatedManagedCaptureRetiresPreparedTargetReservations()
+            throws Exception {
+        admissionMode = AdmissionMode.MANAGED;
+        positiveTarget = true;
+        makeSourceUnowned();
+        OperationWorkflowResult result = submit(
+                24,
+                captureRequest(),
+                (capture, operation) -> LiveOperationResult.compensate(
+                        "managed_capture_target_unchanged", null
+                ).completed()
+        );
+        assertEquals(
+                OperationWorkflowResult.Status.COMPENSATED,
+                result.status(),
+                () -> String.valueOf(result.failure())
+        );
+        assertEquals(1, admissionCalls.get());
+        assertEquals(LifecycleState.ACTIVE, lifecycle().state());
+        try (Connection connection = connections.openReadConnection()) {
+            SqlitePersistenceTransactionContext transaction =
+                    new SqlitePersistenceTransactionContext(connection);
+            assertTrue(transaction.populationDomains()
+                    .findByOperation(operationId(24)).isEmpty());
+            assertTrue(transaction.population()
+                    .findByOperation(operationId(24)).isEmpty());
+            assertTrue(transaction.populationGroups()
+                    .findReservations(operationId(24)).isEmpty());
+        }
     }
     private OperationWorkflowResult submit(
             int number,
@@ -445,10 +478,33 @@ class SqliteCompanionManagedCaptureAdmissionTest {
                 1,
                 Long.MAX_VALUE,
                 1,
-                List.of(),
+                positiveTarget ? List.of(
+                        new PopulationDomainAdmissionOperation.DomainInput(
+                                "managed-test-domain",
+                                PopulationDomainScope.PER_WORLD,
+                                "world",
+                                1,
+                                0,
+                                1,
+                                100,
+                                100,
+                                1
+                        )
+                ) : List.of(),
                 List.of(),
                 -400
         );
+    }
+    private void makeSourceUnowned() throws Exception {
+        try (Connection connection = connections.openWriterConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     UPDATE companion_lifecycle
+                     SET owner_uuid = NULL, owner_world_key = NULL
+                     WHERE profile_id = ?
+                     """)) {
+            statement.setString(1, PROFILE.toString());
+            assertEquals(1, statement.executeUpdate());
+        }
     }
     private LifecycleAdmissionEvidence planlessEvidence() {
         return LifecycleAdmissionEvidence.managed(

@@ -113,6 +113,7 @@ class SqliteCompanionCaptureTameAndLinkOperationsTest {
                 },
                 new SqliteOperationReader(reads),
                 binding,
+                new SqliteLifecycleAdmissionSourceReader(reads),
                 List.of(new ReplacementPublicSemanticEventProjection(
                         publicEvents::add,
                         () -> -300
@@ -616,6 +617,11 @@ class SqliteCompanionCaptureTameAndLinkOperationsTest {
                     .LifecycleAdmissionRequest request
     ) {
         admissionCalls++;
+        assertEquals(
+                CaptureTameAndLinkTestFixtures.evidence()
+                        .live().targetRoleId(),
+                request.targetRoleId()
+        );
         return switch (admissionMode) {
             case DENY -> CompletableFuture.failedFuture(
                     new IllegalStateException("provider-capacity-denied")

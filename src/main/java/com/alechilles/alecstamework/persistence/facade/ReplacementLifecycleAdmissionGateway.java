@@ -92,9 +92,7 @@ public final class ReplacementLifecycleAdmissionGateway
             @Nonnull PopulationDomainAdmissionOperation.Payload payload,
             PopulationAdmissionComposition composition
     ) {
-        return payload.domains().isEmpty()
-                ? LifecycleAdmissionEvidence.neutral()
-                : LifecycleAdmissionEvidence.managed(payload, composition);
+        return LifecycleAdmissionEvidence.managed(payload, composition);
     }
 
     @Nonnull
