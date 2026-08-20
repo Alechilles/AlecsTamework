@@ -20,6 +20,7 @@ import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwPopulationGroupConfig;
+import com.alechilles.alecstamework.config.assets.TwManagedActivityConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
@@ -50,6 +51,13 @@ public enum TwConfigFamily {
             "population-group",
             "Population Groups",
             "Tamework/PopulationGroups",
+            true,
+            true
+    ),
+    MANAGED_ACTIVITY(
+            "managed-activity",
+            "Managed Activities",
+            "Tamework/ManagedActivities",
             true,
             true
     ),
@@ -159,6 +167,9 @@ public enum TwConfigFamily {
             case POPULATION_GROUP ->
                     (AssetStore<String, ?, ? extends AssetMap<String, ?>>)
                             TwPopulationGroupConfig.getAssetStore();
+            case MANAGED_ACTIVITY ->
+                    (AssetStore<String, ?, ? extends AssetMap<String, ?>>)
+                            TwManagedActivityConfig.getAssetStore();
             case ATTACHMENT_MIGRATION ->
                     (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwAttachmentMigrationConfig.getAssetStore();
             case ATTACHMENT_DISPLAY ->

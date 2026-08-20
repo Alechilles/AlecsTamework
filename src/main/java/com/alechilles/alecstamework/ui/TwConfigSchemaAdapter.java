@@ -18,6 +18,7 @@ import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
+import com.alechilles.alecstamework.config.assets.TwManagedActivityConfig;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
@@ -156,6 +157,7 @@ final class TwConfigSchemaAdapter {
             case BREEDING -> TwBreedingConfig.CODEC;
             case CAPTURE_POLICY -> TwCapturePolicyConfig.CODEC;
             case POPULATION_GROUP -> TwPopulationGroupConfig.CODEC;
+            case MANAGED_ACTIVITY -> TwManagedActivityConfig.CODEC;
             case ATTACHMENT_MIGRATION -> TwAttachmentMigrationConfig.CODEC;
             case ATTACHMENT_DISPLAY -> TwAttachmentDisplayConfig.CODEC;
             case DYNAMIC_ATTACHMENTS -> TwDynamicAttachmentsConfig.CODEC;

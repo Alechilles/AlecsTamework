@@ -23,6 +23,7 @@ This document explains where Tamework config assets live and how each family res
 - `TwCoopConfig`: `<ModRoot>/Server/Tamework/Items/Coops/*.json`
 - `TwCapturePolicyConfig`: `<ModRoot>/Server/Tamework/CapturePolicies/*.json`
 - `TwPopulationGroupConfig`: `<ModRoot>/Server/Tamework/PopulationGroups/*.json`
+- `TwManagedActivityConfig`: `<ModRoot>/Server/Tamework/ManagedActivities/*.json`
 
 ## Resolution patterns
 ### Single active global config
@@ -45,6 +46,10 @@ Resolved by role id + `Priority`:
 - `TwPopulationGroupConfig` uses role matching to classify companions into one
   or more namespaced groups, then applies its configured global/per-world
   owned and active limits.
+- `TwManagedActivityConfig` compiles provider-neutral activity profiles. A
+  profile resolves an exact role through its population-group-backed family,
+  exposes named capacity domains and activity mappings, and reports explicit
+  readiness by profile id. Duplicate roles inside one profile are rejected.
 
 ### Dynamic attachment family
 - `TwDynamicAttachmentsConfig` is indexed by role id and evaluates ordered conditional rules.
@@ -86,6 +91,10 @@ Behavior summary:
 - Child keeps explicitly authored fields.
 - Missing fields inherit from parent.
 - Sectioned configs (for example `TwGlobalConfig`, `TwCompanionConfig`) inherit nested fields section-by-section.
+- `TwManagedActivityConfig` treats `Domains`, `Families`, and capability or
+  mapping arrays as replacement sections when authored. An explicit
+  `Activities` object inherits only its omitted nested fields. This prevents a
+  child from silently combining two family or domain lists.
 
 ## Global vs companion policy scope
 - `TwGlobalConfig` contains global defaults and shared infrastructure knobs.
@@ -130,6 +139,17 @@ Other families are asset-registry driven and update through normal loaded/remove
 
 This includes `TwCapturePolicyConfig`. A failed rebuild retains the last valid
 compiled index and does not publish the invalid revision.
+
+Managed-activity profiles use the same loaded/removed asset events. Their
+registry compiles a complete candidate, increments its configuration revision
+only after a successful replacement, and retains the last valid snapshot when
+validation fails. No reload command or polling loop owns this family.
+
+Managed profile readiness is fail-closed for missing, disabled, incomplete, or
+invalid profiles. It includes profile and provider identity, provider contract
+version, configuration revision, and a stable diagnostic detail. Required API
+capabilities are validated as enum names; provider registration and runtime
+capability availability are separate integration checks.
 
 ## Player-facing text
 Player-facing string fields such as talent names/descriptions/branches, trait display names, command labels/messages, interaction messages, and happiness labels may be raw text or `server.lang` keys. Prefer language keys for built-in packs and public integrations so translations can be provided under `Server/Languages/*/server.lang` without editing behavior assets.

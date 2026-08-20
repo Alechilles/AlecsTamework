@@ -224,7 +224,7 @@ final class TwConfigEditorFieldPolicy {
                             : breedingRoleInheritanceModePath(normalized)
                                     ? enumValues(TwBreedingConfig.RoleInheritanceMode.values(), TwBreedingConfig.RoleInheritanceMode::toConfigValue)
                                     : List.of();
-            case LEVELING, TALENT -> List.of();
+            case LEVELING, TALENT, MANAGED_ACTIVITY -> List.of();
             case NEEDS -> {
                 if (NEEDS_TIMER_BASIS_PATHS.contains(normalized)) {
                     yield enumValues(TwNeedsConfig.TimerBasis.values(), TwNeedsConfig.TimerBasis::toConfigValue);

@@ -41,6 +41,8 @@ import com.alechilles.alecstamework.config.SpawnerItemConfigReloadService;
 import com.alechilles.alecstamework.config.bonded.BondedCompanionConfigReloadService;
 import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
+import com.alechilles.alecstamework.config.managed.ManagedActivityAssetRegistrar;
+import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.config.population.PopulationGroupAssetRegistrar;
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegistry;
 import com.alechilles.alecstamework.config.assets.TwAttachmentDisplayConfig;
@@ -282,6 +284,8 @@ public class Tamework extends JavaPlugin {
     private BondedCompanionConfigReloadService bondedCompanionConfigReloadService;
     private PopulationGroupConfigRegistry populationGroupConfigRegistry;
     private PopulationGroupAssetRegistrar populationGroupAssetRegistrar;
+    private ManagedActivityConfigRegistry managedActivityConfigRegistry;
+    private ManagedActivityAssetRegistrar managedActivityAssetRegistrar;
     private ApiSelfTestFixtureManager apiSelfTestFixtureManager;
     private ApiSelfTestRunner apiSelfTestRunner;
     private CompanionXpEventDebugLogService companionXpEventDebugLogService;
@@ -440,10 +444,18 @@ public class Tamework extends JavaPlugin {
                 );
         capturePolicyRegistry = new CapturePolicyRegistry();
         populationGroupConfigRegistry = new PopulationGroupConfigRegistry();
+        managedActivityConfigRegistry = new ManagedActivityConfigRegistry(
+                populationGroupConfigRegistry
+        );
+        managedActivityAssetRegistrar = new ManagedActivityAssetRegistrar(
+                this,
+                managedActivityConfigRegistry,
+                this::emitExperimentalConfigReload
+        );
         populationGroupAssetRegistrar = new PopulationGroupAssetRegistrar(
                 this,
                 populationGroupConfigRegistry,
-                this::emitExperimentalConfigReload
+                this::publishPopulationConfigReload
         );
         assetEditorPackService = new TameworkAssetEditorPackService(this);
         // Patchwork must subscribe to Hytale's one-time LoadAssetEvent before plugin setup returns.
@@ -475,10 +487,16 @@ public class Tamework extends JavaPlugin {
         registerCapturePolicyAssets();
         registerBondedCompanionRosterAssets();
         populationGroupAssetRegistrar.registerAssetStore();
+        managedActivityAssetRegistrar.registerAssetStore();
         deferAssetSubscription(
                 TameworkRuntimeModule.GENERIC_PERSISTENCE,
                 "population-group-assets",
                 populationGroupAssetRegistrar::activate
+        );
+        deferAssetSubscription(
+                TameworkRuntimeModule.GENERIC_PERSISTENCE,
+                "managed-activity-assets",
+                managedActivityAssetRegistrar::activate
         );
         registerCoopAssets();
         registerSpawnerItemAssets();
@@ -1345,7 +1363,11 @@ public class Tamework extends JavaPlugin {
             initializeCrashTelemetry();
         }
         TameworkActiveAssetInitializer.initialize(
-                runtimeStartupPlan, populationGroupAssetRegistrar::initialize,
+                runtimeStartupPlan,
+                () -> {
+                    populationGroupAssetRegistrar.initialize();
+                    managedActivityAssetRegistrar.initialize();
+                },
                 this::rebuildCapturePolicyIndex, this::rebuildBondedCompanionRosterIndex);
         preflightDeclaredRuntimeParticipants();
         initializeRuntimeServices();
@@ -1684,6 +1706,12 @@ public class Tamework extends JavaPlugin {
     @Nullable
     public TameworkApi getApi() {
         return api;
+    }
+
+    /** Returns the active provider-neutral managed-activity content resolver. */
+    @Nonnull
+    public ManagedActivityConfigRegistry getManagedActivityConfigRegistry() {
+        return managedActivityConfigRegistry;
     }
 
     /** Refreshes runtime-backed API settings without exposing its implementation. */
@@ -2810,6 +2838,17 @@ public class Tamework extends JavaPlugin {
             RemovedAssetsEvent<String, TwAvatarFlightConfig, DefaultAssetMap<String, TwAvatarFlightConfig>> event) {
         TwAvatarFlightConfig.clearCache();
         emitExperimentalConfigReload(TameworkConfigFamily.AVATAR_FLIGHT, event.getRemovedAssets());
+    }
+
+    private void publishPopulationConfigReload(
+            @Nonnull TameworkConfigFamily family,
+            @Nonnull Iterable<String> changedIds
+    ) {
+        emitExperimentalConfigReload(family, changedIds);
+        if (family == TameworkConfigFamily.POPULATION_GROUP
+                && managedActivityAssetRegistrar != null) {
+            managedActivityAssetRegistrar.onPopulationGroupsChanged();
+        }
     }
 
     private void emitExperimentalConfigReload(@Nonnull TameworkConfigFamily family, @Nullable Iterable<String> changedIds) {
