@@ -386,11 +386,7 @@ public final class TwManagedActivityConfig
             TwManagedActivityConfig parent,
             @Nullable Set<String> nested
     ) {
-        if (parent.activities == null) {
-            return;
-        }
-        if (activities == null || nested == null) {
-            activities = parent.activities;
+        if (nested == null || activities == null || parent.activities == null) {
             return;
         }
         if (!nested.contains("Feed")) {

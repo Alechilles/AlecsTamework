@@ -96,7 +96,13 @@ public final class ManagedActivityConfigRegistry {
         if (roleId == null || roleId.isBlank()) {
             return Optional.empty();
         }
-        return Optional.ofNullable(current.get().rolesById().get(roleId.trim()));
+        Snapshot snapshot = current.get();
+        if (snapshot.revision() > 0L
+                && snapshot.populationGroupRevision()
+                != populationGroups.snapshot().revision()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(snapshot.rolesById().get(roleId.trim()));
     }
 
     /** Returns explicit content readiness for one profile identity. */
@@ -111,6 +117,38 @@ public final class ManagedActivityConfigRegistry {
                     0,
                     snapshot.revision(),
                     "profile-id-required"
+            );
+        }
+        if (snapshot.revision() > 0L
+                && snapshot.populationGroupRevision()
+                != populationGroups.snapshot().revision()) {
+            UnavailableProfile staleRejection = rejected.get().get(requested);
+            ManagedActivityProfile retainedProfile =
+                    snapshot.profiles().get(requested);
+            UnavailableProfile retainedUnavailable =
+                    snapshot.unavailable().get(requested);
+            String providerId = staleRejection != null
+                    ? staleRejection.providerId()
+                    : retainedProfile != null
+                            ? retainedProfile.providerId()
+                            : retainedUnavailable == null
+                                    ? ""
+                                    : retainedUnavailable.providerId();
+            int providerContractVersion = staleRejection != null
+                    ? staleRejection.providerContractVersion()
+                    : retainedProfile != null
+                            ? retainedProfile.providerContractVersion()
+                            : retainedUnavailable == null
+                                    ? 0
+                                    : retainedUnavailable.providerContractVersion();
+            return Readiness.unavailable(
+                    requested,
+                    providerId,
+                    providerContractVersion,
+                    snapshot.revision(),
+                    staleRejection == null
+                            ? "population-group-revision-stale"
+                            : staleRejection.detail()
             );
         }
         ManagedActivityProfile profile = snapshot.profiles().get(requested);
@@ -180,9 +218,6 @@ public final class ManagedActivityConfigRegistry {
         Set<String> selectedProfiles = new LinkedHashSet<>();
         for (TwManagedActivityConfig config : ordered) {
             String profileId = normalize(config.getProfileId());
-            if (!profileId.isBlank() && !selectedProfiles.add(profileId)) {
-                continue;
-            }
             if (!config.isEnabled()) {
                 if (!profileId.isBlank()) {
                     unavailable.putIfAbsent(
@@ -195,6 +230,9 @@ public final class ManagedActivityConfigRegistry {
                             )
                     );
                 }
+                continue;
+            }
+            if (!profileId.isBlank() && !selectedProfiles.add(profileId)) {
                 continue;
             }
             config.validateOrThrow();
@@ -224,7 +262,13 @@ public final class ManagedActivityConfigRegistry {
             );
             unavailable.remove(profile.profileId());
         }
-        return new Snapshot(revision, profiles, roles, unavailable);
+        return new Snapshot(
+                revision,
+                groupIndex.revision(),
+                profiles,
+                roles,
+                unavailable
+        );
     }
 
     private static Map<String, UnavailableProfile> rejectedProfiles(
@@ -439,6 +483,7 @@ public final class ManagedActivityConfigRegistry {
     /** Immutable active config snapshot. */
     public record Snapshot(
             long revision,
+            long populationGroupRevision,
             @Nonnull Map<String, ManagedActivityProfile> profiles,
             @Nonnull Map<String, RoleResolution> rolesById,
             @Nonnull Map<String, UnavailableProfile> unavailable
@@ -450,7 +495,7 @@ public final class ManagedActivityConfigRegistry {
         }
 
         private static Snapshot empty() {
-            return new Snapshot(0L, Map.of(), Map.of(), Map.of());
+            return new Snapshot(0L, 0L, Map.of(), Map.of(), Map.of());
         }
     }
 
