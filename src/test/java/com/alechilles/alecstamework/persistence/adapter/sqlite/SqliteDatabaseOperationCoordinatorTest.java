@@ -18,12 +18,14 @@ import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.projection.ProjectionApplyOutcome;
+import com.alechilles.alecstamework.persistence.projection.ContextualProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumerId;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEvent;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
+import com.alechilles.alecstamework.persistence.projection.ProjectionPublicationContext;
 import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -31,6 +33,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -47,8 +50,12 @@ class SqliteDatabaseOperationCoordinatorTest {
     private static final OperationKind KIND = new OperationKind("profile_create");
     private static final OperationId OPERATION =
             OperationId.parse("40000000-0000-0000-0000-000000000001");
+    private static final OperationId CONTEXT_RECOVERY_OPERATION =
+            OperationId.parse("40000000-0000-0000-0000-000000000002");
     private static final ProfileId PROFILE =
             ProfileId.parse("20000000-0000-0000-0000-000000000001");
+    private static final ProfileId CONTEXT_RECOVERY_PROFILE =
+            ProfileId.parse("20000000-0000-0000-0000-000000000002");
 
     @TempDir
     Path tempDir;
@@ -170,6 +177,70 @@ class SqliteDatabaseOperationCoordinatorTest {
         }
     }
 
+    @Test
+    void boundLiveAndRecoveryConsumersUseIndependentPublisherLanes()
+            throws Exception {
+        AtomicInteger durableExecutions = new AtomicInteger();
+        ContextBlockingConsumer delegate = new ContextBlockingConsumer(
+                "contextual_projection"
+        );
+        ProjectionConsumer live = new ContextualProjectionConsumer(
+                delegate, ProjectionPublicationContext.LIVE_COMMIT
+        );
+        ProjectionConsumer recovery = new ContextualProjectionConsumer(
+                delegate, ProjectionPublicationContext.RECOVERY_CONVERGENCE
+        );
+
+        SqliteDatabaseOperationCoordinator.Submission liveSubmission =
+                submitContextOperation(
+                        durableExecutions,
+                        OPERATION,
+                        PROFILE,
+                        live
+                );
+        assertTrue(delegate.entered(
+                ProjectionPublicationContext.LIVE_COMMIT
+        ).await(10, TimeUnit.SECONDS));
+
+        SqliteDatabaseOperationCoordinator.Submission recoverySubmission =
+                submitContextOperation(
+                        durableExecutions,
+                        CONTEXT_RECOVERY_OPERATION,
+                        CONTEXT_RECOVERY_PROFILE,
+                        recovery
+                );
+        assertTrue(delegate.entered(
+                ProjectionPublicationContext.RECOVERY_CONVERGENCE
+        ).await(10, TimeUnit.SECONDS));
+
+        try {
+            delegate.release(ProjectionPublicationContext.LIVE_COMMIT);
+            delegate.release(ProjectionPublicationContext.RECOVERY_CONVERGENCE);
+            assertEquals(
+                    OperationWorkflowResult.Status.PUBLISHED,
+                    liveSubmission.completion().toCompletableFuture()
+                            .get(10, TimeUnit.SECONDS).status()
+            );
+            assertEquals(
+                    OperationWorkflowResult.Status.PUBLISHED,
+                    recoverySubmission.completion().toCompletableFuture()
+                            .get(10, TimeUnit.SECONDS).status()
+            );
+            assertEquals(2, durableExecutions.get());
+            assertEquals(2, delegate.maxConcurrent.get());
+            assertEquals(
+                    Set.of(
+                            ProjectionPublicationContext.LIVE_COMMIT,
+                            ProjectionPublicationContext.RECOVERY_CONVERGENCE
+                    ),
+                    Set.copyOf(delegate.contexts)
+            );
+        } finally {
+            delegate.release(ProjectionPublicationContext.LIVE_COMMIT);
+            delegate.release(ProjectionPublicationContext.RECOVERY_CONVERGENCE);
+        }
+    }
+
     private OperationWorkflowResult execute(
             AtomicInteger durableExecutions,
             ProjectionConsumer consumer
@@ -199,6 +270,39 @@ class SqliteDatabaseOperationCoordinatorTest {
                     ));
                 },
                 consumers
+        );
+    }
+
+    private SqliteDatabaseOperationCoordinator.Submission submitContextOperation(
+            AtomicInteger durableExecutions,
+            OperationId operationId,
+            ProfileId profileId,
+            ProjectionConsumer consumer
+    ) {
+        return coordinator.execute(
+                definition,
+                new OperationRequest<>(
+                        operationId,
+                        new IdempotencyKey("context-" + operationId),
+                        new Payload("Contextual"),
+                        "profile",
+                        LifecycleRevision.INITIAL,
+                        List.of(OperationScope.profile(profileId)),
+                        -10_000
+                ),
+                (transaction, operation) -> {
+                    durableExecutions.incrementAndGet();
+                    return List.of(new ProjectionEventDraft(
+                            operation.operationId(),
+                            new ProjectionEventType("contextual_projection"),
+                            profileId.toString(),
+                            1,
+                            1,
+                            "{}",
+                            -8_000
+                    ));
+                },
+                List.of(consumer)
         );
     }
 
@@ -336,6 +440,67 @@ class SqliteDatabaseOperationCoordinatorTest {
                 throw new IllegalStateException("first projection failure");
             }
             return ProjectionApplyOutcome.APPLIED;
+        }
+    }
+
+    private static final class ContextBlockingConsumer
+            implements ProjectionConsumer {
+        private final ProjectionConsumerId consumerId;
+        private final Map<ProjectionPublicationContext, CountDownLatch> entered =
+                new java.util.EnumMap<>(ProjectionPublicationContext.class);
+        private final Map<ProjectionPublicationContext, CountDownLatch> releases =
+                new java.util.EnumMap<>(ProjectionPublicationContext.class);
+        private final AtomicInteger active = new AtomicInteger();
+        private final AtomicInteger maxConcurrent = new AtomicInteger();
+        private final List<ProjectionPublicationContext> contexts =
+                java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+
+        private ContextBlockingConsumer(String consumerId) {
+            this.consumerId = new ProjectionConsumerId(consumerId);
+            for (ProjectionPublicationContext context :
+                    ProjectionPublicationContext.values()) {
+                entered.put(context, new CountDownLatch(1));
+                releases.put(context, new CountDownLatch(1));
+            }
+        }
+
+        private CountDownLatch entered(ProjectionPublicationContext context) {
+            return entered.get(context);
+        }
+
+        private void release(ProjectionPublicationContext context) {
+            releases.get(context).countDown();
+        }
+
+        @Override
+        public ProjectionConsumerId consumerId() {
+            return consumerId;
+        }
+
+        @Override
+        public ProjectionApplyOutcome apply(ProjectionEvent event) {
+            throw new AssertionError("The context-aware overload is required");
+        }
+
+        @Override
+        public ProjectionApplyOutcome apply(
+                ProjectionEvent event,
+                ProjectionPublicationContext context
+        ) throws Exception {
+            int concurrent = active.incrementAndGet();
+            maxConcurrent.accumulateAndGet(concurrent, Math::max);
+            try {
+                entered.get(context).countDown();
+                if (!releases.get(context).await(10, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException(
+                            "context apply was not released: " + context
+                    );
+                }
+                contexts.add(context);
+                return ProjectionApplyOutcome.APPLIED;
+            } finally {
+                active.decrementAndGet();
+            }
         }
     }
 }

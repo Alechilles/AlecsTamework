@@ -212,23 +212,23 @@ public final class SqliteOperationPublisher {
     private ProjectionPublicationContext publicationContext(
             List<ProjectionConsumer> consumers
     ) {
-        boolean recovery = false;
-        boolean live = false;
+        ProjectionPublicationContext resolved = null;
         for (ProjectionConsumer consumer : consumers) {
-            if (consumer instanceof ContextualProjectionConsumer) {
-                recovery = true;
-            } else {
-                live = true;
+            ProjectionPublicationContext candidate =
+                    consumer instanceof ContextualProjectionConsumer contextual
+                            ? contextual.context()
+                            : ProjectionPublicationContext.LIVE_COMMIT;
+            if (resolved == null) {
+                resolved = candidate;
+            } else if (resolved != candidate) {
+                throw new IllegalArgumentException(
+                        "Required projection consumers must share a publication context"
+                );
             }
         }
-        if (recovery && live) {
-            throw new IllegalArgumentException(
-                    "Required projection consumers must share a publication context"
-            );
-        }
-        return recovery
-                ? ProjectionPublicationContext.RECOVERY_CONVERGENCE
-                : ProjectionPublicationContext.LIVE_COMMIT;
+        return resolved == null
+                ? ProjectionPublicationContext.LIVE_COMMIT
+                : resolved;
     }
 
     private Throwable readFailure(

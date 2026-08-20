@@ -161,6 +161,62 @@ class ProjectionPublicationSchedulerTest {
     }
 
     @Test
+    void failedRunningTargetCompletesCoveredWaitersAndContinuesHigherPendingTarget()
+            throws Exception {
+        appendEvents(20);
+        FailFirstConsumer consumer = new FailFirstConsumer(
+                new ProjectionConsumerId("failure_consumer")
+        );
+        ProjectionPublicationScheduler scheduler =
+                new ProjectionPublicationScheduler(coordinator);
+
+        var first = scheduler.publish(
+                consumer,
+                ProjectionPublicationContext.LIVE_COMMIT,
+                new ProjectionSequence(10),
+                10
+        ).toCompletableFuture();
+        assertTrue(consumer.firstApplyEntered.await(10, TimeUnit.SECONDS));
+
+        var higher = scheduler.publish(
+                consumer,
+                ProjectionPublicationContext.LIVE_COMMIT,
+                new ProjectionSequence(20),
+                10
+        ).toCompletableFuture();
+        assertEquals(1, scheduler.activeLaneCount());
+
+        try {
+            consumer.releaseFirst.countDown();
+            ProjectionCatchUpResult firstResult = first.get(10, TimeUnit.SECONDS);
+            ProjectionCatchUpResult higherResult = higher.get(10, TimeUnit.SECONDS);
+
+            assertEquals(
+                    ProjectionCatchUpResult.Status.CONSUMER_FAILED,
+                    firstResult.status()
+            );
+            assertEquals(
+                    "injected running target failure",
+                    firstResult.failure().getMessage()
+            );
+            assertEquals(
+                    ProjectionCatchUpResult.Status.CAUGHT_UP,
+                    higherResult.status()
+            );
+            assertTrue(higherResult.acknowledged().value() >= 20);
+            assertEquals(
+                    3,
+                    projectionBatchReads.get(),
+                    "the pending target continues in one follow-up publication"
+            );
+            assertEquals(21, consumer.appliedSequences.size());
+        } finally {
+            consumer.releaseFirst.countDown();
+        }
+        assertEquals(0, scheduler.activeLaneCount());
+    }
+
+    @Test
     void liveAndRecoveryContextsUseIndependentSerialLanes() throws Exception {
         appendEvents(1);
         ContextBlockingConsumer consumer = new ContextBlockingConsumer(
@@ -278,6 +334,38 @@ class ProjectionPublicationSchedulerTest {
             } finally {
                 active.decrementAndGet();
             }
+        }
+    }
+
+    private static final class FailFirstConsumer implements ProjectionConsumer {
+        private final ProjectionConsumerId consumerId;
+        private final AtomicBoolean failFirst = new AtomicBoolean(true);
+        private final CountDownLatch firstApplyEntered = new CountDownLatch(1);
+        private final CountDownLatch releaseFirst = new CountDownLatch(1);
+        private final List<ProjectionSequence> appliedSequences =
+                java.util.Collections.synchronizedList(new ArrayList<>());
+
+        private FailFirstConsumer(ProjectionConsumerId consumerId) {
+            this.consumerId = consumerId;
+        }
+
+        @Override
+        public ProjectionConsumerId consumerId() {
+            return consumerId;
+        }
+
+        @Override
+        public ProjectionApplyOutcome apply(ProjectionEvent event)
+                throws Exception {
+            appliedSequences.add(event.sequence());
+            if (failFirst.compareAndSet(true, false)) {
+                firstApplyEntered.countDown();
+                if (!releaseFirst.await(10, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("first apply was not released");
+                }
+                throw new IllegalStateException("injected running target failure");
+            }
+            return ProjectionApplyOutcome.APPLIED;
         }
     }
 

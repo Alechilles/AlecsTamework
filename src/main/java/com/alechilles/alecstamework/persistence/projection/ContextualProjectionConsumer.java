@@ -4,8 +4,8 @@ import java.util.List;
 import javax.annotation.Nonnull;
 
 /**
- * Fixes an explicit delivery context at a recovery boundary while preserving
- * the delegate's stable checkpoint identity.
+ * Fixes an explicit delivery context while preserving the delegate's stable
+ * checkpoint identity.
  */
 public final class ContextualProjectionConsumer implements ProjectionConsumer {
     private final ProjectionConsumer delegate;
@@ -23,6 +23,12 @@ public final class ContextualProjectionConsumer implements ProjectionConsumer {
         }
         this.delegate = delegate;
         this.context = context;
+    }
+
+    /** Returns the immutable context bound to this consumer. */
+    @Nonnull
+    public ProjectionPublicationContext context() {
+        return context;
     }
 
     /** Binds one immutable consumer set to the caller's explicit context. */
