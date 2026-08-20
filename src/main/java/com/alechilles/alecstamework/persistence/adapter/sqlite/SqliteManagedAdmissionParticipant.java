@@ -1,8 +1,12 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation;
+import com.alechilles.alecstamework.companion.population.domain.PopulationAdmissionComposition;
+import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
+import com.alechilles.alecstamework.persistence.operation.DurableOperationWork;
 import com.alechilles.alecstamework.persistence.operation.PreparedOperationDetail;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nonnull;
@@ -39,6 +43,39 @@ public final class SqliteManagedAdmissionParticipant
         );
     }
 
+    /** Rebuilds the exact participant from persisted admission evidence. */
+    @Nonnull
+    public static SqliteManagedAdmissionParticipant from(
+            @Nonnull OperationId operationId,
+            @Nonnull LifecycleAdmissionEvidence evidence
+    ) {
+        if (operationId == null || evidence == null
+                || evidence.status() != LifecycleAdmissionEvidence.Status.MANAGED
+                || evidence.payload() == null) {
+            throw new IllegalArgumentException(
+                    "Managed lifecycle admission evidence is required"
+            );
+        }
+        PopulationDomainAdmissionOperation.Payload payload = evidence.payload();
+        PopulationAdmissionComposition composition = evidence.composition();
+        return new SqliteManagedAdmissionParticipant(
+                new SqlitePopulationDomainParticipant(
+                        payload.reservations(operationId),
+                        true
+                ),
+                composition == null || composition.ownerPlan() == null
+                        ? null
+                        : new SqliteOwnerPopulationParticipant(
+                        composition.ownerPlan(), payload.requestedCount()
+                ),
+                composition == null || composition.groupRequest() == null
+                        ? null
+                        : new SqlitePopulationGroupTransitionParticipant(
+                        composition.groupRequest(), payload.requestedCount()
+                )
+        );
+    }
+
     @Override
     public void prepare(
             SqlitePersistenceTransactionContext transaction,
@@ -53,6 +90,22 @@ public final class SqliteManagedAdmissionParticipant
             OperationEnvelope operation
     ) throws Exception {
         return composed.matches(transaction, operation);
+    }
+
+    /** Decorates durable work with owner, group, and retained domain settlement. */
+    @Nonnull
+    public DurableOperationWork decorate(@Nonnull DurableOperationWork delegated) {
+        if (delegated == null) {
+            throw new IllegalArgumentException("Managed admission durable work is required");
+        }
+        DurableOperationWork decorated = delegated;
+        if (groups != null) {
+            decorated = groups.decorate(decorated);
+        }
+        if (owner != null) {
+            decorated = owner.decorate(decorated);
+        }
+        return domain.decorate(decorated, true);
     }
 
     /** Retires every exact reservation authority owned by this operation. */

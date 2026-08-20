@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.persistence.runtime;
 
-import com.alechilles.alecstamework.api.PopulationAdmissionRequestV3;
+import com.alechilles.alecstamework.api.PopulationAdmissionRequestV2;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
@@ -15,7 +15,7 @@ public record LifecycleAdmissionRequest(
         @Nonnull OperationId operationId,
         @Nonnull UUID reservationId,
         @Nonnull String targetRoleId,
-        @Nullable PopulationAdmissionRequestV3 managedRequest,
+        @Nullable PopulationAdmissionRequestV2 managedRequest,
         @Nullable CompanionLifecycle source,
         @Nullable LifecycleState sourceState,
         @Nonnull LifecycleState targetState,
@@ -29,7 +29,7 @@ public record LifecycleAdmissionRequest(
         targetState = Objects.requireNonNull(targetState, "targetState");
         if (managedRequest != null
                 && !targetRoleId.equals(
-                managedRequest.request().targetRoleId()
+                managedRequest.targetRoleId()
         )) {
             throw new IllegalArgumentException(
                     "Managed lifecycle role evidence does not match the request"
@@ -73,7 +73,7 @@ public record LifecycleAdmissionRequest(
             @Nonnull OperationId operationId,
             @Nonnull UUID reservationId,
             @Nonnull String targetRoleId,
-            @Nonnull PopulationAdmissionRequestV3 request,
+            @Nonnull PopulationAdmissionRequestV2 request,
             @Nullable CompanionLifecycle source,
             @Nullable LifecycleState sourceState,
             @Nonnull LifecycleState targetState,

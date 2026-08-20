@@ -154,6 +154,7 @@ class SqlitePopulationDomainParticipantTest {
             ).value();
 
             assertEquals(OperationPhase.DURABLE, durable.phase());
+            assertTrue(participant.matches(transaction, durable));
             assertEquals(2, transaction.populationDomains()
                     .counts(retained.bucket()).committedOwned());
             PopulationDomainBucket otherDomain = new PopulationDomainBucket(

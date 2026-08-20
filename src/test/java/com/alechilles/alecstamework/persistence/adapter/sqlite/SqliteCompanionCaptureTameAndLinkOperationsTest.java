@@ -13,6 +13,8 @@ import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseChan
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChangeCodec;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainScope;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentChangeCodec;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChangeCodec;
 import com.alechilles.alecstamework.persistence.facade
@@ -26,12 +28,16 @@ import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator
 import com.alechilles.alecstamework.persistence.projection.ProjectionEvent;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
 import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
@@ -57,13 +63,15 @@ class SqliteCompanionCaptureTameAndLinkOperationsTest {
     private SqliteCompanionCaptureOperations captures;
     private AtomicInteger refunds;
     private List<TameworkEvent> publicEvents;
+    private AdmissionMode admissionMode;
+    private int admissionCalls;
 
     @BeforeEach
     void setUp() throws Exception {
         connections = new SqliteConnectionFactory(
                 tempDir.resolve("tamework-state.sqlite")
         );
-        new SqliteSchemaV1Manager(
+        new SqliteSchemaV2Manager(
                 connections, () -> -10_000
         ).initialize();
         seedExpectedSource();
@@ -79,6 +87,11 @@ class SqliteCompanionCaptureTameAndLinkOperationsTest {
         );
         refunds = new AtomicInteger();
         publicEvents = new ArrayList<>();
+        admissionMode = AdmissionMode.NEUTRAL;
+        admissionCalls = 0;
+        SqliteLifecycleAdmissionBinding binding =
+                new SqliteLifecycleAdmissionBinding();
+        binding.bind(this::authorizeAdmission);
         captures = new SqliteCompanionCaptureOperations(
                 engine,
                 new SqliteOperationPublisher(
@@ -98,6 +111,8 @@ class SqliteCompanionCaptureTameAndLinkOperationsTest {
                             "tame_link_refund_delivered"
                     ).completed();
                 },
+                new SqliteOperationReader(reads),
+                binding,
                 List.of(new ReplacementPublicSemanticEventProjection(
                         publicEvents::add,
                         () -> -300
@@ -362,6 +377,108 @@ class SqliteCompanionCaptureTameAndLinkOperationsTest {
         assertEquals(2, liveCalls.get());
     }
 
+    @Test
+    void managedAdmissionDenialHappensBeforeLiveMutationOrPersistence()
+            throws Exception {
+        admissionMode = AdmissionMode.DENY;
+        AtomicInteger liveCalls = new AtomicInteger();
+
+        OperationWorkflowResult result = submit(
+                (capture, operation) -> {
+                    liveCalls.incrementAndGet();
+                    return LiveOperationResult.confirmed("must_not_run")
+                            .completed();
+                }
+        );
+
+        assertEquals(
+                OperationWorkflowResult.Status.PREPARE_FAILED,
+                result.status()
+        );
+        assertEquals(0, liveCalls.get());
+        assertEquals(1, admissionCalls);
+        try (Connection connection = connections.openReadConnection()) {
+            SqlitePersistenceTransactionContext transaction =
+                    new SqlitePersistenceTransactionContext(connection);
+            assertTrue(transaction.operations().find(OPERATION).isEmpty());
+            assertEquals(
+                    CaptureTameAndLinkTestFixtures.evidence()
+                            .expectedLifecycle(),
+                    transaction.lifecycles().findByProfile(PROFILE)
+                            .orElseThrow()
+            );
+        }
+    }
+
+    @Test
+    void managedCommitRetainsDomainLedgerAndReplayDoesNotReauthor()
+            throws Exception {
+        admissionMode = AdmissionMode.MANAGED;
+        OperationWorkflowResult first = submit(
+                (capture, operation) -> LiveOperationResult.confirmed(
+                        "managed_tame_confirmed"
+                ).completed()
+        );
+
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLISHED,
+                first.status(),
+                () -> String.valueOf(first.failure())
+        );
+        assertEquals(1, admissionCalls);
+        try (Connection connection = connections.openReadConnection()) {
+            SqlitePersistenceTransactionContext transaction =
+                    new SqlitePersistenceTransactionContext(connection);
+            var expected = managedEvidence(OPERATION).payload()
+                    .reservations(OPERATION).getFirst();
+            var actualReservations = transaction.populationDomains()
+                    .findByOperation(OPERATION);
+            assertEquals(1, actualReservations.size());
+            var actual = actualReservations.getFirst();
+            assertEquals(
+                    expected.bucket(), actual.bucket()
+            );
+            assertEquals(expected.ownedDelta(), actual.ownedDelta());
+            assertEquals(expected.deployableDelta(), actual.deployableDelta());
+            assertEquals(expected.weight(), actual.weight());
+            assertEquals(expected.policyRevision(), actual.policyRevision());
+        }
+
+        OperationWorkflowResult replay = submit(
+                (capture, operation) -> LiveOperationResult.confirmed(
+                        "must_not_run"
+                ).completed()
+        );
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, replay.status());
+        assertEquals(1, admissionCalls);
+    }
+
+    @Test
+    void managedCompensationRetiresDomainLedger()
+            throws Exception {
+        admissionMode = AdmissionMode.MANAGED;
+        OperationWorkflowResult result = submit(
+                (capture, operation) -> LiveOperationResult.compensate(
+                        "managed_tame_target_unchanged",
+                        null
+                ).completed()
+        );
+
+        assertEquals(
+                OperationWorkflowResult.Status.COMPENSATED,
+                result.status(),
+                () -> String.valueOf(result.failure())
+        );
+        assertEquals(1, admissionCalls);
+        assertEquals(1, refunds.get());
+        try (Connection connection = connections.openReadConnection()) {
+            SqlitePersistenceTransactionContext transaction =
+                    new SqlitePersistenceTransactionContext(connection);
+            assertTrue(transaction.populationDomains()
+                    .findByOperation(OPERATION).isEmpty());
+        }
+    }
+
     private OperationWorkflowResult submit(
             com.alechilles.alecstamework.companion.capture
                     .CompanionCaptureLiveBoundary boundary
@@ -492,5 +609,72 @@ class SqliteCompanionCaptureTameAndLinkOperationsTest {
              var statement = connection.createStatement()) {
             statement.execute(sql);
         }
+    }
+
+    private CompletionStage<LifecycleAdmissionEvidence> authorizeAdmission(
+            com.alechilles.alecstamework.persistence.runtime
+                    .LifecycleAdmissionRequest request
+    ) {
+        admissionCalls++;
+        return switch (admissionMode) {
+            case DENY -> CompletableFuture.failedFuture(
+                    new IllegalStateException("provider-capacity-denied")
+            );
+            case NEUTRAL -> CompletableFuture.completedFuture(
+                    LifecycleAdmissionEvidence.neutral()
+            );
+            case MANAGED -> CompletableFuture.completedFuture(
+                    managedEvidence(request.operationId())
+            );
+        };
+    }
+
+    private LifecycleAdmissionEvidence managedEvidence(
+            com.alechilles.alecstamework.persistence.operation.OperationId
+                    operationId
+    ) {
+        PopulationDomainAdmissionOperation.Payload payload =
+                new PopulationDomainAdmissionOperation.Payload(
+                        UUID.nameUUIDFromBytes((operationId.value()
+                                + ":lifecycle-admission").getBytes(
+                                java.nio.charset.StandardCharsets.UTF_8
+                        )),
+                        PROFILE,
+                        CaptureTameAndLinkTestFixtures.OWNER,
+                        CaptureTameAndLinkTestFixtures.EXPECTED,
+                        "world",
+                        null,
+                        null,
+                        LifecycleState.ACTIVE,
+                        LifecycleState.ACTIVE,
+                        "managed-test-group",
+                        "managed-test-provider",
+                        1,
+                        "generation",
+                        1,
+                        1,
+                        Long.MAX_VALUE,
+                        1,
+                        List.of(new PopulationDomainAdmissionOperation.DomainInput(
+                                "managed-test-domain",
+                                PopulationDomainScope.GLOBAL,
+                                null,
+                                1,
+                                1,
+                                1,
+                                100,
+                                100,
+                                1
+                        )),
+                        List.of(),
+                        -400
+                );
+        return LifecycleAdmissionEvidence.managed(payload, null);
+    }
+
+    private enum AdmissionMode {
+        NEUTRAL,
+        MANAGED,
+        DENY
     }
 }

@@ -6,7 +6,6 @@ import com.alechilles.alecstamework.api.PopulationAdmissionLocation;
 import com.alechilles.alecstamework.api.PopulationAdmissionOperation;
 import com.alechilles.alecstamework.api.PopulationAdmissionRequest;
 import com.alechilles.alecstamework.api.PopulationAdmissionRequestV2;
-import com.alechilles.alecstamework.api.PopulationAdmissionRequestV3;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
@@ -207,10 +206,8 @@ class SqliteLifecycleAdmissionBindingTest {
                 PopulationAdmissionForcePolicy.ENFORCE,
                 com.alechilles.alecstamework.api.PopulationCompanionLifecycle.ACTIVE
         );
-        PopulationAdmissionRequestV3 request = new PopulationAdmissionRequestV3(
-                new PopulationAdmissionRequestV2(admission, "role", "world"),
-                "managed"
-        );
+        PopulationAdmissionRequestV2 request =
+                new PopulationAdmissionRequestV2(admission, "role", "world");
         return LifecycleAdmissionRequest.managed(
                 OperationId.create(),
                 UUID.randomUUID(),

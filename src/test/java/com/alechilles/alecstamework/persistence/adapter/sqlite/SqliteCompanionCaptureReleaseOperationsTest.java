@@ -23,6 +23,8 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainScope;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
@@ -45,6 +47,8 @@ import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator
 import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionRequest;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -96,13 +100,15 @@ class SqliteCompanionCaptureReleaseOperationsTest {
     private SqliteReadExecutor reads;
     private SqlitePersistenceKernel recoveryKernel;
     private SqliteCompanionCaptureReleaseOperations releases;
+    private AdmissionMode admissionMode;
+    private int admissionCalls;
 
     @BeforeEach
     void setUp() throws Exception {
         connections = new SqliteConnectionFactory(
                 tempDir.resolve("tamework-state.sqlite")
         );
-        new SqliteSchemaV1Manager(connections, () -> -10_000).initialize();
+        new SqliteSchemaV2Manager(connections, () -> -10_000).initialize();
         seedCapturedProfile();
         writer = new SqliteSingleWriter(connections);
         reads = new SqliteReadExecutor(connections);
@@ -116,6 +122,11 @@ class SqliteCompanionCaptureReleaseOperationsTest {
                 )),
                 units
         );
+        admissionMode = AdmissionMode.NEUTRAL;
+        admissionCalls = 0;
+        SqliteLifecycleAdmissionBinding binding =
+                new SqliteLifecycleAdmissionBinding();
+        binding.bind(this::authorizeAdmission);
         releases = new SqliteCompanionCaptureReleaseOperations(
                 engine,
                 new SqliteOperationPublisher(
@@ -129,6 +140,8 @@ class SqliteCompanionCaptureReleaseOperationsTest {
                         () -> -400
                 ),
                 () -> -400,
+                new SqliteOperationReader(reads),
+                binding,
                 List.of()
         );
     }
@@ -261,6 +274,7 @@ class SqliteCompanionCaptureReleaseOperationsTest {
         assertEquals(OperationWorkflowResult.Status.PUBLISHED, replay.status());
         assertEquals(1, inventoryWrites.get());
         assertEquals(1, spawnWrites.get());
+        assertEquals(1, admissionCalls);
     }
 
     @Test
@@ -543,6 +557,7 @@ class SqliteCompanionCaptureReleaseOperationsTest {
     @Test
     void alreadyMigratedUnloadedHistoryReleasesOnceWithoutLegacyDatabase()
             throws Exception {
+        admissionMode = AdmissionMode.DENY;
         seedAlreadyMigratedStrandedShape();
         CompanionCaptureReleaseRequest recovery = legacyRecoveryRequest();
         AtomicInteger liveCalls = new AtomicInteger();
@@ -561,6 +576,7 @@ class SqliteCompanionCaptureReleaseOperationsTest {
         assertEquals(OperationWorkflowResult.Status.PUBLISHED, first.status());
         assertEquals(OperationWorkflowResult.Status.PUBLISHED, replay.status());
         assertEquals(1, liveCalls.get());
+        assertEquals(0, admissionCalls);
         assertEquals(LifecycleState.ACTIVE, lifecycle().state());
         assertEquals(
                 LifecycleLocation.liveEntity(
@@ -601,6 +617,122 @@ class SqliteCompanionCaptureReleaseOperationsTest {
         assertEquals(CompanionAlias.State.RETIRED,
                 alias(NEWER_SOURCE_ALIAS).state());
         assertTrue(!snapshot().current());
+    }
+
+    @Test
+    void capturedModernReleaseRequiresAdmissionBeforeLiveBoundary()
+            throws Exception {
+        admissionMode = AdmissionMode.DENY;
+        AtomicBoolean liveCalled = new AtomicBoolean();
+
+        OperationWorkflowResult result = submit(
+                17,
+                modernRecoveryRequest(),
+                (request, operation) -> {
+                    liveCalled.set(true);
+                    return LiveOperationResult.confirmed("must_not_run")
+                            .completed();
+                }
+        );
+
+        assertEquals(
+                OperationWorkflowResult.Status.PREPARE_FAILED,
+                result.status()
+        );
+        assertTrue(!liveCalled.get());
+        assertEquals(1, admissionCalls);
+        assertEquals(LifecycleState.CAPTURED, lifecycle().state());
+        try (Connection connection = connections.openReadConnection()) {
+            assertTrue(new SqliteOperationStore(connection)
+                    .find(operationId(17)).isEmpty());
+        }
+    }
+
+    @Test
+    void managedCapturedReleaseRetainsDomainAndReplaysWithoutAdmission()
+            throws Exception {
+        admissionMode = AdmissionMode.MANAGED;
+        setCapturedOwner(null);
+        CompanionCaptureReleaseRequest owned = request(
+                new LifecycleRevision(1), OWNER
+        );
+        AtomicInteger liveCalls = new AtomicInteger();
+
+        OperationWorkflowResult first = submit(
+                18,
+                owned,
+                (request, operation) -> {
+                    liveCalls.incrementAndGet();
+                    return LiveOperationResult.confirmed(
+                            "capture_release_both_receipts_confirmed"
+                    ).completed();
+                }
+        );
+
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLISHED,
+                first.status(),
+                String.valueOf(first.failure())
+        );
+        assertEquals(1, liveCalls.get());
+        assertEquals(1, admissionCalls);
+        var expected = managedEvidence(operationId(18)).payload()
+                .reservations(operationId(18)).getFirst();
+        try (Connection connection = connections.openReadConnection()) {
+            var reservations = new SqlitePersistenceTransactionContext(
+                    connection
+            ).populationDomains().findByOperation(operationId(18));
+            assertEquals(1, reservations.size());
+            var actual = reservations.getFirst();
+            assertEquals(expected.bucket(), actual.bucket());
+            assertEquals(expected.ownedDelta(), actual.ownedDelta());
+            assertEquals(expected.deployableDelta(), actual.deployableDelta());
+        }
+
+        OperationWorkflowResult replay = submit(
+                18,
+                owned,
+                (request, operation) -> {
+                    liveCalls.incrementAndGet();
+                    return LiveOperationResult.confirmed("must_not_run")
+                            .completed();
+                }
+        );
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, replay.status());
+        assertEquals(1, liveCalls.get());
+        assertEquals(1, admissionCalls);
+    }
+
+    @Test
+    void managedOwnedCapturedReleasePreservesOwnerInTargetWorld()
+            throws Exception {
+        admissionMode = AdmissionMode.MANAGED;
+        CompanionCaptureReleaseRequest owned = ownedSourceRequest();
+
+        OperationWorkflowResult result = submit(
+                19,
+                owned,
+                (request, operation) -> LiveOperationResult.confirmed(
+                        "capture_release_both_receipts_confirmed"
+                ).completed()
+        );
+
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLISHED,
+                result.status(),
+                String.valueOf(result.failure())
+        );
+        assertEquals(1, admissionCalls);
+        assertEquals(OWNER, lifecycle().ownerId());
+        assertEquals("world-two", lifecycle().ownerWorldKey());
+        try (Connection connection = connections.openReadConnection()) {
+            var reservations = new SqlitePersistenceTransactionContext(
+                    connection
+            ).populationDomains().findByOperation(operationId(19));
+            assertEquals(1, reservations.size());
+            assertEquals("world-two",
+                    reservations.getFirst().bucket().ownerWorldKey());
+        }
     }
 
     /**
@@ -1138,6 +1270,32 @@ class SqliteCompanionCaptureReleaseOperationsTest {
         );
     }
 
+    private CompanionCaptureReleaseRequest ownedSourceRequest() {
+        CompanionCaptureReleaseRequest base = request(
+                new LifecycleRevision(1), null
+        );
+        return new CompanionCaptureReleaseRequest(
+                base.profileId(),
+                base.expectedLifecycleRevision(),
+                base.sourceSnapshot(),
+                base.sourceAlias(),
+                base.projection(),
+                new CaptureReleaseSourceEvidence(
+                        base.source().actorUuid(),
+                        base.source().worldKey(),
+                        base.source().slot(),
+                        ownedSourceArtifact(),
+                        base.source().receiptArtifact()
+                ),
+                base.targetAlias(),
+                base.ownerAssignment(),
+                base.placement(),
+                base.inventoryReceiptKey(),
+                base.spawnReceiptKey(),
+                base.requestedAtMs()
+        );
+    }
+
     private void setCapturedOwner(OwnerId ownerId) throws Exception {
         try (Connection connection = connections.openWriterConnection();
              PreparedStatement statement = connection.prepareStatement("""
@@ -1242,6 +1400,81 @@ class SqliteCompanionCaptureReleaseOperationsTest {
         );
     }
 
+    private CompletionStage<LifecycleAdmissionEvidence> authorizeAdmission(
+            LifecycleAdmissionRequest request
+    ) {
+        admissionCalls++;
+        return switch (admissionMode) {
+            case DENY -> CompletableFuture.failedFuture(
+                    new IllegalStateException("provider-capacity-denied")
+            );
+            case NEUTRAL -> CompletableFuture.completedFuture(
+                    LifecycleAdmissionEvidence.neutral()
+            );
+            case MANAGED -> CompletableFuture.completedFuture(
+                    managedEvidence(
+                            request.operationId(),
+                            request.sourceOwner(),
+                            request.sourceWorld()
+                    )
+            );
+        };
+    }
+
+    private LifecycleAdmissionEvidence managedEvidence(OperationId operationId) {
+        return managedEvidence(operationId, null, null);
+    }
+
+    private LifecycleAdmissionEvidence managedEvidence(
+            OperationId operationId,
+            OwnerId sourceOwner,
+            String sourceWorld
+    ) {
+        PopulationDomainAdmissionOperation.Payload payload =
+                new PopulationDomainAdmissionOperation.Payload(
+                        UUID.nameUUIDFromBytes((operationId.value()
+                                + ":lifecycle-admission").getBytes(
+                                java.nio.charset.StandardCharsets.UTF_8
+                        )),
+                        PROFILE,
+                        OWNER,
+                        new LifecycleRevision(1),
+                        "world-two",
+                        sourceOwner,
+                        sourceWorld,
+                        LifecycleState.CAPTURED,
+                        LifecycleState.ACTIVE,
+                        "managed-test-group",
+                        "managed-test-provider",
+                        1,
+                        "generation",
+                        1,
+                        1,
+                        Long.MAX_VALUE,
+                        1,
+                        List.of(new PopulationDomainAdmissionOperation.DomainInput(
+                                "managed-test-domain",
+                                PopulationDomainScope.PER_WORLD,
+                                "world-two",
+                                1,
+                                1,
+                                1,
+                                100,
+                                100,
+                                1
+                        )),
+                        List.of(),
+                        -400
+                );
+        return LifecycleAdmissionEvidence.managed(payload, null);
+    }
+
+    private enum AdmissionMode {
+        NEUTRAL,
+        DENY,
+        MANAGED
+    }
+
     private CapturedArtifact sourceArtifact() {
         return artifact(
                 "capture-device-filled",
@@ -1251,6 +1484,20 @@ class SqliteCompanionCaptureReleaseOperationsTest {
                         + "\":\"" + PROFILE + "\","
                         + "\"" + TameworkMetadataKeys.TARGET_UUID
                         + "\":\"" + SOURCE_ALIAS + "\""
+        );
+    }
+
+    private CapturedArtifact ownedSourceArtifact() {
+        return artifact(
+                "capture-device-filled",
+                "\"" + TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID
+                        + "\":\"" + SNAPSHOT + "\","
+                        + "\"" + TameworkMetadataKeys.COMPANION_PROFILE_ID
+                        + "\":\"" + PROFILE + "\","
+                        + "\"" + TameworkMetadataKeys.TARGET_UUID
+                        + "\":\"" + SOURCE_ALIAS + "\","
+                        + "\"" + TameworkMetadataKeys.OWNER_UUID
+                        + "\":\"" + OWNER + "\""
         );
     }
 

@@ -39,14 +39,11 @@ import com.alechilles.alecstamework.items.persistence.SpawnerTameAndLinkIntentEv
 /**
  * Authors exact engine-neutral evidence for an in-place tame-and-command-link capture.
  *
- * <p>The caller supplies one immutable snapshot of every participating authority. This author
- * performs an early fail-closed capacity and duplicate check; the durable operation repeats all
- * canonical checks transactionally before accepting the operation.</p>
+ * <p>The caller supplies one immutable snapshot of every participating authority. Capacity is
+ * admitted by the shared transactional lifecycle gateway; this author only freezes the existing
+ * cross-authority tame/link target evidence.</p>
  */
 public final class SpawnerTameAndLinkEvidenceAuthor {
-    private final SpawnerTameAndLinkCapacityValidator capacity =
-            new SpawnerTameAndLinkCapacityValidator();
-
     /** Builds one internally consistent durable target from exact authoritative source evidence. */
     @Nonnull
     public CaptureTameAndLinkEvidence author(
@@ -169,7 +166,6 @@ public final class SpawnerTameAndLinkEvidenceAuthor {
                         .orElseThrow(() -> failure(
                                 "capture_tame_owner_plan_missing"
                         ));
-        capacity.requireOwnerCapacity(plan, evidence.counts());
         return plan;
     }
 
@@ -204,7 +200,6 @@ public final class SpawnerTameAndLinkEvidenceAuthor {
                 );
         List<PopulationGroupReservation> reservations =
                 groupReservations(input, classified.target());
-        capacity.requireGroupCapacity(reservations, evidence.counts());
         return new CapturePopulationGroupEvidence(
                 evidence.currentAssignment(),
                 new PopulationGroupAssignmentPlan(

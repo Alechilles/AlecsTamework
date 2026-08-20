@@ -65,21 +65,21 @@ public final class SqlitePopulationDomainParticipant
         List<PopulationDomainReservation> actual = transaction
                 .populationDomains()
                 .findByOperation(operation.operationId());
-        if (operation.phase() == OperationPhase.DURABLE
-                || operation.phase() == OperationPhase.PUBLISHED
-                || operation.phase() == OperationPhase.COMPENSATED
+        if (operation.phase() == OperationPhase.COMPENSATED
                 || operation.phase() == OperationPhase.FAILED) {
             return actual.isEmpty();
+        }
+        if (operation.phase() == OperationPhase.DURABLE
+                || operation.phase() == OperationPhase.PUBLISHED) {
+            if (!retainCommitted) {
+                return actual.isEmpty();
+            }
+            return sameReservations(actual);
         }
         if (actual.size() != reservations.size()) {
             return false;
         }
-        for (int index = 0; index < reservations.size(); index++) {
-            if (!sameStored(actual.get(index), reservations.get(index))) {
-                return false;
-            }
-        }
-        return true;
+        return sameReservations(actual);
     }
 
     /** Retires only the exact operation-owned rows after delegated durable work. */
@@ -147,6 +147,18 @@ public final class SqlitePopulationDomainParticipant
 
     public List<PopulationDomainReservation> reservations() {
         return reservations;
+    }
+
+    private boolean sameReservations(List<PopulationDomainReservation> actual) {
+        if (actual.size() != reservations.size()) {
+            return false;
+        }
+        for (int index = 0; index < reservations.size(); index++) {
+            if (!sameStored(actual.get(index), reservations.get(index))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void requireOperation(OperationEnvelope operation) {

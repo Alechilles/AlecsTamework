@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
 import com.alechilles.alecstamework.api.CaptureChanceMode;
@@ -11,6 +12,7 @@ import com.alechilles.alecstamework.api.CaptureSourceConsumption;
 import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.bson.BsonDocument;
@@ -25,7 +27,8 @@ public record CompanionCaptureRequest(
         @Nonnull String targetWorldKey,
         @Nonnull CaptureTerminalPlan terminal,
         @Nonnull CaptureSourceEvidence source,
-        long requestedAtMs
+        long requestedAtMs,
+        @Nullable LifecycleAdmissionEvidence admissionEvidence
 ) {
     public static final SnapshotKind SNAPSHOT_KIND = new SnapshotKind("capture");
     /** Version 1 is the released public minimal payload; replacement full-state capture is v2. */
@@ -78,9 +81,39 @@ public record CompanionCaptureRequest(
             );
         } else if (resultingOwnerId != null) {
             throw new IllegalArgumentException(
-                    "Failed capture cannot change the resulting owner"
+                "Failed capture cannot change the resulting owner"
             );
         }
+        requireAdmissionEvidence(
+                admissionEvidence,
+                profileId,
+                expectedLifecycleRevision,
+                terminal
+        );
+    }
+
+    /** Source-compatible constructor without lifecycle admission evidence. */
+    public CompanionCaptureRequest(
+            ProfileId profileId,
+            LifecycleRevision expectedLifecycleRevision,
+            OwnerId resultingOwnerId,
+            NpcAlias targetAlias,
+            String targetWorldKey,
+            CaptureTerminalPlan terminal,
+            CaptureSourceEvidence source,
+            long requestedAtMs
+    ) {
+        this(
+                profileId,
+                expectedLifecycleRevision,
+                resultingOwnerId,
+                targetAlias,
+                targetWorldKey,
+                terminal,
+                source,
+                requestedAtMs,
+                null
+        );
     }
 
     /** Source-compatible constructor for successful ordinary captures. */
@@ -135,6 +168,75 @@ public record CompanionCaptureRequest(
     public boolean tameAndCommandLink() {
         return terminal
                 instanceof CaptureTerminalPlan.TameAndCommandLink;
+    }
+
+    /** Returns this request with the frozen admission result attached. */
+    @Nonnull
+    public CompanionCaptureRequest withAdmissionEvidence(
+            @Nonnull LifecycleAdmissionEvidence evidence
+    ) {
+        if (admissionEvidence != null
+                && !java.util.Objects.equals(admissionEvidence, evidence)) {
+            throw new IllegalArgumentException(
+                    "Lifecycle admission evidence cannot be replaced"
+            );
+        }
+        return new CompanionCaptureRequest(
+                profileId,
+                expectedLifecycleRevision,
+                resultingOwnerId,
+                targetAlias,
+                targetWorldKey,
+                terminal,
+                source,
+                requestedAtMs,
+                evidence
+        );
+    }
+
+    private static void requireAdmissionEvidence(
+            LifecycleAdmissionEvidence evidence,
+            ProfileId profileId,
+            LifecycleRevision expectedLifecycleRevision,
+            CaptureTerminalPlan terminal
+    ) {
+        if (evidence == null) {
+            return;
+        }
+        if (!(terminal instanceof CaptureTerminalPlan.TameAndCommandLink tame)) {
+            throw new IllegalArgumentException(
+                    "Lifecycle admission evidence requires tame/link capture"
+            );
+        }
+        if (evidence.status() != LifecycleAdmissionEvidence.Status.MANAGED) {
+            return;
+        }
+        var payload = evidence.payload();
+        var tameEvidence = tame.evidence();
+        if (payload == null
+                || !payload.profileId().equals(profileId)
+                || !java.util.Objects.equals(
+                payload.expectedLifecycleRevision(), expectedLifecycleRevision
+        )
+                || payload.targetLifecycle() != LifecycleState.ACTIVE
+                || payload.domains().isEmpty()
+                || !java.util.Objects.equals(
+                payload.ownerId(), tameEvidence.finalLifecycle().ownerId()
+        )
+                || !java.util.Objects.equals(
+                payload.ownerWorldKey(), tameEvidence.finalLifecycle().ownerWorldKey()
+        )
+                || payload.sourceLifecycle() != tameEvidence.expectedLifecycle().state()
+                || !java.util.Objects.equals(
+                payload.sourceOwnerId(), tameEvidence.expectedLifecycle().ownerId()
+        )
+                || !java.util.Objects.equals(
+                payload.sourceWorldKey(), tameEvidence.expectedLifecycle().ownerWorldKey()
+        )) {
+            throw new IllegalArgumentException(
+                    "Tame/link lifecycle admission evidence is inconsistent"
+            );
+        }
     }
 
     public CaptureTameAndLinkEvidence tameAndLinkEvidence() {

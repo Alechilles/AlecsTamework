@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.capture;
 
+import com.alechilles.alecstamework.companion.population.domain.LifecycleAdmissionEvidenceJsonCodec;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
@@ -82,6 +83,14 @@ public final class CompanionCaptureDefinition
         }
         json.add("source", encodeSource(payload.source()));
         json.addProperty("requestedAtMs", payload.requestedAtMs());
+        if (payload.admissionEvidence() != null) {
+            json.add(
+                    "admissionEvidence",
+                    LifecycleAdmissionEvidenceJsonCodec.encode(
+                            payload.admissionEvidence()
+                    )
+            );
+        }
         return json.toString();
     }
 
@@ -93,7 +102,7 @@ public final class CompanionCaptureDefinition
                 json.getAsJsonObject("source")
         );
         CaptureTerminalPlan terminal = decodeTerminal(json, source);
-        return new CompanionCaptureRequest(
+        CompanionCaptureRequest decoded = new CompanionCaptureRequest(
                 ProfileId.parse(json.get("profileId").getAsString()),
                 new LifecycleRevision(
                         json.get("expectedLifecycleRevision").getAsLong()
@@ -105,6 +114,14 @@ public final class CompanionCaptureDefinition
                 source,
                 json.get("requestedAtMs").getAsLong()
         );
+        return json.has("admissionEvidence")
+                && !json.get("admissionEvidence").isJsonNull()
+                ? decoded.withAdmissionEvidence(
+                        LifecycleAdmissionEvidenceJsonCodec.decode(
+                                json.getAsJsonObject("admissionEvidence")
+                        )
+                )
+                : decoded;
     }
 
     private CaptureTerminalPlan decodeTerminal(

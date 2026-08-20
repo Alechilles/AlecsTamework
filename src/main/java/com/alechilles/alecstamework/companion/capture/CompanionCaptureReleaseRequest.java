@@ -4,11 +4,13 @@ import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
 import java.util.Objects;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -31,7 +33,8 @@ public record CompanionCaptureReleaseRequest(
         long requestedAtMs,
         @Nullable CaptureReleaseLegacyRecoveryEvidence legacyRecovery,
         @Nullable CaptureReleaseModernRecoveryEvidence modernRecovery,
-        @Nullable CaptureReleaseOrphanRecoveryEvidence orphanRecovery
+        @Nullable CaptureReleaseOrphanRecoveryEvidence orphanRecovery,
+        @Nullable LifecycleAdmissionEvidence admissionEvidence
 ) {
     /** Creates an ordinary captured-artifact release without recovery evidence. */
     public CompanionCaptureReleaseRequest(
@@ -61,6 +64,7 @@ public record CompanionCaptureReleaseRequest(
                 inventoryReceiptKey,
                 spawnReceiptKey,
                 requestedAtMs,
+                null,
                 null,
                 null,
                 null
@@ -98,6 +102,7 @@ public record CompanionCaptureReleaseRequest(
                 requestedAtMs,
                 legacyRecovery,
                 null,
+                null,
                 null
         );
     }
@@ -134,6 +139,45 @@ public record CompanionCaptureReleaseRequest(
                 requestedAtMs,
                 legacyRecovery,
                 modernRecovery,
+                null,
+                null
+        );
+    }
+
+    /** Source-compatible constructor with explicit recovery modes and no admission evidence. */
+    public CompanionCaptureReleaseRequest(
+            ProfileId profileId,
+            LifecycleRevision expectedLifecycleRevision,
+            CompanionSnapshot sourceSnapshot,
+            NpcAlias sourceAlias,
+            SnapshotCodecRegistry.EncodedSnapshot projection,
+            CaptureReleaseSourceEvidence source,
+            NpcAlias targetAlias,
+            OwnerId ownerAssignment,
+            CompanionSpawnPlacement placement,
+            String inventoryReceiptKey,
+            String spawnReceiptKey,
+            long requestedAtMs,
+            CaptureReleaseLegacyRecoveryEvidence legacyRecovery,
+            CaptureReleaseModernRecoveryEvidence modernRecovery,
+            CaptureReleaseOrphanRecoveryEvidence orphanRecovery
+    ) {
+        this(
+                profileId,
+                expectedLifecycleRevision,
+                sourceSnapshot,
+                sourceAlias,
+                projection,
+                source,
+                targetAlias,
+                ownerAssignment,
+                placement,
+                inventoryReceiptKey,
+                spawnReceiptKey,
+                requestedAtMs,
+                legacyRecovery,
+                modernRecovery,
+                orphanRecovery,
                 null
         );
     }
@@ -252,9 +296,19 @@ public record CompanionCaptureReleaseRequest(
         );
         if (inventoryReceiptKey.equals(spawnReceiptKey)) {
             throw new IllegalArgumentException(
-                    "Captured-artifact inventory and spawn receipts must be distinct"
+                "Captured-artifact inventory and spawn receipts must be distinct"
             );
         }
+        requireAdmissionEvidence(
+                admissionEvidence,
+                profileId,
+                expectedLifecycleRevision,
+                source,
+                ownerAssignment,
+                placement,
+                legacyRecovery,
+                orphanRecovery
+        );
     }
 
     private static boolean isReleasedPublicCapture(
@@ -305,6 +359,93 @@ public record CompanionCaptureReleaseRequest(
     @Nonnull
     public String targetWorldKey() {
         return placement.worldKey();
+    }
+
+    /** Returns this request with the frozen admission result attached. */
+    @Nonnull
+    public CompanionCaptureReleaseRequest withAdmissionEvidence(
+            @Nonnull LifecycleAdmissionEvidence evidence
+    ) {
+        if (admissionEvidence != null
+                && !java.util.Objects.equals(admissionEvidence, evidence)) {
+            throw new IllegalArgumentException(
+                    "Lifecycle admission evidence cannot be replaced"
+            );
+        }
+        return new CompanionCaptureReleaseRequest(
+                profileId,
+                expectedLifecycleRevision,
+                sourceSnapshot,
+                sourceAlias,
+                projection,
+                source,
+                targetAlias,
+                ownerAssignment,
+                placement,
+                inventoryReceiptKey,
+                spawnReceiptKey,
+                requestedAtMs,
+                legacyRecovery,
+                modernRecovery,
+                orphanRecovery,
+                evidence
+        );
+    }
+
+    private static void requireAdmissionEvidence(
+            LifecycleAdmissionEvidence evidence,
+            ProfileId profileId,
+            LifecycleRevision expectedLifecycleRevision,
+            CaptureReleaseSourceEvidence source,
+            OwnerId ownerAssignment,
+            CompanionSpawnPlacement placement,
+            CaptureReleaseLegacyRecoveryEvidence legacyRecovery,
+            CaptureReleaseOrphanRecoveryEvidence orphanRecovery
+    ) {
+        if (evidence == null) {
+            return;
+        }
+        if (legacyRecovery != null || orphanRecovery != null) {
+            throw new IllegalArgumentException(
+                    "Lifecycle admission evidence requires a canonical capture source"
+            );
+        }
+        if (evidence.status() != LifecycleAdmissionEvidence.Status.MANAGED) {
+            return;
+        }
+        var payload = evidence.payload();
+        OwnerId sourceOwner = sourceOwnerFromArtifact(source.sourceArtifact());
+        OwnerId targetOwner = ownerAssignment == null
+                ? sourceOwner : ownerAssignment;
+        String sourceWorld = sourceOwner == null ? null : source.worldKey();
+        if (payload == null
+                || !payload.profileId().equals(profileId)
+                || !java.util.Objects.equals(
+                payload.expectedLifecycleRevision(), expectedLifecycleRevision
+        )
+                || payload.targetLifecycle() != LifecycleState.ACTIVE
+                || payload.sourceLifecycle() != LifecycleState.CAPTURED
+                || payload.domains().isEmpty()
+                || !java.util.Objects.equals(payload.ownerId(), targetOwner)
+                || !java.util.Objects.equals(
+                payload.ownerWorldKey(),
+                targetOwner == null ? null : placement.worldKey()
+        )
+                || !java.util.Objects.equals(payload.sourceOwnerId(), sourceOwner)
+                || !java.util.Objects.equals(payload.sourceWorldKey(), sourceWorld)) {
+            throw new IllegalArgumentException(
+                    "Capture release lifecycle admission evidence is inconsistent"
+            );
+        }
+    }
+
+    @Nullable
+    private static OwnerId sourceOwnerFromArtifact(CapturedArtifact artifact) {
+        BsonValue owner = BsonDocument.parse(
+                artifact.metadataExtendedJson()
+        ).get(TameworkMetadataKeys.OWNER_UUID);
+        return owner == null || owner.isNull()
+                ? null : OwnerId.parse(owner.asString().getValue());
     }
 
     private static void requireSourceReceipt(

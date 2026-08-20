@@ -20,6 +20,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /** Exactness and fail-closed admission tests for tame/link capture evidence authoring. */
@@ -112,55 +113,63 @@ class SpawnerTameAndLinkEvidenceAuthorTest {
     }
 
     @Test
-    void globalOwnerAdmissionIncludesPendingAndCommittedCounts() {
-        assertFailure(
-                fixture.withOwnerPopulation(new OwnerPopulationEvidence(
-                        2,
-                        2,
-                        List.of(
-                                fixture.ownerCount(
-                                        OwnerPopulationScope.global(
-                                                fixture.OWNER
-                                        ),
-                                        1, 1
-                                ),
-                                fixture.ownerCount(
-                                        OwnerPopulationScope.perWorld(
-                                                fixture.OWNER,
-                                                fixture.WORLD
-                                        ),
-                                        0, 0
+    void globalOwnerAdmissionIsFrozenForTheTransactionalGate() {
+        CaptureTameAndLinkEvidence admitted = assertDoesNotThrow(
+                () -> author.author(
+                        fixture.withOwnerPopulation(
+                                new OwnerPopulationEvidence(
+                                        2,
+                                        2,
+                                        List.of(
+                                                fixture.ownerCount(
+                                                        OwnerPopulationScope.global(
+                                                                fixture.OWNER
+                                                        ),
+                                                        1, 1
+                                                ),
+                                                fixture.ownerCount(
+                                                        OwnerPopulationScope.perWorld(
+                                                                fixture.OWNER,
+                                                                fixture.WORLD
+                                                        ),
+                                                        0, 0
+                                                )
+                                        )
                                 )
                         )
-                )),
-                "capture_tame_owner_capacity_reached"
+                )
         );
+        assertEquals(2, admitted.ownerPopulation().increases().size());
     }
 
     @Test
-    void perWorldOwnerAdmissionIncludesPendingAndCommittedCounts() {
-        assertFailure(
-                fixture.withOwnerPopulation(new OwnerPopulationEvidence(
-                        4,
-                        2,
-                        List.of(
-                                fixture.ownerCount(
-                                        OwnerPopulationScope.global(
-                                                fixture.OWNER
-                                        ),
-                                        0, 0
-                                ),
-                                fixture.ownerCount(
-                                        OwnerPopulationScope.perWorld(
-                                                fixture.OWNER,
-                                                fixture.WORLD
-                                        ),
-                                        1, 1
+    void perWorldOwnerAdmissionIsFrozenForTheTransactionalGate() {
+        CaptureTameAndLinkEvidence admitted = assertDoesNotThrow(
+                () -> author.author(
+                        fixture.withOwnerPopulation(
+                                new OwnerPopulationEvidence(
+                                        4,
+                                        2,
+                                        List.of(
+                                                fixture.ownerCount(
+                                                        OwnerPopulationScope.global(
+                                                                fixture.OWNER
+                                                        ),
+                                                        0, 0
+                                                ),
+                                                fixture.ownerCount(
+                                                        OwnerPopulationScope.perWorld(
+                                                                fixture.OWNER,
+                                                                fixture.WORLD
+                                                        ),
+                                                        1, 1
+                                                )
+                                        )
                                 )
                         )
-                )),
-                "capture_tame_owner_capacity_reached"
+                )
         );
+        assertEquals(2, admitted.ownerPopulation().increases().size());
     }
 
     @Test
@@ -180,13 +189,9 @@ class SpawnerTameAndLinkEvidenceAuthorTest {
                         )
                 )
         );
-        assertFailure(
-                fixture.withGroups(blocked),
-                "capture_tame_group_owned_capacity_reached"
+        CaptureTameAndLinkEvidence admitted = assertDoesNotThrow(
+                () -> author.author(fixture.withGroups(blocked))
         );
-
-        CaptureTameAndLinkEvidence admitted =
-                author.author(fixture.baseInput());
         assertEquals(
                 Set.of(
                         fixture.globalBucket(), fixture.worldBucket()

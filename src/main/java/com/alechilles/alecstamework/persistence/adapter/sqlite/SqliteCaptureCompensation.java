@@ -55,12 +55,21 @@ final class SqliteCaptureCompensation {
             @Nonnull CompanionCaptureRequest capture
     ) {
         RefundClaim claim = claim(operation.operationId(), capture);
+        SqliteManagedAdmissionParticipant managed =
+                capture.admissionEvidence() != null
+                        && capture.admissionEvidence().status()
+                        == com.alechilles.alecstamework.persistence.runtime
+                        .LifecycleAdmissionEvidence.Status.MANAGED
+                        ? SqliteManagedAdmissionParticipant.from(
+                        operation.operationId(),
+                        capture.admissionEvidence()
+                ) : null;
         return coordinator.resume(
                 operation,
                 claim,
                 new RefundDetail(claim),
                 refunds,
-                new CaptureCompensatedWork(capture),
+                new CaptureCompensatedWork(capture, managed),
                 "companion_capture_refund"
         );
     }
@@ -242,9 +251,14 @@ final class SqliteCaptureCompensation {
     private static final class CaptureCompensatedWork
             implements TimedCompensatedOperationWork<RefundClaim> {
         private final CompanionCaptureRequest capture;
+        private final SqliteManagedAdmissionParticipant managed;
 
-        private CaptureCompensatedWork(CompanionCaptureRequest capture) {
+        private CaptureCompensatedWork(
+                CompanionCaptureRequest capture,
+                SqliteManagedAdmissionParticipant managed
+        ) {
             this.capture = capture;
+            this.managed = managed;
         }
 
         @Override
@@ -254,7 +268,7 @@ final class SqliteCaptureCompensation {
                 RefundClaim claim,
                 String liveEvidence,
                 long compensatedAtMs
-        ) {
+        ) throws Exception {
             if (!transaction.refunds().complete(
                     operation.operationId(),
                     claim.receiptKey(),
@@ -403,8 +417,21 @@ final class SqliteCaptureCompensation {
         private void requireTameUncommitted(
                 SqlitePersistenceTransactionContext transaction,
                 OperationEnvelope operation
-        ) {
+        ) throws Exception {
             var evidence = capture.tameAndLinkEvidence();
+            boolean reservationsMatch = managed != null
+                    ? managed.matches(transaction, operation)
+                    : transaction.population()
+                    .findByOperation(operation.operationId()).equals(
+                            new SqliteOwnerPopulationParticipant(
+                                    evidence.ownerPopulation()
+                            ).reservations(operation)
+                    )
+                    && transaction.populationGroups()
+                    .findReservations(operation.operationId()).equals(
+                            evidence.populationGroups()
+                                    .targetPlan().reservations()
+                    );
             if (transaction.identities()
                     .findProfile(evidence.expectedIdentity().profileId())
                     .filter(evidence.expectedIdentity()::equals)
@@ -419,17 +446,7 @@ final class SqliteCaptureCompensation {
                     .findByProfile(capture.profileId()).isPresent()
                     || transaction.timedSummons()
                     .find(capture.profileId()).isPresent()
-                    || !transaction.population()
-                    .findByOperation(operation.operationId()).equals(
-                            new SqliteOwnerPopulationParticipant(
-                                    evidence.ownerPopulation()
-                            ).reservations(operation)
-            )
-                    || !transaction.populationGroups()
-                    .findReservations(operation.operationId()).equals(
-                            evidence.populationGroups()
-                                    .targetPlan().reservations()
-            )) {
+                    || !reservationsMatch) {
                 throw new IllegalStateException(
                         "capture_tame_compensation_source_mismatch"
                 );
@@ -440,6 +457,10 @@ final class SqliteCaptureCompensation {
                 SqlitePersistenceTransactionContext transaction,
                 OperationEnvelope operation
         ) {
+            if (managed != null) {
+                managed.retirePrepared(transaction, operation);
+                return;
+            }
             var evidence = capture.tameAndLinkEvidence();
             if (!transaction.population().retireExact(
                     operation.operationId(),

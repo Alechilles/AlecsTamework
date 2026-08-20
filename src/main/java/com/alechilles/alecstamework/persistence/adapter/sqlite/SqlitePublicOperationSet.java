@@ -134,6 +134,9 @@ final class SqlitePublicOperationSet {
                 operationKind -> projections.requiredFor(
                         operationKind, publicationContext
                 );
+        SqliteOperationReader operationReader = new SqliteOperationReader(
+                kernel.reads()
+        );
         profiles = new SqliteCompanionProfileOperations(
                 database,
                 consumers.apply(
@@ -169,7 +172,7 @@ final class SqlitePublicOperationSet {
         populationDomains = new PopulationDomainAdmissionOperation(
                 engine,
                 publisher,
-                new SqliteOperationReader(kernel.reads()),
+                operationReader,
                 consumers.apply(
                         PopulationDomainAdmissionDefinition.INSTANCE.kind()
                 ),
@@ -222,6 +225,8 @@ final class SqlitePublicOperationSet {
                 publisher,
                 clock,
                 refunds,
+                operationReader,
+                lifecycleAdmission,
                 consumers.apply(
                         CompanionCaptureDefinition.INSTANCE.kind()
                 )
@@ -230,6 +235,8 @@ final class SqlitePublicOperationSet {
                 engine,
                 publisher,
                 clock,
+                operationReader,
+                lifecycleAdmission,
                 consumers.apply(
                         CompanionCaptureReleaseDefinition.INSTANCE.kind()
                 )

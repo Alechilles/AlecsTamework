@@ -20,16 +20,18 @@ import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
-import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
+import com.alechilles.alecstamework.persistence.operation.PreparedOperationDetail;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /** One lifecycle-fenced, receipt-first captured-artifact release workflow. */
 public final class SqliteCompanionCaptureReleaseOperations {
@@ -40,12 +42,32 @@ public final class SqliteCompanionCaptureReleaseOperations {
     private final SqliteLiveOperationCoordinator workflow;
     private final SqliteOperationEngine operations;
     private final LongSupplier clock;
+    @Nullable
+    private final SqliteCaptureReleaseLifecycleAdmission admission;
     private final List<ProjectionConsumer> requiredConsumers;
 
     public SqliteCompanionCaptureReleaseOperations(
             @Nonnull SqliteOperationEngine operations,
             @Nonnull SqliteOperationPublisher publisher,
             @Nonnull LongSupplier clock,
+            @Nonnull List<? extends ProjectionConsumer> requiredConsumers
+    ) {
+        this(
+                operations,
+                publisher,
+                clock,
+                null,
+                null,
+                requiredConsumers
+        );
+    }
+
+    SqliteCompanionCaptureReleaseOperations(
+            @Nonnull SqliteOperationEngine operations,
+            @Nonnull SqliteOperationPublisher publisher,
+            @Nonnull LongSupplier clock,
+            @Nullable SqliteOperationReader reader,
+            @Nullable SqliteLifecycleAdmissionBinding lifecycleAdmission,
             @Nonnull List<? extends ProjectionConsumer> requiredConsumers
     ) {
         if (operations == null || publisher == null || clock == null
@@ -61,6 +83,11 @@ public final class SqliteCompanionCaptureReleaseOperations {
         );
         this.operations = operations;
         this.clock = clock;
+        this.admission = reader == null || lifecycleAdmission == null
+                ? null
+                : new SqliteCaptureReleaseLifecycleAdmission(
+                reader, lifecycleAdmission
+        );
         this.requiredConsumers = List.copyOf(requiredConsumers);
     }
 
@@ -78,6 +105,54 @@ public final class SqliteCompanionCaptureReleaseOperations {
                     "Complete captured-artifact release is required"
             );
         }
+        if (!requiresAdmission(release)
+                || admission == null) {
+            return execute(
+                    operationId, idempotencyKey, release, liveBoundary
+            );
+        }
+        return admissionAwareSubmit(
+                operationId, idempotencyKey, release, liveBoundary
+        );
+    }
+
+    private Submission admissionAwareSubmit(
+            OperationId operationId,
+            IdempotencyKey idempotencyKey,
+            CompanionCaptureReleaseRequest requested,
+            CompanionCaptureReleaseLiveBoundary liveBoundary
+    ) {
+        CompletionStage<SqliteCaptureReleaseLifecycleAdmission.ResolvedRelease>
+                resolved = admission.resolve(
+                operationId, idempotencyKey, requested
+        );
+        CompletionStage<OperationWorkflowResult> completion = resolved
+                .thenCompose(value -> execute(
+                        value.operationId(),
+                        idempotencyKey,
+                        value.payload(),
+                        liveBoundary
+                ).completion());
+        return new Submission(
+                SqliteSingleWriter.WriteAcceptance.ACCEPTED,
+                completion.exceptionally(failure ->
+                        SqliteOperationResults.failed(
+                                OperationWorkflowResult.Status.PREPARE_FAILED,
+                                null,
+                                List.of(),
+                                SqliteCaptureReleaseLifecycleAdmission
+                                        .unwrap(failure)
+                        )
+                )
+        );
+    }
+
+    private Submission execute(
+            OperationId operationId,
+            IdempotencyKey idempotencyKey,
+            CompanionCaptureReleaseRequest release,
+            CompanionCaptureReleaseLiveBoundary liveBoundary
+    ) {
         OperationRequest<CompanionCaptureReleaseRequest> request =
                 new OperationRequest<>(
                         operationId,
@@ -85,16 +160,47 @@ public final class SqliteCompanionCaptureReleaseOperations {
                         release,
                         FEATURE_SCOPE,
                         release.expectedLifecycleRevision(),
-                        participantScopes(release),
+                        SqliteCaptureReleaseLifecycleAdmission
+                                .participantScopes(release),
                         release.requestedAtMs()
                 );
+        SqliteCompanionCaptureReleasePreparation base =
+                new SqliteCompanionCaptureReleasePreparation(release);
+        SqliteManagedAdmissionParticipant managed =
+                release.admissionEvidence() != null
+                        && release.admissionEvidence().status()
+                        == LifecycleAdmissionEvidence.Status.MANAGED
+                        ? SqliteManagedAdmissionParticipant.from(
+                        operationId, release.admissionEvidence()
+                ) : null;
+        PreparedOperationDetail detail = managed == null
+                ? base
+                : PreparedOperationDetail.compose(managed, base);
+        SqliteManagedAdmissionParticipant managedParticipant = managed;
         SqliteLiveOperationCoordinator.Submission submission =
                 workflow.execute(
                         CompanionCaptureReleaseDefinition.INSTANCE,
                         request,
-                        new SqliteCompanionCaptureReleasePreparation(release),
+                        detail,
                         liveBoundary,
-                        this::commitRelease,
+                        (transaction, operation, payload, releasedAtMs) -> {
+                            if (managedParticipant == null) {
+                                return commitRelease(
+                                        transaction,
+                                        operation,
+                                        payload,
+                                        releasedAtMs
+                                );
+                            }
+                            return managedParticipant.decorate(
+                                    (current, envelope) -> commitRelease(
+                                            current,
+                                            envelope,
+                                            payload,
+                                            releasedAtMs
+                                    )
+                            ).execute(transaction, operation);
+                        },
                         requiredConsumers,
                         FEATURE_SCOPE
                 );
@@ -106,36 +212,17 @@ public final class SqliteCompanionCaptureReleaseOperations {
                         return CompletableFuture.completedFuture(result);
                     }
                     return containUnknown(result.operation(), release, result);
-                }).thenCompose(result -> releaseProjectionHold(
-                        liveBoundary,
-                        release,
-                        result
-                ));
+                }).thenCompose(result ->
+                        SqliteCaptureReleaseLifecycleAdmission
+                                .releaseProjectionHold(
+                                        liveBoundary, release, result
+                                ));
         return new Submission(submission.acceptance(), completion);
     }
 
-    private CompletionStage<OperationWorkflowResult> releaseProjectionHold(
-            CompanionCaptureReleaseLiveBoundary liveBoundary,
-            CompanionCaptureReleaseRequest release,
-            OperationWorkflowResult result
-    ) {
-        if (result.status() != OperationWorkflowResult.Status.PUBLISHED
-                || result.operation() == null) {
-            return CompletableFuture.completedFuture(result);
-        }
-        CompletionStage<Void> releaseStage;
-        try {
-            releaseStage = liveBoundary.releaseProjectionHold(
-                    release,
-                    result.operation()
-            );
-        } catch (Throwable ignored) {
-            return CompletableFuture.completedFuture(result);
-        }
-        if (releaseStage == null) {
-            return CompletableFuture.completedFuture(result);
-        }
-        return releaseStage.handle((ignored, failure) -> result);
+    private boolean requiresAdmission(CompanionCaptureReleaseRequest release) {
+        return release.orphanRecovery() == null
+                && release.legacyRecovery() == null;
     }
 
     private CompletionStage<OperationWorkflowResult> containUnknown(
@@ -150,7 +237,8 @@ public final class SqliteCompanionCaptureReleaseOperations {
                         : operation.failureCode(),
                 "Captured-artifact release could not prove both the exact "
                         + "inventory and entity receipts",
-                containmentScopes(operation, release),
+                SqliteCaptureReleaseLifecycleAdmission
+                        .containmentScopes(operation, release),
                 clock.getAsLong()
         ).completion().thenApply(containment -> {
             if (containment instanceof
@@ -257,33 +345,6 @@ public final class SqliteCompanionCaptureReleaseOperations {
                         ? null
                         : release.targetWorldKey()
         );
-    }
-
-    private List<OperationScope> participantScopes(
-            CompanionCaptureReleaseRequest release
-    ) {
-        return release.ownerAssignment() == null
-                ? List.of(OperationScope.profile(release.profileId()))
-                : List.of(
-                        OperationScope.profile(release.profileId()),
-                        OperationScope.owner(release.ownerAssignment())
-                );
-    }
-
-    private List<OperationScope> containmentScopes(
-            OperationEnvelope operation,
-            CompanionCaptureReleaseRequest release
-    ) {
-        return release.ownerAssignment() == null
-                ? List.of(
-                        OperationScope.operation(operation.operationId()),
-                        OperationScope.profile(release.profileId())
-                )
-                : List.of(
-                        OperationScope.operation(operation.operationId()),
-                        OperationScope.profile(release.profileId()),
-                        OperationScope.owner(release.ownerAssignment())
-                );
     }
 
     private List<ProjectionEventDraft> events(

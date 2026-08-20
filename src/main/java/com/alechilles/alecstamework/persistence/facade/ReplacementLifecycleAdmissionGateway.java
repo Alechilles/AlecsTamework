@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.persistence.facade;
 import com.alechilles.alecstamework.companion.population.domain.ManagedAdmissionEvidenceAuthor;
 import com.alechilles.alecstamework.companion.population.domain.PopulationAdmissionComposition;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation;
+import com.alechilles.alecstamework.api.PopulationAdmissionRequestV3;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegistry;
 import com.alechilles.alecstamework.api.internal.AdmissionProviderRegistry;
@@ -52,7 +53,7 @@ public final class ReplacementLifecycleAdmissionGateway
         ManagedActivityConfigRegistry.RoleResolution resolution = managed
                 .resolveRole(request.targetRoleId())
                 .orElse(null);
-        if (resolution == null && request.managedRequest() == null) {
+        if (resolution == null) {
             if (managed.snapshot().rolesById().containsKey(
                     request.targetRoleId()
             )) {
@@ -62,27 +63,24 @@ public final class ReplacementLifecycleAdmissionGateway
                     LifecycleAdmissionEvidence.unmanaged()
             );
         }
-        if (resolution == null) {
-            return unavailable("managed-role-unresolved");
-        }
         if (request.managedRequest() == null) {
             return unavailable("managed-admission-request-required");
         }
-        if (!resolution.profile().profileId().equals(
-                request.managedRequest().managedProfileId()
-        )) {
-            return unavailable("managed-profile-role-mismatch");
-        }
+        PopulationAdmissionRequestV3 resolvedRequest =
+                new PopulationAdmissionRequestV3(
+                        request.managedRequest(),
+                        resolution.profile().profileId()
+                );
         return evidenceAuthor.author(
                 request.operationId(),
                 request.reservationId(),
-                request.managedRequest(),
+                resolvedRequest,
                 request.sourceState(),
                 request.targetState(),
                 request.sourceOwner(),
                 request.sourceWorld()
         ).thenCompose(authoring -> compositionAuthor.compose(
-                request.managedRequest(),
+                resolvedRequest,
                 request.source(),
                 authoring.payload(),
                 request.operationId()
