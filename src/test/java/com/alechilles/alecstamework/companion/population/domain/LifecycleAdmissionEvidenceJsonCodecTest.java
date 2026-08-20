@@ -2,16 +2,18 @@ package com.alechilles.alecstamework.companion.population.domain;
 
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
-import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationAdmissionPlan;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationScope;
 import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
+import com.alechilles.alecstamework.persistence.operation.OperationId;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /** Protects the durable admission evidence used by operation replay. */
 class LifecycleAdmissionEvidenceJsonCodecTest {
@@ -79,10 +81,51 @@ class LifecycleAdmissionEvidenceJsonCodecTest {
                                 )
                         )
                 );
+        OperationId operationId = new OperationId(UUID.fromString(
+                "80000000-0000-0000-0000-000000000804"
+        ));
+        PopulationDomainReservation source = new PopulationDomainReservation(
+                new OperationId(UUID.fromString(
+                        "80000000-0000-0000-0000-000000000805"
+                )),
+                PROFILE,
+                new LifecycleRevision(4),
+                new PopulationDomainBucket(
+                        OWNER,
+                        "cattle",
+                        PopulationDomainScope.PER_WORLD,
+                        "husbandry-world"
+                ),
+                1,
+                0,
+                2,
+                12,
+                12,
+                11,
+                13,
+                5,
+                100
+        );
+        PopulationDomainConvergencePlan plan =
+                new PopulationDomainConvergencePlan(
+                        PROFILE,
+                        new LifecycleRevision(4),
+                        OWNER,
+                        "husbandry-world",
+                        LifecycleState.CAPTURED,
+                        OWNER,
+                        "husbandry-world",
+                        LifecycleState.ACTIVE,
+                        List.of(new PopulationDomainConvergencePlan.SourceRow(
+                                source, 1, 0
+                        )),
+                        payload.reservations(operationId)
+                );
         LifecycleAdmissionEvidence evidence =
                 LifecycleAdmissionEvidence.managed(
                         payload,
-                        new PopulationAdmissionComposition(ownerPlan, null)
+                        new PopulationAdmissionComposition(ownerPlan, null),
+                        plan
                 );
 
         assertEquals(
@@ -90,6 +133,13 @@ class LifecycleAdmissionEvidenceJsonCodecTest {
                 LifecycleAdmissionEvidenceJsonCodec.decode(
                         LifecycleAdmissionEvidenceJsonCodec.encode(evidence)
                 )
+        );
+
+        var oldJson = LifecycleAdmissionEvidenceJsonCodec.encode(evidence);
+        oldJson.remove("convergencePlan");
+        assertNull(
+                LifecycleAdmissionEvidenceJsonCodec.decode(oldJson)
+                        .convergencePlan()
         );
     }
 }

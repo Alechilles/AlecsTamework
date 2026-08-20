@@ -137,6 +137,8 @@ final class SqlitePublicOperationSet {
         SqliteOperationReader operationReader = new SqliteOperationReader(
                 kernel.reads()
         );
+        SqliteLifecycleAdmissionSourceReader lifecycleSources =
+                new SqliteLifecycleAdmissionSourceReader(kernel.reads());
         profiles = new SqliteCompanionProfileOperations(
                 database,
                 consumers.apply(
@@ -227,6 +229,7 @@ final class SqlitePublicOperationSet {
                 refunds,
                 operationReader,
                 lifecycleAdmission,
+                lifecycleSources,
                 consumers.apply(
                         CompanionCaptureDefinition.INSTANCE.kind()
                 )

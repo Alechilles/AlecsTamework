@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainConvergencePlan;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
 import com.alechilles.alecstamework.api.CaptureChanceMode;
@@ -88,7 +89,9 @@ public record CompanionCaptureRequest(
                 admissionEvidence,
                 profileId,
                 expectedLifecycleRevision,
-                terminal
+                terminal,
+                resultingOwnerId,
+                targetWorldKey
         );
     }
 
@@ -198,46 +201,88 @@ public record CompanionCaptureRequest(
             LifecycleAdmissionEvidence evidence,
             ProfileId profileId,
             LifecycleRevision expectedLifecycleRevision,
-            CaptureTerminalPlan terminal
+            CaptureTerminalPlan terminal,
+            OwnerId resultingOwnerId,
+            String targetWorldKey
     ) {
         if (evidence == null) {
             return;
         }
-        if (!(terminal instanceof CaptureTerminalPlan.TameAndCommandLink tame)) {
+        if (terminal instanceof CaptureTerminalPlan.FailedAttempt) {
+            if (evidence.status() == LifecycleAdmissionEvidence.Status.MANAGED) {
+                throw new IllegalArgumentException(
+                        "Failed capture cannot carry managed lifecycle evidence"
+                );
+            }
+            return;
+        }
+        if (!(terminal instanceof CaptureTerminalPlan.CapturedItem)
+                && !(terminal instanceof CaptureTerminalPlan.TameAndCommandLink)) {
             throw new IllegalArgumentException(
-                    "Lifecycle admission evidence requires tame/link capture"
+                    "Lifecycle admission evidence requires a successful capture"
             );
         }
         if (evidence.status() != LifecycleAdmissionEvidence.Status.MANAGED) {
             return;
         }
         var payload = evidence.payload();
-        var tameEvidence = tame.evidence();
+        LifecycleState targetState = terminal instanceof CaptureTerminalPlan.CapturedItem
+                ? LifecycleState.CAPTURED : LifecycleState.ACTIVE;
+        OwnerId targetOwner = terminal instanceof CaptureTerminalPlan.TameAndCommandLink tame
+                ? tame.evidence().finalLifecycle().ownerId()
+                : resultingOwnerId;
+        String targetWorld = terminal instanceof CaptureTerminalPlan.TameAndCommandLink tame
+                ? tame.evidence().finalLifecycle().ownerWorldKey()
+                : resultingOwnerId == null ? null : targetWorldKey;
+        LifecycleState sourceState = terminal
+                instanceof CaptureTerminalPlan.TameAndCommandLink tame
+                ? tame.evidence().expectedLifecycle().state()
+                : LifecycleState.ACTIVE;
+        OwnerId sourceOwner = terminal
+                instanceof CaptureTerminalPlan.TameAndCommandLink tame
+                ? tame.evidence().expectedLifecycle().ownerId()
+                : null;
+        String sourceWorld = terminal
+                instanceof CaptureTerminalPlan.TameAndCommandLink tame
+                ? tame.evidence().expectedLifecycle().ownerWorldKey()
+                : null;
         if (payload == null
                 || !payload.profileId().equals(profileId)
                 || !java.util.Objects.equals(
                 payload.expectedLifecycleRevision(), expectedLifecycleRevision
         )
-                || payload.targetLifecycle() != LifecycleState.ACTIVE
-                || payload.domains().isEmpty()
+                || payload.sourceLifecycle() != sourceState
+                || payload.targetLifecycle() != targetState
+                || !java.util.Objects.equals(payload.ownerId(), targetOwner)
+                || !java.util.Objects.equals(payload.ownerWorldKey(), targetWorld)
+                || terminal instanceof CaptureTerminalPlan.TameAndCommandLink
+                && (!java.util.Objects.equals(payload.sourceOwnerId(), sourceOwner)
                 || !java.util.Objects.equals(
-                payload.ownerId(), tameEvidence.finalLifecycle().ownerId()
-        )
-                || !java.util.Objects.equals(
-                payload.ownerWorldKey(), tameEvidence.finalLifecycle().ownerWorldKey()
-        )
-                || payload.sourceLifecycle() != tameEvidence.expectedLifecycle().state()
-                || !java.util.Objects.equals(
-                payload.sourceOwnerId(), tameEvidence.expectedLifecycle().ownerId()
-        )
-                || !java.util.Objects.equals(
-                payload.sourceWorldKey(), tameEvidence.expectedLifecycle().ownerWorldKey()
-        )) {
+                payload.sourceWorldKey(), sourceWorld
+        ))) {
             throw new IllegalArgumentException(
-                    "Tame/link lifecycle admission evidence is inconsistent"
+                    "Capture lifecycle admission evidence is inconsistent"
+            );
+        }
+        PopulationDomainConvergencePlan plan = evidence.convergencePlan();
+        if (plan != null
+                && (!plan.profileId().equals(profileId)
+                || !plan.sourceLifecycleRevision().equals(expectedLifecycleRevision)
+                || plan.sourceState() != sourceState
+                || plan.targetState() != targetState
+                || !java.util.Objects.equals(plan.targetOwner(), targetOwner)
+                || !java.util.Objects.equals(plan.targetWorldKey(), targetWorld)
+                || terminal instanceof CaptureTerminalPlan.TameAndCommandLink
+                && (!java.util.Objects.equals(plan.sourceOwner(), sourceOwner)
+                || !java.util.Objects.equals(
+                plan.sourceWorldKey(), sourceWorld
+        )))) {
+            throw new IllegalArgumentException(
+                    "Capture convergence evidence is inconsistent"
             );
         }
     }
+
 
     public CaptureTameAndLinkEvidence tameAndLinkEvidence() {
         if (terminal
