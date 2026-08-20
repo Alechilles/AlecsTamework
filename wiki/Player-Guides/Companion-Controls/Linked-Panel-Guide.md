@@ -48,8 +48,8 @@ dead companions continue to show their saved progression snapshot.
 - Inactive rows can still appear in the panel so you can manage them individually.
 - The group selector can quickly set all linked companions active, set all inactive, or activate one group while deactivating the rest.
 - Generic linked panels include a `Highlight Active` setting. It starts off.
-  When enabled, loaded active companions show sparkles above their heads while
-  you hold that command tool. Only you see the sparkles. Their color matches
+  When enabled, loaded active companions show an indicator above their heads
+  while you hold that command tool. Only you see the indicator. Its color matches
   each companion's group; ungrouped companions use neutral gold.
 
 ## Per-row actions

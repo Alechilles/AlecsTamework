@@ -227,8 +227,8 @@ Linked panel supports:
 - Filter text input for active filter mode
 - Active/inactive row toggles
 - Optional per-tool active highlights. While the command tool is equipped,
-  loaded active NPCs show controller-only sparkles above their heads in their
-  group color.
+  loaded active NPCs show a controller-only indicator above their heads in
+  their group color.
   Ungrouped NPCs use neutral gold. This setting starts disabled and applies
   only to generic item-metadata rosters.
 - Group active selector: `All`, `None`, or one configured group

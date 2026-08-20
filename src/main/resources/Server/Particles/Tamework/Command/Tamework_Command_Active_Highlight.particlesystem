@@ -1,7 +1,7 @@
 {
   "Spawners": [
     {
-      "SpawnerId": "TwCommandActiveHighlightSparkles",
+      "SpawnerId": "TwCommandActiveHighlightMarker",
       "PositionOffset": {
         "X": 0,
         "Y": 0,
@@ -9,5 +9,7 @@
       }
     }
   ],
-  "LifeSpan": 0.9
+  "CullDistance": 96,
+  "IsImportant": true,
+  "LifeSpan": 1.35
 }
