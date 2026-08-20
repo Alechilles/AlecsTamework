@@ -84,13 +84,20 @@ public final class NeedsResourceTargetCacheAdapter {
         }
         Vector3d target = cached.target() == null ? null : cached.target().toVector();
         if (target != null && isTargetRejected(npcUuid, cached.resourceKind(), target, nowMs)) {
-            TARGET_STATE.clear(npcUuid, null, cached.resourceKind(), target, true);
+            TARGET_STATE.clear(npcUuid, null, cached.resourceKind(), target, true,
+                    NeedsResourceTargetStateStore.DiscardReason.INVALIDATED);
             return null;
         }
         if (target != null && cached.pathState() == NeedsResourceTargetStateStore.PathState.VALIDATED
                 && !reserveTarget(npcUuid, cached.worldName(), cached.resourceKind(), target, nowMs)) {
-            TARGET_STATE.clear(npcUuid, cached.worldName(), cached.resourceKind(), target, false);
+            TARGET_STATE.clear(npcUuid, cached.worldName(), cached.resourceKind(), target, false,
+                    NeedsResourceTargetStateStore.DiscardReason.RESERVATION_LOST);
             return null;
+        }
+        if (target != null
+                && cached.pathState() == NeedsResourceTargetStateStore.PathState.VALIDATED
+                && !cached.fastConsume()) {
+            NeedsResourceHotPathDiagnostics.recordValidatedTargetBypass();
         }
         return toResult(cached);
     }
@@ -329,7 +336,8 @@ public final class NeedsResourceTargetCacheAdapter {
                             @Nullable String resourceKind,
                             @Nullable Vector3d target) {
         if (npcUuid != null) {
-            TARGET_STATE.clear(npcUuid, worldName, resourceKind, target, false);
+            TARGET_STATE.clear(npcUuid, worldName, resourceKind, target, false,
+                    NeedsResourceTargetStateStore.DiscardReason.INVALIDATED);
         }
         releaseTarget(npcUuid, worldName, resourceKind, target);
     }
@@ -552,7 +560,8 @@ public final class NeedsResourceTargetCacheAdapter {
                 npcUuid, normalizedResource, target, suppressSeconds, nowMs
         );
         if (rejected) {
-            clearCachedTarget(npcUuid, null, normalizedResource, target, true);
+            clearCachedTarget(npcUuid, null, normalizedResource, target, true,
+                    NeedsResourceTargetStateStore.DiscardReason.INVALIDATED);
         }
         return rejected;
     }
@@ -586,7 +595,8 @@ public final class NeedsResourceTargetCacheAdapter {
         }
         String normalizedResource = normalizeResourceKind(resourceKind);
         PositionTargetReservationCache.release(npcUuid, worldName, normalizedResource, target);
-        clearCachedTarget(npcUuid, worldName, normalizedResource, target, false);
+        clearCachedTarget(npcUuid, worldName, normalizedResource, target, false,
+                NeedsResourceTargetStateStore.DiscardReason.RELEASED);
         clearFastConsumeTarget(npcUuid, worldName, normalizedResource, target);
     }
     public static boolean hasFastConsumeTarget(@Nullable Ref<EntityStore> npcRef, @Nullable Store<EntityStore> store, long nowMs) {
@@ -649,11 +659,12 @@ public final class NeedsResourceTargetCacheAdapter {
                                           @Nullable String worldName,
                                           @Nonnull String resourceKind,
                                           @Nullable Vector3d target,
-                                          boolean anyWorld) {
+                                          boolean anyWorld,
+                                          @Nonnull NeedsResourceTargetStateStore.DiscardReason reason) {
         if (npcUuid == null) {
             return;
         }
-        TARGET_STATE.clear(npcUuid, worldName, resourceKind, target, anyWorld);
+        TARGET_STATE.clear(npcUuid, worldName, resourceKind, target, anyWorld, reason);
     }
     @Nonnull
     private static String normalizeResourceKind(@Nullable String raw) {

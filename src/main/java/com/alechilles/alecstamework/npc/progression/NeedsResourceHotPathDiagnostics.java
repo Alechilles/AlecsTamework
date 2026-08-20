@@ -25,6 +25,13 @@ public final class NeedsResourceHotPathDiagnostics {
     private static final AtomicLong PREFLIGHT_BUDGET_DEFERRALS = new AtomicLong();
     private static final AtomicLong COORDINATOR_LOOKUPS = new AtomicLong();
     private static final AtomicLong COORDINATOR_RETRIES_SUPPRESSED = new AtomicLong();
+    private static final AtomicLong VALIDATED_TARGET_BYPASSES = new AtomicLong();
+    private static final AtomicLong VALIDATED_TARGET_EXPIRATIONS = new AtomicLong();
+    private static final AtomicLong VALIDATED_TARGET_OUT_OF_BOUNDS = new AtomicLong();
+    private static final AtomicLong VALIDATED_RESERVATION_LOSSES = new AtomicLong();
+    private static final AtomicLong VALIDATED_TARGET_RELEASES = new AtomicLong();
+    private static final AtomicLong VALIDATED_TARGET_INVALIDATIONS = new AtomicLong();
+    private static final AtomicLong VALIDATED_TARGET_REPLACEMENTS = new AtomicLong();
     private static final AtomicLong NEXT_SUMMARY_AT_MS = new AtomicLong(Long.MAX_VALUE);
 
     private static volatile boolean enabled;
@@ -104,6 +111,48 @@ public final class NeedsResourceHotPathDiagnostics {
         }
     }
 
+    public static void recordValidatedTargetBypass() {
+        if (enabled) {
+            VALIDATED_TARGET_BYPASSES.incrementAndGet();
+        }
+    }
+
+    public static void recordValidatedTargetExpiration() {
+        if (enabled) {
+            VALIDATED_TARGET_EXPIRATIONS.incrementAndGet();
+        }
+    }
+
+    public static void recordValidatedTargetOutOfBounds() {
+        if (enabled) {
+            VALIDATED_TARGET_OUT_OF_BOUNDS.incrementAndGet();
+        }
+    }
+
+    public static void recordValidatedReservationLoss() {
+        if (enabled) {
+            VALIDATED_RESERVATION_LOSSES.incrementAndGet();
+        }
+    }
+
+    public static void recordValidatedTargetRelease() {
+        if (enabled) {
+            VALIDATED_TARGET_RELEASES.incrementAndGet();
+        }
+    }
+
+    public static void recordValidatedTargetInvalidation() {
+        if (enabled) {
+            VALIDATED_TARGET_INVALIDATIONS.incrementAndGet();
+        }
+    }
+
+    public static void recordValidatedTargetReplacement() {
+        if (enabled) {
+            VALIDATED_TARGET_REPLACEMENTS.incrementAndGet();
+        }
+    }
+
     /** Returns the current low-cardinality measurement totals. */
     public static Snapshot snapshot() {
         return new Snapshot(
@@ -115,7 +164,14 @@ public final class NeedsResourceHotPathDiagnostics {
                 PREFLIGHT_NO_PATH_RESULTS.get(),
                 PREFLIGHT_BUDGET_DEFERRALS.get(),
                 COORDINATOR_LOOKUPS.get(),
-                COORDINATOR_RETRIES_SUPPRESSED.get()
+                COORDINATOR_RETRIES_SUPPRESSED.get(),
+                VALIDATED_TARGET_BYPASSES.get(),
+                VALIDATED_TARGET_EXPIRATIONS.get(),
+                VALIDATED_TARGET_OUT_OF_BOUNDS.get(),
+                VALIDATED_RESERVATION_LOSSES.get(),
+                VALIDATED_TARGET_RELEASES.get(),
+                VALIDATED_TARGET_INVALIDATIONS.get(),
+                VALIDATED_TARGET_REPLACEMENTS.get()
         );
     }
 
@@ -150,7 +206,7 @@ public final class NeedsResourceHotPathDiagnostics {
         Snapshot value = snapshot();
         LOGGER.log(Level.INFO, () -> String.format(
                 Locale.ROOT,
-                "Needs resource hot path: stage=%s preflightRequests=%d leaseHits=%d leaseMisses=%d computations=%d invalidations=%d noPathResults=%d budgetDeferrals=%d coordinatorLookups=%d coordinatorRetriesSuppressed=%d",
+                "Needs resource hot path: stage=%s preflightRequests=%d leaseHits=%d leaseMisses=%d computations=%d invalidations=%d noPathResults=%d budgetDeferrals=%d coordinatorLookups=%d coordinatorRetriesSuppressed=%d validatedTargetBypasses=%d validatedTargetExpirations=%d validatedTargetOutOfBounds=%d validatedReservationLosses=%d validatedTargetReleases=%d validatedTargetInvalidations=%d validatedTargetReplacements=%d",
                 stage,
                 value.preflightRequests(),
                 value.preflightLeaseHits(),
@@ -160,7 +216,14 @@ public final class NeedsResourceHotPathDiagnostics {
                 value.preflightNoPathResults(),
                 value.preflightBudgetDeferrals(),
                 value.coordinatorLookups(),
-                value.coordinatorRetriesSuppressed()
+                value.coordinatorRetriesSuppressed(),
+                value.validatedTargetBypasses(),
+                value.validatedTargetExpirations(),
+                value.validatedTargetOutOfBounds(),
+                value.validatedReservationLosses(),
+                value.validatedTargetReleases(),
+                value.validatedTargetInvalidations(),
+                value.validatedTargetReplacements()
         ));
     }
 
@@ -174,6 +237,13 @@ public final class NeedsResourceHotPathDiagnostics {
         PREFLIGHT_BUDGET_DEFERRALS.set(0L);
         COORDINATOR_LOOKUPS.set(0L);
         COORDINATOR_RETRIES_SUPPRESSED.set(0L);
+        VALIDATED_TARGET_BYPASSES.set(0L);
+        VALIDATED_TARGET_EXPIRATIONS.set(0L);
+        VALIDATED_TARGET_OUT_OF_BOUNDS.set(0L);
+        VALIDATED_RESERVATION_LOSSES.set(0L);
+        VALIDATED_TARGET_RELEASES.set(0L);
+        VALIDATED_TARGET_INVALIDATIONS.set(0L);
+        VALIDATED_TARGET_REPLACEMENTS.set(0L);
     }
 
     /** Immutable aggregate values for logging and diagnostics tests. */
@@ -185,6 +255,13 @@ public final class NeedsResourceHotPathDiagnostics {
                            long preflightNoPathResults,
                            long preflightBudgetDeferrals,
                            long coordinatorLookups,
-                           long coordinatorRetriesSuppressed) {
+                           long coordinatorRetriesSuppressed,
+                           long validatedTargetBypasses,
+                           long validatedTargetExpirations,
+                           long validatedTargetOutOfBounds,
+                           long validatedReservationLosses,
+                           long validatedTargetReleases,
+                           long validatedTargetInvalidations,
+                           long validatedTargetReplacements) {
     }
 }

@@ -66,6 +66,84 @@ class NeedsResourceTargetCacheAdapterTest {
     }
 
     @Test
+    void validatedLocalTargetReuseIsReportedAsAPathPreflightBypass() {
+        NeedsResourceHotPathDiagnostics.setEnabledForTests(true);
+        NeedsResourceTargetCacheAdapter adapter = new NeedsResourceTargetCacheAdapter();
+        UUID npc = new UUID(0L, 105L);
+        Vector3d target = new Vector3d(2.5, 64.5, 2.5);
+        adapter.adoptTarget(npc, "world-a", "water", target, 1.5, 8.0, 2, 1_000L);
+        assertTrue(adapter.promoteTarget(npc, "world-a", "water", target, 1_001L));
+
+        NeedsResourceTargetCacheAdapter.Result result = adapter.resolveLocal(
+                npc, "world-a", "water", 0.0, 64.0, 0.0, 1_002L
+        );
+
+        assertNotNull(result);
+        assertFalse(result.preflightRequired());
+        assertEquals(1L, NeedsResourceHotPathDiagnostics.snapshot().validatedTargetBypasses());
+        assertEquals(0L, NeedsResourceHotPathDiagnostics.snapshot().preflightRequests());
+    }
+
+    @Test
+    void validatedTargetDiscardReasonsAreReported() {
+        NeedsResourceHotPathDiagnostics.setEnabledForTests(true);
+        NeedsResourceTargetCacheAdapter adapter = new NeedsResourceTargetCacheAdapter();
+        UUID expiredNpc = new UUID(0L, 106L);
+        UUID movedNpc = new UUID(0L, 107L);
+        UUID reservationNpc = new UUID(0L, 108L);
+        UUID releasedNpc = new UUID(0L, 109L);
+        UUID invalidatedNpc = new UUID(0L, 110L);
+        UUID replacedNpc = new UUID(0L, 111L);
+        Vector3d expiredTarget = new Vector3d(1.5, 64.5, 0.5);
+        Vector3d movedTarget = new Vector3d(2.5, 64.5, 0.5);
+        Vector3d reservationTarget = new Vector3d(3.5, 64.5, 0.5);
+        Vector3d releasedTarget = new Vector3d(4.5, 64.5, 0.5);
+        Vector3d invalidatedTarget = new Vector3d(5.5, 64.5, 0.5);
+        Vector3d replacedTarget = new Vector3d(6.5, 64.5, 0.5);
+        cacheValidatedTarget(adapter, expiredNpc, expiredTarget);
+        cacheValidatedTarget(adapter, movedNpc, movedTarget);
+        cacheValidatedTarget(adapter, reservationNpc, reservationTarget);
+        cacheValidatedTarget(adapter, releasedNpc, releasedTarget);
+        cacheValidatedTarget(adapter, invalidatedNpc, invalidatedTarget);
+        cacheValidatedTarget(adapter, replacedNpc, replacedTarget);
+
+        assertNull(adapter.resolveLocal(
+                expiredNpc, "world-a", "water", 0.0, 64.0, 0.0, 11_002L
+        ));
+        assertNull(adapter.resolveLocal(
+                movedNpc, "world-a", "water", 20.0, 64.0, 0.0, 1_002L
+        ));
+        com.alechilles.alecstamework.npc.progression.PositionTargetReservationCache.release(
+                reservationNpc, "world-a", "water", reservationTarget
+        );
+        assertTrue(NeedsResourceTargetCacheAdapter.reserveTarget(
+                new UUID(0L, 112L), "world-a", "water", reservationTarget, 1_002L
+        ));
+        assertNull(adapter.resolveLocal(
+                reservationNpc, "world-a", "water", 0.0, 64.0, 0.0, 1_003L
+        ));
+        NeedsResourceTargetCacheAdapter.releaseTarget(
+                releasedNpc, "world-a", "water", releasedTarget
+        );
+        assertTrue(NeedsResourceTargetCacheAdapter.rejectTarget(
+                invalidatedNpc, "water", invalidatedTarget, 4.0, 1_002L
+        ));
+        adapter.adoptTarget(
+                replacedNpc, "world-a", "water", new Vector3d(7.5, 64.5, 0.5),
+                1.5, 8.0, 2, 1_002L
+        );
+
+        NeedsResourceHotPathDiagnostics.Snapshot snapshot =
+                NeedsResourceHotPathDiagnostics.snapshot();
+        assertEquals(1L, snapshot.validatedTargetExpirations());
+        assertEquals(1L, snapshot.validatedTargetOutOfBounds());
+        assertEquals(1L, snapshot.validatedReservationLosses());
+        assertEquals(1L, snapshot.validatedTargetReleases());
+        assertEquals(1L, snapshot.validatedTargetInvalidations());
+        assertEquals(1L, snapshot.validatedTargetReplacements());
+    }
+
+    @Test
     void fastConsumeTargetExpiresWithItsFastModeMarker() {
         try (TestEntityComponentStore store = newStore()) {
             NeedsResourceSearchCoordinator coordinator = NeedsResourceSearchCoordinator.getInstance();
@@ -660,6 +738,16 @@ class NeedsResourceTargetCacheAdapterTest {
                 npc, "world-a", "water", 0.0, 64.0, 0.0, 1_001L);
         assertNotNull(retained);
         assertEquals(NeedsResourceTargetStateStore.PathState.PENDING, retained.pathState());
+    }
+
+    private static void cacheValidatedTarget(NeedsResourceTargetCacheAdapter adapter,
+                                             UUID npc,
+                                             Vector3d target) {
+        assertEquals(NeedsResourceTargetCacheAdapter.Status.TARGET,
+                adapter.adoptTarget(
+                        npc, "world-a", "water", target, 1.5, 8.0, 2, 1_000L
+                ).status());
+        assertTrue(adapter.promoteTarget(npc, "world-a", "water", target, 1_001L));
     }
 
     private static NeedsResourceSearchCoordinator.Request request(String worldName) {

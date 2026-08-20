@@ -59,26 +59,27 @@ public final class NeedsResourceTargetStateStore {
             return;
         }
         String normalizedResource = normalizeResourceKind(resourceKind);
+        TargetState next = new TargetState(
+                normalizeWorldName(worldName),
+                normalizedResource,
+                Coordinates.copyOf(target),
+                sanitizeApproachRadius(approachRadius),
+                sanitizeSearchRadius(searchRadius),
+                Math.max(0, verticalRadius),
+                expiresAtMs,
+                reason,
+                fastConsume,
+                pathState
+        );
         synchronized (admissionLock(normalizedResource)) {
             ConcurrentHashMap<UUID, TargetState> targets = targetMap(normalizedResource);
             if (!targets.containsKey(npcUuid)) {
                 pruneForCapacity(targets);
             }
-            targets.put(
-                    npcUuid,
-                    new TargetState(
-                            normalizeWorldName(worldName),
-                            normalizedResource,
-                            Coordinates.copyOf(target),
-                            sanitizeApproachRadius(approachRadius),
-                            sanitizeSearchRadius(searchRadius),
-                            Math.max(0, verticalRadius),
-                            expiresAtMs,
-                            reason,
-                            fastConsume,
-                            pathState
-                    )
-            );
+            TargetState previous = targets.put(npcUuid, next);
+            if (isReusableValidated(previous) && !sameIdentityAndTarget(previous, next)) {
+                NeedsResourceHotPathDiagnostics.recordValidatedTargetReplacement();
+            }
         }
     }
 
@@ -130,12 +131,18 @@ public final class NeedsResourceTargetStateStore {
         String normalizedWorld = normalizeWorldName(worldName);
         String normalizedResource = normalizeResourceKind(resourceKind);
         if (!state.worldName().equals(normalizedWorld)
-                || !state.resourceKind().equals(normalizedResource)
-                || nowMs >= state.expiresAtMs()
-                || (state.target() != null && !isUsable(
-                        state.target(), originX, originY, originZ,
-                        state.searchRadius(), state.verticalRadius()))) {
-            targets.remove(npcUuid, state);
+                || !state.resourceKind().equals(normalizedResource)) {
+            remove(targets, npcUuid, state, DiscardReason.INVALIDATED);
+            return null;
+        }
+        if (nowMs >= state.expiresAtMs()) {
+            remove(targets, npcUuid, state, DiscardReason.EXPIRED);
+            return null;
+        }
+        if (state.target() != null && !isUsable(
+                state.target(), originX, originY, originZ,
+                state.searchRadius(), state.verticalRadius())) {
+            remove(targets, npcUuid, state, DiscardReason.OUT_OF_BOUNDS);
             return null;
         }
         if (state.target() != null
@@ -236,6 +243,16 @@ public final class NeedsResourceTargetStateStore {
                          @Nullable String resourceKind,
                          @Nullable Vector3d target,
                          boolean anyWorld) {
+        return clear(npcUuid, worldName, resourceKind, target, anyWorld, DiscardReason.NONE);
+    }
+
+    /** Removes one matching UUID entry and records why a validated target stopped being reusable. */
+    public boolean clear(@Nullable UUID npcUuid,
+                         @Nullable String worldName,
+                         @Nullable String resourceKind,
+                         @Nullable Vector3d target,
+                         boolean anyWorld,
+                         @Nonnull DiscardReason reason) {
         if (npcUuid == null) {
             return false;
         }
@@ -246,7 +263,7 @@ public final class NeedsResourceTargetStateStore {
                 || (target != null && !sameBlock(state.target(), target))) {
             return false;
         }
-        return targets.remove(npcUuid, state);
+        return remove(targets, npcUuid, state, reason);
     }
 
     /** Removes all target and recent state owned by one world. */
@@ -350,6 +367,43 @@ public final class NeedsResourceTargetStateStore {
         }
     }
 
+    private static boolean remove(@Nonnull ConcurrentHashMap<UUID, TargetState> targets,
+                                  @Nonnull UUID npcUuid,
+                                  @Nonnull TargetState state,
+                                  @Nonnull DiscardReason reason) {
+        if (!targets.remove(npcUuid, state)) {
+            return false;
+        }
+        if (!isReusableValidated(state)) {
+            return true;
+        }
+        switch (reason) {
+            case EXPIRED -> NeedsResourceHotPathDiagnostics.recordValidatedTargetExpiration();
+            case OUT_OF_BOUNDS -> NeedsResourceHotPathDiagnostics.recordValidatedTargetOutOfBounds();
+            case RESERVATION_LOST -> NeedsResourceHotPathDiagnostics.recordValidatedReservationLoss();
+            case RELEASED -> NeedsResourceHotPathDiagnostics.recordValidatedTargetRelease();
+            case INVALIDATED -> NeedsResourceHotPathDiagnostics.recordValidatedTargetInvalidation();
+            case NONE -> { }
+        }
+        return true;
+    }
+
+    private static boolean isReusableValidated(@Nullable TargetState state) {
+        return state != null
+                && state.target() != null
+                && state.pathState() == PathState.VALIDATED
+                && !state.fastConsume();
+    }
+
+    private static boolean sameIdentityAndTarget(@Nonnull TargetState first,
+                                                 @Nonnull TargetState second) {
+        return first.worldName().equals(second.worldName())
+                && first.resourceKind().equals(second.resourceKind())
+                && (first.target() == null
+                    ? second.target() == null
+                    : first.target().equals(second.target()));
+    }
+
     private static boolean isUsable(@Nonnull Coordinates target,
                                     double originX,
                                     double originY,
@@ -417,6 +471,16 @@ public final class NeedsResourceTargetStateStore {
     public enum PathState {
         PENDING,
         VALIDATED
+    }
+
+    /** Low-cardinality reason for removing a local target from the shared owner. */
+    public enum DiscardReason {
+        NONE,
+        EXPIRED,
+        OUT_OF_BOUNDS,
+        RESERVATION_LOST,
+        RELEASED,
+        INVALIDATED
     }
 
     /** Immutable scalar target state retained by the shared owner. */
