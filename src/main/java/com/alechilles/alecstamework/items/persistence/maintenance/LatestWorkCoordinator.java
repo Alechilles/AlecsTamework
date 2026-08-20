@@ -91,21 +91,24 @@ public final class LatestWorkCoordinator<K, V> {
     @Nonnull
     public CompletionStage<Void> flush(@Nonnull K key) {
         Objects.requireNonNull(key, "key");
-        CompletableFuture<Void> waiter = new CompletableFuture<>();
-        boolean completeNow = false;
+        List<CompletableFuture<Void>> dependencies = new ArrayList<>(3);
         synchronized (stateLock) {
             KeyState<V> state = states.get(key);
-            Work<V> target = state == null ? null : flushTarget(state);
-            if (target == null) {
-                completeNow = true;
-            } else {
-                target.waiters.add(waiter);
+            if (state != null) {
+                addFlushDependency(state.inFlight, dependencies);
+                addFlushDependency(state.priority, dependencies);
+                addFlushDependency(state.routine, dependencies);
             }
         }
-        if (completeNow) {
-            waiter.complete(null);
+        if (dependencies.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
         }
-        return waiter;
+        if (dependencies.size() == 1) {
+            return dependencies.get(0);
+        }
+        return CompletableFuture.allOf(
+                dependencies.toArray(CompletableFuture[]::new)
+        );
     }
 
     /** Returns immutable point-in-time coordinator activity. */
@@ -593,14 +596,15 @@ public final class LatestWorkCoordinator<K, V> {
         return state.priority != null || state.routine != null;
     }
 
-    private static <V> Work<V> flushTarget(KeyState<V> state) {
-        if (state.routine != null) {
-            return state.routine;
+    private static void addFlushDependency(
+            Work<?> work,
+            List<CompletableFuture<Void>> dependencies
+    ) {
+        if (work != null) {
+            CompletableFuture<Void> dependency = new CompletableFuture<>();
+            work.waiters.add(dependency);
+            dependencies.add(dependency);
         }
-        if (state.priority != null) {
-            return state.priority;
-        }
-        return state.inFlight;
     }
 
     private static <V> Work<V> pending(KeyState<V> state, Lane lane) {

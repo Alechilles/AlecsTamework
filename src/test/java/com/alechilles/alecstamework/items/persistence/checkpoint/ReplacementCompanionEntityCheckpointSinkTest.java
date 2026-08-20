@@ -263,7 +263,7 @@ class ReplacementCompanionEntityCheckpointSinkTest {
     }
 
     @Test
-    void blockedDestructiveRemoveThenLoadedKeepsCriticalCheckpoint()
+    void blockedDestructiveRemoveRunsBeforeTrailingLoadedCheckpoint()
             throws Exception {
         AtomicLong clock = new AtomicLong(-100L);
         try (PersistenceBootstrap persistence =
@@ -308,13 +308,13 @@ class ReplacementCompanionEntityCheckpointSinkTest {
             prior.toCompletableFuture().join();
             destructive.toCompletableFuture().join();
             loaded.toCompletableFuture().join();
-            assertEquals(2, published.size());
+            assertEquals(3, published.size());
             assertEquals(
                     CompanionEntityCheckpoint.CaptureBoundary.DESTRUCTIVE_REMOVE,
                     published.get(1).boundary()
             );
             assertEquals(
-                    CompanionEntityCheckpoint.CaptureBoundary.DESTRUCTIVE_REMOVE,
+                    CompanionEntityCheckpoint.CaptureBoundary.LOADED,
                     readCheckpoint(facades, alias).boundary()
             );
             sink.shutdown(Duration.ofSeconds(1));

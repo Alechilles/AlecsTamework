@@ -266,6 +266,41 @@ class LatestWorkCoordinatorTest {
     }
 
     @Test
+    void flushFailsWhenPriorityFailsBeforeTrailingRoutineSucceeds() {
+        List<String> calls = Collections.synchronizedList(new ArrayList<>());
+        BlockingQueue<Invocation<String>> invocations =
+                new LinkedBlockingQueue<>();
+        LatestWorkCoordinator<String, String> coordinator =
+                outcomeCoordinator(1, calls, invocations);
+
+        coordinator.submit("cow", "in-flight");
+        CompletionStage<Void> priority = coordinator.submitPriority(
+                "cow", "priority", keepNewValue()
+        );
+        CompletionStage<Void> routine = coordinator.submit("cow", "routine");
+        CompletionStage<Void> flush = coordinator.flush("cow");
+
+        take(invocations).completion.complete(null);
+        await(() -> calls.size() == 2);
+        take(invocations).completion.completeExceptionally(
+                new IllegalStateException("priority failed")
+        );
+        await(() -> calls.size() == 3);
+        take(invocations).completion.complete(null);
+
+        assertThrows(
+                RuntimeException.class,
+                () -> priority.toCompletableFuture().join()
+        );
+        assertTrue(routine.toCompletableFuture().isDone());
+        assertThrows(
+                RuntimeException.class,
+                () -> flush.toCompletableFuture().join()
+        );
+        assertEquals(List.of("in-flight", "priority", "routine"), calls);
+    }
+
+    @Test
     void deferredKeysReleaseSlotsForNewWork() {
         BlockingQueue<Runnable> resumes = new LinkedBlockingQueue<>();
         List<Integer> calls = Collections.synchronizedList(new ArrayList<>());

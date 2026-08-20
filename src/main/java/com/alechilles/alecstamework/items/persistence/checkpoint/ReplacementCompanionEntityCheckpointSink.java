@@ -515,8 +515,6 @@ public final class ReplacementCompanionEntityCheckpointSink
         return candidate == CompanionEntityCheckpoint.CaptureBoundary.LOADED
                 ? current == CompanionEntityCheckpoint.CaptureBoundary.LOADED
                 || current == CompanionEntityCheckpoint.CaptureBoundary.UNLOAD
-                || current == CompanionEntityCheckpoint.CaptureBoundary
-                .DESTRUCTIVE_REMOVE
                 : current == candidate;
     }
 
