@@ -31,7 +31,6 @@ import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator
 import com.alechilles.alecstamework.persistence.projection
         .ProjectionPublicationContext;
 import com.alechilles.alecstamework.persistence.projection.ProjectionPublicationScheduler;
-import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceThroughputMetrics;
 import java.util.ArrayList;
 import java.util.List;
@@ -64,23 +63,6 @@ final class SqlitePublicProjectionSet {
             @Nonnull SqlitePersistenceKernel kernel,
             @Nonnull LongSupplier clock,
             @Nonnull Consumer<NpcProfileChangedEvent> profileListener,
-            @Nonnull ReplacementPublicApiEventSink publicEventSink
-    ) {
-        this(
-                registry,
-                kernel,
-                clock,
-                profileListener,
-                publicEventSink,
-                PersistenceThroughputMetrics.NO_OP
-        );
-    }
-
-    SqlitePublicProjectionSet(
-            @Nonnull PersistenceFeatureRegistry registry,
-            @Nonnull SqlitePersistenceKernel kernel,
-            @Nonnull LongSupplier clock,
-            @Nonnull Consumer<NpcProfileChangedEvent> profileListener,
             @Nonnull ReplacementPublicApiEventSink publicEventSink,
             @Nonnull PersistenceThroughputMetrics throughputMetrics
     ) {
@@ -91,19 +73,11 @@ final class SqlitePublicProjectionSet {
                     "Public projection dependencies are required"
             );
         }
-        this.coordinator = new ProjectionCoordinator(
-                new SqliteProjectionGateway(
-                        kernel.reads(),
-                        kernel.units(),
-                        throughputMetrics
-                ),
-                ProjectionRetryPolicy.DEFAULT,
-                clock
+        SqliteProjectionRuntime runtime = SqliteProjectionRuntime.create(
+                kernel, clock, throughputMetrics
         );
-        this.publicationScheduler =
-                new ProjectionPublicationScheduler(
-                        this.coordinator, throughputMetrics
-                );
+        this.coordinator = runtime.coordinator();
+        this.publicationScheduler = runtime.publicationScheduler();
         this.profileObserver =
                 new CompanionProfileObserverProjection(profileListener);
         this.publicEventObserver =
