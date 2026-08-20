@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.migration;
 
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV2Manager;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -143,6 +144,23 @@ class LegacySourceClassifierTest {
                 classifier.classify(replacement, tempDir.resolve("work-tampered"));
         assertEquals(LegacySourceKind.AMBIGUOUS, tampered.kind());
         assertEquals("REPLACEMENT_LINEAGE_INVALID", tampered.diagnosticCode());
+    }
+
+    @Test
+    void classifiesV2SeparatelyFromTheV1RollbackLineage() throws Exception {
+        Path replacement = tempDir.resolve("tamework-state-v2.sqlite");
+        SqliteSchemaV2Manager manager = new SqliteSchemaV2Manager(
+                new SqliteConnectionFactory(replacement), () -> 100
+        );
+        manager.initialize();
+
+        LegacySourceClassification valid = classifier.classify(
+                replacement, tempDir.resolve("work-replacement-v2")
+        );
+
+        assertEquals(LegacySourceKind.REPLACEMENT_V2, valid.kind());
+        assertEquals(2, valid.schemaVersion());
+        assertEquals("REPLACEMENT_V2", valid.diagnosticCode());
     }
 
     @Test

@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.persistence.activation;
 
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV2Manager;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceFiles;
 import com.alechilles.alecstamework.persistence.TameworkDataPathLayout;
@@ -330,7 +330,7 @@ class TameworkPersistenceActivationProbeTest {
     }
 
     private void initializeSchema(Path database) {
-        SqliteSchemaV1Manager manager = new SqliteSchemaV1Manager(
+        SqliteSchemaV2Manager manager = new SqliteSchemaV2Manager(
                 new SqliteConnectionFactory(database));
         assertTrue(manager.initialize() instanceof PersistenceTransactionResult.Committed<?>);
     }

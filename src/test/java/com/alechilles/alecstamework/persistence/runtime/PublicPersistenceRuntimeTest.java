@@ -14,7 +14,7 @@ import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV2Manager;
 import com.alechilles.alecstamework.persistence.control.PersistenceEngineLease;
 import com.alechilles.alecstamework.persistence.control.PersistenceEngineLineage;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureCircuitState;
@@ -144,7 +144,7 @@ class PublicPersistenceRuntimeTest {
                 closed.lastCheckpoint().status()
         );
         assertEquals(
-                SqliteSchemaV1Manager.VERSION,
+                SqliteSchemaV2Manager.VERSION,
                 closed.schemaVersion().orElseThrow()
         );
         assertTrue(closed.guidance().contains(
@@ -218,8 +218,8 @@ class PublicPersistenceRuntimeTest {
         Path database = PersistenceFiles.replacementDatabase(tempDir);
         SqliteConnectionFactory connections =
                 new SqliteConnectionFactory(database);
-        SqliteSchemaV1Manager schemas =
-                new SqliteSchemaV1Manager(connections, () -> -500);
+        SqliteSchemaV2Manager schemas =
+                new SqliteSchemaV2Manager(connections, () -> -500);
         schemas.initialize();
         assertInstanceOf(
                 PersistenceReadResult.Found.class, schemas.verify()

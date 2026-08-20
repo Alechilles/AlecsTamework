@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.migration;
 
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV2Manager;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -260,7 +261,7 @@ class PublicPersistenceImporterTest {
     void restartDiscardsIncompleteOwnedAttemptAndBuildsANewVerifiedTarget() throws Exception {
         ImportCase testCase = importCase("public-v4-representative.sql");
         Path incomplete = temporaryTarget(testCase.target());
-        new SqliteSchemaV1Manager(
+        new SqliteSchemaV2Manager(
                 new SqliteConnectionFactory(incomplete), () -> -7_000
         ).initialize();
 
@@ -357,7 +358,7 @@ class PublicPersistenceImporterTest {
                     plan, snapshot.fingerprint(), classification.schemaVersion(),
                     source.getFileName().toString(), -7_000);
             SqliteConnectionFactory connections = new SqliteConnectionFactory(temporary);
-            new SqliteSchemaV1Manager(connections, () -> -7_000).initialize();
+            new SqliteSchemaV2Manager(connections, () -> -7_000).initialize();
             try (Connection connection = connections.openWriterConnection()) {
                 connection.setAutoCommit(false);
                 new PublicImportSqlWriter().write(connection, plan, manifest);

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.migration;
 
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV2Manager;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -135,8 +136,11 @@ public final class LegacySourceClassifier {
                         Optional.of(snapshot.fingerprint()), Set.of());
             }
             Set<String> tables = userTables(connection);
+            if (tables.equals(SqliteSchemaV2Manager.requiredTables())) {
+                return classifyReplacement(snapshot, tables, 2);
+            }
             if (tables.equals(SqliteSchemaV1Manager.requiredTables())) {
-                return classifyReplacement(snapshot, tables);
+                return classifyReplacement(snapshot, tables, 1);
             }
             if (!tables.contains("schema_migrations")) {
                 if (!disjoint(tables, DEVELOPMENT_TABLES)) {
@@ -176,15 +180,25 @@ public final class LegacySourceClassifier {
 
     private LegacySourceClassification classifyReplacement(
             SqliteReadOnlySnapshotter.Snapshot snapshot,
-            Set<String> tables
+            Set<String> tables,
+            int version
     ) {
-        PersistenceReadResult<?> verification =
-                new SqliteSchemaV1Manager(new SqliteConnectionFactory(snapshot.path())).verify();
+        PersistenceReadResult<?> verification = version == 2
+                ? new SqliteSchemaV2Manager(
+                        new SqliteConnectionFactory(snapshot.path())
+                ).verify()
+                : new SqliteSchemaV1Manager(
+                        new SqliteConnectionFactory(snapshot.path())
+                ).verify();
         if (verification instanceof PersistenceReadResult.Found<?>) {
-            return result(LegacySourceKind.REPLACEMENT_V1, 1, "REPLACEMENT_V1",
+            LegacySourceKind kind = version == 2
+                    ? LegacySourceKind.REPLACEMENT_V2
+                    : LegacySourceKind.REPLACEMENT_V1;
+            return result(kind, version, kind.name(),
                     Optional.of(snapshot.fingerprint()), tables);
         }
-        return result(LegacySourceKind.AMBIGUOUS, 1, "REPLACEMENT_LINEAGE_INVALID",
+        return result(LegacySourceKind.AMBIGUOUS, version,
+                "REPLACEMENT_LINEAGE_INVALID",
                 Optional.of(snapshot.fingerprint()), tables);
     }
 

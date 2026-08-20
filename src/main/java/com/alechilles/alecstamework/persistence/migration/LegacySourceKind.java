@@ -8,6 +8,7 @@ public enum LegacySourceKind {
     PUBLIC_V4,
     LEGACY_DAT,
     REPLACEMENT_V1,
+    REPLACEMENT_V2,
     DEVELOPMENT_V5_TO_V9,
     MALFORMED,
     AMBIGUOUS

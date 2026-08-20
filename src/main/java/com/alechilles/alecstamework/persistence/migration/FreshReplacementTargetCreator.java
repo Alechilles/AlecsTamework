@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.persistence.migration;
 
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV2Manager;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import java.nio.file.Files;
@@ -35,8 +35,8 @@ final class FreshReplacementTargetCreator {
         try {
             SqliteConnectionFactory connections =
                     new SqliteConnectionFactory(temporary);
-            SqliteSchemaV1Manager schemas =
-                    new SqliteSchemaV1Manager(connections, clock);
+            SqliteSchemaV2Manager schemas =
+                    new SqliteSchemaV2Manager(connections, clock);
             PersistenceTransactionResult<?> initialized =
                     schemas.initialize();
             if (!(initialized instanceof PersistenceTransactionResult.Committed<?>)

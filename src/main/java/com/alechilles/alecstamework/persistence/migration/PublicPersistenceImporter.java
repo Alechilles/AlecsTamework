@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.persistence.migration;
 
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV2Manager;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import java.nio.file.Files;
@@ -278,7 +278,7 @@ public final class PublicPersistenceImporter {
     }
 
     private void initializeSchema(SqliteConnectionFactory connections) throws Exception {
-        SqliteSchemaV1Manager schema = new SqliteSchemaV1Manager(connections, clock);
+        SqliteSchemaV2Manager schema = new SqliteSchemaV2Manager(connections, clock);
         PersistenceTransactionResult<?> result = schema.initialize();
         if (result instanceof PersistenceTransactionResult.Committed<?>) {
             return;
@@ -296,7 +296,7 @@ public final class PublicPersistenceImporter {
             PublicImportManifest manifest
     ) throws Exception {
         SqliteConnectionFactory connections = new SqliteConnectionFactory(target);
-        if (!(new SqliteSchemaV1Manager(connections).verify()
+        if (!(new SqliteSchemaV2Manager(connections).verify()
                 instanceof PersistenceReadResult.Found<?>)) {
             throw new IllegalStateException("published_schema_verification_failed");
         }

@@ -4,7 +4,7 @@ import com.alechilles.alecstamework.persistence.TameworkDataPathLayout;
 import com.alechilles.alecstamework.persistence.adapter.sqlite
         .SqliteConnectionFactory;
 import com.alechilles.alecstamework.persistence.adapter.sqlite
-        .SqliteSchemaV1ReadOnlyGateway;
+        .SqliteSchemaV2ReadOnlyGateway;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceFiles;
 import com.alechilles.alecstamework.persistence.runtime
         .PublicPersistenceFeatureRegistry;
@@ -59,7 +59,10 @@ public final class TameworkPersistenceActivationProbe {
             "coop_residency",
             "refund_claim",
             "refund_claim_item",
-            "import_manifest"
+            "import_manifest",
+            "population_domain_reservation",
+            "companion_output_claim",
+            "companion_output_claim_item"
     );
     private final Path databasePath;
     private final List<Path> sourceDirectories;
@@ -153,7 +156,7 @@ public final class TameworkPersistenceActivationProbe {
             if (connection == null) {
                 return readOnly(true, "persistence-file-raced-away");
             }
-            SqliteSchemaV1ReadOnlyGateway.verify(connection);
+            SqliteSchemaV2ReadOnlyGateway.verify(connection);
             Set<String> evidence = durableEvidence(connection);
             if (recoverySidecarPresent) {
                 LinkedHashSet<String> recoveryEvidence =
