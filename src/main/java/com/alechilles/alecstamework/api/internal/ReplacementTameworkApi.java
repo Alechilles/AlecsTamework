@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.BondedCompanionApi;
+import com.alechilles.alecstamework.api.AdmissionProviderApi;
 import com.alechilles.alecstamework.api.ActivityFeedApi;
 import com.alechilles.alecstamework.api.CommandFamilyRosterApi;
 import com.alechilles.alecstamework.api.CommandLinksApi;
@@ -11,6 +12,13 @@ import com.alechilles.alecstamework.api.InteractionExtensionApi;
 import com.alechilles.alecstamework.api.NpcProfilesApi;
 import com.alechilles.alecstamework.api.PaidCommandRevivalApi;
 import com.alechilles.alecstamework.api.PolicyApi;
+import com.alechilles.alecstamework.api.ClaimAccessDecisionView;
+import com.alechilles.alecstamework.api.DamagePolicyDecisionView;
+import com.alechilles.alecstamework.api.OwnerPopulationCapRequestV2;
+import com.alechilles.alecstamework.api.OwnershipPolicyView;
+import com.alechilles.alecstamework.api.PopulationAdmissionApi;
+import com.alechilles.alecstamework.api.PopulationCapDecisionView;
+import com.alechilles.alecstamework.api.RequiredContentProfileApi;
 import com.alechilles.alecstamework.api.PopulationGroupApi;
 import com.alechilles.alecstamework.api.ProfileDataApi;
 import com.alechilles.alecstamework.api.ProgressionApi;
@@ -25,6 +33,8 @@ import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceFeatureRegistry;
 import java.util.EnumSet;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nonnull;
 
@@ -44,6 +54,10 @@ public final class ReplacementTameworkApi
     private final CompanionProvisioningApi provisioning;
     private final PaidCommandRevivalApi paidRevival;
     private final BondedCompanionApi bondedCompanions;
+    private final PopulationAdmissionApi populationAdmissions;
+    private final AdmissionProviderApi admissionProviders;
+    private final RequiredContentProfileApi requiredContentProfiles;
+    private final PolicyApi policies;
     private final AtomicBoolean closed = new AtomicBoolean();
 
     ReplacementTameworkApi(
@@ -56,7 +70,10 @@ public final class ReplacementTameworkApi
             @Nonnull CommandTimedSummoningApi timedSummoning,
             @Nonnull CompanionProvisioningApi provisioning,
             @Nonnull PaidCommandRevivalApi paidRevival,
-            @Nonnull BondedCompanionApi bondedCompanions
+            @Nonnull BondedCompanionApi bondedCompanions,
+            @Nonnull PopulationAdmissionApi populationAdmissions,
+            @Nonnull AdmissionProviderApi admissionProviders,
+            @Nonnull RequiredContentProfileApi requiredContentProfiles
     ) {
         this.base = Objects.requireNonNull(base, "base");
         this.persistence = Objects.requireNonNull(
@@ -84,6 +101,23 @@ public final class ReplacementTameworkApi
         this.bondedCompanions = Objects.requireNonNull(
                 bondedCompanions,
                 "bondedCompanions"
+        );
+        this.populationAdmissions = Objects.requireNonNull(
+                populationAdmissions,
+                "populationAdmissions"
+        );
+        this.admissionProviders = Objects.requireNonNull(
+                admissionProviders,
+                "admissionProviders"
+        );
+        this.requiredContentProfiles = Objects.requireNonNull(
+                requiredContentProfiles,
+                "requiredContentProfiles"
+        );
+        this.policies = new ReadinessPolicyApi(
+                base.policies(),
+                populationAdmissions,
+                admissionProviders
         );
     }
 
@@ -128,7 +162,7 @@ public final class ReplacementTameworkApi
 
     @Override
     public PolicyApi policies() {
-        return base.policies();
+        return policies;
     }
 
     @Override
@@ -200,6 +234,11 @@ public final class ReplacementTameworkApi
     }
 
     @Override
+    public RequiredContentProfileApi requiredContentProfiles() {
+        return requiredContentProfiles;
+    }
+
+    @Override
     public ActivityFeedApi activities() {
         return ActivityFeedApi.unavailable();
     }
@@ -249,6 +288,11 @@ public final class ReplacementTameworkApi
         if (bondedCompanions.availability().available()) {
             capabilities.add(TameworkApiCapability.BONDED_COMPANIONS);
         }
+        if (populationAdmissionReady()) {
+            capabilities.add(TameworkApiCapability.NAMED_CAPACITY_RESERVATIONS);
+            capabilities.add(TameworkApiCapability.EXTERNAL_ADMISSION_PROVIDERS);
+            capabilities.add(TameworkApiCapability.REQUIRED_CONTENT_PROFILES);
+        }
     }
 
     private boolean provisioningReady() {
@@ -274,5 +318,96 @@ public final class ReplacementTameworkApi
                 || readiness
                 == PersistenceReadinessLevel.WORLD_EVIDENCE_PENDING
                 || readiness == PersistenceReadinessLevel.MUTATION_READY;
+    }
+
+    private boolean populationAdmissionReady() {
+        if (!mutationReady(PublicPersistenceFeatureRegistry.POPULATION_DOMAINS)
+                || dependencies.managedActivities() == null
+                || dependencies.admissionProviders() == null
+                || dependencies.populationGroups() == null) {
+            return false;
+        }
+        var snapshot = dependencies.managedActivities().snapshot();
+        if (snapshot.revision() <= 0L || snapshot.profiles().isEmpty()) {
+            return false;
+        }
+        return snapshot.profiles().values().stream().allMatch(profile ->
+                dependencies.admissionProviders().readiness(
+                        profile.providerId(), profile.providerContractVersion()
+                ).available()
+        );
+    }
+
+    /** Readiness-gated policy view that keeps the legacy policy methods intact. */
+    private static final class ReadinessPolicyApi implements PolicyApi {
+        private final PolicyApi delegate;
+        private final PopulationAdmissionApi populationAdmissions;
+        private final AdmissionProviderApi admissionProviders;
+
+        private ReadinessPolicyApi(
+                PolicyApi delegate,
+                PopulationAdmissionApi populationAdmissions,
+                AdmissionProviderApi admissionProviders
+        ) {
+            this.delegate = Objects.requireNonNull(delegate, "delegate");
+            this.populationAdmissions = Objects.requireNonNull(
+                    populationAdmissions, "populationAdmissions"
+            );
+            this.admissionProviders = Objects.requireNonNull(
+                    admissionProviders, "admissionProviders"
+            );
+        }
+
+        @Override
+        public Optional<OwnershipPolicyView> getOwnershipByProfileId(String profileId) {
+            return delegate.getOwnershipByProfileId(profileId);
+        }
+
+        @Override
+        public Optional<OwnershipPolicyView> getOwnershipByNpcUuid(UUID npcUuid) {
+            return delegate.getOwnershipByNpcUuid(npcUuid);
+        }
+
+        @Override
+        public boolean isOwner(String profileId, UUID playerUuid) {
+            return delegate.isOwner(profileId, playerUuid);
+        }
+
+        @Override
+        public ClaimAccessDecisionView evaluateClaimAccess(
+                String profileId,
+                UUID playerUuid
+        ) {
+            return delegate.evaluateClaimAccess(profileId, playerUuid);
+        }
+
+        @Override
+        public DamagePolicyDecisionView evaluateDamage(
+                String profileId,
+                UUID attackerPlayerUuid
+        ) {
+            return delegate.evaluateDamage(profileId, attackerPlayerUuid);
+        }
+
+        @Override
+        public PopulationCapDecisionView evaluatePopulationCap(UUID ownerUuid) {
+            return delegate.evaluatePopulationCap(ownerUuid);
+        }
+
+        @Override
+        public com.alechilles.alecstamework.api.OwnerPopulationCapDecisionViewV2
+        evaluatePopulationCap(OwnerPopulationCapRequestV2 request) {
+            return delegate.evaluatePopulationCap(request);
+        }
+
+        @Override
+        public PopulationAdmissionApi populationAdmissions() {
+            return populationAdmissions;
+        }
+
+        @Override
+        public AdmissionProviderApi admissionProviders() {
+            return admissionProviders;
+        }
     }
 }

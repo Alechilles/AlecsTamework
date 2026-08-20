@@ -7,8 +7,11 @@ import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
 import com.alechilles.alecstamework.api.CommandTimedSummoningChangedEvent;
 import com.alechilles.alecstamework.api.CompanionProvisioningApi;
 import com.alechilles.alecstamework.api.DiagnosticsApi;
+import com.alechilles.alecstamework.api.AdmissionProviderApi;
 import com.alechilles.alecstamework.api.PaidCommandRevivalApi;
 import com.alechilles.alecstamework.api.PopulationGroupApi;
+import com.alechilles.alecstamework.api.PopulationAdmissionApi;
+import com.alechilles.alecstamework.api.RequiredContentProfileApi;
 import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TraitEffectApi;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
@@ -22,6 +25,7 @@ import com.alechilles.alecstamework.persistence.facade.ReplacementNpcProfilesApi
 import com.alechilles.alecstamework.persistence.facade.ReplacementPaidCommandRevivalApi;
 import com.alechilles.alecstamework.persistence.facade.ReplacementPersistenceDiagnosticsApi;
 import com.alechilles.alecstamework.persistence.facade.ReplacementPopulationGroupApi;
+import com.alechilles.alecstamework.persistence.facade.ReplacementPopulationAdmissionApi;
 import com.alechilles.alecstamework.persistence.facade.ReplacementProfileDataApi;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
@@ -179,6 +183,26 @@ public final class ReplacementTameworkApiFactory {
                 bondedCompanions == null
                         ? BondedCompanionApi.unavailable()
                         : bondedCompanions;
+        PopulationAdmissionApi populationAdmissions = PopulationAdmissionApi.unavailable();
+        AdmissionProviderApi admissionProviders = AdmissionProviderApi.unavailable();
+        RequiredContentProfileApi requiredContentProfiles =
+                RequiredContentProfileApi.unavailable();
+        if (dependencies.managedActivities() != null
+                && dependencies.populationGroups() != null
+                && dependencies.admissionProviders() != null) {
+            ReplacementPopulationAdmissionApi admission =
+                    new ReplacementPopulationAdmissionApi(
+                            persistence,
+                            facades.operations(),
+                            dependencies.managedActivities(),
+                            dependencies.populationGroups(),
+                            dependencies.admissionProviders(),
+                            clock
+                    );
+            populationAdmissions = admission;
+            admissionProviders = dependencies.admissionProviders();
+            requiredContentProfiles = admission;
+        }
         ReplacementTameworkApi api = new ReplacementTameworkApi(
                 base,
                 persistence,
@@ -189,7 +213,10 @@ public final class ReplacementTameworkApiFactory {
                 timed,
                 provisioning,
                 paidRevival,
-                bondedApi
+                bondedApi,
+                populationAdmissions,
+                admissionProviders,
+                requiredContentProfiles
         );
         AutoCloseable timedEventBridge = timedFacade == null
                 ? () -> { }

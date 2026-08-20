@@ -32,6 +32,7 @@ import com.alechilles.alecstamework.companion.population.OwnerPopulationTransiti
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionRequest;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentDefinition;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentRequest;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionDefinition;
 import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioningDefinition;
 import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioningRequest;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationDefinition;
@@ -116,6 +117,10 @@ final class SqlitePublicRecoveryRegistry {
                                         PopulationGroupAssignmentRequest.class
                                 )
                         ).completion()
+                ),
+                Map.entry(
+                        PopulationDomainAdmissionDefinition.INSTANCE.kind(),
+                        operations.populationDomains()::recover
                 ),
                 Map.entry(
                         CommandRosterMembershipDefinition.INSTANCE.kind(),

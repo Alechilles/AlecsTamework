@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDe
 import com.alechilles.alecstamework.companion.population.OwnerPopulationReconciliationDefinition;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionDefinition;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentDefinition;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDomain;
@@ -40,6 +41,8 @@ public final class PublicPersistenceFeatureRegistry {
             new PersistenceFeatureId("owner_population");
     public static final PersistenceFeatureId POPULATION_GROUPS =
             new PersistenceFeatureId("population_groups");
+    public static final PersistenceFeatureId POPULATION_DOMAINS =
+            new PersistenceFeatureId("population_domains");
     public static final PersistenceFeatureId COMMAND_ROSTER =
             new PersistenceFeatureId("command_roster");
     public static final PersistenceFeatureId TIMED_SUMMON =
@@ -88,6 +91,7 @@ public final class PublicPersistenceFeatureRegistry {
                 lifecycle(),
                 ownerPopulation(),
                 populationGroups(),
+                populationDomains(),
                 commandRoster(),
                 PublicPersistenceTimedFeature.create(),
                 PublicPersistenceProvisioningFeature.create(),
@@ -236,6 +240,30 @@ public final class PublicPersistenceFeatureRegistry {
                         PersistenceStartupNode.RECOVER_OPERATIONS,
                         PersistenceStartupNode.BUILD_PROJECTIONS
                 ),
+                Set.of(
+                        OperationScopeType.OPERATION,
+                        OperationScopeType.PROFILE,
+                        OperationScopeType.OWNER
+                )
+        );
+    }
+
+    private static PersistenceFeatureDescriptor populationDomains() {
+        return PublicPersistenceFeatureDescriptorFactory.create(
+                POPULATION_DOMAINS,
+                PersistenceFeatureDomain.POPULATION,
+                Set.of("population_domain_reservation"),
+                List.of(PopulationDomainAdmissionDefinition.INSTANCE),
+                PublicPersistenceFeatureDescriptorFactory.scopes(
+                        PopulationDomainAdmissionDefinition.INSTANCE,
+                        Set.of(
+                                OperationScopeType.PROFILE,
+                                OperationScopeType.OWNER
+                        )
+                ),
+                Set.of(IDENTITY, LIFECYCLE, OWNER_POPULATION, POPULATION_GROUPS),
+                Set.of(),
+                PublicPersistenceFeatureDescriptorFactory.worldReadiness(),
                 Set.of(
                         OperationScopeType.OPERATION,
                         OperationScopeType.PROFILE,

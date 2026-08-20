@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.BondedCompanionApi;
+import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegistry;
 import com.alechilles.alecstamework.persistence.facade.ReplacementCommandFamilyRosterApi;
 import com.alechilles.alecstamework.persistence.facade.ReplacementCommandTimedSummoningApi;
@@ -28,7 +29,9 @@ public record ReplacementFeatureApiDependencies(
                 incidents,
         boolean captureResolvedEventsReady,
         boolean captureTameAndLinkReady,
-        @Nullable BondedCompanionApi bondedCompanions
+        @Nullable BondedCompanionApi bondedCompanions,
+        @Nullable ManagedActivityConfigRegistry managedActivities,
+        @Nullable AdmissionProviderRegistry admissionProviders
 ) {
     /** Source-compatible constructor for callers without a bonded facade. */
     public ReplacementFeatureApiDependencies(
@@ -57,6 +60,8 @@ public record ReplacementFeatureApiDependencies(
                 incidents,
                 captureResolvedEventsReady,
                 captureTameAndLinkReady,
+                null,
+                null,
                 null
         );
     }
@@ -72,6 +77,8 @@ public record ReplacementFeatureApiDependencies(
                 null,
                 false,
                 false,
+                null,
+                null,
                 null
         );
     }

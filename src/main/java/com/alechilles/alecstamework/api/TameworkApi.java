@@ -64,5 +64,10 @@ public interface TameworkApi {
     default ActivityFeedApi activities() {
         return ActivityFeedApi.unavailable();
     }
+
+    /** Returns immutable managed-content readiness when advertised. */
+    default RequiredContentProfileApi requiredContentProfiles() {
+        return RequiredContentProfileApi.unavailable();
+    }
 }
 

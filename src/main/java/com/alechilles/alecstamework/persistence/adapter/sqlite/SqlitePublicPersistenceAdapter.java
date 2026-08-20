@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.companion.command.CommandRosterProjectionInd
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonProjectionIndex;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationProjectionIndex;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupProjectionIndex;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningProjectionIndex;
 import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
@@ -187,6 +188,12 @@ public final class SqlitePublicPersistenceAdapter {
     public SqlitePopulationGroupAssignmentOperations
     populationGroupOperations() {
         return publicOperations.populationGroups();
+    }
+
+    @Nonnull
+    public PopulationDomainAdmissionOperation
+    populationDomainAdmissionOperations() {
+        return publicOperations.populationDomains();
     }
 
     @Nonnull

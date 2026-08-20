@@ -192,6 +192,7 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "mutateExtension",
                         "mutateProfile",
                         "mutateTimedSummonLease",
+                        "populationDomainAdmission",
                         "provisionCompanion",
                         "reconcileOwnerPopulation",
                         "registerCoopSlot",

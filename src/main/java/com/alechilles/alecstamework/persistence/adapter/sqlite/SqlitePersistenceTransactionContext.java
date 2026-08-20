@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecyclePort;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationEvidencePort;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationPort;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupPort;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainPort;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningPort;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshotPort;
 import com.alechilles.alecstamework.persistence.compensation.RefundClaimPort;
@@ -39,6 +40,7 @@ public final class SqlitePersistenceTransactionContext {
     private final OwnerPopulationPort population;
     private final OwnerPopulationEvidencePort populationEvidence;
     private final PopulationGroupPort populationGroups;
+    private final PopulationDomainPort populationDomains;
     private final CommandRosterPort commandRosters;
     private final TimedSummonLeasePort timedSummons;
     private final ProvisioningPort provisioning;
@@ -61,6 +63,7 @@ public final class SqlitePersistenceTransactionContext {
         population = new SqliteOwnerPopulationStore(connection);
         populationEvidence = new SqliteOwnerPopulationEvidenceStore(connection);
         populationGroups = new SqlitePopulationGroupStore(connection);
+        populationDomains = new SqlitePopulationDomainStore(connection);
         commandRosters = new SqliteCommandRosterStore(connection);
         timedSummons = new SqliteTimedSummonLeaseStore(connection);
         provisioning = new SqliteProvisioningStore(connection);
@@ -134,6 +137,11 @@ public final class SqlitePersistenceTransactionContext {
     @Nonnull
     PopulationGroupPort populationGroups() {
         return populationGroups;
+    }
+
+    @Nonnull
+    PopulationDomainPort populationDomains() {
+        return populationDomains;
     }
 
     @Nonnull

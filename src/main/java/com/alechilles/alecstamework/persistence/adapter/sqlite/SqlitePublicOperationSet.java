@@ -15,6 +15,8 @@ import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationDef
 import com.alechilles.alecstamework.companion.population.OwnerPopulationReconciliationDefinition;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionDefinition;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentDefinition;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionDefinition;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
 import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioningDefinition;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationDefinition;
@@ -42,6 +44,7 @@ final class SqlitePublicOperationSet {
     private final SqliteOwnerPopulationReconciliationOperations
             ownerPopulationReconciliation;
     private final SqlitePopulationGroupAssignmentOperations populationGroups;
+    private final PopulationDomainAdmissionOperation populationDomains;
     private final SqliteCommandRosterMembershipOperations commandRosters;
     private final SqliteCommandRosterTransitionOperations commandTransitions;
     private final SqliteTimedSummonLeaseOperations timedSummons;
@@ -133,6 +136,15 @@ final class SqlitePublicOperationSet {
                 consumers.apply(
                         PopulationGroupAssignmentDefinition.INSTANCE.kind()
                 )
+        );
+        populationDomains = new PopulationDomainAdmissionOperation(
+                engine,
+                publisher,
+                new SqliteOperationReader(kernel.reads()),
+                consumers.apply(
+                        PopulationDomainAdmissionDefinition.INSTANCE.kind()
+                ),
+                clock
         );
         commandRosters = new SqliteCommandRosterMembershipOperations(
                 database,
@@ -273,6 +285,10 @@ final class SqlitePublicOperationSet {
 
     SqlitePopulationGroupAssignmentOperations populationGroups() {
         return populationGroups;
+    }
+
+    PopulationDomainAdmissionOperation populationDomains() {
+        return populationDomains;
     }
 
     SqliteCommandRosterMembershipOperations commandRosters() {

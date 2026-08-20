@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationReconciliationRequest;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionRequest;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentRequest;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation;
 import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioningRequest;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationRequest;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
@@ -284,6 +285,12 @@ public final class PublicPersistenceOperations {
                 operationId, idempotencyKey, assignment
         );
         return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    /** Returns the staged provider-aware weighted-domain admission adapter. */
+    @Nonnull
+    public PopulationDomainAdmissionOperation populationDomainAdmission() {
+        return adapter.populationDomainAdmissionOperations();
     }
 
     @Nonnull
