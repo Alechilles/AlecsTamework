@@ -1,11 +1,14 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.math.util.ChunkUtil;
 import org.joml.Vector3d;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.modules.collision.WorldUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -17,6 +20,7 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import it.unimi.dsi.fastutil.Pair;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import javax.annotation.Nullable;
 
 /**
@@ -146,6 +150,25 @@ final class BreedingOffspringSpawnService {
                                                          int roleIndex,
                                                          @Nullable Vector3d spawnPosition,
                                                          @Nullable Rotation3f spawnRotation) {
+        return spawnWithFallback(
+                npcPlugin,
+                store,
+                roleIndex,
+                spawnPosition,
+                spawnRotation,
+                null
+        );
+    }
+
+    @Nullable
+    Pair<Ref<EntityStore>, NPCEntity> spawnWithFallback(
+            @Nullable NPCPlugin npcPlugin,
+            @Nullable Store<EntityStore> store,
+            int roleIndex,
+            @Nullable Vector3d spawnPosition,
+            @Nullable Rotation3f spawnRotation,
+            @Nullable UUID plannedUuid
+    ) {
         if (npcPlugin == null || store == null || roleIndex < 0 || spawnPosition == null || spawnRotation == null) {
             return null;
         }
@@ -165,7 +188,8 @@ final class BreedingOffspringSpawnService {
                         store,
                         roleIndex,
                         safeCandidate,
-                        spawnRotation
+                        spawnRotation,
+                        plannedUuid
                 );
                 if (spawned != null) {
                     return spawned;
@@ -219,22 +243,75 @@ final class BreedingOffspringSpawnService {
                                                                   @Nullable Store<EntityStore> store,
                                                                   int roleIndex,
                                                                   @Nullable Vector3d candidate,
-                                                                  @Nullable Rotation3f spawnRotation) {
+                                                                  @Nullable Rotation3f spawnRotation,
+                                                                  @Nullable UUID plannedUuid) {
         if (npcPlugin == null || store == null || roleIndex < 0 || candidate == null || spawnRotation == null) {
             return null;
         }
-        Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(
-                store,
-                roleIndex,
-                candidate,
-                spawnRotation,
-                null,
-                null
-        );
+        Pair<Ref<EntityStore>, NPCEntity> spawned;
+        try {
+            spawned = plannedUuid == null
+                    ? npcPlugin.spawnEntity(
+                            store,
+                            roleIndex,
+                            candidate,
+                            spawnRotation,
+                            null,
+                            null
+                    )
+                    : npcPlugin.spawnEntity(
+                            store,
+                            roleIndex,
+                            candidate,
+                            spawnRotation,
+                            null,
+                            (npc, holder, callbackStore) -> installPlannedUuid(
+                                    npc, holder, plannedUuid
+                            ),
+                            null
+                    );
+        } catch (RuntimeException failure) {
+            return null;
+        }
         if (spawned == null || spawned.first() == null || spawned.second() == null) {
             return null;
         }
+        if (plannedUuid != null
+                && !matchesPlannedUuid(store, spawned, plannedUuid)) {
+            spawned.second().setToDespawn();
+            return null;
+        }
         return spawned;
+    }
+
+    private static void installPlannedUuid(
+            NPCEntity npc,
+            Holder<EntityStore> holder,
+            UUID plannedUuid
+    ) {
+        ComponentType<EntityStore, UUIDComponent> type =
+                UUIDComponent.getComponentType();
+        if (type == null) {
+            throw new IllegalStateException(
+                    "UUIDComponent type is not registered"
+            );
+        }
+        holder.putComponent(type, new UUIDComponent(plannedUuid));
+        npc.setLegacyUUID(plannedUuid);
+    }
+
+    private static boolean matchesPlannedUuid(
+            Store<EntityStore> store,
+            Pair<Ref<EntityStore>, NPCEntity> spawned,
+            UUID plannedUuid
+    ) {
+        ComponentType<EntityStore, UUIDComponent> type =
+                UUIDComponent.getComponentType();
+        UUIDComponent component = type == null
+                ? null : store.getComponent(spawned.first(), type);
+        return component != null
+                && plannedUuid.equals(component.getUuid())
+                && plannedUuid.equals(spawned.second().getUuid());
     }
 
     @Nullable
