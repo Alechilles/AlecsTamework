@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.command.CommandRosterTransitionDef
 import com.alechilles.alecstamework.companion.command.CommandRosterTransitionRequest;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChangeCodec;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChange;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
@@ -15,21 +16,39 @@ import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
+import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.operation.PreparedOperationDetail;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
 import java.util.List;
+import java.util.concurrent.CompletionStage;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /** Command roster storage/live lifecycle changes through shared group admission. */
 public final class SqliteCommandRosterTransitionOperations {
     public static final String FEATURE_SCOPE = "command_roster";
 
     private final SqliteDatabaseOperationCoordinator coordinator;
+    @Nullable
+    private final SqliteManagedRosterReturnAdmission admission;
+    private final SqliteLifecycleAdmissionSingleFlight singleFlight =
+            new SqliteLifecycleAdmissionSingleFlight();
     private final List<ProjectionConsumer> requiredConsumers;
 
     public SqliteCommandRosterTransitionOperations(
             @Nonnull SqliteDatabaseOperationCoordinator coordinator,
+            @Nonnull List<? extends ProjectionConsumer> requiredConsumers
+    ) {
+        this(coordinator, null, null, null, requiredConsumers);
+    }
+
+    SqliteCommandRosterTransitionOperations(
+            @Nonnull SqliteDatabaseOperationCoordinator coordinator,
+            @Nullable SqliteOperationReader reader,
+            @Nullable SqliteLifecycleAdmissionBinding lifecycleAdmission,
+            @Nullable SqliteLifecycleAdmissionSourceReader sourceReader,
             @Nonnull List<? extends ProjectionConsumer> requiredConsumers
     ) {
         if (coordinator == null || requiredConsumers == null) {
@@ -38,6 +57,12 @@ public final class SqliteCommandRosterTransitionOperations {
             );
         }
         this.coordinator = coordinator;
+        admission = reader == null || lifecycleAdmission == null
+                || sourceReader == null
+                ? null
+                : new SqliteManagedRosterReturnAdmission(
+                        reader, lifecycleAdmission, sourceReader
+                );
         this.requiredConsumers = List.copyOf(requiredConsumers);
     }
 
@@ -54,18 +79,69 @@ public final class SqliteCommandRosterTransitionOperations {
                     "Complete command transition operation is required"
             );
         }
-        SqlitePopulationGroupTransitionParticipant groups =
-                new SqlitePopulationGroupTransitionParticipant(
-                        request.groupAdmission()
+        if (!positiveReturn(request) || admission == null) {
+            return execute(operationId, idempotencyKey, request);
+        }
+        CompletionStage<OperationWorkflowResult> completion =
+                singleFlight.submit(
+                        CommandRosterTransitionDefinition.KIND,
+                        operationId,
+                        idempotencyKey,
+                        CommandRosterTransitionDefinition.INSTANCE.encode(
+                                request
+                        ),
+                        () -> admission.resolve(
+                                        operationId, idempotencyKey, request
+                                )
+                                .thenCompose(value -> execute(
+                                        operationId, idempotencyKey, value
+                                ).completion())
                 );
-        PreparedOperationDetail detail = preparationDetail(
-                request, groups
-        );
-        DurableOperationWork work = groups.decorate(
-                (transaction, operation) -> commit(
-                        transaction, operation, request
+        return new SqliteDatabaseOperationCoordinator.Submission(
+                SqliteSingleWriter.WriteAcceptance.ACCEPTED,
+                completion.exceptionally(failure ->
+                        SqliteOperationResults.failed(
+                                OperationWorkflowResult.Status.PREPARE_FAILED,
+                                null,
+                                List.of(),
+                                failure instanceof java.util.concurrent
+                                .CompletionException
+                                && failure.getCause() != null
+                                        ? failure.getCause() : failure
+                        )
                 )
         );
+    }
+
+    private SqliteDatabaseOperationCoordinator.Submission execute(
+            OperationId operationId,
+            IdempotencyKey idempotencyKey,
+            CommandRosterTransitionRequest request
+    ) {
+        SqlitePopulationGroupTransitionParticipant groups =
+                needsExternalGroups(request)
+                        ? new SqlitePopulationGroupTransitionParticipant(
+                        request.groupAdmission()
+                ) : null;
+        SqliteManagedAdmissionParticipant managed =
+                request.admissionEvidence() != null
+                        && request.admissionEvidence().status()
+                        == LifecycleAdmissionEvidence.Status.MANAGED
+                        ? SqliteManagedAdmissionParticipant.from(
+                        operationId, request.admissionEvidence()
+                ) : null;
+        PreparedOperationDetail detail = preparationDetail(
+                request, groups, managed
+        );
+        DurableOperationWork work = (transaction, operation) -> commit(
+                transaction, operation, request
+        );
+        if (managed != null) {
+            work = managed.decorate(work);
+        }
+        if (groups != null) {
+            work = groups.decorate(work);
+        }
         return coordinator.execute(
                 CommandRosterTransitionDefinition.INSTANCE,
                 new OperationRequest<>(
@@ -109,10 +185,50 @@ public final class SqliteCommandRosterTransitionOperations {
             CommandRosterTransitionRequest request,
             SqlitePopulationGroupTransitionParticipant groups
     ) {
+        return preparationDetail(request, groups, null);
+    }
+
+    private static PreparedOperationDetail preparationDetail(
+            CommandRosterTransitionRequest request,
+            @Nullable SqlitePopulationGroupTransitionParticipant groups,
+            @Nullable SqliteManagedAdmissionParticipant managed
+    ) {
+        if (groups == null && managed == null) {
+            return new ExactRosterDetail(request);
+        }
+        if (groups == null) {
+            return PreparedOperationDetail.compose(
+                    new ExactRosterDetail(request), managed
+            );
+        }
+        if (managed == null) {
+            return PreparedOperationDetail.compose(
+                    new ExactRosterDetail(request), groups
+            );
+        }
         return PreparedOperationDetail.compose(
-                new ExactRosterDetail(request),
-                groups
+                new ExactRosterDetail(request), groups, managed
         );
+    }
+
+    private static boolean positiveReturn(
+            CommandRosterTransitionRequest request
+    ) {
+        return request.groupAdmission().before().state()
+                == LifecycleState.ROSTER_STORED
+                && request.groupAdmission().after().state()
+                == LifecycleState.ACTIVE;
+    }
+
+    private static boolean needsExternalGroups(
+            CommandRosterTransitionRequest request
+    ) {
+        return request.admissionEvidence() == null
+                || request.admissionEvidence().status()
+                != LifecycleAdmissionEvidence.Status.MANAGED
+                || request.admissionEvidence().composition() == null
+                || request.admissionEvidence().composition().groupRequest()
+                == null;
     }
 
     private List<ProjectionEventDraft> commit(

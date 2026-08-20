@@ -188,6 +188,9 @@ final class SqlitePublicOperationSet {
         );
         commandTransitions = new SqliteCommandRosterTransitionOperations(
                 database,
+                operationReader,
+                lifecycleAdmission,
+                lifecycleSources,
                 consumers.apply(
                         CommandRosterTransitionDefinition.INSTANCE.kind()
                 )

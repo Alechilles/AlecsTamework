@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.companion.command;
 
 import com.alechilles.alecstamework.companion.identity.OwnerId;
+import com.alechilles.alecstamework.companion.population.domain.LifecycleAdmissionEvidenceJsonCodec;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionJsonCodec;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionRequest;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinition;
@@ -52,6 +53,14 @@ public final class CommandRosterTransitionDefinition
                         payload.groupAdmission()
                 )
         );
+        if (payload.admissionEvidence() != null) {
+            json.add(
+                    "admissionEvidence",
+                    LifecycleAdmissionEvidenceJsonCodec.encode(
+                            payload.admissionEvidence()
+                    )
+            );
+        }
         return json.toString();
     }
 
@@ -72,7 +81,13 @@ public final class CommandRosterTransitionDefinition
                 json.get("expectedMembershipRevision").getAsLong(),
                 PopulationGroupTransitionAdmissionJsonCodec.decode(
                         json.getAsJsonObject("groupAdmission")
-                )
+                ),
+                json.get("admissionEvidence") == null
+                        || json.get("admissionEvidence").isJsonNull()
+                        ? null
+                        : LifecycleAdmissionEvidenceJsonCodec.decode(
+                                json.getAsJsonObject("admissionEvidence")
+                        )
         );
     }
 }

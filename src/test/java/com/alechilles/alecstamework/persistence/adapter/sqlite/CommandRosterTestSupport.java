@@ -66,7 +66,7 @@ abstract class CommandRosterTestSupport {
         connections = new SqliteConnectionFactory(
                 tempDir.resolve("tamework-state.sqlite")
         );
-        new SqliteSchemaV1Manager(connections, () -> -10_000)
+        new SqliteSchemaV2Manager(connections, () -> -10_000)
                 .initialize();
         kernel = new SqlitePersistenceKernel(connections);
         adapter = new SqlitePublicPersistenceAdapter(

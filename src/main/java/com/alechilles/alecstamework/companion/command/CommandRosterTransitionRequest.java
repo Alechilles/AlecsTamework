@@ -4,16 +4,28 @@ import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionRequest;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
 import java.util.Objects;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /** Exact slot, lifecycle, and group evidence for one command storage/live transition. */
 public record CommandRosterTransitionRequest(
         @Nonnull CommandFamilyKey familyKey,
         @Nonnull CommandRosterSlotId slotId,
         long expectedMembershipRevision,
-        @Nonnull PopulationGroupTransitionAdmissionRequest groupAdmission
+        @Nonnull PopulationGroupTransitionAdmissionRequest groupAdmission,
+        @Nullable LifecycleAdmissionEvidence admissionEvidence
 ) {
+    public CommandRosterTransitionRequest(
+            @Nonnull CommandFamilyKey familyKey,
+            @Nonnull CommandRosterSlotId slotId,
+            long expectedMembershipRevision,
+            @Nonnull PopulationGroupTransitionAdmissionRequest groupAdmission
+    ) {
+        this(familyKey, slotId, expectedMembershipRevision, groupAdmission, null);
+    }
+
     public CommandRosterTransitionRequest {
         if (familyKey == null || slotId == null
                 || expectedMembershipRevision <= 0
@@ -42,6 +54,30 @@ public record CommandRosterTransitionRequest(
                     "Valid command roster lifecycle transition is required"
             );
         }
+    }
+
+    @Nonnull
+    public CommandRosterTransitionRequest withAdmissionEvidence(
+            @Nonnull LifecycleAdmissionEvidence evidence
+    ) {
+        if (evidence == null) {
+            throw new IllegalArgumentException(
+                    "Lifecycle admission evidence is required"
+            );
+        }
+        if (admissionEvidence != null
+                && !admissionEvidence.equals(evidence)) {
+            throw new IllegalArgumentException(
+                    "Lifecycle admission evidence cannot be replaced"
+            );
+        }
+        return new CommandRosterTransitionRequest(
+                familyKey,
+                slotId,
+                expectedMembershipRevision,
+                groupAdmission,
+                evidence
+        );
     }
 
     private static boolean allowed(

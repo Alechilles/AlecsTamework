@@ -8,6 +8,9 @@ import com.alechilles.alecstamework.companion.command.CommandRosterTransitionReq
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainBucket;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainScope;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupCounts;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
@@ -16,9 +19,14 @@ import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -133,6 +141,48 @@ class SqliteCommandRosterOperationsTest
         );
         assertTrue(adapter.commandRosterIndex()
                 .laggingProfiles().isEmpty());
+    }
+
+    @Test
+    void managedRosterReturnRestoresDeployableCapacity() throws Exception {
+        createProfile(PROFILE_A, SLOT_A, 34);
+        classify(PROFILE_A, 2, 35);
+        published(addMembership(PROFILE_A, SLOT_A, 0, 36));
+        seedStoredDomainCapacity();
+        AtomicInteger admissionCalls = new AtomicInteger();
+        adapter.bindLifecycleAdmission(request -> {
+            admissionCalls.incrementAndGet();
+            return CompletableFuture.completedFuture(
+                    LifecycleAdmissionEvidence.managed(
+                            rosterReturnPayload(request.operationId()), null
+                    )
+            );
+        });
+
+        OperationId returnId = operationId(37);
+        published(await(transition(
+                returnId,
+                SLOT_A,
+                1,
+                lifecycle(PROFILE_A, LifecycleState.ROSTER_STORED, SLOT_A, 0),
+                lifecycle(PROFILE_A, LifecycleState.ACTIVE, SLOT_A, 1),
+                1
+        )));
+
+        assertEquals(1, admissionCalls.get());
+        try (Connection connection = connections.openReadConnection()) {
+            var domains = new SqlitePersistenceTransactionContext(connection)
+                    .populationDomains();
+            var counts = domains.counts(new PopulationDomainBucket(
+                    OWNER,
+                    "managed-test-domain",
+                    PopulationDomainScope.PER_WORLD,
+                    "world-a"
+            ));
+            assertEquals(1, counts.committedOwned());
+            assertEquals(1, counts.committedDeployable());
+            assertEquals(1, domains.findByOperation(returnId).size());
+        }
     }
 
     @Test
@@ -322,5 +372,94 @@ class SqliteCommandRosterOperationsTest
         assertEquals(0, reservationCount(operationId));
         assertEquals(LifecycleState.ACTIVE,
                 lifecycleRead(PROFILE_A).state());
+    }
+
+    private PopulationDomainAdmissionOperation.Payload rosterReturnPayload(
+            OperationId operationId
+    ) {
+        return new PopulationDomainAdmissionOperation.Payload(
+                UUID.nameUUIDFromBytes((operationId.value()
+                        + ":lifecycle-admission").getBytes(
+                        java.nio.charset.StandardCharsets.UTF_8
+                )),
+                PROFILE_A,
+                OWNER,
+                LifecycleRevision.INITIAL,
+                "world-a",
+                OWNER,
+                "world-a",
+                LifecycleState.ROSTER_STORED,
+                LifecycleState.ACTIVE,
+                "managed-test-group",
+                "managed-test-provider",
+                1,
+                "generation",
+                1,
+                1,
+                Long.MAX_VALUE,
+                1,
+                List.of(new PopulationDomainAdmissionOperation.DomainInput(
+                        "managed-test-domain",
+                        PopulationDomainScope.PER_WORLD,
+                        "world-a",
+                        0,
+                        1,
+                        1,
+                        100,
+                        100,
+                        1
+                )),
+                List.of(),
+                -4_000
+        );
+    }
+
+    private void seedStoredDomainCapacity() throws Exception {
+        OperationId sourceOperation = operationId(38);
+        try (Connection connection = connections.openWriterConnection()) {
+            connection.setAutoCommit(false);
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO operation_envelope(
+                        operation_id, idempotency_key, operation_kind,
+                        payload_version, payload_json, phase, feature_scope,
+                        expected_lifecycle_revision, lease_owner, lease_until_ms,
+                        attempt_count, failure_kind, failure_code, created_at_ms,
+                        updated_at_ms, durable_at_ms, published_at_ms, terminal_at_ms
+                    ) VALUES (?, ?, 'seed_domain', 1, '{}', 'PUBLISHED',
+                              'seed', 0, NULL, 0, 0, NULL, NULL,
+                              -500, -500, -500, -500, NULL)
+                    """)) {
+                statement.setString(1, sourceOperation.toString());
+                statement.setString(2, "seed-roster-domain-38");
+                statement.executeUpdate();
+            }
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO operation_participant(
+                        operation_id, scope_type, scope_key
+                    ) VALUES (?, 'PROFILE', ?), (?, 'OWNER', ?)
+                    """)) {
+                statement.setString(1, sourceOperation.toString());
+                statement.setString(2, PROFILE_A.toString());
+                statement.setString(3, sourceOperation.toString());
+                statement.setString(4, OWNER.toString());
+                statement.executeUpdate();
+            }
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO population_domain_reservation(
+                        operation_id, profile_id, expected_lifecycle_revision,
+                        owner_uuid, domain_id, scope_kind, owner_world_key,
+                        owned_delta, deployable_delta, weight,
+                        snapshotted_max_owned, snapshotted_max_deployable,
+                        policy_revision, created_at_ms
+                    ) VALUES (?, ?, 0, ?, 'managed-test-domain', 'PER_WORLD',
+                              'world-a', 1, 0, 1, 100, 100, 1, -500)
+                    """)) {
+                statement.setString(1, sourceOperation.toString());
+                statement.setString(2, PROFILE_A.toString());
+                statement.setString(3, OWNER.toString());
+                statement.executeUpdate();
+            }
+            connection.commit();
+        }
     }
 }
