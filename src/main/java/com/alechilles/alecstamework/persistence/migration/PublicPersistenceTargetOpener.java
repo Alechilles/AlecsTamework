@@ -1,7 +1,12 @@
 package com.alechilles.alecstamework.persistence.migration;
 
 import com.alechilles.alecstamework.persistence.TameworkDataPathLayout;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV2Manager;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceFiles;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceSchemaStatus;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -17,6 +22,7 @@ import javax.annotation.Nonnull;
  * boundary. Unsupported development sources are refused before target creation.</p>
  */
 public final class PublicPersistenceTargetOpener {
+    private final LongSupplier clock;
     private final PublicPersistenceImporter importer;
     private final LegacyDatPersistenceImporter datImporter;
     private final FreshReplacementTargetCreator fresh;
@@ -32,6 +38,7 @@ public final class PublicPersistenceTargetOpener {
         if (clock == null) {
             throw new IllegalArgumentException("Target open clock is required");
         }
+        this.clock = clock;
         importer = new PublicPersistenceImporter(clock);
         datImporter = new LegacyDatPersistenceImporter(clock);
         fresh = new FreshReplacementTargetCreator(clock);
@@ -87,6 +94,7 @@ public final class PublicPersistenceTargetOpener {
             candidates.add(targetDirectory);
             candidates.addAll(sourceDirectories);
             quarantineRepair.repair(target, candidates);
+            initializeExistingTarget(target);
             return new PublicPersistenceTarget(
                     target,
                     PublicPersistenceTarget.Origin.EXISTING
@@ -149,5 +157,33 @@ public final class PublicPersistenceTargetOpener {
                 "public_persistence_import_failed:" + failed.code(),
                 failed.cause()
         );
+    }
+
+    private void initializeExistingTarget(Path target) {
+        SqliteSchemaV2Manager schemas = new SqliteSchemaV2Manager(
+                new SqliteConnectionFactory(target), clock
+        );
+        PersistenceTransactionResult<PersistenceSchemaStatus> initialized =
+                schemas.initialize();
+        if (!(initialized instanceof
+                PersistenceTransactionResult.Committed<PersistenceSchemaStatus>
+                committed)
+                || committed.value() == null
+                || committed.value().version() != SqliteSchemaV2Manager.VERSION
+                || !committed.value().integrityVerified()) {
+            throw new IllegalStateException(
+                    "existing_replacement_schema_initialization_failed"
+            );
+        }
+        PersistenceReadResult<PersistenceSchemaStatus> verified =
+                schemas.verify();
+        if (!(verified instanceof PersistenceReadResult.Found<
+                PersistenceSchemaStatus> found)
+                || found.value().version() != SqliteSchemaV2Manager.VERSION
+                || !found.value().integrityVerified()) {
+            throw new IllegalStateException(
+                    "existing_replacement_schema_verification_failed"
+            );
+        }
     }
 }

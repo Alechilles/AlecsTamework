@@ -4,6 +4,8 @@ import com.alechilles.alecstamework.persistence.TameworkDataPathLayout;
 import com.alechilles.alecstamework.persistence.adapter.sqlite
         .SqliteConnectionFactory;
 import com.alechilles.alecstamework.persistence.adapter.sqlite
+        .SqliteSchemaV1ReadOnlyGateway;
+import com.alechilles.alecstamework.persistence.adapter.sqlite
         .SqliteSchemaV2ReadOnlyGateway;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceFiles;
 import com.alechilles.alecstamework.persistence.runtime
@@ -64,6 +66,14 @@ public final class TameworkPersistenceActivationProbe {
             "companion_output_claim",
             "companion_output_claim_item"
     );
+    private static final Set<String> V2_ONLY_DURABLE_TABLES = Set.of(
+            "population_domain_reservation",
+            "companion_output_claim",
+            "companion_output_claim_item"
+    );
+    private static final List<String> V1_DURABLE_TABLES = DURABLE_TABLES.stream()
+            .filter(table -> !V2_ONLY_DURABLE_TABLES.contains(table))
+            .toList();
     private final Path databasePath;
     private final List<Path> sourceDirectories;
     private final SqliteConnectionFactory connections;
@@ -156,22 +166,51 @@ public final class TameworkPersistenceActivationProbe {
             if (connection == null) {
                 return readOnly(true, "persistence-file-raced-away");
             }
-            SqliteSchemaV2ReadOnlyGateway.verify(connection);
-            Set<String> evidence = durableEvidence(connection);
-            if (recoverySidecarPresent) {
-                LinkedHashSet<String> recoveryEvidence =
-                        new LinkedHashSet<>(evidence);
-                recoveryEvidence.add("persistence-wal-recovery");
-                evidence = Set.copyOf(recoveryEvidence);
+            try {
+                SqliteSchemaV2ReadOnlyGateway.verify(connection);
+                return verifiedTargetEvidence(
+                        connection, recoverySidecarPresent, DURABLE_TABLES
+                );
+            } catch (Exception v2Failure) {
+                try {
+                    SqliteSchemaV1ReadOnlyGateway.verify(connection);
+                    LinkedHashSet<String> evidence = new LinkedHashSet<>();
+                    evidence.add("persistence-schema-upgrade-v1");
+                    evidence.addAll(durableEvidence(
+                            connection, V1_DURABLE_TABLES
+                    ));
+                    if (recoverySidecarPresent) {
+                        evidence.add("persistence-wal-recovery");
+                    }
+                    return TameworkPersistenceActivationEvidence.active(
+                            evidence
+                    );
+                } catch (Exception v1Failure) {
+                    return readOnly(true, diagnosticCode(v1Failure));
+                }
             }
-            if (evidence.isEmpty()) {
-                return TameworkPersistenceActivationEvidence.dormant(
-                        true, true);
-            }
-            return TameworkPersistenceActivationEvidence.active(evidence);
         } catch (Exception failure) {
             return readOnly(true, diagnosticCode(failure));
         }
+    }
+
+    private TameworkPersistenceActivationEvidence verifiedTargetEvidence(
+            Connection connection,
+            boolean recoverySidecarPresent,
+            List<String> durableTables
+    ) throws SQLException {
+        Set<String> evidence = durableEvidence(connection, durableTables);
+        if (recoverySidecarPresent) {
+            LinkedHashSet<String> recoveryEvidence =
+                    new LinkedHashSet<>(evidence);
+            recoveryEvidence.add("persistence-wal-recovery");
+            evidence = Set.copyOf(recoveryEvidence);
+        }
+        if (evidence.isEmpty()) {
+            return TameworkPersistenceActivationEvidence.dormant(
+                    true, true);
+        }
+        return TameworkPersistenceActivationEvidence.active(evidence);
     }
 
     private TameworkPersistenceActivationEvidence probeHistoricalSources() {
@@ -187,8 +226,10 @@ public final class TameworkPersistenceActivationProbe {
         };
     }
 
-    private Set<String> durableEvidence(Connection connection)
-            throws SQLException {
+    private Set<String> durableEvidence(
+            Connection connection,
+            List<String> durableTables
+    ) throws SQLException {
         LinkedHashSet<String> evidence = new LinkedHashSet<>();
         if (exists(connection, """
                 SELECT 1 FROM operation_envelope
@@ -218,7 +259,7 @@ public final class TameworkPersistenceActivationProbe {
                 """)) {
             evidence.add("open-incident");
         }
-        for (String table : DURABLE_TABLES) {
+        for (String table : durableTables) {
             if (exists(connection,
                     "SELECT 1 FROM " + table + " LIMIT 1")) {
                 evidence.add("durable-row:" + table);

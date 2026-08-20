@@ -14,6 +14,7 @@ import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV2Manager;
 import com.alechilles.alecstamework.persistence.control.PersistenceEngineLease;
 import com.alechilles.alecstamework.persistence.control.PersistenceEngineLineage;
@@ -23,16 +24,19 @@ import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceFiles;
 import com.alechilles.alecstamework.persistence.migration.PublicPersistenceTarget;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
@@ -160,6 +164,99 @@ class PublicPersistenceRuntimeTest {
             assertTrue(manifest.startupComplete());
             assertTrue(manifest.cleanShutdown());
         }
+    }
+
+    /** Regression: normal startup upgrades a populated v1 target before mutation. */
+    @Test
+    void populatedV1StartupMigratesBeforeRuntimeReadiness() throws Exception {
+        Path database = PersistenceFiles.replacementDatabase(tempDir);
+        SqliteSchemaV1Manager v1 = new SqliteSchemaV1Manager(
+                new SqliteConnectionFactory(database), () -> -500);
+        assertInstanceOf(
+                PersistenceTransactionResult.Committed.class,
+                v1.initialize()
+        );
+        String profileId = "20000000-0000-0000-0000-000000000099";
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openWriterConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     INSERT INTO companion_profile(
+                         profile_id, display_name, role_id,
+                         last_known_world_key, created_at_ms, updated_at_ms,
+                         last_active_at_ms, metadata_revision
+                     ) VALUES (?, 'Persisted', 'livestock', 'world',
+                         -500, -500, -500, 0)
+                     """)) {
+            statement.setString(1, profileId);
+            statement.executeUpdate();
+            try (PreparedStatement lifecycle = connection.prepareStatement("""
+                    INSERT INTO companion_lifecycle(
+                        profile_id, lifecycle_state, location_kind, revision,
+                        state_changed_at_ms, last_reconciled_generation
+                    ) VALUES (?, 'UNLOADED', 'NONE', 0, -500, 0)
+                    """)) {
+                lifecycle.setString(1, profileId);
+                lifecycle.executeUpdate();
+            }
+        }
+
+        var activation = new com.alechilles.alecstamework.persistence.activation
+                .TameworkPersistenceActivationProbe(database).probe();
+        assertEquals(
+                com.alechilles.alecstamework.persistence.activation
+                        .PersistenceActivationMode.ACTIVE,
+                activation.mode()
+        );
+        assertTrue(activation.evidence().contains(
+                "persistence-schema-upgrade-v1"));
+
+        PublicPersistenceRuntime runtime = runtime(
+                PublicPersistenceWorldReconciliation.alreadyComplete());
+        var startup = runtime.start().toCompletableFuture().join();
+        assertTrue(startup.complete(), startup.toString());
+        assertEquals(
+                PublicPersistenceTarget.Origin.EXISTING,
+                runtime.targetOrigin().orElseThrow()
+        );
+        assertEquals(
+                PersistenceReadinessLevel.MUTATION_READY,
+                runtime.readiness(PublicPersistenceFeatureRegistry.IDENTITY)
+        );
+        assertEquals(
+                SqliteSchemaV2Manager.VERSION,
+                runtime.operationalStatus().schemaVersion().orElseThrow()
+        );
+        assertEquals(1, queryInt(database,
+                "SELECT COUNT(*) FROM companion_profile"));
+        assertEquals("Persisted", queryString(database, """
+                SELECT display_name FROM companion_profile
+                WHERE profile_id = '20000000-0000-0000-0000-000000000099'
+                """));
+        assertEquals(2, queryInt(database,
+                "SELECT COUNT(*) FROM schema_history"));
+        assertEquals(1, queryInt(database,
+                "SELECT version FROM schema_history ORDER BY rowid LIMIT 1"));
+        assertEquals(2, queryInt(database,
+                "SELECT version FROM schema_history ORDER BY rowid DESC LIMIT 1"));
+        runtime.close();
+
+        List<Path> backups = backupPaths(database);
+        assertEquals(1, backups.size());
+        assertInstanceOf(
+                PersistenceReadResult.Found.class,
+                new SqliteSchemaV1Manager(new SqliteConnectionFactory(backups.get(0)))
+                        .verify()
+        );
+
+        PublicPersistenceRuntime second = runtime(
+                PublicPersistenceWorldReconciliation.alreadyComplete());
+        assertTrue(second.start().toCompletableFuture().join().complete());
+        assertEquals(PublicPersistenceTarget.Origin.EXISTING,
+                second.targetOrigin().orElseThrow());
+        assertEquals(1, backupPaths(database).size());
+        assertEquals(2, queryInt(database,
+                "SELECT COUNT(*) FROM schema_history"));
+        second.close();
     }
 
     @Test
@@ -586,5 +683,33 @@ class PublicPersistenceRuntimeTest {
         return ProfileId.parse(
                 "20000000-0000-0000-0000-000000000001"
         );
+    }
+
+    private int queryInt(Path database, String sql) throws Exception {
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openReadConnection();
+             var statement = connection.createStatement();
+             var rows = statement.executeQuery(sql)) {
+            return rows.next() ? rows.getInt(1) : -1;
+        }
+    }
+
+    private String queryString(Path database, String sql) throws Exception {
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openReadConnection();
+             var statement = connection.createStatement();
+             var rows = statement.executeQuery(sql)) {
+            return rows.next() ? rows.getString(1) : null;
+        }
+    }
+
+    private List<Path> backupPaths(Path database) throws Exception {
+        String prefix = database.getFileName() + ".v1-backup.";
+        try (var paths = Files.list(database.getParent())) {
+            return paths.filter(path -> path.getFileName().toString()
+                    .startsWith(prefix))
+                    .sorted()
+                    .toList();
+        }
     }
 }

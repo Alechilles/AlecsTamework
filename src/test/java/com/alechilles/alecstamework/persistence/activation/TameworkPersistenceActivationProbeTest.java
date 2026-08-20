@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.activation;
 
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV2Manager;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceFiles;
@@ -59,6 +60,42 @@ class TameworkPersistenceActivationProbeTest {
         assertTrue(evidence.databasePresent());
         assertTrue(evidence.schemaValid());
         assertFalse(evidence.hasDurableWork());
+    }
+
+    /** Regression: a valid v1 target must enter the normal upgrade path. */
+    @Test
+    void validV1SchemaActivatesUpgradeWithoutDurableRows() throws Exception {
+        Path database = temporaryDirectory.resolve("tamework-state.sqlite");
+        initializeV1Schema(database);
+
+        TameworkPersistenceActivationEvidence evidence = probe(database);
+
+        assertEquals(PersistenceActivationMode.ACTIVE, evidence.mode());
+        assertTrue(evidence.mutationAllowed());
+        assertTrue(evidence.schemaValid());
+        assertTrue(evidence.evidence().contains(
+                "persistence-schema-upgrade-v1"));
+    }
+
+    /** Regression: an invalid v1-shaped target must not be migrated by probing. */
+    @Test
+    void invalidV1TargetRemainsReadOnlyWithoutMigration() throws Exception {
+        Path database = temporaryDirectory.resolve("tamework-state.sqlite");
+        initializeV1Schema(database);
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openWriterConnection();
+             Statement statement = connection.createStatement()) {
+            statement.execute("DROP INDEX idx_projection_outbox_aggregate");
+        }
+
+        TameworkPersistenceActivationEvidence evidence = probe(database);
+
+        assertEquals(PersistenceActivationMode.READ_ONLY, evidence.mode());
+        assertFalse(evidence.mutationAllowed());
+        assertEquals(1, queryInt(database,
+                "SELECT COUNT(*) FROM schema_history"));
+        assertEquals(1, queryInt(database,
+                "SELECT version FROM schema_history"));
     }
 
     /** Regression: a normal WAL must wake recovery instead of becoming read-only. */
@@ -333,6 +370,21 @@ class TameworkPersistenceActivationProbeTest {
         SqliteSchemaV2Manager manager = new SqliteSchemaV2Manager(
                 new SqliteConnectionFactory(database));
         assertTrue(manager.initialize() instanceof PersistenceTransactionResult.Committed<?>);
+    }
+
+    private void initializeV1Schema(Path database) {
+        SqliteSchemaV1Manager manager = new SqliteSchemaV1Manager(
+                new SqliteConnectionFactory(database));
+        assertTrue(manager.initialize() instanceof PersistenceTransactionResult.Committed<?>);
+    }
+
+    private int queryInt(Path database, String sql) throws Exception {
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openReadConnection();
+             Statement statement = connection.createStatement();
+             var rows = statement.executeQuery(sql)) {
+            return rows.next() ? rows.getInt(1) : -1;
+        }
     }
 
     private void insertPublishedProjection(Path database) throws Exception {
