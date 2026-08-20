@@ -19,6 +19,8 @@ import com.alechilles.alecstamework.items.persistence
 import com.alechilles.alecstamework.items.persistence
         .PositiveEvidenceDormantAuthor;
 import com.alechilles.alecstamework.items.persistence
+        .ReplacementProfileSnapshotSink;
+import com.alechilles.alecstamework.items.persistence
         .SpawnerCaptureAuthor;
 import com.alechilles.alecstamework.items.persistence
         .SpawnerCapturedArtifactReleaseAuthor;
@@ -100,6 +102,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
     private final PersistenceDiagnosticExporter diagnosticsExporter;
     private final PersistenceDomainFacades facades;
     private final CommandLinkedNpcStateSnapshotService snapshots;
+    private final ReplacementProfileSnapshotSink profileSink;
     private final ReplacementCompanionEntityCheckpointSink checkpointSink;
     private final SpawnerCaptureAuthor captureAuthor;
     private final SpawnerCapturedArtifactReleaseAuthor releaseAuthor;
@@ -118,6 +121,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             PersistenceDiagnosticExporter diagnosticsExporter,
             PersistenceDomainFacades facades,
             CommandLinkedNpcStateSnapshotService snapshots,
+            ReplacementProfileSnapshotSink profileSink,
             ReplacementCompanionEntityCheckpointSink checkpointSink,
             SpawnerCaptureAuthor captureAuthor,
             SpawnerCapturedArtifactReleaseAuthor releaseAuthor,
@@ -134,6 +138,9 @@ final class TameworkPersistenceComposition implements AutoCloseable {
         this.diagnosticsExporter = diagnosticsExporter;
         this.facades = facades;
         this.snapshots = snapshots;
+        this.profileSink = Objects.requireNonNull(
+                profileSink, "profileSink"
+        );
         this.checkpointSink = Objects.requireNonNull(
                 checkpointSink, "checkpointSink"
         );
@@ -458,6 +465,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 diagnosticsExporter,
                 facades,
                 authors.snapshots(),
+                authors.profileSink(),
                 authors.checkpointSink(),
                 authors.captureAuthor(),
                 authors.releaseAuthor(),
@@ -659,14 +667,29 @@ final class TameworkPersistenceComposition implements AutoCloseable {
         startupResumer.close();
         restoredFeatures.close();
         long startedAtNanos = System.nanoTime();
+        MaintenanceDrainResult profileDrain = profileSink.shutdown(
+                remainingShutdownTimeout(startedAtNanos)
+        );
+        if (!profileDrain.drained()) {
+            logger.at(Level.WARNING).log(
+                    "Profile maintenance did not drain before persistence "
+                            + "shutdown deadline: pendingKeys=%d, "
+                            + "pendingWork=%d, inFlight=%d",
+                    profileDrain.pendingKeys(),
+                    profileDrain.pendingWork(),
+                    profileDrain.inFlightWork()
+            );
+        }
         MaintenanceDrainResult checkpointDrain = checkpointSink.shutdown(
-                SHUTDOWN_TIMEOUT
+                remainingShutdownTimeout(startedAtNanos)
         );
         if (!checkpointDrain.drained()) {
             logger.at(Level.WARNING).log(
                     "Checkpoint maintenance did not drain before persistence "
-                            + "shutdown deadline: pending=%d, inFlight=%d",
+                            + "shutdown deadline: pendingKeys=%d, "
+                            + "pendingWork=%d, inFlight=%d",
                     checkpointDrain.pendingKeys(),
+                    checkpointDrain.pendingWork(),
                     checkpointDrain.inFlightWork()
             );
         }

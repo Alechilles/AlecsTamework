@@ -3,7 +3,6 @@ package com.alechilles.alecstamework;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.items.CommandRestorationCompletionListener;
-import com.alechilles.alecstamework.items.CompanionProfileSnapshotSink;
 import com.alechilles.alecstamework.items.CompanionRevivePolicy;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService;
 import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex;
@@ -64,7 +63,7 @@ final class TameworkPersistenceAuthors {
         Objects.requireNonNull(identityIndex, "identityIndex");
         Objects.requireNonNull(facades, "facades");
 
-        CompanionProfileSnapshotSink profileSnapshots =
+        ReplacementProfileSnapshotSink profileSnapshots =
                 profileSnapshots(logger, facades);
         ExactCheckpointCompanionRecallRecovery exactRecallRecovery =
                 new ExactCheckpointCompanionRecallRecovery(
@@ -97,6 +96,7 @@ final class TameworkPersistenceAuthors {
 
         return new Bundle(
                 stateSnapshots,
+                profileSnapshots,
                 checkpointSink,
                 captureAuthor(
                         facades,
@@ -122,7 +122,7 @@ final class TameworkPersistenceAuthors {
         );
     }
 
-    private static CompanionProfileSnapshotSink profileSnapshots(
+    private static ReplacementProfileSnapshotSink profileSnapshots(
             HytaleLogger logger,
             PersistenceDomainFacades facades
     ) {
@@ -200,6 +200,7 @@ final class TameworkPersistenceAuthors {
     /** Released gameplay boundaries built over one immutable facade reference. */
     record Bundle(
             CommandLinkedNpcStateSnapshotService snapshots,
+            ReplacementProfileSnapshotSink profileSink,
             ReplacementCompanionEntityCheckpointSink checkpointSink,
             SpawnerCaptureAuthor captureAuthor,
             SpawnerCapturedArtifactReleaseAuthor releaseAuthor,
@@ -211,6 +212,7 @@ final class TameworkPersistenceAuthors {
     ) {
         Bundle {
             Objects.requireNonNull(snapshots, "snapshots");
+            Objects.requireNonNull(profileSink, "profileSink");
             Objects.requireNonNull(checkpointSink, "checkpointSink");
             Objects.requireNonNull(captureAuthor, "captureAuthor");
             Objects.requireNonNull(releaseAuthor, "releaseAuthor");
