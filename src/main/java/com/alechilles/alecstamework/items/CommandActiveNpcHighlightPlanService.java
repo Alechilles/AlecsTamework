@@ -27,6 +27,7 @@ final class CommandActiveNpcHighlightPlanService {
             }
             targets.add(new HighlightTarget(
                     record.npcUuid,
+                    record.profileId,
                     colorsByGroup.getOrDefault(normalize(record.groupId), UNGROUPED_COLOR)
             ));
         }
@@ -55,6 +56,8 @@ final class CommandActiveNpcHighlightPlanService {
         return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
     }
 
-    record HighlightTarget(@Nonnull UUID npcUuid, @Nonnull String colorHex) {
+    record HighlightTarget(@Nonnull UUID npcUuid,
+                           @Nullable String profileId,
+                           @Nonnull String colorHex) {
     }
 }

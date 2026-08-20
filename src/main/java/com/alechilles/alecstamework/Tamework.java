@@ -895,7 +895,8 @@ public class Tamework extends JavaPlugin {
                 "command-active-npc-highlight",
                 () -> new CommandActiveNpcHighlightSystem(
                         commandItemRegistry,
-                        commandHighlightActivationTracker
+                        commandHighlightActivationTracker,
+                        commandLinkedNpcStateSnapshotService.getLoadedNpcIdentityIndex()
                 ));
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
                 "command-hud-player-lifecycle",

@@ -29,14 +29,17 @@ class CommandActiveNpcHighlightPlanServiceTest {
                 service.build(records, groups);
 
         assertEquals(List.of(
-                new CommandActiveNpcHighlightPlanService.HighlightTarget(blueNpc, "#112233"),
-                new CommandActiveNpcHighlightPlanService.HighlightTarget(ungroupedNpc, "#C9A653")
+                new CommandActiveNpcHighlightPlanService.HighlightTarget(
+                        blueNpc, "profile-" + blueNpc, "#112233"),
+                new CommandActiveNpcHighlightPlanService.HighlightTarget(
+                        ungroupedNpc, "profile-" + ungroupedNpc, "#C9A653")
         ), targets);
     }
 
     private LinkedNpcRecord record(UUID npcUuid, String groupId, boolean active) {
         return new LinkedNpcRecord(
-                npcUuid, null, null, npcUuid.toString(), null, "test_role", null,
+                npcUuid, "profile-" + npcUuid, null, null, null,
+                npcUuid.toString(), null, "test_role", null,
                 active, false, groupId
         );
     }
