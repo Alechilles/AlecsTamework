@@ -194,7 +194,6 @@ public final class ProjectionCoordinator {
                 consumer,
                 context,
                 events,
-                0,
                 batch.checkpoint().acknowledgedSequence(),
                 delivered
         ).thenCompose(result -> {
@@ -267,39 +266,30 @@ public final class ProjectionCoordinator {
             ProjectionConsumer consumer,
             ProjectionPublicationContext context,
             List<ProjectionEvent> events,
-            int index,
             ProjectionSequence acknowledged,
             int delivered
     ) {
-        if (index >= events.size()) {
-            return completedSuccess(consumer.consumerId(), acknowledged, delivered);
-        }
-        ProjectionEvent event = events.get(index);
-        ProjectionApplyOutcome outcome;
-        try {
-            outcome = consumer.apply(event, context);
-            if (outcome == null) {
-                throw new IllegalStateException("projection_consumer_returned_null");
+        int applied = delivered;
+        for (ProjectionEvent event : events) {
+            try {
+                ProjectionApplyOutcome outcome = consumer.apply(event, context);
+                if (outcome == null) {
+                    throw new IllegalStateException("projection_consumer_returned_null");
+                }
+                if (outcome != ProjectionApplyOutcome.IRRELEVANT) {
+                    applied++;
+                }
+            } catch (Exception failure) {
+                return completedFailure(
+                        consumer.consumerId(),
+                        ProjectionCatchUpResult.Status.CONSUMER_FAILED,
+                        acknowledged,
+                        applied,
+                        failure
+                );
             }
-        } catch (Exception failure) {
-            return completedFailure(
-                    consumer.consumerId(),
-                    ProjectionCatchUpResult.Status.CONSUMER_FAILED,
-                    acknowledged,
-                    delivered,
-                    failure
-            );
         }
-        return applySequentially(
-                consumer,
-                context,
-                events,
-                index + 1,
-                acknowledged,
-                outcome == ProjectionApplyOutcome.IRRELEVANT
-                        ? delivered
-                        : delivered + 1
-        );
+        return completedSuccess(consumer.consumerId(), acknowledged, applied);
     }
 
     private CompletionStage<ProjectionCatchUpResult> completedSuccess(

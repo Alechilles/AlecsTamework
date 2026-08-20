@@ -251,6 +251,22 @@ class ProjectionCoordinatorTest {
     }
 
     @Test
+    void appliesTenThousandRelevantEventsWithoutStackOverflow() throws Exception {
+        ProjectionEvent target = appendLargeRelevantBatch();
+        RoutedConsumer consumer = new RoutedConsumer();
+
+        ProjectionCatchUpResult result = coordinator.afterCommit(
+                consumer, target.sequence(), 10_000
+        ).toCompletableFuture().get(30, TimeUnit.SECONDS);
+
+        assertEquals(ProjectionCatchUpResult.Status.CAUGHT_UP, result.status());
+        assertEquals(target.sequence(), result.acknowledged());
+        assertEquals(10_000, consumer.applyCalls.get());
+        assertEquals(10_000, result.deliveredCount());
+        assertEquals(target.sequence(), consumer.appliedSequences.getLast());
+    }
+
+    @Test
     void canonicalRebuildComparisonIsExplicit() {
         assertEquals(
                 ProjectionRebuildResult.Status.EQUIVALENT,
@@ -329,6 +345,26 @@ class ProjectionCoordinatorTest {
             )).value();
             connection.commit();
             return event;
+        }
+    }
+
+    private ProjectionEvent appendLargeRelevantBatch() throws Exception {
+        try (Connection connection = transaction()) {
+            SqliteProjectionOutboxStore store = createOperationAndStore(connection);
+            ProjectionEvent target = null;
+            for (int revision = 1; revision <= 10_000; revision++) {
+                target = store.append(new ProjectionEventDraft(
+                        OPERATION,
+                        new ProjectionEventType("lifecycle_changed"),
+                        "profile-a",
+                        revision,
+                        1,
+                        "{\"revision\":" + revision + "}",
+                        -10_000 + revision
+                )).value();
+            }
+            connection.commit();
+            return target;
         }
     }
 
