@@ -117,6 +117,12 @@ final class PublicPersistenceRuntimeState {
         return adapter;
     }
 
+    void bindLifecycleAdmission(
+            PersistenceLifecycleAdmissionGateway gateway
+    ) {
+        requireAdapter().bindLifecycleAdmission(gateway);
+    }
+
     PublicPersistenceOperations requireOperations() {
         requireAdapter();
         return operations;

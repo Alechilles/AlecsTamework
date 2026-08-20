@@ -21,6 +21,8 @@ import com.alechilles.alecstamework.persistence.facade
 import com.alechilles.alecstamework.persistence.projection
         .ProjectionPublicationContext;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
+import com.alechilles.alecstamework.persistence.runtime
+        .PersistenceLifecycleAdmissionGateway;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import java.util.concurrent.CompletionStage;
@@ -117,7 +119,8 @@ public final class SqlitePublicPersistenceAdapter {
                 PersistenceOperationAdmissionGate.allowAll(),
                 clock,
                 refunds,
-                ProjectionPublicationContext.RECOVERY_CONVERGENCE
+                ProjectionPublicationContext.RECOVERY_CONVERGENCE,
+                publicOperations.lifecycleAdmission()
         );
         recovery = new SqliteOperationRecoveryCoordinator(
                 registry.operationDefinitions(),
@@ -142,6 +145,13 @@ public final class SqlitePublicPersistenceAdapter {
         provisioning = new SqliteProvisioningReader(kernel.reads());
         operationReader = new SqliteOperationReader(kernel.reads());
         containmentReader = new SqliteContainmentReader(kernel.reads());
+    }
+
+    /** Binds managed lifecycle authoring once before mutation readiness. */
+    public void bindLifecycleAdmission(
+            @Nonnull PersistenceLifecycleAdmissionGateway gateway
+    ) {
+        publicOperations.bindLifecycleAdmission(gateway);
     }
 
     @Nonnull

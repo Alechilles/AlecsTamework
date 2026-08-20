@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.api.internal
 import com.alechilles.alecstamework.api.internal.AdmissionProviderRegistry;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
+import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.config.population
         .PopulationGroupConfigRegistry;
 import com.alechilles.alecstamework.items.CapturedItemCoopRuntime;
@@ -26,6 +27,8 @@ import com.alechilles.alecstamework.persistence.authoring.runtime
         .HytaleReplacementFeatureLiveEvidenceSource;
 import com.alechilles.alecstamework.persistence.facade
         .ReplacementPersistenceDiagnosticsAdapters;
+import com.alechilles.alecstamework.persistence.facade
+        .ReplacementLifecycleAdmissionGateway;
 import com.alechilles.alecstamework.persistence.activation
         .TameworkPersistenceActivationEvidence;
 import com.alechilles.alecstamework.persistence.activation
@@ -33,6 +36,8 @@ import com.alechilles.alecstamework.persistence.activation
 import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
 import com.alechilles.alecstamework.persistence.runtime
         .PersistenceDomainFacades;
+import com.alechilles.alecstamework.persistence.runtime
+        .PersistenceLifecycleAdmissionGateway;
 import com.alechilles.alecstamework.runtime.activation
         .TameworkRuntimeActivationPlan;
 import com.alechilles.alecstamework.runtime.activation
@@ -63,6 +68,7 @@ final class TameworkRestoredFeatureComposition implements AutoCloseable {
     private final HytaleReplacementFeatureLiveEvidenceSource liveEvidence;
     private final ReplacementFeatureApiDependencies apiDependencies;
     private final AdmissionProviderRegistry admissionProviders;
+    private final PersistenceLifecycleAdmissionGateway lifecycleAdmission;
     private final SpawnerTameAndLinkEvidenceSource tameAndLinkEvidence;
     private final CapturedItemCoopRuntime.Submission capturedItemCoop;
     private final AtomicBoolean capturedItemCoopInstalled =
@@ -74,6 +80,7 @@ final class TameworkRestoredFeatureComposition implements AutoCloseable {
             HytaleReplacementFeatureLiveEvidenceSource liveEvidence,
             ReplacementFeatureApiDependencies apiDependencies,
             AdmissionProviderRegistry admissionProviders,
+            PersistenceLifecycleAdmissionGateway lifecycleAdmission,
             SpawnerTameAndLinkEvidenceSource tameAndLinkEvidence,
             CapturedItemCoopRuntime.Submission capturedItemCoop
     ) {
@@ -86,6 +93,9 @@ final class TameworkRestoredFeatureComposition implements AutoCloseable {
         );
         this.admissionProviders = Objects.requireNonNull(
                 admissionProviders, "admissionProviders"
+        );
+        this.lifecycleAdmission = Objects.requireNonNull(
+                lifecycleAdmission, "lifecycleAdmission"
         );
         this.tameAndLinkEvidence = Objects.requireNonNull(
                 tameAndLinkEvidence, "tameAndLinkEvidence"
@@ -161,6 +171,16 @@ final class TameworkRestoredFeatureComposition implements AutoCloseable {
         CapturedItemCoopAuthor coop = new CapturedItemCoopAuthor(facades);
         AdmissionProviderRegistry admissionProviders =
                 new AdmissionProviderRegistry(Duration.ofSeconds(2));
+        ManagedActivityConfigRegistry managedActivities =
+                plugin.getManagedActivityConfigRegistry();
+        PersistenceLifecycleAdmissionGateway lifecycleAdmission =
+                new ReplacementLifecycleAdmissionGateway(
+                        bootstrap,
+                        managedActivities,
+                        populationGroups,
+                        admissionProviders,
+                        System::currentTimeMillis
+                );
         ReplacementFeatureApiDependencies dependencies =
                 new ReplacementFeatureApiDependencies(
                         populationGroups,
@@ -173,7 +193,7 @@ final class TameworkRestoredFeatureComposition implements AutoCloseable {
                         true,
                         true,
                         null,
-                        plugin.getManagedActivityConfigRegistry(),
+                        managedActivities,
                         admissionProviders
                 );
         return new TameworkRestoredFeatureComposition(
@@ -181,6 +201,7 @@ final class TameworkRestoredFeatureComposition implements AutoCloseable {
                 live,
                 dependencies,
                 admissionProviders,
+                lifecycleAdmission,
                 tameAndLink,
                         coop::capture
                 );
@@ -255,6 +276,11 @@ final class TameworkRestoredFeatureComposition implements AutoCloseable {
     @Nonnull
     SpawnerTameAndLinkEvidenceSource tameAndLinkEvidence() {
         return tameAndLinkEvidence;
+    }
+
+    @Nonnull
+    PersistenceLifecycleAdmissionGateway lifecycleAdmission() {
+        return lifecycleAdmission;
     }
 
     /** Installs the codec runtime only after the persistence graph is ready. */

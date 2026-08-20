@@ -30,10 +30,13 @@ import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection
         .ProjectionPublicationContext;
+import com.alechilles.alecstamework.persistence.runtime
+        .PersistenceLifecycleAdmissionGateway;
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /** All replacement operation adapters composed over one shared engine protocol. */
 final class SqlitePublicOperationSet {
@@ -61,6 +64,7 @@ final class SqlitePublicOperationSet {
     private final SqliteCompanionCoopReleaseOperations coopReleases;
     private final SqlitePaidRevivalOperations paidRevivals;
     private final SqliteProfileExtensionOperations extensions;
+    private final SqliteLifecycleAdmissionBinding lifecycleAdmission;
 
     SqlitePublicOperationSet(
             @Nonnull PersistenceFeatureRegistry registry,
@@ -71,6 +75,28 @@ final class SqlitePublicOperationSet {
             @Nonnull RefundDeliveryBoundary refunds,
             @Nonnull ProjectionPublicationContext publicationContext
     ) {
+        this(
+                registry,
+                kernel,
+                projections,
+                admission,
+                clock,
+                refunds,
+                publicationContext,
+                null
+        );
+    }
+
+    SqlitePublicOperationSet(
+            @Nonnull PersistenceFeatureRegistry registry,
+            @Nonnull SqlitePersistenceKernel kernel,
+            @Nonnull SqlitePublicProjectionSet projections,
+            @Nonnull PersistenceOperationAdmissionGate admission,
+            @Nonnull LongSupplier clock,
+            @Nonnull RefundDeliveryBoundary refunds,
+            @Nonnull ProjectionPublicationContext publicationContext,
+            @Nullable SqliteLifecycleAdmissionBinding sharedLifecycleAdmission
+    ) {
         if (registry == null || kernel == null || projections == null
                 || admission == null || clock == null || refunds == null
                 || publicationContext == null) {
@@ -78,6 +104,9 @@ final class SqlitePublicOperationSet {
                     "Public operation dependencies are required"
             );
         }
+        lifecycleAdmission = sharedLifecycleAdmission == null
+                ? new SqliteLifecycleAdmissionBinding()
+                : sharedLifecycleAdmission;
         engine = new SqliteOperationEngine(
                 registry.operationDefinitions(),
                 kernel.units(),
@@ -349,5 +378,16 @@ final class SqlitePublicOperationSet {
 
     SqliteProfileExtensionOperations extensions() {
         return extensions;
+    }
+
+    void bindLifecycleAdmission(
+            @Nonnull PersistenceLifecycleAdmissionGateway gateway
+    ) {
+        lifecycleAdmission.bind(gateway);
+    }
+
+    @Nonnull
+    SqliteLifecycleAdmissionBinding lifecycleAdmission() {
+        return lifecycleAdmission;
     }
 }

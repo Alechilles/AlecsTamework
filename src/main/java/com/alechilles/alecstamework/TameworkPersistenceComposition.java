@@ -443,6 +443,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             bootstrap.close();
             throw failure;
         }
+        bootstrap.bindLifecycleAdmission(restoredFeatures.lifecycleAdmission());
         TameworkPersistenceComposition composition =
                 new TameworkPersistenceComposition(
                 logger,

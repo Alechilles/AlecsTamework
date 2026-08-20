@@ -51,6 +51,13 @@ public final class PublicPersistenceRuntime implements AutoCloseable {
         return startup.advance();
     }
 
+    /** Binds the internal managed lifecycle authority exactly once. */
+    public void bindLifecycleAdmission(
+            @Nonnull PersistenceLifecycleAdmissionGateway gateway
+    ) {
+        state.bindLifecycleAdmission(gateway);
+    }
+
     /** Returns the current graph-derived readiness evidence. */
     @Nonnull
     public PersistenceStartupReport report() {

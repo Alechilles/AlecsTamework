@@ -35,6 +35,13 @@ public final class PersistenceBootstrap implements AutoCloseable {
         return runtime.start();
     }
 
+    /** Binds managed lifecycle authoring before mutation readiness is published. */
+    public void bindLifecycleAdmission(
+            @Nonnull PersistenceLifecycleAdmissionGateway gateway
+    ) {
+        runtime.bindLifecycleAdmission(gateway);
+    }
+
     /** Returns the current graph-derived startup evidence. */
     @Nonnull
     public PersistenceStartupReport report() {
