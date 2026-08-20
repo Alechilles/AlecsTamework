@@ -10,10 +10,19 @@ import javax.annotation.Nonnull;
  */
 public record PersistenceDomainFacades(
         @Nonnull PublicPersistenceOperations operations,
-        @Nonnull PublicPersistenceQueries queries
+        @Nonnull PublicPersistenceQueries queries,
+        @Nonnull PersistenceThroughputMetrics throughputMetrics
 ) {
+    /** Preserves the original facade pair with passive metrics disabled. */
+    public PersistenceDomainFacades(
+            @Nonnull PublicPersistenceOperations operations,
+            @Nonnull PublicPersistenceQueries queries
+    ) {
+        this(operations, queries, PersistenceThroughputMetrics.NO_OP);
+    }
+
     public PersistenceDomainFacades {
-        if (operations == null || queries == null) {
+        if (operations == null || queries == null || throughputMetrics == null) {
             throw new IllegalArgumentException(
                     "Complete persistence domain facades are required"
             );

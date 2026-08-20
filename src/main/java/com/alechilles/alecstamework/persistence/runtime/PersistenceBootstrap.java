@@ -54,7 +54,8 @@ public final class PersistenceBootstrap implements AutoCloseable {
     public PersistenceDomainFacades facades() {
         return new PersistenceDomainFacades(
                 runtime.operations(),
-                runtime.queries()
+                runtime.queries(),
+                runtime.throughputMetrics()
         );
     }
 

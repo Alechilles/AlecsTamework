@@ -135,6 +135,10 @@ final class PublicPersistenceRuntimeState {
         return control.snapshot();
     }
 
+    PersistenceThroughputMetrics throughputMetrics() {
+        return control;
+    }
+
     PublicPersistencePerformanceSnapshot performance() {
         return control.performance(walBytes());
     }
@@ -245,7 +249,8 @@ final class PublicPersistenceRuntimeState {
                 configuration.clock(),
                 configuration.refunds(),
                 configuration.profileListener(),
-                configuration.publicEventSink()
+                configuration.publicEventSink(),
+                control
         );
         operations = new PublicPersistenceOperations(
                 adapter,
@@ -254,7 +259,9 @@ final class PublicPersistenceRuntimeState {
         );
         queries = new PublicPersistenceQueries(adapter);
         worldReconciliation = configuration.worldReconciliationFactory()
-                .create(new PersistenceDomainFacades(operations, queries));
+                .create(new PersistenceDomainFacades(
+                        operations, queries, control
+                ));
         if (worldReconciliation == null) {
             throw new IllegalStateException(
                     "public_persistence_world_reconciliation_factory_returned_null"

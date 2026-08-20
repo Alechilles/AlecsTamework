@@ -15,6 +15,7 @@ import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.alechilles.alecstamework.persistence.operation.PreparedOperation;
+import com.alechilles.alecstamework.persistence.runtime.PersistenceThroughputMetrics;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.time.Duration;
@@ -99,8 +100,17 @@ class ProjectionPublicationSchedulerTest {
         BlockingConsumer consumer = new BlockingConsumer(
                 new ProjectionConsumerId("merged_consumer")
         );
+        AtomicInteger mergedRequests = new AtomicInteger();
         ProjectionPublicationScheduler scheduler =
-                new ProjectionPublicationScheduler(coordinator);
+                new ProjectionPublicationScheduler(
+                        coordinator,
+                        new PersistenceThroughputMetrics() {
+                            @Override
+                            public void projectionPublicationMerged() {
+                                mergedRequests.incrementAndGet();
+                            }
+                        }
+                );
 
         var first = scheduler.publish(
                 consumer,
@@ -154,6 +164,7 @@ class ProjectionPublicationSchedulerTest {
             );
             assertEquals(2, projectionBatchReads.get(),
                     "one pass to 10 and one merged pass to 20");
+            assertEquals(2, mergedRequests.get());
         } finally {
             consumer.releaseFirst.countDown();
         }

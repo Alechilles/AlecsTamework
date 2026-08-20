@@ -32,6 +32,7 @@ import com.alechilles.alecstamework.persistence.projection
         .ProjectionPublicationContext;
 import com.alechilles.alecstamework.persistence.projection.ProjectionPublicationScheduler;
 import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;
+import com.alechilles.alecstamework.persistence.runtime.PersistenceThroughputMetrics;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -65,8 +66,27 @@ final class SqlitePublicProjectionSet {
             @Nonnull Consumer<NpcProfileChangedEvent> profileListener,
             @Nonnull ReplacementPublicApiEventSink publicEventSink
     ) {
+        this(
+                registry,
+                kernel,
+                clock,
+                profileListener,
+                publicEventSink,
+                PersistenceThroughputMetrics.NO_OP
+        );
+    }
+
+    SqlitePublicProjectionSet(
+            @Nonnull PersistenceFeatureRegistry registry,
+            @Nonnull SqlitePersistenceKernel kernel,
+            @Nonnull LongSupplier clock,
+            @Nonnull Consumer<NpcProfileChangedEvent> profileListener,
+            @Nonnull ReplacementPublicApiEventSink publicEventSink,
+            @Nonnull PersistenceThroughputMetrics throughputMetrics
+    ) {
         if (registry == null || kernel == null || clock == null
-                || profileListener == null || publicEventSink == null) {
+                || profileListener == null || publicEventSink == null
+                || throughputMetrics == null) {
             throw new IllegalArgumentException(
                     "Public projection dependencies are required"
             );
@@ -74,13 +94,16 @@ final class SqlitePublicProjectionSet {
         this.coordinator = new ProjectionCoordinator(
                 new SqliteProjectionGateway(
                         kernel.reads(),
-                        kernel.units()
+                        kernel.units(),
+                        throughputMetrics
                 ),
                 ProjectionRetryPolicy.DEFAULT,
                 clock
         );
         this.publicationScheduler =
-                new ProjectionPublicationScheduler(this.coordinator);
+                new ProjectionPublicationScheduler(
+                        this.coordinator, throughputMetrics
+                );
         this.profileObserver =
                 new CompanionProfileObserverProjection(profileListener);
         this.publicEventObserver =

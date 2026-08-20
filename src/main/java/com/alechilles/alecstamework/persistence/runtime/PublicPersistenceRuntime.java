@@ -83,6 +83,10 @@ public final class PublicPersistenceRuntime implements AutoCloseable {
         return state.metrics();
     }
 
+    PersistenceThroughputMetrics throughputMetrics() {
+        return state.throughputMetrics();
+    }
+
     /** Returns bounded startup, queue, latency, WAL, and shutdown evidence. */
     @Nonnull
     public PublicPersistencePerformanceSnapshot performance() {

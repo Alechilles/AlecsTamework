@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex;
 import com.alechilles.alecstamework.items.persistence.maintenance.LatestWorkCoordinator;
 import com.alechilles.alecstamework.items.persistence.maintenance.MaintenanceDrainResult;
 import com.alechilles.alecstamework.items.persistence.maintenance.MaintenanceMetricsSnapshot;
+import com.alechilles.alecstamework.items.persistence.maintenance.MaintenanceThroughputReporter;
 import com.alechilles.alecstamework.items.persistence.maintenance.MaintenanceWorkOutcome;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
@@ -21,6 +22,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.operation.PublicOperationSubmission;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
+import com.alechilles.alecstamework.persistence.runtime.PersistenceThroughputMetrics;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -67,6 +69,9 @@ public final class ReplacementCompanionEntityCheckpointSink
     private final Object schedulerLock = new Object();
     private final ScheduledThreadPoolExecutor deferralScheduler;
     private final Set<ScheduledFuture<?>> deferralTimers = new HashSet<>();
+    private final PersistenceThroughputMetrics throughputMetrics;
+    private final MaintenanceThroughputReporter<UUID, CheckpointWork>
+            throughputReporter;
     private volatile boolean closing;
 
     public ReplacementCompanionEntityCheckpointSink(
@@ -75,7 +80,8 @@ public final class ReplacementCompanionEntityCheckpointSink
     ) {
         this(
                 persistence, warnings, null,
-                ignored -> { }, ignored -> false
+                ignored -> { }, ignored -> false,
+                PersistenceThroughputMetrics.NO_OP
         );
     }
 
@@ -86,6 +92,25 @@ public final class ReplacementCompanionEntityCheckpointSink
             @Nonnull Consumer<CompanionEntityCheckpoint> published,
             @Nonnull Predicate<NpcAlias> suppressed
     ) {
+        this(
+                persistence,
+                warnings,
+                identities,
+                published,
+                suppressed,
+                PersistenceThroughputMetrics.NO_OP
+        );
+    }
+
+    /** Builds the checkpoint sink with passive maintenance measurements. */
+    public ReplacementCompanionEntityCheckpointSink(
+            @Nonnull PersistenceDomainFacades persistence,
+            @Nonnull Consumer<String> warnings,
+            LoadedNpcIdentityIndex identities,
+            @Nonnull Consumer<CompanionEntityCheckpoint> published,
+            @Nonnull Predicate<NpcAlias> suppressed,
+            @Nonnull PersistenceThroughputMetrics throughputMetrics
+    ) {
         this.persistence = Objects.requireNonNull(
                 persistence, "persistence"
         );
@@ -93,6 +118,9 @@ public final class ReplacementCompanionEntityCheckpointSink
         this.identities = identities;
         this.published = Objects.requireNonNull(published, "published");
         this.suppressed = Objects.requireNonNull(suppressed, "suppressed");
+        this.throughputMetrics = Objects.requireNonNull(
+                throughputMetrics, "throughputMetrics"
+        );
         this.deferralScheduler = new ScheduledThreadPoolExecutor(
                 1,
                 runnable -> {
@@ -112,6 +140,9 @@ public final class ReplacementCompanionEntityCheckpointSink
                 (alias, work) -> persistWithWarning(alias, work),
                 this::scheduleResume
         );
+        this.throughputReporter = new MaintenanceThroughputReporter<>(
+                coordinator, throughputMetrics::checkpointMaintenance
+        );
     }
 
     @Override
@@ -125,28 +156,47 @@ public final class ReplacementCompanionEntityCheckpointSink
         }
         CheckpointWork work = new CheckpointWork(capture);
         UUID alias = capture.alias().value();
+        CompletionStage<Void> result;
         if (critical(capture.boundary())) {
-            return coordinator.submitPriority(
+            result = coordinator.submitPriority(
                     alias,
                     work,
                     ReplacementCompanionEntityCheckpointSink::selectCritical
             );
+        } else {
+            result = coordinator.submit(alias, work);
         }
-        return coordinator.submit(alias, work);
+        throughputReporter.sampleAdmission();
+        result.whenComplete((ignored, failure) -> {
+            if (failure != null && critical(capture.boundary())) {
+                safe(() -> throughputMetrics.criticalFlushFailed());
+            }
+            throughputReporter.recordIfIdle();
+        });
+        return result;
     }
 
     /** Waits until the newest accepted checkpoint for one alias is durable. */
     @Nonnull
     public CompletionStage<Void> flush(@Nonnull NpcAlias alias) {
-        return coordinator.flush(
+        CompletionStage<Void> result = coordinator.flush(
                 Objects.requireNonNull(alias, "alias").value()
         );
+        result.whenComplete((ignored, failure) -> {
+            if (failure != null) {
+                safe(() -> throughputMetrics.criticalFlushFailed());
+            }
+            throughputReporter.record();
+        });
+        return result;
     }
 
     /** Returns bounded checkpoint admission evidence. */
     @Nonnull
     public MaintenanceMetricsSnapshot metrics() {
-        return coordinator.metrics();
+        MaintenanceMetricsSnapshot snapshot = coordinator.metrics();
+        throughputReporter.record(snapshot);
+        return snapshot;
     }
 
     /** Stops admission and drains retained checkpoint work by the deadline. */
@@ -173,7 +223,16 @@ public final class ReplacementCompanionEntityCheckpointSink
         awaitSchedulerTermination(
                 remainingTimeout(checked, startedAtNanos)
         );
+        throughputReporter.record();
         return result;
+    }
+
+    private void safe(Runnable action) {
+        try {
+            action.run();
+        } catch (Throwable ignored) {
+            // Passive measurements cannot change checkpoint persistence.
+        }
     }
 
     private CompletionStage<? extends MaintenanceWorkOutcome<CheckpointWork>>

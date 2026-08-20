@@ -124,6 +124,13 @@ public final class LatestWorkCoordinator<K, V> {
         }
     }
 
+    /** Returns whether any in-flight, priority, or routine value is retained. */
+    public boolean hasRetainedWork() {
+        synchronized (stateLock) {
+            return !states.isEmpty();
+        }
+    }
+
     /**
      * Stops admission, promotes deferred work for one final probe, and waits
      * for retained work. A final deferral becomes a terminal failure.

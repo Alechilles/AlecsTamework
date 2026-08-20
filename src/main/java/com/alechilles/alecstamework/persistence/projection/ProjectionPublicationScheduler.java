@@ -6,23 +6,37 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import com.alechilles.alecstamework.persistence.runtime.PersistenceThroughputMetrics;
 import javax.annotation.Nonnull;
 
 /** Serializes publication requests by consumer identity and publication origin. */
 public final class ProjectionPublicationScheduler {
     private final ProjectionCoordinator coordinator;
+    private final PersistenceThroughputMetrics throughputMetrics;
     private final ConcurrentHashMap<LaneKey, Lane> lanes =
             new ConcurrentHashMap<>();
 
     public ProjectionPublicationScheduler(
             @Nonnull ProjectionCoordinator coordinator
     ) {
+        this(coordinator, PersistenceThroughputMetrics.NO_OP);
+    }
+
+    /** Builds a scheduler with passive publication-merge evidence. */
+    public ProjectionPublicationScheduler(
+            @Nonnull ProjectionCoordinator coordinator,
+            @Nonnull PersistenceThroughputMetrics throughputMetrics
+    ) {
         if (coordinator == null) {
             throw new IllegalArgumentException(
                     "Projection coordinator is required"
             );
         }
+        if (throughputMetrics == null) {
+            throw new IllegalArgumentException("Projection metrics are required");
+        }
         this.coordinator = coordinator;
+        this.throughputMetrics = throughputMetrics;
     }
 
     /** Publishes one consumer through its context-specific serial lane. */
@@ -38,6 +52,7 @@ public final class ProjectionPublicationScheduler {
                 new CompletableFuture<>();
         LaneKey key = new LaneKey(consumer.consumerId(), context);
         AtomicReference<RunRequest> start = new AtomicReference<>();
+        AtomicReference<Boolean> merged = new AtomicReference<>(false);
         lanes.compute(key, (ignored, existing) -> {
             Lane lane = existing;
             Request request = new Request(
@@ -56,13 +71,20 @@ public final class ProjectionPublicationScheduler {
                 lane.running = true;
                 lane.runningTarget = target;
                 start.set(new RunRequest(key, lane, request));
-            } else if (lane.pendingTarget == null
-                    || target.compareTo(lane.pendingTarget) > 0) {
-                lane.pendingTarget = target;
-                lane.pendingRequest = request;
+            } else {
+                merged.set(true);
+                if (target.compareTo(lane.runningTarget) > 0
+                        && (lane.pendingTarget == null
+                        || target.compareTo(lane.pendingTarget) > 0)) {
+                    lane.pendingTarget = target;
+                    lane.pendingRequest = request;
+                }
             }
             return lane;
         });
+        if (Boolean.TRUE.equals(merged.get())) {
+            safe(() -> throughputMetrics.projectionPublicationMerged());
+        }
         start(start.get());
         return waiter;
     }
@@ -243,6 +265,14 @@ public final class ProjectionPublicationScheduler {
     private void complete(List<Completion> completions) {
         for (Completion completion : completions) {
             completion.future.complete(completion.result);
+        }
+    }
+
+    private void safe(Runnable hook) {
+        try {
+            hook.run();
+        } catch (Throwable ignored) {
+            // Throughput measurements cannot change publication outcomes.
         }
     }
 

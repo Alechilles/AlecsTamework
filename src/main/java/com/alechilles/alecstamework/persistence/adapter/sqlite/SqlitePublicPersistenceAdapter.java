@@ -20,6 +20,7 @@ import com.alechilles.alecstamework.persistence.facade
 import com.alechilles.alecstamework.persistence.projection
         .ProjectionPublicationContext;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
+import com.alechilles.alecstamework.persistence.runtime.PersistenceThroughputMetrics;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import java.util.concurrent.CompletionStage;
@@ -68,7 +69,8 @@ public final class SqlitePublicPersistenceAdapter {
                 clock,
                 refunds,
                 profileListener,
-                ReplacementPublicApiEventSink.NO_OP
+                ReplacementPublicApiEventSink.NO_OP,
+                PersistenceThroughputMetrics.NO_OP
         );
     }
 
@@ -84,9 +86,32 @@ public final class SqlitePublicPersistenceAdapter {
             @Nonnull Consumer<NpcProfileChangedEvent> profileListener,
             @Nonnull ReplacementPublicApiEventSink publicEventSink
     ) {
+        this(
+                registry,
+                kernel,
+                admission,
+                clock,
+                refunds,
+                profileListener,
+                publicEventSink,
+                PersistenceThroughputMetrics.NO_OP
+        );
+    }
+
+    /** Builds the adapter with passive throughput measurements. */
+    public SqlitePublicPersistenceAdapter(
+            @Nonnull PersistenceFeatureRegistry registry,
+            @Nonnull SqlitePersistenceKernel kernel,
+            @Nonnull PersistenceOperationAdmissionGate admission,
+            @Nonnull LongSupplier clock,
+            @Nonnull RefundDeliveryBoundary refunds,
+            @Nonnull Consumer<NpcProfileChangedEvent> profileListener,
+            @Nonnull ReplacementPublicApiEventSink publicEventSink,
+            @Nonnull PersistenceThroughputMetrics throughputMetrics
+    ) {
         if (registry == null || kernel == null || admission == null
                 || clock == null || refunds == null || profileListener == null
-                || publicEventSink == null) {
+                || publicEventSink == null || throughputMetrics == null) {
             throw new IllegalArgumentException(
                     "Public persistence adapter dependencies are required"
             );
@@ -98,7 +123,8 @@ public final class SqlitePublicPersistenceAdapter {
                 kernel,
                 clock,
                 profileListener,
-                publicEventSink
+                publicEventSink,
+                throughputMetrics
         );
         publicOperations = new SqlitePublicOperationSet(
                 registry,

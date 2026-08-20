@@ -4,14 +4,17 @@ import com.alechilles.alecstamework.persistence.kernel.PersistenceReadKind;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadPriority;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import com.alechilles.alecstamework.persistence.kernel.TransactionReplayPolicy;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.alechilles.alecstamework.persistence.projection.ProjectionBatch;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCheckpoint;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumerId;
+import com.alechilles.alecstamework.persistence.projection.ProjectionEvent;
 import com.alechilles.alecstamework.persistence.projection.ProjectionSequence;
 import com.alechilles.alecstamework.persistence.projection.ProjectionSubscription;
+import com.alechilles.alecstamework.persistence.runtime.PersistenceThroughputMetrics;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.util.UUID;
@@ -35,22 +38,46 @@ public final class SqliteProjectionGateway {
     private final SqliteReadExecutor reads;
     private final SqliteUnitOfWorkRunner units;
     private final Runnable afterHeadRead;
+    private final PersistenceThroughputMetrics throughputMetrics;
 
     public SqliteProjectionGateway(@Nonnull SqliteReadExecutor reads,
                                    @Nonnull SqliteUnitOfWorkRunner units) {
-        this(reads, units, () -> { });
+        this(reads, units, () -> { }, PersistenceThroughputMetrics.NO_OP);
     }
 
     /** Test-only boundary injection for a concurrent outbox append. */
     SqliteProjectionGateway(@Nonnull SqliteReadExecutor reads,
                             @Nonnull SqliteUnitOfWorkRunner units,
                             @Nonnull Runnable afterHeadRead) {
+        this(reads, units, afterHeadRead, PersistenceThroughputMetrics.NO_OP);
+    }
+
+    /** Builds a gateway with passive throughput evidence. */
+    public SqliteProjectionGateway(
+            @Nonnull SqliteReadExecutor reads,
+            @Nonnull SqliteUnitOfWorkRunner units,
+            @Nonnull PersistenceThroughputMetrics throughputMetrics
+    ) {
+        this(reads, units, () -> { }, throughputMetrics);
+    }
+
+    /** Test-only boundary with a concurrent outbox append and metrics. */
+    SqliteProjectionGateway(
+            @Nonnull SqliteReadExecutor reads,
+            @Nonnull SqliteUnitOfWorkRunner units,
+            @Nonnull Runnable afterHeadRead,
+            @Nonnull PersistenceThroughputMetrics throughputMetrics
+    ) {
         if (reads == null || units == null || afterHeadRead == null) {
             throw new IllegalArgumentException("Projection gateway dependencies are required");
+        }
+        if (throughputMetrics == null) {
+            throw new IllegalArgumentException("Projection metrics are required");
         }
         this.reads = reads;
         this.units = units;
         this.afterHeadRead = afterHeadRead;
+        this.throughputMetrics = throughputMetrics;
     }
 
     /** Loads an ordered consumer batch from its durable checkpoint. */
@@ -132,18 +159,16 @@ public final class SqliteProjectionGateway {
                     ));
             ProjectionSequence target = store.head();
             afterHeadRead.run();
-            return PersistenceReadResult.found(
-                    new ProjectionBatch(
-                            checkpoint,
+            return foundBatch(
+                    checkpoint,
+                    target,
+                    store.readSubscribedAfter(
+                            checkpoint.acknowledgedSequence(),
                             target,
-                            store.readSubscribedAfter(
-                                    checkpoint.acknowledgedSequence(),
-                                    target,
-                                    subscription,
-                                    limit
-                            )
+                            subscription,
+                            limit
                     ),
-                    target.value()
+                    limit
             );
         } finally {
             connection.rollback();
@@ -165,18 +190,16 @@ public final class SqliteProjectionGateway {
                     .orElse(new ProjectionCheckpoint(
                             consumerId, ProjectionSequence.ORIGIN, 0
                     ));
-            return PersistenceReadResult.found(
-                    new ProjectionBatch(
-                            checkpoint,
+            return foundBatch(
+                    checkpoint,
+                    target,
+                    store.readSubscribedAfter(
+                            checkpoint.acknowledgedSequence(),
                             target,
-                            store.readSubscribedAfter(
-                                    checkpoint.acknowledgedSequence(),
-                                    target,
-                                    subscription,
-                                    limit
-                            )
+                            subscription,
+                            limit
                     ),
-                    target.value()
+                    limit
             );
         } finally {
             connection.rollback();
@@ -235,7 +258,8 @@ public final class SqliteProjectionGateway {
                     return result.value();
                 }
         );
-        return units.execute(new SqliteUnitOfWork<>(
+        SqliteUnitOfWorkRunner.Submission<ProjectionCheckpoint> submission =
+                units.execute(new SqliteUnitOfWork<>(
                 command,
                 CHECKPOINT_READBACK,
                 connection -> {
@@ -252,5 +276,53 @@ public final class SqliteProjectionGateway {
                             : PersistenceReadResult.absent();
                 }
         ));
+        return new SqliteUnitOfWorkRunner.Submission<>(
+                submission.acceptance(),
+                submission.completion().thenApply(result -> {
+                    if (result instanceof PersistenceTransactionResult.Committed<?>) {
+                        safe(() -> throughputMetrics.projectionBatchAcknowledged());
+                    }
+                    return result;
+                })
+        );
+    }
+
+    private PersistenceReadResult<ProjectionBatch> foundBatch(
+            ProjectionCheckpoint checkpoint,
+            ProjectionSequence target,
+            java.util.List<ProjectionEvent> events,
+            int limit
+    ) {
+        safe(() -> throughputMetrics.projectionBatchLoaded(
+                sequencePositions(checkpoint, target, events, limit),
+                events.size()
+        ));
+        return PersistenceReadResult.found(
+                new ProjectionBatch(checkpoint, target, events),
+                target.value()
+        );
+    }
+
+    private long sequencePositions(
+            ProjectionCheckpoint checkpoint,
+            ProjectionSequence target,
+            java.util.List<ProjectionEvent> events,
+            int limit
+    ) {
+        long end = events.size() >= limit
+                ? events.getLast().sequence().value()
+                : target.value();
+        return Math.max(
+                0L,
+                end - checkpoint.acknowledgedSequence().value()
+        );
+    }
+
+    private void safe(Runnable hook) {
+        try {
+            hook.run();
+        } catch (Throwable ignored) {
+            // Throughput measurements cannot change persistence outcomes.
+        }
     }
 }

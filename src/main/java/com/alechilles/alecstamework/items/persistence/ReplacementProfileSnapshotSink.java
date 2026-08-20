@@ -14,6 +14,7 @@ import com.alechilles.alecstamework.items.CompanionProfileSnapshotSink;
 import com.alechilles.alecstamework.items.persistence.maintenance.LatestWorkCoordinator;
 import com.alechilles.alecstamework.items.persistence.maintenance.MaintenanceDrainResult;
 import com.alechilles.alecstamework.items.persistence.maintenance.MaintenanceMetricsSnapshot;
+import com.alechilles.alecstamework.items.persistence.maintenance.MaintenanceThroughputReporter;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.kernel.StorageFailure;
@@ -23,6 +24,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResul
 import com.alechilles.alecstamework.persistence.operation.PublicOperationSubmission;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceOperations;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceQueries;
+import com.alechilles.alecstamework.persistence.runtime.PersistenceThroughputMetrics;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.time.Duration;
@@ -58,6 +60,8 @@ public final class ReplacementProfileSnapshotSink
     private final LongSupplier clock;
     private final Consumer<String> warnings;
     private final LatestWorkCoordinator<UUID, LiveSnapshot> coordinator;
+    private final MaintenanceThroughputReporter<UUID, LiveSnapshot>
+            throughputReporter;
 
     public ReplacementProfileSnapshotSink(
             @Nonnull PublicPersistenceQueries queries,
@@ -65,8 +69,25 @@ public final class ReplacementProfileSnapshotSink
             @Nonnull LongSupplier clock,
             @Nonnull Consumer<String> warnings
     ) {
+        this(
+                queries,
+                operations,
+                clock,
+                warnings,
+                PersistenceThroughputMetrics.NO_OP
+        );
+    }
+
+    /** Builds the profile sink with passive maintenance measurements. */
+    public ReplacementProfileSnapshotSink(
+            @Nonnull PublicPersistenceQueries queries,
+            @Nonnull PublicPersistenceOperations operations,
+            @Nonnull LongSupplier clock,
+            @Nonnull Consumer<String> warnings,
+            @Nonnull PersistenceThroughputMetrics throughputMetrics
+    ) {
         if (queries == null || operations == null || clock == null
-                || warnings == null) {
+                || warnings == null || throughputMetrics == null) {
             throw new IllegalArgumentException(
                     "Complete replacement profile snapshot dependencies are required"
             );
@@ -78,6 +99,9 @@ public final class ReplacementProfileSnapshotSink
         this.coordinator = new LatestWorkCoordinator<>(
                 16,
                 this::resolveWithWarning
+        );
+        this.throughputReporter = new MaintenanceThroughputReporter<>(
+                coordinator, throughputMetrics::profileMaintenance
         );
     }
 
@@ -91,28 +115,45 @@ public final class ReplacementProfileSnapshotSink
                 || worldKey == null || worldKey.isBlank()) {
             return CompletableFuture.completedFuture(null);
         }
-        return coordinator.submit(
+        CompletionStage<Void> result = coordinator.submit(
                 snapshot.npcUuid(),
                 new LiveSnapshot(snapshot, worldKey.trim())
         );
+        throughputReporter.sampleAdmission();
+        result.whenComplete(
+                (ignored, failure) -> throughputReporter.recordIfIdle()
+        );
+        return result;
     }
 
     @Override
     @Nonnull
     public CompletionStage<Void> flush(@Nonnull UUID npcUuid) {
-        return coordinator.flush(Objects.requireNonNull(npcUuid, "npcUuid"));
+        CompletionStage<Void> result = coordinator.flush(
+                Objects.requireNonNull(npcUuid, "npcUuid")
+        );
+        result.whenComplete(
+                (ignored, failure) -> throughputReporter.record()
+        );
+        return result;
     }
 
     @Override
     @Nonnull
     public MaintenanceMetricsSnapshot metrics() {
-        return coordinator.metrics();
+        MaintenanceMetricsSnapshot snapshot = coordinator.metrics();
+        throughputReporter.record(snapshot);
+        return snapshot;
     }
 
     @Override
     @Nonnull
     public MaintenanceDrainResult shutdown(@Nonnull Duration timeout) {
-        return coordinator.shutdown(Objects.requireNonNull(timeout, "timeout"));
+        MaintenanceDrainResult result = coordinator.shutdown(
+                Objects.requireNonNull(timeout, "timeout")
+        );
+        throughputReporter.record();
+        return result;
     }
 
     private CompletionStage<Void> resolveWithWarning(

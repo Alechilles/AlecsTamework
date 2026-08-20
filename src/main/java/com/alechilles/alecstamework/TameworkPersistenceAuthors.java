@@ -75,7 +75,8 @@ final class TameworkPersistenceAuthors {
                         detail -> logger.at(Level.WARNING).log(detail),
                         identityIndex,
                         exactRecallRecovery::recoverReturnedOriginal,
-                        exactRecallRecovery::suppressesCheckpoint
+                        exactRecallRecovery::suppressesCheckpoint,
+                        facades.throughputMetrics()
                 );
         CommandLinkedNpcStateSnapshotService stateSnapshots =
                 new CommandLinkedNpcStateSnapshotService(
@@ -130,7 +131,8 @@ final class TameworkPersistenceAuthors {
                 facades.queries(),
                 facades.operations(),
                 System::currentTimeMillis,
-                detail -> logger.at(Level.WARNING).log(detail)
+                detail -> logger.at(Level.WARNING).log(detail),
+                facades.throughputMetrics()
         );
     }
 
