@@ -229,7 +229,7 @@ public final class PopulationDomainAdmissionOperation {
             throw new IllegalArgumentException("Domain admission recovery claim is required");
         }
         return switch (claim.operation().phase()) {
-            case PREPARED -> recover(claim.operation().operationId(), true);
+            case PREPARED -> recoverPreparedClaim(claim);
             case DURABLE, PUBLISHED -> publisher.resume(
                     claim.operation(), consumers
             );
@@ -238,6 +238,35 @@ public final class PopulationDomainAdmissionOperation {
                     new IllegalStateException("domain_admission_terminal_recovery")
             );
         };
+    }
+
+    private CompletionStage<OperationWorkflowResult> recoverPreparedClaim(
+            OperationRecoveryClaim claim
+    ) {
+        Payload payload;
+        try {
+            payload = PopulationDomainAdmissionDefinition.INSTANCE.decode(
+                    claim.operation().payloadJson()
+            );
+        } catch (RuntimeException failure) {
+            return CompletableFuture.completedFuture(new OperationWorkflowResult(
+                    OperationWorkflowResult.Status.LIVE_RETRYABLE,
+                    claim.operation(),
+                    List.of(),
+                    failure
+            ));
+        }
+        if (clock.getAsLong() < payload.expiresAtMs()) {
+            return CompletableFuture.completedFuture(new OperationWorkflowResult(
+                    OperationWorkflowResult.Status.LIVE_RETRYABLE,
+                    claim.operation(),
+                    List.of(),
+                    new IllegalStateException(
+                            "domain_admission_prepared_reservation_not_expired"
+                    )
+            ));
+        }
+        return recover(claim.operation().operationId(), true);
     }
 
     private CompletionStage<OperationWorkflow> durable(

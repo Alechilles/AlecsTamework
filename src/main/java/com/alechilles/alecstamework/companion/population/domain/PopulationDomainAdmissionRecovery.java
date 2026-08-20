@@ -40,21 +40,92 @@ final class PopulationDomainAdmissionRecovery {
                     clock.getAsLong()
             ).completion();
         }
-        return transitioned.thenCompose(result -> {
-            OperationEnvelope current = result instanceof PersistenceTransactionResult.Committed<OperationEnvelope> committed
-                    ? committed.value() : operation;
+        return transitioned.handle((result, failure) -> afterTransition(
+                engine, operation, clock, result, failure
+        )).thenCompose(stage -> stage);
+    }
+
+    private static CompletionStage<OperationWorkflowResult> afterTransition(
+            SqliteOperationEngine engine,
+            OperationEnvelope original,
+            LongSupplier clock,
+            PersistenceTransactionResult<OperationEnvelope> result,
+            Throwable failure
+    ) {
+        if (failure != null) {
+            return CompletableFuture.completedFuture(retryable(
+                    original, "domain_admission_transition_unverified", failure
+            ));
+        }
+        if (!(result instanceof PersistenceTransactionResult.Committed<?> committed)
+                || !(committed.value() instanceof OperationEnvelope current)) {
+            return CompletableFuture.completedFuture(retryable(
+                    original,
+                    "domain_admission_transition_unverified",
+                    new IllegalStateException("domain_admission_transition_readback_failed")
+            ));
+        }
+        return containAndVerify(engine, current, clock);
+    }
+
+    private static CompletionStage<OperationWorkflowResult> containAndVerify(
+            SqliteOperationEngine engine,
+            OperationEnvelope operation,
+            LongSupplier clock
+    ) {
+        try {
             return engine.containUnknown(
-                    current,
+                    operation,
                     "domain_admission_live_effect_unknown",
                     "Managed admission live effect requires positive child readback",
-                    current.participants(),
+                    operation.participants(),
                     clock.getAsLong()
-            ).completion().thenApply(containment -> new OperationWorkflowResult(
-                    OperationWorkflowResult.Status.LIVE_UNKNOWN,
-                    current,
-                    List.of(),
-                    new IllegalStateException("domain_admission_live_effect_unknown")
+            ).completion().handle((containment, failure) -> containmentResult(
+                    operation, containment, failure
             ));
-        });
+        } catch (Throwable failure) {
+            return CompletableFuture.completedFuture(retryable(
+                    operation, "domain_admission_containment_unverified", failure
+            ));
+        }
+    }
+
+    private static OperationWorkflowResult containmentResult(
+            OperationEnvelope operation,
+            PersistenceTransactionResult<?> containment,
+            Throwable failure
+    ) {
+        if (failure != null) {
+            return retryable(
+                    operation, "domain_admission_containment_unverified", failure
+            );
+        }
+        if (!(containment instanceof PersistenceTransactionResult.Committed<?> committed)
+                || committed.value() == null) {
+            return retryable(
+                    operation,
+                    "domain_admission_containment_unverified",
+                    new IllegalStateException("domain_admission_containment_readback_failed")
+            );
+        }
+        return new OperationWorkflowResult(
+                OperationWorkflowResult.Status.LIVE_UNKNOWN,
+                operation,
+                List.of(),
+                new IllegalStateException("domain_admission_live_effect_unknown")
+        );
+    }
+
+    private static OperationWorkflowResult retryable(
+            OperationEnvelope operation,
+            String code,
+            Throwable failure
+    ) {
+        return new OperationWorkflowResult(
+                OperationWorkflowResult.Status.LIVE_RETRYABLE,
+                operation,
+                List.of(),
+                new IllegalStateException(code, failure)
+        );
     }
 }
