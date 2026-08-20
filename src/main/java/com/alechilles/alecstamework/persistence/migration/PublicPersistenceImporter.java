@@ -181,6 +181,7 @@ public final class PublicPersistenceImporter {
         try {
             verifyPublishedTarget(target, plan, manifest);
             publisher.writeReport(target, manifest);
+            deleteOrphanedMigrationBackups(target);
             return new PublicImportResult.AlreadyImported(target, manifest.importId());
         } catch (Exception mismatch) {
             return refused(LegacySourceKind.AMBIGUOUS,
@@ -243,6 +244,46 @@ public final class PublicPersistenceImporter {
             }
         } catch (Exception ignored) {
             // Extra importer-owned attempts are non-canonical and never opened by bootstrap.
+        }
+    }
+
+    private void deleteOrphanedMigrationBackups(Path target) {
+        Path parent = target.getParent();
+        if (parent == null) {
+            return;
+        }
+        String prefix = target.getFileName() + ".importing.";
+        try (var files = Files.list(parent)) {
+            files.filter(path -> Files.isRegularFile(
+                            path, java.nio.file.LinkOption.NOFOLLOW_LINKS))
+                    .filter(path -> isImporterBackupName(
+                            path.getFileName().toString(), prefix))
+                    .forEach(path -> {
+                        try {
+                            Files.deleteIfExists(path);
+                        } catch (Exception ignored) {
+                            // The verified canonical target does not use this backup.
+                        }
+                    });
+        } catch (Exception ignored) {
+            // Cleanup cannot change the verified canonical target.
+        }
+    }
+
+    private boolean isImporterBackupName(String fileName, String prefix) {
+        String marker = ".v1-backup.";
+        int split = fileName.indexOf(marker, prefix.length());
+        if (!fileName.startsWith(prefix) || split < 0
+                || !fileName.endsWith(".sqlite")) {
+            return false;
+        }
+        try {
+            UUID.fromString(fileName.substring(prefix.length(), split));
+            UUID.fromString(fileName.substring(
+                    split + marker.length(), fileName.length() - 7));
+            return true;
+        } catch (IllegalArgumentException failure) {
+            return false;
         }
     }
 

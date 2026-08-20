@@ -20,6 +20,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -158,6 +159,12 @@ class PublicPersistenceImporterTest {
                 importer.importSource(testCase.source(), testCase.target())
         );
         FileEvidence before = fileEvidence(testCase.target());
+        Path orphanedBackup = testCase.target().resolveSibling(
+                testCase.target().getFileName() + ".importing."
+                        + UUID.randomUUID() + ".v1-backup."
+                        + UUID.randomUUID() + ".sqlite"
+        );
+        Files.writeString(orphanedBackup, "orphaned import backup");
 
         PublicImportResult.AlreadyImported second = assertInstanceOf(
                 PublicImportResult.AlreadyImported.class,
@@ -167,6 +174,7 @@ class PublicPersistenceImporterTest {
         assertEquals(first.importId(), second.importId());
         assertEquals(before, fileEvidence(testCase.target()));
         assertEquals(1, count(testCase.target(), "import_manifest"));
+        assertFalse(Files.exists(orphanedBackup));
     }
 
     @Test
