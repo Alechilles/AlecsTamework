@@ -1,14 +1,13 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
-import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmission;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainBucket;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainCounts;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainConvergencePlan;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainPort;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainReservation;
-import com.alechilles.alecstamework.companion.population.domain.PopulationDomainScope;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceStoreException;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
@@ -31,12 +30,14 @@ public final class SqlitePopulationDomainStore implements PopulationDomainPort {
             """;
 
     private final Connection connection;
+    private final SqlitePopulationDomainConvergenceStore convergence;
 
     public SqlitePopulationDomainStore(@Nonnull Connection connection) {
         if (connection == null) {
             throw new IllegalArgumentException("Domain store connection is required");
         }
         this.connection = connection;
+        this.convergence = new SqlitePopulationDomainConvergenceStore(connection);
     }
 
     @Override
@@ -69,7 +70,7 @@ public final class SqlitePopulationDomainStore implements PopulationDomainPort {
             bindBucket(statement, bucket, 2);
             try (ResultSet row = statement.executeQuery()) {
                 return row.next()
-                        ? Optional.of(read(row))
+                        ? Optional.of(SqlitePopulationDomainConvergenceStore.read(row))
                         : Optional.empty();
             }
         } catch (SQLException | RuntimeException failure) {
@@ -93,13 +94,47 @@ public final class SqlitePopulationDomainStore implements PopulationDomainPort {
             ArrayList<PopulationDomainReservation> result = new ArrayList<>();
             try (ResultSet rows = statement.executeQuery()) {
                 while (rows.next()) {
-                    result.add(read(rows));
+                    result.add(SqlitePopulationDomainConvergenceStore.read(rows));
                 }
             }
             return List.copyOf(result);
         } catch (SQLException | RuntimeException failure) {
             throw storeFailure("population_domain_reservation_find_operation", failure);
         }
+    }
+
+    @Override
+    @Nonnull
+    public List<PopulationDomainReservation> findCommittedByProfile(
+            @Nonnull ProfileId profileId
+    ) {
+        return convergence.findCommittedByProfile(profileId);
+    }
+
+    @Override
+    @Nonnull
+    public List<PopulationDomainReservation> findCommittedByProfileAndBucket(
+            @Nonnull ProfileId profileId,
+            @Nonnull PopulationDomainBucket bucket
+    ) {
+        return convergence.findCommittedByProfileAndBucket(profileId, bucket);
+    }
+
+    @Override
+    @Nonnull
+    public List<PopulationDomainReservation> findPendingByProfileAndBucket(
+            @Nonnull ProfileId profileId,
+            @Nonnull PopulationDomainBucket bucket
+    ) {
+        return convergence.findPendingByProfileAndBucket(profileId, bucket);
+    }
+
+    @Override
+    @Nonnull
+    public List<PopulationDomainReservation> findPendingByProfile(
+            @Nonnull ProfileId profileId
+    ) {
+        return convergence.findPendingByProfile(profileId);
     }
 
     @Override
@@ -194,6 +229,11 @@ public final class SqlitePopulationDomainStore implements PopulationDomainPort {
         } catch (SQLException | RuntimeException failure) {
             throw storeFailure("population_domain_reservation_retire", failure);
         }
+    }
+
+    @Override
+    public boolean convergeExact(@Nonnull PopulationDomainConvergencePlan plan) {
+        return convergence.convergeExact(plan);
     }
 
     /** Retains only the exact settled fraction of one aggregate reservation. */
@@ -377,36 +417,6 @@ public final class SqlitePopulationDomainStore implements PopulationDomainPort {
         statement.setString(start + 1, bucket.domainId());
         statement.setString(start + 2, bucket.scope().name());
         statement.setString(start + 3, bucket.storedWorldKey());
-    }
-
-    private PopulationDomainReservation read(ResultSet row) throws SQLException {
-        PopulationDomainScope scope = PopulationDomainScope.valueOf(
-                row.getString("scope_kind")
-        );
-        PopulationDomainBucket bucket = new PopulationDomainBucket(
-                OwnerId.parse(row.getString("owner_uuid")),
-                row.getString("domain_id"),
-                scope,
-                scope == PopulationDomainScope.GLOBAL
-                        ? null
-                        : row.getString("owner_world_key")
-        );
-        Long expected = nullableLong(row, "expected_lifecycle_revision");
-        return new PopulationDomainReservation(
-                OperationId.parse(row.getString("operation_id")),
-                ProfileId.parse(row.getString("profile_id")),
-                expected == null ? null : new LifecycleRevision(expected),
-                bucket,
-                row.getInt("owned_delta"),
-                row.getInt("deployable_delta"),
-                row.getInt("weight"),
-                row.getInt("snapshotted_max_owned"),
-                row.getInt("snapshotted_max_deployable"),
-                0,
-                0,
-                row.getLong("policy_revision"),
-                row.getLong("created_at_ms")
-        );
     }
 
     private PopulationDomainAdmission result(
