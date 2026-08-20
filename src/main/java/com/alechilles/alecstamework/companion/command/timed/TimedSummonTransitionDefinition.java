@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.command.CommandRosterSlotId;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacementJsonCodec;
+import com.alechilles.alecstamework.companion.population.domain.LifecycleAdmissionEvidenceJsonCodec;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionJsonCodec;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshotJsonCodec;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinition;
@@ -110,6 +111,14 @@ public final class TimedSummonTransitionDefinition
         );
         json.addProperty("receiptKey", payload.receiptKey());
         json.addProperty("requestedAtMs", payload.requestedAtMs());
+        if (payload.admissionEvidence() != null) {
+            json.add(
+                    "admissionEvidence",
+                    LifecycleAdmissionEvidenceJsonCodec.encode(
+                            payload.admissionEvidence()
+                    )
+            );
+        }
         return json.toString();
     }
 
@@ -152,7 +161,13 @@ public final class TimedSummonTransitionDefinition
                         json.getAsJsonObject("snapshot")
                 ),
                 json.get("receiptKey").getAsString(),
-                json.get("requestedAtMs").getAsLong()
+                json.get("requestedAtMs").getAsLong(),
+                json.get("admissionEvidence") == null
+                        || json.get("admissionEvidence").isJsonNull()
+                        ? null
+                        : LifecycleAdmissionEvidenceJsonCodec.decode(
+                                json.getAsJsonObject("admissionEvidence")
+                        )
         );
     }
 }

@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitio
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionRequest;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChangeCodec;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChange;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
@@ -23,11 +24,13 @@ import com.alechilles.alecstamework.persistence.operation.PreparedOperationDetai
 import com.alechilles.alecstamework.persistence.operation.TimedDurableOperationWork;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /** One lifecycle-fenced shared live protocol for timed summon and store. */
 public final class SqliteTimedSummonTransitionOperations {
@@ -36,12 +39,35 @@ public final class SqliteTimedSummonTransitionOperations {
     private final SqliteLiveOperationCoordinator workflow;
     private final SqliteOperationEngine operations;
     private final LongSupplier clock;
+    private final SqliteManagedTimedSummonStartAdmission admission;
+    private final SqliteLifecycleAdmissionSingleFlight singleFlight =
+            new SqliteLifecycleAdmissionSingleFlight();
     private final List<ProjectionConsumer> requiredConsumers;
 
     public SqliteTimedSummonTransitionOperations(
             @Nonnull SqliteOperationEngine operations,
             @Nonnull SqliteOperationPublisher publisher,
             @Nonnull LongSupplier clock,
+            @Nonnull List<? extends ProjectionConsumer> requiredConsumers
+    ) {
+        this(
+                operations,
+                publisher,
+                clock,
+                null,
+                null,
+                null,
+                requiredConsumers
+        );
+    }
+
+    SqliteTimedSummonTransitionOperations(
+            @Nonnull SqliteOperationEngine operations,
+            @Nonnull SqliteOperationPublisher publisher,
+            @Nonnull LongSupplier clock,
+            @Nullable SqliteOperationReader reader,
+            @Nullable SqliteLifecycleAdmissionBinding lifecycleAdmission,
+            @Nullable SqliteLifecycleAdmissionSourceReader sourceReader,
             @Nonnull List<? extends ProjectionConsumer> requiredConsumers
     ) {
         if (operations == null || publisher == null || clock == null
@@ -55,6 +81,12 @@ public final class SqliteTimedSummonTransitionOperations {
         );
         this.operations = operations;
         this.clock = clock;
+        admission = reader == null || lifecycleAdmission == null
+                || sourceReader == null
+                ? null
+                : new SqliteManagedTimedSummonStartAdmission(
+                        reader, lifecycleAdmission, sourceReader
+                );
         this.requiredConsumers = List.copyOf(requiredConsumers);
     }
 
@@ -72,33 +104,98 @@ public final class SqliteTimedSummonTransitionOperations {
                     "Complete timed summon transition is required"
             );
         }
+        if (!transition.starting()
+                && transition.admissionEvidence() != null) {
+            return rejected(
+                    "timed_summon_store_admission_evidence_not_allowed"
+            );
+        }
+        if (!transition.starting() || admission == null) {
+            return execute(
+                    operationId, idempotencyKey, transition, liveBoundary
+            );
+        }
+        CompletionStage<OperationWorkflowResult> completion =
+                singleFlight.submit(
+                        TimedSummonTransitionDefinition.KIND,
+                        operationId,
+                        idempotencyKey,
+                        TimedSummonTransitionDefinition.INSTANCE.encode(
+                                transition
+                        ),
+                        () -> admission.resolve(
+                                        operationId, idempotencyKey, transition
+                                )
+                                .thenCompose(value -> execute(
+                                        operationId,
+                                        idempotencyKey,
+                                        value,
+                                        liveBoundary
+                                ).completion())
+                );
+        return new Submission(
+                SqliteSingleWriter.WriteAcceptance.ACCEPTED,
+                completion.exceptionally(failure ->
+                        SqliteOperationResults.failed(
+                                OperationWorkflowResult.Status.PREPARE_FAILED,
+                                null,
+                                List.of(),
+                                failure instanceof java.util.concurrent
+                                .CompletionException
+                                && failure.getCause() != null
+                                        ? failure.getCause() : failure
+                        )
+                )
+        );
+    }
+
+    private Submission execute(
+            OperationId operationId,
+            IdempotencyKey idempotencyKey,
+            TimedSummonTransitionRequest transition,
+            TimedSummonLiveBoundary liveBoundary
+    ) {
         SqlitePopulationGroupTransitionParticipant groups =
-                transition.starting()
+                needsExternalGroups(transition)
                         ? new SqlitePopulationGroupTransitionParticipant(
                                 transition.groupAdmission()
                         )
                         : null;
-        PreparedOperationDetail detail = groups == null
-                ? new SqliteTimedSummonTransitionPreparation(transition)
-                : PreparedOperationDetail.compose(
-                        groups,
-                        new SqliteTimedSummonTransitionPreparation(
-                                transition
-                        )
-                );
+        SqliteManagedAdmissionParticipant managed =
+                transition.admissionEvidence() != null
+                        && transition.admissionEvidence().status()
+                        == LifecycleAdmissionEvidence.Status.MANAGED
+                        ? SqliteManagedAdmissionParticipant.from(
+                        operationId, transition.admissionEvidence()
+                ) : null;
+        PreparedOperationDetail detail = preparationDetail(
+                transition, groups, managed
+        );
         TimedDurableOperationWork<TimedSummonTransitionRequest> durable =
-                groups == null
-                        ? this::commit
-                        : (transaction, operation, payload, committedAtMs) ->
-                        groups.decorate((current, envelope) -> commit(
-                                current,
-                                envelope,
-                                payload,
-                                committedAtMs
-                        )).execute(transaction, operation);
-        SqliteLiveOperationCoordinator.Submission submitted =
-                workflow.execute(
-                        TimedSummonTransitionDefinition.INSTANCE,
+                (transaction, operation, payload, committedAtMs) -> commit(
+                        transaction,
+                        operation,
+                        payload,
+                        committedAtMs
+        );
+        if (managed != null) {
+            TimedDurableOperationWork<TimedSummonTransitionRequest> delegate =
+                    durable;
+            durable = (transaction, operation, payload, committedAtMs) ->
+                    managed.decorate((current, envelope) -> delegate.execute(
+                            current, envelope, payload, committedAtMs
+                    )).execute(transaction, operation);
+        }
+        if (groups != null) {
+            TimedDurableOperationWork<TimedSummonTransitionRequest> delegate =
+                    durable;
+            durable = (transaction, operation, payload, committedAtMs) ->
+                    groups.decorate((current, envelope) -> delegate.execute(
+                            current, envelope, payload, committedAtMs
+                    )).execute(transaction, operation);
+        }
+        SqliteLiveOperationCoordinator.Submission submitted = workflow.execute(
+                    TimedSummonTransitionDefinition.INSTANCE,
                         new OperationRequest<>(
                                 operationId,
                                 idempotencyKey,
@@ -132,6 +229,51 @@ public final class SqliteTimedSummonTransitionOperations {
                 submitted.completion().thenCompose(result ->
                         containUnknown(result, transition));
         return new Submission(submitted.acceptance(), completion);
+    }
+
+    private static PreparedOperationDetail preparationDetail(
+            TimedSummonTransitionRequest transition,
+            SqlitePopulationGroupTransitionParticipant groups,
+            SqliteManagedAdmissionParticipant managed
+    ) {
+        PreparedOperationDetail exact =
+                new SqliteTimedSummonTransitionPreparation(transition);
+        if (groups == null && managed == null) {
+            return exact;
+        }
+        if (groups == null) {
+            return PreparedOperationDetail.compose(exact, managed);
+        }
+        if (managed == null) {
+            return PreparedOperationDetail.compose(groups, exact);
+        }
+        return PreparedOperationDetail.compose(groups, exact, managed);
+    }
+
+    private static boolean needsExternalGroups(
+            TimedSummonTransitionRequest transition
+    ) {
+        return transition.starting()
+                && (transition.admissionEvidence() == null
+                || transition.admissionEvidence().status()
+                != LifecycleAdmissionEvidence.Status.MANAGED
+                || transition.admissionEvidence().composition() == null
+                || transition.admissionEvidence().composition().groupRequest()
+                == null);
+    }
+
+    private static Submission rejected(String code) {
+        return new Submission(
+                SqliteSingleWriter.WriteAcceptance.REJECTED,
+                CompletableFuture.completedFuture(
+                        SqliteOperationResults.failed(
+                                OperationWorkflowResult.Status.PREPARE_FAILED,
+                                null,
+                                List.of(),
+                                new IllegalStateException(code)
+                        )
+                )
+        );
     }
 
     private List<ProjectionEventDraft> commit(

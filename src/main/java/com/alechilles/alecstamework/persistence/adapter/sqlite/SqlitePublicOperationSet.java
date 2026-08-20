@@ -205,6 +205,9 @@ final class SqlitePublicOperationSet {
                 engine,
                 publisher,
                 clock,
+                operationReader,
+                lifecycleAdmission,
+                lifecycleSources,
                 consumers.apply(
                         TimedSummonTransitionDefinition.INSTANCE.kind()
                 )

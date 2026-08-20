@@ -33,6 +33,7 @@ class SqliteTimedSummonTransitionOperationsTest
     @Test
     void cleanupRunsWithDurableOperationBeforePublication()
             throws Exception {
+        bindNeutralAdmission();
         PreparedTimed prepared = prepareStoredTimedProfile(75);
         TimedSummonTransitionRequest start = startRequest(
                 prepared, lifecycleRead(PROFILE_A), -3_000
@@ -82,6 +83,7 @@ class SqliteTimedSummonTransitionOperationsTest
     @Test
     void summonAndStoreCommitOneLeaseLifecycleAndAliasPath()
             throws Exception {
+        bindNeutralAdmission();
         PreparedTimed prepared = prepareStoredTimedProfile(80);
         CompanionLifecycle stored = lifecycleRead(PROFILE_A);
         TimedSummonTransitionRequest start = startRequest(
@@ -180,6 +182,7 @@ class SqliteTimedSummonTransitionOperationsTest
     @Test
     void unavailableWorldLeavesExactFencesAndResumes()
             throws Exception {
+        bindNeutralAdmission();
         PreparedTimed prepared = prepareStoredTimedProfile(90);
         TimedSummonTransitionRequest start = startRequest(
                 prepared, lifecycleRead(PROFILE_A), -3_000
@@ -225,6 +228,7 @@ class SqliteTimedSummonTransitionOperationsTest
     @Test
     void recoveryReverifiesKnownCaseDamagedStoreAndReleasesContainment()
             throws Exception {
+        bindNeutralAdmission();
         PreparedTimed prepared = prepareStoredTimedProfile(100);
         TimedSummonTransitionRequest start = startRequest(
                 prepared, lifecycleRead(PROFILE_A), -3_000
@@ -281,7 +285,8 @@ class SqliteTimedSummonTransitionOperationsTest
 
         assertEquals(
                 SqlitePublicRecoveryResult.Status.COMPLETE,
-                recovered.status()
+                recovered.status(),
+                () -> rootMessage(recovered.failure())
         );
         assertEquals(1, recovered.completedCount());
         assertEquals(LifecycleState.ROSTER_STORED,
@@ -317,6 +322,7 @@ class SqliteTimedSummonTransitionOperationsTest
     @Test
     void unresolvedCaseDamagedStoreRemainsUnknownAndContained()
             throws Exception {
+        bindNeutralAdmission();
         PreparedTimed prepared = prepareStoredTimedProfile(110);
         published(adapter.timedSummonTransitionOperations().submit(
                 operationId(114),
@@ -359,7 +365,7 @@ class SqliteTimedSummonTransitionOperationsTest
         ).toCompletableFuture().get(10, TimeUnit.SECONDS);
 
         assertEquals(SqlitePublicRecoveryResult.Status.COMPLETE,
-                recovered.status());
+                recovered.status(), () -> rootMessage(recovered.failure()));
         assertEquals(0, recovered.completedCount());
         assertEquals(1, recovered.deferredCount());
         try (var connection = connections.openReadConnection()) {
@@ -392,5 +398,13 @@ class SqliteTimedSummonTransitionOperationsTest
                 request.receiptKey(),
                 request.requestedAtMs()
         );
+    }
+
+    private void bindNeutralAdmission() {
+        adapter.bindLifecycleAdmission(request ->
+                java.util.concurrent.CompletableFuture.completedFuture(
+                        com.alechilles.alecstamework.persistence.runtime
+                                .LifecycleAdmissionEvidence.neutral()
+                ));
     }
 }

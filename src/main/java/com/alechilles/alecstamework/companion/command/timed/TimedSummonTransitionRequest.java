@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionRequest;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -28,10 +29,44 @@ public record TimedSummonTransitionRequest(
         @Nullable CompanionSpawnPlacement spawnPlacement,
         @Nonnull CompanionSnapshot snapshot,
         @Nonnull String receiptKey,
-        long requestedAtMs
+        long requestedAtMs,
+        @Nullable LifecycleAdmissionEvidence admissionEvidence
 ) {
     public static final SnapshotKind SNAPSHOT_KIND =
             new SnapshotKind("timed_summon");
+
+    public TimedSummonTransitionRequest(
+            @Nonnull Action action,
+            @Nonnull CommandFamilyKey familyKey,
+            @Nonnull CommandRosterSlotId slotId,
+            long expectedMembershipRevision,
+            @Nonnull TimedSummonLease beforeLease,
+            @Nonnull TimedSummonLease afterLease,
+            @Nonnull PopulationGroupTransitionAdmissionRequest groupAdmission,
+            @Nonnull NpcAlias liveAlias,
+            @Nonnull String worldKey,
+            @Nullable CompanionSpawnPlacement spawnPlacement,
+            @Nonnull CompanionSnapshot snapshot,
+            @Nonnull String receiptKey,
+            long requestedAtMs
+    ) {
+        this(
+                action,
+                familyKey,
+                slotId,
+                expectedMembershipRevision,
+                beforeLease,
+                afterLease,
+                groupAdmission,
+                liveAlias,
+                worldKey,
+                spawnPlacement,
+                snapshot,
+                receiptKey,
+                requestedAtMs,
+                null
+        );
+    }
 
     public TimedSummonTransitionRequest {
         if (action == null || familyKey == null || slotId == null
@@ -91,6 +126,40 @@ public record TimedSummonTransitionRequest(
 
     public boolean starting() {
         return action == Action.START;
+    }
+
+    /** Returns this request with the one frozen lifecycle admission result. */
+    @Nonnull
+    public TimedSummonTransitionRequest withAdmissionEvidence(
+            @Nonnull LifecycleAdmissionEvidence evidence
+    ) {
+        if (evidence == null) {
+            throw new IllegalArgumentException(
+                    "Lifecycle admission evidence is required"
+            );
+        }
+        if (admissionEvidence != null
+                && !admissionEvidence.equals(evidence)) {
+            throw new IllegalArgumentException(
+                    "Lifecycle admission evidence cannot be replaced"
+            );
+        }
+        return new TimedSummonTransitionRequest(
+                action,
+                familyKey,
+                slotId,
+                expectedMembershipRevision,
+                beforeLease,
+                afterLease,
+                groupAdmission,
+                liveAlias,
+                worldKey,
+                spawnPlacement,
+                snapshot,
+                receiptKey,
+                requestedAtMs,
+                evidence
+        );
     }
 
     /** Returns the canonical post-fence lifecycle committed by this operation. */
