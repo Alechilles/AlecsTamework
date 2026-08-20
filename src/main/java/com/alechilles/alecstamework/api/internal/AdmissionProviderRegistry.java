@@ -14,15 +14,24 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /** Thread-safe provider registry with bounded, fail-closed evaluation. */
-public final class AdmissionProviderRegistry implements AdmissionProviderApi {
+public final class AdmissionProviderRegistry implements AdmissionProviderApi, AutoCloseable {
     private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(2);
+    private static final int MAX_CALLBACK_WORKERS = 4;
 
     private final Duration timeout;
+    private final ExecutorService callbacks;
+    private final ScheduledExecutorService timers;
+    private final AtomicBoolean closed = new AtomicBoolean();
     private final ConcurrentMap<String, Registration> registrations =
             new ConcurrentHashMap<>();
 
@@ -35,6 +44,13 @@ public final class AdmissionProviderRegistry implements AdmissionProviderApi {
             throw new IllegalArgumentException("Provider timeout must be positive");
         }
         this.timeout = timeout;
+        this.callbacks = Executors.newFixedThreadPool(
+                MAX_CALLBACK_WORKERS,
+                daemonFactory("tamework-admission-provider")
+        );
+        this.timers = Executors.newSingleThreadScheduledExecutor(
+                daemonFactory("tamework-admission-timeout")
+        );
     }
 
     @Override
@@ -49,6 +65,9 @@ public final class AdmissionProviderRegistry implements AdmissionProviderApi {
             throw new IllegalArgumentException("contractVersion must be positive");
         }
         Objects.requireNonNull(provider, "provider");
+        if (closed.get()) {
+            throw new IllegalStateException("Admission provider registry is closed");
+        }
         Registration registration = new Registration(
                 id,
                 contractVersion,
@@ -70,7 +89,7 @@ public final class AdmissionProviderRegistry implements AdmissionProviderApi {
     ) {
         String id = canonical(providerId);
         Registration registration = registrations.get(id);
-        if (registration == null) {
+        if (registration == null || !registration.active.get() || closed.get()) {
             return ProviderReadiness.unavailable(id, contractVersion, "provider-not-registered");
         }
         if (registration.contractVersion != contractVersion) {
@@ -94,16 +113,14 @@ public final class AdmissionProviderRegistry implements AdmissionProviderApi {
     public Map<String, ProviderReadiness> snapshot() {
         java.util.LinkedHashMap<String, ProviderReadiness> result =
                 new java.util.LinkedHashMap<>();
-        registrations.forEach((id, registration) -> result.put(
-                id,
-                new ProviderReadiness(
-                        id,
-                        registration.contractVersion,
-                        registration.generationToken,
-                        true,
-                        "ready"
-                )
-        ));
+        registrations.forEach((id, registration) -> {
+            if (registration.active.get() && !closed.get()) {
+                result.put(id, new ProviderReadiness(
+                        id, registration.contractVersion,
+                        registration.generationToken, true, "ready"
+                ));
+            }
+        });
         return Map.copyOf(result);
     }
 
@@ -124,46 +141,95 @@ public final class AdmissionProviderRegistry implements AdmissionProviderApi {
     ) {
         String id = canonical(providerId);
         Registration registration = registrations.get(id);
-        if (registration == null || request == null
+        if (closed.get() || registration == null || !registration.active.get() || request == null
                 || !id.equals(canonical(request.providerId()))
                 || request.contractVersion() != registration.contractVersion) {
             return CompletableFuture.completedFuture(
                     unavailable("provider-not-ready")
             );
         }
+        CompletableFuture<PopulationAdmissionProviderDecision> result =
+                new CompletableFuture<>();
+        java.util.concurrent.ScheduledFuture<?> timeoutTask = timers.schedule(
+                () -> result.complete(unavailable("provider-timeout")),
+                timeout.toNanos(),
+                java.util.concurrent.TimeUnit.NANOSECONDS
+        );
+        try {
+            callbacks.execute(() -> invoke(
+                    registration,
+                    request,
+                    result,
+                    timeoutTask
+            ));
+        } catch (Throwable failure) {
+            timeoutTask.cancel(false);
+            result.complete(unavailable("provider-exception"));
+        }
+        return result;
+    }
+
+    private void invoke(
+            Registration registration,
+            PopulationAdmissionProviderRequest request,
+            CompletableFuture<PopulationAdmissionProviderDecision> result,
+            java.util.concurrent.ScheduledFuture<?> timeoutTask
+    ) {
+        if (result.isDone() || !registration.active.get() || closed.get()) {
+            timeoutTask.cancel(false);
+            result.complete(unavailable("provider-closed"));
+            return;
+        }
         CompletionStage<PopulationAdmissionProviderDecision> stage;
         try {
             stage = registration.provider.evaluate(request);
         } catch (Throwable failure) {
-            return CompletableFuture.completedFuture(
-                    unavailable("provider-exception")
-            );
+            timeoutTask.cancel(false);
+            result.complete(unavailable("provider-exception"));
+            return;
         }
         if (stage == null) {
-            return CompletableFuture.completedFuture(
-                    unavailable("provider-null-stage")
-            );
+            timeoutTask.cancel(false);
+            result.complete(unavailable("provider-null-stage"));
+            return;
         }
-        CompletableFuture<PopulationAdmissionProviderDecision> bounded;
         try {
-            bounded = stage.toCompletableFuture()
-                    .exceptionally(failure -> unavailable("provider-exception"));
+            stage.whenComplete((decision, failure) -> {
+                timeoutTask.cancel(false);
+                if (!registration.active.get() || closed.get()) {
+                    result.complete(unavailable("provider-closed"));
+                } else if (failure != null) {
+                    result.complete(unavailable("provider-exception"));
+                } else if (decision == null) {
+                    result.complete(unavailable("provider-null-decision"));
+                } else {
+                    result.complete(decision);
+                }
+            });
         } catch (Throwable failure) {
-            return CompletableFuture.completedFuture(
-                    unavailable("provider-exception")
-            );
+            timeoutTask.cancel(false);
+            result.complete(unavailable("provider-exception"));
         }
-        return bounded.orTimeout(timeout.toNanos(), TimeUnit.NANOSECONDS)
-                .exceptionally(failure -> unavailable(
-                        failure instanceof java.util.concurrent.TimeoutException
-                                ? "provider-timeout"
-                                : "provider-exception"
-                ))
-                .thenApply(decision -> decision == null
-                        ? unavailable("provider-null-decision")
-                        : decision.status() == PopulationAdmissionProviderStatus.UNAVAILABLE
-                                ? decision
-                                : decision);
+    }
+
+    @Override
+    public void close() {
+        if (closed.compareAndSet(false, true)) {
+            registrations.values().forEach(registration -> registration.active.set(false));
+            registrations.clear();
+            callbacks.shutdownNow();
+            timers.shutdownNow();
+        }
+    }
+
+    private static ThreadFactory daemonFactory(String prefix) {
+        AtomicInteger sequence = new AtomicInteger();
+        return runnable -> {
+            Thread thread = new Thread(runnable,
+                    prefix + "-" + sequence.incrementAndGet());
+            thread.setDaemon(true);
+            return thread;
+        };
     }
 
     private static PopulationAdmissionProviderDecision unavailable(String reason) {
@@ -182,8 +248,7 @@ public final class AdmissionProviderRegistry implements AdmissionProviderApi {
     private final class RegistrationHandle implements AutoCloseable {
         private final String id;
         private final Registration registration;
-        private final java.util.concurrent.atomic.AtomicBoolean closed =
-                new java.util.concurrent.atomic.AtomicBoolean();
+        private final AtomicBoolean closed = new AtomicBoolean();
 
         private RegistrationHandle(String id, Registration registration) {
             this.id = id;
@@ -193,17 +258,30 @@ public final class AdmissionProviderRegistry implements AdmissionProviderApi {
         @Override
         public void close() {
             if (closed.compareAndSet(false, true)) {
+                registration.active.set(false);
                 registrations.remove(id, registration);
             }
         }
     }
 
-    private record Registration(
-            String id,
-            int contractVersion,
-            PopulationAdmissionProvider provider,
-            String generationToken
-    ) {
+    private static final class Registration {
+        private final String id;
+        private final int contractVersion;
+        private final PopulationAdmissionProvider provider;
+        private final String generationToken;
+        private final AtomicBoolean active = new AtomicBoolean(true);
+
+        private Registration(
+                String id,
+                int contractVersion,
+                PopulationAdmissionProvider provider,
+                String generationToken
+        ) {
+            this.id = id;
+            this.contractVersion = contractVersion;
+            this.provider = provider;
+            this.generationToken = generationToken;
+        }
     }
 
     /** Immutable provider registration evidence frozen into admission tokens. */

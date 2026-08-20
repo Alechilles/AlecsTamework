@@ -16,16 +16,29 @@ import javax.annotation.Nonnull;
 public final class SqliteOwnerPopulationParticipant
         implements PreparedOperationDetail {
     private final OwnerPopulationAdmissionPlan plan;
+    private final int units;
 
     public SqliteOwnerPopulationParticipant(
             @Nonnull OwnerPopulationAdmissionPlan plan
+    ) {
+        this(plan, 1);
+    }
+
+    /** Creates one owner participant for an aggregate admission. */
+    public SqliteOwnerPopulationParticipant(
+            @Nonnull OwnerPopulationAdmissionPlan plan,
+            int units
     ) {
         if (plan == null) {
             throw new IllegalArgumentException(
                     "Owner population admission plan is required"
             );
         }
+        if (units <= 0) {
+            throw new IllegalArgumentException("Admission units must be positive");
+        }
         this.plan = plan;
+        this.units = units;
     }
 
     @Override
@@ -95,6 +108,20 @@ public final class SqliteOwnerPopulationParticipant
         };
     }
 
+    /** Retires only this participant's exact prepared reservation set. */
+    public void retirePrepared(
+            SqlitePersistenceTransactionContext transaction,
+            OperationEnvelope operation
+    ) {
+        if (!transaction.population().retireExact(
+                operation.operationId(), plan.increases().size()
+        )) {
+            throw new IllegalStateException(
+                    "owner_population_reservation_retirement_failed"
+            );
+        }
+    }
+
     List<OwnerPopulationReservation> reservations(
             OperationEnvelope operation
     ) {
@@ -104,7 +131,7 @@ public final class SqliteOwnerPopulationParticipant
                         plan.profileId(),
                         plan.expectedLifecycleRevision(),
                         increase.scope(),
-                        increase.capacityDelta(),
+                        Math.multiplyExact(increase.capacityDelta(), units),
                         increase.snapshottedLimit(),
                         operation.createdAtMs()
                 ))

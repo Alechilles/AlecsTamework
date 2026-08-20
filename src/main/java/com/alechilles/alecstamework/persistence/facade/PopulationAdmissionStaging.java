@@ -5,8 +5,12 @@ import com.alechilles.alecstamework.api.PopulationAdmissionDecision;
 import com.alechilles.alecstamework.api.PopulationAdmissionRequestV3;
 import com.alechilles.alecstamework.api.PopulationAdmissionToken;
 import com.alechilles.alecstamework.companion.population.domain.ManagedAdmissionEvidenceAuthor;
+import com.alechilles.alecstamework.companion.population.domain.ManagedBatchAdmissionRequest;
+import com.alechilles.alecstamework.companion.population.domain.ManagedBatchSettlement;
+import com.alechilles.alecstamework.companion.population.domain.PopulationAdmissionComposition;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionDefinition;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation;
+import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
@@ -14,24 +18,50 @@ import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.LongSupplier;
 
 /** Owns staged admission tokens and their durable idempotency lifecycle. */
 final class PopulationAdmissionStaging {
     private static final long TOKEN_TTL_NANOS = 30_000_000_000L;
 
     private final PopulationDomainAdmissionOperation operations;
+    private final LongSupplier wallClock;
+    private final LongSupplier monotonicClock;
     private final ConcurrentMap<UUID, ActiveToken> active =
             new ConcurrentHashMap<>();
+    private final PopulationAdmissionSettlementFlights<PopulationAdmissionDecision>
+            settlementFlights = new PopulationAdmissionSettlementFlights<>();
+    private final PopulationAdmissionBatchStaging batches;
 
     PopulationAdmissionStaging(
             PopulationDomainAdmissionOperation operations
     ) {
+        this(operations, System::nanoTime);
+    }
+
+    PopulationAdmissionStaging(
+            PopulationDomainAdmissionOperation operations,
+            LongSupplier clock
+    ) {
+        this(operations, clock, System::nanoTime);
+    }
+
+    PopulationAdmissionStaging(
+            PopulationDomainAdmissionOperation operations,
+            LongSupplier wallClock,
+            LongSupplier monotonicClock
+    ) {
         this.operations = Objects.requireNonNull(operations, "operations");
+        this.wallClock = Objects.requireNonNull(wallClock, "wallClock");
+        this.monotonicClock = Objects.requireNonNull(monotonicClock, "monotonicClock");
+        this.batches = new PopulationAdmissionBatchStaging(operations, active);
     }
 
     Identity identity(PopulationAdmissionRequestV3 request) {
@@ -50,9 +80,29 @@ final class PopulationAdmissionStaging {
         return new Identity(operation, reservation, key);
     }
 
+    Identity batchIdentity(UUID litterOperationId) {
+        Objects.requireNonNull(litterOperationId, "litterOperationId");
+        String key = "population-domain:litter:" + litterOperationId;
+        return new Identity(
+                litterOperationId,
+                UUID.nameUUIDFromBytes(
+                        (key + ":reservation").getBytes(StandardCharsets.UTF_8)
+                ),
+                key
+        );
+    }
+
     CompletionStage<PopulationAdmissionDecision> prepareOrReuse(
             Identity identity,
             ManagedAdmissionEvidenceAuthor.Authoring evidence
+    ) {
+        return prepareOrReuse(identity, evidence, null);
+    }
+
+    CompletionStage<PopulationAdmissionDecision> prepareOrReuse(
+            Identity identity,
+            ManagedAdmissionEvidenceAuthor.Authoring evidence,
+            PopulationAdmissionComposition composition
     ) {
         OperationId operationId = new OperationId(identity.operationId());
         IdempotencyKey idempotencyKey = new IdempotencyKey(
@@ -60,9 +110,26 @@ final class PopulationAdmissionStaging {
         );
         return operations.findByIdempotency(idempotencyKey)
                 .thenCompose(existing -> existing.isPresent()
-                        ? reuseExisting(existing.orElseThrow(), evidence)
+                        ? reuseExisting(existing.orElseThrow(), evidence, composition)
                         : prepareNew(operationId, idempotencyKey,
-                                identity.reservationId(), evidence));
+                                identity.reservationId(), evidence, composition));
+    }
+
+    CompletionStage<PopulationAdmissionDecision> prepareBatch(
+            ManagedBatchAdmissionRequest batch,
+            ManagedAdmissionEvidenceAuthor author,
+            CompanionLifecycle source,
+            PopulationAdmissionCompositionAuthor compositionAuthor
+    ) {
+        return batches.prepare(batch, author, this, source, compositionAuthor);
+    }
+
+    CompletionStage<ManagedBatchSettlement> settleBatch(
+            PopulationAdmissionToken token,
+            Set<Integer> ordinals,
+            Map<Integer, UUID> actualChildIds
+    ) {
+        return batches.settle(token, ordinals, actualChildIds);
     }
 
     PopulationAdmissionDecision claimForApply(
@@ -70,12 +137,28 @@ final class PopulationAdmissionStaging {
     ) {
         ActiveToken current = active.get(token.operationId());
         if (current == null || !current.token().equals(token)
-                || System.nanoTime() >= token.expiresAtMonotonicNanos()) {
+                || current.terminal() != null
+                || current.applying()
+                || current.settling()
+                || monotonicClock.getAsLong() >= token.expiresAtMonotonicNanos()) {
             return PopulationAdmissionDecision.unavailable(
                     "population-admission-token-invalid"
             );
         }
-        active.put(token.operationId(), current.asApplying());
+        if (!active.replace(token.operationId(), current, current.asApplying())) {
+            return PopulationAdmissionDecision.unavailable(
+                    "population-admission-token-invalid"
+            );
+        }
+        try {
+            operations.claim(new OperationId(token.operationId()))
+                    .toCompletableFuture().join();
+        } catch (RuntimeException failure) {
+            active.replace(token.operationId(), current.asApplying(), current);
+            return PopulationAdmissionDecision.unavailable(
+                    "population-admission-claim-failed"
+            );
+        }
         return new PopulationAdmissionDecision(
                 PopulationAdmissionDecision.Status.APPLYING,
                 "population-admission-applying",
@@ -91,18 +174,60 @@ final class PopulationAdmissionStaging {
             boolean canceled
     ) {
         ActiveToken current = active.get(token.operationId());
+        if (current != null && current.terminal() != null) {
+            return CompletableFuture.completedFuture(current.terminal());
+        }
         if (current == null || !current.token().equals(token)) {
+            return operations.settlementEvidence(new OperationId(token.operationId()))
+                    .thenApply(evidence -> replayDecision(token, evidence))
+                    .exceptionally(failure -> PopulationAdmissionDecision.unavailable(
+                            "population-admission-token-invalid"
+                    ));
+        }
+        if (current.settling()) {
+            CompletableFuture<PopulationAdmissionDecision> flight = settlementFlights.get(
+                    token.operationId()
+            );
+            if (flight != null) {
+                return flight;
+            }
+            return operations.settlementEvidence(new OperationId(token.operationId()))
+                    .thenApply(evidence -> replayDecision(token, evidence))
+                    .exceptionally(failure -> PopulationAdmissionDecision.unavailable(
+                            "population-admission-settlement-pending"
+                    ));
+        }
+        if ((!canceled && !current.applying())
+                || (canceled && current.applying())
+                || (!canceled
+                && monotonicClock.getAsLong() >= token.expiresAtMonotonicNanos())) {
             return CompletableFuture.completedFuture(
                     PopulationAdmissionDecision.unavailable(
-                            "population-admission-token-invalid"
+                            "population-admission-token-not-applying"
                     )
+            );
+        }
+        ActiveToken settling = current.asSettling();
+        PopulationAdmissionSettlementFlights.Lease<PopulationAdmissionDecision> lease =
+                settlementFlights.acquire(token.operationId());
+        if (!lease.owner()) {
+            return lease.future();
+        }
+        CompletableFuture<PopulationAdmissionDecision> flight = lease.future();
+        if (!active.replace(token.operationId(), current, settling)) {
+            PopulationAdmissionDecision decision = PopulationAdmissionDecision.unavailable(
+                    "population-admission-token-invalid"
+            );
+            settlementFlights.complete(token.operationId(), flight, decision);
+            return CompletableFuture.completedFuture(
+                    decision
             );
         }
         return operations.commit(
                         new OperationId(token.operationId()),
                         canceled
                 )
-                .thenApply(result -> {
+                .thenCompose(result -> {
                     if (result == null || result.result() == null
                             || result.result().status()
                             != com.alechilles.alecstamework.persistence.operation
@@ -111,33 +236,47 @@ final class PopulationAdmissionStaging {
                                 "population-admission-publication-pending"
                         );
                     }
-                    active.remove(token.operationId());
-                    return new PopulationAdmissionDecision(
-                            canceled
-                                    ? PopulationAdmissionDecision.Status.CANCELED
-                                    : PopulationAdmissionDecision.Status.COMMITTED,
-                            canceled
-                                    ? "population-admission-canceled"
-                                    : "population-admission-committed",
-                            canceled ? null : current.token(),
-                            OwnerPopulationCapDecisionViewV2.Readiness.READY,
-                            0,
-                            0
+                    return operations.settlementEvidence(
+                            new OperationId(token.operationId())
                     );
                 })
-                .exceptionally(failure -> PopulationAdmissionDecision.unavailable(
-                        "population-admission-settlement-failed"
-                ));
+                .thenApply(evidence -> {
+                    PopulationAdmissionDecision decision = replayDecision(
+                            token, evidence
+                    );
+                    active.put(token.operationId(), settling.terminal(decision));
+                    settlementFlights.complete(token.operationId(), flight, decision);
+                    return decision;
+                })
+                .exceptionally(failure -> {
+                    active.replace(token.operationId(), settling, current);
+                    PopulationAdmissionDecision decision = PopulationAdmissionDecision.unavailable(
+                            "population-admission-settlement-failed"
+                    );
+                    settlementFlights.complete(token.operationId(), flight, decision);
+                    return decision;
+                });
     }
 
     CompletionStage<Integer> cleanupExpired() {
-        long now = System.nanoTime();
+        long now = monotonicClock.getAsLong();
         java.util.ArrayList<CompletionStage<PopulationAdmissionDecision>> pending =
                 new java.util.ArrayList<>();
         for (ActiveToken value : active.values()) {
-            if (!value.applying()
+            if (value.terminal() == null
                     && now >= value.token().expiresAtMonotonicNanos()) {
-                pending.add(settle(value.token(), true));
+                if (value.applying()) {
+                    pending.add(operations.containExpiredClaim(
+                            new OperationId(value.token().operationId())
+                    ).thenApply(ignored -> {
+                        active.remove(value.token().operationId(), value);
+                        return PopulationAdmissionDecision.unavailable(
+                                "population-admission-live-effect-contained"
+                        );
+                    }));
+                } else {
+                    pending.add(settle(value.token(), true));
+                }
             }
         }
         if (pending.isEmpty()) {
@@ -153,12 +292,14 @@ final class PopulationAdmissionStaging {
             OperationId operationId,
             IdempotencyKey idempotencyKey,
             UUID reservationId,
-            ManagedAdmissionEvidenceAuthor.Authoring evidence
+            ManagedAdmissionEvidenceAuthor.Authoring evidence,
+            PopulationAdmissionComposition composition
     ) {
         return operations.prepare(
                 operationId,
                 idempotencyKey,
-                evidence.payload()
+                evidence.payload(),
+                composition
         ).completion().thenApply(result -> {
             OperationEnvelope envelope = envelope(result,
                     "population-admission-prepare-failed");
@@ -181,18 +322,39 @@ final class PopulationAdmissionStaging {
 
     private CompletionStage<PopulationAdmissionDecision> reuseExisting(
             OperationEnvelope envelope,
-            ManagedAdmissionEvidenceAuthor.Authoring evidence
+            ManagedAdmissionEvidenceAuthor.Authoring evidence,
+            PopulationAdmissionComposition composition
     ) {
         PopulationDomainAdmissionOperation.Payload stored =
                 PopulationDomainAdmissionDefinition.INSTANCE.decode(
                         envelope.payloadJson()
                 );
-        if (!samePayloadExceptTimes(stored, evidence.payload())) {
+        if (!PopulationAdmissionPayloadMatcher.sameExceptTimes(
+                stored, evidence.payload()
+        )) {
             return CompletableFuture.failedFuture(
                     new IllegalStateException(
                             "population-admission-idempotency-conflict"
                     )
             );
+        }
+        PopulationAdmissionToken replayToken = token(
+                stored.reservationId(),
+                envelope.operationId(),
+                stored.managedConfigRevision(),
+                stored.providerGenerationToken()
+        );
+        if (envelope.phase() == OperationPhase.DURABLE
+                || envelope.phase() == OperationPhase.PUBLISHED) {
+            return operations.settlementEvidence(envelope.operationId())
+                    .thenApply(settlement -> replayDecision(replayToken, settlement));
+        }
+        if (envelope.phase() == OperationPhase.LIVE_APPLYING) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException(
+                            "population-admission-live-effect-contained"
+                    )
+                );
         }
         if (!staged(envelope)) {
             return CompletableFuture.failedFuture(
@@ -201,10 +363,16 @@ final class PopulationAdmissionStaging {
                     )
             );
         }
+        if (wallClock.getAsLong() >= stored.expiresAtMs()) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("population-admission-expired")
+            );
+        }
         return operations.prepare(
                 envelope.operationId(),
                 envelope.idempotencyKey(),
-                stored
+                stored,
+                composition
         ).completion().thenApply(result -> {
             OperationEnvelope refreshed = envelope(result,
                     "population-admission-already-settled");
@@ -214,10 +382,8 @@ final class PopulationAdmissionStaging {
                 );
             }
             PopulationAdmissionToken token = token(
-                    stored.reservationId(),
-                    refreshed.operationId(),
-                    stored.managedConfigRevision(),
-                    stored.providerGenerationToken()
+                    stored.reservationId(), refreshed.operationId(),
+                    stored.managedConfigRevision(), stored.providerGenerationToken()
             );
             active.put(refreshed.operationId().value(),
                     new ActiveToken(token, evidence));
@@ -237,30 +403,7 @@ final class PopulationAdmissionStaging {
     }
 
     private boolean staged(OperationEnvelope envelope) {
-        return envelope.phase() == OperationPhase.PREPARED
-                || envelope.phase() == OperationPhase.LIVE_APPLYING;
-    }
-
-    private boolean samePayloadExceptTimes(
-            PopulationDomainAdmissionOperation.Payload stored,
-            PopulationDomainAdmissionOperation.Payload requested
-    ) {
-        return stored.reservationId().equals(requested.reservationId())
-                && stored.profileId().equals(requested.profileId())
-                && Objects.equals(stored.ownerId(), requested.ownerId())
-                && Objects.equals(
-                        stored.expectedLifecycleRevision(),
-                        requested.expectedLifecycleRevision()
-                )
-                && Objects.equals(stored.ownerWorldKey(), requested.ownerWorldKey())
-                && stored.providerId().equals(requested.providerId())
-                && stored.providerContractVersion() == requested.providerContractVersion()
-                && stored.providerGenerationToken().equals(requested.providerGenerationToken())
-                && stored.providerSnapshotRevision() == requested.providerSnapshotRevision()
-                && stored.managedConfigRevision() == requested.managedConfigRevision()
-                && stored.requestedCount() == requested.requestedCount()
-                && stored.domains().equals(requested.domains())
-                && stored.provisionalChildIds().equals(requested.provisionalChildIds());
+        return envelope.phase() == OperationPhase.PREPARED;
     }
 
     private PopulationAdmissionDecision reserved(
@@ -285,7 +428,7 @@ final class PopulationAdmissionStaging {
         return new PopulationAdmissionToken(
                 operationId.value(),
                 reservationId,
-                System.nanoTime() + TOKEN_TTL_NANOS,
+                monotonicClock.getAsLong() + TOKEN_TTL_NANOS,
                 settingsRevision,
                 providerGenerationToken,
                 OwnerPopulationCapDecisionViewV2.Readiness.READY
@@ -299,20 +442,49 @@ final class PopulationAdmissionStaging {
     ) {
     }
 
-    private record ActiveToken(
+    record ActiveToken(
             PopulationAdmissionToken token,
             ManagedAdmissionEvidenceAuthor.Authoring evidence,
-            boolean applying
+            boolean applying,
+            boolean settling,
+            PopulationAdmissionDecision terminal
     ) {
         private ActiveToken(
                 PopulationAdmissionToken token,
                 ManagedAdmissionEvidenceAuthor.Authoring evidence
         ) {
-            this(token, evidence, false);
+            this(token, evidence, false, false, null);
         }
 
-        private ActiveToken asApplying() {
-            return new ActiveToken(token, evidence, true);
+        ActiveToken asApplying() {
+            return new ActiveToken(token, evidence, true, false, null);
+        }
+
+        ActiveToken asSettling() {
+            return new ActiveToken(token, evidence, applying, true, null);
+        }
+
+        ActiveToken terminal(PopulationAdmissionDecision decision) {
+            return new ActiveToken(token, evidence, false, false, decision);
         }
     }
+
+    private PopulationAdmissionDecision replayDecision(
+            PopulationAdmissionToken token,
+            PopulationDomainAdmissionOperation.SettlementEvidence evidence
+    ) {
+        return new PopulationAdmissionDecision(
+                evidence.canceled()
+                        ? PopulationAdmissionDecision.Status.CANCELED
+                        : PopulationAdmissionDecision.Status.COMMITTED,
+                evidence.canceled()
+                        ? "population-admission-canceled"
+                        : "population-admission-committed",
+                evidence.canceled() ? null : token,
+                OwnerPopulationCapDecisionViewV2.Readiness.READY,
+                0,
+                0
+        );
+    }
+
 }

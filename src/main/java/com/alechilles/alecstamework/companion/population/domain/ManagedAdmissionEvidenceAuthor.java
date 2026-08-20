@@ -81,6 +81,32 @@ public final class ManagedAdmissionEvidenceAuthor {
             @Nullable LifecycleState beforeState,
             @Nonnull LifecycleState afterState
     ) {
+        PopulationAdmissionRequest admission = request == null
+                ? null : request.request().request();
+        return author(
+                operationId,
+                reservationId,
+                request,
+                beforeState,
+                afterState,
+                admission == null || admission.oldOwnerUuid() == null
+                        ? null : new OwnerId(admission.oldOwnerUuid()),
+                admission == null || admission.source() == null
+                        ? null : admission.source().worldName()
+        );
+    }
+
+    /** Authorizes with exact canonical source ownership and world evidence. */
+    @Nonnull
+    public CompletionStage<Authoring> author(
+            @Nonnull OperationId operationId,
+            @Nonnull UUID reservationId,
+            @Nonnull PopulationAdmissionRequestV3 request,
+            @Nullable LifecycleState beforeState,
+            @Nonnull LifecycleState afterState,
+            @Nullable OwnerId sourceOwner,
+            @Nullable String sourceWorld
+    ) {
         if (operationId == null || reservationId == null || request == null) {
             throw new IllegalArgumentException("Complete managed admission request is required");
         }
@@ -107,6 +133,50 @@ public final class ManagedAdmissionEvidenceAuthor {
         }
         AdmissionProviderRegistry.ProviderReadiness providerReadiness =
                 providers.readiness(readiness.providerId(), readiness.providerContractVersion());
+        if (!ManagedAdmissionEvidenceSupport.positiveTransition(
+                sourceOwner,
+                sourceWorld,
+                beforeState,
+                request.request().request().newOwnerUuid() == null
+                        ? null : new OwnerId(request.request().request().newOwnerUuid()),
+                ManagedAdmissionEvidenceSupport.targetWorld(request),
+                afterState,
+                resolution.profile()
+        )) {
+            PopulationAdmissionProviderDecision decision =
+                    new PopulationAdmissionProviderDecision(
+                            PopulationAdmissionProviderStatus.ALLOW,
+                            "provider-not-required",
+                            Set.of(),
+                            Map.of(),
+                            0,
+                            readiness.configRevision()
+                    );
+            try {
+                return CompletableFuture.completedFuture(new Authoring(
+                        payload(
+                                operationId,
+                                reservationId,
+                                request,
+                                readiness,
+                                providerReadiness,
+                                resolution,
+                                decision,
+                                sourceOwner,
+                                sourceWorld,
+                                beforeState,
+                                afterState,
+                                1,
+                                List.of()
+                        ),
+                        readiness,
+                        providerReadiness,
+                        decision
+                ));
+            } catch (RuntimeException invalid) {
+                return CompletableFuture.failedFuture(invalid);
+            }
+        }
         if (!providerReadiness.available()) {
             return CompletableFuture.failedFuture(
                     new IllegalStateException("provider-" + providerReadiness.detail())
@@ -172,6 +242,8 @@ public final class ManagedAdmissionEvidenceAuthor {
                         providerReadiness,
                         resolution,
                         decision,
+                        sourceOwner,
+                        sourceWorld,
                         beforeState,
                         afterState,
                         1,
@@ -194,6 +266,26 @@ public final class ManagedAdmissionEvidenceAuthor {
     public CompletionStage<Authoring> authorBatch(
             @Nonnull ManagedBatchAdmissionRequest batch
     ) {
+        PopulationAdmissionRequest admission = batch == null
+                ? null : batch.admission().request().request();
+        return authorBatch(
+                batch,
+                admission == null ? null : before(admission),
+                admission == null || admission.oldOwnerUuid() == null
+                        ? null : new OwnerId(admission.oldOwnerUuid()),
+                admission == null || admission.source() == null
+                        ? null : admission.source().worldName()
+        );
+    }
+
+    /** Authorizes an aggregate with exact canonical source evidence. */
+    @Nonnull
+    public CompletionStage<Authoring> authorBatch(
+            @Nonnull ManagedBatchAdmissionRequest batch,
+            @Nullable LifecycleState beforeState,
+            @Nullable OwnerId sourceOwner,
+            @Nullable String sourceWorld
+    ) {
         if (batch == null) {
             throw new IllegalArgumentException("Managed batch request is required");
         }
@@ -201,12 +293,13 @@ public final class ManagedAdmissionEvidenceAuthor {
                 new OperationId(batch.litterOperationId()),
                 UUID.nameUUIDFromBytes((batch.litterOperationId() + ":reservation")
                         .getBytes(java.nio.charset.StandardCharsets.UTF_8)),
-                batch.admission()
-        ).thenApply(authoring -> new Authoring(
-                scale(authoring, batch.requestedUnits(), batch.provisionalChildIds()),
-                authoring.readiness(),
-                authoring.providerReadiness(),
-                authoring.decision()
+                batch.admission(),
+                beforeState,
+                map(batch.admission().request().request().targetLifecycle()),
+                sourceOwner,
+                sourceWorld
+        ).thenApply(authoring -> ManagedAdmissionBatchSupport.scale(
+                authoring, batch.requestedUnits(), batch.provisionalChildIds()
         ));
     }
 
@@ -223,34 +316,6 @@ public final class ManagedAdmissionEvidenceAuthor {
         );
     }
 
-    private PopulationDomainAdmissionOperation.Payload scale(
-            Authoring source,
-            int count,
-            List<UUID> children
-    ) {
-        List<PopulationDomainAdmissionOperation.DomainInput> domains = source.payload()
-                .domains().stream().map(input -> new PopulationDomainAdmissionOperation.DomainInput(
-                        input.domainId(),
-                        input.scope(),
-                        input.worldKey(),
-                        Math.multiplyExact(input.ownedDelta(), count),
-                        Math.multiplyExact(input.deployableDelta(), count),
-                        input.weight(),
-                        input.maxOwned(),
-                        input.maxDeployable(),
-                        input.policyRevision()
-                )).toList();
-        PopulationDomainAdmissionOperation.Payload payload = source.payload();
-        return new PopulationDomainAdmissionOperation.Payload(
-                payload.reservationId(), payload.profileId(), payload.ownerId(),
-                payload.expectedLifecycleRevision(), payload.ownerWorldKey(),
-                payload.providerId(), payload.providerContractVersion(),
-                payload.providerGenerationToken(), payload.providerSnapshotRevision(),
-                payload.managedConfigRevision(), payload.expiresAtMs(), count,
-                domains, children, payload.createdAtMs()
-        );
-    }
-
     private PopulationDomainAdmissionOperation.Payload payload(
             OperationId operationId,
             UUID reservationId,
@@ -259,6 +324,8 @@ public final class ManagedAdmissionEvidenceAuthor {
             AdmissionProviderRegistry.ProviderReadiness providerReadiness,
             ManagedActivityConfigRegistry.RoleResolution resolution,
             PopulationAdmissionProviderDecision decision,
+            @Nullable OwnerId sourceOwner,
+            @Nullable String sourceWorld,
             @Nullable LifecycleState beforeState,
             @Nonnull LifecycleState afterState,
             int requestedCount,
@@ -267,12 +334,10 @@ public final class ManagedAdmissionEvidenceAuthor {
         PopulationAdmissionRequest admission = request.request().request();
         OwnerId owner = admission.newOwnerUuid() == null
                 ? null : new OwnerId(admission.newOwnerUuid());
-        ProfileId profile = profileId(admission);
+        ProfileId profile = ManagedAdmissionEvidenceSupport.profileId(admission);
         LifecycleState target = afterState;
         LifecycleState before = beforeState;
-        String world = admission.destination() == null
-                ? request.request().ownershipWorldName()
-                : admission.destination().worldName();
+        String world = ManagedAdmissionEvidenceSupport.targetWorld(request);
         ManagedActivityProfile profileConfig = resolution.profile();
         PopulationGroupConfigDefinition group = populationGroups.snapshot()
                 .getDefinition(resolution.family().groupId())
@@ -286,13 +351,19 @@ public final class ManagedAdmissionEvidenceAuthor {
                 throw new IllegalStateException("provider-duplicate-domain-claim");
             }
         }
-        if (!claims.keySet().equals(profileConfig.domains().keySet())) {
+        boolean providerRequired = !"provider-not-required".equals(
+                decision.messageKey()
+        );
+        if (providerRequired && !claims.keySet().equals(profileConfig.domains().keySet())) {
             throw new IllegalStateException("provider-domain-claim-set-mismatch");
         }
         ArrayList<PopulationDomainAdmissionPlanner.DomainPolicy> policies = new ArrayList<>();
         for (ManagedActivityProfile.DomainDefinition definition : profileConfig.domains().values()) {
             PopulationDomainClaim claim = claims.get(definition.domainId());
             Integer limit = decision.domainLimits().get(definition.domainId());
+            if (!providerRequired) {
+                continue;
+            }
             if (claim == null || limit == null
                     || claim.weight() <= 0
                     || claim.owned() != definition.owned()
@@ -306,13 +377,11 @@ public final class ManagedAdmissionEvidenceAuthor {
                     definition.owned(),
                     definition.deployable(),
                     claim.weight(),
-                    limit,
+                    definition.owned() ? limit : 0,
                     definition.deployable() ? limit : 0,
                     decision.snapshotRevision()
             ));
         }
-        OwnerId expectedOwner = admission.oldOwnerUuid() == null
-                ? null : new OwnerId(admission.oldOwnerUuid());
         long now = clock.getAsLong();
         List<PopulationDomainAdmissionOperation.DomainInput> domains =
                 PopulationDomainAdmissionPlanner.plan(
@@ -321,7 +390,8 @@ public final class ManagedAdmissionEvidenceAuthor {
                         admission.expectedProfileRevision() < 0
                                 ? null
                                 : new LifecycleRevision(admission.expectedProfileRevision()),
-                        expectedOwner,
+                        sourceOwner,
+                        sourceWorld,
                         owner,
                         before,
                         target,
@@ -349,6 +419,11 @@ public final class ManagedAdmissionEvidenceAuthor {
                         ? null
                         : new LifecycleRevision(admission.expectedProfileRevision()),
                 world,
+                sourceOwner,
+                sourceWorld,
+                before,
+                target,
+                resolution.family().groupId(),
                 providerReadiness.providerId(),
                 providerReadiness.contractVersion(),
                 providerReadiness.generationToken(),
@@ -360,21 +435,6 @@ public final class ManagedAdmissionEvidenceAuthor {
                 children,
                 now
         );
-    }
-
-    private ProfileId profileId(PopulationAdmissionRequest request) {
-        String value = request.identity().canonicalProfileId();
-        if (value == null) {
-            value = request.identity().provisionalProfileId();
-        }
-        if (value == null) {
-            throw new IllegalStateException("managed-profile-identity-missing");
-        }
-        try {
-            return ProfileId.parse(value);
-        } catch (IllegalArgumentException invalid) {
-            throw new IllegalStateException("managed-profile-identity-invalid", invalid);
-        }
     }
 
     private LifecycleState before(PopulationAdmissionRequest request) {

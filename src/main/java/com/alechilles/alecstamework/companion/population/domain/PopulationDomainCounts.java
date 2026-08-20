@@ -9,10 +9,8 @@ public record PopulationDomainCounts(
 ) {
     public PopulationDomainCounts {
         if (committedOwned < 0 || committedDeployable < 0
-                || pendingOwned < 0 || pendingDeployable < 0
-                || committedDeployable > committedOwned
-                || pendingDeployable > pendingOwned) {
-            throw new IllegalArgumentException("Domain counts must be non-negative subsets");
+                || pendingOwned < 0 || pendingDeployable < 0) {
+            throw new IllegalArgumentException("Domain counts must be non-negative");
         }
     }
 }

@@ -37,6 +37,43 @@ public final class PopulationDomainAdmissionPlanner {
             long managedConfigRevision,
             long createdAtMs
     ) {
+        return plan(
+                operationId,
+                profileId,
+                expectedLifecycleRevision,
+                expectedOwner,
+                targetWorldKey,
+                targetOwner,
+                beforeState,
+                afterState,
+                targetWorldKey,
+                policies,
+                providerSnapshotRevision,
+                managedConfigRevision,
+                createdAtMs
+        );
+    }
+
+    /**
+     * Calculates target-bucket deltas from exact source and target ownership.
+     * A per-world move reserves the destination bucket even when the owner is unchanged.
+     */
+    @Nonnull
+    public static List<PopulationDomainReservation> plan(
+            @Nonnull OperationId operationId,
+            @Nonnull ProfileId profileId,
+            @Nullable LifecycleRevision expectedLifecycleRevision,
+            @Nullable OwnerId expectedOwner,
+            @Nullable String sourceWorldKey,
+            @Nullable OwnerId targetOwner,
+            @Nullable LifecycleState beforeState,
+            @Nonnull LifecycleState afterState,
+            @Nonnull String targetWorldKey,
+            @Nonnull Collection<DomainPolicy> policies,
+            long providerSnapshotRevision,
+            long managedConfigRevision,
+            long createdAtMs
+    ) {
         require(operationId, "Operation ID");
         require(profileId, "Profile ID");
         require(afterState, "Target lifecycle state");
@@ -53,30 +90,33 @@ public final class PopulationDomainAdmissionPlanner {
         boolean ownerChanged = !java.util.Objects.equals(expectedOwner, targetOwner);
         ArrayList<PopulationDomainReservation> result = new ArrayList<>();
         for (DomainPolicy policy : policies) {
-            int ownedDelta = positive(
-                    policy.owned() && after.owned(),
-                    ownerChanged || !before.owned()
-            );
-            int deployableDelta = positive(
-                    policy.deployable() && after.deployable(),
-                    ownerChanged || !before.deployable()
-            );
+            PopulationDomainBucket targetBucket = targetOwner == null
+                    ? null
+                    : bucket(targetOwner, targetWorldKey, policy);
+            PopulationDomainBucket sourceBucket = expectedOwner == null
+                    ? null
+                    : bucket(expectedOwner, sourceWorldKey, policy);
+            boolean sourceOwned = beforeState != null
+                    && before.owned() && sourceBucket != null;
+            boolean sourceDeployable = beforeState != null
+                    && before.deployable() && sourceBucket != null;
+            boolean targetOwned = policy.owned() && after.owned() && targetBucket != null;
+            boolean targetDeployable = policy.deployable()
+                    && after.deployable() && targetBucket != null;
+            int ownedDelta = targetOwned
+                    && (!sourceOwned || !sourceBucket.equals(targetBucket))
+                    ? 1 : 0;
+            int deployableDelta = targetDeployable
+                    && (!sourceDeployable || !sourceBucket.equals(targetBucket))
+                    ? 1 : 0;
             if (ownedDelta == 0 && deployableDelta == 0) {
                 continue;
             }
-            PopulationDomainBucket bucket = new PopulationDomainBucket(
-                    targetOwner,
-                    policy.domainId(),
-                    policy.scope(),
-                    policy.scope() == PopulationDomainScope.PER_WORLD
-                            ? targetWorldKey
-                            : null
-            );
             result.add(new PopulationDomainReservation(
                     operationId,
                     profileId,
                     expectedLifecycleRevision,
-                    bucket,
+                    targetBucket,
                     ownedDelta,
                     deployableDelta,
                     policy.weight(),
@@ -90,6 +130,30 @@ public final class PopulationDomainAdmissionPlanner {
         }
         result.sort(Comparator.comparing(PopulationDomainReservation::bucket));
         return List.copyOf(result);
+    }
+
+    private static PopulationDomainBucket bucket(
+            OwnerId owner,
+            String worldKey,
+            DomainPolicy policy
+    ) {
+        return new PopulationDomainBucket(
+                owner,
+                policy.domainId(),
+                policy.scope(),
+                policy.scope() == PopulationDomainScope.PER_WORLD
+                        ? requireWorld(worldKey)
+                        : null
+        );
+    }
+
+    private static String requireWorld(String worldKey) {
+        if (worldKey == null || worldKey.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Per-world domain admission requires an exact world key"
+            );
+        }
+        return worldKey.trim();
     }
 
     /** Creates a policy from one public provider claim and frozen limits. */
@@ -112,10 +176,6 @@ public final class PopulationDomainAdmissionPlanner {
                 maxDeployable,
                 policyRevision
         );
-    }
-
-    private static int positive(boolean applies, boolean newlyOwned) {
-        return applies && newlyOwned ? 1 : 0;
     }
 
     private static <T> T require(T value, String label) {
@@ -143,11 +203,6 @@ public final class PopulationDomainAdmissionPlanner {
                 throw new IllegalArgumentException("Valid domain policy is required");
             }
             domainId = domainId.trim();
-            if (deployable && !owned) {
-                throw new IllegalArgumentException(
-                        "Deployable domains must also count owned capacity"
-                );
-            }
         }
     }
 }

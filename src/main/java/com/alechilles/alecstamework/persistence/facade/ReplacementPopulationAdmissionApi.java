@@ -13,7 +13,23 @@ import com.alechilles.alecstamework.api.RequiredContentProfileApi;
 import com.alechilles.alecstamework.api.RequiredContentProfileStatus;
 import com.alechilles.alecstamework.api.internal.AdmissionProviderRegistry;
 import com.alechilles.alecstamework.companion.population.domain.ManagedAdmissionEvidenceAuthor;
+import com.alechilles.alecstamework.companion.population.domain.ManagedBatchAdmissionRequest;
+import com.alechilles.alecstamework.companion.population.domain.ManagedBatchSettlement;
+import com.alechilles.alecstamework.companion.population.domain.PopulationAdmissionComposition;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation;
+import com.alechilles.alecstamework.companion.population.OwnerPopulationAdmissionPlan;
+import com.alechilles.alecstamework.companion.population.OwnerPopulationAdmissionPlanner;
+import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionRequest;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignment;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupPolicy;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionRequest;
+import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceReadinessLevel;
@@ -27,6 +43,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /** Replacement-persistence facade for staged provider-aware admission. */
 public final class ReplacementPopulationAdmissionApi
@@ -35,9 +52,12 @@ public final class ReplacementPopulationAdmissionApi
             "population-admission-authority-unavailable";
 
     private final PersistenceBootstrap persistence;
+    private final PopulationDomainAdmissionOperation operations;
     private final ManagedAdmissionEvidenceAuthor author;
     private final ManagedActivityConfigRegistry managed;
     private final AdmissionProviderRegistry providers;
+    private final PopulationGroupConfigRegistry populationGroups;
+    private final PopulationAdmissionCompositionAuthor compositionAuthor;
     private final PopulationAdmissionStaging staging;
 
     public ReplacementPopulationAdmissionApi(
@@ -57,7 +77,8 @@ public final class ReplacementPopulationAdmissionApi
                 ),
                 managed,
                 providers,
-                clock
+                clock,
+                populationGroups
         );
     }
 
@@ -69,12 +90,37 @@ public final class ReplacementPopulationAdmissionApi
             @Nonnull AdmissionProviderRegistry providers,
             @Nonnull LongSupplier clock
     ) {
+        this(
+                persistence,
+                operations,
+                author,
+                managed,
+                providers,
+                clock,
+                null
+        );
+    }
+
+    private ReplacementPopulationAdmissionApi(
+            @Nonnull PersistenceBootstrap persistence,
+            @Nonnull PopulationDomainAdmissionOperation operations,
+            @Nonnull ManagedAdmissionEvidenceAuthor author,
+            @Nonnull ManagedActivityConfigRegistry managed,
+            @Nonnull AdmissionProviderRegistry providers,
+            @Nonnull LongSupplier clock,
+            @Nullable PopulationGroupConfigRegistry populationGroups
+    ) {
         this.persistence = Objects.requireNonNull(persistence, "persistence");
+        this.operations = Objects.requireNonNull(operations, "operations");
         this.author = Objects.requireNonNull(author, "author");
         this.managed = Objects.requireNonNull(managed, "managed");
         this.providers = Objects.requireNonNull(providers, "providers");
+        this.populationGroups = populationGroups;
+        this.compositionAuthor = new PopulationAdmissionCompositionAuthor(
+                this.persistence, populationGroups
+        );
         Objects.requireNonNull(clock, "clock");
-        this.staging = new PopulationAdmissionStaging(operations);
+        this.staging = new PopulationAdmissionStaging(operations, clock);
     }
 
     @Override
@@ -113,7 +159,7 @@ public final class ReplacementPopulationAdmissionApi
         if (request == null) {
             throw new NullPointerException("request");
         }
-        if (!ready(request.managedProfileId())) {
+        if (!managedReady(request.managedProfileId())) {
             return CompletableFuture.completedFuture(
                     PopulationAdmissionDecision.unavailable(
                             "population-admission-v3-authority-unavailable"
@@ -122,12 +168,23 @@ public final class ReplacementPopulationAdmissionApi
         }
         PopulationAdmissionStaging.Identity identity = staging.identity(request);
         OperationId operationId = new OperationId(identity.operationId());
-        return author.author(
+        return canonicalSource(request)
+                .thenCompose(source -> author.author(
                         operationId,
                         identity.reservationId(),
-                        request
-                )
-                .thenCompose(evidence -> staging.prepareOrReuse(identity, evidence))
+                        request,
+                        source == null ? null : source.state(),
+                        map(request.request().request().targetLifecycle()),
+                        source == null ? null : source.ownerId(),
+                        source == null ? null : source.ownerWorldKey()
+                ).thenCompose(evidence -> compositionAuthor.compose(
+                        request,
+                        source,
+                        evidence.payload(),
+                        operationId
+                ).thenCompose(composed -> staging.prepareOrReuse(
+                        identity, evidence, composed
+                ))))
                 .exceptionally(this::failure);
     }
 
@@ -145,6 +202,47 @@ public final class ReplacementPopulationAdmissionApi
                         "population-admission-batch-authority-unavailable"
                 )
         );
+    }
+
+    /** Internal aggregate litter path. The legacy public batch API remains unavailable. */
+    @Nonnull
+    public CompletionStage<PopulationAdmissionDecision> prepareManagedBatch(
+            @Nonnull ManagedBatchAdmissionRequest request
+    ) {
+        if (request == null) {
+            throw new NullPointerException("request");
+        }
+        if (!managedReady(request.admission().managedProfileId())) {
+            return CompletableFuture.completedFuture(
+                    PopulationAdmissionDecision.unavailable(
+                            "population-admission-batch-authority-unavailable"
+                    )
+            );
+        }
+        return canonicalSource(request.admission()).thenCompose(source ->
+                staging.prepareBatch(request, author, source, compositionAuthor))
+                .exceptionally(this::failure);
+    }
+
+    /** Internal claim boundary used immediately before the first litter child. */
+    @Nonnull
+    public PopulationAdmissionDecision claimManagedBatch(
+            @Nonnull PopulationAdmissionToken token
+    ) {
+        return claimForApply(token);
+    }
+
+    /** Internal exact ordinal settlement boundary for one managed litter. */
+    @Nonnull
+    public CompletionStage<ManagedBatchSettlement> settleManagedBatch(
+            @Nonnull PopulationAdmissionToken token,
+            @Nonnull java.util.Set<Integer> settledOrdinals,
+            @Nonnull java.util.Map<Integer, java.util.UUID> actualChildIds
+    ) {
+        if (token == null || settledOrdinals == null || actualChildIds == null) {
+            throw new NullPointerException("batch settlement");
+        }
+        return staging.settleBatch(token, settledOrdinals, actualChildIds);
     }
 
     @Override
@@ -218,12 +316,83 @@ public final class ReplacementPopulationAdmissionApi
         );
     }
 
-    private boolean ready(String profileId) {
+    private boolean managedReady(String profileId) {
         if (persistence.readiness(PublicPersistenceFeatureRegistry.POPULATION_DOMAINS)
                 != PersistenceReadinessLevel.MUTATION_READY) {
             return false;
         }
-        return status(profileId).available();
+        return managed.readiness(profileId).available();
+    }
+
+    private CompletionStage<CompanionLifecycle> canonicalSource(
+            PopulationAdmissionRequestV3 request
+    ) {
+        var admission = request.request().request();
+        if (admission.expectedProfileRevision()
+                == PopulationAdmissionRequest.NEW_PROFILE_REVISION) {
+            return CompletableFuture.completedFuture(null);
+        }
+        String identity = admission.identity().canonicalProfileId();
+        if (identity == null) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("population-admission-source-identity-missing")
+            );
+        }
+        ProfileId profile;
+        try {
+            profile = ProfileId.parse(identity);
+        } catch (IllegalArgumentException invalid) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("population-admission-source-identity-invalid", invalid)
+            );
+        }
+        return persistence.facades().queries().findAllLifecycles().thenCompose(read -> {
+            if (!(read instanceof PersistenceReadResult.Found<java.util.List<CompanionLifecycle>> found)) {
+                return CompletableFuture.failedFuture(
+                        new IllegalStateException("population-admission-source-unavailable")
+                );
+            }
+            CompanionLifecycle source = found.value().stream()
+                    .filter(value -> value.profileId().equals(profile))
+                    .findFirst().orElse(null);
+            if (source == null || source.revision().value()
+                    != admission.expectedProfileRevision()) {
+                return CompletableFuture.failedFuture(
+                        new IllegalStateException("population-admission-source-stale")
+                );
+            }
+            if (!java.util.Objects.equals(
+                    source.ownerId(),
+                    admission.oldOwnerUuid() == null
+                            ? null
+                            : new com.alechilles.alecstamework.companion.identity.OwnerId(
+                                    admission.oldOwnerUuid()
+                            )
+            )) {
+                return CompletableFuture.failedFuture(
+                        new IllegalStateException("population-admission-source-owner-stale")
+                );
+            }
+            return CompletableFuture.completedFuture(source);
+        });
+    }
+
+    private LifecycleState map(
+            com.alechilles.alecstamework.api.PopulationCompanionLifecycle lifecycle
+    ) {
+        return switch (lifecycle) {
+            case ACTIVE -> LifecycleState.ACTIVE;
+            case UNLOADED -> LifecycleState.UNLOADED;
+            case CAPTURED -> LifecycleState.CAPTURED;
+            case COOP -> LifecycleState.COOP;
+            case DEAD_REVIVABLE -> LifecycleState.DEAD_REVIVABLE;
+            case LOST -> LifecycleState.LOST;
+            case ROSTER_STORED -> LifecycleState.ROSTER_STORED;
+            case PROVISIONED_DORMANT -> LifecycleState.PROVISIONED_DORMANT;
+            case RELEASED -> LifecycleState.RELEASED;
+            case RESTORING, STORING -> LifecycleState.ACTIVE;
+            case UNKNOWN_DORMANT -> LifecycleState.UNRESOLVED;
+        };
     }
 
     private PopulationAdmissionDecision failure(Throwable failure) {

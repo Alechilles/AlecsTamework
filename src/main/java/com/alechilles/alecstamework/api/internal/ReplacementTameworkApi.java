@@ -331,11 +331,15 @@ public final class ReplacementTameworkApi
         if (snapshot.revision() <= 0L || snapshot.profiles().isEmpty()) {
             return false;
         }
-        return snapshot.profiles().values().stream().allMatch(profile ->
-                dependencies.admissionProviders().readiness(
-                        profile.providerId(), profile.providerContractVersion()
-                ).available()
-        );
+        return snapshot.profiles().values().stream().allMatch(profile -> {
+            var readiness = dependencies.managedActivities()
+                    .readiness(profile.profileId());
+            return readiness.available()
+                    && readiness.configRevision() == profile.configRevision()
+                    && dependencies.admissionProviders().readiness(
+                    readiness.providerId(), readiness.providerContractVersion()
+            ).available();
+        });
     }
 
     /** Readiness-gated policy view that keeps the legacy policy methods intact. */

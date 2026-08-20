@@ -32,11 +32,6 @@ public record PopulationDomainReservation(
                 || policyRevision < 0) {
             throw new IllegalArgumentException("Valid positive domain reservation is required");
         }
-        if (deployableDelta > ownedDelta) {
-            throw new IllegalArgumentException(
-                    "Deployable domain delta cannot exceed owned delta"
-            );
-        }
     }
 
     /** Weighted cost for the owned claim. */

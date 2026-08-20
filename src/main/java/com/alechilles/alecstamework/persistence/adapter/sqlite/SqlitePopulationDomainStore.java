@@ -196,22 +196,93 @@ public final class SqlitePopulationDomainStore implements PopulationDomainPort {
         }
     }
 
-    private long[] committed(PopulationDomainBucket bucket) {
-        String world = bucket.scope() == PopulationDomainScope.GLOBAL
-                ? ""
-                : " AND owner_world_key = ?";
-        try (PreparedStatement statement = connection.prepareStatement("""
-                SELECT COUNT(*) AS owned_count,
-                       COALESCE(SUM(CASE WHEN lifecycle_state IN
-                           ('ACTIVE', 'UNLOADED', 'COOP', 'LOST', 'UNRESOLVED')
-                           THEN 1 ELSE 0 END), 0) AS deployable_count
-                FROM companion_lifecycle
-                WHERE owner_uuid = ? AND lifecycle_state <> 'RELEASED'
-                """ + world)) {
-            statement.setString(1, bucket.ownerId().toString());
-            if (bucket.scope() == PopulationDomainScope.PER_WORLD) {
-                statement.setString(2, bucket.ownerWorldKey());
+    /** Retains only the exact settled fraction of one aggregate reservation. */
+    public boolean settleBatch(
+            @Nonnull OperationId operationId,
+            @Nonnull List<PopulationDomainReservation> expected,
+            int requestedUnits,
+            int settledUnits
+    ) {
+        require(operationId, "Operation ID");
+        if (expected == null || requestedUnits <= 0
+                || settledUnits < 0 || settledUnits > requestedUnits) {
+            throw new IllegalArgumentException("Valid batch settlement is required");
+        }
+        if (findByOperation(operationId).size() != expected.size()) {
+            return false;
+        }
+        for (PopulationDomainReservation reservation : expected) {
+            int ownedPerUnit = perUnit(
+                    reservation.ownedDelta(), requestedUnits
+            );
+            int deployablePerUnit = perUnit(
+                    reservation.deployableDelta(), requestedUnits
+            );
+            int owned = Math.multiplyExact(ownedPerUnit, settledUnits);
+            int deployable = Math.multiplyExact(deployablePerUnit, settledUnits);
+            try {
+                if (owned == 0 && deployable == 0) {
+                    try (PreparedStatement statement = connection.prepareStatement("""
+                            DELETE FROM population_domain_reservation
+                            WHERE operation_id = ? AND owner_uuid = ?
+                              AND domain_id = ? AND scope_kind = ?
+                              AND owner_world_key = ?
+                            """)) {
+                        statement.setString(1, operationId.toString());
+                        bindBucket(statement, reservation.bucket(), 2);
+                        if (statement.executeUpdate() != 1) {
+                            return false;
+                        }
+                    }
+                } else {
+                    try (PreparedStatement statement = connection.prepareStatement("""
+                            UPDATE population_domain_reservation
+                            SET owned_delta = ?, deployable_delta = ?
+                            WHERE operation_id = ? AND owner_uuid = ?
+                              AND domain_id = ? AND scope_kind = ?
+                              AND owner_world_key = ?
+                            """)) {
+                        statement.setInt(1, owned);
+                        statement.setInt(2, deployable);
+                        statement.setString(3, operationId.toString());
+                        bindBucket(statement, reservation.bucket(), 4);
+                        if (statement.executeUpdate() != 1) {
+                            return false;
+                        }
+                    }
+                }
+            } catch (SQLException | RuntimeException failure) {
+                throw storeFailure("population_domain_batch_settlement", failure);
             }
+        }
+        return true;
+    }
+
+    private int perUnit(int total, int requestedUnits) {
+        if (total % requestedUnits != 0) {
+            throw new IllegalArgumentException(
+                    "Aggregate domain delta is not evenly divisible by requested units"
+            );
+        }
+        return total / requestedUnits;
+    }
+
+    private long[] committed(PopulationDomainBucket bucket) {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT COALESCE(SUM(CAST(reservation.weight AS INTEGER)
+                                    * CAST(reservation.owned_delta AS INTEGER)), 0),
+                       COALESCE(SUM(CAST(reservation.weight AS INTEGER)
+                                    * CAST(reservation.deployable_delta AS INTEGER)), 0)
+                FROM population_domain_reservation reservation
+                JOIN operation_envelope envelope
+                  ON envelope.operation_id = reservation.operation_id
+                WHERE reservation.owner_uuid = ?
+                  AND reservation.domain_id = ?
+                  AND reservation.scope_kind = ?
+                  AND reservation.owner_world_key = ?
+                  AND envelope.phase IN ('DURABLE', 'PUBLISHED')
+                """)) {
+            bindBucket(statement, bucket, 1);
             return pair(statement);
         } catch (SQLException | RuntimeException failure) {
             throw storeFailure("population_domain_committed_count", failure);
@@ -231,7 +302,10 @@ public final class SqlitePopulationDomainStore implements PopulationDomainPort {
                   AND reservation.domain_id = ?
                   AND reservation.scope_kind = ?
                   AND reservation.owner_world_key = ?
-                  AND envelope.phase NOT IN ('PUBLISHED', 'COMPENSATED', 'FAILED')
+                  AND envelope.phase IN (
+                      'PREPARED', 'LIVE_APPLYING', 'RETRYABLE',
+                      'UNKNOWN', 'COMPENSATING'
+                  )
                 """)) {
             bindBucket(statement, bucket, 1);
             return pair(statement);

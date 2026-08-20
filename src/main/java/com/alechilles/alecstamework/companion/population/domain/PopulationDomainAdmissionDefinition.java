@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.companion.population.domain;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation.DomainInput;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinition;
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
@@ -35,12 +36,12 @@ public final class PopulationDomainAdmissionDefinition
         return 1;
     }
 
-    /** Domain admission has no external live side effect; unknown commits are read-back safe. */
+    /** A live claim may have spawned a companion; unknown outcomes require containment. */
     @Override
     public boolean allowsUnknownLiveReverification(
             com.alechilles.alecstamework.persistence.operation.OperationEnvelope operation
     ) {
-        return true;
+        return false;
     }
 
     @Override
@@ -59,6 +60,11 @@ public final class PopulationDomainAdmissionDefinition
         nullable(json, "ownerId", payload.ownerId());
         nullable(json, "expectedLifecycleRevision", payload.expectedLifecycleRevision());
         nullable(json, "ownerWorldKey", payload.ownerWorldKey());
+        nullable(json, "sourceOwnerId", payload.sourceOwnerId());
+        nullable(json, "sourceWorldKey", payload.sourceWorldKey());
+        nullable(json, "sourceLifecycle", payload.sourceLifecycle());
+        json.addProperty("targetLifecycle", payload.targetLifecycle().name());
+        json.addProperty("familyGroupId", payload.familyGroupId());
         json.addProperty("providerId", payload.providerId());
         json.addProperty("providerContractVersion", payload.providerContractVersion());
         json.addProperty("providerGenerationToken", payload.providerGenerationToken());
@@ -116,6 +122,10 @@ public final class PopulationDomainAdmissionDefinition
             }
         }
         String owner = text(json, "ownerId");
+        String sourceOwner = text(json, "sourceOwnerId");
+        String sourceLifecycle = text(json, "sourceLifecycle");
+        String targetLifecycle = text(json, "targetLifecycle");
+        String familyGroupId = text(json, "familyGroupId");
         String revision = text(json, "expectedLifecycleRevision");
         return new PopulationDomainAdmissionOperation.Payload(
                 UUID.fromString(json.get("reservationId").getAsString()),
@@ -123,6 +133,12 @@ public final class PopulationDomainAdmissionDefinition
                 owner == null ? null : OwnerId.parse(owner),
                 revision == null ? null : new LifecycleRevision(Long.parseLong(revision)),
                 text(json, "ownerWorldKey"),
+                sourceOwner == null ? null : OwnerId.parse(sourceOwner),
+                text(json, "sourceWorldKey"),
+                sourceLifecycle == null ? null : LifecycleState.valueOf(sourceLifecycle),
+                targetLifecycle == null ? LifecycleState.ACTIVE
+                        : LifecycleState.valueOf(targetLifecycle),
+                familyGroupId == null ? "legacy-unknown" : familyGroupId,
                 json.get("providerId").getAsString(),
                 json.get("providerContractVersion").getAsInt(),
                 json.get("providerGenerationToken").getAsString(),

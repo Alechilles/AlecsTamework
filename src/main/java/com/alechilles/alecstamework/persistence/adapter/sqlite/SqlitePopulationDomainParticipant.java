@@ -14,9 +14,18 @@ import javax.annotation.Nonnull;
 public final class SqlitePopulationDomainParticipant
         implements PreparedOperationDetail {
     private final List<PopulationDomainReservation> reservations;
+    private final boolean retainCommitted;
 
     public SqlitePopulationDomainParticipant(
             @Nonnull List<PopulationDomainReservation> reservations
+    ) {
+        this(reservations, false);
+    }
+
+    /** Creates a participant that retains committed rows as the domain ledger. */
+    public SqlitePopulationDomainParticipant(
+            @Nonnull List<PopulationDomainReservation> reservations,
+            boolean retainCommitted
     ) {
         if (reservations == null || reservations.stream().anyMatch(java.util.Objects::isNull)) {
             throw new IllegalArgumentException("Domain reservations are required");
@@ -26,6 +35,7 @@ public final class SqlitePopulationDomainParticipant
                         PopulationDomainReservation::bucket
                 ))
                 .toList();
+        this.retainCommitted = retainCommitted;
     }
 
     @Override
@@ -75,6 +85,15 @@ public final class SqlitePopulationDomainParticipant
     /** Retires only the exact operation-owned rows after delegated durable work. */
     @Nonnull
     public DurableOperationWork decorate(@Nonnull DurableOperationWork delegated) {
+        return decorate(delegated, retainCommitted);
+    }
+
+    /** Decorates durable work and optionally retains exact committed rows. */
+    @Nonnull
+    public DurableOperationWork decorate(
+            @Nonnull DurableOperationWork delegated,
+            boolean retainCommitted
+    ) {
         if (delegated == null) {
             throw new IllegalArgumentException("Domain durable work is required");
         }
@@ -83,7 +102,7 @@ public final class SqlitePopulationDomainParticipant
                 throw new IllegalStateException("population_domain_reservation_missing");
             }
             List<ProjectionEventDraft> events = delegated.execute(transaction, operation);
-            if (!transaction.populationDomains().retireExact(
+            if (!retainCommitted && !transaction.populationDomains().retireExact(
                     operation.operationId(), reservations.size()
             )) {
                 throw new IllegalStateException(
@@ -104,6 +123,24 @@ public final class SqlitePopulationDomainParticipant
         )) {
             throw new IllegalStateException(
                     "population_domain_reservation_retirement_failed"
+            );
+        }
+    }
+
+    /** Settles one aggregate request to its exact live ordinal count. */
+    public void settleBatch(
+            SqlitePersistenceTransactionContext transaction,
+            OperationEnvelope operation,
+            int requestedUnits,
+            int settledUnits
+    ) {
+        requireOperation(operation);
+        if (!(transaction.populationDomains() instanceof SqlitePopulationDomainStore store)
+                || !store.settleBatch(
+                operation.operationId(), reservations, requestedUnits, settledUnits
+        )) {
+            throw new IllegalStateException(
+                    "population_domain_batch_settlement_failed"
             );
         }
     }

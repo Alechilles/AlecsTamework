@@ -14,19 +14,32 @@ import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
 import java.util.List;
 
 /** Reusable shared-envelope participant for positive group lifecycle admission. */
-final class SqlitePopulationGroupTransitionParticipant
+public final class SqlitePopulationGroupTransitionParticipant
         implements PreparedOperationDetail {
     private final PopulationGroupTransitionAdmissionRequest request;
+    private final int units;
 
-    SqlitePopulationGroupTransitionParticipant(
+    public SqlitePopulationGroupTransitionParticipant(
             PopulationGroupTransitionAdmissionRequest request
+    ) {
+        this(request, 1);
+    }
+
+    /** Creates one group participant for an aggregate admission. */
+    public SqlitePopulationGroupTransitionParticipant(
+            PopulationGroupTransitionAdmissionRequest request,
+            int units
     ) {
         if (request == null) {
             throw new IllegalArgumentException(
                     "Group transition admission request is required"
             );
         }
+        if (units <= 0) {
+            throw new IllegalArgumentException("Admission units must be positive");
+        }
         this.request = request;
+        this.units = units;
     }
 
     @Override
@@ -100,15 +113,13 @@ final class SqlitePopulationGroupTransitionParticipant
     }
 
     /** Retires only this participant's exact prepared reservation set. */
-    void retirePrepared(
+    public void retirePrepared(
             SqlitePersistenceTransactionContext transaction,
             OperationEnvelope operation
     ) {
-        retireExact(
-                transaction,
-                operation,
-                plannedReservationCount(transaction, operation)
-        );
+        int expected = transaction.populationGroups()
+                .findReservations(operation.operationId()).size();
+        retireExact(transaction, operation, expected);
     }
 
     private int plannedReservationCount(
@@ -154,7 +165,18 @@ final class SqlitePopulationGroupTransitionParticipant
         }
         return PopulationGroupTransitionAdmissionPlanner.plan(
                 operation.operationId(), request, assignment
-        );
+        ).stream().map(reservation -> new PopulationGroupReservation(
+                reservation.operationId(),
+                reservation.profileId(),
+                reservation.expectedLifecycleRevision(),
+                reservation.bucket(),
+                Math.multiplyExact(reservation.ownedDelta(), units),
+                Math.multiplyExact(reservation.activeDelta(), units),
+                reservation.snapshottedMaxOwned(),
+                reservation.snapshottedMaxActive(),
+                reservation.policyRevision(),
+                reservation.createdAtMs()
+        )).toList();
     }
 
     private boolean sourceMatches(

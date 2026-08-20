@@ -12,6 +12,8 @@ import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
+import com.alechilles.alecstamework.persistence.operation.OperationPhase;
+import com.alechilles.alecstamework.persistence.operation.OperationTransition;
 import com.alechilles.alecstamework.persistence.operation.PreparedOperation;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -115,6 +117,52 @@ class SqlitePopulationDomainParticipantTest {
                             secondReservation
                     )).prepare(transaction, second)
             );
+            connection.rollback();
+        }
+    }
+
+    @Test
+    void retainedCommitIsWeightedAndIsolatedByDomain() throws Exception {
+        SqliteConnectionFactory connections = new SqliteConnectionFactory(
+                tempDir.resolve("committed-weighted.sqlite")
+        );
+        assertTrue(new SqliteSchemaV2Manager(connections, () -> -10_000)
+                .initialize() instanceof com.alechilles.alecstamework.persistence.kernel
+                .PersistenceTransactionResult.Committed<?>);
+        try (Connection connection = connections.openWriterConnection()) {
+            connection.setAutoCommit(false);
+            SqlitePersistenceTransactionContext transaction =
+                    new SqlitePersistenceTransactionContext(connection);
+            OperationEnvelope operation = prepareOperation(
+                    transaction, OPERATION, PROFILE
+            );
+            PopulationDomainReservation retained = reservation(OPERATION, PROFILE);
+            SqlitePopulationDomainParticipant participant =
+                    new SqlitePopulationDomainParticipant(List.of(retained), true);
+            participant.prepare(transaction, operation);
+            OperationEnvelope applying = transaction.operations().transition(
+                    new OperationTransition(
+                            OPERATION, OperationPhase.PREPARED,
+                            OperationPhase.LIVE_APPLYING, null, null, null, -8_000
+                    )
+            ).value();
+            OperationEnvelope durable = transaction.operations().transition(
+                    new OperationTransition(
+                            OPERATION, applying.phase(), OperationPhase.DURABLE,
+                            null, null, null, -7_000
+                    )
+            ).value();
+
+            assertEquals(OperationPhase.DURABLE, durable.phase());
+            assertEquals(2, transaction.populationDomains()
+                    .counts(retained.bucket()).committedOwned());
+            PopulationDomainBucket otherDomain = new PopulationDomainBucket(
+                    OWNER, "runeteria:unrelated", PopulationDomainScope.GLOBAL, null
+            );
+            assertEquals(0, transaction.populationDomains()
+                    .counts(otherDomain).committedOwned());
+            assertEquals(0, transaction.populationDomains()
+                    .counts(retained.bucket()).pendingOwned());
             connection.rollback();
         }
     }
