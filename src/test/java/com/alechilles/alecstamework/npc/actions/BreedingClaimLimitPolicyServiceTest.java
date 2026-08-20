@@ -171,48 +171,6 @@ class BreedingClaimLimitPolicyServiceTest {
         assertEquals("simpleclaims-lookup-error", errorDecision.reason());
     }
 
-    /** Regression: the limiting cap must retain both ephemeral sweep reservation keys. */
-    @Test
-    void combinedCapRetainsClaimAndOwnerSweepKeys() {
-        BreedingClaimLimitPolicyService.ClaimReservationKey claimKey =
-                new BreedingClaimLimitPolicyService.ClaimReservationKey(
-                        "world", UUID.randomUUID()
-                );
-        BreedingClaimLimitPolicyService.PlayerReservationKey ownerKey =
-                BreedingClaimLimitPolicyService.PlayerReservationKey.perWorld(
-                        "world", UUID.randomUUID()
-                );
-        BreedingClaimLimitPolicyService.Decision claim =
-                BreedingClaimLimitPolicyService.Decision.allowWithCap(
-                        BreedingClaimLimitPolicyService.ConstraintType.CLAIM,
-                        10,
-                        8,
-                        0,
-                        2,
-                        claimKey,
-                        List.of()
-                );
-        BreedingClaimLimitPolicyService.Decision owner =
-                new BreedingClaimLimitPolicyService.Decision(
-                        true,
-                        true,
-                        10,
-                        7,
-                        0,
-                        3,
-                        null,
-                        List.of(ownerKey),
-                        "owner-cap-allow"
-                );
-
-        BreedingClaimLimitPolicyService.Decision combined =
-                BreedingClaimLimitPolicyService.combineAllowed(claim, owner);
-
-        assertEquals(2, combined.remainingHeadroom());
-        assertEquals(claimKey, combined.claimReservationKey());
-        assertEquals(List.of(ownerKey), combined.playerReservationKeys());
-    }
-
     private static BreedingClaimLimitPolicyService.ResolvedClaim claimFound(int chunkCount) {
         return new BreedingClaimLimitPolicyService.ResolvedClaim(
                 BreedingClaimLimitPolicyService.ClaimResolutionStatus.CLAIM_FOUND,

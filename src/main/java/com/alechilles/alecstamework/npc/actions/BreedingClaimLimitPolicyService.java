@@ -6,7 +6,6 @@ import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.damage.SimpleClaimsCapabilityRuntime;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
-import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -28,7 +27,7 @@ import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
 /**
- * Evaluates released SimpleClaims owner-population limits without a second durable authority.
+ * Evaluates the released SimpleClaims land and space rule for breeding.
  */
 final class BreedingClaimLimitPolicyService {
     private final SimpleClaimsCapabilityRuntime capabilityRuntime;
@@ -44,9 +43,8 @@ final class BreedingClaimLimitPolicyService {
     }
 
     /**
-     * Evaluates the released SimpleClaims cap and the process-local owner cap.
-     *
-     * <p>Both counts are live reads. No reservation or replay state is created.
+     * Evaluates the released SimpleClaims rule. Durable admission owns all
+     * owner and weighted population limits.
      */
     @Nonnull
     Decision evaluate(@Nullable Store<EntityStore> store,
@@ -78,59 +76,8 @@ final class BreedingClaimLimitPolicyService {
             @Nullable Map<ClaimReservationKey, Integer> pendingClaims,
             @Nullable Map<PlayerReservationKey, Integer> pendingOwners
     ) {
-        Decision claimDecision = evaluateLiveClaim(
+        return evaluateLiveClaim(
                 store, spawnPosition, pendingClaims
-        );
-        if (!claimDecision.allowed()) {
-            return claimDecision;
-        }
-        BreedingOffspringProgressionService.OwnerSnapshot inheritedOwner =
-                BreedingInheritedOwnerResolver.resolve(
-                        config,
-                        inheritanceRoleId,
-                        new BreedingOffspringProgressionService.OwnerSnapshot(
-                                parentAOwnerId, null
-                        ),
-                        new BreedingOffspringProgressionService.OwnerSnapshot(
-                                parentBOwnerId, null
-                        )
-                );
-        Decision ownerDecision = evaluateLiveOwner(
-                store,
-                inheritedOwner.ownerId() == null
-                        ? List.of()
-                        : List.of(inheritedOwner.ownerId()),
-                pendingOwners
-        );
-        if (!ownerDecision.allowed()) {
-            return ownerDecision;
-        }
-        return combineAllowed(claimDecision, ownerDecision);
-    }
-
-    @Nonnull
-    static Decision combineAllowed(@Nonnull Decision claimDecision,
-                                   @Nonnull Decision ownerDecision) {
-        if (!claimDecision.capEnforced()) {
-            return ownerDecision.capEnforced() ? ownerDecision : claimDecision;
-        }
-        if (!ownerDecision.capEnforced()) {
-            return claimDecision;
-        }
-        Decision limiting = claimDecision.remainingHeadroom()
-                <= ownerDecision.remainingHeadroom()
-                ? claimDecision
-                : ownerDecision;
-        return new Decision(
-                true,
-                true,
-                limiting.effectiveCap(),
-                limiting.currentCount(),
-                limiting.pendingReservations(),
-                limiting.remainingHeadroom(),
-                claimDecision.claimReservationKey(),
-                ownerDecision.playerReservationKeys(),
-                limiting.reason()
         );
     }
 
@@ -183,54 +130,6 @@ final class BreedingClaimLimitPolicyService {
         return count.success()
                 ? evaluateResolved(globalConfig, resolved, count.count(), pending)
                 : Decision.deny("simpleclaims-population-count-error");
-    }
-
-    @Nonnull
-    private static Decision evaluateLiveOwner(
-            @Nullable Store<EntityStore> store,
-            @Nonnull List<UUID> ownerTargets,
-            @Nullable Map<PlayerReservationKey, Integer> pendingOwners
-    ) {
-        if (ownerTargets.isEmpty()) {
-            return Decision.allowWithoutCap(null, List.of(), "owner-cap-no-owner");
-        }
-        OwnerPopulationCapService.Decision ownerDecision =
-                OwnerPopulationCapService.evaluateAcquisition(store, ownerTargets.get(0));
-        if (!ownerDecision.allowed()) {
-            return new Decision(
-                    false,
-                    ownerDecision.capEnabled(),
-                    ownerDecision.limit(),
-                    ownerDecision.currentCount(),
-                    0,
-                    0,
-                    null,
-                    List.of(),
-                    ownerDecision.reason()
-            );
-        }
-        if (!ownerDecision.capEnabled()) {
-            return Decision.allowWithoutCap(null, List.of(), ownerDecision.reason());
-        }
-        PlayerReservationKey key = ownerDecision.scope()
-                == TwGlobalConfig.PerPlayerLimitScope.GLOBAL
-                ? PlayerReservationKey.global(ownerTargets.get(0))
-                : PlayerReservationKey.perWorld(resolveWorldName(store), ownerTargets.get(0));
-        int pending = pendingOwners == null
-                ? 0
-                : Math.max(0, pendingOwners.getOrDefault(key, 0));
-        int remaining = Math.max(0, ownerDecision.remainingHeadroom() - pending);
-        return new Decision(
-                remaining > 0,
-                true,
-                ownerDecision.limit(),
-                ownerDecision.currentCount(),
-                pending,
-                remaining,
-                null,
-                List.of(key),
-                remaining > 0 ? ownerDecision.reason() : "owner-cap-reached"
-        );
     }
 
     @Nonnull
