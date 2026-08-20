@@ -187,6 +187,8 @@ public final class ReplacementTameworkApiFactory {
         AdmissionProviderApi admissionProviders = AdmissionProviderApi.unavailable();
         RequiredContentProfileApi requiredContentProfiles =
                 RequiredContentProfileApi.unavailable();
+        ManagedBatchAdmissionAuthority managedBatchAdmissions =
+                ManagedBatchAdmissionAuthority.unavailable();
         if (dependencies.managedActivities() != null
                 && dependencies.populationGroups() != null
                 && dependencies.admissionProviders() != null) {
@@ -202,6 +204,7 @@ public final class ReplacementTameworkApiFactory {
             populationAdmissions = admission;
             admissionProviders = dependencies.admissionProviders();
             requiredContentProfiles = admission;
+            managedBatchAdmissions = admission;
         }
         ReplacementTameworkApi api = new ReplacementTameworkApi(
                 base,
@@ -216,7 +219,8 @@ public final class ReplacementTameworkApiFactory {
                 bondedApi,
                 populationAdmissions,
                 admissionProviders,
-                requiredContentProfiles
+                requiredContentProfiles,
+                managedBatchAdmissions
         );
         AutoCloseable timedEventBridge = timedFacade == null
                 ? () -> { }

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework;
 
 import com.alechilles.alecstamework.api.internal
         .ReplacementFeatureApiDependencies;
+import com.alechilles.alecstamework.api.internal.AdmissionProviderRegistry;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.population
@@ -61,6 +62,7 @@ final class TameworkRestoredFeatureComposition implements AutoCloseable {
     private final HytaleLogger logger;
     private final HytaleReplacementFeatureLiveEvidenceSource liveEvidence;
     private final ReplacementFeatureApiDependencies apiDependencies;
+    private final AdmissionProviderRegistry admissionProviders;
     private final SpawnerTameAndLinkEvidenceSource tameAndLinkEvidence;
     private final CapturedItemCoopRuntime.Submission capturedItemCoop;
     private final AtomicBoolean capturedItemCoopInstalled =
@@ -71,6 +73,7 @@ final class TameworkRestoredFeatureComposition implements AutoCloseable {
             HytaleLogger logger,
             HytaleReplacementFeatureLiveEvidenceSource liveEvidence,
             ReplacementFeatureApiDependencies apiDependencies,
+            AdmissionProviderRegistry admissionProviders,
             SpawnerTameAndLinkEvidenceSource tameAndLinkEvidence,
             CapturedItemCoopRuntime.Submission capturedItemCoop
     ) {
@@ -80,6 +83,9 @@ final class TameworkRestoredFeatureComposition implements AutoCloseable {
         );
         this.apiDependencies = Objects.requireNonNull(
                 apiDependencies, "apiDependencies"
+        );
+        this.admissionProviders = Objects.requireNonNull(
+                admissionProviders, "admissionProviders"
         );
         this.tameAndLinkEvidence = Objects.requireNonNull(
                 tameAndLinkEvidence, "tameAndLinkEvidence"
@@ -153,6 +159,8 @@ final class TameworkRestoredFeatureComposition implements AutoCloseable {
                         new TameworkFullStateSnapshotReader(snapshots)
                 );
         CapturedItemCoopAuthor coop = new CapturedItemCoopAuthor(facades);
+        AdmissionProviderRegistry admissionProviders =
+                new AdmissionProviderRegistry(Duration.ofSeconds(2));
         ReplacementFeatureApiDependencies dependencies =
                 new ReplacementFeatureApiDependencies(
                         populationGroups,
@@ -163,13 +171,17 @@ final class TameworkRestoredFeatureComposition implements AutoCloseable {
                         diagnostics.availability(),
                         diagnostics.incidents(),
                         true,
-                        true
+                        true,
+                        null,
+                        plugin.getManagedActivityConfigRegistry(),
+                        admissionProviders
                 );
         return new TameworkRestoredFeatureComposition(
-                        plugin.getLogger(),
-                        live,
-                        dependencies,
-                        tameAndLink,
+                plugin.getLogger(),
+                live,
+                dependencies,
+                admissionProviders,
+                tameAndLink,
                         coop::capture
                 );
     }
@@ -273,6 +285,10 @@ final class TameworkRestoredFeatureComposition implements AutoCloseable {
                             + "before shutdown."
             );
         }
-        liveEvidence.close();
+        try {
+            liveEvidence.close();
+        } finally {
+            admissionProviders.close();
+        }
     }
 }

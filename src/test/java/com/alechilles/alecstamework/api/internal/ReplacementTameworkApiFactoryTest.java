@@ -1,12 +1,14 @@
 package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
+import com.alechilles.alecstamework.api.OwnerPopulationCapDecisionViewV2;
 import com.alechilles.alecstamework.api.CommandTimedSummoningChangedEvent;
 import com.alechilles.alecstamework.api.CommandTimedSummoningState;
 import com.alechilles.alecstamework.api.CommandTimedSummoningView;
 import com.alechilles.alecstamework.api.PersistenceMutationAvailabilityView;
 import com.alechilles.alecstamework.api.ProfileDataCompareAndSetRequest;
 import com.alechilles.alecstamework.api.ProfileDataCompareAndSetResult;
+import com.alechilles.alecstamework.api.PopulationAdmissionToken;
 import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TameworkApiCapability;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
@@ -41,6 +43,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ReplacementTameworkApiFactoryTest {
@@ -140,6 +143,34 @@ class ReplacementTameworkApiFactoryTest {
                          )) {
                 TameworkApi api = composition.api();
                 assertTrue(api instanceof ReplacementTameworkApi);
+                ReplacementTameworkApi replacement =
+                        (ReplacementTameworkApi) api;
+                ManagedBatchAdmissionAuthority batchAuthority =
+                        replacement.managedBatchAdmissions();
+                assertNotNull(batchAuthority);
+                assertEquals(
+                        "population-admission-batch-authority-unavailable",
+                        batchAuthority.claimManagedBatch(
+                                new PopulationAdmissionToken(
+                                        UUID.fromString(
+                                                "50000000-0000-0000-0000-000000000001"
+                                        ),
+                                        UUID.fromString(
+                                                "50000000-0000-0000-0000-000000000002"
+                                        ),
+                                        Long.MAX_VALUE,
+                                        0L,
+                                        "unavailable",
+                                        OwnerPopulationCapDecisionViewV2.Readiness.UNAVAILABLE
+                                )
+                        ).reason()
+                );
+                assertEquals(
+                        "required-content-profile-authority-unavailable",
+                        api.requiredContentProfiles()
+                                .status("runeteria:husbandry")
+                                .detail()
+                );
                 assertTrue(api.getCapabilities().containsAll(List.of(
                         TameworkApiCapability.PERSISTENCE_RESILIENCE,
                         TameworkApiCapability.POPULATION_GROUPS,

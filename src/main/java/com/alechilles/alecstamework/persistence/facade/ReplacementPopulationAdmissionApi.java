@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.api.PopulationBatchAdmissionRequest;
 import com.alechilles.alecstamework.api.RequiredContentProfileApi;
 import com.alechilles.alecstamework.api.RequiredContentProfileStatus;
 import com.alechilles.alecstamework.api.internal.AdmissionProviderRegistry;
+import com.alechilles.alecstamework.api.internal.ManagedBatchAdmissionAuthority;
 import com.alechilles.alecstamework.companion.population.domain.ManagedAdmissionEvidenceAuthor;
 import com.alechilles.alecstamework.companion.population.domain.ManagedBatchAdmissionRequest;
 import com.alechilles.alecstamework.companion.population.domain.ManagedBatchSettlement;
@@ -47,7 +48,8 @@ import javax.annotation.Nullable;
 
 /** Replacement-persistence facade for staged provider-aware admission. */
 public final class ReplacementPopulationAdmissionApi
-        implements PopulationAdmissionApi, RequiredContentProfileApi {
+        implements PopulationAdmissionApi, RequiredContentProfileApi,
+        ManagedBatchAdmissionAuthority {
     private static final String UNAVAILABLE =
             "population-admission-authority-unavailable";
 
@@ -206,6 +208,7 @@ public final class ReplacementPopulationAdmissionApi
 
     /** Internal aggregate litter path. The legacy public batch API remains unavailable. */
     @Nonnull
+    @Override
     public CompletionStage<PopulationAdmissionDecision> prepareManagedBatch(
             @Nonnull ManagedBatchAdmissionRequest request
     ) {
@@ -226,6 +229,7 @@ public final class ReplacementPopulationAdmissionApi
 
     /** Internal claim boundary used immediately before the first litter child. */
     @Nonnull
+    @Override
     public PopulationAdmissionDecision claimManagedBatch(
             @Nonnull PopulationAdmissionToken token
     ) {
@@ -234,6 +238,7 @@ public final class ReplacementPopulationAdmissionApi
 
     /** Internal exact ordinal settlement boundary for one managed litter. */
     @Nonnull
+    @Override
     public CompletionStage<ManagedBatchSettlement> settleManagedBatch(
             @Nonnull PopulationAdmissionToken token,
             @Nonnull java.util.Set<Integer> settledOrdinals,

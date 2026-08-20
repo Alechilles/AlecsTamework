@@ -57,6 +57,7 @@ public final class ReplacementTameworkApi
     private final PopulationAdmissionApi populationAdmissions;
     private final AdmissionProviderApi admissionProviders;
     private final RequiredContentProfileApi requiredContentProfiles;
+    private final ManagedBatchAdmissionAuthority managedBatchAdmissions;
     private final PolicyApi policies;
     private final AtomicBoolean closed = new AtomicBoolean();
 
@@ -73,7 +74,8 @@ public final class ReplacementTameworkApi
             @Nonnull BondedCompanionApi bondedCompanions,
             @Nonnull PopulationAdmissionApi populationAdmissions,
             @Nonnull AdmissionProviderApi admissionProviders,
-            @Nonnull RequiredContentProfileApi requiredContentProfiles
+            @Nonnull RequiredContentProfileApi requiredContentProfiles,
+            @Nonnull ManagedBatchAdmissionAuthority managedBatchAdmissions
     ) {
         this.base = Objects.requireNonNull(base, "base");
         this.persistence = Objects.requireNonNull(
@@ -113,6 +115,10 @@ public final class ReplacementTameworkApi
         this.requiredContentProfiles = Objects.requireNonNull(
                 requiredContentProfiles,
                 "requiredContentProfiles"
+        );
+        this.managedBatchAdmissions = Objects.requireNonNull(
+                managedBatchAdmissions,
+                "managedBatchAdmissions"
         );
         this.policies = new ReadinessPolicyApi(
                 base.policies(),
@@ -236,6 +242,16 @@ public final class ReplacementTameworkApi
     @Override
     public RequiredContentProfileApi requiredContentProfiles() {
         return requiredContentProfiles;
+    }
+
+    /**
+     * Returns the internal aggregate newborn authority for Tamework runtime
+     * integrations. The authority is fail-closed when the managed composition
+     * is not available.
+     */
+    @Nonnull
+    public ManagedBatchAdmissionAuthority managedBatchAdmissions() {
+        return managedBatchAdmissions;
     }
 
     @Override
