@@ -70,17 +70,19 @@ final class TameworkPersistenceAuthors {
                 new ExactCheckpointCompanionRecallRecovery(
                         facades, identityIndex, retirementType, logger
                 );
+        ReplacementCompanionEntityCheckpointSink checkpointSink =
+                new ReplacementCompanionEntityCheckpointSink(
+                        facades,
+                        detail -> logger.at(Level.WARNING).log(detail),
+                        identityIndex,
+                        exactRecallRecovery::recoverReturnedOriginal,
+                        exactRecallRecovery::suppressesCheckpoint
+                );
         CommandLinkedNpcStateSnapshotService stateSnapshots =
                 new CommandLinkedNpcStateSnapshotService(
                         profileSnapshots,
                         identityIndex,
-                        new ReplacementCompanionEntityCheckpointSink(
-                                facades,
-                                detail -> logger.at(Level.WARNING).log(detail),
-                                identityIndex,
-                                exactRecallRecovery::recoverReturnedOriginal,
-                                exactRecallRecovery::suppressesCheckpoint
-                        )
+                        checkpointSink
                 );
         TameworkFullStateSnapshotReader snapshots =
                 new TameworkFullStateSnapshotReader(
@@ -95,6 +97,7 @@ final class TameworkPersistenceAuthors {
 
         return new Bundle(
                 stateSnapshots,
+                checkpointSink,
                 captureAuthor(
                         facades,
                         events,
@@ -197,6 +200,7 @@ final class TameworkPersistenceAuthors {
     /** Released gameplay boundaries built over one immutable facade reference. */
     record Bundle(
             CommandLinkedNpcStateSnapshotService snapshots,
+            ReplacementCompanionEntityCheckpointSink checkpointSink,
             SpawnerCaptureAuthor captureAuthor,
             SpawnerCapturedArtifactReleaseAuthor releaseAuthor,
             FreeCompanionRestorationAuthor restorationAuthor,
@@ -207,6 +211,7 @@ final class TameworkPersistenceAuthors {
     ) {
         Bundle {
             Objects.requireNonNull(snapshots, "snapshots");
+            Objects.requireNonNull(checkpointSink, "checkpointSink");
             Objects.requireNonNull(captureAuthor, "captureAuthor");
             Objects.requireNonNull(releaseAuthor, "releaseAuthor");
             Objects.requireNonNull(restorationAuthor, "restorationAuthor");

@@ -1,25 +1,33 @@
 package com.alechilles.alecstamework.items.persistence.checkpoint;
 
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionKey;
+import com.alechilles.alecstamework.companion.extension.ProfileExtensionData;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutation;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutationAction;
+import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
-import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex;
+import com.alechilles.alecstamework.items.persistence.maintenance.LatestWorkCoordinator;
+import com.alechilles.alecstamework.items.persistence.maintenance.MaintenanceDrainResult;
+import com.alechilles.alecstamework.items.persistence.maintenance.MaintenanceMetricsSnapshot;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
+import com.alechilles.alecstamework.persistence.kernel.StorageFailure;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.operation.PublicOperationSubmission;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -44,8 +52,8 @@ public final class ReplacementCompanionEntityCheckpointSink
     private final LoadedNpcIdentityIndex identities;
     private final Consumer<CompanionEntityCheckpoint> published;
     private final Predicate<NpcAlias> suppressed;
-    private final ConcurrentHashMap<UUID, CompletableFuture<Void>> chains =
-            new ConcurrentHashMap<>();
+    private final LatestWorkCoordinator<UUID, CompanionEntityCheckpointCapture>
+            coordinator;
 
     public ReplacementCompanionEntityCheckpointSink(
             @Nonnull PersistenceDomainFacades persistence,
@@ -71,44 +79,79 @@ public final class ReplacementCompanionEntityCheckpointSink
         this.identities = identities;
         this.published = Objects.requireNonNull(published, "published");
         this.suppressed = Objects.requireNonNull(suppressed, "suppressed");
+        this.coordinator = new LatestWorkCoordinator<>(
+                4,
+                (alias, capture) -> persistWithWarning(alias, capture)
+        );
     }
 
     @Override
-    public void publish(CompanionEntityCheckpointCapture capture) {
+    @Nonnull
+    public CompletionStage<Void> publish(CompanionEntityCheckpointCapture capture) {
         if (capture == null) {
-            return;
+            return CompletableFuture.completedFuture(null);
         }
         if (suppressed.test(capture.alias())) {
-            return;
+            return CompletableFuture.completedFuture(null);
         }
-        UUID alias = capture.alias().value();
-        chains.compute(alias, (ignored, previous) -> {
-            CompletableFuture<Void> base = previous == null
-                    ? CompletableFuture.completedFuture(null)
-                    : previous.handle((value, failure) -> null);
-            CompletableFuture<Void> next = base.thenCompose(
-                    unused -> persist(capture, 0)
+        return coordinator.submit(capture.alias().value(), capture);
+    }
+
+    /** Waits until the newest accepted checkpoint for one alias is durable. */
+    @Nonnull
+    public CompletionStage<Void> flush(@Nonnull NpcAlias alias) {
+        return coordinator.flush(
+                Objects.requireNonNull(alias, "alias").value()
+        );
+    }
+
+    /** Returns bounded checkpoint admission evidence. */
+    @Nonnull
+    public MaintenanceMetricsSnapshot metrics() {
+        return coordinator.metrics();
+    }
+
+    /** Stops admission and drains retained checkpoint work by the deadline. */
+    @Nonnull
+    public MaintenanceDrainResult shutdown(@Nonnull Duration timeout) {
+        return coordinator.shutdown(Objects.requireNonNull(timeout, "timeout"));
+    }
+
+    private CompletionStage<Void> persistWithWarning(
+            UUID alias,
+            CompanionEntityCheckpointCapture capture
+    ) {
+        CompletionStage<Void> persistence;
+        try {
+            persistence = persist(capture, 0);
+        } catch (Throwable failure) {
+            warnFailure(alias, failure);
+            return CompletableFuture.failedFuture(failure);
+        }
+        if (persistence == null) {
+            NullPointerException failure = new NullPointerException(
+                    "Checkpoint persistence returned no completion"
             );
-            next.whenComplete((value, failure) -> {
-                chains.remove(alias, next);
-                if (failure != null) {
-                    warnings.accept(
-                            "Companion checkpoint persistence failed for npc="
-                                    + alias + ": "
-                                    + failure.getClass().getSimpleName()
-                    );
-                }
-            });
-            return next;
+            warnFailure(alias, failure);
+            return CompletableFuture.failedFuture(failure);
+        }
+        return persistence.whenComplete((ignored, failure) -> {
+            if (failure != null) {
+                warnFailure(alias, failure);
+            }
         });
     }
 
-    private CompletableFuture<Void> persist(
+    private CompletionStage<Void> persist(
             CompanionEntityCheckpointCapture capture,
             int returnedIdentityAttempt
     ) {
         return persistence.queries().findProfile(capture.alias())
                 .thenCompose(read -> {
+                    if (read instanceof PersistenceReadResult.Failed<
+                            CompanionProfileReadModel> failed) {
+                        return failedStorage(failed.failure());
+                    }
                     if (!(read instanceof PersistenceReadResult.Found<
                             CompanionProfileReadModel> found)) {
                         return CompletableFuture.completedFuture(null);
@@ -122,10 +165,10 @@ public final class ReplacementCompanionEntityCheckpointSink
                     return persistReturned(
                             found.value(), capture, returnedIdentityAttempt
                     );
-                }).toCompletableFuture();
+                });
     }
 
-    private CompletableFuture<Void> persistReturned(
+    private CompletionStage<Void> persistReturned(
             CompanionProfileReadModel profile,
             CompanionEntityCheckpointCapture capture,
             int returnedIdentityAttempt
@@ -163,6 +206,10 @@ public final class ReplacementCompanionEntityCheckpointSink
         }
         return persistence.queries().findAlias(capture.alias())
                 .thenCompose(read -> {
+                    if (read instanceof PersistenceReadResult.Failed<
+                            CompanionAlias> failed) {
+                        return failedStorage(failed.failure());
+                    }
                     if (!(read instanceof PersistenceReadResult.Found<
                             CompanionAlias> found)) {
                         return CompletableFuture.completedFuture(null);
@@ -177,16 +224,22 @@ public final class ReplacementCompanionEntityCheckpointSink
                     return checkpoint == null
                             ? CompletableFuture.completedFuture(null)
                             : submitAndPublish(checkpoint);
-                }).toCompletableFuture();
+                });
     }
 
-    private CompletableFuture<Void> submitAndPublish(
+    private CompletionStage<Void> submitAndPublish(
             CompanionEntityCheckpoint checkpoint
     ) {
-        return submit(checkpoint).thenRun(() -> published.accept(checkpoint));
+        ProfileExtensionKey extensionKey = key(checkpoint);
+        return currentCheckpoint(extensionKey).thenCompose(current -> {
+            if (current != null && equivalent(current, checkpoint)) {
+                return CompletableFuture.completedFuture(null);
+            }
+            return submit(checkpoint).thenRun(() -> published.accept(checkpoint));
+        });
     }
 
-    private CompletableFuture<Void> submit(
+    private CompletionStage<Void> submit(
             CompanionEntityCheckpoint checkpoint
     ) {
         String payload = codec.encode(checkpoint);
@@ -228,7 +281,99 @@ public final class ReplacementCompanionEntityCheckpointSink
                         result.failure()
                 );
             }
-        }).toCompletableFuture();
+        });
+    }
+
+    private CompletionStage<CompanionEntityCheckpoint> currentCheckpoint(
+            ProfileExtensionKey key
+    ) {
+        var projected = persistence.queries().projectedExtension(key);
+        if (projected.isPresent()) {
+            return decode(projected.get().jsonPayload());
+        }
+        return persistence.queries().findExtension(key).thenCompose(read -> {
+            if (read instanceof PersistenceReadResult.Failed<
+                    ProfileExtensionData> failed) {
+                return failedStorage(failed.failure());
+            }
+            if (!(read instanceof PersistenceReadResult.Found<
+                    ProfileExtensionData> found)) {
+                return CompletableFuture.completedFuture(null);
+            }
+            return decode(found.value().jsonPayload());
+        });
+    }
+
+    private CompletionStage<CompanionEntityCheckpoint> decode(String payload) {
+        try {
+            return CompletableFuture.completedFuture(codec.decode(payload));
+        } catch (RuntimeException failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+    }
+
+    private static boolean equivalent(
+            CompanionEntityCheckpoint current,
+            CompanionEntityCheckpoint candidate
+    ) {
+        return current.profileId().equals(candidate.profileId())
+                && current.alias().equals(candidate.alias())
+                && current.sourceAlias().equals(candidate.sourceAlias())
+                && current.aliasGeneration() == candidate.aliasGeneration()
+                && current.ownerId().equals(candidate.ownerId())
+                && current.lifecycleRevision().equals(
+                        candidate.lifecycleRevision()
+                )
+                && current.reconciliationGeneration().equals(
+                        candidate.reconciliationGeneration()
+                )
+                && current.worldKey().equals(candidate.worldKey())
+                && Double.compare(current.x(), candidate.x()) == 0
+                && Double.compare(current.y(), candidate.y()) == 0
+                && Double.compare(current.z(), candidate.z()) == 0
+                && current.holder().equals(candidate.holder())
+                && equivalentBoundary(current.boundary(), candidate.boundary());
+    }
+
+    private static boolean equivalentBoundary(
+            CompanionEntityCheckpoint.CaptureBoundary current,
+            CompanionEntityCheckpoint.CaptureBoundary candidate
+    ) {
+        return candidate == CompanionEntityCheckpoint.CaptureBoundary.LOADED
+                ? current == CompanionEntityCheckpoint.CaptureBoundary.LOADED
+                || current == CompanionEntityCheckpoint.CaptureBoundary.UNLOAD
+                : current == candidate;
+    }
+
+    private static <T> CompletionStage<T> failedStorage(
+            StorageFailure failure
+    ) {
+        Throwable cause = failure.cause();
+        return CompletableFuture.failedFuture(
+                new IllegalStateException(failure.code(), cause)
+        );
+    }
+
+    private void warnFailure(UUID alias, Throwable failure) {
+        Throwable unwrapped = unwrap(failure);
+        String message = unwrapped.getMessage();
+        if (message == null || message.isBlank()) {
+            message = unwrapped.getClass().getSimpleName();
+        }
+        warnings.accept(
+                "Companion checkpoint persistence failed for npc="
+                        + alias + ": " + message
+        );
+    }
+
+    private static Throwable unwrap(Throwable failure) {
+        Throwable current = failure;
+        while ((current instanceof CompletionException
+                || current instanceof ExecutionException)
+                && current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current;
     }
 
     /** Returns the stable extension key for one alias checkpoint. */

@@ -27,6 +27,8 @@ import com.alechilles.alecstamework.items.persistence
 import com.alechilles.alecstamework.items.coop.DirectLiveCoopAuthor;
 import com.alechilles.alecstamework.items.coop.DirectLiveCoopProjectionView;
 import com.alechilles.alecstamework.items.persistence.checkpoint.ExactCheckpointCompanionRecallRecovery;
+import com.alechilles.alecstamework.items.persistence.checkpoint.ReplacementCompanionEntityCheckpointSink;
+import com.alechilles.alecstamework.items.persistence.maintenance.MaintenanceDrainResult;
 import com.alechilles.alecstamework.npc.components
         .TameworkPersistenceRetirementComponent;
 import com.alechilles.alecstamework.lifecycle
@@ -98,6 +100,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
     private final PersistenceDiagnosticExporter diagnosticsExporter;
     private final PersistenceDomainFacades facades;
     private final CommandLinkedNpcStateSnapshotService snapshots;
+    private final ReplacementCompanionEntityCheckpointSink checkpointSink;
     private final SpawnerCaptureAuthor captureAuthor;
     private final SpawnerCapturedArtifactReleaseAuthor releaseAuthor;
     private final FreeCompanionRestorationAuthor restorationAuthor;
@@ -115,6 +118,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             PersistenceDiagnosticExporter diagnosticsExporter,
             PersistenceDomainFacades facades,
             CommandLinkedNpcStateSnapshotService snapshots,
+            ReplacementCompanionEntityCheckpointSink checkpointSink,
             SpawnerCaptureAuthor captureAuthor,
             SpawnerCapturedArtifactReleaseAuthor releaseAuthor,
             FreeCompanionRestorationAuthor restorationAuthor,
@@ -130,6 +134,9 @@ final class TameworkPersistenceComposition implements AutoCloseable {
         this.diagnosticsExporter = diagnosticsExporter;
         this.facades = facades;
         this.snapshots = snapshots;
+        this.checkpointSink = Objects.requireNonNull(
+                checkpointSink, "checkpointSink"
+        );
         this.captureAuthor = captureAuthor;
         this.releaseAuthor = releaseAuthor;
         this.restorationAuthor = restorationAuthor;
@@ -451,6 +458,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 diagnosticsExporter,
                 facades,
                 authors.snapshots(),
+                authors.checkpointSink(),
                 authors.captureAuthor(),
                 authors.releaseAuthor(),
                 authors.restorationAuthor(),
@@ -596,6 +604,11 @@ final class TameworkPersistenceComposition implements AutoCloseable {
         return snapshots;
     }
 
+    @Nonnull
+    ReplacementCompanionEntityCheckpointSink checkpointSink() {
+        return checkpointSink;
+    }
+
     ExactCheckpointCompanionRecallRecovery exactRecallRecovery() {
         return exactRecallRecovery;
     }
@@ -645,7 +658,34 @@ final class TameworkPersistenceComposition implements AutoCloseable {
     PublicPersistenceShutdownReport shutdown() {
         startupResumer.close();
         restoredFeatures.close();
-        return bootstrap.shutdown(SHUTDOWN_TIMEOUT);
+        long startedAtNanos = System.nanoTime();
+        MaintenanceDrainResult checkpointDrain = checkpointSink.shutdown(
+                SHUTDOWN_TIMEOUT
+        );
+        if (!checkpointDrain.drained()) {
+            logger.at(Level.WARNING).log(
+                    "Checkpoint maintenance did not drain before persistence "
+                            + "shutdown deadline: pending=%d, inFlight=%d",
+                    checkpointDrain.pendingKeys(),
+                    checkpointDrain.inFlightWork()
+            );
+        }
+        return bootstrap.shutdown(remainingShutdownTimeout(startedAtNanos));
+    }
+
+    private Duration remainingShutdownTimeout(long startedAtNanos) {
+        long elapsed = System.nanoTime() - startedAtNanos;
+        if (elapsed <= 0) {
+            return SHUTDOWN_TIMEOUT;
+        }
+        long total;
+        try {
+            total = SHUTDOWN_TIMEOUT.toNanos();
+        } catch (ArithmeticException overflow) {
+            return SHUTDOWN_TIMEOUT;
+        }
+        long remaining = total - elapsed;
+        return remaining <= 0 ? Duration.ZERO : Duration.ofNanos(remaining);
     }
 
     @Override
