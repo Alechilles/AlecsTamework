@@ -155,6 +155,10 @@ class SqliteSchemaV2ManagerTest {
         assertEquals(expected, new SqliteSchemaV2Manager(
                 connections("hash.sqlite"), () -> -5_000
         ).schemaHash());
+        assertEquals(
+                "b72b00e5e77277f936866aa2f20555c3d35473379e40b6608890b9f0a382d5d7",
+                expected
+        );
     }
 
     @Test
