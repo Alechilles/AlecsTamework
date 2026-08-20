@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.companion.coop;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
+import com.alechilles.alecstamework.companion.population.domain.LifecycleAdmissionEvidenceJsonCodec;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacementJsonCodec;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshotJsonCodec;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
@@ -58,13 +59,21 @@ public final class CompanionCoopReleaseDefinition
         );
         json.addProperty("spawnReceiptKey", payload.spawnReceiptKey());
         json.addProperty("requestedAtMs", payload.requestedAtMs());
+        if (payload.admissionEvidence() != null) {
+            json.add(
+                    "admissionEvidence",
+                    LifecycleAdmissionEvidenceJsonCodec.encode(
+                            payload.admissionEvidence()
+                    )
+            );
+        }
         return json.toString();
     }
 
     @Override
     public CompanionCoopReleaseRequest decode(String payloadJson) {
         JsonObject json = JsonParser.parseString(payloadJson).getAsJsonObject();
-        return new CompanionCoopReleaseRequest(
+        CompanionCoopReleaseRequest decoded = new CompanionCoopReleaseRequest(
                 ProfileId.parse(json.get("profileId").getAsString()),
                 new LifecycleRevision(
                         json.get("expectedLifecycleRevision").getAsLong()
@@ -80,6 +89,14 @@ public final class CompanionCoopReleaseDefinition
                 json.get("spawnReceiptKey").getAsString(),
                 json.get("requestedAtMs").getAsLong()
         );
+        return json.has("admissionEvidence")
+                && !json.get("admissionEvidence").isJsonNull()
+                ? decoded.withAdmissionEvidence(
+                        LifecycleAdmissionEvidenceJsonCodec.decode(
+                                json.getAsJsonObject("admissionEvidence")
+                        )
+                )
+                : decoded;
     }
 
     private JsonObject encodeResidency(CoopResidency residency) {

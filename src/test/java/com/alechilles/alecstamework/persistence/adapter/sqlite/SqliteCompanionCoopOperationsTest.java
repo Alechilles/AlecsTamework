@@ -75,6 +75,8 @@ class SqliteCompanionCoopOperationsTest {
     private SqliteConnectionFactory connections;
     private SqliteSingleWriter writer;
     private SqliteReadExecutor reads;
+    private SqliteOperationEngine engine;
+    private SqliteOperationPublisher publisher;
     private SqliteCompanionCoopCaptureOperations captures;
     private SqliteCompanionCoopReleaseOperations releases;
     private CoopResidencyProjectionIndex index;
@@ -84,12 +86,12 @@ class SqliteCompanionCoopOperationsTest {
         connections = new SqliteConnectionFactory(
                 tempDir.resolve("tamework-state.sqlite")
         );
-        new SqliteSchemaV1Manager(connections, () -> -10_000).initialize();
+        new SqliteSchemaV2Manager(connections, () -> -10_000).initialize();
         seedLiveProfile();
         writer = new SqliteSingleWriter(connections);
         reads = new SqliteReadExecutor(connections);
         SqliteUnitOfWorkRunner units = new SqliteUnitOfWorkRunner(writer, reads);
-        SqliteOperationEngine engine = new SqliteOperationEngine(
+        engine = new SqliteOperationEngine(
                 new OperationDefinitionRegistry(List.of(
                         CoopSlotRegistrationDefinition.INSTANCE,
                         CompanionCoopCaptureDefinition.INSTANCE,
@@ -104,7 +106,7 @@ class SqliteCompanionCoopOperationsTest {
         );
         SqliteOperationEvidenceReader evidence =
                 new SqliteOperationEvidenceReader(reads);
-        SqliteOperationPublisher publisher = new SqliteOperationPublisher(
+        publisher = new SqliteOperationPublisher(
                 engine, evidence, projections, () -> -400
         );
         index = new CoopResidencyProjectionIndex();
@@ -351,6 +353,95 @@ class SqliteCompanionCoopOperationsTest {
         assertEquals(LifecycleState.ACTIVE, lifecycle().state());
         assertTrue(slot().reserved());
         assertTrue(residency().isEmpty());
+    }
+
+    @Test
+    void sameOwnerWorldReleaseRemainsNeutralWithoutAdmissionGateway()
+            throws Exception {
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLISHED,
+                capture(20, confirmedRetirement()).status()
+        );
+        AtomicInteger liveCalls = new AtomicInteger();
+        SqliteCompanionCoopReleaseOperations managedReleases =
+                new SqliteCompanionCoopReleaseOperations(
+                        engine,
+                        publisher,
+                        () -> -300,
+                        new SqliteOperationReader(reads),
+                        new SqliteLifecycleAdmissionBinding(),
+                        new SqliteLifecycleAdmissionSourceReader(reads),
+                        List.of(index)
+                );
+        CompanionCoopReleaseRequest request = new CompanionCoopReleaseRequest(
+                PROFILE,
+                new LifecycleRevision(2),
+                residency().orElseThrow(),
+                snapshot(),
+                TARGET_ALIAS,
+                new CompanionSpawnPlacement(
+                        "world", -12.5, -63.05, -4.5,
+                        -0.25f, -1.5f, -0.5f
+                ),
+                "same-world-spawn-receipt",
+                -350
+        );
+        OperationWorkflowResult result = managedReleases.submit(
+                operationId(21),
+                new IdempotencyKey("coop-release-same-world"),
+                request,
+                (release, operation) -> {
+                    liveCalls.incrementAndGet();
+                    return LiveOperationResult.confirmed(
+                            "spawn_receipt_confirmed"
+                    ).completed();
+                }
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLISHED,
+                result.status(),
+                () -> String.valueOf(result.failure())
+        );
+        assertEquals(1, liveCalls.get());
+        assertEquals(LifecycleState.ACTIVE, lifecycle().state());
+        assertEquals("world", lifecycle().ownerWorldKey());
+    }
+
+    @Test
+    void crossOwnerWorldReleaseFailsBeforeLiveWhenAdmissionIsUnbound()
+            throws Exception {
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLISHED,
+                capture(22, confirmedRetirement()).status()
+        );
+        AtomicInteger liveCalls = new AtomicInteger();
+        SqliteCompanionCoopReleaseOperations managedReleases =
+                new SqliteCompanionCoopReleaseOperations(
+                        engine,
+                        publisher,
+                        () -> -300,
+                        new SqliteOperationReader(reads),
+                        new SqliteLifecycleAdmissionBinding(),
+                        new SqliteLifecycleAdmissionSourceReader(reads),
+                        List.of(index)
+                );
+        OperationWorkflowResult result = managedReleases.submit(
+                operationId(23),
+                new IdempotencyKey("coop-release-cross-world-unbound"),
+                releaseRequest(),
+                (release, operation) -> {
+                    liveCalls.incrementAndGet();
+                    return LiveOperationResult.confirmed(
+                            "must_not_run"
+                    ).completed();
+                }
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(OperationWorkflowResult.Status.PREPARE_FAILED, result.status());
+        assertEquals(0, liveCalls.get());
+        assertEquals(LifecycleState.COOP, lifecycle().state());
+        assertFalse(slot().reserved());
     }
 
     private OperationWorkflowResult capture(

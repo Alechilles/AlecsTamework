@@ -15,21 +15,23 @@ import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivatio
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationOutcome;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationRequest;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
+import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
-import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.operation.PreparedOperationDetail;
+import com.alechilles.alecstamework.persistence.operation.TimedDurableOperationWork;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /** Initial provisioned entity activation through the shared live protocol. */
 public final class SqliteProvisioningActivationOperations {
@@ -38,12 +40,36 @@ public final class SqliteProvisioningActivationOperations {
     private final SqliteLiveOperationCoordinator workflow;
     private final SqliteOperationEngine operations;
     private final LongSupplier clock;
+    @Nullable
+    private final SqliteManagedProvisioningActivationAdmission admission;
+    private final SqliteLifecycleAdmissionSingleFlight singleFlight =
+            new SqliteLifecycleAdmissionSingleFlight();
     private final List<ProjectionConsumer> requiredConsumers;
 
     public SqliteProvisioningActivationOperations(
             @Nonnull SqliteOperationEngine operations,
             @Nonnull SqliteOperationPublisher publisher,
             @Nonnull LongSupplier clock,
+            @Nonnull List<? extends ProjectionConsumer> requiredConsumers
+    ) {
+        this(
+                operations,
+                publisher,
+                clock,
+                null,
+                null,
+                null,
+                requiredConsumers
+        );
+    }
+
+    SqliteProvisioningActivationOperations(
+            @Nonnull SqliteOperationEngine operations,
+            @Nonnull SqliteOperationPublisher publisher,
+            @Nonnull LongSupplier clock,
+            @Nullable SqliteOperationReader reader,
+            @Nullable SqliteLifecycleAdmissionBinding lifecycleAdmission,
+            @Nullable SqliteLifecycleAdmissionSourceReader sourceReader,
             @Nonnull List<? extends ProjectionConsumer> requiredConsumers
     ) {
         if (operations == null || publisher == null || clock == null
@@ -57,6 +83,12 @@ public final class SqliteProvisioningActivationOperations {
         );
         this.operations = operations;
         this.clock = clock;
+        admission = reader == null || lifecycleAdmission == null
+                || sourceReader == null
+                ? null
+                : new SqliteManagedProvisioningActivationAdmission(
+                        reader, lifecycleAdmission, sourceReader
+                );
         this.requiredConsumers = List.copyOf(requiredConsumers);
     }
 
@@ -73,51 +105,145 @@ public final class SqliteProvisioningActivationOperations {
                     "Complete provisioning activation is required"
             );
         }
-        SqlitePopulationGroupTransitionParticipant groups =
-                new SqlitePopulationGroupTransitionParticipant(
-                        request.groupAdmission()
+        IdempotencyKey idempotencyKey = request.origin().activationKey(
+                request.spawnReceiptKey()
+        );
+        if (admission == null) {
+            return execute(operationId, idempotencyKey, request, liveBoundary);
+        }
+        CompletionStage<OperationWorkflowResult> completion =
+                singleFlight.submit(
+                        ProvisioningActivationDefinition.KIND,
+                        operationId,
+                        idempotencyKey,
+                        ProvisioningActivationDefinition.INSTANCE.encode(
+                                request
+                        ),
+                        () -> admission.resolve(
+                                        operationId,
+                                        idempotencyKey,
+                                        request
+                                )
+                                .thenCompose(value -> execute(
+                                        operationId,
+                                        idempotencyKey,
+                                        value,
+                                        liveBoundary
+                                ).completion())
                 );
+        return new Submission(
+                SqliteSingleWriter.WriteAcceptance.ACCEPTED,
+                completion.exceptionally(failure ->
+                        SqliteOperationResults.failed(
+                                OperationWorkflowResult.Status.PREPARE_FAILED,
+                                null,
+                                List.of(),
+                                failure instanceof java.util.concurrent
+                                .CompletionException
+                                && failure.getCause() != null
+                                        ? failure.getCause() : failure
+                        ))
+        );
+    }
+
+    private Submission execute(
+            OperationId operationId,
+            IdempotencyKey idempotencyKey,
+            ProvisioningActivationRequest request,
+            ProvisioningActivationLiveBoundary liveBoundary
+    ) {
+        SqlitePopulationGroupTransitionParticipant groups =
+                needsExternalGroups(request)
+                        ? new SqlitePopulationGroupTransitionParticipant(
+                        request.groupAdmission()
+                ) : null;
         SqliteProvisioningActivationPreparation activation =
                 new SqliteProvisioningActivationPreparation(request);
-        SqliteLiveOperationCoordinator.Submission submission =
-                workflow.execute(
+        SqliteManagedAdmissionParticipant managed =
+                request.admissionEvidence() != null
+                        && request.admissionEvidence().status()
+                        == LifecycleAdmissionEvidence.Status.MANAGED
+                        ? SqliteManagedAdmissionParticipant.from(
+                        operationId, request.admissionEvidence()
+                ) : null;
+        PreparedOperationDetail detail = preparationDetail(
+                groups, activation, managed
+        );
+        TimedDurableOperationWork<ProvisioningActivationRequest> durable =
+                (transaction, operation, payload, committedAtMs) -> commit(
+                        transaction, operation, payload, committedAtMs
+                );
+        if (managed != null) {
+            TimedDurableOperationWork<ProvisioningActivationRequest> delegate =
+                    durable;
+            durable = (transaction, operation, payload, committedAtMs) ->
+                    managed.decorate((current, envelope) -> delegate.execute(
+                            current, envelope, payload, committedAtMs
+                    )).execute(transaction, operation);
+        }
+        if (groups != null) {
+            TimedDurableOperationWork<ProvisioningActivationRequest> delegate =
+                    durable;
+            durable = (transaction, operation, payload, committedAtMs) ->
+                    groups.decorate((current, envelope) -> delegate.execute(
+                            current, envelope, payload, committedAtMs
+                    )).execute(transaction, operation);
+        }
+        SqliteLiveOperationCoordinator.Submission submission = workflow.execute(
                         ProvisioningActivationDefinition.INSTANCE,
                         new OperationRequest<>(
                                 operationId,
-                                request.origin().activationKey(
-                                        request.spawnReceiptKey()
-                                ),
+                                idempotencyKey,
                                 request,
                                 FEATURE_SCOPE,
                                 request.groupAdmission()
                                         .before().revision(),
-                                participants(request),
+                                SqliteProvisioningActivationContainment
+                                        .participants(request),
                                 request.requestedAtMs()
                         ),
-                        PreparedOperationDetail.compose(
-                                groups, activation
-                        ),
+                        detail,
                         liveBoundary,
-                        (transaction, operation, payload, committedAtMs) ->
-                                groups.decorate((current, envelope) ->
-                                        commit(
-                                                current,
-                                                envelope,
-                                                payload,
-                                                committedAtMs
-                                        )).execute(
-                                                transaction, operation
-                                        ),
+                        durable,
                         requiredConsumers,
                         "provisioning_activation"
                 );
         CompletionStage<OperationWorkflowResult> completion =
                 submission.completion().thenCompose(
-                        result -> containUnknown(result, request)
+                        result -> SqliteProvisioningActivationContainment
+                                .contain(operations, clock, result, request)
                 );
         return new Submission(
                 submission.acceptance(), completion
         );
+    }
+
+    private static PreparedOperationDetail preparationDetail(
+            @Nullable SqlitePopulationGroupTransitionParticipant groups,
+            SqliteProvisioningActivationPreparation activation,
+            @Nullable SqliteManagedAdmissionParticipant managed
+    ) {
+        if (groups == null && managed == null) {
+            return activation;
+        }
+        if (groups == null) {
+            return PreparedOperationDetail.compose(activation, managed);
+        }
+        if (managed == null) {
+            return PreparedOperationDetail.compose(groups, activation);
+        }
+        return PreparedOperationDetail.compose(groups, activation, managed);
+    }
+
+    private static boolean needsExternalGroups(
+            ProvisioningActivationRequest request
+    ) {
+        return request.admissionEvidence() == null
+                || request.admissionEvidence().status()
+                != LifecycleAdmissionEvidence.Status.MANAGED
+                || request.admissionEvidence().composition() == null
+                || request.admissionEvidence().composition().groupRequest()
+                == null;
     }
 
     private List<ProjectionEventDraft> commit(
@@ -297,68 +423,6 @@ public final class SqliteProvisioningActivationOperations {
                     timed.expectedMembershipRevision()
             );
         }
-    }
-
-    private CompletionStage<OperationWorkflowResult> containUnknown(
-            OperationWorkflowResult result,
-            ProvisioningActivationRequest request
-    ) {
-        if (result.status() != OperationWorkflowResult.Status.LIVE_UNKNOWN
-                || result.operation() == null) {
-            return CompletableFuture.completedFuture(result);
-        }
-        OperationEnvelope operation = result.operation();
-        return operations.containUnknown(
-                operation,
-                operation.failureCode() == null
-                        ? "provisioning_activation_live_outcome_unknown"
-                        : operation.failureCode(),
-                "Provisioning activation could not prove the exact spawn receipt",
-                containmentScopes(operation, request),
-                clock.getAsLong()
-        ).completion().thenApply(containment ->
-                containment instanceof
-                        com.alechilles.alecstamework.persistence.kernel
-                        .PersistenceTransactionResult.Committed<?>
-                        ? result
-                        : new OperationWorkflowResult(
-                                OperationWorkflowResult.Status.LIVE_UNKNOWN,
-                                operation,
-                                List.of(),
-                                new IllegalStateException(
-                                        "provisioning_activation_unknown_"
-                                                + "containment_failed",
-                                        result.failure()
-                                )
-                        ));
-    }
-
-    private List<OperationScope> participants(
-            ProvisioningActivationRequest request
-    ) {
-        TreeSet<OperationScope> scopes = new TreeSet<>();
-        scopes.add(OperationScope.profile(
-                request.origin().profileId()
-        ));
-        scopes.add(OperationScope.owner(
-                request.groupAdmission().before().ownerId()
-        ));
-        if (request.timedActivation() != null) {
-            scopes.add(OperationScope.commandFamily(
-                    request.timedActivation().familyKey()
-            ));
-        }
-        return List.copyOf(scopes);
-    }
-
-    private List<OperationScope> containmentScopes(
-            OperationEnvelope operation,
-            ProvisioningActivationRequest request
-    ) {
-        ArrayList<OperationScope> scopes = new ArrayList<>();
-        scopes.add(OperationScope.operation(operation.operationId()));
-        scopes.addAll(participants(request));
-        return List.copyOf(scopes);
     }
 
     private static <T> T requireApplied(

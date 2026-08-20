@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionRequest;
 import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -24,7 +25,8 @@ public record ProvisioningActivationRequest(
         @Nonnull CompanionSpawnPlacement placement,
         @Nonnull String spawnReceiptKey,
         @Nullable TimedSummonActivation timedActivation,
-        long requestedAtMs
+        long requestedAtMs,
+        @Nullable LifecycleAdmissionEvidence admissionEvidence
 ) {
     public ProvisioningActivationRequest {
         if (origin == null || groupAdmission == null
@@ -58,9 +60,8 @@ public record ProvisioningActivationRequest(
                                 .LifecycleLocationKind.PROVISIONING,
                         origin.stableKey()
                 )
-        )
+                )
                 || before.ownerId() == null
-                || !placement.worldKey().equals(before.ownerWorldKey())
                 || after.state() != LifecycleState.ACTIVE
                 || !after.location().equals(
                 LifecycleLocation.liveEntity(
@@ -70,9 +71,7 @@ public record ProvisioningActivationRequest(
                 || !java.util.Objects.equals(
                 before.ownerId(), after.ownerId()
         )
-                || !java.util.Objects.equals(
-                before.ownerWorldKey(), after.ownerWorldKey()
-        )
+                || !placement.worldKey().equals(after.ownerWorldKey())
                 || requestedAtMs != groupAdmission.requestedAtMs()
                 || requestedAtMs != after.stateChangedAtMs()) {
             throw new IllegalArgumentException(
@@ -80,6 +79,70 @@ public record ProvisioningActivationRequest(
             );
         }
         requireTimed(timedActivation, before, requestedAtMs);
+        requireAdmissionEvidence(
+                admissionEvidence,
+                origin,
+                before,
+                after,
+                targetAlias,
+                placement.worldKey()
+        );
+    }
+
+    /** Source-compatible constructor without managed admission evidence. */
+    public ProvisioningActivationRequest(
+            ProvisioningOrigin origin,
+            PopulationGroupTransitionAdmissionRequest groupAdmission,
+            NpcAlias targetAlias,
+            String expectedRoleId,
+            SnapshotCodecRegistry.EncodedSnapshot fullState,
+            CompanionSpawnPlacement placement,
+            String spawnReceiptKey,
+            TimedSummonActivation timedActivation,
+            long requestedAtMs
+    ) {
+        this(
+                origin,
+                groupAdmission,
+                targetAlias,
+                expectedRoleId,
+                fullState,
+                placement,
+                spawnReceiptKey,
+                timedActivation,
+                requestedAtMs,
+                null
+        );
+    }
+
+    /** Returns this request with its frozen lifecycle admission evidence attached. */
+    @Nonnull
+    public ProvisioningActivationRequest withAdmissionEvidence(
+            @Nonnull LifecycleAdmissionEvidence evidence
+    ) {
+        if (evidence == null) {
+            throw new IllegalArgumentException(
+                    "Lifecycle admission evidence is required"
+            );
+        }
+        if (admissionEvidence != null
+                && !admissionEvidence.equals(evidence)) {
+            throw new IllegalArgumentException(
+                    "Lifecycle admission evidence cannot be replaced"
+            );
+        }
+        return new ProvisioningActivationRequest(
+                origin,
+                groupAdmission,
+                targetAlias,
+                expectedRoleId,
+                fullState,
+                placement,
+                spawnReceiptKey,
+                timedActivation,
+                requestedAtMs,
+                evidence
+        );
     }
 
     /** Returns the canonical target world without storing a second placement authority. */
@@ -135,6 +198,77 @@ public record ProvisioningActivationRequest(
                 || lease.updatedAtMs() != requestedAtMs) {
             throw new IllegalArgumentException(
                     "Provisioning timed activation must start one full session"
+            );
+        }
+    }
+
+    private static void requireAdmissionEvidence(
+            LifecycleAdmissionEvidence evidence,
+            ProvisioningOrigin origin,
+            CompanionLifecycle before,
+            CompanionLifecycle after,
+            NpcAlias targetAlias,
+            String targetWorld
+    ) {
+        if (evidence == null
+                || evidence.status() != LifecycleAdmissionEvidence.Status.MANAGED) {
+            return;
+        }
+        var payload = evidence.payload();
+        if (payload == null
+                || !payload.profileId().equals(origin.profileId())
+                || !java.util.Objects.equals(
+                payload.expectedLifecycleRevision(), before.revision()
+        )
+                || payload.sourceLifecycle() != before.state()
+                || !java.util.Objects.equals(
+                payload.sourceOwnerId(), before.ownerId()
+        )
+                || !java.util.Objects.equals(
+                payload.sourceWorldKey(), before.ownerWorldKey()
+        )
+                || payload.targetLifecycle() != after.state()
+                || !java.util.Objects.equals(
+                payload.ownerId(), after.ownerId()
+        )
+                || !java.util.Objects.equals(
+                payload.ownerWorldKey(), after.ownerWorldKey()
+        )) {
+            throw new IllegalArgumentException(
+                    "Provisioning activation admission evidence is inconsistent"
+            );
+        }
+        if (after.location().kind()
+                != com.alechilles.alecstamework.companion.lifecycle
+                .LifecycleLocationKind.LIVE_ENTITY
+                || !targetAlias.toString().equals(after.location().key())
+                || !targetWorld.equals(after.location().worldKey())) {
+            throw new IllegalArgumentException(
+                    "Provisioning activation target evidence is inconsistent"
+            );
+        }
+        var convergence = evidence.convergencePlan();
+        if (convergence != null
+                && (!convergence.profileId().equals(origin.profileId())
+                || !convergence.sourceLifecycleRevision().equals(
+                before.revision()
+        )
+                || convergence.sourceState() != before.state()
+                || convergence.targetState() != after.state()
+                || !java.util.Objects.equals(
+                convergence.sourceOwner(), before.ownerId()
+        )
+                || !java.util.Objects.equals(
+                convergence.sourceWorldKey(), before.ownerWorldKey()
+        )
+                || !java.util.Objects.equals(
+                convergence.targetOwner(), after.ownerId()
+        )
+                || !java.util.Objects.equals(
+                convergence.targetWorldKey(), after.ownerWorldKey()
+        ))) {
+            throw new IllegalArgumentException(
+                    "Provisioning activation convergence evidence is inconsistent"
             );
         }
     }

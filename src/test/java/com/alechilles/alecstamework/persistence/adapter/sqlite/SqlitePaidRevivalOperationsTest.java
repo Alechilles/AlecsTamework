@@ -11,6 +11,8 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalDefinition;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalLiveResult;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainScope;
 import com.alechilles.alecstamework.persistence.compensation.RefundClaim;
 import com.alechilles.alecstamework.persistence.operation
         .DurableOperationCleanupBoundary;
@@ -22,6 +24,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
 import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.time.Duration;
@@ -56,7 +59,7 @@ class SqlitePaidRevivalOperationsTest {
         connections = new SqliteConnectionFactory(
                 tempDir.resolve("paid-revival.db")
         );
-        new SqliteSchemaV1Manager(
+        new SqliteSchemaV2Manager(
                 connections, () -> -10_000
         ).initialize();
         PaidRevivalTestSupport.seed(connections);
@@ -182,6 +185,35 @@ class SqlitePaidRevivalOperationsTest {
         assertEquals(0, refunds.get());
         assertTrue(refund(operationId(2)).isEmpty());
         assertCompensatedDead(operationId(2));
+    }
+
+    @Test
+    void managedNoChargeCompensationRetiresDomainReservation()
+            throws Exception {
+        OperationId operationId = operationId(12);
+        var request = PaidRevivalTestSupport.request()
+                .withAdmissionEvidence(LifecycleAdmissionEvidence.managed(
+                        managedPayload(operationId), null
+                ));
+
+        OperationWorkflowResult result = submit(
+                12,
+                request,
+                (value, operation) -> PaidRevivalLiveResult.noCharge(
+                        "no-charge-no-spawn"
+                ).completed()
+        );
+
+        assertEquals(
+                OperationWorkflowResult.Status.COMPENSATED,
+                result.status(),
+                () -> String.valueOf(result.failure())
+        );
+        try (Connection connection = connections.openReadConnection()) {
+            assertTrue(new SqlitePersistenceTransactionContext(connection)
+                    .populationDomains()
+                    .findByOperation(operationId).isEmpty());
+        }
     }
 
     @Test
@@ -428,6 +460,46 @@ class SqlitePaidRevivalOperationsTest {
                 number,
                 PaidRevivalTestSupport.request(),
                 boundary
+        );
+    }
+
+    private PopulationDomainAdmissionOperation.Payload managedPayload(
+            OperationId operationId
+    ) {
+        return new PopulationDomainAdmissionOperation.Payload(
+                UUID.nameUUIDFromBytes((operationId.value()
+                        + ":lifecycle-admission").getBytes(
+                        java.nio.charset.StandardCharsets.UTF_8
+                )),
+                PaidRevivalTestSupport.PROFILE,
+                PaidRevivalTestSupport.OWNER,
+                LifecycleRevision.INITIAL,
+                "world",
+                PaidRevivalTestSupport.OWNER,
+                "world",
+                LifecycleState.DEAD_REVIVABLE,
+                LifecycleState.ACTIVE,
+                "managed-revival-group",
+                "managed-revival-provider",
+                1,
+                "generation",
+                1,
+                1,
+                Long.MAX_VALUE,
+                1,
+                List.of(new PopulationDomainAdmissionOperation.DomainInput(
+                        "managed-revival-test",
+                        PopulationDomainScope.PER_WORLD,
+                        "world",
+                        0,
+                        1,
+                        1,
+                        100,
+                        100,
+                        1
+                )),
+                List.of(),
+                PaidRevivalTestSupport.REQUESTED_AT
         );
     }
 

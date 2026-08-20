@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacementJsonCodec;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionJsonCodec;
+import com.alechilles.alecstamework.companion.population.domain.LifecycleAdmissionEvidenceJsonCodec;
 import com.alechilles.alecstamework.companion.restoration.RestorationProjectionJsonCodec;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshotJsonCodec;
 import com.google.gson.JsonArray;
@@ -84,6 +85,14 @@ public final class PaidRevivalJsonCodec {
                         )
         );
         json.addProperty("requestedAtMs", request.requestedAtMs());
+        if (request.admissionEvidence() != null) {
+            json.add(
+                    "admissionEvidence",
+                    LifecycleAdmissionEvidenceJsonCodec.encode(
+                            request.admissionEvidence()
+                    )
+            );
+        }
         return json.toString();
     }
 
@@ -92,7 +101,7 @@ public final class PaidRevivalJsonCodec {
         JsonObject json = JsonParser.parseString(payloadJson)
                 .getAsJsonObject();
         JsonElement timed = json.get("timedActivation");
-        return new PaidRevivalRequest(
+        PaidRevivalRequest decoded = new PaidRevivalRequest(
                 json.get("callerNamespace").getAsString(),
                 json.get("callerIdempotencyKey").getAsString(),
                 new CommandFamilyKey(
@@ -130,6 +139,14 @@ public final class PaidRevivalJsonCodec {
                         ),
                 json.get("requestedAtMs").getAsLong()
         );
+        return json.has("admissionEvidence")
+                && !json.get("admissionEvidence").isJsonNull()
+                ? decoded.withAdmissionEvidence(
+                        LifecycleAdmissionEvidenceJsonCodec.decode(
+                                json.getAsJsonObject("admissionEvidence")
+                        )
+                )
+                : decoded;
     }
 
     private static JsonArray costs(PaidRevivalRequest request) {

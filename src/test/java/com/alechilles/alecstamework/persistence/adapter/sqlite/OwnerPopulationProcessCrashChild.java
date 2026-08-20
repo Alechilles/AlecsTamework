@@ -10,6 +10,8 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionDefinition;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionRequest;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainScope;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceCheckpoint;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceKernelMetrics;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
@@ -17,9 +19,12 @@ import com.alechilles.alecstamework.persistence.operation.OperationDefinitionReg
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
 import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -45,7 +50,7 @@ final class OwnerPopulationProcessCrashChild {
         Files.createDirectories(database.getParent());
         SqliteConnectionFactory connections =
                 new SqliteConnectionFactory(database);
-        new SqliteSchemaV1Manager(connections, () -> -10_000).initialize();
+        new SqliteSchemaV2Manager(connections, () -> -10_000).initialize();
         seed(connections);
 
         AtomicInteger commitNumber = new AtomicInteger();
@@ -84,6 +89,11 @@ final class OwnerPopulationProcessCrashChild {
                 )),
                 units
         );
+        SqliteLifecycleAdmissionBinding admission =
+                new SqliteLifecycleAdmissionBinding();
+        admission.bind(request -> CompletableFuture.completedFuture(
+                managedEvidence(request.operationId())
+        ));
         SqliteOwnerPopulationTransitionOperations operations =
                 new SqliteOwnerPopulationTransitionOperations(
                         new SqliteDatabaseOperationCoordinator(
@@ -99,6 +109,9 @@ final class OwnerPopulationProcessCrashChild {
                                 ),
                                 () -> -5_000
                         ),
+                        new SqliteOperationReader(reads),
+                        admission,
+                        new SqliteLifecycleAdmissionSourceReader(reads),
                         List.of()
                 );
         operations.submit(OPERATION, IDEMPOTENCY, transition())
@@ -121,6 +134,48 @@ final class OwnerPopulationProcessCrashChild {
                 2,
                 -5_000
         );
+    }
+
+    private static LifecycleAdmissionEvidence managedEvidence(
+            OperationId operationId
+    ) {
+        PopulationDomainAdmissionOperation.Payload payload =
+                new PopulationDomainAdmissionOperation.Payload(
+                        UUID.nameUUIDFromBytes((operationId.value()
+                                + ":lifecycle-admission").getBytes(
+                                java.nio.charset.StandardCharsets.UTF_8
+                        )),
+                        PROFILE,
+                        OWNER,
+                        LifecycleRevision.INITIAL,
+                        "world-a",
+                        null,
+                        null,
+                        LifecycleState.UNRESOLVED,
+                        LifecycleState.UNRESOLVED,
+                        "owner-crash-group",
+                        "owner-crash-provider",
+                        1,
+                        "generation",
+                        1,
+                        1,
+                        Long.MAX_VALUE,
+                        1,
+                        List.of(new PopulationDomainAdmissionOperation.DomainInput(
+                                "owner-crash-domain",
+                                PopulationDomainScope.PER_WORLD,
+                                "world-a",
+                                1,
+                                1,
+                                1,
+                                100,
+                                100,
+                                1
+                        )),
+                        List.of(),
+                        -5_000
+                );
+        return LifecycleAdmissionEvidence.managed(payload, null);
     }
 
     private static void seed(SqliteConnectionFactory connections)

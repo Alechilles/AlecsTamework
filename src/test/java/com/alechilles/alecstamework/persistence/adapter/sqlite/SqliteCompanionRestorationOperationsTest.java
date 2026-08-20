@@ -28,6 +28,9 @@ import com.alechilles.alecstamework.companion.provisioning.ProvisioningRecord;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignment;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupMembership;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainBucket;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainScope;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationEventCodec;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationLiveBoundary;
@@ -48,6 +51,8 @@ import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.operation.PreparedOperation;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionRequest;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
 import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;
 import java.nio.file.Path;
@@ -56,6 +61,7 @@ import java.sql.PreparedStatement;
 import java.time.Duration;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -69,6 +75,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** End-to-end alias lease, live receipt, durable restoration, and replay tests. */
@@ -100,7 +107,7 @@ class SqliteCompanionRestorationOperationsTest {
         connections = new SqliteConnectionFactory(
                 tempDir.resolve("tamework-state.sqlite")
         );
-        new SqliteSchemaV1Manager(connections, () -> -10_000).initialize();
+        new SqliteSchemaV2Manager(connections, () -> -10_000).initialize();
         seedDormantProfile(LifecycleState.DEAD_REVIVABLE);
         writer = new SqliteSingleWriter(connections);
         reads = new SqliteReadExecutor(connections);
@@ -354,6 +361,125 @@ class SqliteCompanionRestorationOperationsTest {
     }
 
     @Test
+    void managedFreeRestorationUsesCanonicalAdmissionAndReplaysWithoutProvider()
+            throws Exception {
+        seedCommittedDomainSource();
+        AtomicInteger admissionCalls = new AtomicInteger();
+        AtomicInteger liveCalls = new AtomicInteger();
+        SqliteLifecycleAdmissionBinding binding =
+                new SqliteLifecycleAdmissionBinding();
+        binding.bind(request -> {
+            admissionCalls.incrementAndGet();
+            assertEquals(
+                    "world-two",
+                    request.managedRequest().request().destination().worldName()
+            );
+            assertEquals(
+                    -1,
+                    request.managedRequest().request().destination().chunkX()
+            );
+            assertEquals(
+                    -1,
+                    request.managedRequest().request().destination().chunkZ()
+            );
+            return CompletableFuture.completedFuture(
+                    managedEvidence(request.operationId())
+            );
+        });
+        SqliteCompanionRestorationOperations managed =
+                newManagedRestorations(binding);
+        CompanionRestorationLiveBoundary boundary = (request, operation) -> {
+            liveCalls.incrementAndGet();
+            return LiveOperationResult.confirmed(
+                    "spawn_receipt_confirmed"
+            ).completed();
+        };
+
+        OperationWorkflowResult first = managed.submit(
+                operationId(30),
+                new IdempotencyKey("restoration-30"),
+                restorationRequest(),
+                boundary
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        OperationWorkflowResult replay = managed.submit(
+                operationId(30),
+                new IdempotencyKey("restoration-30"),
+                restorationRequest(),
+                boundary
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLISHED,
+                first.status(), String.valueOf(first.failure())
+        );
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, replay.status());
+        assertEquals(1, admissionCalls.get());
+        assertEquals(1, liveCalls.get());
+        assertEquals(LifecycleState.ACTIVE, lifecycle().state());
+        try (Connection connection = connections.openReadConnection()) {
+            SqlitePopulationDomainStore domains =
+                    new SqlitePopulationDomainStore(connection);
+            assertEquals(
+                    0,
+                    domains.counts(new PopulationDomainBucket(
+                            OWNER,
+                            "managed-test-domain",
+                            PopulationDomainScope.PER_WORLD,
+                            "world"
+                    )).committedOwned()
+            );
+            assertEquals(
+                    1,
+                    domains.counts(new PopulationDomainBucket(
+                            OWNER,
+                            "managed-test-domain",
+                            PopulationDomainScope.PER_WORLD,
+                            "world-two"
+                    )).committedDeployable()
+            );
+        }
+    }
+
+    @Test
+    void managedEvidenceCannotBeInjectedIntoNeutralRestoration() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new CompanionRestorationRequest(
+                        PROFILE,
+                        new LifecycleRevision(1),
+                        LifecycleState.DEAD_REVIVABLE,
+                        sourceSnapshot(true),
+                        LifecycleState.PROVISIONED_DORMANT,
+                        null,
+                        null,
+                        null,
+                        null,
+                        -600,
+                        managedEvidence(operationId(31))
+                )
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new CompanionRestorationRequest(
+                        PROFILE,
+                        new LifecycleRevision(1),
+                        LifecycleState.LOST,
+                        lostSnapshot(),
+                        LifecycleState.ACTIVE,
+                        restorationProjection(),
+                        TARGET_ALIAS,
+                        new CompanionSpawnPlacement(
+                                "world-two", -12.5, -63.05, -4.5,
+                                -0.25f, -1.5f, -0.5f
+                        ),
+                        "spawn-receipt",
+                        -600,
+                        managedEvidence(operationId(32))
+                )
+        );
+    }
+
+    @Test
     void provisionedRevivalPublishesSelfContainedSemanticEvent()
             throws Exception {
         seedProvisioning();
@@ -559,6 +685,125 @@ class SqliteCompanionRestorationOperationsTest {
         );
     }
 
+    private SqliteCompanionRestorationOperations newManagedRestorations(
+            SqliteLifecycleAdmissionBinding binding
+    ) {
+        SqliteUnitOfWorkRunner units = new SqliteUnitOfWorkRunner(writer, reads);
+        SqliteOperationEngine engine = new SqliteOperationEngine(
+                new OperationDefinitionRegistry(List.of(
+                        CompanionRestorationDefinition.INSTANCE
+                )),
+                units
+        );
+        SqliteOperationPublisher publisher = new SqliteOperationPublisher(
+                engine,
+                new SqliteOperationEvidenceReader(reads),
+                new ProjectionCoordinator(
+                        new SqliteProjectionGateway(reads, units),
+                        ProjectionRetryPolicy.DEFAULT,
+                        () -> -400
+                ),
+                () -> -400
+        );
+        return new SqliteCompanionRestorationOperations(
+                engine,
+                publisher,
+                () -> -400,
+                new SqliteOperationReader(reads),
+                binding,
+                new SqliteLifecycleAdmissionSourceReader(reads),
+                List.of()
+        );
+    }
+
+    private LifecycleAdmissionEvidence managedEvidence(OperationId operationId) {
+        PopulationDomainAdmissionOperation.Payload payload =
+                new PopulationDomainAdmissionOperation.Payload(
+                        UUID.nameUUIDFromBytes((operationId.value()
+                                + ":lifecycle-admission").getBytes(
+                                java.nio.charset.StandardCharsets.UTF_8
+                        )),
+                        PROFILE,
+                        OWNER,
+                        new LifecycleRevision(1),
+                        "world-two",
+                        OWNER,
+                        "world",
+                        LifecycleState.DEAD_REVIVABLE,
+                        LifecycleState.ACTIVE,
+                        "managed-test-group",
+                        "managed-test-provider",
+                        1,
+                        "generation",
+                        1,
+                        1,
+                        Long.MAX_VALUE,
+                        1,
+                        List.of(new PopulationDomainAdmissionOperation.DomainInput(
+                                "managed-test-domain",
+                                PopulationDomainScope.PER_WORLD,
+                                "world-two",
+                                1,
+                                1,
+                                1,
+                                100,
+                                100,
+                                1
+                        )),
+                        List.of(),
+                        -400
+                );
+        return LifecycleAdmissionEvidence.managed(payload, null);
+    }
+
+    private void seedCommittedDomainSource() throws Exception {
+        OperationId sourceOperation = operationId(190);
+        try (Connection connection = connections.openWriterConnection()) {
+            connection.setAutoCommit(false);
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO operation_envelope(
+                        operation_id, idempotency_key, operation_kind,
+                        payload_version, payload_json, phase, feature_scope,
+                        expected_lifecycle_revision, lease_owner, lease_until_ms,
+                        attempt_count, failure_kind, failure_code, created_at_ms,
+                        updated_at_ms, durable_at_ms, published_at_ms, terminal_at_ms
+                    ) VALUES (?, ?, 'seed_domain', 1, '{}', 'PUBLISHED',
+                              'seed', 0, NULL, 0, 0, NULL, NULL,
+                              -500, -500, -500, -500, NULL)
+                    """)) {
+                statement.setString(1, sourceOperation.toString());
+                statement.setString(2, "seed-domain-190");
+                statement.executeUpdate();
+            }
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO operation_participant(operation_id, scope_type, scope_key)
+                    VALUES (?, 'PROFILE', ?), (?, 'OWNER', ?)
+                    """)) {
+                statement.setString(1, sourceOperation.toString());
+                statement.setString(2, PROFILE.toString());
+                statement.setString(3, sourceOperation.toString());
+                statement.setString(4, OWNER.toString());
+                statement.executeUpdate();
+            }
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO population_domain_reservation(
+                        operation_id, profile_id, expected_lifecycle_revision,
+                        owner_uuid, domain_id, scope_kind, owner_world_key,
+                        owned_delta, deployable_delta, weight,
+                        snapshotted_max_owned, snapshotted_max_deployable,
+                        policy_revision, created_at_ms
+                    ) VALUES (?, ?, 0, ?, 'managed-test-domain', 'PER_WORLD',
+                              'world', 1, 0, 1, 100, 100, 1, -500)
+                    """)) {
+                statement.setString(1, sourceOperation.toString());
+                statement.setString(2, PROFILE.toString());
+                statement.setString(3, OWNER.toString());
+                statement.executeUpdate();
+            }
+            connection.commit();
+        }
+    }
+
     private void seedDormantProfile(LifecycleState state) throws Exception {
         try (Connection connection = connections.openWriterConnection()) {
             connection.setAutoCommit(false);
@@ -615,7 +860,8 @@ class SqliteCompanionRestorationOperationsTest {
                             null,
                             -10_000,
                             new ReconciliationGeneration(4),
-                            null
+                            null,
+                            "world"
                     )
             ));
             connection.commit();
@@ -752,6 +998,20 @@ class SqliteCompanionRestorationOperationsTest {
                 Sha256Hash.ofUtf8(SNAPSHOT_JSON),
                 LifecycleRevision.INITIAL,
                 current,
+                -10_000
+        );
+    }
+
+    private CompanionSnapshot lostSnapshot() {
+        return new CompanionSnapshot(
+                SNAPSHOT_ID,
+                PROFILE,
+                DormantSourceEvidence.Kind.DESTRUCTIVE_REMOVAL.snapshotKind(),
+                1,
+                SNAPSHOT_JSON,
+                Sha256Hash.ofUtf8(SNAPSHOT_JSON),
+                LifecycleRevision.INITIAL,
+                true,
                 -10_000
         );
     }

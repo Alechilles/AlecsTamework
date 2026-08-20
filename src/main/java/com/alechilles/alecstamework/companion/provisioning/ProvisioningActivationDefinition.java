@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacementJsonCodec;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionJsonCodec;
 import com.alechilles.alecstamework.companion.snapshot.EncodedSnapshotJsonCodec;
+import com.alechilles.alecstamework.companion.population.domain.LifecycleAdmissionEvidenceJsonCodec;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinition;
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.google.gson.JsonElement;
@@ -73,6 +74,14 @@ public final class ProvisioningActivationDefinition
                         )
         );
         json.addProperty("requestedAtMs", payload.requestedAtMs());
+        if (payload.admissionEvidence() != null) {
+            json.add(
+                    "admissionEvidence",
+                    LifecycleAdmissionEvidenceJsonCodec.encode(
+                            payload.admissionEvidence()
+                    )
+            );
+        }
         return json.toString();
     }
 
@@ -81,7 +90,7 @@ public final class ProvisioningActivationDefinition
         JsonObject json = JsonParser.parseString(payloadJson)
                 .getAsJsonObject();
         JsonElement timed = json.get("timedActivation");
-        return new ProvisioningActivationRequest(
+        ProvisioningActivationRequest decoded = new ProvisioningActivationRequest(
                 new ProvisioningOrigin(
                         json.get("callerNamespace").getAsString(),
                         json.get("callerKey").getAsString()
@@ -107,6 +116,14 @@ public final class ProvisioningActivationDefinition
                         ),
                 json.get("requestedAtMs").getAsLong()
         );
+        return json.has("admissionEvidence")
+                && !json.get("admissionEvidence").isJsonNull()
+                ? decoded.withAdmissionEvidence(
+                        LifecycleAdmissionEvidenceJsonCodec.decode(
+                                json.getAsJsonObject("admissionEvidence")
+                        )
+                )
+                : decoded;
     }
 
 }

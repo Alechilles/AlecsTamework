@@ -15,6 +15,7 @@ import com.alechilles.alecstamework.companion.restoration.RestorationProjection;
 import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -43,8 +44,55 @@ public record PaidRevivalRequest(
         @Nonnull String chargeReceiptKey,
         @Nonnull String spawnReceiptKey,
         @Nullable TimedSummonActivation timedActivation,
-        long requestedAtMs
+        long requestedAtMs,
+        @Nullable LifecycleAdmissionEvidence admissionEvidence
 ) {
+    /** Source-compatible constructor for callers without managed evidence. */
+    public PaidRevivalRequest(
+            String callerNamespace,
+            String callerIdempotencyKey,
+            CommandFamilyKey familyKey,
+            CommandRosterSlotId slotId,
+            long expectedMembershipRevision,
+            long expectedProfileRevision,
+            PopulationGroupTransitionAdmissionRequest groupAdmission,
+            CompanionSnapshot sourceSnapshot,
+            RestorationProjection projection,
+            NpcAlias targetAlias,
+            CompanionSpawnPlacement placement,
+            String configId,
+            String configRevision,
+            List<RevivalCostItem> exactCost,
+            List<RevivalInventoryReservation> reservations,
+            String chargeReceiptKey,
+            String spawnReceiptKey,
+            TimedSummonActivation timedActivation,
+            long requestedAtMs
+    ) {
+        this(
+                callerNamespace,
+                callerIdempotencyKey,
+                familyKey,
+                slotId,
+                expectedMembershipRevision,
+                expectedProfileRevision,
+                groupAdmission,
+                sourceSnapshot,
+                projection,
+                targetAlias,
+                placement,
+                configId,
+                configRevision,
+                exactCost,
+                reservations,
+                chargeReceiptKey,
+                spawnReceiptKey,
+                timedActivation,
+                requestedAtMs,
+                null
+        );
+    }
+
     public PaidRevivalRequest {
         callerNamespace = text(
                 callerNamespace, "Paid revival caller namespace"
@@ -91,6 +139,11 @@ public record PaidRevivalRequest(
                 groupAdmission.before(),
                 requestedAtMs
         );
+        requireAdmissionEvidence(
+                admissionEvidence,
+                groupAdmission,
+                sourceSnapshot.profileId()
+        );
     }
 
     /** Returns the canonical target world from the frozen placement. */
@@ -120,6 +173,46 @@ public record PaidRevivalRequest(
                 target.lastReconciledGeneration(),
                 target.quarantineIncidentId(),
                 target.ownerWorldKey()
+        );
+    }
+
+    /** Returns this request with the one frozen lifecycle admission result attached. */
+    @Nonnull
+    public PaidRevivalRequest withAdmissionEvidence(
+            @Nonnull LifecycleAdmissionEvidence evidence
+    ) {
+        if (evidence == null) {
+            throw new IllegalArgumentException(
+                    "Lifecycle admission evidence is required"
+            );
+        }
+        if (admissionEvidence != null
+                && !admissionEvidence.equals(evidence)) {
+            throw new IllegalArgumentException(
+                    "Lifecycle admission evidence cannot be replaced"
+            );
+        }
+        return new PaidRevivalRequest(
+                callerNamespace,
+                callerIdempotencyKey,
+                familyKey,
+                slotId,
+                expectedMembershipRevision,
+                expectedProfileRevision,
+                groupAdmission,
+                sourceSnapshot,
+                projection,
+                targetAlias,
+                placement,
+                configId,
+                configRevision,
+                exactCost,
+                reservations,
+                chargeReceiptKey,
+                spawnReceiptKey,
+                timedActivation,
+                requestedAtMs,
+                evidence
         );
     }
 
@@ -276,6 +369,40 @@ public record PaidRevivalRequest(
                 || lease.updatedAtMs() != requestedAtMs) {
             throw new IllegalArgumentException(
                     "Paid revival timed activation must start one full session"
+            );
+        }
+    }
+
+    private static void requireAdmissionEvidence(
+            @Nullable LifecycleAdmissionEvidence evidence,
+            PopulationGroupTransitionAdmissionRequest admission,
+            com.alechilles.alecstamework.companion.identity.ProfileId profileId
+    ) {
+        if (evidence == null
+                || evidence.status()
+                != LifecycleAdmissionEvidence.Status.MANAGED) {
+            return;
+        }
+        var payload = evidence.payload();
+        CompanionLifecycle before = admission.before();
+        CompanionLifecycle after = admission.after();
+        if (payload == null
+                || !payload.profileId().equals(profileId)
+                || !Objects.equals(
+                payload.expectedLifecycleRevision(), before.revision()
+        )
+                || payload.sourceLifecycle() != before.state()
+                || !Objects.equals(payload.sourceOwnerId(), before.ownerId())
+                || !Objects.equals(
+                payload.sourceWorldKey(), before.ownerWorldKey()
+        )
+                || payload.targetLifecycle() != LifecycleState.ACTIVE
+                || !Objects.equals(payload.ownerId(), after.ownerId())
+                || !Objects.equals(
+                payload.ownerWorldKey(), after.ownerWorldKey()
+        )) {
+            throw new IllegalArgumentException(
+                    "Paid revival admission evidence is inconsistent"
             );
         }
     }

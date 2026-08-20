@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.population.domain.LifecycleAdmissionEvidenceJsonCodec;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacementJsonCodec;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshotJsonCodec;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinition;
@@ -73,6 +74,14 @@ public final class CompanionRestorationDefinition
             );
         }
         json.addProperty("requestedAtMs", payload.requestedAtMs());
+        if (payload.admissionEvidence() != null) {
+            json.add(
+                    "admissionEvidence",
+                    LifecycleAdmissionEvidenceJsonCodec.encode(
+                            payload.admissionEvidence()
+                    )
+            );
+        }
         return json.toString();
     }
 
@@ -85,7 +94,8 @@ public final class CompanionRestorationDefinition
         )
                 : LifecycleState.ACTIVE;
         if (targetState == LifecycleState.PROVISIONED_DORMANT) {
-            return CompanionRestorationRequest.reviveProvisionedDormant(
+            CompanionRestorationRequest dormant =
+                    CompanionRestorationRequest.reviveProvisionedDormant(
                     ProfileId.parse(json.get("profileId").getAsString()),
                     new LifecycleRevision(
                             json.get("expectedLifecycleRevision").getAsLong()
@@ -95,8 +105,16 @@ public final class CompanionRestorationDefinition
                     ),
                     json.get("requestedAtMs").getAsLong()
             );
+            return json.has("admissionEvidence")
+                    && !json.get("admissionEvidence").isJsonNull()
+                    ? dormant.withAdmissionEvidence(
+                            LifecycleAdmissionEvidenceJsonCodec.decode(
+                                    json.getAsJsonObject("admissionEvidence")
+                            )
+                    )
+                    : dormant;
         }
-        return new CompanionRestorationRequest(
+        CompanionRestorationRequest decoded = new CompanionRestorationRequest(
                 ProfileId.parse(json.get("profileId").getAsString()),
                 new LifecycleRevision(
                         json.get("expectedLifecycleRevision").getAsLong()
@@ -115,5 +133,13 @@ public final class CompanionRestorationDefinition
                 json.get("spawnReceiptKey").getAsString(),
                 json.get("requestedAtMs").getAsLong()
         );
+        return json.has("admissionEvidence")
+                && !json.get("admissionEvidence").isJsonNull()
+                ? decoded.withAdmissionEvidence(
+                        LifecycleAdmissionEvidenceJsonCodec.decode(
+                                json.getAsJsonObject("admissionEvidence")
+                        )
+                )
+                : decoded;
     }
 }

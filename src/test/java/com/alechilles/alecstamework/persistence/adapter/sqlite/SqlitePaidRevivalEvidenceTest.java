@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
 import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.time.Duration;
@@ -42,6 +43,7 @@ class SqlitePaidRevivalEvidenceTest {
     private SqliteSingleWriter writer;
     private SqliteReadExecutor reads;
     private SqlitePaidRevivalOperations revivals;
+    private SqlitePaidRevivalOperations gatedRevivals;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -62,22 +64,37 @@ class SqlitePaidRevivalEvidenceTest {
                 ),
                 units
         );
-        revivals = new SqlitePaidRevivalOperations(
+        SqliteOperationPublisher publisher = new SqliteOperationPublisher(
                 engine,
-                new SqliteOperationPublisher(
-                        engine,
-                        new SqliteOperationEvidenceReader(reads),
-                        new ProjectionCoordinator(
-                                new SqliteProjectionGateway(reads, units),
-                                ProjectionRetryPolicy.DEFAULT,
-                                () -> PaidRevivalTestSupport.CLOCK
-                        ),
+                new SqliteOperationEvidenceReader(reads),
+                new ProjectionCoordinator(
+                        new SqliteProjectionGateway(reads, units),
+                        ProjectionRetryPolicy.DEFAULT,
                         () -> PaidRevivalTestSupport.CLOCK
                 ),
+                () -> PaidRevivalTestSupport.CLOCK
+        );
+        revivals = new SqlitePaidRevivalOperations(
+                engine,
+                publisher,
                 reads,
                 () -> PaidRevivalTestSupport.CLOCK,
                 (claim, operation) ->
                         LiveOperationResult.confirmed("refund").completed(),
+                List.of()
+        );
+        SqliteLifecycleAdmissionBinding unbound =
+                new SqliteLifecycleAdmissionBinding();
+        gatedRevivals = new SqlitePaidRevivalOperations(
+                engine,
+                publisher,
+                reads,
+                () -> PaidRevivalTestSupport.CLOCK,
+                (claim, operation) ->
+                        LiveOperationResult.confirmed("refund").completed(),
+                new SqliteOperationReader(reads),
+                unbound,
+                new SqliteLifecycleAdmissionSourceReader(reads),
                 List.of()
         );
     }
@@ -116,6 +133,46 @@ class SqlitePaidRevivalEvidenceTest {
         );
         assertEquals(0, liveCalls.get());
         assertUnprepared();
+    }
+
+    @Test
+    void deadRevivalFailsClosedWhenAdmissionAuthorityIsUnbound()
+            throws Exception {
+        AtomicInteger liveCalls = new AtomicInteger();
+
+        OperationWorkflowResult result = gatedRevivals.submit(
+                OPERATION,
+                IDEMPOTENCY,
+                PaidRevivalTestSupport.request(),
+                (request, operation) -> {
+                    liveCalls.incrementAndGet();
+                    return PaidRevivalLiveResult.confirmed("must-not-run")
+                            .completed();
+                },
+                (payload, operation) ->
+                        LiveOperationResult.confirmed("release")
+                                .completed(),
+                com.alechilles.alecstamework.persistence.operation
+                        .DurableOperationCleanupBoundary.notRequired()
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(OperationWorkflowResult.Status.PREPARE_FAILED, result.status());
+        assertEquals(0, liveCalls.get());
+        assertUnprepared();
+    }
+
+    @Test
+    void admissionEvidenceRoundTripsInPayloadVersionFour() {
+        PaidRevivalRequest request = PaidRevivalTestSupport.request()
+                .withAdmissionEvidence(LifecycleAdmissionEvidence.neutral());
+
+        assertEquals(4, PaidRevivalDefinition.INSTANCE.payloadVersion());
+        assertEquals(
+                request,
+                PaidRevivalDefinition.INSTANCE.decode(
+                        PaidRevivalDefinition.INSTANCE.encode(request)
+                )
+        );
     }
 
     @Test

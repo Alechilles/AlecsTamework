@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.alechilles.alecstamework.companion.population.domain.LifecycleAdmissionEvidenceJsonCodec;
 
 /** Version-one operation definition for owner and owner-world transitions. */
 public final class OwnerPopulationTransitionDefinition
@@ -58,6 +59,14 @@ public final class OwnerPopulationTransitionDefinition
         json.addProperty("globalLimit", payload.globalLimit());
         json.addProperty("perWorldLimit", payload.perWorldLimit());
         json.addProperty("requestedAtMs", payload.requestedAtMs());
+        if (payload.admissionEvidence() != null) {
+            json.add(
+                    "admissionEvidence",
+                    LifecycleAdmissionEvidenceJsonCodec.encode(
+                            payload.admissionEvidence()
+                    )
+            );
+        }
         return json.toString();
     }
 
@@ -79,7 +88,11 @@ public final class OwnerPopulationTransitionDefinition
                 text(json, "targetOwnerWorldKey"),
                 json.get("globalLimit").getAsInt(),
                 json.get("perWorldLimit").getAsInt(),
-                json.get("requestedAtMs").getAsLong()
+                json.get("requestedAtMs").getAsLong(),
+                json.has("admissionEvidence")
+                        ? LifecycleAdmissionEvidenceJsonCodec.decode(
+                        json.getAsJsonObject("admissionEvidence")
+                ) : null
         );
     }
 

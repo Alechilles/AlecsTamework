@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -29,7 +30,8 @@ public record CompanionRestorationRequest(
         @Nullable NpcAlias targetAlias,
         @Nullable CompanionSpawnPlacement placement,
         @Nullable String spawnReceiptKey,
-        long requestedAtMs
+        long requestedAtMs,
+        @Nullable LifecycleAdmissionEvidence admissionEvidence
 ) {
     /** Compatibility constructor for the existing active restoration shape. */
     public CompanionRestorationRequest(
@@ -53,7 +55,36 @@ public record CompanionRestorationRequest(
                 targetAlias,
                 placement,
                 spawnReceiptKey,
-                requestedAtMs
+                requestedAtMs,
+                null
+        );
+    }
+
+    /** Compatibility constructor for the explicit target-state shape. */
+    public CompanionRestorationRequest(
+            @Nonnull ProfileId profileId,
+            @Nonnull LifecycleRevision expectedLifecycleRevision,
+            @Nonnull LifecycleState sourceState,
+            @Nonnull CompanionSnapshot sourceSnapshot,
+            @Nonnull LifecycleState targetState,
+            @Nullable RestorationProjection projection,
+            @Nullable NpcAlias targetAlias,
+            @Nullable CompanionSpawnPlacement placement,
+            @Nullable String spawnReceiptKey,
+            long requestedAtMs
+    ) {
+        this(
+                profileId,
+                expectedLifecycleRevision,
+                sourceState,
+                sourceSnapshot,
+                targetState,
+                projection,
+                targetAlias,
+                placement,
+                spawnReceiptKey,
+                requestedAtMs,
+                null
         );
     }
 
@@ -94,6 +125,14 @@ public record CompanionRestorationRequest(
                     "Restoration target must be active or provisioned dormant"
             );
         }
+        requireAdmissionEvidence(
+                admissionEvidence,
+                profileId,
+                expectedLifecycleRevision,
+                sourceState,
+                targetState,
+                placement
+        );
     }
 
     /** Authors a database-only provisioned revival with no live target. */
@@ -114,7 +153,8 @@ public record CompanionRestorationRequest(
                 null,
                 null,
                 null,
-                requestedAtMs
+                requestedAtMs,
+                null
         );
     }
 
@@ -123,10 +163,79 @@ public record CompanionRestorationRequest(
         return targetState == LifecycleState.ACTIVE;
     }
 
+    /** Returns this request with frozen lifecycle admission evidence attached. */
+    @Nonnull
+    public CompanionRestorationRequest withAdmissionEvidence(
+            @Nonnull LifecycleAdmissionEvidence evidence
+    ) {
+        if (evidence == null) {
+            throw new IllegalArgumentException(
+                    "Lifecycle admission evidence is required"
+            );
+        }
+        if (admissionEvidence != null
+                && !java.util.Objects.equals(admissionEvidence, evidence)) {
+            throw new IllegalArgumentException(
+                    "Lifecycle admission evidence cannot be replaced"
+            );
+        }
+        return new CompanionRestorationRequest(
+                profileId,
+                expectedLifecycleRevision,
+                sourceState,
+                sourceSnapshot,
+                targetState,
+                projection,
+                targetAlias,
+                placement,
+                spawnReceiptKey,
+                requestedAtMs,
+                evidence
+        );
+    }
+
     /** Returns the canonical target world for active restoration. */
     @Nullable
     public String targetWorldKey() {
         return placement == null ? null : placement.worldKey();
+    }
+
+    private static void requireAdmissionEvidence(
+            LifecycleAdmissionEvidence evidence,
+            ProfileId profileId,
+            LifecycleRevision expectedLifecycleRevision,
+            LifecycleState sourceState,
+            LifecycleState targetState,
+            CompanionSpawnPlacement placement
+    ) {
+        if (evidence == null
+                || evidence.status() != LifecycleAdmissionEvidence.Status.MANAGED) {
+            return;
+        }
+        if (sourceState != LifecycleState.DEAD_REVIVABLE
+                || targetState != LifecycleState.ACTIVE) {
+            throw new IllegalArgumentException(
+                    "Managed restoration evidence requires death to active restoration"
+                            + " (source=" + sourceState
+                            + ", target=" + targetState + ")"
+            );
+        }
+        var payload = evidence.payload();
+        if (payload == null
+                || !payload.profileId().equals(profileId)
+                || !java.util.Objects.equals(
+                payload.expectedLifecycleRevision(), expectedLifecycleRevision
+        )
+                || payload.sourceLifecycle() != LifecycleState.DEAD_REVIVABLE
+                || payload.targetLifecycle() != LifecycleState.ACTIVE
+                || !java.util.Objects.equals(
+                payload.ownerWorldKey(),
+                payload.ownerId() == null ? null : placement.worldKey()
+        )) {
+            throw new IllegalArgumentException(
+                    "Restoration lifecycle admission evidence is inconsistent"
+            );
+        }
     }
 
     private static void requireActiveTarget(

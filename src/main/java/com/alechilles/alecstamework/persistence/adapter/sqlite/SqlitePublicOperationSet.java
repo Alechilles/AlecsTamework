@@ -153,6 +153,9 @@ final class SqlitePublicOperationSet {
         );
         ownerPopulation = new SqliteOwnerPopulationTransitionOperations(
                 database,
+                operationReader,
+                lifecycleAdmission,
+                lifecycleSources,
                 consumers.apply(
                         OwnerPopulationTransitionDefinition.INSTANCE.kind()
                 )
@@ -223,6 +226,9 @@ final class SqlitePublicOperationSet {
                         engine,
                         publisher,
                         clock,
+                        operationReader,
+                        lifecycleAdmission,
+                        lifecycleSources,
                         consumers.apply(
                                 ProvisioningActivationDefinition
                                         .INSTANCE.kind()
@@ -261,6 +267,9 @@ final class SqlitePublicOperationSet {
                 engine,
                 publisher,
                 clock,
+                operationReader,
+                lifecycleAdmission,
+                lifecycleSources,
                 consumers.apply(
                         CompanionRestorationDefinition.INSTANCE.kind()
                 )
@@ -283,6 +292,9 @@ final class SqlitePublicOperationSet {
                 engine,
                 publisher,
                 clock,
+                operationReader,
+                lifecycleAdmission,
+                lifecycleSources,
                 consumers.apply(
                         CompanionCoopReleaseDefinition.INSTANCE.kind()
                 )
@@ -293,6 +305,9 @@ final class SqlitePublicOperationSet {
                 kernel.reads(),
                 clock,
                 refunds,
+                operationReader,
+                lifecycleAdmission,
+                lifecycleSources,
                 consumers.apply(
                         PaidRevivalDefinition.INSTANCE.kind()
                 )

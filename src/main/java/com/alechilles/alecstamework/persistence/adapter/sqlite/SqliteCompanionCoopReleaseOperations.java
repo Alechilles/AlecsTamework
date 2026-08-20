@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.companion.coop.CompanionCoopReleaseRequest;
 import com.alechilles.alecstamework.companion.coop.CoopResidencyProjectionChange;
 import com.alechilles.alecstamework.companion.coop.CoopResidencyProjectionCodec;
 import com.alechilles.alecstamework.companion.coop.CoopSlot;
+import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChangeCodec;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
@@ -22,13 +23,19 @@ import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
+import com.alechilles.alecstamework.persistence.operation.PreparedOperationDetail;
+import com.alechilles.alecstamework.persistence.operation.TimedDurableOperationWork;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
 import java.util.List;
+import java.util.TreeSet;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /** One alias-leased coop-to-live transition through the shared operation protocol. */
 public final class SqliteCompanionCoopReleaseOperations {
@@ -37,6 +44,10 @@ public final class SqliteCompanionCoopReleaseOperations {
             new ProjectionEventType("companion_coop_released");
 
     private final SqliteLiveOperationCoordinator workflow;
+    @Nullable
+    private final SqliteManagedCoopReleaseAdmission admission;
+    private final SqliteLifecycleAdmissionSingleFlight singleFlight =
+            new SqliteLifecycleAdmissionSingleFlight();
     private final SqliteCoopUnknownContainment containment;
     private final List<ProjectionConsumer> requiredConsumers;
 
@@ -46,11 +57,37 @@ public final class SqliteCompanionCoopReleaseOperations {
             @Nonnull LongSupplier clock,
             @Nonnull List<? extends ProjectionConsumer> requiredConsumers
     ) {
+        this(
+                operations,
+                publisher,
+                clock,
+                null,
+                null,
+                null,
+                requiredConsumers
+        );
+    }
+
+    SqliteCompanionCoopReleaseOperations(
+            @Nonnull SqliteOperationEngine operations,
+            @Nonnull SqliteOperationPublisher publisher,
+            @Nonnull LongSupplier clock,
+            @Nullable SqliteOperationReader reader,
+            @Nullable SqliteLifecycleAdmissionBinding lifecycleAdmission,
+            @Nullable SqliteLifecycleAdmissionSourceReader sourceReader,
+            @Nonnull List<? extends ProjectionConsumer> requiredConsumers
+    ) {
         if (operations == null || publisher == null || clock == null
                 || requiredConsumers == null) {
             throw new IllegalArgumentException("Coop release dependencies are required");
         }
         workflow = new SqliteLiveOperationCoordinator(operations, publisher, clock);
+        admission = reader == null || lifecycleAdmission == null
+                || sourceReader == null
+                ? null
+                : new SqliteManagedCoopReleaseAdmission(
+                        reader, lifecycleAdmission, sourceReader
+                );
         containment = new SqliteCoopUnknownContainment(operations, clock);
         this.requiredConsumers = List.copyOf(requiredConsumers);
     }
@@ -67,29 +104,92 @@ public final class SqliteCompanionCoopReleaseOperations {
                 || release == null || liveBoundary == null) {
             throw new IllegalArgumentException("Complete coop release is required");
         }
-        OperationRequest<CompanionCoopReleaseRequest> request =
-                new OperationRequest<>(
+        if (admission == null) {
+            return release.admissionEvidence() == null
+                    ? execute(operationId, idempotencyKey, release, liveBoundary)
+                    : rejected("coop_release_admission_not_wired");
+        }
+        CompletionStage<OperationWorkflowResult> admitted =
+                singleFlight.submit(
+                        CompanionCoopReleaseDefinition.KIND,
                         operationId,
                         idempotencyKey,
-                        release,
-                        FEATURE_SCOPE,
-                        release.expectedLifecycleRevision(),
-                        List.of(
-                                OperationScope.profile(release.profileId()),
-                                OperationScope.coop(
-                                        release.sourceResidency()
-                                                .slotKey().toString()
-                                )
+                        CompanionCoopReleaseDefinition.INSTANCE.encode(
+                                release
                         ),
-                        release.requestedAtMs()
+                        () -> admission.resolve(
+                                        operationId, idempotencyKey, release
+                                )
+                                .thenCompose(value -> execute(
+                                        operationId,
+                                        idempotencyKey,
+                                        value,
+                                        liveBoundary
+                                ).completion())
                 );
+        return new Submission(
+                SqliteSingleWriter.WriteAcceptance.ACCEPTED,
+                admitted.exceptionally(failure ->
+                        SqliteOperationResults.failed(
+                                OperationWorkflowResult.Status.PREPARE_FAILED,
+                                null,
+                                List.of(),
+                                failure instanceof java.util.concurrent
+                                .CompletionException
+                                        && failure.getCause() != null
+                                        ? failure.getCause() : failure
+                        ))
+        );
+    }
+
+    private Submission execute(
+            OperationId operationId,
+            IdempotencyKey idempotencyKey,
+            CompanionCoopReleaseRequest release,
+            CompanionCoopReleaseLiveBoundary liveBoundary
+    ) {
+        SqliteCompanionCoopReleasePreparation base =
+                new SqliteCompanionCoopReleasePreparation(release);
+        SqliteManagedAdmissionParticipant managed =
+                release.admissionEvidence() != null
+                        && release.admissionEvidence().status()
+                        == LifecycleAdmissionEvidence.Status.MANAGED
+                        ? SqliteManagedAdmissionParticipant.from(
+                        operationId, release.admissionEvidence()
+                ) : null;
+        PreparedOperationDetail detail = managed == null
+                ? base : PreparedOperationDetail.compose(base, managed);
+        TimedDurableOperationWork<CompanionCoopReleaseRequest> durable =
+                (transaction, operation, payload, committedAtMs) ->
+                        commitRelease(
+                                transaction,
+                                operation,
+                                payload,
+                                committedAtMs
+                        );
+        if (managed != null) {
+            TimedDurableOperationWork<CompanionCoopReleaseRequest> delegated =
+                    durable;
+            durable = (transaction, operation, payload, committedAtMs) ->
+                    managed.decorate((current, envelope) -> delegated.execute(
+                            current, envelope, payload, committedAtMs
+                    )).execute(transaction, operation);
+        }
         SqliteLiveOperationCoordinator.Submission submission =
                 workflow.execute(
                         CompanionCoopReleaseDefinition.INSTANCE,
-                        request,
-                        new SqliteCompanionCoopReleasePreparation(release),
+                        new OperationRequest<>(
+                                operationId,
+                                idempotencyKey,
+                                release,
+                                FEATURE_SCOPE,
+                                release.expectedLifecycleRevision(),
+                                participants(release),
+                                release.requestedAtMs()
+                        ),
+                        detail,
                         liveBoundary,
-                        this::commitRelease,
+                        durable,
                         requiredConsumers,
                         "companion_coop_release"
                 );
@@ -104,6 +204,45 @@ public final class SqliteCompanionCoopReleaseOperations {
                         )
                 );
         return new Submission(submission.acceptance(), completion);
+    }
+
+    private List<OperationScope> participants(
+            CompanionCoopReleaseRequest release
+    ) {
+        TreeSet<OperationScope> scopes = new TreeSet<>();
+        scopes.add(OperationScope.profile(release.profileId()));
+        scopes.add(OperationScope.coop(
+                release.sourceResidency().slotKey().toString()
+        ));
+        if (release.admissionEvidence() != null
+                && release.admissionEvidence().status()
+                == LifecycleAdmissionEvidence.Status.MANAGED
+                && release.admissionEvidence().payload() != null) {
+            OwnerId owner = release.admissionEvidence().payload().ownerId();
+            if (owner != null) {
+                scopes.add(OperationScope.owner(owner));
+            }
+            OwnerId sourceOwner = release.admissionEvidence().payload()
+                    .sourceOwnerId();
+            if (sourceOwner != null) {
+                scopes.add(OperationScope.owner(sourceOwner));
+            }
+        }
+        return List.copyOf(scopes);
+    }
+
+    private static Submission rejected(String code) {
+        return new Submission(
+                SqliteSingleWriter.WriteAcceptance.REJECTED,
+                CompletableFuture.completedFuture(
+                        SqliteOperationResults.failed(
+                                OperationWorkflowResult.Status.PREPARE_FAILED,
+                                null,
+                                List.of(),
+                                new IllegalStateException(code)
+                        )
+                )
+        );
     }
 
     private List<ProjectionEventDraft> commitRelease(

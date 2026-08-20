@@ -15,6 +15,9 @@ import com.alechilles.alecstamework.companion.population.OwnerPopulationTransiti
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionEventCodec;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionOutcome;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionRequest;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainBucket;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainScope;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.persistence.control.PersistenceOperationAdmissionGate;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
@@ -25,12 +28,16 @@ import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
+import com.alechilles.alecstamework.persistence.runtime.PersistenceLifecycleAdmissionGateway;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,13 +62,15 @@ class SqliteOwnerPopulationTransitionOperationsTest {
     private SqliteConnectionFactory connections;
     private SqlitePersistenceKernel kernel;
     private SqlitePublicPersistenceAdapter adapter;
+    private final AtomicReference<PersistenceLifecycleAdmissionGateway>
+            lifecycleAdmission = new AtomicReference<>();
 
     @BeforeEach
     void setUp() throws Exception {
         connections = new SqliteConnectionFactory(
                 tempDir.resolve("tamework-state.sqlite")
         );
-        new SqliteSchemaV1Manager(connections, () -> -10_000).initialize();
+        new SqliteSchemaV2Manager(connections, () -> -10_000).initialize();
         kernel = new SqlitePersistenceKernel(connections);
         adapter = new SqlitePublicPersistenceAdapter(
                 PublicPersistenceFeatureRegistry.create(),
@@ -76,8 +85,65 @@ class SqliteOwnerPopulationTransitionOperationsTest {
                 event -> {
                 }
         );
+        lifecycleAdmission.set(request ->
+                CompletableFuture.completedFuture(
+                        LifecycleAdmissionEvidence.neutral()
+                ));
+        adapter.bindLifecycleAdmission(request ->
+                lifecycleAdmission.get().authorize(request));
         createProfile(PROFILE_A, 1);
         createProfile(PROFILE_B, 2);
+    }
+
+    @Test
+    void managedOwnershipAdmissionCommitsDomainOnceAndReplays()
+            throws Exception {
+        AtomicInteger calls = new AtomicInteger();
+        lifecycleAdmission.set(request -> {
+            calls.incrementAndGet();
+            return CompletableFuture.completedFuture(
+                    LifecycleAdmissionEvidence.managed(
+                            managedPayload(request.operationId()), null
+                    )
+            );
+        });
+        OwnerPopulationTransitionRequest transition = transition(
+                PROFILE_A, 2, -4_900
+        );
+        OperationId operationId = operationId(9);
+        IdempotencyKey key = new IdempotencyKey("population:managed");
+
+        OperationWorkflowResult first =
+                adapter.ownerPopulationOperations().submit(
+                        operationId, key, transition
+                ).completion().toCompletableFuture()
+                        .get(10, TimeUnit.SECONDS);
+        OperationWorkflowResult replay =
+                adapter.ownerPopulationOperations().submit(
+                        operationId, key, transition
+                ).completion().toCompletableFuture()
+                        .get(10, TimeUnit.SECONDS);
+
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLISHED,
+                first.status(),
+                () -> String.valueOf(first.failure())
+        );
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, replay.status());
+        assertEquals(1, calls.get());
+        try (var connection = connections.openReadConnection()) {
+            var domains = new SqlitePersistenceTransactionContext(connection)
+                    .populationDomains();
+            var counts = domains.counts(new PopulationDomainBucket(
+                    OWNER,
+                    "managed-owner-test",
+                    PopulationDomainScope.PER_WORLD,
+                    "world-a"
+            ));
+            assertEquals(1, counts.committedOwned());
+            assertEquals(1, counts.committedDeployable());
+            assertEquals(1, domains.findByOperation(operationId).size());
+        }
     }
 
     @AfterEach
@@ -96,7 +162,11 @@ class SqliteOwnerPopulationTransitionOperationsTest {
                 2
         ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
 
-        assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLISHED,
+                result.status(),
+                () -> String.valueOf(result.failure())
+        );
         assertEquals(3, result.events().size());
         assertEquals(
                 SqliteOwnerPopulationTransitionOperations.EVENT_TYPE,
@@ -197,7 +267,7 @@ class SqliteOwnerPopulationTransitionOperationsTest {
         );
         assertTrue(
                 rootMessage(result.failure()).contains(
-                        "owner_population_source_mismatch"
+                        "owner_population_canonical_source_mismatch"
                 )
         );
         assertCanonicalCount(0);
@@ -278,6 +348,46 @@ class SqliteOwnerPopulationTransitionOperationsTest {
                 limit,
                 limit,
                 requestedAtMs
+        );
+    }
+
+    private PopulationDomainAdmissionOperation.Payload managedPayload(
+            OperationId operationId
+    ) {
+        return new PopulationDomainAdmissionOperation.Payload(
+                java.util.UUID.nameUUIDFromBytes((operationId.value()
+                        + ":lifecycle-admission").getBytes(
+                        java.nio.charset.StandardCharsets.UTF_8
+                )),
+                PROFILE_A,
+                OWNER,
+                LifecycleRevision.INITIAL,
+                "world-a",
+                null,
+                null,
+                LifecycleState.UNRESOLVED,
+                LifecycleState.UNRESOLVED,
+                "managed-owner-group",
+                "managed-owner-provider",
+                1,
+                "generation",
+                1,
+                1,
+                Long.MAX_VALUE,
+                1,
+                List.of(new PopulationDomainAdmissionOperation.DomainInput(
+                        "managed-owner-test",
+                        PopulationDomainScope.PER_WORLD,
+                        "world-a",
+                        1,
+                        1,
+                        1,
+                        100,
+                        100,
+                        1
+                )),
+                List.of(),
+                -4_900
         );
     }
 

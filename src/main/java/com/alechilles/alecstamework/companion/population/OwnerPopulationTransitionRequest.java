@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.companion.population;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -22,8 +23,34 @@ public record OwnerPopulationTransitionRequest(
         @Nullable String targetOwnerWorldKey,
         int globalLimit,
         int perWorldLimit,
-        long requestedAtMs
+        long requestedAtMs,
+        @Nullable LifecycleAdmissionEvidence admissionEvidence
 ) {
+    public OwnerPopulationTransitionRequest(
+            @Nonnull ProfileId profileId,
+            @Nonnull LifecycleRevision expectedLifecycleRevision,
+            @Nullable OwnerId expectedOwnerId,
+            @Nullable String expectedOwnerWorldKey,
+            @Nullable OwnerId targetOwnerId,
+            @Nullable String targetOwnerWorldKey,
+            int globalLimit,
+            int perWorldLimit,
+            long requestedAtMs
+    ) {
+        this(
+                profileId,
+                expectedLifecycleRevision,
+                expectedOwnerId,
+                expectedOwnerWorldKey,
+                targetOwnerId,
+                targetOwnerWorldKey,
+                globalLimit,
+                perWorldLimit,
+                requestedAtMs,
+                null
+        );
+    }
+
     public OwnerPopulationTransitionRequest {
         if (profileId == null || expectedLifecycleRevision == null) {
             throw new IllegalArgumentException(
@@ -58,6 +85,35 @@ public record OwnerPopulationTransitionRequest(
                     "Population transition must change owner or owner world"
             );
         }
+    }
+
+    /** Returns this request with its one frozen managed admission result. */
+    @Nonnull
+    public OwnerPopulationTransitionRequest withAdmissionEvidence(
+            @Nonnull LifecycleAdmissionEvidence evidence
+    ) {
+        if (evidence == null) {
+            throw new IllegalArgumentException(
+                    "Lifecycle admission evidence is required"
+            );
+        }
+        if (admissionEvidence != null && !admissionEvidence.equals(evidence)) {
+            throw new IllegalArgumentException(
+                    "Lifecycle admission evidence cannot be replaced"
+            );
+        }
+        return new OwnerPopulationTransitionRequest(
+                profileId,
+                expectedLifecycleRevision,
+                expectedOwnerId,
+                expectedOwnerWorldKey,
+                targetOwnerId,
+                targetOwnerWorldKey,
+                globalLimit,
+                perWorldLimit,
+                requestedAtMs,
+                evidence
+        );
     }
 
     private static String normalize(String value) {

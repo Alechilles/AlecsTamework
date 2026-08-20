@@ -1,10 +1,5 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
-import com.alechilles.alecstamework.companion.identity.CompanionAlias;
-import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
-import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
-import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
-import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalLiveResult;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalReleaseBoundary;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalRequest;
@@ -163,12 +158,16 @@ final class SqlitePaidRevivalCompensation {
             PaidRevivalReleaseBoundary releases,
             DurableOperationCleanupBoundary<PaidRevivalRequest> cleanup
     ) {
+        SqliteManagedAdmissionParticipant managed =
+                SqlitePaidRevivalCompensationCleanup.managed(
+                operation, request
+        );
         return coordinator.resume(
                 operation,
                 request,
                 new NoChargeDetail(),
                 releases,
-                new NoChargeWork(request),
+                new NoChargeWork(request, managed),
                 "paid_revival_no_charge"
         ).thenCompose(result ->
                 cleanupCompensated(result, request, cleanup));
@@ -193,12 +192,16 @@ final class SqlitePaidRevivalCompensation {
                     )
             );
         }
+        SqliteManagedAdmissionParticipant managed =
+                SqlitePaidRevivalCompensationCleanup.managed(
+                operation, request
+        );
         return coordinator.resume(
                 operation,
                 expected,
                 new RefundDetail(expected),
                 refunds,
-                new RefundWork(request),
+                new RefundWork(request, managed),
                 "paid_revival_refund"
         ).thenCompose(result ->
                 cleanupCompensated(result, request, cleanup));
@@ -338,9 +341,14 @@ final class SqlitePaidRevivalCompensation {
     private static final class NoChargeWork
             implements TimedCompensatedOperationWork<PaidRevivalRequest> {
         private final PaidRevivalRequest request;
+        private final SqliteManagedAdmissionParticipant managed;
 
-        private NoChargeWork(PaidRevivalRequest request) {
+        private NoChargeWork(
+                PaidRevivalRequest request,
+                SqliteManagedAdmissionParticipant managed
+        ) {
             this.request = request;
+            this.managed = managed;
         }
 
         @Override
@@ -358,8 +366,8 @@ final class SqlitePaidRevivalCompensation {
                         "paid_revival_no_charge_evidence_mismatch"
                 );
             }
-            cleanup(
-                    transaction, operation, request, compensatedAtMs
+            SqlitePaidRevivalCompensationCleanup.cleanup(
+                    transaction, operation, request, managed, compensatedAtMs
             );
         }
 
@@ -373,16 +381,24 @@ final class SqlitePaidRevivalCompensation {
                     && transaction.refunds()
                     .findByOperation(operation.operationId()).isEmpty()
                     && new SqlitePaidRevivalPreparation(request)
-                    .compensatedMatches(transaction, operation);
+                    .compensatedMatches(transaction, operation)
+                    && !SqlitePaidRevivalCompensationCleanup.rowsRemain(
+                            transaction, operation, managed
+                    );
         }
     }
 
     private static final class RefundWork
             implements TimedCompensatedOperationWork<RefundClaim> {
         private final PaidRevivalRequest request;
+        private final SqliteManagedAdmissionParticipant managed;
 
-        private RefundWork(PaidRevivalRequest request) {
+        private RefundWork(
+                PaidRevivalRequest request,
+                SqliteManagedAdmissionParticipant managed
+        ) {
             this.request = request;
+            this.managed = managed;
         }
 
         @Override
@@ -403,8 +419,8 @@ final class SqlitePaidRevivalCompensation {
                         "paid_revival_refund_completion_rejected"
                 );
             }
-            cleanup(
-                    transaction, operation, request, compensatedAtMs
+            SqlitePaidRevivalCompensationCleanup.cleanup(
+                    transaction, operation, request, managed, compensatedAtMs
             );
         }
 
@@ -422,66 +438,10 @@ final class SqlitePaidRevivalCompensation {
                     ))
                     .isPresent()
                     && new SqlitePaidRevivalPreparation(request)
-                    .compensatedMatches(transaction, operation);
-        }
-    }
-
-    private static void cleanup(
-            SqlitePersistenceTransactionContext transaction,
-            OperationEnvelope operation,
-            PaidRevivalRequest request,
-            long compensatedAtMs
-    ) {
-        CompanionLifecycle source = request.groupAdmission().before();
-        CompanionLifecycle fenced = transaction.lifecycles()
-                .findByProfile(source.profileId())
-                .orElseThrow(() -> new IllegalStateException(
-                        "paid_revival_compensation_lifecycle_missing"
-                ));
-        CompanionAlias alias = transaction.identities()
-                .resolveAlias(request.targetAlias()).orElse(null);
-        if (!SqlitePaidRevivalSourceEvidence.fencedMatches(
-                fenced, request, operation
-        )
-                || !SqlitePaidRevivalSourceEvidence.leaseMatches(
-                        alias, request, operation
-                )) {
-            throw new IllegalStateException(
-                    "paid_revival_compensation_fence_mismatch"
-            );
-        }
-        new SqlitePopulationGroupTransitionParticipant(
-                request.groupAdmission()
-        ).retirePrepared(transaction, operation);
-        if (!transaction.identities().retireAlias(
-                request.targetAlias(), compensatedAtMs
-        ).applied()) {
-            throw new IllegalStateException(
-                    "paid_revival_compensation_alias_rejected"
-            );
-        }
-        CompanionLifecycle restored = new CompanionLifecycle(
-                source.profileId(),
-                source.ownerId(),
-                source.state(),
-                source.location(),
-                fenced.revision().next(),
-                null,
-                compensatedAtMs,
-                source.lastReconciledGeneration(),
-                source.quarantineIncidentId(),
-                source.ownerWorldKey()
-        );
-        if (!transaction.lifecycles().transition(
-                new LifecycleTransition(
-                        fenced.revision(),
-                        operation.operationId(),
-                        restored
-                )
-        ).applied()) {
-            throw new IllegalStateException(
-                    "paid_revival_compensation_lifecycle_rejected"
-            );
+                    .compensatedMatches(transaction, operation)
+                    && !SqlitePaidRevivalCompensationCleanup.rowsRemain(
+                            transaction, operation, managed
+                    );
         }
     }
 }

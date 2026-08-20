@@ -20,14 +20,18 @@ import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
+import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.operation.PreparedOperationDetail;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
+import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
 import java.util.List;
 import java.util.Optional;
 import java.util.TreeSet;
+import java.util.concurrent.CompletionStage;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Existing-profile ownership transitions through the shared database operation protocol.
@@ -38,10 +42,24 @@ public final class SqliteOwnerPopulationTransitionOperations {
             new ProjectionEventType("owner_population_transition_committed");
 
     private final SqliteDatabaseOperationCoordinator coordinator;
+    @Nullable
+    private final SqliteManagedOwnerPopulationAdmission admission;
+    private final SqliteLifecycleAdmissionSingleFlight singleFlight =
+            new SqliteLifecycleAdmissionSingleFlight();
     private final List<ProjectionConsumer> requiredConsumers;
 
     public SqliteOwnerPopulationTransitionOperations(
             @Nonnull SqliteDatabaseOperationCoordinator coordinator,
+            @Nonnull List<? extends ProjectionConsumer> requiredConsumers
+    ) {
+        this(coordinator, null, null, null, requiredConsumers);
+    }
+
+    SqliteOwnerPopulationTransitionOperations(
+            @Nonnull SqliteDatabaseOperationCoordinator coordinator,
+            @Nullable SqliteOperationReader reader,
+            @Nullable SqliteLifecycleAdmissionBinding lifecycleAdmission,
+            @Nullable SqliteLifecycleAdmissionSourceReader sourceReader,
             @Nonnull List<? extends ProjectionConsumer> requiredConsumers
     ) {
         if (coordinator == null || requiredConsumers == null) {
@@ -50,6 +68,12 @@ public final class SqliteOwnerPopulationTransitionOperations {
             );
         }
         this.coordinator = coordinator;
+        admission = reader == null || lifecycleAdmission == null
+                || sourceReader == null
+                ? null
+                : new SqliteManagedOwnerPopulationAdmission(
+                        reader, lifecycleAdmission, sourceReader
+                );
         this.requiredConsumers = List.copyOf(requiredConsumers);
     }
 
@@ -66,16 +90,78 @@ public final class SqliteOwnerPopulationTransitionOperations {
                     "Complete population transition is required"
             );
         }
+        if (!positiveTarget(transition)
+                && transition.admissionEvidence() != null) {
+            return rejected(
+                    "owner_population_nonpositive_admission_evidence_forbidden"
+            );
+        }
+        if (!positiveTarget(transition)) {
+            return execute(operationId, idempotencyKey, transition);
+        }
+        if (admission == null) {
+            return rejected("owner_population_lifecycle_admission_unbound");
+        }
+        CompletionStage<OperationWorkflowResult> completion =
+                singleFlight.submit(
+                        OwnerPopulationTransitionDefinition.KIND,
+                        operationId,
+                        idempotencyKey,
+                        OwnerPopulationTransitionDefinition.INSTANCE.encode(
+                                transition
+                        ),
+                        () -> admission.resolve(
+                                        operationId,
+                                        idempotencyKey,
+                                        transition
+                                )
+                                .thenCompose(value -> execute(
+                                        operationId, idempotencyKey, value
+                                ).completion())
+                );
+        return new SqliteDatabaseOperationCoordinator.Submission(
+                SqliteSingleWriter.WriteAcceptance.ACCEPTED,
+                completion.exceptionally(failure ->
+                        SqliteOperationResults.failed(
+                                OperationWorkflowResult.Status.PREPARE_FAILED,
+                                null,
+                                List.of(),
+                                failure instanceof java.util.concurrent
+                                .CompletionException
+                                && failure.getCause() != null
+                                        ? failure.getCause() : failure
+                        )
+                )
+        );
+    }
+
+    private SqliteDatabaseOperationCoordinator.Submission execute(
+            OperationId operationId,
+            IdempotencyKey idempotencyKey,
+            OwnerPopulationTransitionRequest transition
+    ) {
         Optional<OwnerPopulationAdmissionPlan> plan =
                 OwnerPopulationAdmissionPlanner.plan(transition);
-        SqliteOwnerPopulationParticipant population = plan
+        SqliteOwnerPopulationParticipant population = needsExternalOwner(
+                transition
+        ) ? plan
                 .map(SqliteOwnerPopulationParticipant::new)
-                .orElse(null);
+                .orElse(null) : null;
+        SqliteManagedAdmissionParticipant managed =
+                transition.admissionEvidence() != null
+                && transition.admissionEvidence().status()
+                == LifecycleAdmissionEvidence.Status.MANAGED
+                        ? SqliteManagedAdmissionParticipant.from(
+                        operationId, transition.admissionEvidence()
+                ) : null;
         PreparedOperationDetail detail = PreparedOperationDetail.compose(
                 new ExactSourceDetail(transition),
                 population == null
                         ? PreparedOperationDetail.none()
-                        : population
+                        : population,
+                managed == null
+                        ? PreparedOperationDetail.none()
+                        : managed
         );
         DurableOperationWork work =
                 (transaction, operation) -> commit(
@@ -86,6 +172,9 @@ public final class SqliteOwnerPopulationTransitionOperations {
         if (population != null) {
             work = population.decorate(work);
         }
+        if (managed != null) {
+            work = managed.decorate(work);
+        }
         return coordinator.execute(
                 OwnerPopulationTransitionDefinition.INSTANCE,
                 request(operationId, idempotencyKey, transition),
@@ -93,6 +182,36 @@ public final class SqliteOwnerPopulationTransitionOperations {
                 work,
                 requiredConsumers
         );
+    }
+
+    private SqliteDatabaseOperationCoordinator.Submission rejected(
+            String code
+    ) {
+        return new SqliteDatabaseOperationCoordinator.Submission(
+                SqliteSingleWriter.WriteAcceptance.ACCEPTED,
+                java.util.concurrent.CompletableFuture.completedFuture(
+                        SqliteOperationResults.failed(
+                                OperationWorkflowResult.Status.PREPARE_FAILED,
+                                null,
+                                List.of(),
+                                new IllegalArgumentException(code)
+                        )
+                )
+        );
+    }
+
+    private boolean positiveTarget(OwnerPopulationTransitionRequest request) {
+        return request.targetOwnerId() != null;
+    }
+
+    private boolean needsExternalOwner(
+            OwnerPopulationTransitionRequest request
+    ) {
+        return request.admissionEvidence() == null
+                || request.admissionEvidence().status()
+                != LifecycleAdmissionEvidence.Status.MANAGED
+                || request.admissionEvidence().composition() == null
+                || request.admissionEvidence().composition().ownerPlan() == null;
     }
 
     private OperationRequest<OwnerPopulationTransitionRequest> request(
