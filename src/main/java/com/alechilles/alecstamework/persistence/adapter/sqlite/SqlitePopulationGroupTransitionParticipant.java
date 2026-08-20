@@ -1,9 +1,16 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAdmission;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignment;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupBucket;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupLifecycleClassifier;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupPolicy;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupReservation;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionPlanner;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionRequest;
 import com.alechilles.alecstamework.persistence.operation.DurableOperationWork;
@@ -147,6 +154,9 @@ public final class SqlitePopulationGroupTransitionParticipant
             SqlitePersistenceTransactionContext transaction,
             OperationEnvelope operation
     ) {
+        if (isNewProfileEvidence(operation)) {
+            return newProfilePlan(operation);
+        }
         CompanionLifecycle lifecycle = transaction.lifecycles()
                 .findByProfile(request.before().profileId())
                 .orElseThrow(() -> new IllegalStateException(
@@ -177,6 +187,70 @@ public final class SqlitePopulationGroupTransitionParticipant
                 reservation.policyRevision(),
                 reservation.createdAtMs()
         )).toList();
+    }
+
+    private List<PopulationGroupReservation> newProfilePlan(
+            OperationEnvelope operation
+    ) {
+        CompanionLifecycle after = request.after();
+        boolean owned = PopulationGroupLifecycleClassifier.consumesOwned(
+                after.state()
+        );
+        boolean active = PopulationGroupLifecycleClassifier.consumesActive(
+                after.state()
+        );
+        return request.policies().stream()
+                .map(policy -> newProfileReservation(
+                        operation, after, policy, owned, active
+                ))
+                .filter(reservation -> reservation.ownedDelta() > 0
+                        || reservation.activeDelta() > 0)
+                .toList();
+    }
+
+    private PopulationGroupReservation newProfileReservation(
+            OperationEnvelope operation,
+            CompanionLifecycle after,
+            PopulationGroupPolicy policy,
+            boolean owned,
+            boolean active
+    ) {
+        String world = policy.scope() == PopulationGroupScope.PER_WORLD
+                ? after.ownerWorldKey()
+                : null;
+        if (policy.scope() == PopulationGroupScope.PER_WORLD && world == null) {
+            throw new IllegalStateException(
+                    "population_group_new_profile_owner_world_missing"
+            );
+        }
+        return new PopulationGroupReservation(
+                operation.operationId(),
+                after.profileId(),
+                null,
+                new PopulationGroupBucket(
+                        after.ownerId(), policy.groupId(), policy.scope(), world
+                ),
+                owned ? units : 0,
+                active ? units : 0,
+                policy.maxOwnedPerOwner(),
+                policy.maxActivePerOwner(),
+                policy.policyRevision(),
+                request.requestedAtMs()
+        );
+    }
+
+    private boolean isNewProfileEvidence(OperationEnvelope operation) {
+        CompanionLifecycle before = request.before();
+        CompanionLifecycle after = request.after();
+        return operation.expectedLifecycleRevision() == null
+                && before.ownerId() == null
+                && before.state() == LifecycleState.RELEASED
+                && before.location().kind() == LifecycleLocationKind.NONE
+                && before.revision().equals(LifecycleRevision.INITIAL)
+                && operation.operationId().equals(before.activeOperationId())
+                && after.ownerId() != null
+                && operation.operationId().equals(after.activeOperationId())
+                && after.revision().equals(before.revision().next());
     }
 
     private boolean sourceMatches(

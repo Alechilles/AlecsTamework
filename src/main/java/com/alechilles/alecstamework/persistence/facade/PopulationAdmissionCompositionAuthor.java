@@ -1,11 +1,16 @@
 package com.alechilles.alecstamework.persistence.facade;
 
+import com.alechilles.alecstamework.api.PopulationAdmissionRequest;
 import com.alechilles.alecstamework.api.PopulationAdmissionRequestV3;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationAdmissionPlan;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationAdmissionPlanner;
+import com.alechilles.alecstamework.companion.population.OwnerPopulationScope;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionRequest;
 import com.alechilles.alecstamework.companion.population.domain.ManagedAdmissionEvidenceAuthor;
 import com.alechilles.alecstamework.companion.population.domain.PopulationAdmissionComposition;
@@ -48,11 +53,20 @@ final class PopulationAdmissionCompositionAuthor {
         if (payload.domains().isEmpty()) {
             return CompletableFuture.completedFuture(null);
         }
-        if (source == null) {
-            return unavailable("population-admission-source-required-for-composition");
-        }
         if (groups == null) {
             return unavailable("population-admission-group-authority-unavailable");
+        }
+        if (source == null) {
+            if (request.request().request().expectedProfileRevision()
+                    != PopulationAdmissionRequest.NEW_PROFILE_REVISION) {
+                return unavailable("population-admission-source-required-for-composition");
+            }
+            if (payload.ownerId() == null) {
+                return unavailable("population-admission-new-owner-required");
+            }
+            return CompletableFuture.completedFuture(
+                    newProfileComposition(request, payload, operationId)
+            );
         }
         return persistence.facades().queries().findAllPopulationGroupAssignments()
                 .thenCompose(read -> {
@@ -71,6 +85,90 @@ final class PopulationAdmissionCompositionAuthor {
                             composition(request, source, payload, operationId, assignment)
                     );
                 });
+    }
+
+    private PopulationAdmissionComposition newProfileComposition(
+            PopulationAdmissionRequestV3 request,
+            PopulationDomainAdmissionOperation.Payload payload,
+            OperationId operationId
+    ) {
+        List<PopulationGroupPolicy> policies = groups.snapshot()
+                .resolvePoliciesForRole(request.request().targetRoleId());
+        if (policies.isEmpty()) {
+            throw new IllegalStateException("population-admission-group-policy-missing");
+        }
+        CompanionLifecycle before = new CompanionLifecycle(
+                payload.profileId(),
+                null,
+                LifecycleState.RELEASED,
+                LifecycleLocation.none(),
+                LifecycleRevision.INITIAL,
+                operationId,
+                payload.createdAtMs(),
+                ReconciliationGeneration.INITIAL,
+                null,
+                null
+        );
+        CompanionLifecycle after = new CompanionLifecycle(
+                payload.profileId(),
+                payload.ownerId(),
+                payload.targetLifecycle(),
+                targetLocation(request, payload, operationId),
+                LifecycleRevision.INITIAL.next(),
+                operationId,
+                payload.createdAtMs(),
+                ReconciliationGeneration.INITIAL,
+                null,
+                payload.ownerWorldKey()
+        );
+        PopulationGroupTransitionAdmissionRequest groupRequest =
+                new PopulationGroupTransitionAdmissionRequest(
+                        before,
+                        after,
+                        groups.snapshot().revision(),
+                        policies.get(0).policyRevision(),
+                        policies,
+                        payload.createdAtMs()
+                );
+        return new PopulationAdmissionComposition(
+                newProfileOwnerPlan(payload), groupRequest
+        );
+    }
+
+    private OwnerPopulationAdmissionPlan newProfileOwnerPlan(
+            PopulationDomainAdmissionOperation.Payload payload
+    ) {
+        TwGlobalConfig config = TwGlobalConfig.resolveActive();
+        if (config == null) {
+            config = TwGlobalConfig.defaultConfig();
+        }
+        int limit = config.getPopulationLimitPerPlayerOwnedTotal();
+        TwGlobalConfig.PerPlayerLimitScope configuredScope =
+                config.getPopulationPerPlayerLimitScope();
+        OwnerPopulationScope scope = configuredScope
+                == TwGlobalConfig.PerPlayerLimitScope.GLOBAL
+                ? OwnerPopulationScope.global(payload.ownerId())
+                : OwnerPopulationScope.perWorld(
+                        payload.ownerId(), requireOwnerWorld(payload)
+                );
+        return new OwnerPopulationAdmissionPlan(
+                payload.profileId(),
+                null,
+                List.of(new OwnerPopulationAdmissionPlan.LimitIncrease(
+                        scope, 1, limit
+                ))
+        );
+    }
+
+    private String requireOwnerWorld(
+            PopulationDomainAdmissionOperation.Payload payload
+    ) {
+        if (payload.ownerWorldKey() == null) {
+            throw new IllegalStateException(
+                    "population-admission-new-owner-world-required"
+            );
+        }
+        return payload.ownerWorldKey();
     }
 
     private PopulationAdmissionComposition composition(
