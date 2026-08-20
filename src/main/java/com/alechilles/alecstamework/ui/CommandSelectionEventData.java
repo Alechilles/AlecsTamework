@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ui;
 
 import static com.alechilles.alecstamework.ui.CommandSelectionPageEventBinder.EVENT_COMMAND_ID;
 import static com.alechilles.alecstamework.ui.CommandSelectionPageEventBinder.KEY_PANEL_AUTO_LINK_ENABLED;
+import static com.alechilles.alecstamework.ui.CommandSelectionPageEventBinder.KEY_PANEL_ACTIVE_HIGHLIGHT_ENABLED;
 import static com.alechilles.alecstamework.ui.CommandSelectionPageEventBinder.KEY_PANEL_FILTER_MODE_VALUE;
 import static com.alechilles.alecstamework.ui.CommandSelectionPageEventBinder.KEY_PANEL_FILTER_TEXT_INPUT;
 import static com.alechilles.alecstamework.ui.CommandSelectionPageEventBinder.KEY_PANEL_GROUP_ACTIVE_VALUE;
@@ -36,6 +37,11 @@ public final class CommandSelectionEventData {
                     new KeyedCodec<>(KEY_PANEL_AUTO_LINK_ENABLED, Codec.BOOLEAN),
                     (event, value) -> event.panelAutoLinkEnabled = value,
                     event -> event.panelAutoLinkEnabled)
+            .add()
+            .append(
+                    new KeyedCodec<>(KEY_PANEL_ACTIVE_HIGHLIGHT_ENABLED, Codec.BOOLEAN),
+                    (event, value) -> event.panelActiveHighlightEnabled = value,
+                    event -> event.panelActiveHighlightEnabled)
             .add()
             .append(
                     new KeyedCodec<>(KEY_PANEL_SORT_VALUE, Codec.STRING),
@@ -73,6 +79,7 @@ public final class CommandSelectionEventData {
     String commandId;
     String panelModeValue;
     Boolean panelAutoLinkEnabled;
+    Boolean panelActiveHighlightEnabled;
     String panelSortValue;
     String panelFilterModeValue;
     String panelFilterTextInput;

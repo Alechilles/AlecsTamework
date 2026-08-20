@@ -24,6 +24,7 @@ final class CommandSelectionRosterEventBoundary {
                    @Nonnull String commandId) {
         if (!bondedRoster) return false;
         if (data.panelAutoLinkEnabled != null
+                || data.panelActiveHighlightEnabled != null
                 || data.panelGroupActiveValue != null
                 || data.panelGroupAssignValue != null) {
             return true;

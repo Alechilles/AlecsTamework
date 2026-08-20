@@ -14,6 +14,7 @@ class BondedCompanionPanelChromeTest {
         BondedCompanionPanelChrome.bind(commands, true);
 
         assertCommand(commands, "#TameworkLinkedPanelAutoLinkControls.Visible", "false");
+        assertCommand(commands, "#TameworkLinkedPanelActiveHighlightControls.Visible", "false");
         assertCommand(commands, "#TameworkLinkedPanelModeDropdown.Visible", "false");
         assertCommand(commands, "#TameworkLinkedPanelSubtitleRow.Visible", "false");
         assertCommand(commands, "#TameworkLinkedPanelGroupAssignOverlay.Visible", "false");

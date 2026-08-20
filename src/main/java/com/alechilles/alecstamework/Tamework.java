@@ -104,6 +104,7 @@ import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.items.CommandHotswapHudService;
 import com.alechilles.alecstamework.items.CommandNpcRelocationService;
 import com.alechilles.alecstamework.items.CommandHudDirtySink;
+import com.alechilles.alecstamework.items.CommandActiveNpcHighlightSystem;
 import com.alechilles.alecstamework.items.CommandHudPlayerLifecycleSystem;
 import com.alechilles.alecstamework.items.CommandHudStoreLifecycleSystem;
 import com.alechilles.alecstamework.items.CommandTargetHudActivationTracker;
@@ -863,9 +864,11 @@ public class Tamework extends JavaPlugin {
                 () -> new CommandLinkedNpcInventoryCanonicalizationSystem(commandItemFeatureHandler));
         CommandTargetHudActivationTracker commandTargetHudActivationTracker = new CommandTargetHudActivationTracker();
         CommandTargetHudActivationTracker commandHotswapHudActivationTracker = new CommandTargetHudActivationTracker();
+        CommandTargetHudActivationTracker commandHighlightActivationTracker = new CommandTargetHudActivationTracker();
         CommandHudDirtySink commandHudDirtySink = CommandHudDirtySink.fanOut(
                 commandTargetHudActivationTracker,
-                commandHotswapHudActivationTracker
+                commandHotswapHudActivationTracker,
+                commandHighlightActivationTracker
         );
         CommandTargetInspector commandTargetInspector = new CommandTargetInspector();
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
@@ -887,6 +890,12 @@ public class Tamework extends JavaPlugin {
                         commandItemRegistry,
                         commandHotswapHudActivationTracker,
                         commandTargetInspector
+                ));
+        deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
+                "command-active-npc-highlight",
+                () -> new CommandActiveNpcHighlightSystem(
+                        commandItemRegistry,
+                        commandHighlightActivationTracker
                 ));
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
                 "command-hud-player-lifecycle",

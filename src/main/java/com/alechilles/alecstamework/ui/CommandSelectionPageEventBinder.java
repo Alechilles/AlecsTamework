@@ -13,6 +13,8 @@ final class CommandSelectionPageEventBinder {
     static final String KEY_PANEL_MODE_VALUE = "@PanelModeValue";
     static final String KEY_PANEL_AUTO_LINK_ENABLED =
             "@PanelAutoLinkEnabled";
+    static final String KEY_PANEL_ACTIVE_HIGHLIGHT_ENABLED =
+            "@PanelActiveHighlightEnabled";
     static final String KEY_PANEL_SORT_VALUE = "@PanelSortValue";
     static final String KEY_PANEL_FILTER_MODE_VALUE =
             "@PanelFilterModeValue";
@@ -89,6 +91,11 @@ final class CommandSelectionPageEventBinder {
                 events,
                 "#TameworkLinkedPanelAutoLinkCheck",
                 KEY_PANEL_AUTO_LINK_ENABLED
+        );
+        bindValue(
+                events,
+                "#TameworkLinkedPanelActiveHighlightCheck",
+                KEY_PANEL_ACTIVE_HIGHLIGHT_ENABLED
         );
         bindValue(
                 events,

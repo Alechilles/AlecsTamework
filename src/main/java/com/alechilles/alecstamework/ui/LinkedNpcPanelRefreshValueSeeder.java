@@ -9,12 +9,14 @@ final class LinkedNpcPanelRefreshValueSeeder {
     private LinkedNpcPanelRefreshValueSeeder() { }
     static void seed(LinkedNpcPanelRefreshValues values, String language, LinkedNpcEntry[] entries,
                      String pendingInput, Supplier<String> empty, Supplier<String> mode,
-                     Supplier<Boolean> autoLink, Supplier<String> radius, Supplier<String> sort,
+                     Supplier<Boolean> autoLink, Supplier<Boolean> activeHighlight,
+                     Supplier<String> radius, Supplier<String> sort,
                      Supplier<String> filter, Supplier<String> input,
                      Supplier<List<DropdownEntryInfo>> groupEntries, Supplier<String> groupValue) {
         values.remember("#TameworkLinkedPanelTitle.Text", LinkedNpcPanelPresentationSupport.title(mode, entries, language)); values.remember("#TameworkLinkedPanelGroupSelectorDropdown.Entries", LinkedNpcPanelPresentationSupport.entries(groupEntries));
         values.remember("#TameworkLinkedPanelGroupSelectorDropdown.Value", LinkedNpcPanelPresentationSupport.value(groupValue, "")); values.remember("#TameworkLinkedPanelModeDropdown.Entries", CommandSelectionPanelOptions.resolveModeDropdownEntries(language));
         values.remember("#TameworkLinkedPanelModeDropdown.Value", LinkedNpcPanelPresentationSupport.mode(mode)); values.remember("#TameworkLinkedPanelAutoLinkCheck.Value", LinkedNpcPanelPresentationSupport.autoLink(autoLink));
+        values.remember("#TameworkLinkedPanelActiveHighlightCheck.Value", LinkedNpcPanelPresentationSupport.activeHighlight(activeHighlight));
         values.remember("#TameworkLinkedPanelSubtitleRadiusControls.Visible", LinkedNpcPanelPresentationSupport.nearby(mode)); values.remember("#TameworkLinkedPanelRadiusValue.Text", LinkedNpcPanelPresentationSupport.radius(radius, language));
         values.remember("#TameworkLinkedPanelSortDropdown.Entries", CommandSelectionPanelOptions.resolveSortDropdownEntries(language)); values.remember("#TameworkLinkedPanelSortDropdown.Value", LinkedNpcPanelPresentationSupport.sort(sort));
         values.remember("#TameworkLinkedPanelFilterDropdown.Entries", CommandSelectionPanelOptions.resolveFilterModeDropdownEntries(language)); values.remember("#TameworkLinkedPanelFilterDropdown.Value", LinkedNpcPanelPresentationSupport.filterMode(filter));

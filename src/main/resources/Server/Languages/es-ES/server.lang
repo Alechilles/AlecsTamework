@@ -72,3 +72,7 @@ tamework.ui.settingsAnnouncement.body.scope=Después, crea un informe en el cana
 tamework.ui.settingsAnnouncement.optOut=No volver a mostrar hasta el próximo anuncio
 tamework.ui.settingsAnnouncement.button.later=Más tarde
 tamework.ui.settingsAnnouncement.button.review=Revisar configuración
+
+# ===== Panel de PNJ vinculados =====
+tamework.ui.linkedPanel.activeHighlight.label=Resaltar activos
+tamework.ui.notifications.command.panel.activeHighlightUpdateFailed=No se pudieron actualizar los resaltados activos.

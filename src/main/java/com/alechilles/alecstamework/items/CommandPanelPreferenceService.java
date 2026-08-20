@@ -128,6 +128,29 @@ final class CommandPanelPreferenceService {
         return updated.withMetadata(TameworkMetadataKeys.COMMAND_PANEL_AUTO_LINK, Codec.BOOLEAN, enabled);
     }
 
+    boolean resolveActiveHighlightEnabled(@Nullable ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        Boolean raw = stack.getFromMetadataOrNull(
+                TameworkMetadataKeys.COMMAND_PANEL_ACTIVE_HIGHLIGHT,
+                Codec.BOOLEAN
+        );
+        return raw != null && raw;
+    }
+
+    ItemStack setActiveHighlightEnabled(@Nullable ItemStack stack, boolean enabled) {
+        if (stack == null || stack.isEmpty()) {
+            return stack;
+        }
+        ItemStack updated = withSchemaVersion(stack);
+        return updated.withMetadata(
+                TameworkMetadataKeys.COMMAND_PANEL_ACTIVE_HIGHLIGHT,
+                Codec.BOOLEAN,
+                enabled
+        );
+    }
+
     ItemStack togglePanelMode(@Nullable ItemStack stack, @Nullable TwCommandItemConfig config) {
         if (stack == null || stack.isEmpty()) {
             return stack;

@@ -169,6 +169,23 @@ Group #TameworkLinkedPanelRoot {
                 }
             }
 
+            Group #TameworkLinkedPanelActiveHighlightControls {
+                Anchor: (Top: 0, Height: 28);
+
+                CheckBox #TameworkLinkedPanelActiveHighlightCheck {
+                    Anchor: (Top: 3, Left: 2, Width: 22, Height: 22);
+                    Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                    Padding: (Full: 4);
+                    Style: $C.@DefaultCheckBoxStyle;
+                }
+
+                Label #TameworkLinkedPanelActiveHighlightLabel {
+                    Anchor: (Left: 30, Width: 180, Height: 28);
+                    Text: %server.tamework.ui.linkedPanel.activeHighlight.label;
+                    Style: (FontSize: 11, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                }
+            }
+
             Label #TameworkLinkedPanelEmptyState {
                 Anchor: (Top: 8, Height: 48);
                 Text: %server.tamework.ui.linkedPanel.emptyState;

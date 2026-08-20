@@ -226,6 +226,10 @@ Linked panel supports:
 - Filter: `None`, `Name`, `Species`, `Group`
 - Filter text input for active filter mode
 - Active/inactive row toggles
+- Optional per-tool active highlights. While the command tool is equipped,
+  loaded active NPCs show controller-only sparkles in their group color.
+  Ungrouped NPCs use neutral gold. This setting starts disabled and applies
+  only to generic item-metadata rosters.
 - Group active selector: `All`, `None`, or one configured group
 - Breeding enable/disable row toggles (default: disabled)
 - Group assignment overlay per row
