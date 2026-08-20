@@ -11,20 +11,22 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.BiFunction;
+import java.util.function.BinaryOperator;
+import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 
 /**
- * Bounds asynchronous newest-wins work while preserving durable completion
- * outcomes for every accepted caller.
+ * Bounds asynchronous per-key work with one priority fence and newest-wins
+ * routine retention.
  *
- * <p>The coordinator owns one synchronized state machine. User handlers and
- * completion callbacks are always invoked after that state lock is released.
+ * <p>One monitor owns all state. Handlers, schedulers, and waiter callbacks
+ * always run after that monitor is released.</p>
  */
 public final class LatestWorkCoordinator<K, V> {
     private final Object stateLock = new Object();
     private final int maxInFlight;
-    private final BiFunction<? super K, ? super V,
-            ? extends CompletionStage<Void>> handler;
+    private final MaintenanceWorkHandler<? super K, V> handler;
+    private final Consumer<Runnable> resumeScheduler;
     private final Map<K, KeyState<V>> states = new HashMap<>();
     private final ArrayDeque<K> readyKeys = new ArrayDeque<>();
     private final ThreadLocal<Boolean> dispatching =
@@ -38,24 +40,124 @@ public final class LatestWorkCoordinator<K, V> {
     private long completions;
     private long failures;
 
+    /** Creates a newest-wins coordinator whose handler cannot defer. */
     public LatestWorkCoordinator(
             int maxInFlight,
             @Nonnull BiFunction<? super K, ? super V,
                     ? extends CompletionStage<Void>> handler
     ) {
+        this(maxInFlight, durableHandler(handler), ignored -> { });
+    }
+
+    /** Creates a coordinator with caller-scheduled pre-write deferral. */
+    public LatestWorkCoordinator(
+            int maxInFlight,
+            @Nonnull MaintenanceWorkHandler<? super K, V> handler,
+            @Nonnull Consumer<Runnable> resumeScheduler
+    ) {
         if (maxInFlight < 1) {
-            throw new IllegalArgumentException("At least one in-flight slot is required");
+            throw new IllegalArgumentException(
+                    "At least one in-flight slot is required"
+            );
         }
         this.maxInFlight = maxInFlight;
         this.handler = Objects.requireNonNull(handler, "handler");
+        this.resumeScheduler = Objects.requireNonNull(
+                resumeScheduler, "resumeScheduler"
+        );
+    }
+
+    /** Accepts routine work and replaces only older pending routine work. */
+    @Nonnull
+    public CompletionStage<Void> submit(@Nonnull K key, @Nonnull V value) {
+        return submit(key, value, null);
     }
 
     /**
-     * Accepts a value, replacing only an older pending value for the same key.
-     * The returned stage completes when the retained value is durable.
+     * Accepts sealed priority work. The selector chooses the retained value
+     * when another priority value is already pending. The selector must be a
+     * pure, non-blocking function because selection is part of admission.
      */
     @Nonnull
-    public CompletionStage<Void> submit(@Nonnull K key, @Nonnull V value) {
+    public CompletionStage<Void> submitPriority(
+            @Nonnull K key,
+            @Nonnull V value,
+            @Nonnull BinaryOperator<V> selector
+    ) {
+        return submit(key, value, Objects.requireNonNull(selector, "selector"));
+    }
+
+    /** Waits for all work accepted for this key at call time. */
+    @Nonnull
+    public CompletionStage<Void> flush(@Nonnull K key) {
+        Objects.requireNonNull(key, "key");
+        CompletableFuture<Void> waiter = new CompletableFuture<>();
+        boolean completeNow = false;
+        synchronized (stateLock) {
+            KeyState<V> state = states.get(key);
+            Work<V> target = state == null ? null : flushTarget(state);
+            if (target == null) {
+                completeNow = true;
+            } else {
+                target.waiters.add(waiter);
+            }
+        }
+        if (completeNow) {
+            waiter.complete(null);
+        }
+        return waiter;
+    }
+
+    /** Returns immutable point-in-time coordinator activity. */
+    @Nonnull
+    public MaintenanceMetricsSnapshot metrics() {
+        synchronized (stateLock) {
+            return new MaintenanceMetricsSnapshot(
+                    submissions, replacements, completions, failures,
+                    pendingKeysLocked(), pendingWorkLocked(), inFlightWork,
+                    maximumInFlightWork, oldestPendingAgeLocked()
+            );
+        }
+    }
+
+    /**
+     * Stops admission, promotes deferred work for one final probe, and waits
+     * for retained work. A final deferral becomes a terminal failure.
+     */
+    @Nonnull
+    public MaintenanceDrainResult shutdown(@Nonnull Duration timeout) {
+        Objects.requireNonNull(timeout, "timeout");
+        if (timeout.isNegative()) {
+            throw new IllegalArgumentException(
+                    "Shutdown timeout must be non-negative"
+            );
+        }
+        long deadline = deadline(System.nanoTime(), timeout);
+        synchronized (stateLock) {
+            accepting = false;
+            for (KeyState<V> state : states.values()) {
+                state.deferred = false;
+                state.deferralGeneration++;
+            }
+            enqueuePendingKeysLocked();
+        }
+        startReadyWork();
+        synchronized (stateLock) {
+            while (inFlightWork > 0 || pendingWorkLocked() > 0) {
+                long remaining = deadline - System.nanoTime();
+                if (remaining <= 0 || !awaitNanosLocked(remaining)) {
+                    return drainResultLocked(false);
+                }
+            }
+            return drainResultLocked(true);
+        }
+    }
+
+    private CompletionStage<Void> submit(
+            K key,
+            V value,
+            BinaryOperator<V> prioritySelector
+    ) {
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(value, "value");
         CompletableFuture<Void> waiter = new CompletableFuture<>();
@@ -64,111 +166,58 @@ public final class LatestWorkCoordinator<K, V> {
             rejected = !accepting;
             if (!rejected) {
                 submissions++;
-                acceptLocked(key, value, waiter);
+                acceptLocked(key, value, waiter, prioritySelector);
             }
         }
         if (rejected) {
-            waiter.completeExceptionally(
-                    new RejectedExecutionException("Maintenance coordinator is closed")
-            );
+            waiter.completeExceptionally(new RejectedExecutionException(
+                    "Maintenance coordinator is closed"
+            ));
             return waiter;
         }
         startReadyWork();
         return waiter;
     }
 
-    /**
-     * Waits for the newest value currently accepted for a key.
-     * A later pending replacement may satisfy this call-time fence because it
-     * supersedes the value observed by the flush. A missing key is flushed.
-     */
-    @Nonnull
-    public CompletionStage<Void> flush(@Nonnull K key) {
-        Objects.requireNonNull(key, "key");
-        CompletableFuture<Void> waiter = new CompletableFuture<>();
-        boolean alreadyFlushed = false;
-        synchronized (stateLock) {
-            KeyState<V> state = states.get(key);
-            if (state == null) {
-                alreadyFlushed = true;
-            } else {
-                Work<V> target = state.pending != null
-                        ? state.pending : state.inFlight;
-                if (target == null) {
-                    alreadyFlushed = true;
-                } else {
-                    target.waiters.add(waiter);
-                }
-            }
-        }
-        if (alreadyFlushed) {
-            waiter.complete(null);
-        }
-        return waiter;
-    }
-
-    /** Returns an immutable point-in-time view of coordinator activity. */
-    @Nonnull
-    public MaintenanceMetricsSnapshot metrics() {
-        synchronized (stateLock) {
-            return new MaintenanceMetricsSnapshot(
-                    submissions,
-                    replacements,
-                    completions,
-                    failures,
-                    pendingKeysLocked(),
-                    inFlightWork,
-                    maximumInFlightWork,
-                    oldestPendingAgeLocked()
-            );
-        }
-    }
-
-    /**
-     * Stops admission, starts retained work, and waits for the given deadline.
-     * This coordinator owns no executor, so shutdown never interrupts work.
-     * Handlers must return their completion stage promptly; the coordinator
-     * cannot preempt a handler blocked inside {@code apply}.
-     */
-    @Nonnull
-    public MaintenanceDrainResult shutdown(@Nonnull Duration timeout) {
-        Objects.requireNonNull(timeout, "timeout");
-        if (timeout.isNegative()) {
-            throw new IllegalArgumentException("Shutdown timeout must be non-negative");
-        }
-        long deadline = deadline(System.nanoTime(), timeout);
-        synchronized (stateLock) {
-            accepting = false;
-            enqueuePendingKeysLocked();
-        }
-        startReadyWork();
-        synchronized (stateLock) {
-            while (inFlightWork > 0 || pendingKeysLocked() > 0) {
-                long remaining = deadline - System.nanoTime();
-                if (remaining <= 0) {
-                    return drainResultLocked(false);
-                }
-                if (!awaitNanosLocked(remaining)) {
-                    return drainResultLocked(false);
-                }
-            }
-            return drainResultLocked(true);
-        }
-    }
-
-    private void acceptLocked(K key, V value, CompletableFuture<Void> waiter) {
+    private void acceptLocked(
+            K key,
+            V value,
+            CompletableFuture<Void> waiter,
+            BinaryOperator<V> prioritySelector
+    ) {
         KeyState<V> state = states.computeIfAbsent(key, ignored -> new KeyState<>());
-        if (state.pending == null) {
-            state.pending = new Work<>(value, waiter, System.nanoTime());
+        Lane lane = prioritySelector == null ? Lane.ROUTINE : Lane.PRIORITY;
+        Work<V> candidate = new Work<>(
+                value, waiter, System.nanoTime(), prioritySelector
+        );
+        if (lane == Lane.PRIORITY) {
+            if (state.priority == null) {
+                state.priority = candidate;
+            } else {
+                state.priority = mergePriority(state.priority, candidate);
+                replacements++;
+            }
+        } else if (state.routine == null) {
+            state.routine = candidate;
         } else {
-            state.pending = state.pending.replace(value, waiter);
+            state.routine = inheritRoutine(candidate, state.routine);
             replacements++;
         }
+        wakeDeferredLocked(state, lane);
         enqueueIfReadyLocked(key, state);
     }
 
+    private void wakeDeferredLocked(KeyState<V> state, Lane submittedLane) {
+        if (state.deferred && (state.deferredLane == submittedLane
+                || submittedLane == Lane.PRIORITY)) {
+            state.deferred = false;
+            state.deferralGeneration++;
+        }
+    }
+
     private void enqueueIfReadyLocked(K key, KeyState<V> state) {
-        if (state.inFlight == null && state.pending != null && !state.ready) {
+        if (state.inFlight == null && !state.deferred
+                && hasPending(state) && !state.ready) {
             state.ready = true;
             readyKeys.addLast(key);
         }
@@ -204,46 +253,161 @@ public final class LatestWorkCoordinator<K, V> {
                     continue;
                 }
                 state.ready = false;
-                if (state.inFlight != null || state.pending == null) {
+                if (state.inFlight != null || state.deferred) {
                     continue;
                 }
-                Work<V> work = state.pending;
-                state.pending = null;
+                Lane lane = state.priority != null
+                        ? Lane.PRIORITY : Lane.ROUTINE;
+                Work<V> work = takePending(state, lane);
+                if (work == null) {
+                    continue;
+                }
                 state.inFlight = work;
                 inFlightWork++;
                 maximumInFlightWork = Math.max(
-                        maximumInFlightWork,
-                        inFlightWork
+                        maximumInFlightWork, inFlightWork
                 );
-                return new Launch<>(key, work);
+                return new Launch<>(key, work, lane);
             }
             return null;
         }
     }
 
     private void invokeHandler(Launch<K, V> launch) {
-        CompletionStage<Void> completion;
+        CompletionStage<? extends MaintenanceWorkOutcome<V>> completion;
         try {
             completion = handler.apply(launch.key, launch.work.value);
             if (completion == null) {
-                throw new NullPointerException("Maintenance handler returned null");
+                throw new NullPointerException(
+                        "Maintenance handler returned null"
+                );
             }
         } catch (Throwable failure) {
-            complete(launch, failure);
+            complete(launch, null, failure);
             return;
         }
         try {
-            completion.whenComplete((ignored, failure) -> complete(launch, failure));
+            completion.whenComplete((outcome, failure) ->
+                    complete(launch, outcome, failure));
         } catch (Throwable failure) {
-            complete(launch, failure);
+            complete(launch, null, failure);
         }
     }
 
-    private void complete(Launch<K, V> launch, Throwable failure) {
+    private void complete(
+            Launch<K, V> launch,
+            MaintenanceWorkOutcome<V> outcome,
+            Throwable failure
+    ) {
+        if (failure == null
+                && outcome instanceof MaintenanceWorkOutcome.Failed<V> failed) {
+            failure = failed.failure();
+        }
+        if (failure == null
+                && outcome instanceof MaintenanceWorkOutcome.Deferred<V>) {
+            defer(launch);
+            return;
+        }
+        if (failure == null
+                && !(outcome instanceof MaintenanceWorkOutcome.Durable<V>)) {
+            failure = new NullPointerException(
+                    "Maintenance handler returned no outcome"
+            );
+        }
+        finish(launch, failure);
+    }
+
+    private void defer(Launch<K, V> launch) {
+        Resume<K> resume = null;
+        Throwable terminal = null;
+        synchronized (stateLock) {
+            KeyState<V> state = liveState(launch);
+            if (state == null) {
+                return;
+            }
+            state.inFlight = null;
+            inFlightWork--;
+            if (!accepting) {
+                terminal = new RejectedExecutionException(
+                        "Maintenance work remained deferred during shutdown"
+                );
+            } else {
+                boolean sameLaneNewer = pending(state, launch.lane) != null;
+                boolean shouldRun = sameLaneNewer
+                        || (launch.lane == Lane.ROUTINE
+                        && state.priority != null);
+                restoreDeferred(state, launch);
+                if (sameLaneNewer) {
+                    replacements++;
+                }
+                if (shouldRun) {
+                    enqueueIfReadyLocked(launch.key, state);
+                } else {
+                    state.deferred = true;
+                    state.deferredLane = launch.lane;
+                    long generation = ++state.deferralGeneration;
+                    resume = new Resume<>(launch.key, launch.lane, generation);
+                }
+                stateLock.notifyAll();
+            }
+        }
+        if (terminal != null) {
+            finishDetached(launch, terminal);
+        } else if (resume != null) {
+            scheduleResume(resume);
+        }
+        startReadyWork();
+    }
+
+    private void scheduleResume(Resume<K> resume) {
+        try {
+            resumeScheduler.accept(() -> resume(resume));
+        } catch (Throwable failure) {
+            failDeferred(resume, failure);
+        }
+    }
+
+    private void resume(Resume<K> resume) {
+        synchronized (stateLock) {
+            KeyState<V> state = states.get(resume.key);
+            if (state == null || !state.deferred
+                    || state.deferredLane != resume.lane
+                    || state.deferralGeneration != resume.generation) {
+                return;
+            }
+            state.deferred = false;
+            enqueueIfReadyLocked(resume.key, state);
+        }
+        startReadyWork();
+    }
+
+    private void failDeferred(Resume<K> resume, Throwable failure) {
+        List<CompletableFuture<Void>> waiters = List.of();
+        synchronized (stateLock) {
+            KeyState<V> state = states.get(resume.key);
+            if (state == null || !state.deferred
+                    || state.deferredLane != resume.lane
+                    || state.deferralGeneration != resume.generation) {
+                return;
+            }
+            state.deferred = false;
+            Work<V> work = takePending(state, resume.lane);
+            if (work != null) {
+                waiters = new ArrayList<>(work.waiters);
+                failures++;
+            }
+            cleanOrEnqueueLocked(resume.key, state);
+            stateLock.notifyAll();
+        }
+        completeWaiters(waiters, failure);
+        startReadyWork();
+    }
+
+    private void finish(Launch<K, V> launch, Throwable failure) {
         List<CompletableFuture<Void>> waiters;
         synchronized (stateLock) {
-            KeyState<V> state = states.get(launch.key);
-            if (state == null || state.inFlight != launch.work) {
+            KeyState<V> state = liveState(launch);
+            if (state == null) {
                 return;
             }
             state.inFlight = null;
@@ -254,15 +418,77 @@ public final class LatestWorkCoordinator<K, V> {
                 failures++;
             }
             waiters = new ArrayList<>(launch.work.waiters);
-            if (state.pending == null) {
-                states.remove(launch.key);
-            } else {
-                enqueueIfReadyLocked(launch.key, state);
-            }
+            cleanOrEnqueueLocked(launch.key, state);
             stateLock.notifyAll();
         }
         completeWaiters(waiters, failure);
         startReadyWork();
+    }
+
+    private void finishDetached(Launch<K, V> launch, Throwable failure) {
+        List<CompletableFuture<Void>> waiters;
+        synchronized (stateLock) {
+            KeyState<V> state = states.get(launch.key);
+            failures++;
+            waiters = new ArrayList<>(launch.work.waiters);
+            if (state != null) {
+                cleanOrEnqueueLocked(launch.key, state);
+            }
+            stateLock.notifyAll();
+        }
+        completeWaiters(waiters, failure);
+    }
+
+    private KeyState<V> liveState(Launch<K, V> launch) {
+        KeyState<V> state = states.get(launch.key);
+        return state != null && state.inFlight == launch.work
+                ? state : null;
+    }
+
+    private void cleanOrEnqueueLocked(K key, KeyState<V> state) {
+        if (state.inFlight == null && !hasPending(state)) {
+            states.remove(key);
+        } else {
+            enqueueIfReadyLocked(key, state);
+        }
+    }
+
+    private void restoreDeferred(KeyState<V> state, Launch<K, V> launch) {
+        Work<V> newer = pending(state, launch.lane);
+        if (newer == null) {
+            setPending(state, launch.lane, launch.work);
+        } else if (launch.lane == Lane.PRIORITY) {
+            setPending(state, launch.lane, mergePriority(launch.work, newer));
+        } else {
+            setPending(state, launch.lane, inheritRoutine(newer, launch.work));
+        }
+    }
+
+    private static <V> Work<V> mergePriority(Work<V> old, Work<V> candidate) {
+        BinaryOperator<V> selector = old.prioritySelector;
+        V retained = Objects.requireNonNull(
+                selector.apply(old.value, candidate.value),
+                "Priority selector returned null"
+        );
+        Work<V> merged = new Work<>(
+                retained,
+                Math.min(old.createdAtNanos, candidate.createdAtNanos),
+                selector
+        );
+        merged.waiters.addAll(old.waiters);
+        merged.waiters.addAll(candidate.waiters);
+        return merged;
+    }
+
+    private static <V> Work<V> inheritRoutine(Work<V> newer, Work<V> old) {
+        Work<V> retained = new Work<>(
+                newer.value,
+                Math.min(old.createdAtNanos, newer.createdAtNanos),
+                null
+        );
+        retained.waiters.addAll(old.waiters);
+        retained.waiters.addAll(newer.waiters);
+        return retained;
     }
 
     private static void completeWaiters(
@@ -280,43 +506,45 @@ public final class LatestWorkCoordinator<K, V> {
 
     private MaintenanceDrainResult drainResultLocked(boolean drained) {
         return new MaintenanceDrainResult(
-                drained,
-                pendingKeysLocked(),
-                inFlightWork
+                drained, pendingKeysLocked(), pendingWorkLocked(), inFlightWork
         );
     }
 
     private int pendingKeysLocked() {
-        int pending = 0;
+        int count = 0;
         for (KeyState<V> state : states.values()) {
-            if (state.pending != null) {
-                pending++;
+            if (hasPending(state)) {
+                count++;
             }
         }
-        return pending;
+        return count;
+    }
+
+    private int pendingWorkLocked() {
+        int count = 0;
+        for (KeyState<V> state : states.values()) {
+            count += state.priority == null ? 0 : 1;
+            count += state.routine == null ? 0 : 1;
+        }
+        return count;
     }
 
     private long oldestPendingAgeLocked() {
         long now = System.nanoTime();
         long oldest = 0;
         for (KeyState<V> state : states.values()) {
-            if (state.pending == null) {
-                continue;
-            }
-            long age = now - state.pending.createdAtNanos;
-            if (age < 0) {
-                age = Long.MAX_VALUE;
-            }
-            oldest = Math.max(oldest, age);
+            oldest = Math.max(oldest, age(now, state.priority));
+            oldest = Math.max(oldest, age(now, state.routine));
         }
         return oldest;
     }
 
     private boolean awaitNanosLocked(long remaining) {
         try {
-            long millis = remaining / 1_000_000L;
-            int nanos = (int) (remaining % 1_000_000L);
-            stateLock.wait(millis, nanos);
+            stateLock.wait(
+                    remaining / 1_000_000L,
+                    (int) (remaining % 1_000_000L)
+            );
             return true;
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
@@ -331,36 +559,124 @@ public final class LatestWorkCoordinator<K, V> {
         } catch (ArithmeticException overflow) {
             return Long.MAX_VALUE;
         }
-        if (start > 0 && nanos >= Long.MAX_VALUE - start) {
-            return Long.MAX_VALUE;
+        return start > 0 && nanos >= Long.MAX_VALUE - start
+                ? Long.MAX_VALUE : start + nanos;
+    }
+
+    private static long age(long now, Work<?> work) {
+        if (work == null) {
+            return 0;
         }
-        return start + nanos;
+        long age = now - work.createdAtNanos;
+        return age < 0 ? Long.MAX_VALUE : age;
+    }
+
+    private static boolean hasPending(KeyState<?> state) {
+        return state.priority != null || state.routine != null;
+    }
+
+    private static <V> Work<V> flushTarget(KeyState<V> state) {
+        if (state.routine != null) {
+            return state.routine;
+        }
+        if (state.priority != null) {
+            return state.priority;
+        }
+        return state.inFlight;
+    }
+
+    private static <V> Work<V> pending(KeyState<V> state, Lane lane) {
+        return lane == Lane.PRIORITY ? state.priority : state.routine;
+    }
+
+    private static <V> Work<V> takePending(KeyState<V> state, Lane lane) {
+        Work<V> work = pending(state, lane);
+        setPending(state, lane, null);
+        return work;
+    }
+
+    private static <V> void setPending(
+            KeyState<V> state,
+            Lane lane,
+            Work<V> work
+    ) {
+        if (lane == Lane.PRIORITY) {
+            state.priority = work;
+        } else {
+            state.routine = work;
+        }
+    }
+
+    private static <K, V> MaintenanceWorkHandler<K, V> durableHandler(
+            BiFunction<? super K, ? super V,
+                    ? extends CompletionStage<Void>> handler
+    ) {
+        Objects.requireNonNull(handler, "handler");
+        return (key, value) -> {
+            CompletionStage<Void> completion = handler.apply(key, value);
+            if (completion == null) {
+                throw new NullPointerException(
+                        "Maintenance handler returned null"
+                );
+            }
+            CompletableFuture<MaintenanceWorkOutcome<V>> adapted =
+                    new CompletableFuture<>();
+            completion.whenComplete((ignored, failure) -> {
+                if (failure == null) {
+                    adapted.complete(MaintenanceWorkOutcome.durable());
+                } else {
+                    adapted.completeExceptionally(failure);
+                }
+            });
+            return adapted;
+        };
+    }
+
+    private enum Lane {
+        PRIORITY,
+        ROUTINE
     }
 
     private static final class KeyState<V> {
         private Work<V> inFlight;
-        private Work<V> pending;
+        private Work<V> priority;
+        private Work<V> routine;
         private boolean ready;
+        private boolean deferred;
+        private Lane deferredLane;
+        private long deferralGeneration;
     }
 
     private static final class Work<V> {
         private final V value;
         private final List<CompletableFuture<Void>> waiters = new ArrayList<>();
         private final long createdAtNanos;
+        private final BinaryOperator<V> prioritySelector;
 
-        private Work(V value, CompletableFuture<Void> waiter, long createdAtNanos) {
-            this.value = value;
-            this.waiters.add(waiter);
-            this.createdAtNanos = createdAtNanos;
+        private Work(
+                V value,
+                CompletableFuture<Void> waiter,
+                long createdAtNanos,
+                BinaryOperator<V> prioritySelector
+        ) {
+            this(value, createdAtNanos, prioritySelector);
+            waiters.add(waiter);
         }
 
-        private Work<V> replace(V replacement, CompletableFuture<Void> waiter) {
-            Work<V> next = new Work<>(replacement, waiter, createdAtNanos);
-            next.waiters.addAll(waiters);
-            return next;
+        private Work(
+                V value,
+                long createdAtNanos,
+                BinaryOperator<V> prioritySelector
+        ) {
+            this.value = value;
+            this.createdAtNanos = createdAtNanos;
+            this.prioritySelector = prioritySelector;
         }
     }
 
-    private record Launch<K, V>(K key, Work<V> work) {
+    private record Launch<K, V>(K key, Work<V> work, Lane lane) {
+    }
+
+    private record Resume<K>(K key, Lane lane, long generation) {
     }
 }

@@ -4,19 +4,27 @@ package com.alechilles.alecstamework.items.persistence.maintenance;
 public record MaintenanceDrainResult(
         boolean drained,
         int pendingKeys,
+        int pendingWork,
         int inFlightWork
 ) {
     public MaintenanceDrainResult {
-        if (pendingKeys < 0 || inFlightWork < 0
-                || (drained && (pendingKeys != 0 || inFlightWork != 0))) {
+        if (pendingKeys < 0 || pendingWork < 0 || inFlightWork < 0
+                || pendingWork < pendingKeys
+                || (drained && (pendingKeys != 0
+                || pendingWork != 0 || inFlightWork != 0))) {
             throw new IllegalArgumentException(
                     "Consistent maintenance drain counts are required"
             );
         }
     }
 
-    /** Returns the number of retained pending values. There is at most one per key. */
-    public int pendingWork() {
-        return pendingKeys;
+    /** Preserves the original constructor for single-lane callers. */
+    public MaintenanceDrainResult(
+            boolean drained,
+            int pendingKeys,
+            int inFlightWork
+    ) {
+        this(drained, pendingKeys, pendingKeys, inFlightWork);
     }
+
 }

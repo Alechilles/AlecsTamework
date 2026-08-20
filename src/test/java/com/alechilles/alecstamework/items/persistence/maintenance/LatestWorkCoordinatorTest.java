@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
+import java.util.function.BinaryOperator;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -158,6 +159,274 @@ class LatestWorkCoordinatorTest {
     }
 
     @Test
+    void priorityRunsBeforeRoutineAfterCurrentInFlight() {
+        List<String> calls = Collections.synchronizedList(new ArrayList<>());
+        BlockingQueue<Invocation<String>> invocations =
+                new LinkedBlockingQueue<>();
+        LatestWorkCoordinator<String, String> coordinator =
+                outcomeCoordinator(1, calls, invocations);
+
+        coordinator.submit("cow", "routine-1");
+        CompletionStage<Void> priority = coordinator.submitPriority(
+                "cow", "priority", keepNewValue()
+        );
+        CompletionStage<Void> routine = coordinator.submit("cow", "routine-2");
+
+        take(invocations).completion.complete(null);
+        await(() -> calls.size() == 2);
+        assertEquals(List.of("routine-1", "priority"), calls);
+        assertFalse(priority.toCompletableFuture().isDone());
+        assertFalse(routine.toCompletableFuture().isDone());
+
+        take(invocations).completion.complete(null);
+        await(() -> calls.size() == 3);
+        assertEquals(List.of("routine-1", "priority", "routine-2"), calls);
+        take(invocations).completion.complete(null);
+        assertTrue(priority.toCompletableFuture().isDone());
+        assertTrue(routine.toCompletableFuture().isDone());
+    }
+
+    @Test
+    void prioritySelectorCanRetainTheOldValue() {
+        List<String> calls = Collections.synchronizedList(new ArrayList<>());
+        BlockingQueue<Invocation<String>> invocations =
+                new LinkedBlockingQueue<>();
+        LatestWorkCoordinator<String, String> coordinator =
+                outcomeCoordinator(1, calls, invocations);
+
+        coordinator.submit("cow", "routine");
+        CompletionStage<Void> oldPriority = coordinator.submitPriority(
+                "cow", "old", (oldValue, newValue) -> oldValue
+        );
+        CompletionStage<Void> newPriority = coordinator.submitPriority(
+                "cow", "new", keepNewValue()
+        );
+
+        take(invocations).completion.complete(null);
+        await(() -> calls.size() == 2);
+        assertEquals(List.of("routine", "old"), calls);
+        take(invocations).completion.complete(null);
+        assertTrue(oldPriority.toCompletableFuture().isDone());
+        assertTrue(newPriority.toCompletableFuture().isDone());
+    }
+
+    @Test
+    void prioritySelectorCanChooseTheNewValue() {
+        List<String> calls = Collections.synchronizedList(new ArrayList<>());
+        BlockingQueue<Invocation<String>> invocations =
+                new LinkedBlockingQueue<>();
+        LatestWorkCoordinator<String, String> coordinator =
+                outcomeCoordinator(1, calls, invocations);
+
+        coordinator.submit("cow", "routine");
+        CompletionStage<Void> oldPriority = coordinator.submitPriority(
+                "cow", "old", keepNewValue()
+        );
+        CompletionStage<Void> newPriority = coordinator.submitPriority(
+                "cow", "new", keepNewValue()
+        );
+
+        take(invocations).completion.complete(null);
+        await(() -> calls.size() == 2);
+        assertEquals(List.of("routine", "new"), calls);
+        take(invocations).completion.complete(null);
+        assertTrue(oldPriority.toCompletableFuture().isDone());
+        assertTrue(newPriority.toCompletableFuture().isDone());
+    }
+
+    @Test
+    void priorityAndRoutineWaitersCompleteSeparatelyAndFlushWaitsThroughBoth() {
+        List<String> calls = Collections.synchronizedList(new ArrayList<>());
+        BlockingQueue<Invocation<String>> invocations =
+                new LinkedBlockingQueue<>();
+        LatestWorkCoordinator<String, String> coordinator =
+                outcomeCoordinator(1, calls, invocations);
+
+        coordinator.submit("cow", "routine-1");
+        CompletionStage<Void> priority = coordinator.submitPriority(
+                "cow", "priority", keepNewValue()
+        );
+        CompletionStage<Void> routine = coordinator.submit("cow", "routine-2");
+        CompletionStage<Void> flush = coordinator.flush("cow");
+
+        take(invocations).completion.complete(null);
+        await(() -> calls.size() == 2);
+        take(invocations).completion.complete(null);
+        assertTrue(priority.toCompletableFuture().isDone());
+        assertFalse(routine.toCompletableFuture().isDone());
+        assertFalse(flush.toCompletableFuture().isDone());
+
+        take(invocations).completion.complete(null);
+        assertTrue(routine.toCompletableFuture().isDone());
+        assertTrue(flush.toCompletableFuture().isDone());
+
+        MaintenanceMetricsSnapshot metrics = coordinator.metrics();
+        assertEquals(0, metrics.pendingKeys());
+        assertEquals(0, metrics.pendingWork());
+    }
+
+    @Test
+    void deferredKeysReleaseSlotsForNewWork() {
+        BlockingQueue<Runnable> resumes = new LinkedBlockingQueue<>();
+        List<Integer> calls = Collections.synchronizedList(new ArrayList<>());
+        LatestWorkCoordinator<Integer, Integer> coordinator =
+                new LatestWorkCoordinator<>(
+                        4,
+                        (key, value) -> {
+                            calls.add(value);
+                            return CompletableFuture.completedFuture(
+                                    value < 4
+                                            ? MaintenanceWorkOutcome.deferred()
+                                            : MaintenanceWorkOutcome.durable()
+                            );
+                        },
+                        resumes::add
+                );
+
+        for (int key = 0; key < 5; key++) {
+            coordinator.submit(key, key);
+        }
+
+        assertEquals(List.of(0, 1, 2, 3, 4), calls);
+        assertEquals(4, coordinator.metrics().pendingKeys());
+        assertEquals(4, coordinator.metrics().pendingWork());
+        assertEquals(0, coordinator.metrics().inFlightWork());
+        assertEquals(4, resumes.size());
+    }
+
+    @Test
+    void deferredResumeCompletesOriginalWaiters() {
+        BlockingQueue<Runnable> resumes = new LinkedBlockingQueue<>();
+        BlockingQueue<Invocation<Integer>> invocations =
+                new LinkedBlockingQueue<>();
+        AtomicInteger attempts = new AtomicInteger();
+        LatestWorkCoordinator<Integer, Integer> coordinator =
+                new LatestWorkCoordinator<>(
+                        1,
+                        (key, value) -> {
+                            if (attempts.getAndIncrement() == 0) {
+                                return CompletableFuture.completedFuture(
+                                        MaintenanceWorkOutcome.deferred()
+                                );
+                            }
+                            Invocation<Integer> invocation = new Invocation<>(value);
+                            invocations.add(invocation);
+                            return invocation.completion.thenApply(
+                                    ignored -> MaintenanceWorkOutcome.durable()
+                            );
+                        },
+                        resumes::add
+                );
+
+        CompletionStage<Void> submitted = coordinator.submit(1, 1);
+        takeRunnable(resumes).run();
+        assertFalse(submitted.toCompletableFuture().isDone());
+        take(invocations).completion.complete(null);
+        assertTrue(submitted.toCompletableFuture().isDone());
+    }
+
+    @Test
+    void newerRoutineSupersedesDeferredValueAndStaleResumeIsHarmless() {
+        BlockingQueue<Runnable> resumes = new LinkedBlockingQueue<>();
+        BlockingQueue<Invocation<Integer>> invocations =
+                new LinkedBlockingQueue<>();
+        List<Integer> calls = Collections.synchronizedList(new ArrayList<>());
+        LatestWorkCoordinator<Integer, Integer> coordinator =
+                new LatestWorkCoordinator<>(
+                        1,
+                        (key, value) -> {
+                            calls.add(value);
+                            if (value == 1) {
+                                return CompletableFuture.completedFuture(
+                                        MaintenanceWorkOutcome.deferred()
+                                );
+                            }
+                            Invocation<Integer> invocation = new Invocation<>(value);
+                            invocations.add(invocation);
+                            return invocation.completion.thenApply(
+                                    ignored -> MaintenanceWorkOutcome.durable()
+                            );
+                        },
+                        resumes::add
+                );
+
+        CompletionStage<Void> stale = coordinator.submit(1, 1);
+        CompletionStage<Void> newest = coordinator.submit(1, 2);
+        await(() -> calls.size() == 2);
+        assertEquals(List.of(1, 2), calls);
+        takeRunnable(resumes).run();
+        assertEquals(List.of(1, 2), calls);
+        take(invocations).completion.complete(null);
+        assertTrue(stale.toCompletableFuture().isDone());
+        assertTrue(newest.toCompletableFuture().isDone());
+    }
+
+    @Test
+    void priorityWorkWakesAheadOfADeferredRoutine() {
+        BlockingQueue<Runnable> resumes = new LinkedBlockingQueue<>();
+        List<String> calls = Collections.synchronizedList(new ArrayList<>());
+        AtomicInteger routineAttempts = new AtomicInteger();
+        LatestWorkCoordinator<String, String> coordinator =
+                new LatestWorkCoordinator<>(
+                        1,
+                        (key, value) -> {
+                            calls.add(value);
+                            if ("routine".equals(value)
+                                    && routineAttempts.getAndIncrement() == 0) {
+                                return CompletableFuture.completedFuture(
+                                        MaintenanceWorkOutcome.deferred()
+                                );
+                            }
+                            return CompletableFuture.completedFuture(
+                                    MaintenanceWorkOutcome.durable()
+                            );
+                        },
+                        resumes::add
+                );
+
+        CompletionStage<Void> routine = coordinator.submit("cow", "routine");
+        CompletionStage<Void> priority = coordinator.submitPriority(
+                "cow", "priority", keepNewValue()
+        );
+
+        assertEquals(List.of("routine", "priority", "routine"), calls);
+        assertTrue(priority.toCompletableFuture().isDone());
+        assertTrue(routine.toCompletableFuture().isDone());
+        takeRunnable(resumes).run();
+        assertEquals(List.of("routine", "priority", "routine"), calls);
+    }
+
+    @Test
+    void shutdownPromotesDeferredWorkAndTurnsFinalDeferralIntoFailure() {
+        BlockingQueue<Runnable> resumes = new LinkedBlockingQueue<>();
+        AtomicInteger calls = new AtomicInteger();
+        LatestWorkCoordinator<Integer, Integer> coordinator =
+                new LatestWorkCoordinator<>(
+                        1,
+                        (key, value) -> {
+                            calls.incrementAndGet();
+                            return CompletableFuture.completedFuture(
+                                    MaintenanceWorkOutcome.deferred()
+                            );
+                        },
+                        resumes::add
+                );
+
+        CompletionStage<Void> submitted = coordinator.submit(1, 1);
+        MaintenanceDrainResult result = coordinator.shutdown(Duration.ofSeconds(1));
+
+        assertTrue(result.drained());
+        assertEquals(2, calls.get());
+        assertThrows(RuntimeException.class, () -> submitted.toCompletableFuture().join());
+        assertEquals(0, result.pendingKeys());
+        assertEquals(0, result.pendingWork());
+        assertEquals(0, result.inFlightWork());
+        assertEquals(1, coordinator.metrics().failures());
+        takeRunnable(resumes).run();
+        assertEquals(2, calls.get());
+    }
+
+    @Test
     void callbackRegistrationFailureFailsWaitersReleasesSlotAndDrains() throws Exception {
         BlockingQueue<Invocation<Integer>> invocations =
                 new LinkedBlockingQueue<>();
@@ -297,6 +566,40 @@ class LatestWorkCoordinatorTest {
             Thread.currentThread().interrupt();
             throw new AssertionError("Interrupted while waiting for handler", interrupted);
         }
+    }
+
+    private static Runnable takeRunnable(BlockingQueue<Runnable> resumes) {
+        try {
+            Runnable resume = resumes.poll(5, TimeUnit.SECONDS);
+            assertNotNull(resume);
+            return resume;
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("Interrupted while waiting for resume", interrupted);
+        }
+    }
+
+    private static BinaryOperator<String> keepNewValue() {
+        return (oldValue, newValue) -> newValue;
+    }
+
+    private static LatestWorkCoordinator<String, String> outcomeCoordinator(
+            int maxInFlight,
+            List<String> calls,
+            BlockingQueue<Invocation<String>> invocations
+    ) {
+        return new LatestWorkCoordinator<>(
+                maxInFlight,
+                (key, value) -> {
+                    calls.add(value);
+                    Invocation<String> invocation = new Invocation<>(value);
+                    invocations.add(invocation);
+                    return invocation.completion.thenApply(
+                            ignored -> MaintenanceWorkOutcome.durable()
+                    );
+                },
+                ignored -> { }
+        );
     }
 
     private static void await(BooleanSupplier condition) {
