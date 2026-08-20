@@ -56,8 +56,7 @@ class PopulationAdmissionBatchStagingTest {
                             .getBytes(java.nio.charset.StandardCharsets.UTF_8))
             );
             PopulationDomainAdmissionOperation.Payload payload = new PopulationDomainAdmissionOperation.Payload(
-                    UUID.nameUUIDFromBytes(("population-domain:litter:" + LITTER
-                            + ":reservation")
+                    UUID.nameUUIDFromBytes((LITTER + ":reservation")
                             .getBytes(java.nio.charset.StandardCharsets.UTF_8)),
                     PROFILE,
                     new OwnerId(OWNER),
@@ -100,6 +99,54 @@ class PopulationAdmissionBatchStagingTest {
                     operations,
                     new java.util.concurrent.ConcurrentHashMap<>()
             );
+            PopulationAdmissionToken forged = new PopulationAdmissionToken(
+                    LITTER,
+                    UUID.fromString("60000000-0000-0000-0000-000000000605"),
+                    Long.MAX_VALUE,
+                    99,
+                    "forged-generation",
+                    OwnerPopulationCapDecisionViewV2.Readiness.READY
+            );
+            ManagedBatchSettlement rejected = staging.settle(
+                    forged,
+                    Set.of(0),
+                    Map.of(0, UUID.fromString(
+                            "60000000-0000-0000-0000-000000000604"
+                    ))
+            ).toCompletableFuture().join();
+            assertEquals(ManagedBatchSettlement.Status.UNAVAILABLE,
+                    rejected.status());
+            assertEquals(com.alechilles.alecstamework.persistence.operation
+                    .OperationPhase.LIVE_APPLYING,
+                    operations.findByIdempotency(new IdempotencyKey(
+                            "batch-restart-test"
+                    )).toCompletableFuture().join().orElseThrow().phase());
+            PopulationAdmissionToken expired = new PopulationAdmissionToken(
+                    LITTER,
+                    payload.reservationId(),
+                    0,
+                    1,
+                    "generation",
+                    OwnerPopulationCapDecisionViewV2.Readiness.READY
+            );
+            ManagedBatchSettlement expiredResult = staging.settle(
+                    expired,
+                    Set.of(0),
+                    Map.of(0, UUID.fromString(
+                            "60000000-0000-0000-0000-000000000604"
+                    ))
+            ).toCompletableFuture().join();
+            assertEquals(ManagedBatchSettlement.Status.UNAVAILABLE,
+                    expiredResult.status());
+            ManagedBatchSettlement invalidOrdinal = staging.settle(
+                    token,
+                    Set.of(2),
+                    Map.of(2, UUID.fromString(
+                            "60000000-0000-0000-0000-000000000604"
+                    ))
+            ).toCompletableFuture().join();
+            assertEquals(ManagedBatchSettlement.Status.UNAVAILABLE,
+                    invalidOrdinal.status());
             ManagedBatchSettlement settlement = staging.settle(
                     token,
                     Set.of(0),

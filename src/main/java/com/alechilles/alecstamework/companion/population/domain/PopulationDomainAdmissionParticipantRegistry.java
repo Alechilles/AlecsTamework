@@ -28,6 +28,13 @@ final class PopulationDomainAdmissionParticipantRegistry {
         ));
     }
 
+    /** Releases participant evidence after the operation has published terminally. */
+    void evict(OperationId operationId) {
+        if (operationId != null) {
+            values.remove(operationId.value());
+        }
+    }
+
     private SqliteManagedAdmissionParticipant create(
             OperationId operationId,
             PopulationDomainAdmissionOperation.Payload payload,

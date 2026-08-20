@@ -8,20 +8,14 @@ import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteOperationEn
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteManagedAdmissionParticipant;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteOperationPublisher;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteOperationReader;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePersistenceTransactionContext;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteUnitOfWorkRunner;
-import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
-import com.alechilles.alecstamework.persistence.operation.DurableCommitEvidence;
-import com.alechilles.alecstamework.persistence.operation.DurableOperationWork;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
-import com.alechilles.alecstamework.persistence.operation.PreparedOperationDetail;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
-import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
 import com.alechilles.alecstamework.persistence.recovery.OperationRecoveryClaim;
 import java.util.List;
@@ -101,33 +95,6 @@ public final class PopulationDomainAdmissionOperation {
     }
 
     @Nonnull
-    public PreparedOperationDetail preparedDetail(
-            @Nonnull OperationId operationId,
-            @Nonnull Payload payload
-    ) {
-        if (operationId == null || payload == null) {
-            throw new IllegalArgumentException(
-                    "Complete domain admission detail is required"
-            );
-        }
-        return participant(operationId, payload, null);
-    }
-
-    @Nonnull
-    public PreparedOperationDetail preparedDetail(
-            @Nonnull OperationId operationId,
-            @Nonnull Payload payload,
-            @Nonnull PopulationAdmissionComposition composition
-    ) {
-        if (operationId == null || payload == null || composition == null) {
-            throw new IllegalArgumentException(
-                    "Complete composed admission detail is required"
-            );
-        }
-        return participant(operationId, payload, composition);
-    }
-
-    @Nonnull
     public CompletionStage<Optional<OperationEnvelope>> findByIdempotency(
             @Nonnull IdempotencyKey idempotencyKey
     ) {
@@ -137,6 +104,26 @@ public final class PopulationDomainAdmissionOperation {
         return PopulationDomainAdmissionOperationSupport.findByIdempotency(
                 reader, idempotencyKey
         );
+    }
+
+    /** Reads the frozen authority needed to authenticate a restarted batch. */
+    @Nonnull
+    public CompletionStage<BatchSettlementAuthority> batchSettlementAuthority(
+            @Nonnull OperationId operationId
+    ) {
+        return read(operationId).thenApply(operation -> {
+            if (!PopulationDomainAdmissionDefinition.KIND.equals(operation.kind())) {
+                throw new IllegalStateException(
+                        "domain_admission_batch_operation_kind_invalid"
+                );
+            }
+            return new BatchSettlementAuthority(
+                    operation,
+                    PopulationDomainAdmissionDefinition.INSTANCE.decode(
+                            operation.payloadJson()
+                    )
+            );
+        });
     }
 
     @Nonnull
@@ -206,6 +193,7 @@ public final class PopulationDomainAdmissionOperation {
                             "domain_admission_settlement_readback_failed"
                     );
                 }
+                terminalResult(workflow, operation);
                 return PopulationDomainAdmissionSettlement.decode(
                         workflow.events().getLast().payloadJson()
                 );
@@ -240,7 +228,7 @@ public final class PopulationDomainAdmissionOperation {
             case PREPARED -> recoverPreparedClaim(claim);
             case DURABLE, PUBLISHED -> publisher.resume(
                     claim.operation(), consumers
-            );
+            ).thenApply(result -> terminalResult(result, claim.operation()));
             case LIVE_APPLYING, UNKNOWN, RETRYABLE, COMPENSATING -> containLiveClaim(claim);
             case COMPENSATED, FAILED -> CompletableFuture.failedFuture(
                     new IllegalStateException("domain_admission_terminal_recovery")
@@ -295,83 +283,21 @@ public final class PopulationDomainAdmissionOperation {
             java.util.Map<Integer, UUID> actualChildIds,
             boolean allowLiveCancellation
     ) {
-        return read(operationId).thenCompose(operation -> {
-            if (operation.phase() == OperationPhase.DURABLE
-                    || operation.phase() == OperationPhase.PUBLISHED) {
-                return publisher.resume(operation, consumers)
-                        .thenApply(result -> new OperationWorkflow(result, operation));
-            }
-            boolean preparingCancel = canceled
-                    && (operation.phase() == OperationPhase.PREPARED
-                    || allowLiveCancellation
-                    && operation.phase() == OperationPhase.LIVE_APPLYING);
-            boolean committing = !canceled && operation.phase() == OperationPhase.LIVE_APPLYING;
-            if (!preparingCancel && !committing) {
-                return CompletableFuture.failedFuture(new IllegalStateException(
-                        "domain_admission_invalid_phase_"
-                                + operation.phase().name().toLowerCase()
-                ));
-            }
-            Payload payload = PopulationDomainAdmissionDefinition.INSTANCE.decode(
-                    operation.payloadJson()
-            );
-            SqliteManagedAdmissionParticipant participant = participant(
-                    operationId, payload, null
-            );
-            java.util.Set<Integer> ordinals = settledOrdinals == null
-                    ? canceled
-                            ? java.util.Set.of()
-                            : java.util.stream.IntStream.range(
-                                    0, payload.requestedCount()
-                            ).boxed().collect(java.util.stream.Collectors.toUnmodifiableSet())
-                    : java.util.Set.copyOf(settledOrdinals);
-            java.util.Map<Integer, UUID> children = actualChildIds == null
-                    ? java.util.Map.of() : java.util.Map.copyOf(actualChildIds);
-            PopulationDomainAdmissionSettlement.validate(payload, ordinals, children);
-            DurableOperationWork work = (transaction, current) -> {
-                List<ProjectionEventDraft> events = List.of(
-                        new ProjectionEventDraft(
-                                current.operationId(),
-                                EVENT_TYPE,
-                                payload.reservationId().toString(),
-                                1,
-                                1,
-                                PopulationDomainAdmissionSettlement.encode(
-                                        payload, canceled, ordinals, children
-                                ),
-                                clock.getAsLong()
-                        )
-                );
-                if (canceled) {
-                    participant.retirePrepared(transaction, current);
-                } else {
-                    participant.settleBatch(
-                            transaction,
-                            current,
-                            payload.requestedCount(),
-                            ordinals.size()
-                    );
-                }
-                return events;
-            };
-            return engine.commitDurable(
-                    operation,
-                    work,
-                    clock.getAsLong()
-            ).completion().thenCompose(result -> {
-                if (!(result instanceof PersistenceTransactionResult.Committed<?> committed)
-                        || !(committed.value() instanceof DurableCommitEvidence evidence)) {
-                    Throwable failure = result instanceof PersistenceTransactionResult.RolledBack<?> rolled
-                            ? rolled.failure().cause()
-                            : new IllegalStateException("domain_admission_commit_failed");
-                    return CompletableFuture.failedFuture(failure == null
-                            ? new IllegalStateException("domain_admission_commit_failed")
-                            : failure);
-                }
-                return publisher.publish(evidence, consumers)
-                        .thenApply(published -> new OperationWorkflow(published, published.operation()));
-            });
-        });
+        return PopulationDomainAdmissionWorkflowSupport.durable(
+                engine, publisher, reader, consumers, clock, participantRegistry,
+                operationId, canceled, settledOrdinals, actualChildIds,
+                allowLiveCancellation
+        );
+    }
+
+    private OperationWorkflowResult terminalResult(
+            OperationWorkflowResult result,
+            OperationEnvelope operation
+    ) {
+        if (result.status() == OperationWorkflowResult.Status.PUBLISHED) {
+            participantRegistry.evict(operation.operationId());
+        }
+        return result;
     }
 
     private CompletionStage<OperationEnvelope> read(OperationId operationId) {
@@ -415,6 +341,13 @@ public final class PopulationDomainAdmissionOperation {
     public record OperationWorkflow(
             @Nullable com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult result,
             @Nonnull OperationEnvelope operation
+    ) {
+    }
+
+    /** Frozen operation evidence used by restart settlement authentication. */
+    public record BatchSettlementAuthority(
+            @Nonnull OperationEnvelope operation,
+            @Nonnull Payload payload
     ) {
     }
 

@@ -40,20 +40,17 @@ final class PopulationAdmissionStaging {
     private final PopulationAdmissionSettlementFlights<PopulationAdmissionDecision>
             settlementFlights = new PopulationAdmissionSettlementFlights<>();
     private final PopulationAdmissionBatchStaging batches;
-
     PopulationAdmissionStaging(
             PopulationDomainAdmissionOperation operations
     ) {
         this(operations, System::nanoTime);
     }
-
     PopulationAdmissionStaging(
             PopulationDomainAdmissionOperation operations,
             LongSupplier clock
     ) {
         this(operations, clock, System::nanoTime);
     }
-
     PopulationAdmissionStaging(
             PopulationDomainAdmissionOperation operations,
             LongSupplier wallClock,
@@ -62,9 +59,10 @@ final class PopulationAdmissionStaging {
         this.operations = Objects.requireNonNull(operations, "operations");
         this.wallClock = Objects.requireNonNull(wallClock, "wallClock");
         this.monotonicClock = Objects.requireNonNull(monotonicClock, "monotonicClock");
-        this.batches = new PopulationAdmissionBatchStaging(operations, active);
+        this.batches = new PopulationAdmissionBatchStaging(
+                operations, active, wallClock, monotonicClock
+        );
     }
-
     Identity identity(PopulationAdmissionRequestV3 request) {
         String supplied = request.request().request().identity().idempotencyKey();
         if (supplied == null || supplied.isBlank()) {
@@ -80,26 +78,24 @@ final class PopulationAdmissionStaging {
         );
         return new Identity(operation, reservation, key);
     }
-
     Identity batchIdentity(UUID litterOperationId) {
         Objects.requireNonNull(litterOperationId, "litterOperationId");
         String key = "population-domain:litter:" + litterOperationId;
         return new Identity(
                 litterOperationId,
                 UUID.nameUUIDFromBytes(
-                        (key + ":reservation").getBytes(StandardCharsets.UTF_8)
+                        (litterOperationId + ":reservation")
+                                .getBytes(StandardCharsets.UTF_8)
                 ),
                 key
         );
     }
-
     CompletionStage<PopulationAdmissionDecision> prepareOrReuse(
             Identity identity,
             ManagedAdmissionEvidenceAuthor.Authoring evidence
     ) {
         return prepareOrReuse(identity, evidence, null);
     }
-
     CompletionStage<PopulationAdmissionDecision> prepareOrReuse(
             Identity identity,
             ManagedAdmissionEvidenceAuthor.Authoring evidence,
@@ -138,7 +134,6 @@ final class PopulationAdmissionStaging {
     ) {
         ActiveToken current = active.get(token.operationId());
         if (current == null || !current.token().equals(token)
-                || current.terminal() != null
                 || current.applying()
                 || current.settling()
                 || monotonicClock.getAsLong() >= token.expiresAtMonotonicNanos()) {
@@ -166,9 +161,6 @@ final class PopulationAdmissionStaging {
             boolean canceled
     ) {
         ActiveToken current = active.get(token.operationId());
-        if (current != null && current.terminal() != null) {
-            return CompletableFuture.completedFuture(current.terminal());
-        }
         if (current == null || !current.token().equals(token)) {
             return operations.settlementEvidence(new OperationId(token.operationId()))
                     .thenApply(evidence -> replayDecision(token, evidence))
@@ -202,6 +194,13 @@ final class PopulationAdmissionStaging {
         ActiveToken settling = current.asSettling();
         PopulationAdmissionSettlementFlights.Lease<PopulationAdmissionDecision> lease =
                 settlementFlights.acquire(token.operationId());
+        if (lease.saturated()) {
+            return CompletableFuture.completedFuture(
+                    PopulationAdmissionDecision.unavailable(
+                            "population-admission-settlement-busy"
+                    )
+            );
+        }
         if (!lease.owner()) {
             return lease.future();
         }
@@ -237,7 +236,7 @@ final class PopulationAdmissionStaging {
                     PopulationAdmissionDecision decision = replayDecision(
                             token, evidence
                     );
-                    active.put(token.operationId(), settling.terminal(decision));
+                    active.remove(token.operationId(), settling);
                     settlementFlights.complete(token.operationId(), flight, decision);
                     return decision;
                 })
@@ -256,8 +255,7 @@ final class PopulationAdmissionStaging {
         java.util.ArrayList<CompletionStage<PopulationAdmissionDecision>> pending =
                 new java.util.ArrayList<>();
         for (ActiveToken value : active.values()) {
-            if (value.terminal() == null
-                    && now >= value.token().expiresAtMonotonicNanos()) {
+            if (now >= value.token().expiresAtMonotonicNanos()) {
                 if (value.applying()) {
                     pending.add(operations.containExpiredClaim(
                             new OperationId(value.token().operationId())
@@ -352,7 +350,6 @@ final class PopulationAdmissionStaging {
         if (envelope.phase() == OperationPhase.LIVE_APPLYING) {
             ActiveToken local = active.get(envelope.operationId().value());
             if (local != null && local.token().equals(replayToken)
-                    && local.terminal() == null
                     && !local.applying() && !local.settling()) {
                 return CompletableFuture.completedFuture(reserved(replayToken));
             }
@@ -456,37 +453,27 @@ final class PopulationAdmissionStaging {
         );
     }
 
-    record Identity(
-            UUID operationId,
-            UUID reservationId,
-            String idempotencyKey
-    ) {
-    }
+    record Identity(UUID operationId, UUID reservationId, String idempotencyKey) {}
 
     record ActiveToken(
             PopulationAdmissionToken token,
             ManagedAdmissionEvidenceAuthor.Authoring evidence,
             boolean applying,
-            boolean settling,
-            PopulationAdmissionDecision terminal
+            boolean settling
     ) {
         private ActiveToken(
                 PopulationAdmissionToken token,
                 ManagedAdmissionEvidenceAuthor.Authoring evidence
         ) {
-            this(token, evidence, false, false, null);
+            this(token, evidence, false, false);
         }
 
         ActiveToken asApplying() {
-            return new ActiveToken(token, evidence, true, false, null);
+            return new ActiveToken(token, evidence, true, false);
         }
 
         ActiveToken asSettling() {
-            return new ActiveToken(token, evidence, applying, true, null);
-        }
-
-        ActiveToken terminal(PopulationAdmissionDecision decision) {
-            return new ActiveToken(token, evidence, false, false, decision);
+            return new ActiveToken(token, evidence, applying, true);
         }
     }
 

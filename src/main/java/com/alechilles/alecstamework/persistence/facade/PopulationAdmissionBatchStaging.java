@@ -8,7 +8,11 @@ import com.alechilles.alecstamework.companion.population.domain.ManagedBatchAdmi
 import com.alechilles.alecstamework.companion.population.domain.ManagedBatchSettlement;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.alechilles.alecstamework.persistence.operation.OperationPhase;
+import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -16,20 +20,34 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.LongSupplier;
 
 /** Stages the private aggregate litter contract over one durable admission. */
 final class PopulationAdmissionBatchStaging {
     private final PopulationDomainAdmissionOperation operations;
     private final ConcurrentMap<UUID, PopulationAdmissionStaging.ActiveToken> active;
-    private final ConcurrentMap<UUID, CompletableFuture<ManagedBatchSettlement>> settlementFlights =
-            new java.util.concurrent.ConcurrentHashMap<>();
+    private final LongSupplier wallClock;
+    private final LongSupplier monotonicClock;
+    private final PopulationAdmissionSettlementFlights<ManagedBatchSettlement>
+            settlementFlights = new PopulationAdmissionSettlementFlights<>();
 
     PopulationAdmissionBatchStaging(
             PopulationDomainAdmissionOperation operations,
             ConcurrentMap<UUID, PopulationAdmissionStaging.ActiveToken> active
     ) {
+        this(operations, active, System::currentTimeMillis, System::nanoTime);
+    }
+
+    PopulationAdmissionBatchStaging(
+            PopulationDomainAdmissionOperation operations,
+            ConcurrentMap<UUID, PopulationAdmissionStaging.ActiveToken> active,
+            LongSupplier wallClock,
+            LongSupplier monotonicClock
+    ) {
         this.operations = Objects.requireNonNull(operations, "operations");
         this.active = Objects.requireNonNull(active, "active");
+        this.wallClock = Objects.requireNonNull(wallClock, "wallClock");
+        this.monotonicClock = Objects.requireNonNull(monotonicClock, "monotonicClock");
     }
 
     CompletionStage<PopulationAdmissionDecision> prepare(
@@ -64,10 +82,8 @@ final class PopulationAdmissionBatchStaging {
         PopulationAdmissionStaging.ActiveToken current = active.get(
                 token.operationId()
         );
-        if (current != null && current.terminal() != null) {
-            return terminalEvidence(token, current.evidence().payload().requestedCount());
-        }
-        if (current != null && current.settling()) {
+        if (current != null && current.token().equals(token)
+                && current.settling()) {
             CompletableFuture<ManagedBatchSettlement> flight = settlementFlights.get(
                     token.operationId()
             );
@@ -77,7 +93,7 @@ final class PopulationAdmissionBatchStaging {
         }
         if (current == null || !current.token().equals(token)
                 || !current.applying()) {
-            if (current == null && exactRestartToken(token)) {
+            if (current == null) {
                 return settleRestarted(token, ordinals, actualChildIds);
             }
             return operations.settlementEvidence(new OperationId(token.operationId()))
@@ -94,28 +110,33 @@ final class PopulationAdmissionBatchStaging {
                     ));
         }
         try {
-            validate(current.evidence().payload(), ordinals, actualChildIds);
+            validate(current.evidence().payload(), token.operationId(), ordinals,
+                    actualChildIds);
         } catch (IllegalArgumentException invalid) {
             return CompletableFuture.completedFuture(unavailableBatch(
                     "population-admission-batch-receipts-invalid",
                     current.evidence().payload().requestedCount()
             ));
         }
-        PopulationAdmissionStaging.ActiveToken settling = current.asSettling();
-        CompletableFuture<ManagedBatchSettlement> flight = new CompletableFuture<>();
-        CompletableFuture<ManagedBatchSettlement> existingFlight = settlementFlights.putIfAbsent(
-                token.operationId(), flight
-        );
-        if (existingFlight != null) {
-            return existingFlight;
+        PopulationAdmissionSettlementFlights.Lease<ManagedBatchSettlement> lease =
+                settlementFlights.acquire(token.operationId());
+        if (lease.saturated()) {
+            return CompletableFuture.completedFuture(unavailableBatch(
+                    "population-admission-batch-settlement-busy",
+                    current.evidence().payload().requestedCount()
+            ));
         }
+        if (!lease.owner()) {
+            return lease.future();
+        }
+        CompletableFuture<ManagedBatchSettlement> flight = lease.future();
+        PopulationAdmissionStaging.ActiveToken settling = current.asSettling();
         if (!active.replace(token.operationId(), current, settling)) {
             ManagedBatchSettlement unavailable = unavailableBatch(
                     "population-admission-batch-token-invalid",
                     current.evidence().payload().requestedCount()
             );
-            flight.complete(unavailable);
-            settlementFlights.remove(token.operationId(), flight);
+            settlementFlights.complete(token.operationId(), flight, unavailable);
             return CompletableFuture.completedFuture(unavailable);
         }
         return operations.commitBatch(
@@ -140,11 +161,8 @@ final class PopulationAdmissionBatchStaging {
                     ManagedBatchSettlement settlement = batchSettlement(
                             current.evidence().payload().requestedCount(), evidence
                     );
-                    active.put(token.operationId(), settling.terminal(
-                            decisionForSettlement(token, evidence)
-                    ));
-                    flight.complete(settlement);
-                    settlementFlights.remove(token.operationId(), flight);
+                    active.remove(token.operationId(), settling);
+                    settlementFlights.complete(token.operationId(), flight, settlement);
                     return settlement;
                 })
                 .exceptionally(failure -> {
@@ -153,22 +171,115 @@ final class PopulationAdmissionBatchStaging {
                             "population-admission-batch-settlement-failed",
                             current.evidence().payload().requestedCount()
                     );
-                    flight.complete(unavailable);
-                    settlementFlights.remove(token.operationId(), flight);
+                    settlementFlights.complete(token.operationId(), flight, unavailable);
                     return unavailable;
                 });
     }
 
-    private CompletionStage<ManagedBatchSettlement> terminalEvidence(
-            PopulationAdmissionToken token,
-            int requestedUnits
-    ) {
-        return operations.settlementEvidence(new OperationId(token.operationId()))
-                .thenApply(evidence -> batchSettlement(requestedUnits, evidence));
-    }
-
     private CompletionStage<ManagedBatchSettlement> settleRestarted(
             PopulationAdmissionToken token,
+            Set<Integer> ordinals,
+            Map<Integer, UUID> actualChildIds
+    ) {
+        PopulationAdmissionSettlementFlights.Lease<ManagedBatchSettlement> lease =
+                settlementFlights.acquire(token.operationId());
+        if (lease.saturated()) {
+            return CompletableFuture.completedFuture(unavailableBatch(
+                    "population-admission-batch-settlement-busy",
+                    Math.max(1, ordinals == null ? 1 : ordinals.size())
+            ));
+        }
+        if (!lease.owner()) {
+            return lease.future();
+        }
+        CompletableFuture<ManagedBatchSettlement> flight = lease.future();
+        CompletionStage<ManagedBatchSettlement> result = settleRestartedWork(
+                token, ordinals, actualChildIds
+        );
+        result.whenComplete((value, failure) -> {
+            if (failure == null) {
+                flight.complete(value);
+            } else {
+                flight.completeExceptionally(failure);
+            }
+        });
+        return result;
+    }
+
+    private CompletionStage<ManagedBatchSettlement> settleRestartedWork(
+            PopulationAdmissionToken token,
+            Set<Integer> ordinals,
+            Map<Integer, UUID> actualChildIds
+    ) {
+        return operations.batchSettlementAuthority(
+                        new OperationId(token.operationId())
+                )
+                .thenCompose(authority -> {
+                    OperationEnvelope operation = authority.operation();
+                    PopulationDomainAdmissionOperation.Payload payload =
+                            authority.payload();
+                    if (!tokenMatches(token, authority,
+                            operation.phase() == OperationPhase.LIVE_APPLYING)) {
+                        return CompletableFuture.completedFuture(unavailableBatch(
+                                "population-admission-batch-token-invalid",
+                                payload.requestedCount()
+                        ));
+                    }
+                    if (operation.phase() == OperationPhase.DURABLE
+                            || operation.phase() == OperationPhase.PUBLISHED) {
+                        return operations.settlementEvidence(operation.operationId())
+                                .thenApply(evidence -> batchSettlement(
+                                        evidence.requestedUnits() > 0
+                                                ? evidence.requestedUnits()
+                                                : payload.requestedCount(),
+                                        evidence
+                                ));
+                    }
+                    if (operation.phase() != OperationPhase.LIVE_APPLYING) {
+                        return CompletableFuture.completedFuture(unavailableBatch(
+                                "population-admission-batch-token-invalid",
+                                payload.requestedCount()
+                        ));
+                    }
+                    try {
+                        validate(payload, token.operationId(), ordinals, actualChildIds);
+                    } catch (IllegalArgumentException invalid) {
+                        return CompletableFuture.completedFuture(unavailableBatch(
+                                "population-admission-batch-receipts-invalid",
+                                payload.requestedCount()
+                        ));
+                    }
+                    return commitAndRead(token, payload.requestedCount(),
+                            ordinals, actualChildIds);
+                })
+                .exceptionally(failure -> unavailableBatch(
+                        "population-admission-batch-settlement-failed",
+                        Math.max(1, ordinals == null ? 1 : ordinals.size())
+                ));
+    }
+
+    private boolean tokenMatches(
+            PopulationAdmissionToken token,
+            PopulationDomainAdmissionOperation.BatchSettlementAuthority authority,
+            boolean live
+    ) {
+        OperationEnvelope operation = authority.operation();
+        PopulationDomainAdmissionOperation.Payload payload = authority.payload();
+        return operation.operationId().value().equals(token.operationId())
+                && payload.reservationId().equals(token.reservationId())
+                && payload.managedConfigRevision() == token.settingsRevision()
+                && payload.providerGenerationToken().equals(
+                        token.providerGenerationToken()
+                )
+                && token.readiness()
+                == OwnerPopulationCapDecisionViewV2.Readiness.READY
+                && (!live || payload.expiresAtMs() > wallClock.getAsLong()
+                && token.expiresAtMonotonicNanos() > monotonicClock.getAsLong());
+    }
+
+    private CompletionStage<ManagedBatchSettlement> commitAndRead(
+            PopulationAdmissionToken token,
+            int requestedUnits,
             Set<Integer> ordinals,
             Map<Integer, UUID> actualChildIds
     ) {
@@ -180,8 +291,7 @@ final class PopulationAdmissionBatchStaging {
                 .thenCompose(workflow -> {
                     if (workflow == null || workflow.result() == null
                             || workflow.result().status()
-                            != com.alechilles.alecstamework.persistence.operation
-                            .OperationWorkflowResult.Status.PUBLISHED) {
+                            != OperationWorkflowResult.Status.PUBLISHED) {
                         throw new IllegalStateException(
                                 "population-admission-batch-publication-pending"
                         );
@@ -190,31 +300,18 @@ final class PopulationAdmissionBatchStaging {
                             new OperationId(token.operationId())
                     );
                 })
-                .thenApply(evidence -> batchSettlement(
-                        evidence.requestedUnits() > 0
-                                ? evidence.requestedUnits() : ordinals.size(),
-                        evidence
-                ))
-                .exceptionally(failure -> unavailableBatch(
-                        "population-admission-batch-settlement-failed",
-                        Math.max(1, ordinals.size())
-                ));
-    }
-
-    private boolean exactRestartToken(PopulationAdmissionToken token) {
-        String key = "population-domain:litter:" + token.operationId();
-        UUID expected = UUID.nameUUIDFromBytes(
-                (key + ":reservation").getBytes(java.nio.charset.StandardCharsets.UTF_8)
-        );
-        return expected.equals(token.reservationId());
+                .thenApply(evidence -> batchSettlement(requestedUnits, evidence));
     }
 
     private void validate(
             PopulationDomainAdmissionOperation.Payload payload,
+            UUID operationId,
             Set<Integer> ordinals,
             Map<Integer, UUID> actualChildIds
     ) {
-        if (ordinals == null || actualChildIds == null
+        if (payload.provisionalChildIds().size() != payload.requestedCount()
+                || !deterministicChildren(payload, operationId)
+                || ordinals == null || actualChildIds == null
                 || !actualChildIds.keySet().equals(ordinals)
                 || ordinals.stream().anyMatch(ordinal ->
                 ordinal == null || ordinal < 0 || ordinal >= payload.requestedCount())
@@ -223,6 +320,22 @@ final class PopulationAdmissionBatchStaging {
                 != actualChildIds.size()) {
             throw new IllegalArgumentException("Exact batch child receipts are required");
         }
+    }
+
+    private boolean deterministicChildren(
+            PopulationDomainAdmissionOperation.Payload payload,
+            UUID operationId
+    ) {
+        for (int ordinal = 0; ordinal < payload.requestedCount(); ordinal++) {
+            UUID expected = UUID.nameUUIDFromBytes(
+                    (operationId + ":child:" + ordinal)
+                            .getBytes(StandardCharsets.UTF_8)
+            );
+            if (!expected.equals(payload.provisionalChildIds().get(ordinal))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private ManagedBatchSettlement batchSettlement(
@@ -239,24 +352,6 @@ final class PopulationAdmissionBatchStaging {
                 requestedUnits,
                 evidence.settledOrdinals(),
                 evidence.actualChildIds()
-        );
-    }
-
-    private PopulationAdmissionDecision decisionForSettlement(
-            PopulationAdmissionToken token,
-            PopulationDomainAdmissionOperation.SettlementEvidence evidence
-    ) {
-        return new PopulationAdmissionDecision(
-                evidence.canceled()
-                        ? PopulationAdmissionDecision.Status.CANCELED
-                        : PopulationAdmissionDecision.Status.COMMITTED,
-                evidence.canceled()
-                        ? "population-admission-canceled"
-                        : "population-admission-committed",
-                evidence.canceled() ? null : token,
-                OwnerPopulationCapDecisionViewV2.Readiness.READY,
-                0,
-                0
         );
     }
 
