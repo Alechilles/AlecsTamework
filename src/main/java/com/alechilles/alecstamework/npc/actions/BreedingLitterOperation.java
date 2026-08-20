@@ -33,13 +33,23 @@ public record BreedingLitterOperation(
         double parentBFertility,
         double expectedOffspring,
         int requestedCount,
-        @Nonnull List<UUID> plannedChildIds,
+        @Nonnull List<ChildPlan> children,
         @Nonnull PopulationAdmissionToken admissionToken,
         long requestedAtMs
 ) {
     public static final OperationKind KIND =
             new OperationKind("breeding_litter");
     public static final Definition DEFINITION = new Definition();
+
+    /** Returns the journal ID for the durable litter job linked to this litter. */
+    @Nonnull
+    public static UUID jobOperationId(@Nonnull UUID litterId) {
+        return UUID.nameUUIDFromBytes(
+                (Objects.requireNonNull(litterId, "litterId")
+                        + ":breeding-litter-job")
+                        .getBytes(StandardCharsets.UTF_8)
+        );
+    }
 
     public BreedingLitterOperation {
         litterId = Objects.requireNonNull(litterId, "litterId");
@@ -69,15 +79,14 @@ public record BreedingLitterOperation(
                     "Breeding litter frozen values are invalid"
             );
         }
-        if (plannedChildIds == null
-                || plannedChildIds.size() != requestedCount) {
+        if (children == null || children.size() != requestedCount) {
             throw new IllegalArgumentException(
                     "One planned child is required per litter ordinal"
             );
         }
         for (int ordinal = 0; ordinal < requestedCount; ordinal++) {
             if (!plannedChildId(litterId, ordinal).equals(
-                    plannedChildIds.get(ordinal)
+                    children.get(ordinal).uuid()
             )) {
                 throw new IllegalArgumentException(
                         "Breeding litter planned child IDs are not deterministic"
@@ -89,7 +98,7 @@ public record BreedingLitterOperation(
                     "Breeding litter token must belong to the litter"
             );
         }
-        plannedChildIds = List.copyOf(plannedChildIds);
+        children = List.copyOf(children);
     }
 
     /** Creates deterministic actual Hytale UUIDs before any live spawn. */
@@ -108,6 +117,12 @@ public record BreedingLitterOperation(
             values.add(plannedChildId(litterId, ordinal));
         }
         return List.copyOf(values);
+    }
+
+    /** Returns planned actual UUIDs in ordinal order. */
+    @Nonnull
+    public List<UUID> plannedChildIds() {
+        return children.stream().map(ChildPlan::uuid).toList();
     }
 
     /** Encodes exact live child receipts for durable operation evidence. */
@@ -149,7 +164,7 @@ public record BreedingLitterOperation(
                         || entry.getKey() >= requestedCount
                         || entry.getValue() == null
                         || !entry.getValue().equals(
-                        plannedChildIds.get(entry.getKey())
+                        children.get(entry.getKey()).uuid()
                 ))) {
             throw new IllegalArgumentException(
                     "Breeding litter receipts must match planned ordinals"
@@ -200,6 +215,25 @@ public record BreedingLitterOperation(
         }
     }
 
+    /** Frozen child selection used for exact replay after restart. */
+    public record ChildPlan(
+            @Nonnull UUID uuid,
+            @Nonnull String roleId,
+            @Nullable String adultRoleId,
+            @Nullable String gender,
+            @Nullable String lifecycleFamilyId,
+            @Nullable String lifecycleLineId
+    ) {
+        public ChildPlan {
+            uuid = Objects.requireNonNull(uuid, "uuid");
+            roleId = requireText(roleId, "roleId");
+            adultRoleId = normalize(adultRoleId);
+            gender = normalize(gender);
+            lifecycleFamilyId = normalize(lifecycleFamilyId);
+            lifecycleLineId = normalize(lifecycleLineId);
+        }
+    }
+
     /** Versioned codec for the shared operation envelope. */
     public static final class Definition
             implements OperationDefinition<BreedingLitterOperation> {
@@ -244,9 +278,8 @@ public record BreedingLitterOperation(
             json.addProperty("expectedOffspring", value.expectedOffspring());
             json.addProperty("requestedCount", value.requestedCount());
             JsonArray children = new JsonArray();
-            value.plannedChildIds().forEach(child ->
-                    children.add(child.toString()));
-            json.add("plannedChildIds", children);
+            value.children().forEach(child -> children.add(child(child)));
+            json.add("children", children);
             json.add("admissionToken", token(value.admissionToken()));
             json.addProperty("requestedAtMs", value.requestedAtMs());
             return json.toString();
@@ -256,11 +289,11 @@ public record BreedingLitterOperation(
         public BreedingLitterOperation decode(String payloadJson) {
             JsonObject json = JsonParser.parseString(payloadJson)
                     .getAsJsonObject();
-            JsonArray children = json.getAsJsonArray("plannedChildIds");
-            java.util.ArrayList<UUID> childIds =
+            JsonArray children = json.getAsJsonArray("children");
+            java.util.ArrayList<ChildPlan> childPlans =
                     new java.util.ArrayList<>(children.size());
             children.forEach(child ->
-                    childIds.add(UUID.fromString(child.getAsString())));
+                    childPlans.add(child(child.getAsJsonObject())));
             return new BreedingLitterOperation(
                     UUID.fromString(json.get("litterId").getAsString()),
                     parent(json.getAsJsonObject("parentA")),
@@ -279,10 +312,18 @@ public record BreedingLitterOperation(
                     json.get("parentBFertility").getAsDouble(),
                     json.get("expectedOffspring").getAsDouble(),
                     json.get("requestedCount").getAsInt(),
-                    childIds,
+                    childPlans,
                     token(json.getAsJsonObject("admissionToken")),
                     json.get("requestedAtMs").getAsLong()
             );
+        }
+
+        @Override
+        public boolean allowsUnknownLiveReverification(
+                @Nonnull com.alechilles.alecstamework.persistence.operation
+                        .OperationEnvelope operation
+        ) {
+            return KIND.equals(operation.kind());
         }
 
         private static JsonObject parent(Parent value) {
@@ -312,6 +353,43 @@ public record BreedingLitterOperation(
                             ? json.get("ownerName").getAsString() : null,
                     json.get("tamed").getAsBoolean()
             );
+        }
+
+        private static JsonObject child(ChildPlan value) {
+            JsonObject json = new JsonObject();
+            json.addProperty("uuid", value.uuid().toString());
+            json.addProperty("roleId", value.roleId());
+            add(json, "adultRoleId", value.adultRoleId());
+            add(json, "gender", value.gender());
+            add(json, "lifecycleFamilyId", value.lifecycleFamilyId());
+            add(json, "lifecycleLineId", value.lifecycleLineId());
+            return json;
+        }
+
+        private static ChildPlan child(JsonObject json) {
+            return new ChildPlan(
+                    UUID.fromString(json.get("uuid").getAsString()),
+                    json.get("roleId").getAsString(),
+                    text(json, "adultRoleId"),
+                    text(json, "gender"),
+                    text(json, "lifecycleFamilyId"),
+                    text(json, "lifecycleLineId")
+            );
+        }
+
+        private static void add(
+                JsonObject json,
+                String key,
+                @Nullable String value
+        ) {
+            if (value != null) {
+                json.addProperty(key, value);
+            }
+        }
+
+        @Nullable
+        private static String text(JsonObject json, String key) {
+            return json.has(key) ? json.get(key).getAsString() : null;
         }
 
         private static JsonObject token(PopulationAdmissionToken value) {
