@@ -10,8 +10,6 @@ import javax.annotation.Nonnull;
  * submission or completion.
  */
 public final class MaintenanceThroughputReporter<K, V> {
-    private static final long SAMPLE_MASK = 63L;
-
     private final LatestWorkCoordinator<K, V> coordinator;
     private final Consumer<MaintenanceMetricsSnapshot> observer;
     private final AtomicLong observations = new AtomicLong();
@@ -26,9 +24,10 @@ public final class MaintenanceThroughputReporter<K, V> {
         this.observer = Objects.requireNonNull(observer, "observer");
     }
 
-    /** Records every 64th admission to keep hot-path work bounded. */
+    /** Records the first and each power-of-two admission while work remains. */
     public void sampleAdmission() {
-        if ((observations.incrementAndGet() & SAMPLE_MASK) == 0L) {
+        long observation = observations.incrementAndGet();
+        if ((observation & (observation - 1L)) == 0L) {
             record();
         }
     }
@@ -36,6 +35,7 @@ public final class MaintenanceThroughputReporter<K, V> {
     /** Records exact final counters when the coordinator retains no work. */
     public void recordIfIdle() {
         if (!coordinator.hasRetainedWork()) {
+            observations.set(0L);
             record();
         }
     }

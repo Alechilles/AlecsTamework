@@ -216,7 +216,7 @@ class ReplacementPersistencePerformanceGateTest {
                     throughput.projectionSequencePositionsBypassed()
                             >= 10_000
             );
-            assertTrue(throughput.projectionBatchAcknowledgements() <= 2);
+            assertEquals(1, throughput.projectionBatchAcknowledgements());
             assertTrue(throughput.writerMaximumDepth() < 64);
             assertEquals(0, throughput.readSaturationFailures());
         } finally {

@@ -740,6 +740,37 @@ class LatestWorkCoordinatorTest {
         take(invocations).completion.complete(null);
     }
 
+    @Test
+    void throughputReporterSamplesFirstAdmissionOfEachBusyPeriod() {
+        BlockingQueue<Invocation<Integer>> invocations =
+                new LinkedBlockingQueue<>();
+        LatestWorkCoordinator<String, Integer> coordinator =
+                new LatestWorkCoordinator<>(1, (key, value) -> {
+                    Invocation<Integer> invocation = new Invocation<>(value);
+                    invocations.add(invocation);
+                    return invocation.completion;
+                });
+        List<MaintenanceMetricsSnapshot> snapshots = new ArrayList<>();
+        MaintenanceThroughputReporter<String, Integer> reporter =
+                new MaintenanceThroughputReporter<>(coordinator, snapshots::add);
+
+        CompletionStage<Void> first = coordinator.submit("cow", 1);
+        reporter.sampleAdmission();
+        assertEquals(1, snapshots.size());
+        assertEquals(1, snapshots.get(0).inFlightWork());
+
+        take(invocations).completion.complete(null);
+        first.toCompletableFuture().join();
+        reporter.recordIfIdle();
+        assertEquals(0, snapshots.get(1).inFlightWork());
+
+        coordinator.submit("pig", 2);
+        reporter.sampleAdmission();
+        assertEquals(3, snapshots.size());
+        assertEquals(1, snapshots.get(2).inFlightWork());
+        take(invocations).completion.complete(null);
+    }
+
     private static <T> Invocation<T> take(BlockingQueue<Invocation<T>> invocations) {
         try {
             Invocation<T> invocation = invocations.poll(5, TimeUnit.SECONDS);

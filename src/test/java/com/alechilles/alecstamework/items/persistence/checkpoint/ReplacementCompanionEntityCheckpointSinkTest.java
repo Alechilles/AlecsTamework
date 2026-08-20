@@ -13,6 +13,7 @@ import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.items.persistence.maintenance.MaintenanceDrainResult;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
+import com.alechilles.alecstamework.persistence.runtime.PersistenceThroughputMetrics;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceRuntimeConfiguration;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceWorldReconciliation;
@@ -521,9 +522,17 @@ class ReplacementCompanionEntityCheckpointSinkTest {
     }
 
     @Test
-    void warningSurfacesDeepestStorageFailureCode() throws Exception {
+    void criticalFailurePublishesMetricAndDeepestStorageCode() throws Exception {
         AtomicLong clock = new AtomicLong(-100L);
         List<String> warnings = new CopyOnWriteArrayList<>();
+        AtomicInteger criticalFailures = new AtomicInteger();
+        PersistenceThroughputMetrics metrics =
+                new PersistenceThroughputMetrics() {
+                    @Override
+                    public void criticalFlushFailed() {
+                        criticalFailures.incrementAndGet();
+                    }
+                };
         try (PersistenceBootstrap persistence =
                      new PersistenceBootstrap(configuration(clock))) {
             assertTrue(persistence.start().toCompletableFuture().join().complete());
@@ -535,18 +544,20 @@ class ReplacementCompanionEntityCheckpointSinkTest {
                             warnings::add,
                             null,
                             ignored -> { },
-                            ignored -> false
+                            ignored -> false,
+                            metrics
                     );
 
             var stage = sink.publish(capture(
                     new NpcAlias(NPC), 6,
-                    CompanionEntityCheckpoint.CaptureBoundary.LOADED,
+                    CompanionEntityCheckpoint.CaptureBoundary.UNLOAD,
                     -100L
             ));
             assertThrows(CompletionException.class,
                     () -> stage.toCompletableFuture().join());
             assertTrue(await(() -> !warnings.isEmpty()));
             assertTrue(warnings.get(0).contains("read_executor_closed"));
+            assertEquals(1, criticalFailures.get());
             assertTrue(sink.shutdown(Duration.ofSeconds(1)).drained());
         }
     }
