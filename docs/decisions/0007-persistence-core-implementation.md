@@ -12,6 +12,39 @@ focused participants in this core under ADR 0008. The historical reduced
 artifact was not feature-complete; the composed replacement implementation now
 awaits exact-artifact live acceptance.
 
+## 2026-08-20 throughput amendment
+
+The persistence core keeps its single-writer and at-least-once delivery
+contracts, but it no longer makes every consumer read every outbox row.
+Projection subscriptions now route SQL reads by consumer event type. One
+loaded batch is acknowledged once after all relevant rows apply. Sequence gaps
+from events for other consumers remain valid and do not weaken checkpoint
+ordering.
+
+Publication requests merge only when they have the same consumer and
+publication context. Live publication, recovery, and rebuild work therefore
+cannot hide or acknowledge each other. A schema V2 index supports the routed
+read. Startup migrates an exact V1 database to V2 before normal work begins;
+the schema history still rejects unknown or changed schema bytes.
+
+Live profile observations and entity checkpoints now use bounded maintenance
+coordinators. Profile work permits at most 16 active alias chains. Checkpoint
+work permits at most four. Each alias retains the newest routine snapshot,
+while unload and destructive-removal checkpoints use a priority lane and must
+become durable before later routine work. Unknown identity evidence releases
+its permit while a bounded retry timer waits, so it cannot hold the maintenance
+queue.
+
+First live observation publishes the canonical profile before its immutable
+entity checkpoint. Shutdown drains profile work, checkpoint work, and the core
+writer against one shared deadline. Passive diagnostics expose counts, maximum
+depth, merge totals, failures, and oldest pending age only. They do not expose
+player names, owner IDs, companion UUIDs, or payload JSON.
+
+Deterministic gates cover 10,000 unrelated projection events followed by one
+relevant event and 500 distinct live profile observations. A staged server
+test must still measure the live p95 spawn and Recall latency target.
+
 ## Context
 
 The replacement architecture needs fewer independent mechanisms than the unreleased v5-v9

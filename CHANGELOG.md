@@ -31,6 +31,14 @@
 
 ### Fixed
 
+- Reduced persistence stalls with large companion populations. Spawner
+  releases and Recall no longer wait behind unrelated projection events or
+  repeated older live-state snapshots. Profile and checkpoint maintenance now
+  use bounded, newest-state queues while unload and destructive-removal
+  checkpoints keep priority.
+- Added privacy-safe persistence throughput diagnostics. They report queue
+  counts, merged work, batch acknowledgements, and pending age without player
+  names, companion IDs, or saved payloads.
 - Restored the shared Nametag and Soul Lantern models, textures, icons,
   particles, and audio to the main Tamework pack. Dependent mods no longer
   require the optional examples pack to validate these reusable assets.
