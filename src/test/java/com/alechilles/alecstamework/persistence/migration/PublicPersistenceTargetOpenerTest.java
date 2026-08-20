@@ -2,7 +2,7 @@ package com.alechilles.alecstamework.persistence.migration;
 
 import com.alechilles.alecstamework.persistence.TameworkDataPathLayout;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV2Manager;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceFiles;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import java.io.InputStream;
@@ -43,7 +43,7 @@ class PublicPersistenceTargetOpenerTest {
         assertEquals(fresh.databasePath(), existing.databasePath());
         assertInstanceOf(
                 PersistenceReadResult.Found.class,
-                new SqliteSchemaV1Manager(new SqliteConnectionFactory(
+                new SqliteSchemaV2Manager(new SqliteConnectionFactory(
                         fresh.databasePath()
                 )).verify()
         );

@@ -8,7 +8,7 @@ import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicContr
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicPersistenceAdapter;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicProjectionStartupResult;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicRecoveryResult;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV2Manager;
 import com.alechilles.alecstamework.persistence.control.PersistenceEngineLease;
 import com.alechilles.alecstamework.persistence.control.PersistenceEngineLineage;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
@@ -42,7 +42,7 @@ final class PublicPersistenceRuntimeState {
     private PersistenceStartupCoordinator startup;
     private PersistenceEngineLease lease;
     private PublicPersistenceTarget target;
-    private SqliteSchemaV1Manager schemas;
+    private SqliteSchemaV2Manager schemas;
     private SqlitePersistenceKernel kernel;
     private SqlitePublicPersistenceAdapter adapter;
     private PublicPersistenceOperations operations;
@@ -202,7 +202,7 @@ final class PublicPersistenceRuntimeState {
         return report.completedNodes().contains(
                 PersistenceStartupNode.VALIDATE_SCHEMA
         )
-                ? OptionalInt.of(SqliteSchemaV1Manager.VERSION)
+                ? OptionalInt.of(SqliteSchemaV2Manager.VERSION)
                 : OptionalInt.empty();
     }
 
@@ -233,7 +233,7 @@ final class PublicPersistenceRuntimeState {
         );
         SqliteConnectionFactory connections =
                 new SqliteConnectionFactory(target.databasePath());
-        schemas = new SqliteSchemaV1Manager(
+        schemas = new SqliteSchemaV2Manager(
                 connections,
                 configuration.clock()
         );
@@ -264,12 +264,13 @@ final class PublicPersistenceRuntimeState {
     }
 
     private CompletionStage<PersistenceStartupAction.Result> validateSchema() {
-        PersistenceReadResult<PersistenceSchemaStatus> result =
-                schemas.verify();
-        if (!(result instanceof
-                PersistenceReadResult.Found<PersistenceSchemaStatus> found)
-                || found.value().version() != SqliteSchemaV1Manager.VERSION
-                || !found.value().integrityVerified()) {
+        PersistenceTransactionResult<PersistenceSchemaStatus> result =
+                schemas.initialize();
+        if (!(result instanceof PersistenceTransactionResult.Committed<
+                PersistenceSchemaStatus> committed)
+                || committed.value() == null
+                || committed.value().version() != SqliteSchemaV2Manager.VERSION
+                || !committed.value().integrityVerified()) {
             throw new IllegalStateException(
                     "replacement_schema_validation_failed"
             );

@@ -15,6 +15,7 @@ import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV2Manager;
 import com.alechilles.alecstamework.persistence.control.PersistenceEngineLease;
 import com.alechilles.alecstamework.persistence.control.PersistenceEngineLineage;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureCircuitState;
@@ -144,7 +145,7 @@ class PublicPersistenceRuntimeTest {
                 closed.lastCheckpoint().status()
         );
         assertEquals(
-                SqliteSchemaV1Manager.VERSION,
+                SqliteSchemaV2Manager.VERSION,
                 closed.schemaVersion().orElseThrow()
         );
         assertTrue(closed.guidance().contains(
