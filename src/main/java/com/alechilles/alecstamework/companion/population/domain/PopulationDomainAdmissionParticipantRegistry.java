@@ -6,6 +6,9 @@ import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteManagedAdmi
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteOwnerPopulationParticipant;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePopulationDomainParticipant;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePopulationGroupTransitionParticipant;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteUnitOfWorkRunner;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
+import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,6 +36,22 @@ final class PopulationDomainAdmissionParticipantRegistry {
         if (operationId != null) {
             values.remove(operationId.value());
         }
+    }
+
+    SqliteUnitOfWorkRunner.Submission<OperationEnvelope> wrapPreparation(
+            OperationId operationId,
+            SqliteUnitOfWorkRunner.Submission<OperationEnvelope> submission
+    ) {
+        return new SqliteUnitOfWorkRunner.Submission<>(
+                submission.acceptance(),
+                submission.completion().thenApply(result -> {
+                    if (result instanceof PersistenceTransactionResult.RolledBack<?>
+                            || result instanceof PersistenceTransactionResult.Rejected<?>) {
+                        evict(operationId);
+                    }
+                    return result;
+                })
+        );
     }
 
     private SqliteManagedAdmissionParticipant create(

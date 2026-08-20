@@ -228,7 +228,9 @@ public final class ReplacementTameworkApiFactory {
                         CommandTimedSummoningChangedEvent.class,
                         timedFacade::publishFromOutbox
                 );
-        return new Composition(base, api, timedEventBridge);
+        return new Composition(
+                base, api, timedEventBridge, managedBatchAdmissions
+        );
     }
 
     private static TameworkApiImpl base(
@@ -273,23 +275,34 @@ public final class ReplacementTameworkApiFactory {
         private final TameworkApiImpl base;
         private final ReplacementTameworkApi api;
         private final AutoCloseable timedEventBridge;
+        private final ManagedBatchAdmissionAuthority managedBatchAdmissions;
         private final AtomicBoolean closed = new AtomicBoolean();
 
         private Composition(
                 TameworkApiImpl base,
                 ReplacementTameworkApi api,
-                AutoCloseable timedEventBridge
+                AutoCloseable timedEventBridge,
+                ManagedBatchAdmissionAuthority managedBatchAdmissions
         ) {
             this.base = Objects.requireNonNull(base, "base");
             this.api = Objects.requireNonNull(api, "api");
             this.timedEventBridge = Objects.requireNonNull(
                     timedEventBridge, "timedEventBridge"
             );
+            this.managedBatchAdmissions = Objects.requireNonNull(
+                    managedBatchAdmissions, "managedBatchAdmissions"
+            );
         }
 
         @Nonnull
         public TameworkApi api() {
             return api;
+        }
+
+        /** Returns the typed aggregate authority for internal runtime consumers. */
+        @Nonnull
+        public ManagedBatchAdmissionAuthority managedBatchAdmissions() {
+            return managedBatchAdmissions;
         }
 
         public void activateCapturePolicyRuntime(

@@ -125,6 +125,9 @@ class ReplacementPopulationAdmissionApiTest {
                     .toCompletableFuture().join();
             assertEquals(PopulationAdmissionDecision.Status.RESERVED,
                     single.status(), single.reason());
+            PopulationAdmissionDecision duplicate = api.tryAdmitV3(request())
+                    .toCompletableFuture().join();
+            assertEquals(single.token(), duplicate.token());
             assertEquals(OperationPhase.LIVE_APPLYING,
                     persistence.facades().operations().populationDomainAdmission()
                             .findByIdempotency(new IdempotencyKey(

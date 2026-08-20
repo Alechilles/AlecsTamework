@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.population.domain;
 
+import com.alechilles.alecstamework.api.PopulationAdmissionToken;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
@@ -23,6 +24,8 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -40,6 +43,8 @@ public final class PopulationDomainAdmissionOperation {
     private final LongSupplier clock;
     private final PopulationDomainAdmissionParticipantRegistry participantRegistry =
             new PopulationDomainAdmissionParticipantRegistry();
+    private final ConcurrentMap<UUID, PopulationAdmissionCancellationPermit>
+            cancellationPermits = new ConcurrentHashMap<>();
     public PopulationDomainAdmissionOperation(
             @Nonnull SqliteOperationEngine engine,
             @Nonnull SqliteOperationPublisher publisher,
@@ -57,6 +62,7 @@ public final class PopulationDomainAdmissionOperation {
         this.consumers = List.copyOf(consumers);
         this.clock = clock;
     }
+
     @Nonnull
     public SqliteUnitOfWorkRunner.Submission<OperationEnvelope> prepare(
             @Nonnull OperationId operationId,
@@ -76,10 +82,12 @@ public final class PopulationDomainAdmissionOperation {
         if (operationId == null || idempotencyKey == null || payload == null) {
             throw new IllegalArgumentException("Complete domain admission preparation is required");
         }
-        SqliteManagedAdmissionParticipant participant = participant(
-                operationId, payload, composition
+        SqliteManagedAdmissionParticipant participant = participantRegistry.getOrCreate(
+                operationId, payload,
+                composition == null ? null : composition.ownerPlan(),
+                composition == null ? null : composition.groupRequest()
         );
-        return engine.prepare(
+        return participantRegistry.wrapPreparation(operationId, engine.prepare(
                 PopulationDomainAdmissionDefinition.INSTANCE,
                 new OperationRequest<>(
                         operationId,
@@ -91,7 +99,7 @@ public final class PopulationDomainAdmissionOperation {
                         payload.createdAtMs()
                 ),
                 participant
-        );
+        ));
     }
 
     @Nonnull
@@ -147,20 +155,42 @@ public final class PopulationDomainAdmissionOperation {
         });
     }
 
+    /** Claims one prepared token and returns its process-local cancellation proof. */
+    @Nonnull
+    public CompletionStage<PopulationAdmissionCancellationPermit> claimForAdmission(
+            @Nonnull PopulationAdmissionToken token
+    ) {
+        if (token == null) {
+            throw new IllegalArgumentException("Admission token is required");
+        }
+        return read(new OperationId(token.operationId())).thenCompose(operation ->
+                PopulationAdmissionCancellationPermit.claim(
+                        token, operation, engine, clock, cancellationPermits
+                ));
+    }
+
     @Nonnull
     public CompletionStage<OperationWorkflow> commit(
             @Nonnull OperationId operationId,
             boolean canceled
     ) {
+        if (canceled) {
+            return CompletableFuture.failedFuture(new IllegalStateException(
+                    "domain_admission_cancellation_permit_required"
+            ));
+        }
         return durable(operationId, canceled, null, null);
     }
 
     /** Cancels a locally preclaimed token before world mutation is authorized. */
     @Nonnull
     public CompletionStage<OperationWorkflow> cancelPreclaimed(
-            @Nonnull OperationId operationId
+            @Nonnull PopulationAdmissionCancellationPermit permit
     ) {
-        return durable(operationId, true, null, null, true);
+        return PopulationAdmissionCancellationPermit.cancel(
+                permit, clock.getAsLong(), cancellationPermits,
+                id -> durable(id, true, null, null, true)
+        );
     }
 
     @Nonnull
@@ -199,21 +229,6 @@ public final class PopulationDomainAdmissionOperation {
                 );
             });
         });
-    }
-
-    /** Recovery route that cancels a retained staged reservation. */
-    @Nonnull
-    public CompletionStage<com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult>
-    recover(
-            @Nonnull OperationId operationId,
-            boolean canceled
-    ) {
-        return durable(operationId, canceled, null, null).thenCompose(workflow ->
-                workflow.result() == null
-                        ? CompletableFuture.failedFuture(
-                        new IllegalStateException("domain_admission_recovery_missing_result"))
-                        : CompletableFuture.completedFuture(workflow.result())
-        );
     }
 
     /** Re-enters the exact shared recovery route for a leased operation claim. */
@@ -262,7 +277,11 @@ public final class PopulationDomainAdmissionOperation {
                     )
             ));
         }
-        return recover(claim.operation().operationId(), true);
+        return durable(claim.operation().operationId(), true, null, null)
+                .thenCompose(workflow -> workflow.result() == null
+                        ? CompletableFuture.failedFuture(new IllegalStateException(
+                        "domain_admission_recovery_missing_result"))
+                        : CompletableFuture.completedFuture(workflow.result()));
     }
 
     private CompletionStage<OperationWorkflow> durable(
@@ -296,6 +315,7 @@ public final class PopulationDomainAdmissionOperation {
     ) {
         if (result.status() == OperationWorkflowResult.Status.PUBLISHED) {
             participantRegistry.evict(operation.operationId());
+            cancellationPermits.remove(operation.operationId().value());
         }
         return result;
     }
@@ -307,8 +327,10 @@ public final class PopulationDomainAdmissionOperation {
     private CompletionStage<OperationWorkflowResult> containLiveClaim(
             OperationRecoveryClaim claim
     ) {
-        return PopulationDomainAdmissionRecovery.contain(
-                engine, claim.operation(), clock
+        return PopulationAdmissionCancellationPermit.evictAfterVerifiedContainment(
+                PopulationDomainAdmissionRecovery.contain(
+                        engine, claim.operation(), clock
+                ), claim.operation().operationId(), cancellationPermits
         );
     }
 
@@ -318,23 +340,11 @@ public final class PopulationDomainAdmissionOperation {
             @Nonnull OperationId operationId
     ) {
         return read(operationId).thenCompose(operation ->
-                PopulationDomainAdmissionRecovery.contain(
-                        engine, operation, clock
-                )
-        );
-    }
-
-    private SqliteManagedAdmissionParticipant participant(
-            OperationId operationId,
-            Payload payload,
-            @Nullable PopulationAdmissionComposition composition
-    ) {
-        return participantRegistry.getOrCreate(
-                operationId,
-                payload,
-                composition == null ? null : composition.ownerPlan(),
-                composition == null ? null : composition.groupRequest()
-        );
+                PopulationAdmissionCancellationPermit.evictAfterVerifiedContainment(
+                        PopulationDomainAdmissionRecovery.contain(
+                                engine, operation, clock
+                        ), operationId, cancellationPermits
+                ));
     }
 
     /** Result wrapper used by the facade to preserve the published workflow evidence. */
@@ -365,7 +375,6 @@ public final class PopulationDomainAdmissionOperation {
         ) {
             this(canceled, settledOrdinals, actualChildIds, 0);
         }
-
         public SettlementEvidence {
             if (requestedUnits < 0) {
                 throw new IllegalArgumentException("Requested units cannot be negative");
@@ -430,7 +439,6 @@ public final class PopulationDomainAdmissionOperation {
             domains = List.copyOf(domains);
             provisionalChildIds = List.copyOf(provisionalChildIds);
         }
-
         @Nonnull
         public List<PopulationDomainReservation> reservations(OperationId operationId) {
             return domains.stream().map(input -> new PopulationDomainReservation(
@@ -457,7 +465,6 @@ public final class PopulationDomainAdmissionOperation {
             )).toList();
         }
     }
-
     /** One immutable domain row input with provider-frozen limits. */
     public record DomainInput(
             @Nonnull String domainId,

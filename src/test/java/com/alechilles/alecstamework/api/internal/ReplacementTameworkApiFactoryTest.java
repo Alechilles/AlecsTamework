@@ -140,13 +140,10 @@ class ReplacementTameworkApiFactoryTest {
                                  new TraitEffectRegistry(null, null),
                                  new SimpleClaimsTamedDamagePolicy(),
                                  restoredDependencies()
-                         )) {
+                )) {
                 TameworkApi api = composition.api();
-                assertTrue(api instanceof ReplacementTameworkApi);
-                ReplacementTameworkApi replacement =
-                        (ReplacementTameworkApi) api;
                 ManagedBatchAdmissionAuthority batchAuthority =
-                        replacement.managedBatchAdmissions();
+                        composition.managedBatchAdmissions();
                 assertNotNull(batchAuthority);
                 assertEquals(
                         "population-admission-batch-authority-unavailable",
