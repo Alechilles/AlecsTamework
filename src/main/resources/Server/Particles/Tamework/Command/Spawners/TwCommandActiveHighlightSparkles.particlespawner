@@ -49,8 +49,7 @@
         "Y": { "Min": 0.08, "Max": 0.12 }
       },
       "Opacity": 1,
-      "FrameIndex": { "Min": 0, "Max": 0 },
-      "Color": "#ffffff"
+      "FrameIndex": { "Min": 0, "Max": 0 }
     }
   },
   "InitialVelocity": {

@@ -29,7 +29,7 @@
   names with color-coded values, and a separate appearance section. Gender markers use pink
   for female companions and blue for male companions.
 - Generic linked panels now include an optional per-tool `Highlight Active`
-  setting. While the tool is equipped, only its controller sees sparkles on
+  setting. While the tool is equipped, only its controller sees sparkles above
   loaded active NPCs, colored by group or neutral gold when ungrouped.
 
 ### Fixed

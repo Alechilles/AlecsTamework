@@ -16,7 +16,6 @@ import org.joml.Vector3f;
 final class CommandActiveNpcHighlightEmitter {
     static final String PARTICLE_SYSTEM_ID = "Tamework_Command_Active_Highlight";
     private static final String FALLBACK_COLOR = "#C9A653";
-    private static final Vector3f MODEL_OFFSET = new Vector3f(0.0f, 0.65f, 0.0f);
 
     private final PacketSink packetSink;
 
@@ -31,13 +30,16 @@ final class CommandActiveNpcHighlightEmitter {
     boolean emit(@Nullable NetworkId networkId,
                  @Nullable Ref<EntityStore> viewerRef,
                  @Nullable String colorHex,
+                 @Nonnull CommandActiveNpcHighlightAnchor anchor,
                  @Nullable Store<EntityStore> store) {
         if (networkId == null || viewerRef == null || !viewerRef.isValid()) {
             return false;
         }
+        Vector3f offset = anchor.positionOffset();
         ModelParticle modelParticle = new ModelParticle();
         modelParticle.setSystemId(PARTICLE_SYSTEM_ID);
-        modelParticle.setPositionOffset(new Vector3f(MODEL_OFFSET));
+        modelParticle.setTargetNodeName(anchor.targetNodeName());
+        modelParticle.setPositionOffset(new Vector3f(offset));
         modelParticle.setDetachedFromModel(false);
         com.hypixel.hytale.protocol.ModelParticle packetParticle = modelParticle.toPacket();
         packetParticle.color = parseColor(colorHex);

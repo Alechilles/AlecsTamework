@@ -13,6 +13,7 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.system.tick.TickingSystem;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.modules.entity.tracker.NetworkId;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -41,6 +42,8 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
     private final CommandLinkedNpcRecordStore recordStore = new CommandLinkedNpcRecordStore();
     private final CommandGroupService groupService = new CommandGroupService();
     private final CommandActiveNpcHighlightPlanService planService = new CommandActiveNpcHighlightPlanService();
+    private final CommandActiveNpcHighlightAnchorResolver anchorResolver =
+            new CommandActiveNpcHighlightAnchorResolver();
     private final CommandActiveNpcHighlightEmitter emitter = new CommandActiveNpcHighlightEmitter();
     private final CommandActiveNpcHighlightBatchService<
             CommandActiveNpcHighlightPlanService.HighlightTarget> batchService =
@@ -211,12 +214,19 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
                 store, npcRef, TameworkCommandLinksComponent.getComponentType()
         );
         NetworkId networkId = component(store, npcRef, NetworkId.getComponentType());
+        ModelComponent model = component(store, npcRef, ModelComponent.getComponentType());
         if (npc == null || links == null || networkId == null
                 || !playerUuid.equals(links.getOwnerId())
                 || !links.containsToolId(toolId)) {
             return;
         }
-        emitter.emit(networkId, viewerRef, target.colorHex(), store);
+        emitter.emit(
+                networkId,
+                viewerRef,
+                target.colorHex(),
+                anchorResolver.resolve(model),
+                store
+        );
     }
 
     @Nullable

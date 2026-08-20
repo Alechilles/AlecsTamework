@@ -6,6 +6,7 @@ import com.hypixel.hytale.server.core.modules.entity.tracker.NetworkId;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
 import java.util.List;
+import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -21,7 +22,13 @@ class CommandActiveNpcHighlightEmitterTest {
         );
         Ref<EntityStore> viewer = new Ref<>(null, 7);
 
-        boolean emitted = emitter.emit(new NetworkId(42), viewer, "#112233", null);
+        boolean emitted = emitter.emit(
+                new NetworkId(42),
+                viewer,
+                "#112233",
+                new CommandActiveNpcHighlightAnchor("Head", new Vector3f(0.0f, 0.25f, 0.0f)),
+                null
+        );
 
         assertTrue(emitted);
         assertEquals(1, sent.size());
@@ -31,6 +38,8 @@ class CommandActiveNpcHighlightEmitterTest {
         assertEquals(1, packet.modelParticles.length);
         assertEquals(CommandActiveNpcHighlightEmitter.PARTICLE_SYSTEM_ID,
                 packet.modelParticles[0].systemId);
+        assertEquals("Head", packet.modelParticles[0].targetNodeName);
+        assertEquals(0.25f, packet.modelParticles[0].positionOffset.y());
         assertEquals(0x11, Byte.toUnsignedInt(packet.modelParticles[0].color.red));
         assertEquals(0x22, Byte.toUnsignedInt(packet.modelParticles[0].color.green));
         assertEquals(0x33, Byte.toUnsignedInt(packet.modelParticles[0].color.blue));
