@@ -14,6 +14,7 @@ import com.alechilles.alecstamework.persistence.projection.ProjectionApplyOutcom
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumerId;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEvent;
+import com.alechilles.alecstamework.persistence.projection.ProjectionSubscription;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -40,6 +41,15 @@ public final class TimedSummonProjectionIndex
     @Override
     public ProjectionConsumerId consumerId() {
         return CONSUMER_ID;
+    }
+
+    @Override
+    public ProjectionSubscription subscription() {
+        return ProjectionSubscription.events(Set.of(
+                TimedSummonLeaseChangeCodec.EVENT_TYPE,
+                CommandRosterMembershipChangeCodec.EVENT_TYPE,
+                CompanionLifecycleProjectionChangeCodec.EVENT_TYPE
+        ));
     }
 
     @Override

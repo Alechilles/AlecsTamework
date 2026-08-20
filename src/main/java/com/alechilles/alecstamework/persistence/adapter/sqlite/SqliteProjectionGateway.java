@@ -11,7 +11,10 @@ import com.alechilles.alecstamework.persistence.projection.ProjectionBatch;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCheckpoint;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumerId;
 import com.alechilles.alecstamework.persistence.projection.ProjectionSequence;
+import com.alechilles.alecstamework.persistence.projection.ProjectionSubscription;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
+import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 import javax.annotation.Nonnull;
 
@@ -54,21 +57,69 @@ public final class SqliteProjectionGateway {
     @Nonnull
     public CompletionStage<PersistenceReadResult<ProjectionBatch>> load(
             @Nonnull ProjectionConsumerId consumerId,
+            @Nonnull ProjectionSubscription subscription,
+            @Nonnull ProjectionSequence target,
             int limit
     ) {
-        if (consumerId == null || limit <= 0 || limit > 10_000) {
+        if (consumerId == null || subscription == null || target == null
+                || limit <= 0 || limit > 10_000) {
             throw new IllegalArgumentException("Valid projection consumer and batch limit are required");
         }
         return reads.execute(new SqliteReadCommand<>(
                 BATCH_READ,
                 PersistenceReadPriority.GAMEPLAY_CRITICAL,
-                connection -> loadBatch(connection, consumerId, limit)
+                connection -> loadBatch(
+                        connection, consumerId, subscription, target, limit
+                )
         ));
     }
 
-    private PersistenceReadResult<ProjectionBatch> loadBatch(
+    /** Compatibility overload that snapshots the current head for wildcard delivery. */
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<ProjectionBatch>> load(
+            @Nonnull ProjectionConsumerId consumerId,
+            int limit
+    ) {
+        return loadToHead(
+                consumerId, ProjectionSubscription.allEvents(), limit
+        );
+    }
+
+    /** Compatibility overload with the bounded target before the subscription. */
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<ProjectionBatch>> load(
+            @Nonnull ProjectionConsumerId consumerId,
+            @Nonnull ProjectionSequence target,
+            @Nonnull ProjectionSubscription subscription,
+            int limit
+    ) {
+        return load(consumerId, subscription, target, limit);
+    }
+
+    /** Loads one startup snapshot and routes rows only for the consumer subscription. */
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<ProjectionBatch>> loadToHead(
+            @Nonnull ProjectionConsumerId consumerId,
+            @Nonnull ProjectionSubscription subscription,
+            int limit
+    ) {
+        if (consumerId == null || subscription == null
+                || limit <= 0 || limit > 10_000) {
+            throw new IllegalArgumentException("Valid projection consumer and batch limit are required");
+        }
+        return reads.execute(new SqliteReadCommand<>(
+                BATCH_READ,
+                PersistenceReadPriority.GAMEPLAY_CRITICAL,
+                connection -> loadToHead(
+                        connection, consumerId, subscription, limit
+                )
+        ));
+    }
+
+    private PersistenceReadResult<ProjectionBatch> loadToHead(
             Connection connection,
             ProjectionConsumerId consumerId,
+            ProjectionSubscription subscription,
             int limit
     ) throws Exception {
         connection.setAutoCommit(false);
@@ -79,17 +130,53 @@ public final class SqliteProjectionGateway {
                     .orElse(new ProjectionCheckpoint(
                             consumerId, ProjectionSequence.ORIGIN, 0
                     ));
-            ProjectionSequence head = store.head();
+            ProjectionSequence target = store.head();
             afterHeadRead.run();
             return PersistenceReadResult.found(
                     new ProjectionBatch(
                             checkpoint,
-                            head,
-                            store.readAfter(
-                                    checkpoint.acknowledgedSequence(), limit
+                            target,
+                            store.readSubscribedAfter(
+                                    checkpoint.acknowledgedSequence(),
+                                    target,
+                                    subscription,
+                                    limit
                             )
                     ),
-                    head.value()
+                    target.value()
+            );
+        } finally {
+            connection.rollback();
+        }
+    }
+
+    private PersistenceReadResult<ProjectionBatch> loadBatch(
+            Connection connection,
+            ProjectionConsumerId consumerId,
+            ProjectionSubscription subscription,
+            ProjectionSequence target,
+            int limit
+    ) throws Exception {
+        connection.setAutoCommit(false);
+        try {
+            SqliteProjectionOutboxStore store =
+                    new SqliteProjectionOutboxStore(connection);
+            ProjectionCheckpoint checkpoint = store.findCheckpoint(consumerId)
+                    .orElse(new ProjectionCheckpoint(
+                            consumerId, ProjectionSequence.ORIGIN, 0
+                    ));
+            return PersistenceReadResult.found(
+                    new ProjectionBatch(
+                            checkpoint,
+                            target,
+                            store.readSubscribedAfter(
+                                    checkpoint.acknowledgedSequence(),
+                                    target,
+                                    subscription,
+                                    limit
+                            )
+                    ),
+                    target.value()
             );
         } finally {
             connection.rollback();
@@ -97,6 +184,30 @@ public final class SqliteProjectionGateway {
     }
 
     /** Durably acknowledges one delivered event through exact unknown-commit readback. */
+    @Nonnull
+    public SqliteUnitOfWorkRunner.Submission<ProjectionCheckpoint> acknowledge(
+            @Nonnull ProjectionConsumerId consumerId,
+            @Nonnull ProjectionSequence sequence,
+            long acknowledgedAtMs
+    ) {
+        if (consumerId == null || sequence == null) {
+            throw new IllegalArgumentException("Complete projection acknowledgement is required");
+        }
+        OperationId operationId = new OperationId(UUID.nameUUIDFromBytes(
+                ("projection-checkpoint:v1:" + consumerId + ':' + sequence)
+                        .getBytes(StandardCharsets.UTF_8)
+        ));
+        return acknowledge(
+                consumerId, operationId, sequence, acknowledgedAtMs
+        );
+    }
+
+    /**
+     * Acknowledges one delivered boundary with a caller-supplied operation ID.
+     *
+     * <p>This overload remains for compatibility with older adapter callers;
+     * coordinator delivery uses the deterministic boundary identity.</p>
+     */
     @Nonnull
     public SqliteUnitOfWorkRunner.Submission<ProjectionCheckpoint> acknowledge(
             @Nonnull ProjectionConsumerId consumerId,

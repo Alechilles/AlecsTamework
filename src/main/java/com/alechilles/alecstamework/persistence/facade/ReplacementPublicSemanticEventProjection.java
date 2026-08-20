@@ -30,6 +30,7 @@ import com.alechilles.alecstamework.persistence.projection
 import com.alechilles.alecstamework.persistence.projection
         .ProjectionConsumerId;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEvent;
+import com.alechilles.alecstamework.persistence.projection.ProjectionSubscription;
 import com.alechilles.alecstamework.persistence.projection
         .ProjectionPublicationContext;
 import java.util.function.LongSupplier;
@@ -69,6 +70,12 @@ public final class ReplacementPublicSemanticEventProjection
     @Nonnull
     public ProjectionConsumerId consumerId() {
         return CONSUMER_ID;
+    }
+
+    @Override
+    @Nonnull
+    public ProjectionSubscription subscription() {
+        return ProjectionSubscription.allEvents();
     }
 
     @Override

@@ -52,6 +52,12 @@ public final class ContextualProjectionConsumer implements ProjectionConsumer {
 
     @Override
     @Nonnull
+    public ProjectionSubscription subscription() {
+        return delegate.subscription();
+    }
+
+    @Override
+    @Nonnull
     public ProjectionApplyOutcome apply(@Nonnull ProjectionEvent event)
             throws Exception {
         return delegate.apply(event, context);

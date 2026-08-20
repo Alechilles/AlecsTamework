@@ -8,10 +8,12 @@ import com.alechilles.alecstamework.persistence.projection.ProjectionApplyOutcom
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumerId;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEvent;
+import com.alechilles.alecstamework.persistence.projection.ProjectionSubscription;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nonnull;
 
 /** Rebuildable committed owner counts derived only from canonical lifecycle evidence. */
@@ -28,6 +30,14 @@ public final class OwnerPopulationProjectionIndex
     @Nonnull
     public ProjectionConsumerId consumerId() {
         return CONSUMER_ID;
+    }
+
+    @Override
+    @Nonnull
+    public ProjectionSubscription subscription() {
+        return ProjectionSubscription.events(Set.of(
+                CompanionLifecycleProjectionChangeCodec.EVENT_TYPE
+        ));
     }
 
     @Override

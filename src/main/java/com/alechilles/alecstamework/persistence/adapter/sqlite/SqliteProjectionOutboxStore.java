@@ -11,12 +11,14 @@ import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
 import com.alechilles.alecstamework.persistence.projection.ProjectionOutboxPort;
 import com.alechilles.alecstamework.persistence.projection.ProjectionSequence;
+import com.alechilles.alecstamework.persistence.projection.ProjectionSubscription;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import javax.annotation.Nonnull;
@@ -103,6 +105,74 @@ public final class SqliteProjectionOutboxStore implements ProjectionOutboxPort {
         } catch (SQLException | RuntimeException failure) {
             throw storeFailure("projection_read_after", failure);
         }
+    }
+
+    /** Reads only subscribed events inside the supplied bounded sequence range. */
+    @Nonnull
+    public List<ProjectionEvent> readSubscribedAfter(
+            @Nonnull ProjectionSequence sequence,
+            @Nonnull ProjectionSequence target,
+            @Nonnull ProjectionSubscription subscription,
+            int limit
+    ) {
+        require(sequence, "Projection sequence");
+        require(target, "Projection target");
+        require(subscription, "Projection subscription");
+        if (limit <= 0 || limit > 10_000) {
+            throw new IllegalArgumentException(
+                    "Projection read limit must be between 1 and 10000"
+            );
+        }
+        if (target.compareTo(sequence) <= 0) {
+            return List.of();
+        }
+        boolean wildcard = subscription.wildcard();
+        String predicate = wildcard
+                ? ""
+                : " AND event_type IN ("
+                        + String.join(",", Collections.nCopies(
+                                subscription.eventTypes().size(), "?"
+                        ))
+                        + ")";
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT " + SELECT_EVENT + """
+                         FROM projection_outbox
+                         WHERE event_sequence > ?
+                           AND event_sequence <= ?
+                        """ + predicate + """
+                         ORDER BY event_sequence
+                         LIMIT ?
+                        """)) {
+            int parameter = 1;
+            statement.setLong(parameter++, sequence.value());
+            statement.setLong(parameter++, target.value());
+            if (!wildcard) {
+                for (ProjectionEventType eventType : subscription.eventTypes()) {
+                    statement.setString(parameter++, eventType.toString());
+                }
+            }
+            statement.setInt(parameter, limit);
+            ArrayList<ProjectionEvent> events = new ArrayList<>();
+            try (ResultSet row = statement.executeQuery()) {
+                while (row.next()) {
+                    events.add(readEvent(row));
+                }
+            }
+            return List.copyOf(events);
+        } catch (SQLException | RuntimeException failure) {
+            throw storeFailure("projection_read_subscribed_after", failure);
+        }
+    }
+
+    /** Compatibility overload with the subscription before the bounded target. */
+    @Nonnull
+    public List<ProjectionEvent> readSubscribedAfter(
+            @Nonnull ProjectionSequence sequence,
+            @Nonnull ProjectionSubscription subscription,
+            @Nonnull ProjectionSequence target,
+            int limit
+    ) {
+        return readSubscribedAfter(sequence, target, subscription, limit);
     }
 
     @Override

@@ -9,6 +9,12 @@ public interface ProjectionConsumer {
     @Nonnull
     ProjectionConsumerId consumerId();
 
+    /** Returns the event types this consumer needs from the shared outbox. */
+    @Nonnull
+    default ProjectionSubscription subscription() {
+        return ProjectionSubscription.allEvents();
+    }
+
     @Nonnull
     ProjectionApplyOutcome apply(@Nonnull ProjectionEvent event) throws Exception;
 
