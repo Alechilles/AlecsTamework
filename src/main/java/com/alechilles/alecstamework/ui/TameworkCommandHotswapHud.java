@@ -29,7 +29,6 @@ public final class TameworkCommandHotswapHud extends CustomUIHud {
 
     public void hideNow() {
         UICommandBuilder commandBuilder = new UICommandBuilder();
-        commandBuilder.set("#TameworkCommandHotswapControls.Visible", false);
         update(true, commandBuilder);
     }
 

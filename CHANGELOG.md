@@ -31,6 +31,7 @@
 
 ### Fixed
 
+- World transfers no longer disconnect players who have the command hotswap HUD active.
 - Restored the shared Nametag and Soul Lantern models, textures, icons,
   particles, and audio to the main Tamework pack. Dependent mods no longer
   require the optional examples pack to validate these reusable assets.
