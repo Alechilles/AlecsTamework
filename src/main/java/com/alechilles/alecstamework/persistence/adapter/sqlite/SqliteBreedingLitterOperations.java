@@ -28,6 +28,7 @@ public final class SqliteBreedingLitterOperations {
     public static final ProjectionEventType EVENT_TYPE =
             new ProjectionEventType("breeding_litter_settled");
 
+    private final SqliteOperationEngine operations;
     private final SqliteLiveOperationCoordinator workflow;
     private final List<ProjectionConsumer> requiredConsumers;
 
@@ -43,10 +44,28 @@ public final class SqliteBreedingLitterOperations {
                     "Breeding litter operation dependencies are required"
             );
         }
+        this.operations = operations;
         workflow = new SqliteLiveOperationCoordinator(
                 operations, publisher, clock
         );
         this.requiredConsumers = List.copyOf(requiredConsumers);
+    }
+
+    /** Persists one pending litter before released pairing effects begin. */
+    @Nonnull
+    public SqliteUnitOfWorkRunner.Submission<OperationEnvelope> prepare(
+            @Nonnull BreedingLitterOperation litter
+    ) {
+        if (litter == null) {
+            throw new IllegalArgumentException(
+                    "Breeding litter operation is required"
+            );
+        }
+        return operations.prepare(
+                BreedingLitterOperation.DEFINITION,
+                request(litter),
+                PreparedOperationDetail.none()
+        );
     }
 
     /** Starts or resumes one exact durable litter job. */
@@ -60,23 +79,10 @@ public final class SqliteBreedingLitterOperations {
                     "Complete breeding litter operation is required"
             );
         }
-        OperationId operationId = new OperationId(
-                BreedingLitterOperation.jobOperationId(litter.litterId())
-        );
         LitterLiveAdapter live = new LitterLiveAdapter(liveBoundary);
         SqliteLiveOperationCoordinator.Submission submitted = workflow.execute(
                 BreedingLitterOperation.DEFINITION,
-                new OperationRequest<>(
-                        operationId,
-                        new IdempotencyKey(
-                                "breeding-litter:" + litter.litterId()
-                        ),
-                        litter,
-                        FEATURE_SCOPE,
-                        null,
-                        List.of(),
-                        litter.requestedAtMs()
-                ),
+                request(litter),
                 PreparedOperationDetail.none(),
                 live,
                 (transaction, operation, payload, committedAtMs) ->
@@ -86,6 +92,26 @@ public final class SqliteBreedingLitterOperations {
         );
         return new Submission(
                 submitted.acceptance(), submitted.completion()
+        );
+    }
+
+    private static OperationRequest<BreedingLitterOperation> request(
+            BreedingLitterOperation litter
+    ) {
+        return new OperationRequest<>(
+                new OperationId(
+                        BreedingLitterOperation.jobOperationId(
+                                litter.litterId()
+                        )
+                ),
+                new IdempotencyKey(
+                        "breeding-litter:" + litter.litterId()
+                ),
+                litter,
+                FEATURE_SCOPE,
+                null,
+                List.of(),
+                litter.requestedAtMs()
         );
     }
 
