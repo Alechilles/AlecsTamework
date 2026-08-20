@@ -82,7 +82,7 @@ class TameworkApiImplTest {
                     new TraitEffectRegistry(null, null),
                     new SimpleClaimsTamedDamagePolicy()
             )) {
-                assertEquals("0.9.0", api.getApiVersion());
+                assertEquals("0.10.0", api.getApiVersion());
                 assertEquals(expectedCapabilities(), api.getCapabilities());
 
                 assertEquals(

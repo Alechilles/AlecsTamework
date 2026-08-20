@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.api.CommandLinkView;
 import com.alechilles.alecstamework.api.CommandLinksApi;
 import com.alechilles.alecstamework.api.DiagnosticsApi;
 import com.alechilles.alecstamework.api.DamagePolicyDecisionView;
+import com.alechilles.alecstamework.api.ActivityFeedApi;
 import com.alechilles.alecstamework.api.GlobalConfigView;
 import com.alechilles.alecstamework.api.InteractionConfigView;
 import com.alechilles.alecstamework.api.InteractionExtensionApi;
@@ -116,7 +117,7 @@ import javax.annotation.Nullable;
 public final class TameworkApiImpl
         implements TameworkApi, NpcProfilesApi, ProfileDataApi, TameworkConfigReadApi, PolicyApi,
         AutoCloseable {
-    static final String API_VERSION = "0.9.0";
+    static final String API_VERSION = "0.10.0";
     private static final String SNAPSHOT_CAPTURE = "capture";
     private static final String SNAPSHOT_DEATH = "death";
     private static final String SNAPSHOT_LOST = "lost";
@@ -386,6 +387,11 @@ public final class TameworkApiImpl
     @Override
     public DiagnosticsApi diagnostics() {
         return diagnosticsApi;
+    }
+
+    @Override
+    public ActivityFeedApi activities() {
+        return ActivityFeedApi.unavailable();
     }
 
     private ProgressionMutationResult setHappinessByProfileId(@Nullable String profileId,

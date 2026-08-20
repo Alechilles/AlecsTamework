@@ -32,6 +32,24 @@ public interface PopulationAdmissionApi {
         );
     }
 
+    /**
+     * Managed-profile admission with provider and weighted-domain context. The default fails
+     * closed so an older implementation cannot silently bypass a managed policy.
+     */
+    @Nonnull
+    default CompletionStage<PopulationAdmissionDecision> tryAdmitV3(
+            @Nonnull PopulationAdmissionRequestV3 request
+    ) {
+        if (request == null) {
+            throw new NullPointerException("request");
+        }
+        return CompletableFuture.completedFuture(
+                PopulationAdmissionDecision.unavailable(
+                        "population-admission-v3-authority-unavailable"
+                )
+        );
+    }
+
     @Nonnull
     CompletionStage<PopulationBatchAdmissionDecision> tryAdmitBatch(
             @Nonnull PopulationBatchAdmissionRequest request

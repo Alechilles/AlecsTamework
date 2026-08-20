@@ -30,6 +30,16 @@ public enum TameworkApiCapability {
     /** Successful capture can tame the live NPC and commit command-roster membership. */
     CAPTURE_TAME_AND_LINK,
     /** Separate canonical profile, lease, revive, and extension-data authority. */
-    BONDED_COMPANIONS
+    BONDED_COMPANIONS,
+    /** Durable, at-least-once successful companion-activity feed. */
+    SUCCESSFUL_ACTIVITY_FEED,
+    /** Durable companion output operations and pending-output claims. */
+    DURABLE_OUTPUT_OPERATIONS,
+    /** Named, weighted population-capacity reservations. */
+    NAMED_CAPACITY_RESERVATIONS,
+    /** External admission-policy provider registration and evaluation. */
+    EXTERNAL_ADMISSION_PROVIDERS,
+    /** Validated managed-content profiles and readiness state. */
+    REQUIRED_CONTENT_PROFILES
 }
 

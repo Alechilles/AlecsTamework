@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.BondedCompanionApi;
+import com.alechilles.alecstamework.api.ActivityFeedApi;
 import com.alechilles.alecstamework.api.CommandFamilyRosterApi;
 import com.alechilles.alecstamework.api.CommandLinksApi;
 import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
@@ -196,6 +197,11 @@ public final class ReplacementTameworkApi
         return bondedCompanions.availability().available()
                 ? bondedCompanions
                 : BondedCompanionApi.unavailable();
+    }
+
+    @Override
+    public ActivityFeedApi activities() {
+        return ActivityFeedApi.unavailable();
     }
 
     @Override

@@ -59,5 +59,10 @@ public interface TameworkApi {
     default BondedCompanionApi bondedCompanions() {
         return BondedCompanionApi.unavailable();
     }
+
+    /** Returns the durable successful-activity feed when advertised. */
+    default ActivityFeedApi activities() {
+        return ActivityFeedApi.unavailable();
+    }
 }
 

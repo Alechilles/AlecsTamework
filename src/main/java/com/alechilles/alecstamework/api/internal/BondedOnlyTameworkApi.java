@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.BondedCompanionApi;
+import com.alechilles.alecstamework.api.ActivityFeedApi;
 import com.alechilles.alecstamework.api.CommandLinksApi;
 import com.alechilles.alecstamework.api.DiagnosticsApi;
 import com.alechilles.alecstamework.api.InteractionExtensionApi;
@@ -26,7 +27,7 @@ import javax.annotation.Nullable;
  * exposed only while its own availability contract is satisfied.</p>
  */
 public final class BondedOnlyTameworkApi implements TameworkApi {
-    private static final String API_VERSION = "0.9.0";
+    private static final String API_VERSION = "0.10.0";
     private final BondedCompanionApi bonded;
 
     public BondedOnlyTameworkApi(@Nonnull BondedCompanionApi bonded) {
@@ -46,6 +47,10 @@ public final class BondedOnlyTameworkApi implements TameworkApi {
     @Override public BondedCompanionApi bondedCompanions() {
         return bonded.availability().available()
                 ? bonded : BondedCompanionApi.unavailable();
+    }
+
+    @Override public ActivityFeedApi activities() {
+        return ActivityFeedApi.unavailable();
     }
 
     @Nullable @Override public NpcProfilesApi profiles() { return null; }

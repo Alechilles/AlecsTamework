@@ -47,4 +47,10 @@ public interface PolicyApi {
         return PopulationAdmissionApi.unavailable();
     }
 
+    /** Returns the external population-admission provider registry when advertised. */
+    @Nonnull
+    default AdmissionProviderApi admissionProviders() {
+        return AdmissionProviderApi.unavailable();
+    }
+
 }
