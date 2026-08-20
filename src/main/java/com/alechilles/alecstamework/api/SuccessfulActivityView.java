@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.api;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -36,25 +38,37 @@ public record SuccessfulActivityView(
     }
 
     private static Set<String> immutableTextSet(Set<String> values, String field) {
-        Set<String> copy = Set.copyOf(Objects.requireNonNull(values, field));
-        for (String value : copy) {
-            requireText(value, field + " entry");
+        Set<String> source = Objects.requireNonNull(values, field);
+        LinkedHashSet<String> normalized = new LinkedHashSet<>();
+        for (String value : source) {
+            String canonical = requireText(value, field + " entry");
+            if (!normalized.add(canonical)) {
+                throw new IllegalArgumentException(
+                        field + " contains duplicate canonical identifier: " + canonical
+                );
+            }
         }
-        return copy;
+        return Set.copyOf(normalized);
     }
 
     private static Map<String, Integer> immutablePositiveQuantities(
             Map<String, Integer> quantities
     ) {
-        Map<String, Integer> copy = Map.copyOf(Objects.requireNonNull(quantities, "itemQuantities"));
-        for (Map.Entry<String, Integer> entry : copy.entrySet()) {
-            requireText(entry.getKey(), "itemQuantities key");
+        Map<String, Integer> source = Objects.requireNonNull(quantities, "itemQuantities");
+        LinkedHashMap<String, Integer> normalized = new LinkedHashMap<>();
+        for (Map.Entry<String, Integer> entry : source.entrySet()) {
+            String canonical = requireText(entry.getKey(), "itemQuantities key");
             Integer quantity = Objects.requireNonNull(entry.getValue(), "itemQuantities value");
             if (quantity <= 0) {
                 throw new IllegalArgumentException("itemQuantities values must be positive.");
             }
+            if (normalized.put(canonical, quantity) != null) {
+                throw new IllegalArgumentException(
+                        "itemQuantities contains duplicate canonical identifier: " + canonical
+                );
+            }
         }
-        return copy;
+        return Map.copyOf(normalized);
     }
 
     private static String requireText(String value, String field) {

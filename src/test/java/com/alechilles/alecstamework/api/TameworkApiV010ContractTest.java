@@ -1,8 +1,16 @@
 package com.alechilles.alecstamework.api;
 
+import com.alechilles.alecstamework.api.internal.BondedOnlyTameworkApi;
+import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
+import com.alechilles.alecstamework.api.internal.TameworkApiImpl;
+import com.alechilles.alecstamework.api.internal.TameworkEventBus;
+import com.alechilles.alecstamework.api.internal.TraitEffectRegistry;
+import com.alechilles.alecstamework.damage.SimpleClaimsTamedDamagePolicy;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.EnumSet;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -10,12 +18,12 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Public-only compatibility checks for the Tamework 0.10 contract surface. */
+/** Public compatibility checks for the Tamework 0.10 contract surface. */
 class TameworkApiV010ContractTest {
-    private static final EnumSet<TameworkApiCapability> REQUIRED_CAPABILITIES = EnumSet.of(
+    private static final EnumSet<TameworkApiCapability> NEW_CAPABILITIES = EnumSet.of(
             TameworkApiCapability.SUCCESSFUL_ACTIVITY_FEED,
             TameworkApiCapability.DURABLE_OUTPUT_OPERATIONS,
             TameworkApiCapability.NAMED_CAPACITY_RESERVATIONS,
@@ -24,26 +32,117 @@ class TameworkApiV010ContractTest {
     );
 
     @Test
-    void publicContractKeepsFiveCapabilitiesAndFailClosedDefaults() throws Exception {
-        TameworkApi api = new ContractApi();
+    void legacyDefaultsFailClosed() throws Exception {
+        TameworkApi legacy = new LegacyApiImplementation();
 
-        assertEquals("0.10.0", api.getApiVersion());
-        assertTrue(api.getCapabilities().containsAll(REQUIRED_CAPABILITIES));
+        assertNewCapabilitiesAbsent(legacy);
+        assertActivityFeedUnavailable(legacy);
+        assertAdmissionDefaultsUnavailable(legacy.policies());
+    }
 
-        ActivityFeedApi feed = api.activities();
-        assertNotNull(feed);
-        assertFalse(feed.status("contract-consumer").available());
-        ActivityFeedSubscription subscription = feed.subscribe(
+    @Test
+    void productionAndDegradedFacadesHoldBackNewCapabilitiesUntilReady() throws Exception {
+        try (TameworkApiImpl base = newBaseApi()) {
+            assertNewCapabilitiesAbsent(base);
+            assertActivityFeedUnavailable(base);
+            assertAdmissionDefaultsUnavailable(base.policies());
+        }
+
+        TameworkApi degraded = new BondedOnlyTameworkApi(BondedCompanionApi.unavailable());
+        assertNewCapabilitiesAbsent(degraded);
+        assertActivityFeedUnavailable(degraded);
+    }
+
+    @Test
+    void collectionIdentifiersAreCanonicalizedAtThePublicBoundary() {
+        SuccessfulActivityView activity = activity(
+                Set.of("  family:cow  "),
+                Map.of("  Item_Milk  ", 2)
+        );
+        assertEquals(Set.of("family:cow"), activity.groupIds());
+        assertEquals(Map.of("Item_Milk", 2), activity.itemQuantities());
+
+        PopulationAdmissionProviderRequest providerRequest = new PopulationAdmissionProviderRequest(
+                "provider:test",
+                1,
+                admissionRequest(),
+                "family:cow",
+                Set.of("  family:cow  ", "  group:all  "),
+                "  gate:cow  ",
+                1,
+                4L
+        );
+        assertEquals(Set.of("family:cow", "group:all"), providerRequest.groupIds());
+
+        PopulationAdmissionProviderDecision decision = new PopulationAdmissionProviderDecision(
+                PopulationAdmissionProviderStatus.ALLOW,
+                "allowed",
+                Set.of(new PopulationDomainClaim("owned", 1, true, false)),
+                Map.of("  owned  ", 12),
+                8L,
+                4L
+        );
+        assertEquals(Map.of("owned", 12), decision.domainLimits());
+    }
+
+    @Test
+    void collectionIdentifiersRejectDuplicatesAfterCanonicalization() {
+        assertThrows(IllegalArgumentException.class, () -> activity(
+                Set.of("family:cow", " family:cow "),
+                Map.of("Item_Milk", 1)
+        ));
+        assertThrows(IllegalArgumentException.class, () -> activity(
+                Set.of("family:cow"),
+                Map.of("Item_Milk", 1, " Item_Milk ", 2)
+        ));
+        assertThrows(IllegalArgumentException.class, () -> new PopulationAdmissionProviderRequest(
+                "provider:test",
+                1,
+                admissionRequest(),
+                "family:cow",
+                Set.of("family:cow", " family:cow "),
+                "gate:cow",
+                1,
+                4L
+        ));
+        assertThrows(IllegalArgumentException.class, () -> new PopulationAdmissionProviderDecision(
+                PopulationAdmissionProviderStatus.ALLOW,
+                "allowed",
+                Set.of(),
+                Map.of("owned", 1, " owned ", 2),
+                8L,
+                4L
+        ));
+    }
+
+    private static void assertNewCapabilitiesAbsent(TameworkApi api) {
+        assertTrue(api.getCapabilities().stream().noneMatch(NEW_CAPABILITIES::contains));
+    }
+
+    private static void assertActivityFeedUnavailable(TameworkApi api) {
+        ActivityFeedStatus status = api.activities().status("contract-consumer");
+        assertFalse(status.available());
+        assertFalse(status.subscribed());
+        ActivityFeedSubscription subscription = api.activities().subscribe(
                 "contract-consumer",
                 activity -> CompletableFuture.completedFuture(ActivityConsumeResult.APPLIED)
         );
         assertEquals("contract-consumer", subscription.consumerId());
         subscription.close();
         subscription.close();
-        assertFalse(feed.status("contract-consumer").subscribed());
+    }
 
-        AutoCloseable registration = api.policies().admissionProviders().register(
-                "runeteria:husbandry",
+    private static void assertAdmissionDefaultsUnavailable(PolicyApi policy) throws Exception {
+        assertEquals(
+                PopulationAdmissionDecision.Status.UNAVAILABLE,
+                policy.populationAdmissions()
+                        .tryAdmitV3(admissionRequest())
+                        .toCompletableFuture()
+                        .join()
+                        .status()
+        );
+        AutoCloseable registration = policy.admissionProviders().register(
+                "provider:test",
                 1,
                 request -> CompletableFuture.completedFuture(
                         PopulationAdmissionProviderDecision.unavailable("test-unavailable")
@@ -51,13 +150,34 @@ class TameworkApiV010ContractTest {
         );
         registration.close();
         registration.close();
+    }
 
-        PopulationAdmissionDecision decision = api.policies()
-                .populationAdmissions()
-                .tryAdmitV3(admissionRequest())
-                .toCompletableFuture()
-                .join();
-        assertEquals(PopulationAdmissionDecision.Status.UNAVAILABLE, decision.status());
+    private static TameworkApiImpl newBaseApi() {
+        return new TameworkApiImpl(
+                new EmptyProfiles(),
+                new EmptyProfileData(),
+                new EmptyDiagnostics(),
+                new TameworkEventBus(null),
+                null,
+                new InteractionExtensionRegistry(null),
+                new TraitEffectRegistry(null, null),
+                new SimpleClaimsTamedDamagePolicy()
+        );
+    }
+
+    private static SuccessfulActivityView activity(Set<String> groups, Map<String, Integer> quantities) {
+        return new SuccessfulActivityView(
+                UUID.randomUUID(),
+                1L,
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                "role:cow",
+                groups,
+                "profile:test",
+                "activity:milk",
+                quantities,
+                Instant.EPOCH
+        );
     }
 
     private static PopulationAdmissionRequestV3 admissionRequest() {
@@ -84,15 +204,15 @@ class TameworkApiV010ContractTest {
         );
     }
 
-    private static final class ContractApi implements TameworkApi {
+    private static final class LegacyApiImplementation implements TameworkApi {
         @Override
         public String getApiVersion() {
-            return "0.10.0";
+            return "0.9.0";
         }
 
         @Override
         public EnumSet<TameworkApiCapability> getCapabilities() {
-            return REQUIRED_CAPABILITIES.clone();
+            return EnumSet.noneOf(TameworkApiCapability.class);
         }
 
         @Override
@@ -112,7 +232,7 @@ class TameworkApiV010ContractTest {
 
         @Override
         public PolicyApi policies() {
-            return new ContractPolicy();
+            return new LegacyPolicyImplementation();
         }
 
         @Override
@@ -146,7 +266,7 @@ class TameworkApiV010ContractTest {
         }
     }
 
-    private static final class ContractPolicy implements PolicyApi {
+    private static final class LegacyPolicyImplementation implements PolicyApi {
         @Override
         public Optional<OwnershipPolicyView> getOwnershipByProfileId(String profileId) {
             return Optional.empty();
@@ -175,6 +295,83 @@ class TameworkApiV010ContractTest {
         @Override
         public PopulationCapDecisionView evaluatePopulationCap(UUID ownerUuid) {
             return null;
+        }
+    }
+
+    private static final class EmptyProfiles implements NpcProfilesApi {
+        @Override
+        public Optional<String> resolveProfileId(UUID npcUuid) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<NpcProfileView> getByProfileId(String profileId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<NpcProfileView> getByNpcUuid(UUID npcUuid) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<String> getActiveSnapshot(String profileId, String snapshotType) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Set<String> listActiveSnapshotTypes(String profileId) {
+            return Set.of();
+        }
+    }
+
+    private static final class EmptyProfileData implements ProfileDataApi {
+        @Override
+        public Optional<String> get(String profileId, String namespace, String key) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Map<String, String> list(String profileId, String namespace) {
+            return Map.of();
+        }
+
+        @Override
+        public boolean put(String profileId, String namespace, String key, String jsonPayload) {
+            return false;
+        }
+
+        @Override
+        public boolean delete(String profileId, String namespace, String key) {
+            return false;
+        }
+    }
+
+    private static final class EmptyDiagnostics implements DiagnosticsApi {
+        @Override
+        public PersistenceDiagnosticsView getPersistenceDiagnostics() {
+            return new PersistenceDiagnosticsView(
+                    "test",
+                    0L,
+                    0L,
+                    0L,
+                    0L,
+                    new PersistenceDiagnosticsView.QueueMetricsView(
+                            0,
+                            0,
+                            0,
+                            0L,
+                            0L,
+                            0L,
+                            0L,
+                            0.0,
+                            0.0,
+                            0.0,
+                            null,
+                            0L
+                    ),
+                    new PersistenceDiagnosticsView.HealthView("UNAVAILABLE", null, 0L)
+            );
         }
     }
 }

@@ -8,7 +8,10 @@ public interface ActivityFeedSubscription extends AutoCloseable {
     @Nonnull
     String consumerId();
 
-    /** Closes the subscription. Repeated calls are safe. */
+    /**
+     * Closes the subscription. Repeated calls are safe. Closing blocks new callbacks but does not
+     * cancel a callback that is already in flight.
+     */
     @Override
     void close();
 }

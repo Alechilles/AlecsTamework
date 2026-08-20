@@ -5,7 +5,11 @@ import javax.annotation.Nonnull;
 
 /** Public registration surface for external population-admission policy providers. */
 public interface AdmissionProviderApi {
-    /** Registers a provider and returns an idempotent handle for unregistering it. */
+    /**
+     * Registers a provider and returns an idempotent handle for unregistering it. Closing the
+     * handle prevents new evaluations for that registration; an evaluation already in flight may
+     * finish.
+     */
     @Nonnull
     AutoCloseable register(
             @Nonnull String providerId,

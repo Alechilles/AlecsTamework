@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.api;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -41,15 +42,21 @@ public record PopulationAdmissionProviderDecision(
     }
 
     private static Map<String, Integer> immutableLimits(Map<String, Integer> values) {
-        Map<String, Integer> copy = Map.copyOf(Objects.requireNonNull(values, "domainLimits"));
-        for (Map.Entry<String, Integer> entry : copy.entrySet()) {
-            requireText(entry.getKey(), "domainLimits key");
+        Map<String, Integer> source = Objects.requireNonNull(values, "domainLimits");
+        LinkedHashMap<String, Integer> normalized = new LinkedHashMap<>();
+        for (Map.Entry<String, Integer> entry : source.entrySet()) {
+            String canonical = requireText(entry.getKey(), "domainLimits key");
             Integer limit = Objects.requireNonNull(entry.getValue(), "domainLimits value");
             if (limit < 0) {
                 throw new IllegalArgumentException("domainLimits values cannot be negative.");
             }
+            if (normalized.put(canonical, limit) != null) {
+                throw new IllegalArgumentException(
+                        "domainLimits contains duplicate canonical identifier: " + canonical
+                );
+            }
         }
-        return copy;
+        return Map.copyOf(normalized);
     }
 
     private static String requireText(String value, String field) {

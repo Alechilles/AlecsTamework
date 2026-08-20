@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.api;
 
+import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nonnull;
@@ -33,11 +34,17 @@ public record PopulationAdmissionProviderRequest(
     }
 
     private static Set<String> immutableTextSet(Set<String> values) {
-        Set<String> copy = Set.copyOf(Objects.requireNonNull(values, "groupIds"));
-        for (String value : copy) {
-            requireText(value, "groupIds entry");
+        Set<String> source = Objects.requireNonNull(values, "groupIds");
+        LinkedHashSet<String> normalized = new LinkedHashSet<>();
+        for (String value : source) {
+            String canonical = requireText(value, "groupIds entry");
+            if (!normalized.add(canonical)) {
+                throw new IllegalArgumentException(
+                        "groupIds contains duplicate canonical identifier: " + canonical
+                );
+            }
         }
-        return copy;
+        return Set.copyOf(normalized);
     }
 
     private static String requireText(String value, String field) {
