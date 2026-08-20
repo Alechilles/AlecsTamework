@@ -214,10 +214,42 @@ class CommandLinkedNpcStateSnapshotServiceTest {
         service.publishCheckpointAfterProfile(firstProfile, first);
         service.publishCheckpointAfterProfile(newestProfile, newest);
 
-        firstProfile.complete(null);
         newestProfile.complete(null);
+        firstProfile.complete(null);
 
         assertEquals(List.of(newest), published);
+    }
+
+    @Test
+    void successfulOlderProfileKeepsCheckpointWhenNewerProfileFails() {
+        CompletableFuture<Void> firstProfile = new CompletableFuture<>();
+        CompletableFuture<Void> newestProfile = new CompletableFuture<>();
+        List<CompanionEntityCheckpointCapture> published = new ArrayList<>();
+        CommandLinkedNpcStateSnapshotService service =
+                new CommandLinkedNpcStateSnapshotService(
+                        CompanionProfileSnapshotSink.ignore(),
+                        new LoadedNpcIdentityIndex(),
+                        value -> {
+                            published.add(value);
+                            return CompletableFuture.completedFuture(null);
+                        }
+                );
+        CompanionEntityCheckpointCapture first = capture(
+                CompanionEntityCheckpoint.CaptureBoundary.LOADED, 1.0D
+        );
+        CompanionEntityCheckpointCapture newest = capture(
+                CompanionEntityCheckpoint.CaptureBoundary.LOADED, 9.0D
+        );
+
+        service.publishCheckpointAfterProfile(firstProfile, first);
+        service.publishCheckpointAfterProfile(newestProfile, newest);
+
+        firstProfile.complete(null);
+        newestProfile.completeExceptionally(
+                new IllegalStateException("newest profile failed")
+        );
+
+        assertEquals(List.of(first), published);
     }
 
     private TameworkProjectionIdentityComponent marker(String kind) {

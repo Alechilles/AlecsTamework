@@ -639,6 +639,56 @@ class LatestWorkCoordinatorTest {
     }
 
     @Test
+    void shutdownWaitsForCompletionCallbacksToFinishAdmission() throws Exception {
+        BlockingQueue<Invocation<Integer>> invocations =
+                new LinkedBlockingQueue<>();
+        LatestWorkCoordinator<Integer, Integer> coordinator =
+                new LatestWorkCoordinator<>(1, (key, value) -> {
+                    Invocation<Integer> invocation = new Invocation<>(value);
+                    invocations.add(invocation);
+                    return invocation.completion;
+                });
+        CountDownLatch callbackStarted = new CountDownLatch(1);
+        CountDownLatch releaseCallback = new CountDownLatch(1);
+        coordinator.submit(1, 1).thenRun(() -> {
+            callbackStarted.countDown();
+            try {
+                releaseCallback.await();
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        });
+
+        AtomicReference<MaintenanceDrainResult> result = new AtomicReference<>();
+        Thread drainer = new Thread(
+                () -> result.set(coordinator.shutdown(Duration.ofSeconds(2))),
+                "latest-work-completion-drainer"
+        );
+        drainer.start();
+        await(drainer::isAlive);
+
+        Thread completer = new Thread(
+                () -> take(invocations).completion.complete(null),
+                "latest-work-completion-callback"
+        );
+        completer.start();
+        try {
+            assertTrue(callbackStarted.await(1, TimeUnit.SECONDS));
+            drainer.join(250);
+            assertTrue(drainer.isAlive());
+        } finally {
+            releaseCallback.countDown();
+            completer.join(TimeUnit.SECONDS.toMillis(5));
+            drainer.join(TimeUnit.SECONDS.toMillis(5));
+        }
+
+        assertFalse(completer.isAlive());
+        assertFalse(drainer.isAlive());
+        assertNotNull(result.get());
+        assertTrue(result.get().drained());
+    }
+
+    @Test
     void shutdownTimeoutReportsExactPendingAndInFlightCounts() {
         BlockingQueue<Invocation<Integer>> invocations =
                 new LinkedBlockingQueue<>();

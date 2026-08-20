@@ -34,6 +34,7 @@ public final class LatestWorkCoordinator<K, V> {
 
     private boolean accepting = true;
     private int inFlightWork;
+    private int completionDispatches;
     private int maximumInFlightWork;
     private long submissions;
     private long replacements;
@@ -146,7 +147,8 @@ public final class LatestWorkCoordinator<K, V> {
         }
         startReadyWork();
         synchronized (stateLock) {
-            while (inFlightWork > 0 || pendingWorkLocked() > 0) {
+            while (inFlightWork > 0 || pendingWorkLocked() > 0
+                    || completionDispatches > 0) {
                 long remaining = deadline - System.nanoTime();
                 if (remaining <= 0 || !awaitNanosLocked(remaining)) {
                     return drainResultLocked(false);
@@ -416,11 +418,12 @@ public final class LatestWorkCoordinator<K, V> {
             if (work != null) {
                 waiters = new ArrayList<>(work.waiters);
                 failures++;
+                beginCompletionDispatchLocked(waiters);
             }
             cleanOrEnqueueLocked(resume.key, state);
             stateLock.notifyAll();
         }
-        completeWaiters(waiters, failure);
+        completeWaitersAndRelease(waiters, failure);
         startReadyWork();
     }
 
@@ -439,10 +442,11 @@ public final class LatestWorkCoordinator<K, V> {
                 failures++;
             }
             waiters = new ArrayList<>(launch.work.waiters);
+            beginCompletionDispatchLocked(waiters);
             cleanOrEnqueueLocked(launch.key, state);
             stateLock.notifyAll();
         }
-        completeWaiters(waiters, failure);
+        completeWaitersAndRelease(waiters, failure);
         startReadyWork();
     }
 
@@ -452,12 +456,13 @@ public final class LatestWorkCoordinator<K, V> {
             KeyState<V> state = states.get(launch.key);
             failures++;
             waiters = new ArrayList<>(launch.work.waiters);
+            beginCompletionDispatchLocked(waiters);
             if (state != null) {
                 cleanOrEnqueueLocked(launch.key, state);
             }
             stateLock.notifyAll();
         }
-        completeWaiters(waiters, failure);
+        completeWaitersAndRelease(waiters, failure);
     }
 
     private KeyState<V> liveState(Launch<K, V> launch) {
@@ -512,15 +517,32 @@ public final class LatestWorkCoordinator<K, V> {
         return retained;
     }
 
-    private static void completeWaiters(
+    private void beginCompletionDispatchLocked(
+            List<CompletableFuture<Void>> waiters
+    ) {
+        if (!waiters.isEmpty()) {
+            completionDispatches++;
+        }
+    }
+
+    private void completeWaitersAndRelease(
             List<CompletableFuture<Void>> waiters,
             Throwable failure
     ) {
-        for (CompletableFuture<Void> waiter : waiters) {
-            if (failure == null) {
-                waiter.complete(null);
-            } else {
-                waiter.completeExceptionally(failure);
+        try {
+            for (CompletableFuture<Void> waiter : waiters) {
+                if (failure == null) {
+                    waiter.complete(null);
+                } else {
+                    waiter.completeExceptionally(failure);
+                }
+            }
+        } finally {
+            if (!waiters.isEmpty()) {
+                synchronized (stateLock) {
+                    completionDispatches--;
+                    stateLock.notifyAll();
+                }
             }
         }
     }

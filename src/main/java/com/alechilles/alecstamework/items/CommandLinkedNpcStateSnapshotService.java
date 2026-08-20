@@ -18,7 +18,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import javax.annotation.Nonnull;
@@ -39,9 +38,8 @@ public final class CommandLinkedNpcStateSnapshotService {
     private final CompanionProfileSnapshotSink profileSnapshots;
     private final LoadedNpcIdentityIndex loadedNpcIdentityIndex;
     private final CompanionEntityCheckpointCaptureService checkpointCaptures;
-    private final ConcurrentHashMap<UUID, Long> newestRoutineCheckpoints =
-            new ConcurrentHashMap<>();
-    private final AtomicLong checkpointSequence = new AtomicLong();
+    private final RoutineCheckpointContinuationGate routineCheckpointGate =
+            new RoutineCheckpointContinuationGate();
 
     public CommandLinkedNpcStateSnapshotService() {
         this(
@@ -352,21 +350,18 @@ public final class CommandLinkedNpcStateSnapshotService {
         UUID alias = checkpoint.alias().value();
         boolean routine = checkpoint.boundary()
                 == CompanionEntityCheckpoint.CaptureBoundary.LOADED;
-        long token = checkpointSequence.incrementAndGet();
-        if (routine) {
-            newestRoutineCheckpoints.put(alias, token);
-        }
+        RoutineCheckpointContinuationGate.Ticket ticket = routine
+                ? routineCheckpointGate.register(alias) : null;
         CompletionStage<Void> chained = publishCheckpointAfterProfile(
                 profilePublication,
                 checkpoint,
                 checkpointCaptures::publish,
-                () -> !routine || Objects.equals(
-                        newestRoutineCheckpoints.get(alias), token
-                )
+                () -> ticket == null
+                        || routineCheckpointGate.markProfilePublished(ticket)
         );
         chained.whenComplete((ignored, failure) -> {
-            if (routine) {
-                newestRoutineCheckpoints.remove(alias, token);
+            if (ticket != null) {
+                routineCheckpointGate.complete(ticket);
             }
         });
     }
