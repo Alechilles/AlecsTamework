@@ -4,8 +4,10 @@ import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitio
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLiveBoundary;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionRequest;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionRequest;
 import com.alechilles.alecstamework.persistence.incidents.IncidentState;
 import com.alechilles.alecstamework.persistence.incidents.QuarantineState;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
@@ -19,6 +21,7 @@ import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBou
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -30,6 +33,88 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Live round-trip and late-world recovery tests for timed transitions. */
 class SqliteTimedSummonTransitionOperationsTest
         extends TimedSummonTestSupport {
+    @Test
+    void crossWorldStartUsesFrozenDestinationForAdmission()
+            throws Exception {
+        PreparedTimed prepared = prepareStoredTimedProfile(70);
+        TimedSummonTransitionRequest base = startRequest(
+                prepared, lifecycleRead(PROFILE_A), -3_000
+        );
+        CompanionLifecycle before = base.groupAdmission().before();
+        CompanionLifecycle after = base.groupAdmission().after();
+        CompanionLifecycle crossWorld = new CompanionLifecycle(
+                after.profileId(),
+                after.ownerId(),
+                after.state(),
+                LifecycleLocation.liveEntity(
+                        base.liveAlias().toString(), "world-b"
+                ),
+                after.revision(),
+                after.activeOperationId(),
+                after.stateChangedAtMs(),
+                after.lastReconciledGeneration(),
+                after.quarantineIncidentId(),
+                "world-b"
+        );
+        CompanionSpawnPlacement placement = new CompanionSpawnPlacement(
+                "world-b", 65.0, 4.0, -33.0, 0, 0, 0
+        );
+        PopulationGroupTransitionAdmissionRequest groups =
+                base.groupAdmission();
+        TimedSummonTransitionRequest request =
+                new TimedSummonTransitionRequest(
+                        base.action(),
+                        base.familyKey(),
+                        base.slotId(),
+                        base.expectedMembershipRevision(),
+                        base.beforeLease(),
+                        base.afterLease(),
+                        new PopulationGroupTransitionAdmissionRequest(
+                                before,
+                                crossWorld,
+                                groups.expectedAssignmentRevision(),
+                                groups.expectedPolicyRevision(),
+                                groups.policies(),
+                                groups.requestedAtMs()
+                        ),
+                        base.liveAlias(),
+                        "world-b",
+                        placement,
+                        base.snapshot(),
+                        base.receiptKey(),
+                        base.requestedAtMs()
+                );
+        AtomicReference<com.alechilles.alecstamework.persistence.runtime
+                .LifecycleAdmissionRequest> admitted =
+                new AtomicReference<>();
+        adapter.bindLifecycleAdmission(value -> {
+            admitted.set(value);
+            return java.util.concurrent.CompletableFuture.completedFuture(
+                    com.alechilles.alecstamework.persistence.runtime
+                            .LifecycleAdmissionEvidence.neutral()
+            );
+        });
+
+        published(adapter.timedSummonTransitionOperations().submit(
+                operationId(74),
+                new IdempotencyKey("timed:cross-world"),
+                request,
+                (value, operation) -> LiveOperationResult.confirmed(
+                        "spawned"
+                ).completed()
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS));
+
+        var managed = admitted.get().managedRequest().request();
+        assertEquals("world-b", managed.destination().worldName());
+        assertEquals(2, managed.destination().chunkX());
+        assertEquals(-2, managed.destination().chunkZ());
+        assertEquals(
+                "world-b",
+                admitted.get().managedRequest().ownershipWorldName()
+        );
+        assertEquals("world-b", lifecycleRead(PROFILE_A).ownerWorldKey());
+    }
+
     @Test
     void cleanupRunsWithDurableOperationBeforePublication()
             throws Exception {

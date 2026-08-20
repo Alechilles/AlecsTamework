@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitio
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainConvergencePlan;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainConvergencePlanner;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
@@ -29,6 +30,7 @@ import javax.annotation.Nonnull;
 
 /** Resolves managed evidence for a timed summon stored-to-live transition. */
 final class SqliteManagedTimedSummonStartAdmission {
+    private static final int CHUNK_SIZE = 32;
     private final SqliteOperationReader operations;
     private final SqliteLifecycleAdmissionBinding gateway;
     private final SqliteLifecycleAdmissionSourceReader sources;
@@ -167,8 +169,8 @@ final class SqliteManagedTimedSummonStartAdmission {
                     || !Objects.equals(
                     target.ownerId(), source.lifecycle().ownerId()
             )
-                    || !Objects.equals(
-                    target.ownerWorldKey(), source.lifecycle().ownerWorldKey()
+                    || !requested.worldKey().equals(
+                    target.ownerWorldKey()
             )) {
                 return failed(null, "timed_summon_canonical_source_mismatch");
             }
@@ -176,7 +178,8 @@ final class SqliteManagedTimedSummonStartAdmission {
                     operationId,
                     source.lifecycle(),
                     source.canonicalRoleId(),
-                    target
+                    target,
+                    requested.spawnPlacement()
             )).thenApply(evidence -> attach(
                     requested, evidence, source, target, operationId
             ));
@@ -187,9 +190,15 @@ final class SqliteManagedTimedSummonStartAdmission {
             OperationId operationId,
             CompanionLifecycle source,
             String roleId,
-            CompanionLifecycle target
+            CompanionLifecycle target,
+            CompanionSpawnPlacement placement
     ) {
-        String targetWorld = target.ownerWorldKey();
+        if (placement == null) {
+            throw new IllegalStateException(
+                    "timed_summon_spawn_placement_missing"
+            );
+        }
+        String targetWorld = placement.worldKey();
         PopulationAdmissionRequest admission = new PopulationAdmissionRequest(
                 new PopulationAdmissionIdentity(
                         source.profileId().toString(), null, null
@@ -199,7 +208,11 @@ final class SqliteManagedTimedSummonStartAdmission {
                 source.ownerId() == null ? null : source.ownerId().value(),
                 target.ownerId() == null ? null : target.ownerId().value(),
                 null,
-                new PopulationAdmissionLocation(targetWorld, 0, 0),
+                new PopulationAdmissionLocation(
+                        targetWorld,
+                        chunkCoordinate(placement.x()),
+                        chunkCoordinate(placement.z())
+                ),
                 PopulationAdmissionOperation.LIFECYCLE_CHANGE,
                 1,
                 PopulationAdmissionForcePolicy.ENFORCE,
@@ -295,6 +308,10 @@ final class SqliteManagedTimedSummonStartAdmission {
                     locationKey.getBytes(StandardCharsets.UTF_8)
             );
         }
+    }
+
+    private static int chunkCoordinate(double coordinate) {
+        return Math.floorDiv((int) Math.floor(coordinate), CHUNK_SIZE);
     }
 
     private static UUID reservationId(OperationId operationId) {
