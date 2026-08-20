@@ -427,6 +427,104 @@ class LatestWorkCoordinatorTest {
     }
 
     @Test
+    void prioritySelectorFailureDuringDeferredMergeRunsNewerPriority() {
+        List<String> calls = Collections.synchronizedList(new ArrayList<>());
+        CompletableFuture<MaintenanceWorkOutcome<String>> firstOutcome =
+                new CompletableFuture<>();
+        LatestWorkCoordinator<String, String> coordinator =
+                new LatestWorkCoordinator<>(
+                        1,
+                        (key, value) -> {
+                            calls.add(value);
+                            if ("priority-1".equals(value)) {
+                                return firstOutcome;
+                            }
+                            return CompletableFuture.completedFuture(
+                                    MaintenanceWorkOutcome.durable()
+                            );
+                        },
+                        ignored -> { }
+                );
+
+        CompletionStage<Void> failed = coordinator.submitPriority(
+                "cow",
+                "priority-1",
+                (oldValue, newValue) -> {
+                    throw new IllegalStateException("selector failed");
+                }
+        );
+        CompletionStage<Void> retained = coordinator.submitPriority(
+                "cow", "priority-2", keepNewValue()
+        );
+
+        firstOutcome.complete(MaintenanceWorkOutcome.deferred());
+
+        assertThrows(
+                RuntimeException.class,
+                () -> failed.toCompletableFuture().join()
+        );
+        assertTrue(retained.toCompletableFuture().isDone());
+        assertEquals(List.of("priority-1", "priority-2"), calls);
+        MaintenanceMetricsSnapshot metrics = coordinator.metrics();
+        assertEquals(1, metrics.failures());
+        assertEquals(1, metrics.completions());
+        assertEquals(0, metrics.pendingKeys());
+        assertEquals(0, metrics.pendingWork());
+        assertEquals(0, metrics.inFlightWork());
+    }
+
+    @Test
+    void schedulerRejectionFailsDeferredLaneAndRunsOtherLane() {
+        List<String> calls = Collections.synchronizedList(new ArrayList<>());
+        AtomicReference<Runnable> staleResume = new AtomicReference<>();
+        CompletableFuture<MaintenanceWorkOutcome<String>> priorityOutcome =
+                new CompletableFuture<>();
+        CompletableFuture<MaintenanceWorkOutcome<String>> routineOutcome =
+                new CompletableFuture<>();
+        LatestWorkCoordinator<String, String> coordinator =
+                new LatestWorkCoordinator<>(
+                        1,
+                        (key, value) -> {
+                            calls.add(value);
+                            return "priority".equals(value)
+                                    ? priorityOutcome : routineOutcome;
+                        },
+                        resume -> {
+                            staleResume.set(resume);
+                            throw new IllegalStateException(
+                                    "resume scheduler rejected work"
+                            );
+                        }
+                );
+
+        CompletionStage<Void> priority = coordinator.submitPriority(
+                "cow", "priority", keepNewValue()
+        );
+        CompletionStage<Void> routine = coordinator.submit("cow", "routine");
+
+        priorityOutcome.complete(MaintenanceWorkOutcome.deferred());
+
+        assertThrows(
+                RuntimeException.class,
+                () -> priority.toCompletableFuture().join()
+        );
+        assertEquals(List.of("priority", "routine"), calls);
+        assertFalse(routine.toCompletableFuture().isDone());
+        assertNotNull(staleResume.get());
+        staleResume.get().run();
+        assertEquals(List.of("priority", "routine"), calls);
+
+        routineOutcome.complete(MaintenanceWorkOutcome.durable());
+        assertTrue(routine.toCompletableFuture().isDone());
+        MaintenanceMetricsSnapshot metrics = coordinator.metrics();
+        assertEquals(1, metrics.failures());
+        assertEquals(1, metrics.completions());
+        assertEquals(0, metrics.pendingKeys());
+        assertEquals(0, metrics.pendingWork());
+        assertEquals(0, metrics.inFlightWork());
+    }
+
+    @Test
     void callbackRegistrationFailureFailsWaitersReleasesSlotAndDrains() throws Exception {
         BlockingQueue<Invocation<Integer>> invocations =
                 new LinkedBlockingQueue<>();

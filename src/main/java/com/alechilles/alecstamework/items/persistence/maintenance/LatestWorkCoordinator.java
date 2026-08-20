@@ -162,17 +162,26 @@ public final class LatestWorkCoordinator<K, V> {
         Objects.requireNonNull(value, "value");
         CompletableFuture<Void> waiter = new CompletableFuture<>();
         boolean rejected;
+        Throwable admissionFailure = null;
         synchronized (stateLock) {
             rejected = !accepting;
             if (!rejected) {
-                submissions++;
-                acceptLocked(key, value, waiter, prioritySelector);
+                try {
+                    acceptLocked(key, value, waiter, prioritySelector);
+                    submissions++;
+                } catch (Throwable failure) {
+                    admissionFailure = failure;
+                }
             }
         }
         if (rejected) {
             waiter.completeExceptionally(new RejectedExecutionException(
                     "Maintenance coordinator is closed"
             ));
+            return waiter;
+        }
+        if (admissionFailure != null) {
+            waiter.completeExceptionally(admissionFailure);
             return waiter;
         }
         startReadyWork();
@@ -332,21 +341,30 @@ public final class LatestWorkCoordinator<K, V> {
                         "Maintenance work remained deferred during shutdown"
                 );
             } else {
-                boolean sameLaneNewer = pending(state, launch.lane) != null;
-                boolean shouldRun = sameLaneNewer
-                        || (launch.lane == Lane.ROUTINE
-                        && state.priority != null);
-                restoreDeferred(state, launch);
-                if (sameLaneNewer) {
-                    replacements++;
-                }
-                if (shouldRun) {
+                try {
+                    boolean sameLaneNewer = pending(
+                            state, launch.lane
+                    ) != null;
+                    boolean shouldRun = sameLaneNewer
+                            || (launch.lane == Lane.ROUTINE
+                            && state.priority != null);
+                    restoreDeferred(state, launch);
+                    if (sameLaneNewer) {
+                        replacements++;
+                    }
+                    if (shouldRun) {
+                        enqueueIfReadyLocked(launch.key, state);
+                    } else {
+                        state.deferred = true;
+                        state.deferredLane = launch.lane;
+                        long generation = ++state.deferralGeneration;
+                        resume = new Resume<>(
+                                launch.key, launch.lane, generation
+                        );
+                    }
+                } catch (Throwable failure) {
+                    terminal = failure;
                     enqueueIfReadyLocked(launch.key, state);
-                } else {
-                    state.deferred = true;
-                    state.deferredLane = launch.lane;
-                    long generation = ++state.deferralGeneration;
-                    resume = new Resume<>(launch.key, launch.lane, generation);
                 }
                 stateLock.notifyAll();
             }
