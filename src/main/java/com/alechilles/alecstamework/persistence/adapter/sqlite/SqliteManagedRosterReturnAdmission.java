@@ -20,7 +20,6 @@ import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionEvidence;
 import com.alechilles.alecstamework.persistence.runtime.LifecycleAdmissionRequest;
-import com.alechilles.alecstamework.persistence.runtime.PersistenceLifecycleAdmissionGateway;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.UUID;
@@ -70,7 +69,9 @@ final class SqliteManagedRosterReturnAdmission {
     ) {
         if (read instanceof PersistenceReadResult.Found<
                 SqliteOperationReader.OperationReadModel> found) {
-            return decodeExisting(found.value(), operationId, idempotencyKey);
+            return decodeExisting(
+                    found.value(), operationId, idempotencyKey, requested
+            );
         }
         if (read instanceof PersistenceReadResult.Failed<
                 SqliteOperationReader.OperationReadModel> failed) {
@@ -80,7 +81,9 @@ final class SqliteManagedRosterReturnAdmission {
         return operations.find(operationId).thenCompose(byId -> {
             if (byId instanceof PersistenceReadResult.Found<
                     SqliteOperationReader.OperationReadModel> found) {
-                return decodeExisting(found.value(), operationId, idempotencyKey);
+                return decodeExisting(
+                        found.value(), operationId, idempotencyKey, requested
+                );
             }
             if (byId instanceof PersistenceReadResult.Failed<
                     SqliteOperationReader.OperationReadModel> failed) {
@@ -98,7 +101,8 @@ final class SqliteManagedRosterReturnAdmission {
     private CompletionStage<CommandRosterTransitionRequest> decodeExisting(
             SqliteOperationReader.OperationReadModel model,
             OperationId operationId,
-            IdempotencyKey idempotencyKey
+            IdempotencyKey idempotencyKey,
+            CommandRosterTransitionRequest requested
     ) {
         if (!model.operation().operationId().equals(operationId)
                 || !CommandRosterTransitionDefinition.KIND.equals(
@@ -111,11 +115,14 @@ final class SqliteManagedRosterReturnAdmission {
                     "command_roster_replay_operation_identity_mismatch");
         }
         try {
-            return CompletableFuture.completedFuture(
+            CommandRosterTransitionRequest durable =
                     CommandRosterTransitionDefinition.INSTANCE.decode(
                             model.operation().payloadJson()
-                    )
-            );
+                    );
+            if (!sameCallerRequest(requested, durable)) {
+                return failed(null, "command_roster_replay_payload_conflict");
+            }
+            return CompletableFuture.completedFuture(durable);
         } catch (RuntimeException invalid) {
             return failed(invalid, "command_roster_replay_payload_invalid");
         }
@@ -125,14 +132,6 @@ final class SqliteManagedRosterReturnAdmission {
             OperationId operationId,
             CommandRosterTransitionRequest requested
     ) {
-        if (gateway.gateway()
-                instanceof PersistenceLifecycleAdmissionGateway.Unbound) {
-            return CompletableFuture.completedFuture(
-                    requested.withAdmissionEvidence(
-                            LifecycleAdmissionEvidence.unmanaged()
-                    )
-            );
-        }
         CompanionLifecycle expected = requested.groupAdmission().before();
         CompanionLifecycle target = requested.groupAdmission().after();
         return sources.findByProfile(expected.profileId()).thenCompose(read -> {
@@ -290,6 +289,21 @@ final class SqliteManagedRosterReturnAdmission {
     private static UUID reservationId(OperationId operationId) {
         return UUID.nameUUIDFromBytes((operationId.value()
                 + ":lifecycle-admission").getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static boolean sameCallerRequest(
+            CommandRosterTransitionRequest requested,
+            CommandRosterTransitionRequest durable
+    ) {
+        if (requested.admissionEvidence() != null) {
+            return requested.equals(durable);
+        }
+        return requested.equals(new CommandRosterTransitionRequest(
+                durable.familyKey(),
+                durable.slotId(),
+                durable.expectedMembershipRevision(),
+                durable.groupAdmission()
+        ));
     }
 
     private static <T> CompletionStage<T> failed(

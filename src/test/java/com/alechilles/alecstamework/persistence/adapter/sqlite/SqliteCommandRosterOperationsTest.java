@@ -104,6 +104,10 @@ class SqliteCommandRosterOperationsTest
         createProfile(PROFILE_A, SLOT_A, 3);
         classify(PROFILE_A, 2, 30);
         published(addMembership(PROFILE_A, SLOT_A, 0, 31));
+        adapter.bindLifecycleAdmission(request ->
+                CompletableFuture.completedFuture(
+                        LifecycleAdmissionEvidence.neutral()
+                ));
 
         CompanionLifecycle stored = lifecycle(
                 PROFILE_A, LifecycleState.ROSTER_STORED, SLOT_A, 0
@@ -131,6 +135,26 @@ class SqliteCommandRosterOperationsTest
                 PROFILE_A, LifecycleState.ROSTER_STORED, SLOT_A, 2
         );
         OperationId storeId = operationId(33);
+        OperationWorkflowResult injected = await(
+                adapter.commandRosterTransitionOperations().submit(
+                        operationId(39),
+                        new IdempotencyKey("command:store:injected"),
+                        transitionRequest(
+                                SLOT_A, 1, active, restored, 2
+                        ).withAdmissionEvidence(
+                                LifecycleAdmissionEvidence.managed(
+                                        rosterReturnPayload(operationId(39)),
+                                        null
+                                )
+                        )
+                )
+        );
+        assertEquals(
+                OperationWorkflowResult.Status.PREPARE_FAILED,
+                injected.status()
+        );
+        assertEquals(LifecycleState.ACTIVE,
+                lifecycleRead(PROFILE_A).state());
         published(await(transition(
                 storeId, SLOT_A, 1, active, restored, 2
         )));
@@ -183,6 +207,45 @@ class SqliteCommandRosterOperationsTest
             assertEquals(1, counts.committedDeployable());
             assertEquals(1, domains.findByOperation(returnId).size());
         }
+        OperationWorkflowResult conflictingReplay = await(transition(
+                returnId,
+                SLOT_A,
+                1,
+                lifecycle(PROFILE_A, LifecycleState.ROSTER_STORED, SLOT_A, 0),
+                lifecycle(PROFILE_A, LifecycleState.ACTIVE, SLOT_A, 1),
+                2
+        ));
+        assertEquals(
+                OperationWorkflowResult.Status.PREPARE_FAILED,
+                conflictingReplay.status()
+        );
+        assertTrue(rootMessage(conflictingReplay.failure()).contains(
+                "command_roster_replay_payload_conflict"
+        ));
+        assertEquals(1, admissionCalls.get());
+    }
+
+    @Test
+    void unboundManagedRosterReturnFailsClosed() throws Exception {
+        createProfile(PROFILE_A, SLOT_A, 40);
+        classify(PROFILE_A, 2, 41);
+        published(addMembership(PROFILE_A, SLOT_A, 0, 42));
+
+        OperationWorkflowResult result = await(transition(
+                operationId(43),
+                SLOT_A,
+                1,
+                lifecycle(PROFILE_A, LifecycleState.ROSTER_STORED, SLOT_A, 0),
+                lifecycle(PROFILE_A, LifecycleState.ACTIVE, SLOT_A, 1),
+                1
+        ));
+
+        assertEquals(
+                OperationWorkflowResult.Status.PREPARE_FAILED,
+                result.status()
+        );
+        assertEquals(LifecycleState.ROSTER_STORED,
+                lifecycleRead(PROFILE_A).state());
     }
 
     @Test
@@ -194,6 +257,10 @@ class SqliteCommandRosterOperationsTest
         classify(PROFILE_B, 2, 41);
         published(addMembership(PROFILE_A, SLOT_A, 0, 42));
         published(addMembership(PROFILE_B, SLOT_B, 1, 43));
+        adapter.bindLifecycleAdmission(request ->
+                CompletableFuture.completedFuture(
+                        LifecycleAdmissionEvidence.neutral()
+                ));
 
         CompletableFuture<OperationWorkflowResult> first = transition(
                 operationId(44),

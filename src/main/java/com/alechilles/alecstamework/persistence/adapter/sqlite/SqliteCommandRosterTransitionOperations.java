@@ -79,6 +79,11 @@ public final class SqliteCommandRosterTransitionOperations {
                     "Complete command transition operation is required"
             );
         }
+        if (!positiveReturn(request) && request.admissionEvidence() != null) {
+            return rejected(
+                    "command_roster_store_admission_evidence_forbidden"
+            );
+        }
         if (!positiveReturn(request) || admission == null) {
             return execute(operationId, idempotencyKey, request);
         }
@@ -108,6 +113,22 @@ public final class SqliteCommandRosterTransitionOperations {
                                 .CompletionException
                                 && failure.getCause() != null
                                         ? failure.getCause() : failure
+                        )
+                )
+        );
+    }
+
+    private SqliteDatabaseOperationCoordinator.Submission rejected(
+            String code
+    ) {
+        return new SqliteDatabaseOperationCoordinator.Submission(
+                SqliteSingleWriter.WriteAcceptance.ACCEPTED,
+                java.util.concurrent.CompletableFuture.completedFuture(
+                        SqliteOperationResults.failed(
+                                OperationWorkflowResult.Status.PREPARE_FAILED,
+                                null,
+                                List.of(),
+                                new IllegalArgumentException(code)
                         )
                 )
         );
