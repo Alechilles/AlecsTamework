@@ -21,9 +21,11 @@ import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioning
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationRequest;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalRequest;
+import com.alechilles.alecstamework.npc.actions.BreedingLitterOperation;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteDatabaseOperationCoordinator;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicPersistenceAdapter;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSingleWriter;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
@@ -291,6 +293,33 @@ public final class PublicPersistenceOperations {
     @Nonnull
     public PopulationDomainAdmissionOperation populationDomainAdmission() {
         return adapter.populationDomainAdmissionOperations();
+    }
+
+    /** Prepares one durable litter job before any world-thread spawn work. */
+    @Nonnull
+    public CompletionStage<Boolean>
+    prepareBreedingLitter(@Nonnull BreedingLitterOperation litter) {
+        var submitted = adapter.breedingLitterOperations().prepare(litter);
+        if (submitted.acceptance()
+                != SqliteSingleWriter.WriteAcceptance.ACCEPTED) {
+            return java.util.concurrent.CompletableFuture
+                    .completedFuture(false);
+        }
+        return submitted.completion().thenApply(result ->
+                result instanceof PersistenceTransactionResult.Committed<?>
+        );
+    }
+
+    /** Submits or resumes one exact durable litter job at its live boundary. */
+    @Nonnull
+    public PublicOperationSubmission submitBreedingLitter(
+            @Nonnull BreedingLitterOperation litter
+    ) {
+        var submitted = adapter.breedingLitterOperations().submit(
+                litter,
+                boundaries.breedingLitters()
+        );
+        return submission(submitted.acceptance(), submitted.completion());
     }
 
     @Nonnull

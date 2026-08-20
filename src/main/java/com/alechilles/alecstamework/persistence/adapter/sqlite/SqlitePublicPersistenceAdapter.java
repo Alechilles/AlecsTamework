@@ -312,6 +312,12 @@ public final class SqlitePublicPersistenceAdapter {
         return publicOperations.extensions();
     }
 
+    /** Returns the durable breeding litter job adapter. */
+    @Nonnull
+    public SqliteBreedingLitterOperations breedingLitterOperations() {
+        return publicOperations.breedingLitters();
+    }
+
     @Nonnull
     public SqliteCompanionProfileReader profileReader() {
         return profiles;

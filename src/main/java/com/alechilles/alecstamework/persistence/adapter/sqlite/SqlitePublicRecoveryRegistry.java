@@ -41,6 +41,7 @@ import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDe
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalDefinition;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalRequest;
+import com.alechilles.alecstamework.npc.actions.BreedingLitterOperation;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
@@ -121,6 +122,13 @@ final class SqlitePublicRecoveryRegistry {
                 Map.entry(
                         PopulationDomainAdmissionDefinition.INSTANCE.kind(),
                         operations.populationDomains()::recover
+                ),
+                Map.entry(
+                        BreedingLitterOperation.KIND,
+                        claim -> operations.breedingLitters().submit(
+                                payload(claim, BreedingLitterOperation.class),
+                                boundaries.breedingLitters()
+                        ).completion()
                 ),
                 Map.entry(
                         CommandRosterMembershipDefinition.INSTANCE.kind(),

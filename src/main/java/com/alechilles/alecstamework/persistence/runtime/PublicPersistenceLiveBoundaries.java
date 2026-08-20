@@ -8,6 +8,8 @@ import com.alechilles.alecstamework.companion.coop.CompanionCoopReleaseLiveBound
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationLiveBoundary;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationLiveBoundary;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalBoundaries;
+import com.alechilles.alecstamework.npc.actions.BreedingLitterLiveBoundary;
+import com.alechilles.alecstamework.npc.actions.BreedingLitterLiveResult;
 import javax.annotation.Nonnull;
 
 /** Complete external mutation/resolution boundaries used by normal work and recovery. */
@@ -19,7 +21,8 @@ public record PublicPersistenceLiveBoundaries(
         @Nonnull CompanionCoopReleaseLiveBoundary coopReleases,
         @Nonnull TimedSummonLiveBoundary timedSummons,
         @Nonnull ProvisioningActivationLiveBoundary provisioningActivations,
-        @Nonnull PaidRevivalBoundaries paidRevivals
+        @Nonnull PaidRevivalBoundaries paidRevivals,
+        @Nonnull BreedingLitterLiveBoundary breedingLitters
 ) {
     public PublicPersistenceLiveBoundaries {
         if (captures == null || capturedReleases == null
@@ -27,11 +30,36 @@ public record PublicPersistenceLiveBoundaries(
                 || coopCaptures == null || coopReleases == null
                 || timedSummons == null
                 || provisioningActivations == null
-                || paidRevivals == null) {
+                || paidRevivals == null
+                || breedingLitters == null) {
             throw new IllegalArgumentException(
                     "Every public live persistence boundary is required"
             );
         }
+    }
+
+    /** Compatibility composition for callers without breeding-litter work. */
+    public PublicPersistenceLiveBoundaries(
+            CompanionCaptureLiveBoundary captures,
+            CompanionCaptureReleaseLiveBoundary capturedReleases,
+            CompanionRestorationLiveBoundary restorations,
+            CompanionCoopCaptureLiveBoundary coopCaptures,
+            CompanionCoopReleaseLiveBoundary coopReleases,
+            TimedSummonLiveBoundary timedSummons,
+            ProvisioningActivationLiveBoundary provisioningActivations,
+            PaidRevivalBoundaries paidRevivals
+    ) {
+        this(
+                captures,
+                capturedReleases,
+                restorations,
+                coopCaptures,
+                coopReleases,
+                timedSummons,
+                provisioningActivations,
+                paidRevivals,
+                unavailableBreedingLitters()
+        );
     }
 
     /** Compatibility composition for callers without paid revival. */
@@ -52,7 +80,8 @@ public record PublicPersistenceLiveBoundaries(
                 coopReleases,
                 timedSummons,
                 provisioningActivations,
-                PaidRevivalBoundaries.unavailable()
+                PaidRevivalBoundaries.unavailable(),
+                unavailableBreedingLitters()
         );
     }
 
@@ -77,7 +106,9 @@ public record PublicPersistenceLiveBoundaries(
                                 .LiveOperationResult.retryable(
                                         "provisioning_boundary_unavailable",
                                         null
-                                ).completed()
+                                ).completed(),
+                PaidRevivalBoundaries.unavailable(),
+                unavailableBreedingLitters()
         );
     }
 
@@ -104,7 +135,22 @@ public record PublicPersistenceLiveBoundaries(
                                 .LiveOperationResult.retryable(
                                         "timed_summon_boundary_unavailable",
                                         null
-                                ).completed()
+                                ).completed(),
+                (request, operation) ->
+                        com.alechilles.alecstamework.persistence.operation
+                                .LiveOperationResult.retryable(
+                                        "provisioning_boundary_unavailable",
+                                        null
+                                ).completed(),
+                PaidRevivalBoundaries.unavailable(),
+                unavailableBreedingLitters()
         );
+    }
+
+    private static BreedingLitterLiveBoundary unavailableBreedingLitters() {
+        return (litter, operation) -> BreedingLitterLiveResult.retryable(
+                "breeding_litter_boundary_unavailable",
+                null
+        ).completed();
     }
 }

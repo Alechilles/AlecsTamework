@@ -22,6 +22,7 @@ import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioning
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalDefinition;
+import com.alechilles.alecstamework.npc.actions.BreedingLitterOperation;
 import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceContainmentListener;
@@ -48,6 +49,7 @@ final class SqlitePublicOperationSet {
             ownerPopulationReconciliation;
     private final SqlitePopulationGroupAssignmentOperations populationGroups;
     private final PopulationDomainAdmissionOperation populationDomains;
+    private final SqliteBreedingLitterOperations breedingLitters;
     private final SqliteCommandRosterMembershipOperations commandRosters;
     private final SqliteCommandRosterTransitionOperations commandTransitions;
     private final SqliteTimedSummonLeaseOperations timedSummons;
@@ -182,6 +184,12 @@ final class SqlitePublicOperationSet {
                         PopulationDomainAdmissionDefinition.INSTANCE.kind()
                 ),
                 clock
+        );
+        breedingLitters = new SqliteBreedingLitterOperations(
+                engine,
+                publisher,
+                clock,
+                consumers.apply(BreedingLitterOperation.KIND)
         );
         commandRosters = new SqliteCommandRosterMembershipOperations(
                 database,
@@ -347,6 +355,10 @@ final class SqlitePublicOperationSet {
 
     PopulationDomainAdmissionOperation populationDomains() {
         return populationDomains;
+    }
+
+    SqliteBreedingLitterOperations breedingLitters() {
+        return breedingLitters;
     }
 
     SqliteCommandRosterMembershipOperations commandRosters() {

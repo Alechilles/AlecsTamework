@@ -3,12 +3,14 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 import com.alechilles.alecstamework.npc.actions.BreedingLitterLiveBoundary;
 import com.alechilles.alecstamework.npc.actions.BreedingLitterLiveResult;
 import com.alechilles.alecstamework.npc.actions.BreedingLitterOperation;
+import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationBoundary;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
+import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.operation.PreparedOperationDetail;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
@@ -110,7 +112,14 @@ public final class SqliteBreedingLitterOperations {
                 litter,
                 FEATURE_SCOPE,
                 null,
-                List.of(),
+                List.of(
+                        OperationScope.profile(new ProfileId(
+                                litter.parentA().uuid()
+                        )),
+                        OperationScope.profile(new ProfileId(
+                                litter.parentB().uuid()
+                        ))
+                ),
                 litter.requestedAtMs()
         );
     }

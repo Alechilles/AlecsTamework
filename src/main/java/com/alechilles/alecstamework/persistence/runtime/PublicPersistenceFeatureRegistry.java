@@ -18,6 +18,7 @@ import com.alechilles.alecstamework.companion.population.OwnerPopulationTransiti
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentDefinition;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
+import com.alechilles.alecstamework.npc.actions.BreedingLitterOperation;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDomain;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureId;
@@ -253,13 +254,18 @@ public final class PublicPersistenceFeatureRegistry {
                 POPULATION_DOMAINS,
                 PersistenceFeatureDomain.POPULATION,
                 Set.of("population_domain_reservation"),
-                List.of(PopulationDomainAdmissionDefinition.INSTANCE),
+                List.of(
+                        PopulationDomainAdmissionDefinition.INSTANCE,
+                        BreedingLitterOperation.DEFINITION
+                ),
                 PublicPersistenceFeatureDescriptorFactory.scopes(
                         PopulationDomainAdmissionDefinition.INSTANCE,
                         Set.of(
                                 OperationScopeType.PROFILE,
                                 OperationScopeType.OWNER
-                        )
+                        ),
+                        BreedingLitterOperation.DEFINITION,
+                        Set.of(OperationScopeType.PROFILE)
                 ),
                 Set.of(IDENTITY, LIFECYCLE, OWNER_POPULATION, POPULATION_GROUPS),
                 Set.of(),
