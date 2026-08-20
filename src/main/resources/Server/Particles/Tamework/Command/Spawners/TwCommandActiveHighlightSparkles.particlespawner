@@ -1,5 +1,5 @@
 {
-  "RenderMode": "BlendLinear",
+  "RenderMode": "Erosion",
   "EmitOffset": {
     "X": { "Min": -0.45, "Max": 0.45 },
     "Y": { "Min": -0.15, "Max": 0.65 },
