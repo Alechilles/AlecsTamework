@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,7 +40,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** End-to-end tests for the one database-only operation workflow. */
 class SqliteDatabaseOperationCoordinatorTest {
@@ -133,11 +134,55 @@ class SqliteDatabaseOperationCoordinatorTest {
         assertEquals(1, recovered.applyCalls.get());
     }
 
+    @Test
+    void requiredConsumersPublishConcurrentlyAndReturnFirstConcreteFailure()
+            throws Exception {
+        AtomicInteger durableExecutions = new AtomicInteger();
+        BlockingConsumer first = new BlockingConsumer(
+                "first_projection", true
+        );
+        BlockingConsumer second = new BlockingConsumer(
+                "second_projection", false
+        );
+
+        SqliteDatabaseOperationCoordinator.Submission submission = submit(
+                durableExecutions, List.of(first, second)
+        );
+        assertTrue(first.entered.await(10, TimeUnit.SECONDS));
+        assertTrue(second.entered.await(10, TimeUnit.SECONDS));
+        try {
+            first.release.countDown();
+            second.release.countDown();
+            OperationWorkflowResult result = submission.completion()
+                    .toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+            assertEquals(
+                    OperationWorkflowResult.Status.PUBLICATION_PENDING,
+                    result.status()
+            );
+            assertEquals("first projection failure", result.failure().getMessage());
+            assertEquals(1, durableExecutions.get());
+            assertEquals(1, first.applyCalls.get());
+            assertEquals(1, second.applyCalls.get());
+        } finally {
+            first.release.countDown();
+            second.release.countDown();
+        }
+    }
+
     private OperationWorkflowResult execute(
             AtomicInteger durableExecutions,
             ProjectionConsumer consumer
     ) throws Exception {
-        SqliteDatabaseOperationCoordinator.Submission submission = coordinator.execute(
+        return submit(durableExecutions, List.of(consumer)).completion()
+                .toCompletableFuture().get(10, TimeUnit.SECONDS);
+    }
+
+    private SqliteDatabaseOperationCoordinator.Submission submit(
+            AtomicInteger durableExecutions,
+            List<? extends ProjectionConsumer> consumers
+    ) {
+        return coordinator.execute(
                 definition,
                 request(),
                 (transaction, operation) -> {
@@ -153,10 +198,8 @@ class SqliteDatabaseOperationCoordinatorTest {
                             -8_000
                     ));
                 },
-                List.of(consumer)
+                consumers
         );
-        assertNotNull(submission.acceptance());
-        return submission.completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
     }
 
     private OperationRequest<Payload> request() {
@@ -260,6 +303,38 @@ class SqliteDatabaseOperationCoordinatorTest {
                 return ProjectionApplyOutcome.ALREADY_APPLIED;
             }
             revisions.put(event.aggregateId(), event.aggregateRevision());
+            return ProjectionApplyOutcome.APPLIED;
+        }
+    }
+
+    private static final class BlockingConsumer implements ProjectionConsumer {
+        private final ProjectionConsumerId consumerId;
+        private final boolean fail;
+        private final CountDownLatch entered = new CountDownLatch(1);
+        private final CountDownLatch release = new CountDownLatch(1);
+        private final AtomicInteger applyCalls = new AtomicInteger();
+
+        private BlockingConsumer(String consumerId, boolean fail) {
+            this.consumerId = new ProjectionConsumerId(consumerId);
+            this.fail = fail;
+        }
+
+        @Override
+        public ProjectionConsumerId consumerId() {
+            return consumerId;
+        }
+
+        @Override
+        public ProjectionApplyOutcome apply(ProjectionEvent event)
+                throws Exception {
+            applyCalls.incrementAndGet();
+            entered.countDown();
+            if (!release.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("projection consumer was not released");
+            }
+            if (fail) {
+                throw new IllegalStateException("first projection failure");
+            }
             return ProjectionApplyOutcome.APPLIED;
         }
     }

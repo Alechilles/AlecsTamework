@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationRequest;
 import com.alechilles.alecstamework.persistence.operation.PreparedOperationDetail;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
+import com.alechilles.alecstamework.persistence.projection.ProjectionPublicationScheduler;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
 import java.util.function.LongSupplier;
@@ -33,7 +34,22 @@ public final class SqliteDatabaseOperationCoordinator {
             @Nonnull ProjectionCoordinator projections,
             @Nonnull LongSupplier clock
     ) {
-        if (operations == null || evidence == null || projections == null || clock == null) {
+        this(
+                operations,
+                evidence,
+                new ProjectionPublicationScheduler(projections),
+                clock
+        );
+    }
+
+    SqliteDatabaseOperationCoordinator(
+            @Nonnull SqliteOperationEngine operations,
+            @Nonnull SqliteOperationEvidenceReader evidence,
+            @Nonnull ProjectionPublicationScheduler publicationScheduler,
+            @Nonnull LongSupplier clock
+    ) {
+        if (operations == null || evidence == null
+                || publicationScheduler == null || clock == null) {
             throw new IllegalArgumentException(
                     "Database operation coordinator dependencies are required"
             );
@@ -42,7 +58,7 @@ public final class SqliteDatabaseOperationCoordinator {
         this.publisher = new SqliteOperationPublisher(
                 operations,
                 evidence,
-                projections,
+                publicationScheduler,
                 clock
         );
         this.clock = clock;

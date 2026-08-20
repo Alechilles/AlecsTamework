@@ -30,6 +30,7 @@ import com.alechilles.alecstamework.persistence.projection
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
 import com.alechilles.alecstamework.persistence.projection
         .ProjectionPublicationContext;
+import com.alechilles.alecstamework.persistence.projection.ProjectionPublicationScheduler;
 import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,10 +39,10 @@ import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
-
 /** Registry-checked projection composition shared by public work and recovery. */
 final class SqlitePublicProjectionSet {
     private final ProjectionCoordinator coordinator;
+    private final ProjectionPublicationScheduler publicationScheduler;
     private final CompanionProfileObserverProjection profileObserver;
     private final ReplacementPublicSemanticEventProjection
             publicEventObserver;
@@ -78,6 +79,8 @@ final class SqlitePublicProjectionSet {
                 ProjectionRetryPolicy.DEFAULT,
                 clock
         );
+        this.publicationScheduler =
+                new ProjectionPublicationScheduler(this.coordinator);
         this.profileObserver =
                 new CompanionProfileObserverProjection(profileListener);
         this.publicEventObserver =
@@ -114,8 +117,8 @@ final class SqlitePublicProjectionSet {
         ));
     }
     @Nonnull
-    ProjectionCoordinator coordinator() {
-        return coordinator;
+    ProjectionPublicationScheduler publicationScheduler() {
+        return publicationScheduler;
     }
     @Nonnull
     CoopResidencyProjectionIndex coopIndex() {
@@ -494,5 +497,4 @@ final class SqlitePublicProjectionSet {
                 "canonical_" + authority + "_rebuild_read_absent"
         );
     }
-
 }
