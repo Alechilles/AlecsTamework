@@ -38,16 +38,13 @@ class CompanionLevelingServiceXpTransitionTest {
     @Test
     void appliedAwardReturnsAndPublishesTheSameTransition() throws Exception {
         try (Fixture fixture = new Fixture(true)) {
-            AtomicReference<CompanionXpTransition> published = new AtomicReference<>();
-            try (AutoCloseable ignored = fixture.signals.subscribe(published::set)) {
-                CompanionLevelingService.AwardResult result = fixture.award();
+            CompanionLevelingService.AwardResult result = fixture.award();
 
-                assertTrue(result.applied());
-                assertNotNull(result.transition());
-                assertSame(result.transition(), published.get());
-                assertEquals(5.0, result.transition().awardedXp());
-                assertEquals(5.0, fixture.leveling().getTotalXp());
-            }
+            assertTrue(result.applied());
+            assertNotNull(result.transition());
+            assertSame(result.transition(), fixture.publishedTransition());
+            assertEquals(5.0, result.transition().awardedXp());
+            assertEquals(5.0, fixture.leveling().getTotalXp());
         }
     }
 
@@ -72,8 +69,6 @@ class CompanionLevelingServiceXpTransitionTest {
                 new ComponentType<>();
         private final ComponentType<EntityStore, TameworkTamedComponent> tamedType =
                 new ComponentType<>();
-        private final CompanionProgressionSignalBus signals =
-                new CompanionProgressionSignalBus();
         private final TestEntityComponentStore store = new TestEntityComponentStore(
                 new EntityStore(null));
         private final Ref<EntityStore> npcRef = store.createReference();
@@ -83,8 +78,6 @@ class CompanionLevelingServiceXpTransitionTest {
             Tamework tamework = tameworkInstance();
             setField(tamework, "levelingComponentType", levelingType);
             setField(tamework, "tamedComponentType", tamedType);
-            setField(tamework, "companionProgressionSignalBus", signals);
-            CompanionProgressionSignalBus.installForTamework(signals);
             installConfig();
 
             store.put(npcRef, tamedType, new TameworkTamedComponent(true));
@@ -96,7 +89,6 @@ class CompanionLevelingServiceXpTransitionTest {
                 npc.setRoleName(ROLE_ID);
                 store.put(npcRef, NPCEntity.getComponentType(), npc);
             }
-            signals.subscribe(published::set);
         }
 
         private CompanionLevelingService.AwardResult award() {
@@ -106,7 +98,9 @@ class CompanionLevelingServiceXpTransitionTest {
                     null,
                     ROLE_ID,
                     com.alechilles.alecstamework.api.CompanionXpSource.CUSTOM,
-                    5.0
+                    5.0,
+                    null,
+                    published::set
             );
         }
 
@@ -118,9 +112,12 @@ class CompanionLevelingServiceXpTransitionTest {
             return published.get() == null ? 0 : 1;
         }
 
+        private CompanionXpTransition publishedTransition() {
+            return published.get();
+        }
+
         @Override
         public void close() throws Exception {
-            signals.close();
             store.close();
             staticField(TwLevelingConfig.class, "ASSET_STORE").set(null, previousAssetStore);
             TwLevelingConfig.clearRoleCache();

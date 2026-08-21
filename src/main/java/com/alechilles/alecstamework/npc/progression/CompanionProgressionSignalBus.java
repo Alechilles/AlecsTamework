@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.progression;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -10,10 +11,13 @@ import javax.annotation.Nullable;
 
 /** Small synchronous process-local signal bus for committed companion progression changes. */
 public final class CompanionProgressionSignalBus implements AutoCloseable {
+    private static final Object INSTALL_LOCK = new Object();
+
     @Nullable
     private static volatile CompanionProgressionSignalBus installedBus;
     private final CopyOnWriteArrayList<Consumer<CompanionXpTransition>> listeners =
             new CopyOnWriteArrayList<>();
+    private boolean legacyAdapterInstalled;
 
     /** Registers one listener. The returned handle is idempotent. */
     @Nonnull
@@ -29,8 +33,20 @@ public final class CompanionProgressionSignalBus implements AutoCloseable {
     }
 
     /** Installs the one bus owned by Tamework for the current runtime. */
-    public static void installForTamework(@Nonnull CompanionProgressionSignalBus bus) {
-        installedBus = Objects.requireNonNull(bus, "bus");
+    public static boolean installForTamework(@Nonnull Tamework owner,
+                                             @Nonnull Object token,
+                                             @Nonnull CompanionProgressionSignalBus bus) {
+        if (owner == null || owner != Tamework.getInstance() || token == null || bus == null
+                || !owner.ownsCompanionProgressionSignalToken(token)) {
+            return false;
+        }
+        synchronized (INSTALL_LOCK) {
+            if (installedBus != null && installedBus != bus) {
+                return false;
+            }
+            installedBus = bus;
+            return true;
+        }
     }
 
     /** Publishes on the calling thread after progression mutation and trait updates. */
@@ -54,15 +70,33 @@ public final class CompanionProgressionSignalBus implements AutoCloseable {
     }
 
     /** Installs the package-owned legacy projection used by Tamework composition. */
-    @Nonnull
-    public AutoCloseable installLegacyAdapter(@Nonnull TameworkEventBus legacyEvents) {
-        return new CompanionXpLegacyAdapter(this, legacyEvents);
+    @Nullable
+    public AutoCloseable installLegacyAdapter(@Nonnull Tamework owner,
+                                              @Nonnull Object token,
+                                              @Nonnull TameworkEventBus legacyEvents) {
+        if (owner == null || owner != Tamework.getInstance() || token == null || legacyEvents == null
+                || !owner.ownsCompanionProgressionSignalToken(token)) {
+            return null;
+        }
+        synchronized (INSTALL_LOCK) {
+            if (installedBus != this || legacyAdapterInstalled) {
+                return null;
+            }
+            CompanionXpLegacyAdapter adapter = new CompanionXpLegacyAdapter(this, legacyEvents);
+            legacyAdapterInstalled = true;
+            return adapter;
+        }
     }
 
     @Override
     public void close() {
         listeners.clear();
-        installedBus = installedBus == this ? null : installedBus;
+        synchronized (INSTALL_LOCK) {
+            legacyAdapterInstalled = false;
+            if (installedBus == this) {
+                installedBus = null;
+            }
+        }
     }
 
 }

@@ -257,6 +257,7 @@ import com.hypixel.hytale.server.spawning.spawnmarkers.SpawnMarkerEntity;
  */
 public class Tamework extends JavaPlugin {
     private static Tamework instance;
+    private final Object companionProgressionSignalToken = new Object();
 
     private ItemFeatureRegistry itemFeatureRegistry;
     private SpawnerItemConfigReloadService spawnerItemConfigReloadService;
@@ -420,6 +421,11 @@ public class Tamework extends JavaPlugin {
         instance = this;
     }
 
+    /** Checks the private token used by the internal progression composition. */
+    public final boolean ownsCompanionProgressionSignalToken(@Nullable Object candidate) {
+        return candidate != null && candidate == companionProgressionSignalToken;
+    }
+
     @Override
     protected void setup() {
         setupInternal();
@@ -427,7 +433,12 @@ public class Tamework extends JavaPlugin {
 
     private void setupInternal() {
         companionProgressionSignalBus = new CompanionProgressionSignalBus();
-        CompanionProgressionSignalBus.installForTamework(companionProgressionSignalBus);
+        if (!CompanionProgressionSignalBus.installForTamework(
+                this, companionProgressionSignalToken, companionProgressionSignalBus)) {
+            companionProgressionSignalBus = null;
+            throw new IllegalStateException(
+                    "Could not install Tamework's companion progression signal bus.");
+        }
         runtimeParticipants = new TameworkRuntimeParticipantRegistry(
                 eventType -> getEntityStoreRegistry().registerEntityEventType(eventType),
                 getLogger()
@@ -617,7 +628,12 @@ public class Tamework extends JavaPlugin {
             return;
         }
         apiEventBus = new TameworkEventBus(getLogger());
-        companionXpLegacyAdapter = companionProgressionSignalBus.installLegacyAdapter(apiEventBus);
+        companionXpLegacyAdapter = companionProgressionSignalBus.installLegacyAdapter(
+                this, companionProgressionSignalToken, apiEventBus);
+        if (companionXpLegacyAdapter == null) {
+            throw new IllegalStateException(
+                    "Could not install Tamework's companion XP legacy adapter.");
+        }
         runtimeDataDirectory = new TameworkDataPathService(getLogger())
                 .resolveAndInitializeDataPathLayout(getDataDirectory())
                 .targetDirectory();

@@ -16,6 +16,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -84,7 +85,8 @@ public final class CompanionLevelingService {
     public static AwardResult awardXp(@Nullable Ref<EntityStore> npcRef,
                                       @Nullable Store<EntityStore> store,
                                       double amount) {
-        return awardXp(npcRef, store, null, null, CompanionXpSource.CUSTOM, amount);
+        return awardXp(npcRef, store, null, null, CompanionXpSource.CUSTOM, amount, null,
+                CompanionProgressionSignalBus::publishCommitted);
     }
 
     @Nonnull
@@ -116,7 +118,8 @@ public final class CompanionLevelingService {
                                       @Nullable Store<EntityStore> store,
                                       @Nullable String roleIdHint,
                                       double amount) {
-        return awardXp(npcRef, store, null, roleIdHint, CompanionXpSource.CUSTOM, amount);
+        return awardXp(npcRef, store, null, roleIdHint, CompanionXpSource.CUSTOM, amount, null,
+                CompanionProgressionSignalBus::publishCommitted);
     }
 
     @Nonnull
@@ -125,7 +128,8 @@ public final class CompanionLevelingService {
                                       @Nullable CommandBuffer<EntityStore> commandBuffer,
                                       @Nullable String roleIdHint,
                                       double amount) {
-        return awardXp(npcRef, store, commandBuffer, roleIdHint, CompanionXpSource.CUSTOM, amount);
+        return awardXp(npcRef, store, commandBuffer, roleIdHint, CompanionXpSource.CUSTOM, amount, null,
+                CompanionProgressionSignalBus::publishCommitted);
     }
 
     @Nonnull
@@ -135,17 +139,19 @@ public final class CompanionLevelingService {
                                       @Nullable String roleIdHint,
                                       @Nonnull CompanionXpSource source,
                                       double amount) {
-        return awardXp(npcRef, store, commandBuffer, roleIdHint, source, amount, null);
+        return awardXp(npcRef, store, commandBuffer, roleIdHint, source, amount, null,
+                CompanionProgressionSignalBus::publishCommitted);
     }
 
     @Nonnull
-    private static AwardResult awardXp(@Nullable Ref<EntityStore> npcRef,
-                                       @Nullable Store<EntityStore> store,
-                                       @Nullable CommandBuffer<EntityStore> commandBuffer,
-                                       @Nullable String roleIdHint,
-                                       @Nonnull CompanionXpSource source,
-                                       double amount,
-                                       @Nullable Long feedXpAwardedAtMs) {
+    static AwardResult awardXp(@Nullable Ref<EntityStore> npcRef,
+                               @Nullable Store<EntityStore> store,
+                               @Nullable CommandBuffer<EntityStore> commandBuffer,
+                               @Nullable String roleIdHint,
+                               @Nonnull CompanionXpSource source,
+                               double amount,
+                               @Nullable Long feedXpAwardedAtMs,
+                               @Nonnull Consumer<CompanionXpTransition> transitionPublisher) {
         if (npcRef == null || !npcRef.isValid() || store == null || !Double.isFinite(amount) || amount <= 0.0) {
             return AwardResult.notApplied();
         }
@@ -220,7 +226,7 @@ public final class CompanionLevelingService {
                 npcUuid,
                 System.currentTimeMillis()
         );
-        publishXpTransition(transition);
+        publishXpTransition(transition, transitionPublisher);
         return new AwardResult(true, amount, previousLevel, updated.getLevel(), updated.getTotalXp(), transition);
     }
 
@@ -432,11 +438,13 @@ public final class CompanionLevelingService {
         );
     }
 
-    private static void publishXpTransition(@Nullable CompanionXpTransition transition) {
+    private static void publishXpTransition(
+            @Nullable CompanionXpTransition transition,
+            @Nonnull Consumer<CompanionXpTransition> transitionPublisher) {
         if (transition == null) {
             return;
         }
-        CompanionProgressionSignalBus.publishCommitted(transition);
+        transitionPublisher.accept(transition);
     }
 
     @Nullable
@@ -626,7 +634,8 @@ public final class CompanionLevelingService {
             }
             feedXpAwardedAtMs = nowMs;
         }
-        return awardXp(npcRef, store, null, roleId, xpSource, settings.getFlatXp(), feedXpAwardedAtMs);
+        return awardXp(npcRef, store, null, roleId, xpSource, settings.getFlatXp(), feedXpAwardedAtMs,
+                CompanionProgressionSignalBus::publishCommitted);
     }
 
     @Nonnull
