@@ -133,10 +133,11 @@ final class SqlitePopulationDomainConvergenceStore {
                         : row.getString("owner_world_key")
         );
         long revision = row.getLong("expected_lifecycle_revision");
+        boolean revisionPresent = !row.wasNull();
         return new PopulationDomainReservation(
                 OperationId.parse(row.getString("operation_id")),
                 ProfileId.parse(row.getString("profile_id")),
-                row.wasNull() ? null : new LifecycleRevision(revision),
+                revisionPresent ? new LifecycleRevision(revision) : null,
                 bucket,
                 row.getInt("owned_delta"),
                 row.getInt("deployable_delta"),

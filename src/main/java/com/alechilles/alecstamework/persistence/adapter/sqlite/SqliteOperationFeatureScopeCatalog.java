@@ -14,12 +14,15 @@ import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutation
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationDefinition;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationReconciliationDefinition;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionDefinition;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionDefinition;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentDefinition;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
 import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioningDefinition;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalDefinition;
+import com.alechilles.alecstamework.npc.actions.BreedingLitterOperation;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import java.util.HashMap;
@@ -81,6 +84,10 @@ public final class SqliteOperationFeatureScopeCatalog {
                 SqliteOwnerPopulationReconciliationOperations.FEATURE_SCOPE);
         put(scopes, PopulationGroupAssignmentDefinition.KIND,
                 SqlitePopulationGroupAssignmentOperations.FEATURE_SCOPE);
+        put(scopes, PopulationDomainAdmissionDefinition.KIND,
+                PopulationDomainAdmissionOperation.FEATURE_SCOPE);
+        put(scopes, BreedingLitterOperation.KIND,
+                SqliteBreedingLitterOperations.FEATURE_SCOPE);
         put(scopes, CommandRosterMembershipDefinition.KIND,
                 SqliteCommandRosterMembershipOperations.FEATURE_SCOPE);
         put(scopes, CommandRosterTransitionDefinition.KIND,
