@@ -18,7 +18,6 @@ import com.hypixel.hytale.server.core.modules.entity.tracker.NetworkId;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -157,15 +156,13 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
                     return desiredTargets;
                 }
         );
-        ArrayList<CommandActiveNpcHighlightProxyService.SyncTarget> syncTargets =
-                new ArrayList<>(targets.size());
         for (CommandActiveNpcHighlightPlanService.HighlightTarget target : targets) {
             emitForLoadedTarget(
                     store, world, loadedTargetProbe, playerCandidate.ref(), playerUuid,
-                    activeTool.toolId(), target, syncTargets
+                    activeTool.toolId(), target
             );
         }
-        scheduleProxySync(store, syncTargets);
+        scheduleProxySync(store, displayTracker.syncTargets(store, playerUuid));
     }
 
     @Nullable
@@ -219,8 +216,7 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
             @Nonnull Ref<EntityStore> viewerRef,
             @Nonnull UUID playerUuid,
             @Nonnull String toolId,
-            @Nonnull CommandActiveNpcHighlightPlanService.HighlightTarget target,
-            @Nonnull List<CommandActiveNpcHighlightProxyService.SyncTarget> syncTargets
+            @Nonnull CommandActiveNpcHighlightPlanService.HighlightTarget target
     ) {
         UUID resolvedNpcUuid = targetResolver.resolve(
                 target.npcUuid(), target.profileId(), loadedTargetProbe
@@ -253,17 +249,20 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
         if (proxyUuid == null) {
             requestProxyCreation(
                     store, world, playerUuid, toolId, target, resolvedNpcUuid,
-                    anchorResolver.resolveMountedOffset(model)
+                    anchorResolver.resolveHeadOffset(model)
             );
             return;
         }
         Ref<EntityStore> proxyRef = world.getEntityRef(proxyUuid);
+        Vector3f attachmentOffset = anchorResolver.resolveHeadOffset(model);
         if (proxyRef != null && proxyRef.isValid()
-                && proxyService.requiresRecreation(store, npcRef, proxyRef)) {
+                && proxyService.requiresRecreation(
+                        store, npcRef, proxyRef, attachmentOffset
+                )) {
             scheduleProxyRemoval(store, displayTracker.forgetTarget(store, playerUuid, target));
             requestProxyCreation(
                     store, world, playerUuid, toolId, target, resolvedNpcUuid,
-                    anchorResolver.resolveMountedOffset(model)
+                    anchorResolver.resolveHeadOffset(model)
             );
             return;
         }
@@ -274,9 +273,6 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
             scheduleProxyRemoval(store, displayTracker.forgetTarget(store, playerUuid, target));
             return;
         }
-        syncTargets.add(new CommandActiveNpcHighlightProxyService.SyncTarget(
-                proxyUuid, resolvedNpcUuid
-        ));
         int resolvedNetworkId = networkId.getId();
         if (!displayTracker.needsEmission(
                 store, playerUuid, target, resolvedNetworkId
@@ -344,7 +340,7 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
             }
             proxyUuid = proxyService.create(store, npcRef, attachmentOffset);
             if (proxyUuid != null && displayTracker.recordProxy(
-                    store, playerUuid, target, npcUuid, proxyUuid
+                    store, playerUuid, target, npcUuid, proxyUuid, attachmentOffset
             )) {
                 proxyRetained = true;
                 return;

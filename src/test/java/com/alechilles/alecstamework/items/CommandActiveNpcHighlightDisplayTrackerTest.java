@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import java.util.List;
 import java.util.UUID;
+import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -26,7 +27,7 @@ class CommandActiveNpcHighlightDisplayTrackerTest {
         tracker.reconcile(store, PLAYER_UUID, "flute-a", List.of("cow-a"));
         assertTrue(tracker.beginProxyCreation(store, PLAYER_UUID, "cow-a", NPC_UUID));
         assertTrue(tracker.recordProxy(
-                store, PLAYER_UUID, "cow-a", NPC_UUID, PROXY_UUID
+                store, PLAYER_UUID, "cow-a", NPC_UUID, PROXY_UUID, new Vector3f()
         ));
         assertTrue(tracker.needsEmission(store, PLAYER_UUID, "cow-a", 42));
 
@@ -44,10 +45,18 @@ class CommandActiveNpcHighlightDisplayTrackerTest {
 
         tracker.reconcile(store, PLAYER_UUID, "flute-a", List.of("cow-a"));
         tracker.beginProxyCreation(store, PLAYER_UUID, "cow-a", NPC_UUID);
-        tracker.recordProxy(store, PLAYER_UUID, "cow-a", NPC_UUID, PROXY_UUID);
+        tracker.recordProxy(
+                store, PLAYER_UUID, "cow-a", NPC_UUID, PROXY_UUID, new Vector3f()
+        );
         tracker.recordEmission(store, PLAYER_UUID, "cow-a", 42);
 
         assertFalse(tracker.needsEmission(store, PLAYER_UUID, "cow-a", 42));
+        assertEquals(
+                List.of(new CommandActiveNpcHighlightProxyService.SyncTarget(
+                        PROXY_UUID, NPC_UUID, new Vector3f()
+                )),
+                tracker.syncTargets(store, PLAYER_UUID)
+        );
     }
 
     @Test
@@ -58,7 +67,9 @@ class CommandActiveNpcHighlightDisplayTrackerTest {
 
         tracker.reconcile(store, PLAYER_UUID, "flute-a", List.of("cow-a"));
         tracker.beginProxyCreation(store, PLAYER_UUID, "cow-a", NPC_UUID);
-        tracker.recordProxy(store, PLAYER_UUID, "cow-a", NPC_UUID, PROXY_UUID);
+        tracker.recordProxy(
+                store, PLAYER_UUID, "cow-a", NPC_UUID, PROXY_UUID, new Vector3f()
+        );
 
         assertEquals(
                 List.of(PROXY_UUID),
@@ -75,7 +86,9 @@ class CommandActiveNpcHighlightDisplayTrackerTest {
 
         tracker.reconcile(store, PLAYER_UUID, "flute-a", List.of("cow-a"));
         tracker.beginProxyCreation(store, PLAYER_UUID, "cow-a", NPC_UUID);
-        tracker.recordProxy(store, PLAYER_UUID, "cow-a", NPC_UUID, PROXY_UUID);
+        tracker.recordProxy(
+                store, PLAYER_UUID, "cow-a", NPC_UUID, PROXY_UUID, new Vector3f()
+        );
         tracker.recordEmission(store, PLAYER_UUID, "cow-a", 42);
 
         assertEquals(List.of(PROXY_UUID), tracker.remove(store, PLAYER_UUID));

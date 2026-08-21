@@ -33,8 +33,10 @@
   continuous, gently animated indicator above each loaded active NPC. The
   indicator uses the NPC's group color, or neutral gold when the NPC is
   ungrouped. Each indicator now runs continuously from one invisible helper
-  mounted above the NPC. Disabling the setting, changing tools, or removing the
-  NPC removes that helper and its indicator without periodic server respawns.
+  that follows the NPC's head. Disabling the setting, changing tools, or
+  removing the NPC removes that helper and its indicator without periodic
+  server respawns. The helper does not use the mount system, so it remains safe
+  when a player mounts or dismounts the highlighted NPC.
 
 ### Fixed
 
