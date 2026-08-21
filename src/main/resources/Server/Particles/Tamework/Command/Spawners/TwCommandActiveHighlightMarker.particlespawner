@@ -10,6 +10,9 @@
     "Texture": "Particles/Textures/Tamework/Command/TwCommandActiveMarker.png",
     "ScaleRatioConstraint": "OneToOne",
     "UVOption": "None",
+    "Animation": {
+      "0": {}
+    },
     "SoftParticles": "Disable",
     "InitialAnimationFrame": {
       "Opacity": 1,

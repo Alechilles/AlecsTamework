@@ -41,6 +41,9 @@
 
 ### Fixed
 
+- Update 6 pre-release clients no longer reject Tamework because the active
+  NPC indicator now supplies the particle animation data that Update 6
+  requires.
 - Update 5 servers no longer register or emit active NPC indicators because
   the feature requires Update 6 model-particle cleanup support.
 - Active NPC indicators now use the base indicator timing pattern, with a very
