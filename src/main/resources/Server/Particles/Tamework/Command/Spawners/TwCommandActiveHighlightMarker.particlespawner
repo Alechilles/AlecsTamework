@@ -4,14 +4,10 @@
   "ParticleRotateWithSpawner": false,
   "LinearFiltering": true,
   "LightInfluence": 0,
-  "MaxConcurrentParticles": 1,
+  "MaxConcurrentParticles": 2,
   "ParticleLifeSpan": {
     "Min": 2.55,
     "Max": 2.55
-  },
-  "TotalParticles": {
-    "Min": 1,
-    "Max": 1
   },
   "Particle": {
     "Texture": "Particles/Textures/Tamework/Command/TwCommandActiveMarker.png",
@@ -73,5 +69,6 @@
     }
   ],
   "SpawnRate": { "Min": 1, "Max": 1 },
-  "SpawnBurst": true
+  "SpawnBurst": true,
+  "WaveDelay": { "Min": 2.4, "Max": 2.4 }
 }

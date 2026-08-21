@@ -18,21 +18,24 @@ import com.hypixel.hytale.server.core.modules.entity.tracker.NetworkId;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.joml.Vector3f;
 
 /**
- * Reconciles renewable, controller-only indicators for the equipped command tool.
- * Work runs at 100 ms only for tracked command users and is capped at 82 NPCs per player sweep.
+ * Reconciles controller-only indicators for the equipped command tool.
+ * Inventory events queue candidate players, while an 800 ms pass covers missed NPC load and
+ * alias changes. Work runs at 100 ms only while candidates exist and processes at most four
+ * players and 82 NPCs per player sweep.
  */
 public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityStore> {
     private static final long SWEEP_INTERVAL_MS = 100L;
     private static final long RECONCILE_INTERVAL_MS = 800L;
-    private static final long HIGHLIGHT_RENEWAL_INTERVAL_MS = 2_400L;
     static final int MAX_TARGETS_PER_PLAYER_SWEEP = 82;
     private static final int MAX_CANDIDATES_PER_PASS = 4;
     private static final int RESERVED_ACTIVE_CANDIDATES = 1;
@@ -46,9 +49,11 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
     private final CommandActiveNpcHighlightAnchorResolver anchorResolver =
             new CommandActiveNpcHighlightAnchorResolver();
     private final CommandActiveNpcHighlightEmitter emitter = new CommandActiveNpcHighlightEmitter();
+    private final CommandActiveNpcHighlightProxyService proxyService =
+            new CommandActiveNpcHighlightProxyService();
     private final CommandActiveNpcHighlightDisplayTracker<
             CommandActiveNpcHighlightPlanService.HighlightTarget> displayTracker =
-            new CommandActiveNpcHighlightDisplayTracker<>(HIGHLIGHT_RENEWAL_INTERVAL_MS);
+            new CommandActiveNpcHighlightDisplayTracker<>();
     private final CommandActiveNpcHighlightBatchService<
             CommandActiveNpcHighlightPlanService.HighlightTarget> batchService =
             new CommandActiveNpcHighlightBatchService<>(MAX_TARGETS_PER_PLAYER_SWEEP);
@@ -66,7 +71,7 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
             @Override
             public void onPlayerRemoved(@Nonnull Store<EntityStore> store, @Nonnull UUID playerUuid) {
                 batchService.remove(store, playerUuid);
-                displayTracker.remove(store, playerUuid);
+                scheduleProxyRemoval(store, displayTracker.remove(store, playerUuid));
             }
 
             @Override
@@ -121,18 +126,18 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
             activationTracker.remove(store, playerUuid);
             return;
         }
-        ActiveTool activeTool = resolveActiveTool(playerCandidate.player());
-        if (activeTool == null) {
-            batchService.remove(store, playerUuid);
-            displayTracker.remove(store, playerUuid);
-            activationTracker.recordResolvedHand(store, playerUuid, null, false, nowMs);
-            return;
-        }
-        activationTracker.recordResolvedHand(store, playerUuid, activeTool.itemId(), true, nowMs);
         World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
         if (world == null) {
             return;
         }
+        ActiveTool activeTool = resolveActiveTool(playerCandidate.player());
+        if (activeTool == null) {
+            batchService.remove(store, playerUuid);
+            scheduleProxyRemoval(store, displayTracker.remove(store, playerUuid));
+            activationTracker.recordResolvedHand(store, playerUuid, null, false, nowMs);
+            return;
+        }
+        activationTracker.recordResolvedHand(store, playerUuid, activeTool.itemId(), true, nowMs);
         CommandActiveNpcHighlightTargetResolver.LoadedTargetProbe loadedTargetProbe = npcUuid -> {
             Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
             return npcRef != null && npcRef.isValid();
@@ -146,18 +151,21 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
                 () -> {
                     List<CommandActiveNpcHighlightPlanService.HighlightTarget> desiredTargets =
                             resolveTargets(activeTool.stack());
-                    displayTracker.reconcile(
+                    scheduleProxyRemoval(store, displayTracker.reconcile(
                             store, playerUuid, activeTool.toolId(), desiredTargets
-                    );
+                    ));
                     return desiredTargets;
                 }
         );
+        ArrayList<CommandActiveNpcHighlightProxyService.SyncTarget> syncTargets =
+                new ArrayList<>(targets.size());
         for (CommandActiveNpcHighlightPlanService.HighlightTarget target : targets) {
             emitForLoadedTarget(
                     store, world, loadedTargetProbe, playerCandidate.ref(), playerUuid,
-                    activeTool.toolId(), target, nowMs
+                    activeTool.toolId(), target, syncTargets
             );
         }
+        scheduleProxySync(store, syncTargets);
     }
 
     @Nullable
@@ -212,7 +220,7 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
             @Nonnull UUID playerUuid,
             @Nonnull String toolId,
             @Nonnull CommandActiveNpcHighlightPlanService.HighlightTarget target,
-            long nowMs
+            @Nonnull List<CommandActiveNpcHighlightProxyService.SyncTarget> syncTargets
     ) {
         UUID resolvedNpcUuid = targetResolver.resolve(
                 target.npcUuid(), target.profileId(), loadedTargetProbe
@@ -222,23 +230,56 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
                 : null;
         if (npcRef == null || !npcRef.isValid()
                 || !CommandGenericTargetAuthority.allowsGenericTargetMutation(npcRef, store)) {
-            displayTracker.forgetTarget(store, playerUuid, target);
+            scheduleProxyRemoval(store, displayTracker.forgetTarget(store, playerUuid, target));
             return;
         }
         NPCEntity npc = component(store, npcRef, NPCEntity.getComponentType());
         TameworkCommandLinksComponent links = component(
                 store, npcRef, TameworkCommandLinksComponent.getComponentType()
         );
-        NetworkId networkId = component(store, npcRef, NetworkId.getComponentType());
         ModelComponent model = component(store, npcRef, ModelComponent.getComponentType());
-        if (npc == null || links == null || networkId == null
+        if (npc == null || links == null
                 || !playerUuid.equals(links.getOwnerId())
                 || !links.containsToolId(toolId)) {
+            scheduleProxyRemoval(store, displayTracker.forgetTarget(store, playerUuid, target));
             return;
         }
+        scheduleProxyRemoval(store, displayTracker.forgetProxyForDifferentParent(
+                store, playerUuid, target, resolvedNpcUuid
+        ));
+        UUID proxyUuid = displayTracker.proxyUuid(
+                store, playerUuid, target, resolvedNpcUuid
+        );
+        if (proxyUuid == null) {
+            requestProxyCreation(
+                    store, world, playerUuid, toolId, target, resolvedNpcUuid,
+                    anchorResolver.resolveMountedOffset(model)
+            );
+            return;
+        }
+        Ref<EntityStore> proxyRef = world.getEntityRef(proxyUuid);
+        if (proxyRef != null && proxyRef.isValid()
+                && proxyService.requiresRecreation(store, npcRef, proxyRef)) {
+            scheduleProxyRemoval(store, displayTracker.forgetTarget(store, playerUuid, target));
+            requestProxyCreation(
+                    store, world, playerUuid, toolId, target, resolvedNpcUuid,
+                    anchorResolver.resolveMountedOffset(model)
+            );
+            return;
+        }
+        NetworkId networkId = proxyRef != null && proxyRef.isValid()
+                ? component(store, proxyRef, NetworkId.getComponentType())
+                : null;
+        if (networkId == null) {
+            scheduleProxyRemoval(store, displayTracker.forgetTarget(store, playerUuid, target));
+            return;
+        }
+        syncTargets.add(new CommandActiveNpcHighlightProxyService.SyncTarget(
+                proxyUuid, resolvedNpcUuid
+        ));
         int resolvedNetworkId = networkId.getId();
         if (!displayTracker.needsEmission(
-                store, playerUuid, target, resolvedNetworkId, nowMs
+                store, playerUuid, target, resolvedNetworkId
         )) {
             return;
         }
@@ -246,13 +287,123 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
                 networkId,
                 viewerRef,
                 target.colorHex(),
-                anchorResolver.resolve(model),
+                new CommandActiveNpcHighlightAnchor(null, new Vector3f()),
                 store
         );
         if (emitted) {
             displayTracker.recordEmission(
-                    store, playerUuid, target, resolvedNetworkId, nowMs
+                    store, playerUuid, target, resolvedNetworkId
             );
+        }
+    }
+
+    private void requestProxyCreation(
+            @Nonnull Store<EntityStore> store,
+            @Nonnull World world,
+            @Nonnull UUID playerUuid,
+            @Nonnull String toolId,
+            @Nonnull CommandActiveNpcHighlightPlanService.HighlightTarget target,
+            @Nonnull UUID npcUuid,
+            @Nonnull Vector3f attachmentOffset
+    ) {
+        if (!displayTracker.beginProxyCreation(
+                store, playerUuid, target, npcUuid
+        )) {
+            return;
+        }
+        try {
+            world.execute(() -> createProxyOnWorld(
+                    store, world, playerUuid, toolId, target, npcUuid, attachmentOffset
+            ));
+        } catch (RuntimeException failure) {
+            displayTracker.cancelProxyCreation(store, playerUuid, target, npcUuid);
+        }
+    }
+
+    private void createProxyOnWorld(
+            @Nonnull Store<EntityStore> store,
+            @Nonnull World world,
+            @Nonnull UUID playerUuid,
+            @Nonnull String toolId,
+            @Nonnull CommandActiveNpcHighlightPlanService.HighlightTarget target,
+            @Nonnull UUID npcUuid,
+            @Nonnull Vector3f attachmentOffset
+    ) {
+        UUID proxyUuid = null;
+        boolean proxyRetained = false;
+        try {
+            PlayerCandidate playerCandidate = resolvePlayer(store, playerUuid);
+            ActiveTool activeTool = playerCandidate != null
+                    ? resolveActiveTool(playerCandidate.player())
+                    : null;
+            Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
+            if (activeTool == null || !toolId.equals(activeTool.toolId())
+                    || npcRef == null || !npcRef.isValid()
+                    || !allowsProxyFor(store, npcRef, playerUuid, toolId)) {
+                return;
+            }
+            proxyUuid = proxyService.create(store, npcRef, attachmentOffset);
+            if (proxyUuid != null && displayTracker.recordProxy(
+                    store, playerUuid, target, npcUuid, proxyUuid
+            )) {
+                proxyRetained = true;
+                return;
+            }
+        } catch (RuntimeException ignored) {
+            // A later reconciliation can retry after a transient entity or asset failure.
+        } finally {
+            displayTracker.cancelProxyCreation(store, playerUuid, target, npcUuid);
+            if (proxyUuid != null && !proxyRetained) {
+                proxyService.removeAll(store, world, List.of(proxyUuid));
+            }
+        }
+    }
+
+    private boolean allowsProxyFor(@Nonnull Store<EntityStore> store,
+                                   @Nonnull Ref<EntityStore> npcRef,
+                                   @Nonnull UUID playerUuid,
+                                   @Nonnull String toolId) {
+        TameworkCommandLinksComponent links = component(
+                store, npcRef, TameworkCommandLinksComponent.getComponentType()
+        );
+        return CommandGenericTargetAuthority.allowsGenericTargetMutation(npcRef, store)
+                && component(store, npcRef, NPCEntity.getComponentType()) != null
+                && links != null
+                && playerUuid.equals(links.getOwnerId())
+                && links.containsToolId(toolId);
+    }
+
+    private void scheduleProxyRemoval(@Nonnull Store<EntityStore> store,
+                                      @Nonnull List<UUID> proxyUuids) {
+        if (proxyUuids.isEmpty() || store.getExternalData() == null) {
+            return;
+        }
+        World world = store.getExternalData().getWorld();
+        if (world == null) {
+            return;
+        }
+        try {
+            world.execute(() -> proxyService.removeAll(store, world, proxyUuids));
+        } catch (RuntimeException ignored) {
+            // The world is already closing, so its non-persistent proxies will be discarded.
+        }
+    }
+
+    private void scheduleProxySync(
+            @Nonnull Store<EntityStore> store,
+            @Nonnull List<CommandActiveNpcHighlightProxyService.SyncTarget> targets) {
+        if (targets.isEmpty() || store.getExternalData() == null) {
+            return;
+        }
+        World world = store.getExternalData().getWorld();
+        if (world == null) {
+            return;
+        }
+        List<CommandActiveNpcHighlightProxyService.SyncTarget> snapshot = List.copyOf(targets);
+        try {
+            world.execute(() -> proxyService.syncAll(store, world, snapshot));
+        } catch (RuntimeException ignored) {
+            // The next bounded pass will retry unless the world is closing.
         }
     }
 

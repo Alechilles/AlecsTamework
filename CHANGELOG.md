@@ -32,9 +32,9 @@
   setting on Update 6. While the tool is equipped, only its controller sees a
   continuous, gently animated indicator above each loaded active NPC. The
   indicator uses the NPC's group color, or neutral gold when the NPC is
-  ungrouped. Its overlapping renewal hides animation-cycle flashes, and its
-  bounded lifetime prevents old indicators from stacking after the setting or
-  equipped command tool changes.
+  ungrouped. Each indicator now runs continuously from one invisible helper
+  mounted above the NPC. Disabling the setting, changing tools, or removing the
+  NPC removes that helper and its indicator without periodic server respawns.
 
 ### Fixed
 

@@ -122,10 +122,11 @@ particle effects and spatial searches through cached compatibility bindings. Cal
 that use the unchanged coordinate overloads stay direct.
 
 Update 6 also adds `ModelParticle.setClearParticlesOnRemove(...)` and the
-`CancelParticleSystems` packet. Active command indicators bind these additions
-only on Update 6. Update 5 does not register or emit the indicator system
-because it has no safe way to cancel a persistent client particle. This also
-prevents either absent API from linking on an Update 5 world thread.
+`CancelParticleSystems` packet. Active command indicators use the model-particle
+cleanup flag on an invisible, non-persistent mounted helper and run only on
+Update 6. Removing the helper clears its persistent client particle. Update 5
+does not register or emit the indicator system because it cannot use that API
+safely on a world thread.
 
 ### Build and manifest
 

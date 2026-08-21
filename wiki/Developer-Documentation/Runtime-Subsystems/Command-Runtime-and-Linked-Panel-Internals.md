@@ -61,10 +61,13 @@ restoration, or spawn decisions.
   warning. It does not create `LOST`; only positive destructive-removal
   evidence can author that lifecycle.
 - Active-NPC indicators are sent only to the controlling player. Each loaded
-  target is emitted once per stable tool and roster state. A roster, color,
-  setting, or equipped-tool change cancels the old indicator set before the
-  current set is sent. This subsystem registers only on Update 6 because
-  Update 5 cannot cancel persistent particle systems.
+  target gets one invisible, non-persistent helper entity mounted above its
+  model bounds. The helper receives one persistent particle emission. A roster,
+  color, setting, equipped-tool, player, or NPC lifecycle change removes the
+  helper and its particle before a replacement is created. The bounded roster
+  pass also syncs each helper's server tracking position; a large parent jump
+  recreates it. This subsystem registers only on Update 6 because Update 5
+  cannot safely clear the effect.
 
 ## Related Pages
 - [Persistence, SQLite, and Data Paths](/mod/alecs-tamework/persistence-sqlite-and-data-paths)
