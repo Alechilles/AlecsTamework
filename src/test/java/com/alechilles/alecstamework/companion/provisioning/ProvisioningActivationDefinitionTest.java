@@ -111,7 +111,7 @@ class ProvisioningActivationDefinitionTest {
     }
 
     @Test
-    void aDifferentOwnerWorldOrPartialTimedSessionIsRejected() {
+    void aDifferentOwnerWorldIsAcceptedButPartialTimedSessionIsRejected() {
         ProvisioningActivationRequest valid = request(true);
         CompanionLifecycle wrongWorld = lifecycle(
                 LifecycleState.ACTIVE,
@@ -121,26 +121,23 @@ class ProvisioningActivationDefinitionTest {
                 1,
                 "world-b"
         );
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> new ProvisioningActivationRequest(
-                        ORIGIN,
-                        new PopulationGroupTransitionAdmissionRequest(
-                                valid.groupAdmission().before(),
-                                wrongWorld,
-                                1,
-                                7,
-                                valid.groupAdmission().policies(),
-                                NOW
-                        ),
-                        ALIAS,
-                        "Mini",
-                        projection(ALIAS),
-                        placement("world-b"),
-                        "receipt",
-                        valid.timedActivation(),
+        new ProvisioningActivationRequest(
+                ORIGIN,
+                new PopulationGroupTransitionAdmissionRequest(
+                        valid.groupAdmission().before(),
+                        wrongWorld,
+                        1,
+                        7,
+                        valid.groupAdmission().policies(),
                         NOW
-                )
+                ),
+                ALIAS,
+                "Mini",
+                projection(ALIAS),
+                placement("world-b"),
+                "receipt",
+                valid.timedActivation(),
+                NOW
         );
         TimedSummonLease partial = new TimedSummonLease(
                 ORIGIN.profileId(),

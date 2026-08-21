@@ -23,8 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Regression coverage for the paid-revival public facade and recovery-route
- * composition introduced with the coordinated replacement persistence engine.
+ * Regression coverage for the fail-closed paid-revival facade before managed
+ * lifecycle admission is bound by the production Tamework composition.
  */
 class PaidRevivalPublicCompositionTest {
     private static final OperationId OPERATION = OperationId.parse(
@@ -37,7 +37,7 @@ class PaidRevivalPublicCompositionTest {
     Path tempDir;
 
     @Test
-    void publicFacadeSubmitsPaidRevivalAfterExhaustiveRecoveryComposition()
+    void directBootstrapRejectsPaidRevivalUntilLifecycleAdmissionIsBound()
             throws Exception {
         SqliteConnectionFactory connections = new SqliteConnectionFactory(
                 PersistenceFiles.replacementDatabase(tempDir)
@@ -68,10 +68,11 @@ class PaidRevivalPublicCompositionTest {
                     .toCompletableFuture().get(10, TimeUnit.SECONDS);
 
             assertEquals(
-                    OperationWorkflowResult.Status.PUBLISHED,
-                    result.status()
+                    OperationWorkflowResult.Status.PREPARE_FAILED,
+                    result.status(),
+                    () -> String.valueOf(result.failure())
             );
-            assertEquals(1, paidBoundaryCalls.get());
+            assertEquals(0, paidBoundaryCalls.get());
             assertEquals(
                     PublicPersistenceShutdownReport.Status.COMPLETE,
                     bootstrap.shutdown(Duration.ofSeconds(5)).status()
