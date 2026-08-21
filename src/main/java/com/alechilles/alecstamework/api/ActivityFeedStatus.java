@@ -3,10 +3,11 @@ package com.alechilles.alecstamework.api;
 import java.util.Objects;
 import javax.annotation.Nonnull;
 
-/** Immutable availability and checkpoint view for one successful-activity consumer. */
+/** Immutable live availability view for one successful-activity consumer. */
 public record ActivityFeedStatus(
         boolean available,
         boolean subscribed,
+        /** Last attempted process-local sequence; it is not a durable checkpoint. */
         long checkpointSequence,
         @Nonnull String detail
 ) {

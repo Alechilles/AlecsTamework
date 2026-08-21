@@ -4,29 +4,22 @@ import java.util.Objects;
 import javax.annotation.Nonnull;
 
 /**
- * Public access to the durable, at-least-once successful-activity feed.
+ * Public access to the process-local successful-activity feed.
  *
- * <p>Delivery is serialized for each consumer ID. The feed delivers records in sequence order;
- * a later record does not pass a failed sequence. A callback can run on any platform executor;
- * it has no game-loop or thread-affinity guarantee.
- *
- * <p>A callback that throws, returns a null stage or result, completes exceptionally, or exceeds
- * the coordinator's bounded callback timeout is treated as {@link ActivityConsumeResult#RETRY}.
- * The feed does not advance the checkpoint in those cases. A subscription close is idempotent,
- * prevents new callbacks, and permits an in-flight callback to finish.
+ * <p>The feed attempts live delivery to each active consumer. It does not
+ * retain events, replay missed events, or provide a durable checkpoint. A
+ * callback can run on the publishing thread and has no game-loop guarantee.
+ * Callback failures are isolated from the publisher and other consumers.</p>
  */
 public interface ActivityFeedApi {
-    /**
-     * Subscribes one consumer to ordered activity delivery. At most one active subscription exists
-     * for a consumer ID.
-     */
+    /** Subscribes one consumer. At most one active subscription exists per ID. */
     @Nonnull
     ActivityFeedSubscription subscribe(
             @Nonnull String consumerId,
             @Nonnull SuccessfulActivityConsumer consumer
     );
 
-    /** Returns availability and checkpoint state for one consumer. */
+    /** Returns live availability and the last attempted sequence for one consumer. */
     @Nonnull
     ActivityFeedStatus status(@Nonnull String consumerId);
 

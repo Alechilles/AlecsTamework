@@ -31,7 +31,7 @@ public enum TameworkApiCapability {
     CAPTURE_TAME_AND_LINK,
     /** Separate canonical profile, lease, revive, and extension-data authority. */
     BONDED_COMPANIONS,
-    /** Durable, at-least-once successful companion-activity feed. */
+    /** Process-local, at-least-once best-effort successful-activity feed. */
     SUCCESSFUL_ACTIVITY_FEED,
     /** Durable companion output operations and pending-output claims. */
     DURABLE_OUTPUT_OPERATIONS,

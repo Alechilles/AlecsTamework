@@ -4,20 +4,17 @@ import java.util.concurrent.CompletionStage;
 import javax.annotation.Nonnull;
 
 /**
- * Receives durable successful companion activities from the Tamework feed.
+ * Receives live successful companion activities from the Tamework feed.
  *
- * <p>The feed calls one consumer serially and in global-sequence order. The callback can run on
- * any platform executor and has no game-loop or thread-affinity guarantee. A callback must return
- * a non-null stage with a non-null result. A synchronous throw, null stage or result, exceptional
- * completion, or completion after the coordinator's bounded timeout means {@link
- * ActivityConsumeResult#RETRY}; the failed sequence keeps its checkpoint and later records wait.
+ * <p>The feed invokes each active consumer in publish order when possible.
+ * The callback can run on the publishing thread and has no game-loop or
+ * thread-affinity guarantee. The returned stage is observed for compatibility
+ * with persistence-backed consumers, but the live feed does not checkpoint or
+ * retry it.</p>
  */
 @FunctionalInterface
 public interface SuccessfulActivityConsumer {
-    /**
-     * Applies an activity. The feed advances the consumer checkpoint only for {@link
-     * ActivityConsumeResult#APPLIED} or {@link ActivityConsumeResult#DUPLICATE}.
-     */
+    /** Applies an activity and may report its local handling result. */
     @Nonnull
     CompletionStage<ActivityConsumeResult> consume(@Nonnull SuccessfulActivityView activity);
 }

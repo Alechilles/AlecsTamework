@@ -206,6 +206,7 @@ public final class ReplacementTameworkApiFactory {
             requiredContentProfiles = admission;
             managedBatchAdmissions = admission;
         }
+        LiveActivityFeed activityFeed = new LiveActivityFeed();
         ReplacementTameworkApi api = new ReplacementTameworkApi(
                 base,
                 persistence,
@@ -220,7 +221,8 @@ public final class ReplacementTameworkApiFactory {
                 populationAdmissions,
                 admissionProviders,
                 requiredContentProfiles,
-                managedBatchAdmissions
+                managedBatchAdmissions,
+                activityFeed
         );
         AutoCloseable timedEventBridge = timedFacade == null
                 ? () -> { }
@@ -229,7 +231,8 @@ public final class ReplacementTameworkApiFactory {
                         timedFacade::publishFromOutbox
                 );
         return new Composition(
-                base, api, timedEventBridge, managedBatchAdmissions
+                base, api, timedEventBridge, managedBatchAdmissions,
+                activityFeed
         );
     }
 
@@ -276,13 +279,15 @@ public final class ReplacementTameworkApiFactory {
         private final ReplacementTameworkApi api;
         private final AutoCloseable timedEventBridge;
         private final ManagedBatchAdmissionAuthority managedBatchAdmissions;
+        private final LiveActivityFeed activityFeed;
         private final AtomicBoolean closed = new AtomicBoolean();
 
         private Composition(
                 TameworkApiImpl base,
                 ReplacementTameworkApi api,
                 AutoCloseable timedEventBridge,
-                ManagedBatchAdmissionAuthority managedBatchAdmissions
+                ManagedBatchAdmissionAuthority managedBatchAdmissions,
+                LiveActivityFeed activityFeed
         ) {
             this.base = Objects.requireNonNull(base, "base");
             this.api = Objects.requireNonNull(api, "api");
@@ -291,6 +296,9 @@ public final class ReplacementTameworkApiFactory {
             );
             this.managedBatchAdmissions = Objects.requireNonNull(
                     managedBatchAdmissions, "managedBatchAdmissions"
+            );
+            this.activityFeed = Objects.requireNonNull(
+                    activityFeed, "activityFeed"
             );
         }
 
@@ -303,6 +311,12 @@ public final class ReplacementTameworkApiFactory {
         @Nonnull
         public ManagedBatchAdmissionAuthority managedBatchAdmissions() {
             return managedBatchAdmissions;
+        }
+
+        /** Returns the internal live publisher for successful activities. */
+        @Nonnull
+        public LiveActivityFeed.Publisher activityPublisher() {
+            return activityFeed.publisher();
         }
 
         public void activateCapturePolicyRuntime(

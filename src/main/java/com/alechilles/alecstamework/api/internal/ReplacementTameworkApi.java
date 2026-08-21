@@ -58,6 +58,7 @@ public final class ReplacementTameworkApi
     private final AdmissionProviderApi admissionProviders;
     private final RequiredContentProfileApi requiredContentProfiles;
     private final ManagedBatchAdmissionAuthority managedBatchAdmissions;
+    private final ActivityFeedApi activities;
     private final PolicyApi policies;
     private final AtomicBoolean closed = new AtomicBoolean();
 
@@ -75,7 +76,8 @@ public final class ReplacementTameworkApi
             @Nonnull PopulationAdmissionApi populationAdmissions,
             @Nonnull AdmissionProviderApi admissionProviders,
             @Nonnull RequiredContentProfileApi requiredContentProfiles,
-            @Nonnull ManagedBatchAdmissionAuthority managedBatchAdmissions
+            @Nonnull ManagedBatchAdmissionAuthority managedBatchAdmissions,
+            @Nonnull ActivityFeedApi activities
     ) {
         this.base = Objects.requireNonNull(base, "base");
         this.persistence = Objects.requireNonNull(
@@ -120,6 +122,7 @@ public final class ReplacementTameworkApi
                 managedBatchAdmissions,
                 "managedBatchAdmissions"
         );
+        this.activities = Objects.requireNonNull(activities, "activities");
         this.policies = new ReadinessPolicyApi(
                 base.policies(),
                 populationAdmissions,
@@ -256,12 +259,19 @@ public final class ReplacementTameworkApi
 
     @Override
     public ActivityFeedApi activities() {
-        return ActivityFeedApi.unavailable();
+        return activities;
     }
 
     @Override
     public void close() {
         if (closed.compareAndSet(false, true)) {
+            if (activities instanceof AutoCloseable closeable) {
+                try {
+                    closeable.close();
+                } catch (Exception ignored) {
+                    // The live feed has no external resources to release.
+                }
+            }
             base.close();
         }
     }
@@ -303,6 +313,10 @@ public final class ReplacementTameworkApi
         }
         if (bondedCompanions.availability().available()) {
             capabilities.add(TameworkApiCapability.BONDED_COMPANIONS);
+        }
+        if (activities instanceof LiveActivityFeed live
+                && live.isOpen()) {
+            capabilities.add(TameworkApiCapability.SUCCESSFUL_ACTIVITY_FEED);
         }
         if (populationAdmissionReady()) {
             capabilities.add(TameworkApiCapability.NAMED_CAPACITY_RESERVATIONS);

@@ -1,11 +1,11 @@
 package com.alechilles.alecstamework.api;
 
-/** Result returned after a consumer handles one durable successful activity. */
+/** Optional result returned after a consumer handles one live activity. */
 public enum ActivityConsumeResult {
-    /** The consumer applied the activity and can advance its checkpoint. */
+    /** The consumer applied the activity. */
     APPLIED,
-    /** The consumer already persisted this activity and can advance its checkpoint. */
+    /** The consumer already handled this activity. */
     DUPLICATE,
-    /** The consumer could not persist the activity and needs another delivery. */
+    /** The consumer could not handle this activity. */
     RETRY
 }
