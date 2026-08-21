@@ -15,11 +15,9 @@ import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
-import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
 import com.alechilles.alecstamework.persistence.recovery.OperationRecoveryClaim;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -243,33 +241,16 @@ public final class PopulationDomainAdmissionOperation {
             if (payload.provisionalChildIds().isEmpty()) {
                 return containLiveClaim(claim);
             }
-            return litterJobExists(claim.operation().operationId()).thenCompose(
+            return PopulationDomainAdmissionOperationSupport.litterJobExists(
+                    reader, claim.operation().operationId()).thenCompose(
                     exists -> exists
-                            ? CompletableFuture.completedFuture(new OperationWorkflowResult(
-                            OperationWorkflowResult.Status.LIVE_RETRYABLE,
-                            claim.operation(), List.of(), new IllegalStateException(
-                            "domain_admission_litter_recovery_owned_by_litter_job")))
+                            ? CompletableFuture.completedFuture(litterOwned(claim))
                             : cancelLiveClaim(claim)
             );
         } catch (RuntimeException invalid) {
             return CompletableFuture.completedFuture(new OperationWorkflowResult(
                     OperationWorkflowResult.Status.LIVE_RETRYABLE, claim.operation(), List.of(), invalid));
         }
-    }
-    private CompletionStage<Boolean> litterJobExists(OperationId litterId) {
-        UUID jobId = UUID.nameUUIDFromBytes((litterId.value() + ":breeding-litter-job")
-                .getBytes(StandardCharsets.UTF_8));
-        return reader.find(new OperationId(jobId)).thenApply(read -> {
-            if (read instanceof PersistenceReadResult.Found<?> found) {
-                OperationEnvelope job = ((SqliteOperationReader.OperationReadModel) found.value()).operation();
-                return "breeding_litter".equals(job.kind().value())
-                        && !job.phase().isTerminal();
-            }
-            if (read instanceof PersistenceReadResult.Failed<?> failed) {
-                throw new IllegalStateException("domain_admission_litter_job_read_failed", failed.failure().cause());
-            }
-            return false;
-        });
     }
     private CompletionStage<OperationWorkflowResult> recoverPreparedClaim(
             OperationRecoveryClaim claim
@@ -287,6 +268,18 @@ public final class PopulationDomainAdmissionOperation {
                     failure
             ));
         }
+        if (!payload.provisionalChildIds().isEmpty()) {
+            return PopulationDomainAdmissionOperationSupport.litterJobExists(
+                    reader, claim.operation().operationId()).thenCompose(
+                    exists -> exists
+                            ? CompletableFuture.completedFuture(litterOwned(claim))
+                            : recoverExpiredPrepared(claim, payload)
+            );
+        }
+        return recoverExpiredPrepared(claim, payload);
+    }
+    private CompletionStage<OperationWorkflowResult> recoverExpiredPrepared(
+            OperationRecoveryClaim claim, Payload payload) {
         if (clock.getAsLong() < payload.expiresAtMs()) {
             return CompletableFuture.completedFuture(new OperationWorkflowResult(
                     OperationWorkflowResult.Status.LIVE_RETRYABLE,
@@ -302,6 +295,13 @@ public final class PopulationDomainAdmissionOperation {
                         ? CompletableFuture.failedFuture(new IllegalStateException(
                         "domain_admission_recovery_missing_result"))
                         : CompletableFuture.completedFuture(workflow.result()));
+    }
+    private OperationWorkflowResult litterOwned(OperationRecoveryClaim claim) {
+        return new OperationWorkflowResult(
+                OperationWorkflowResult.Status.LIVE_RETRYABLE,
+                claim.operation(), List.of(), new IllegalStateException(
+                "domain_admission_litter_recovery_owned_by_litter_job")
+        );
     }
     private CompletionStage<OperationWorkflow> durable(
             OperationId operationId,

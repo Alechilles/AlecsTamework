@@ -6,7 +6,9 @@ import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionRes
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
@@ -46,6 +48,28 @@ final class PopulationDomainAdmissionOperationSupport {
             return CompletableFuture.failedFuture(
                     new IllegalStateException("domain_admission_operation_missing")
             );
+        });
+    }
+
+    static CompletionStage<Boolean> litterJobExists(
+            SqliteOperationReader reader,
+            OperationId litterId
+    ) {
+        UUID jobId = UUID.nameUUIDFromBytes((litterId.value()
+                + ":breeding-litter-job").getBytes(StandardCharsets.UTF_8));
+        return reader.find(new OperationId(jobId)).thenApply(result -> {
+            if (result instanceof PersistenceReadResult.Found<SqliteOperationReader.OperationReadModel> found) {
+                OperationEnvelope job = found.value().operation();
+                return "breeding_litter".equals(job.kind().value())
+                        && !job.phase().isTerminal();
+            }
+            if (result instanceof PersistenceReadResult.Failed<SqliteOperationReader.OperationReadModel> failed) {
+                throw new IllegalStateException(
+                        "domain_admission_litter_job_read_failed",
+                        failed.failure().cause()
+                );
+            }
+            return false;
         });
     }
 

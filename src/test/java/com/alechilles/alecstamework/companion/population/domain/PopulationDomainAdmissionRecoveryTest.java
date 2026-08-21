@@ -116,6 +116,46 @@ class PopulationDomainAdmissionRecoveryTest {
     }
 
     @Test
+    void expiredPreparedBatchDefersWhenDurableLitterJobExists() {
+        AtomicInteger now = new AtomicInteger(10);
+        try (PersistenceBootstrap persistence = new PersistenceBootstrap(
+                configuration(tempDir.resolve("expired-paired"), now::get))) {
+            assertTrue(persistence.start().toCompletableFuture().join().complete());
+            PopulationDomainAdmissionOperation operations = persistence.facades()
+                    .operations().populationDomainAdmission();
+            PopulationDomainAdmissionOperation.Payload payload = payload(
+                    10,
+                    List.of(java.util.UUID.nameUUIDFromBytes((OPERATION
+                            + ":child:0").getBytes(
+                            java.nio.charset.StandardCharsets.UTF_8)))
+            );
+            OperationEnvelope prepared = committedEnvelope(operations.prepare(
+                    OPERATION,
+                    new IdempotencyKey("recovery-expired-paired"),
+                    payload
+            ).completion().toCompletableFuture().join());
+            assertTrue(persistence.facades().operations().prepareBreedingLitter(
+                    litter(payload)
+            ).toCompletableFuture().join());
+
+            OperationWorkflowResult result = operations.recover(
+                    claim(prepared, payload)
+            ).toCompletableFuture().join();
+
+            assertEquals(OperationWorkflowResult.Status.LIVE_RETRYABLE,
+                    result.status());
+            assertEquals(
+                    "domain_admission_litter_recovery_owned_by_litter_job",
+                    result.failure().getMessage()
+            );
+            assertEquals(OperationPhase.PREPARED,
+                    operations.findByIdempotency(
+                            new IdempotencyKey("recovery-expired-paired")
+                    ).toCompletableFuture().join().orElseThrow().phase());
+        }
+    }
+
+    @Test
     void liveBatchRecoveryWithoutLitterJobCancelsAndReleasesBatch() {
         AtomicInteger now = new AtomicInteger(10);
         try (PersistenceBootstrap persistence = new PersistenceBootstrap(
