@@ -7,7 +7,7 @@ Branch: `update6`
 ## Supported baseline
 
 Tamework now compiles against Hytale `0.6.0-pre.11`. The plugin manifest accepts
-server versions `>=0.5.7 <0.7.0 || >=0.6.0-pre.1 <0.6.0` so one JAR can support
+server versions `>=0.5.0 <0.7.0 || >=0.6.0-pre.1 <0.6.0` so one JAR can support
 Update 5, Update 6 prereleases, and the Update 6 release line.
 
 The compatibility target is:
@@ -131,7 +131,7 @@ safely on a world thread.
 ### Build and manifest
 
 The branch targets `0.6.0-pre.11` from the prerelease dependency line. The generated
-manifest uses `>=0.5.7 <0.7.0 || >=0.6.0-pre.1 <0.6.0` instead of the old
+manifest uses `>=0.5.0 <0.7.0 || >=0.6.0-pre.1 <0.6.0` instead of the old
 `0.5.x` range. Hytale's semver range rules exclude prereleases from the first
 clause, so the explicit second clause is required for pre.11.
 
