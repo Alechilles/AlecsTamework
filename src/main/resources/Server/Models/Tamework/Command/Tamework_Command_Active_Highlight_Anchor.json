@@ -1,5 +1,6 @@
 {
-  "Model": "NPC/MISC/Empty.blockymodel",
+  "Model": "Characters/Empty_Cube.blockymodel",
+  "Texture": "Characters/Empty_Cube_Texture.png",
   "EyeHeight": 0,
   "HitBox": {
     "Max": { "X": 0.01, "Y": 0.01, "Z": 0.01 },
