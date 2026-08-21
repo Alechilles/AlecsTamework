@@ -3,7 +3,6 @@ package com.alechilles.alecstamework.items;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.protocol.Packet;
 import com.hypixel.hytale.protocol.packets.entities.SpawnModelParticles;
-import com.hypixel.hytale.protocol.packets.world.CancelParticleSystems;
 import com.hypixel.hytale.server.core.modules.entity.tracker.NetworkId;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
@@ -46,24 +45,6 @@ class CommandActiveNpcHighlightEmitterTest {
         assertEquals(0x22, Byte.toUnsignedInt(packet.modelParticles[0].color.green));
         assertEquals(0x33, Byte.toUnsignedInt(packet.modelParticles[0].color.blue));
         assertTrue(packet.modelParticles[0].clearParticlesOnRemove);
-    }
-
-    @Test
-    void cancellationTargetsOnlyTheRequestedViewerAndHighlightSystem() {
-        List<SentPacket> sent = new ArrayList<>();
-        CommandActiveNpcHighlightEmitter emitter = new CommandActiveNpcHighlightEmitter(
-                (viewer, packet, store) -> sent.add(new SentPacket(viewer, packet))
-        );
-        Ref<EntityStore> viewer = new Ref<>(null, 9);
-
-        assertTrue(emitter.cancel(viewer, null));
-
-        assertEquals(1, sent.size());
-        assertSame(viewer, sent.getFirst().viewer());
-        CancelParticleSystems packet = (CancelParticleSystems) sent.getFirst().packet();
-        assertEquals(List.of(CommandActiveNpcHighlightEmitter.PARTICLE_SYSTEM_ID),
-                List.of(packet.particleSystemIds));
-        assertTrue(packet.instant);
     }
 
     private record SentPacket(Ref<EntityStore> viewer, Packet packet) {

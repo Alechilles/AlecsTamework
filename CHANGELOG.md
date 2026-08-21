@@ -30,14 +30,16 @@
   for female companions and blue for male companions.
 - Generic linked panels now include an optional per-tool `Highlight Active`
   setting on Update 6. While the tool is equipped, only its controller sees a
-  persistent, gently animated indicator above each loaded active NPC. The
+  continuous, gently animated indicator above each loaded active NPC. The
   indicator uses the NPC's group color, or neutral gold when the NPC is
-  ungrouped, and clears when the setting or equipped command tool changes.
+  ungrouped. Its overlapping renewal hides animation-cycle flashes, and its
+  bounded lifetime prevents old indicators from stacking after the setting or
+  equipped command tool changes.
 
 ### Fixed
 
 - Update 5 servers no longer register or emit active NPC indicators because
-  that patch line cannot cancel persistent particle systems safely.
+  the feature requires Update 6 model-particle cleanup support.
 - World transfers no longer disconnect players who have the command hotswap HUD active.
 - Reduced persistence stalls with large companion populations. Spawner
   releases and Recall no longer wait behind unrelated projection events or

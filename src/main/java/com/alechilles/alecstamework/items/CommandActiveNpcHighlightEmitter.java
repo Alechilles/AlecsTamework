@@ -15,7 +15,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3f;
 
-/** Starts and cancels model-attached highlights for one controlling player. */
+/** Starts a model-attached highlight for one controlling player. */
 final class CommandActiveNpcHighlightEmitter {
     static final String PARTICLE_SYSTEM_ID = "Tamework_Command_Active_Highlight";
     private static final String FALLBACK_COLOR = "#C9A653";
@@ -54,23 +54,6 @@ final class CommandActiveNpcHighlightEmitter {
                         networkId.getId(),
                         new com.hypixel.hytale.protocol.ModelParticle[]{packetParticle}
                 ),
-                store
-        );
-    }
-
-    boolean cancel(@Nullable Ref<EntityStore> viewerRef,
-                   @Nullable Store<EntityStore> store) {
-        if (!HytaleApiLevel.isUpdate6OrLater()
-                || viewerRef == null || !viewerRef.isValid()) {
-            return false;
-        }
-        ToClientPacket packet = HytaleModelParticleAccess.createCancelPacket(PARTICLE_SYSTEM_ID);
-        if (packet == null) {
-            return false;
-        }
-        return packetSink.send(
-                viewerRef,
-                packet,
                 store
         );
     }

@@ -6,8 +6,12 @@
   "LightInfluence": 0,
   "MaxConcurrentParticles": 1,
   "ParticleLifeSpan": {
-    "Min": 2.4,
-    "Max": 2.4
+    "Min": 3.0,
+    "Max": 3.0
+  },
+  "TotalParticles": {
+    "Min": 1,
+    "Max": 1
   },
   "Particle": {
     "Texture": "Particles/Textures/Tamework/Command/TwCommandActiveMarker.png",
@@ -16,10 +20,17 @@
     "SoftParticles": "Disable",
     "Animation": {
       "0": {
-        "Opacity": 1,
+        "Opacity": 0,
         "Scale": {
           "X": { "Min": 0.94, "Max": 0.94 },
           "Y": { "Min": 0.94, "Max": 0.94 }
+        }
+      },
+      "20": {
+        "Opacity": 1,
+        "Scale": {
+          "X": { "Min": 0.96, "Max": 0.96 },
+          "Y": { "Min": 0.96, "Max": 0.96 }
         }
       },
       "50": {
@@ -29,8 +40,15 @@
           "Y": { "Min": 1.03, "Max": 1.03 }
         }
       },
-      "100": {
+      "80": {
         "Opacity": 1,
+        "Scale": {
+          "X": { "Min": 0.96, "Max": 0.96 },
+          "Y": { "Min": 0.96, "Max": 0.96 }
+        }
+      },
+      "100": {
+        "Opacity": 0,
         "Scale": {
           "X": { "Min": 0.94, "Max": 0.94 },
           "Y": { "Min": 0.94, "Max": 0.94 }
@@ -38,7 +56,7 @@
       }
     },
     "InitialAnimationFrame": {
-      "Opacity": 1,
+      "Opacity": 0,
       "Scale": {
         "X": { "Min": 0.94, "Max": 0.94 },
         "Y": { "Min": 0.94, "Max": 0.94 }
@@ -55,6 +73,5 @@
     }
   ],
   "SpawnRate": { "Min": 1, "Max": 1 },
-  "SpawnBurst": true,
-  "WaveDelay": { "Min": 2.4, "Max": 2.4 }
+  "SpawnBurst": true
 }

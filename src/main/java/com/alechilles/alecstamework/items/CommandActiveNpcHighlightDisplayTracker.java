@@ -8,20 +8,24 @@ import java.util.Objects;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 
-/** Tracks the model particles that each command user has already received. */
+/** Tracks delivery and renewal for each command user's private model particles. */
 final class CommandActiveNpcHighlightDisplayTracker<T> {
+    private final long renewalIntervalMs;
     private final Map<Object, Map<UUID, PlayerState<T>>> statesByStore =
             new IdentityHashMap<>();
 
-    /**
-     * Replaces the desired roster when it changes.
-     *
-     * @return true when previously emitted particles must be cancelled
-     */
-    synchronized boolean reconcile(@Nonnull Object storeIdentity,
-                                   @Nonnull UUID playerUuid,
-                                   @Nonnull String toolId,
-                                   @Nonnull List<T> targets) {
+    CommandActiveNpcHighlightDisplayTracker(long renewalIntervalMs) {
+        if (renewalIntervalMs <= 0L) {
+            throw new IllegalArgumentException("renewalIntervalMs must be positive");
+        }
+        this.renewalIntervalMs = renewalIntervalMs;
+    }
+
+    /** Replaces the desired roster and its renewal state when either changes. */
+    synchronized void reconcile(@Nonnull Object storeIdentity,
+                                @Nonnull UUID playerUuid,
+                                @Nonnull String toolId,
+                                @Nonnull List<T> targets) {
         Objects.requireNonNull(storeIdentity, "storeIdentity");
         Objects.requireNonNull(playerUuid, "playerUuid");
         Objects.requireNonNull(toolId, "toolId");
@@ -33,31 +37,34 @@ final class CommandActiveNpcHighlightDisplayTracker<T> {
         if (current != null
                 && toolId.equals(current.toolId)
                 && targets.equals(current.targets)) {
-            return false;
+            return;
         }
-        boolean needsCancellation = current != null && !current.renderedNetworkIds.isEmpty();
         states.put(playerUuid, new PlayerState<>(toolId, List.copyOf(targets)));
-        return needsCancellation;
     }
 
     synchronized boolean needsEmission(@Nonnull Object storeIdentity,
                                        @Nonnull UUID playerUuid,
                                        @Nonnull T target,
-                                       int networkId) {
+                                       int networkId,
+                                       long nowMs) {
         PlayerState<T> state = state(storeIdentity, playerUuid);
         if (state == null || !state.targets.contains(target)) {
             return false;
         }
-        return !Integer.valueOf(networkId).equals(state.renderedNetworkIds.get(target));
+        Emission emission = state.emissions.get(target);
+        return emission == null
+                || emission.networkId != networkId
+                || nowMs >= emission.nextRenewalMs;
     }
 
     synchronized void recordEmission(@Nonnull Object storeIdentity,
                                      @Nonnull UUID playerUuid,
                                      @Nonnull T target,
-                                     int networkId) {
+                                     int networkId,
+                                     long nowMs) {
         PlayerState<T> state = state(storeIdentity, playerUuid);
         if (state != null && state.targets.contains(target)) {
-            state.renderedNetworkIds.put(target, networkId);
+            state.emissions.put(target, new Emission(networkId, nowMs + renewalIntervalMs));
         }
     }
 
@@ -66,20 +73,19 @@ final class CommandActiveNpcHighlightDisplayTracker<T> {
                                    @Nonnull T target) {
         PlayerState<T> state = state(storeIdentity, playerUuid);
         if (state != null) {
-            state.renderedNetworkIds.remove(target);
+            state.emissions.remove(target);
         }
     }
 
-    synchronized boolean remove(@Nonnull Object storeIdentity, @Nonnull UUID playerUuid) {
+    synchronized void remove(@Nonnull Object storeIdentity, @Nonnull UUID playerUuid) {
         Map<UUID, PlayerState<T>> states = statesByStore.get(storeIdentity);
         if (states == null) {
-            return false;
+            return;
         }
-        PlayerState<T> removed = states.remove(playerUuid);
+        states.remove(playerUuid);
         if (states.isEmpty()) {
             statesByStore.remove(storeIdentity);
         }
-        return removed != null && !removed.renderedNetworkIds.isEmpty();
     }
 
     synchronized void clear(@Nonnull Object storeIdentity) {
@@ -94,11 +100,14 @@ final class CommandActiveNpcHighlightDisplayTracker<T> {
     private static final class PlayerState<T> {
         private final String toolId;
         private final List<T> targets;
-        private final Map<T, Integer> renderedNetworkIds = new HashMap<>();
+        private final Map<T, Emission> emissions = new HashMap<>();
 
         private PlayerState(@Nonnull String toolId, @Nonnull List<T> targets) {
             this.toolId = toolId;
             this.targets = targets;
         }
+    }
+
+    private record Emission(int networkId, long nextRenewalMs) {
     }
 }

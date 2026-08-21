@@ -79,46 +79,6 @@ class CommandActiveNpcHighlightUpdate5CompatibilityTest {
         }
     }
 
-    @Test
-    void cancellationDoesNotLinkTheUpdate6OnlyPacketOnUpdate5() throws Exception {
-        URL mainClasses = CommandActiveNpcHighlightEmitter.class
-                .getProtectionDomain()
-                .getCodeSource()
-                .getLocation();
-        URL update5Server = Path.of(System.getProperty("tamework.update5ServerJar"))
-                .toUri()
-                .toURL();
-
-        try (Update5ClassLoader loader = new Update5ClassLoader(mainClasses, update5Server)) {
-            Class<?> packetSinkType = loader.loadClass(EMITTER + "$PacketSink");
-            List<Object> packets = new ArrayList<>();
-            Object packetSink = Proxy.newProxyInstance(
-                    loader,
-                    new Class<?>[]{packetSinkType},
-                    (proxy, method, arguments) -> {
-                        if ("send".equals(method.getName())) {
-                            packets.add(arguments[1]);
-                            return true;
-                        }
-                        return method.invoke(this, arguments);
-                    }
-            );
-
-            Class<?> emitterType = loader.loadClass(EMITTER);
-            Constructor<?> emitterConstructor = emitterType.getDeclaredConstructor(packetSinkType);
-            emitterConstructor.setAccessible(true);
-            Object emitter = emitterConstructor.newInstance(packetSink);
-            Class<?> refType = loader.loadClass("com.hypixel.hytale.component.Ref");
-            Class<?> storeType = loader.loadClass("com.hypixel.hytale.component.Store");
-            Object viewerRef = refType.getConstructor(storeType, int.class).newInstance(null, 7);
-
-            Method cancel = emitterType.getDeclaredMethod("cancel", refType, storeType);
-            cancel.setAccessible(true);
-            assertEquals(false, cancel.invoke(emitter, viewerRef, null));
-            assertTrue(packets.isEmpty());
-        }
-    }
-
     private static final class Update5ClassLoader extends URLClassLoader {
         private Update5ClassLoader(URL mainClasses, URL update5Server) {
             super(new URL[]{mainClasses, update5Server}, ClassLoader.getPlatformClassLoader());
