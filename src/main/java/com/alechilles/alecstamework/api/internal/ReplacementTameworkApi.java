@@ -316,7 +316,7 @@ public final class ReplacementTameworkApi
         }
         if (activities instanceof LiveActivityFeed live
                 && live.isOpen()) {
-            capabilities.add(TameworkApiCapability.SUCCESSFUL_ACTIVITY_FEED);
+            capabilities.add(TameworkApiCapability.ACTIVITY_FEED_V2);
         }
         if (populationAdmissionInfrastructureReady()) {
             capabilities.add(TameworkApiCapability.NAMED_CAPACITY_RESERVATIONS);

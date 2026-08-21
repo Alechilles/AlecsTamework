@@ -4,7 +4,7 @@ import java.util.Objects;
 import javax.annotation.Nonnull;
 
 /**
- * Public access to the process-local successful-activity feed.
+ * Public access to the process-local Activity API V2 feed.
  *
  * <p>The feed attempts live delivery to each active consumer. It does not
  * retain events, replay missed events, or provide a durable checkpoint. A
@@ -16,7 +16,8 @@ public interface ActivityFeedApi {
     @Nonnull
     ActivityFeedSubscription subscribe(
             @Nonnull String consumerId,
-            @Nonnull SuccessfulActivityConsumer consumer
+            @Nonnull ActivityFilter filter,
+            @Nonnull ActivityConsumer consumer
     );
 
     /** Returns live availability and the last attempted sequence for one consumer. */
@@ -35,9 +36,11 @@ public interface ActivityFeedApi {
             @Override
             public ActivityFeedSubscription subscribe(
                     String consumerId,
-                    SuccessfulActivityConsumer consumer
+                    ActivityFilter filter,
+                    ActivityConsumer consumer
             ) {
                 String id = requireText(consumerId, "consumerId");
+                Objects.requireNonNull(filter, "filter");
                 Objects.requireNonNull(consumer, "consumer");
                 return new ActivityFeedSubscription() {
                     @Override

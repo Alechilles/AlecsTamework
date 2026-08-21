@@ -27,7 +27,7 @@ import javax.annotation.Nullable;
  * exposed only while its own availability contract is satisfied.</p>
  */
 public final class BondedOnlyTameworkApi implements TameworkApi {
-    private static final String API_VERSION = "0.10.0";
+    private static final String API_VERSION = "0.11.0";
     private final BondedCompanionApi bonded;
 
     public BondedOnlyTameworkApi(@Nonnull BondedCompanionApi bonded) {
