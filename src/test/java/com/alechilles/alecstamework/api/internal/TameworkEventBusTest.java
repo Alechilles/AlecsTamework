@@ -27,6 +27,24 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TameworkEventBusTest {
     @Test
+    void tracksLegacyXpInterestForSpecificAndBaseSubscriptions() throws Exception {
+        TameworkEventBus bus = new TameworkEventBus(null);
+
+        assertFalse(bus.hasCompanionXpSubscribers());
+        AutoCloseable specific = bus.subscribe(CompanionXpAwardedEvent.class, ignored -> { });
+        assertTrue(bus.hasCompanionXpSubscribers());
+        AutoCloseable base = bus.subscribe(TameworkEvent.class, ignored -> { });
+        assertTrue(bus.hasCompanionXpSubscribers());
+
+        specific.close();
+        specific.close();
+        assertTrue(bus.hasCompanionXpSubscribers());
+        base.close();
+        base.close();
+        assertFalse(bus.hasCompanionXpSubscribers());
+    }
+
+    @Test
     void subscribeDeliversProfileEventsAndCloseStopsDelivery() throws Exception {
         TameworkEventBus bus = new TameworkEventBus(null);
         AtomicInteger deliveries = new AtomicInteger();

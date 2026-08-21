@@ -4,7 +4,6 @@ import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
 import com.alechilles.alecstamework.api.PaidCommandRevivalApi;
 import com.alechilles.alecstamework.api.PopulationGroupApi;
-import com.alechilles.alecstamework.api.TameworkEventsApi;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
@@ -24,6 +23,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TargetSour
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TriggerHookStep;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionSignalBus;
 import com.alechilles.alecstamework.items.persistence.FreeCompanionRestorationAuthor;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
@@ -189,7 +189,7 @@ public final class CommandItemFeatureHandler {
             @Nullable Supplier<PaidCommandRevivalApi> paidRevival,
             @Nullable Supplier<PopulationGroupApi> populationGroups,
             @Nullable Supplier<BondedCompanionApi> bondedCompanions,
-            @Nullable TameworkEventsApi events
+            @Nullable CompanionProgressionSignalBus progressionSignals
     ) {
         this.registry = registry;
         this.relocationService = relocationService;
@@ -257,7 +257,7 @@ public final class CommandItemFeatureHandler {
         this.bondedPanelLifecycle = new BondedCompanionPanelLifecycle(
                 registry, panelEntrySourceService.bondedReadModel());
         BondedCompanionPanelRefreshSignalSource bondedRefreshSignals =
-                new BondedCompanionPanelRefreshSignalSource(bondedPanelLifecycle, events);
+                new BondedCompanionPanelRefreshSignalSource(bondedPanelLifecycle, progressionSignals);
         this.linkMutationService = new CommandLinkMutationService(
                 linkedNpcRecordStore,
                 linkPolicyService,

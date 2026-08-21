@@ -16,6 +16,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Consumer;
@@ -28,6 +30,7 @@ public final class TameworkEventBus
     @Nullable
     private final HytaleLogger logger;
     private final CopyOnWriteArrayList<Subscription<?>> subscriptions = new CopyOnWriteArrayList<>();
+    private final AtomicInteger companionXpSubscriberCount = new AtomicInteger();
     private final LongAdder dispatchedEvents = new LongAdder();
     private final LongAdder deliveryAttempts = new LongAdder();
     private final LongAdder deliveredListeners = new LongAdder();
@@ -65,7 +68,15 @@ public final class TameworkEventBus
     public <E extends TameworkEvent> AutoCloseable subscribe(@Nonnull Class<E> type, @Nonnull Consumer<E> listener) {
         Subscription<E> subscription = new Subscription<>(Objects.requireNonNull(type), Objects.requireNonNull(listener));
         subscriptions.add(subscription);
-        return () -> subscriptions.remove(subscription);
+        if (subscription.acceptsCompanionXpAwardedEvent()) {
+            companionXpSubscriberCount.incrementAndGet();
+        }
+        return subscription::close;
+    }
+
+    /** Returns the cached legacy XP interest used by the lazy compatibility adapter. */
+    public boolean hasCompanionXpSubscribers() {
+        return companionXpSubscriberCount.get() > 0;
     }
 
     /** Publishes an already-mapped replacement capture event without legacy service types. */
@@ -114,6 +125,7 @@ public final class TameworkEventBus
     @Override
     public void close() {
         subscriptions.clear();
+        companionXpSubscriberCount.set(0);
     }
 
     private void dispatch(@Nonnull TameworkEvent event) {
@@ -156,9 +168,10 @@ public final class TameworkEventBus
         }
     }
 
-    private static final class Subscription<E extends TameworkEvent> {
+    private final class Subscription<E extends TameworkEvent> {
         private final Class<E> type;
         private final Consumer<E> listener;
+        private final AtomicBoolean closed = new AtomicBoolean();
 
         private Subscription(@Nonnull Class<E> type, @Nonnull Consumer<E> listener) {
             this.type = type;
@@ -167,6 +180,19 @@ public final class TameworkEventBus
 
         private boolean accepts(@Nonnull TameworkEvent event) {
             return type.isAssignableFrom(event.getClass());
+        }
+
+        private boolean acceptsCompanionXpAwardedEvent() {
+            return type.isAssignableFrom(CompanionXpAwardedEvent.class);
+        }
+
+        private void close() {
+            if (!closed.compareAndSet(false, true)) {
+                return;
+            }
+            if (subscriptions.remove(this) && acceptsCompanionXpAwardedEvent()) {
+                companionXpSubscriberCount.decrementAndGet();
+            }
         }
 
         private boolean invoke(@Nonnull TameworkEvent event, @Nullable HytaleLogger logger) {

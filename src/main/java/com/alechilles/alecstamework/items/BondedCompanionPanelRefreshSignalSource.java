@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.api.CompanionXpAwardedEvent;
-import com.alechilles.alecstamework.api.TameworkEventsApi;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionSignalBus;
 import com.alechilles.alecstamework.ui.LinkedPanelRefreshSignal;
 import com.alechilles.alecstamework.ui.LinkedPanelRefreshSignalSource;
 import java.util.Objects;
@@ -13,17 +12,17 @@ import javax.annotation.Nullable;
 /** Creates owner-and-roster scoped refresh sources for bonded companion panels. */
 final class BondedCompanionPanelRefreshSignalSource {
     private final CacheSubscriptions cacheSubscriptions;
-    @Nullable private final TameworkEventsApi events;
+    @Nullable private final CompanionProgressionSignalBus progressionSignals;
 
     BondedCompanionPanelRefreshSignalSource(BondedCompanionPanelLifecycle lifecycle,
-                                            @Nullable TameworkEventsApi events) {
-        this(lifecycle::subscribe, events);
+                                            @Nullable CompanionProgressionSignalBus progressionSignals) {
+        this(lifecycle::subscribe, progressionSignals);
     }
 
     BondedCompanionPanelRefreshSignalSource(CacheSubscriptions cacheSubscriptions,
-                                            @Nullable TameworkEventsApi events) {
+                                            @Nullable CompanionProgressionSignalBus progressionSignals) {
         this.cacheSubscriptions = Objects.requireNonNull(cacheSubscriptions, "cacheSubscriptions");
-        this.events = events;
+        this.progressionSignals = progressionSignals;
     }
 
     LinkedPanelRefreshSignalSource forRoster(UUID ownerUuid, String rosterId) {
@@ -38,10 +37,9 @@ final class BondedCompanionPanelRefreshSignalSource {
         AutoCloseable cache = cacheSubscriptions.subscribe(ownerUuid, rosterId,
                 () -> listener.accept(new LinkedPanelRefreshSignal(
                         LinkedPanelRefreshSignal.Kind.IMMEDIATE)));
-        AutoCloseable progression = events == null ? () -> { } : events.subscribe(
-                CompanionXpAwardedEvent.class,
-                event -> {
-                    if (ownerUuid.equals(event.ownerUuid())) {
+        AutoCloseable progression = progressionSignals == null ? () -> { } : progressionSignals.subscribe(
+                transition -> {
+                    if (ownerUuid.equals(transition.ownerUuid())) {
                         listener.accept(new LinkedPanelRefreshSignal(
                                 LinkedPanelRefreshSignal.Kind.PROGRESSION));
                     }

@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.debug;
 
 import com.alechilles.alecstamework.api.CommandLinksApi;
-import com.alechilles.alecstamework.api.CompanionXpAwardedEvent;
 import com.alechilles.alecstamework.api.CompanionXpSource;
 import com.alechilles.alecstamework.api.DiagnosticsApi;
 import com.alechilles.alecstamework.api.InteractionExtensionApi;
@@ -15,6 +14,9 @@ import com.alechilles.alecstamework.api.TameworkConfigReadApi;
 import com.alechilles.alecstamework.api.TameworkEventsApi;
 import com.alechilles.alecstamework.api.TraitEffectApi;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionSignalBus;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionSignalTestSupport;
+import com.alechilles.alecstamework.npc.progression.CompanionXpTransition;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -28,26 +30,29 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompanionXpEventDebugLogServiceTest {
     @Test
-    void enabledServiceLogsCompanionXpEventsFromPublicEventBus() {
+    void enabledServiceLogsCompanionXpTransitionsFromInternalSignalBus() {
         TameworkEventBus bus = new TameworkEventBus(null);
+        CompanionProgressionSignalBus signals = new CompanionProgressionSignalBus();
         List<String> logs = new ArrayList<>();
         CompanionXpEventDebugLogService service = new CompanionXpEventDebugLogService(
                 () -> new FakeApi(bus, EnumSet.of(TameworkApiCapability.EVENTS, TameworkApiCapability.COMPANION_XP_EVENTS)),
-                logs::add
+                logs::add,
+                signals
         );
 
         assertTrue(service.setEnabled(true));
-        bus.emitCompanionXpAwarded(event(CompanionXpSource.FEED, 12.5));
+        assertFalse(bus.hasCompanionXpSubscribers());
+        CompanionProgressionSignalTestSupport.publish(signals, event(CompanionXpSource.FEED, 12.5));
 
         assertEquals(1L, service.getEventCount());
-        assertTrue(logs.stream().anyMatch(line -> line.contains("enabled through TameworkApi.events()")));
+        assertTrue(logs.stream().anyMatch(line -> line.contains("enabled through internal progression signals")));
         assertTrue(logs.stream().anyMatch(line -> line.contains("[Tamework XP Event Debug] hit=1")));
         assertTrue(logs.stream().anyMatch(line -> line.contains("source=FEED")));
         assertTrue(logs.stream().anyMatch(line -> line.contains("awardedXp=12.500")));
         assertTrue(logs.stream().anyMatch(line -> line.contains("leveledUp=true")));
 
         service.setEnabled(false);
-        bus.emitCompanionXpAwarded(event(CompanionXpSource.HARVEST, 4.0));
+        CompanionProgressionSignalTestSupport.publish(signals, event(CompanionXpSource.HARVEST, 4.0));
 
         assertEquals(1L, service.getEventCount());
         assertTrue(logs.stream().anyMatch(line -> line.contains("disabled after 1 event(s)")));
@@ -56,14 +61,16 @@ class CompanionXpEventDebugLogServiceTest {
     @Test
     void enableFailsWhenCompanionXpEventsCapabilityIsUnavailable() {
         TameworkEventBus bus = new TameworkEventBus(null);
+        CompanionProgressionSignalBus signals = new CompanionProgressionSignalBus();
         List<String> logs = new ArrayList<>();
         CompanionXpEventDebugLogService service = new CompanionXpEventDebugLogService(
                 () -> new FakeApi(bus, EnumSet.of(TameworkApiCapability.EVENTS)),
-                logs::add
+                logs::add,
+                signals
         );
 
         assertFalse(service.setEnabled(true));
-        bus.emitCompanionXpAwarded(event(CompanionXpSource.FEED, 1.0));
+        CompanionProgressionSignalTestSupport.publish(signals, event(CompanionXpSource.FEED, 1.0));
 
         assertEquals(0L, service.getEventCount());
         assertTrue(logs.stream().anyMatch(line -> line.contains("could not be enabled")));
@@ -72,10 +79,12 @@ class CompanionXpEventDebugLogServiceTest {
     @Test
     void harvestDropDiagnosticsOnlyLogWhileEnabled() {
         TameworkEventBus bus = new TameworkEventBus(null);
+        CompanionProgressionSignalBus signals = new CompanionProgressionSignalBus();
         List<String> logs = new ArrayList<>();
         CompanionXpEventDebugLogService service = new CompanionXpEventDebugLogService(
                 () -> new FakeApi(bus, EnumSet.of(TameworkApiCapability.EVENTS, TameworkApiCapability.COMPANION_XP_EVENTS)),
-                logs::add
+                logs::add,
+                signals
         );
 
         service.logHarvestDropAttempt("award applied=false reason=not-tamed-or-owned");
@@ -91,14 +100,16 @@ class CompanionXpEventDebugLogServiceTest {
     @Test
     void enabledServiceLabelsAvatarFlightXpEvents() {
         TameworkEventBus bus = new TameworkEventBus(null);
+        CompanionProgressionSignalBus signals = new CompanionProgressionSignalBus();
         List<String> logs = new ArrayList<>();
         CompanionXpEventDebugLogService service = new CompanionXpEventDebugLogService(
                 () -> new FakeApi(bus, EnumSet.of(TameworkApiCapability.EVENTS, TameworkApiCapability.COMPANION_XP_EVENTS)),
-                logs::add
+                logs::add,
+                signals
         );
 
         assertTrue(service.setEnabled(true));
-        bus.emitCompanionXpAwarded(event(CompanionXpSource.AVATAR_FLIGHT, 1.5));
+        CompanionProgressionSignalTestSupport.publish(signals, event(CompanionXpSource.AVATAR_FLIGHT, 1.5));
 
         assertEquals(1L, service.getEventCount());
         assertTrue(logs.stream().anyMatch(line -> line.contains("source=AVATAR_FLIGHT")));
@@ -107,21 +118,23 @@ class CompanionXpEventDebugLogServiceTest {
     @Test
     void enabledServiceLabelsSummonedXpEvents() {
         TameworkEventBus bus = new TameworkEventBus(null);
+        CompanionProgressionSignalBus signals = new CompanionProgressionSignalBus();
         List<String> logs = new ArrayList<>();
         CompanionXpEventDebugLogService service = new CompanionXpEventDebugLogService(
                 () -> new FakeApi(bus, EnumSet.of(TameworkApiCapability.EVENTS, TameworkApiCapability.COMPANION_XP_EVENTS)),
-                logs::add
+                logs::add,
+                signals
         );
 
         assertTrue(service.setEnabled(true));
-        bus.emitCompanionXpAwarded(event(CompanionXpSource.SUMMONED, 3.0));
+        CompanionProgressionSignalTestSupport.publish(signals, event(CompanionXpSource.SUMMONED, 3.0));
 
         assertEquals(1L, service.getEventCount());
         assertTrue(logs.stream().anyMatch(line -> line.contains("source=SUMMONED")));
     }
 
-    private static CompanionXpAwardedEvent event(CompanionXpSource source, double awardedXp) {
-        return new CompanionXpAwardedEvent(
+    private static CompanionXpTransition event(CompanionXpSource source, double awardedXp) {
+        return new CompanionXpTransition(
                 UUID.fromString("00000000-0000-0000-0000-000000000001"),
                 UUID.fromString("00000000-0000-0000-0000-000000000002"),
                 Set.of("tool-alpha"),

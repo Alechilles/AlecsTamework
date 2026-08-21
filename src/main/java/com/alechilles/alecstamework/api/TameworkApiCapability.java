@@ -10,6 +10,11 @@ public enum TameworkApiCapability {
     TRAIT_EFFECTS,
     PROFILE_DATA,
     EVENTS,
+    /**
+     * @deprecated Use Activity API V2 outcomes for new integrations. The capability remains
+     * available for released legacy XP subscribers.
+     */
+    @Deprecated
     COMPANION_XP_EVENTS,
     CONFIG_READ,
     DIAGNOSTICS,

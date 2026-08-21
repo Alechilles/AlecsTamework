@@ -3,11 +3,10 @@ package com.alechilles.alecstamework.items;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.alechilles.alecstamework.api.CompanionXpAwardedEvent;
-import com.alechilles.alecstamework.api.CompanionXpSource;
-import com.alechilles.alecstamework.api.TameworkEvent;
-import com.alechilles.alecstamework.api.TameworkEventsApi;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionSignalBus;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionSignalTestSupport;
+import com.alechilles.alecstamework.npc.progression.CompanionXpTransition;
 import com.alechilles.alecstamework.ui.LinkedPanelRefreshSignal;
 import com.hypixel.hytale.codec.ExtraInfo;
 import org.bson.BsonDocument;
@@ -16,7 +15,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 
 class BondedCompanionPanelRefreshSignalSourceTest {
@@ -29,14 +27,14 @@ class BondedCompanionPanelRefreshSignalSourceTest {
     @Test
     void emitsScopedCacheAndOwnerProgressionSignals() throws Exception {
         FakeCache cache = new FakeCache();
-        FakeEvents events = new FakeEvents();
+        CompanionProgressionSignalBus events = new CompanionProgressionSignalBus();
         BondedCompanionPanelRefreshSignalSource source =
                 new BondedCompanionPanelRefreshSignalSource(cache, events);
         List<LinkedPanelRefreshSignal> signals = new ArrayList<>();
 
         try (AutoCloseable ignored = source.forRoster(OWNER, ROSTER).subscribe(signals::add)) {
-            events.emit(xpEvent(OWNER, NPC_ONE));
-            events.emit(xpEvent(OTHER_OWNER, NPC_TWO));
+            CompanionProgressionSignalTestSupport.publish(events, xpEvent(OWNER, NPC_ONE));
+            CompanionProgressionSignalTestSupport.publish(events, xpEvent(OTHER_OWNER, NPC_TWO));
             cache.emit();
 
             assertEquals(List.of(
@@ -67,16 +65,18 @@ class BondedCompanionPanelRefreshSignalSourceTest {
     void closesSecondChildOnceWhenFirstCloseThrows() throws Exception {
         FakeCache cache = new FakeCache();
         cache.throwOnClose = true;
-        FakeEvents events = new FakeEvents();
+        CompanionProgressionSignalBus events = new CompanionProgressionSignalBus();
         BondedCompanionPanelRefreshSignalSource source =
                 new BondedCompanionPanelRefreshSignalSource(cache, events);
-        AutoCloseable subscription = source.forRoster(OWNER, ROSTER).subscribe(ignored -> { });
+        List<LinkedPanelRefreshSignal> signals = new ArrayList<>();
+        AutoCloseable subscription = source.forRoster(OWNER, ROSTER).subscribe(signals::add);
 
         assertThrows(IllegalStateException.class, subscription::close);
         subscription.close();
 
         assertEquals(1, cache.closeCount.get());
-        assertEquals(1, events.closeCount.get());
+        CompanionProgressionSignalTestSupport.publish(events, xpEvent(OWNER, NPC_ONE));
+        assertEquals(List.of(), kinds(signals));
     }
 
     @Test
@@ -100,16 +100,18 @@ class BondedCompanionPanelRefreshSignalSourceTest {
     @Test
     void closesCacheAndEventSubscriptionsExactlyOnce() throws Exception {
         FakeCache cache = new FakeCache();
-        FakeEvents events = new FakeEvents();
+        CompanionProgressionSignalBus events = new CompanionProgressionSignalBus();
         BondedCompanionPanelRefreshSignalSource source =
                 new BondedCompanionPanelRefreshSignalSource(cache, events);
-        AutoCloseable subscription = source.forRoster(OWNER, ROSTER).subscribe(ignored -> { });
+        List<LinkedPanelRefreshSignal> signals = new ArrayList<>();
+        AutoCloseable subscription = source.forRoster(OWNER, ROSTER).subscribe(signals::add);
 
         subscription.close();
         subscription.close();
 
         assertEquals(1, cache.closeCount.get());
-        assertEquals(1, events.closeCount.get());
+        CompanionProgressionSignalTestSupport.publish(events, xpEvent(OWNER, NPC_ONE));
+        assertEquals(List.of(), kinds(signals));
     }
 
     private static List<LinkedPanelRefreshSignal.Kind> kinds(
@@ -117,11 +119,11 @@ class BondedCompanionPanelRefreshSignalSourceTest {
         return signals.stream().map(LinkedPanelRefreshSignal::kind).toList();
     }
 
-    private static CompanionXpAwardedEvent xpEvent(UUID ownerUuid, UUID npcUuid) {
-        return new CompanionXpAwardedEvent(npcUuid, ownerUuid, Set.of(), null,
-                null, CompanionXpSource.CUSTOM, 1.0, 1, 1,
-                0.0, 1.0, 0.0, 1.0, 2.0, 10, false,
-                false, 1L, 1L);
+    private static CompanionXpTransition xpEvent(UUID ownerUuid, UUID npcUuid) {
+        return new CompanionXpTransition(npcUuid, ownerUuid, Set.of(), null,
+                null, com.alechilles.alecstamework.api.CompanionXpSource.CUSTOM,
+                1.0, 1, 1, 0.0, 1.0, 0.0, 1.0, 2.0, 10,
+                false, false, 1L, 1L);
     }
 
     private static TwCommandItemConfig bondedConfig() {
@@ -157,23 +159,6 @@ class BondedCompanionPanelRefreshSignalSourceTest {
 
         private void emit() {
             listener.run();
-        }
-    }
-
-    private static final class FakeEvents implements TameworkEventsApi {
-        private Consumer<CompanionXpAwardedEvent> listener;
-        private final AtomicInteger closeCount = new AtomicInteger();
-
-        @Override
-        @SuppressWarnings("unchecked")
-        public <E extends TameworkEvent> AutoCloseable subscribe(
-                Class<E> type, Consumer<E> listener) {
-            this.listener = (Consumer<CompanionXpAwardedEvent>) listener;
-            return closeCount::incrementAndGet;
-        }
-
-        private void emit(CompanionXpAwardedEvent event) {
-            listener.accept(event);
         }
     }
 }

@@ -13,7 +13,11 @@ import javax.annotation.Nullable;
  *
  * <p>This event is informational and non-cancelable. Listener failures are isolated by the
  * Tamework event bus, so one integration cannot prevent companion progression or other listeners.
+ *
+ * @deprecated Use Activity API V2 XP outcomes for new integrations. This event remains available
+ * for released legacy subscribers.
  */
+@Deprecated
 public record CompanionXpAwardedEvent(@Nonnull UUID npcUuid,
                                       @Nullable UUID ownerUuid,
                                       @Nonnull Set<String> toolIds,

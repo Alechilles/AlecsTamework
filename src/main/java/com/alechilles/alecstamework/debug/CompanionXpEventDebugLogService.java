@@ -1,8 +1,9 @@
 package com.alechilles.alecstamework.debug;
 
-import com.alechilles.alecstamework.api.CompanionXpAwardedEvent;
 import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TameworkApiCapability;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionSignalBus;
+import com.alechilles.alecstamework.npc.progression.CompanionXpTransition;
 import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Objects;
@@ -13,21 +14,22 @@ import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/**
- * Toggleable debug logger that validates companion XP events through the public API event bus.
- */
+/** Toggleable debug logger for internal companion XP transitions. */
 public final class CompanionXpEventDebugLogService implements AutoCloseable {
     private final Supplier<TameworkApi> apiSupplier;
     private final Consumer<String> infoLogger;
+    private final CompanionProgressionSignalBus progressionSignals;
     private final AtomicLong eventCount = new AtomicLong();
     @Nullable
     private AutoCloseable subscription;
     private boolean enabled;
 
     public CompanionXpEventDebugLogService(@Nonnull Supplier<TameworkApi> apiSupplier,
-                                           @Nonnull Consumer<String> infoLogger) {
+                                           @Nonnull Consumer<String> infoLogger,
+                                           @Nonnull CompanionProgressionSignalBus progressionSignals) {
         this.apiSupplier = Objects.requireNonNull(apiSupplier);
         this.infoLogger = Objects.requireNonNull(infoLogger);
+        this.progressionSignals = Objects.requireNonNull(progressionSignals);
     }
 
     public synchronized boolean isEnabled() {
@@ -66,10 +68,10 @@ public final class CompanionXpEventDebugLogService implements AutoCloseable {
             infoLogger.accept("Tamework XP event debug logging could not be enabled: API events are unavailable.");
             return false;
         }
-        subscription = api.events().subscribe(CompanionXpAwardedEvent.class, this::logEvent);
+        subscription = progressionSignals.subscribe(this::logEvent);
         enabled = true;
         eventCount.set(0L);
-        infoLogger.accept("Tamework XP event debug logging enabled through TameworkApi.events().");
+        infoLogger.accept("Tamework XP event debug logging enabled through internal progression signals.");
         return true;
     }
 
@@ -96,7 +98,7 @@ public final class CompanionXpEventDebugLogService implements AutoCloseable {
                 && capabilities.contains(TameworkApiCapability.COMPANION_XP_EVENTS);
     }
 
-    private void logEvent(@Nonnull CompanionXpAwardedEvent event) {
+    private void logEvent(@Nonnull CompanionXpTransition event) {
         long hit = eventCount.incrementAndGet();
         infoLogger.accept(
                 "[Tamework XP Event Debug] hit="

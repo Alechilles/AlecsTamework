@@ -1,9 +1,7 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.api.CompanionXpAwardedEvent;
 import com.alechilles.alecstamework.api.CompanionXpSource;
-import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
@@ -205,8 +203,21 @@ public final class CompanionLevelingService {
         if (updated.getLevel() != previousLevel) {
             applyTraitModifiers(npcRef, store, commandBuffer);
         }
-        emitXpAwardedEvent(npcRef, store, config, roleId, source, amount, previousLevel, previousTotalXp, previousCurrentXp, updated);
-        return new AwardResult(true, amount, previousLevel, updated.getLevel(), updated.getTotalXp());
+        CompanionXpTransition transition = buildXpTransition(
+                npcRef,
+                store,
+                config,
+                roleId,
+                source,
+                amount,
+                previousLevel,
+                previousTotalXp,
+                previousCurrentXp,
+                updated,
+                System.currentTimeMillis()
+        );
+        publishXpTransition(transition);
+        return new AwardResult(true, amount, previousLevel, updated.getLevel(), updated.getTotalXp(), transition);
     }
 
     @Nullable
@@ -378,17 +389,17 @@ public final class CompanionLevelingService {
     }
 
     @Nullable
-    private static CompanionXpAwardedEvent buildXpAwardedEvent(@Nonnull Ref<EntityStore> npcRef,
-                                                               @Nonnull Store<EntityStore> store,
-                                                               @Nonnull TwLevelingConfig config,
-                                                               @Nullable String roleId,
-                                                               @Nonnull CompanionXpSource source,
-                                                               double awardedXp,
-                                                               int previousLevel,
-                                                               double previousTotalXp,
-                                                               double previousCurrentXp,
-                                                               @Nonnull TameworkLevelingComponent updated,
-                                                               long nowMs) {
+    private static CompanionXpTransition buildXpTransition(@Nonnull Ref<EntityStore> npcRef,
+                                                            @Nonnull Store<EntityStore> store,
+                                                            @Nonnull TwLevelingConfig config,
+                                                            @Nullable String roleId,
+                                                            @Nonnull CompanionXpSource source,
+                                                            double awardedXp,
+                                                            int previousLevel,
+                                                            double previousTotalXp,
+                                                            double previousCurrentXp,
+                                                            @Nonnull TameworkLevelingComponent updated,
+                                                            long nowMs) {
         UUID npcUuid = resolveNpcUuid(npcRef, store);
         if (npcUuid == null) {
             return null;
@@ -397,7 +408,7 @@ public final class CompanionLevelingService {
         int maxLevel = config.getLevels().getMaxLevel();
         boolean atMaxLevel = updated.getLevel() >= maxLevel;
         double nextLevelXp = atMaxLevel ? 0.0 : nextLevelDeltaXp(config, updated.getLevel());
-        return new CompanionXpAwardedEvent(
+        return new CompanionXpTransition(
                 npcUuid,
                 creditContext.ownerUuid(),
                 creditContext.toolIds(),
@@ -420,37 +431,18 @@ public final class CompanionLevelingService {
         );
     }
 
-    private static void emitXpAwardedEvent(@Nonnull Ref<EntityStore> npcRef,
-                                           @Nonnull Store<EntityStore> store,
-                                           @Nonnull TwLevelingConfig config,
-                                           @Nullable String roleId,
-                                           @Nonnull CompanionXpSource source,
-                                           double awardedXp,
-                                           int previousLevel,
-                                           double previousTotalXp,
-                                           double previousCurrentXp,
-                                           @Nonnull TameworkLevelingComponent updated) {
-        Tamework instance = Tamework.getInstance();
-        TameworkEventBus eventBus = instance != null ? instance.getApiEventBus() : null;
-        if (eventBus == null) {
+    private static void publishXpTransition(@Nullable CompanionXpTransition transition) {
+        if (transition == null) {
             return;
         }
-        CompanionXpAwardedEvent event = buildXpAwardedEvent(
-                npcRef,
-                store,
-                config,
-                roleId,
-                source,
-                awardedXp,
-                previousLevel,
-                previousTotalXp,
-                previousCurrentXp,
-                updated,
-                System.currentTimeMillis()
-        );
-        if (event != null) {
-            eventBus.emitCompanionXpAwarded(event);
+        Tamework instance = Tamework.getInstance();
+        CompanionProgressionSignalBus signalBus = instance != null
+                ? instance.getCompanionProgressionSignalBus()
+                : null;
+        if (signalBus == null) {
+            return;
         }
+        signalBus.publish(transition);
     }
 
     @Nullable
@@ -775,9 +767,10 @@ public final class CompanionLevelingService {
                               double awardedXp,
                               int previousLevel,
                               int currentLevel,
-                              double totalXp) {
+                              double totalXp,
+                              @Nullable CompanionXpTransition transition) {
         static AwardResult notApplied() {
-            return new AwardResult(false, 0.0, 1, 1, 0.0);
+            return new AwardResult(false, 0.0, 1, 1, 0.0, null);
         }
     }
 

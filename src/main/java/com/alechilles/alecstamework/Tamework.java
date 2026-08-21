@@ -96,6 +96,8 @@ import com.alechilles.alecstamework.debug.PlayerInputDebugProbe;
 import com.alechilles.alecstamework.npc.actions.BreedingPairAdmissionRegistry;
 import com.alechilles.alecstamework.npc.actions.HeldItemAttachmentInteractionService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionSignalBus;
+import com.alechilles.alecstamework.npc.progression.CompanionXpLegacyAdapter;
 import com.alechilles.alecstamework.integration.creditor.CreditorIntegration;
 import com.alechilles.alecstamework.integration.nameplatebuilder.NameplateBuilderBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
@@ -282,6 +284,8 @@ public class Tamework extends JavaPlugin {
     private TameworkApi api;
     private ReplacementTameworkApiFactory.Composition apiComposition;
     private TameworkEventBus apiEventBus;
+    private CompanionProgressionSignalBus companionProgressionSignalBus;
+    private CompanionXpLegacyAdapter companionXpLegacyAdapter;
     private InteractionExtensionRegistry interactionExtensionRegistry;
     private TraitEffectRegistry traitEffectRegistry;
     private CapturePolicyRegistry capturePolicyRegistry;
@@ -423,6 +427,7 @@ public class Tamework extends JavaPlugin {
     }
 
     private void setupInternal() {
+        companionProgressionSignalBus = new CompanionProgressionSignalBus();
         runtimeParticipants = new TameworkRuntimeParticipantRegistry(
                 eventType -> getEntityStoreRegistry().registerEntityEventType(eventType),
                 getLogger()
@@ -612,6 +617,10 @@ public class Tamework extends JavaPlugin {
             return;
         }
         apiEventBus = new TameworkEventBus(getLogger());
+        companionXpLegacyAdapter = new CompanionXpLegacyAdapter(
+                companionProgressionSignalBus,
+                apiEventBus
+        );
         runtimeDataDirectory = new TameworkDataPathService(getLogger())
                 .resolveAndInitializeDataPathLayout(getDataDirectory())
                 .targetDirectory();
@@ -829,7 +838,8 @@ public class Tamework extends JavaPlugin {
         );
         companionXpEventDebugLogService = new CompanionXpEventDebugLogService(
                 () -> api,
-                message -> getLogger().at(Level.INFO).log(message)
+                message -> getLogger().at(Level.INFO).log(message),
+                companionProgressionSignalBus
         );
         apiSelfTestFixtureManager = new ApiSelfTestFixtureManager();
         apiSelfTestRunner = new ApiSelfTestRunner();
@@ -887,7 +897,7 @@ public class Tamework extends JavaPlugin {
                 api::paidCommandRevival,
                 api::populationGroups,
                 api::bondedCompanions,
-                api.events()
+                companionProgressionSignalBus
         );
         CommandWorldChangeTravelEventHandler commandWorldChangeTravelEventHandler =
                 new CommandWorldChangeTravelEventHandler(commandItemFeatureHandler);
@@ -1567,9 +1577,17 @@ public class Tamework extends JavaPlugin {
             commandNpcRelocationService = null;
         }
         shutdownPersistence();
+        if (companionXpLegacyAdapter != null) {
+            companionXpLegacyAdapter.close();
+            companionXpLegacyAdapter = null;
+        }
         if (apiEventBus != null) {
             apiEventBus.close();
             apiEventBus = null;
+        }
+        if (companionProgressionSignalBus != null) {
+            companionProgressionSignalBus.close();
+            companionProgressionSignalBus = null;
         }
         ownerPopulationLiveIndex.clear();
         runtimeDataDirectory = null;
@@ -1771,6 +1789,14 @@ public class Tamework extends JavaPlugin {
     @Nullable
     public TameworkEventBus getApiEventBus() {
         return apiEventBus;
+    }
+
+    @Nonnull
+    public CompanionProgressionSignalBus getCompanionProgressionSignalBus() {
+        if (companionProgressionSignalBus == null) {
+            companionProgressionSignalBus = new CompanionProgressionSignalBus();
+        }
+        return companionProgressionSignalBus;
     }
 
     @Nullable
