@@ -33,15 +33,18 @@
   continuous, gently animated indicator above each loaded active NPC. The
   indicator uses the NPC's group color, or neutral gold when the NPC is
   ungrouped. Each indicator now runs continuously from one invisible helper
-  that follows the NPC's head. Disabling the setting, changing tools, or
+  mounted above the NPC's head. Disabling the setting, changing tools, or
   removing the NPC removes that helper and its indicator without periodic
-  server respawns. The helper does not use the mount system, so it remains safe
-  when a player mounts or dismounts the highlighted NPC.
+  server respawns. Mounting the NPC removes and suppresses the helper until the
+  rider dismounts. The panel also keeps the NPC's real name and species while
+  the native mount system temporarily uses its empty parking role.
 
 ### Fixed
 
 - Update 5 servers no longer register or emit active NPC indicators because
   the feature requires Update 6 model-particle cleanup support.
+- Active NPC indicators now use the base indicator timing pattern, with a very
+  short particle overlap that prevents an empty frame between animation waves.
 - World transfers no longer disconnect players who have the command hotswap HUD active.
 - Reduced persistence stalls with large companion populations. Spawner
   releases and Recall no longer wait behind unrelated projection events or

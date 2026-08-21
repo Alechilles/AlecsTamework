@@ -1,12 +1,11 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.avatarflight.AvatarFlightSnapshotRoleResolver;
-import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
 import com.alechilles.alecstamework.npc.NpcDisplayNameComponentService;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.movement.MountedNpcSnapshotRoleResolver;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -55,15 +54,12 @@ final class CommandLiveNpcSnapshotFactory {
                 ? owner.getOwnerId() : links.getOwnerId();
         String ownerName = owner == null ? null : owner.getOwnerName();
 
-        String liveRoleId = resolveRoleId(npc);
-        AvatarFlightSourceComponent flightSource = component(
-                npcRef, store, AvatarFlightSourceComponent.getComponentType()
+        MountedNpcSnapshotRoleResolver.Resolution roleResolution =
+                MountedNpcSnapshotRoleResolver.resolve(
+                        resolveRoleId(npc), npcRef, store
         );
-        String roleId = AvatarFlightSnapshotRoleResolver.resolve(
-                liveRoleId, flightSource
-        );
-        boolean parkedForAvatarFlight = !Objects.equals(liveRoleId, roleId);
-        if (parkedForAvatarFlight && previous == null) {
+        String roleId = roleResolution.roleId();
+        if (roleResolution.temporarilyParked() && previous == null) {
             return null;
         }
         String customName = resolveCustomName(npcRef, store);
@@ -82,7 +78,7 @@ final class CommandLiveNpcSnapshotFactory {
                         position(npcRef, store),
                         links.hasHome() ? links.getHomePosition() : null
                 );
-        return parkedForAvatarFlight
+        return roleResolution.temporarilyParked()
                 ? preserveParkedPresentation(captured, previous)
                 : captured;
     }

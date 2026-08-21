@@ -5,6 +5,9 @@ import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
+import com.hypixel.hytale.builtin.mounts.MountedComponent;
+import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
@@ -18,6 +21,7 @@ import com.hypixel.hytale.server.core.modules.entity.tracker.NetworkId;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -156,13 +160,15 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
                     return desiredTargets;
                 }
         );
+        ArrayList<CommandActiveNpcHighlightProxyService.SyncTarget> syncTargets =
+                new ArrayList<>(targets.size());
         for (CommandActiveNpcHighlightPlanService.HighlightTarget target : targets) {
             emitForLoadedTarget(
                     store, world, loadedTargetProbe, playerCandidate.ref(), playerUuid,
-                    activeTool.toolId(), target
+                    activeTool.toolId(), target, syncTargets
             );
         }
-        scheduleProxySync(store, displayTracker.syncTargets(store, playerUuid));
+        scheduleProxySync(store, syncTargets);
     }
 
     @Nullable
@@ -216,7 +222,8 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
             @Nonnull Ref<EntityStore> viewerRef,
             @Nonnull UUID playerUuid,
             @Nonnull String toolId,
-            @Nonnull CommandActiveNpcHighlightPlanService.HighlightTarget target
+            @Nonnull CommandActiveNpcHighlightPlanService.HighlightTarget target,
+            @Nonnull List<CommandActiveNpcHighlightProxyService.SyncTarget> syncTargets
     ) {
         UUID resolvedNpcUuid = targetResolver.resolve(
                 target.npcUuid(), target.profileId(), loadedTargetProbe
@@ -240,6 +247,12 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
             scheduleProxyRemoval(store, displayTracker.forgetTarget(store, playerUuid, target));
             return;
         }
+        if (isNpcInMountLifecycle(store, npcRef)) {
+            scheduleProxyRemoval(store, displayTracker.forgetTarget(
+                    store, playerUuid, target
+            ));
+            return;
+        }
         scheduleProxyRemoval(store, displayTracker.forgetProxyForDifferentParent(
                 store, playerUuid, target, resolvedNpcUuid
         ));
@@ -254,11 +267,8 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
             return;
         }
         Ref<EntityStore> proxyRef = world.getEntityRef(proxyUuid);
-        Vector3f attachmentOffset = anchorResolver.resolveHeadOffset(model);
         if (proxyRef != null && proxyRef.isValid()
-                && proxyService.requiresRecreation(
-                        store, npcRef, proxyRef, attachmentOffset
-                )) {
+                && proxyService.requiresRecreation(store, npcRef, proxyRef)) {
             scheduleProxyRemoval(store, displayTracker.forgetTarget(store, playerUuid, target));
             requestProxyCreation(
                     store, world, playerUuid, toolId, target, resolvedNpcUuid,
@@ -273,6 +283,9 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
             scheduleProxyRemoval(store, displayTracker.forgetTarget(store, playerUuid, target));
             return;
         }
+        syncTargets.add(new CommandActiveNpcHighlightProxyService.SyncTarget(
+                proxyUuid, resolvedNpcUuid
+        ));
         int resolvedNetworkId = networkId.getId();
         if (!displayTracker.needsEmission(
                 store, playerUuid, target, resolvedNetworkId
@@ -340,7 +353,7 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
             }
             proxyUuid = proxyService.create(store, npcRef, attachmentOffset);
             if (proxyUuid != null && displayTracker.recordProxy(
-                    store, playerUuid, target, npcUuid, proxyUuid, attachmentOffset
+                    store, playerUuid, target, npcUuid, proxyUuid
             )) {
                 proxyRetained = true;
                 return;
@@ -364,9 +377,17 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
         );
         return CommandGenericTargetAuthority.allowsGenericTargetMutation(npcRef, store)
                 && component(store, npcRef, NPCEntity.getComponentType()) != null
+                && !isNpcInMountLifecycle(store, npcRef)
                 && links != null
                 && playerUuid.equals(links.getOwnerId())
                 && links.containsToolId(toolId);
+    }
+
+    private boolean isNpcInMountLifecycle(@Nonnull Store<EntityStore> store,
+                                          @Nonnull Ref<EntityStore> npcRef) {
+        return component(store, npcRef, NPCMountComponent.getComponentType()) != null
+                || component(store, npcRef, MountedComponent.getComponentType()) != null
+                || component(store, npcRef, TameworkRideMountComponent.getComponentType()) != null;
     }
 
     private void scheduleProxyRemoval(@Nonnull Store<EntityStore> store,

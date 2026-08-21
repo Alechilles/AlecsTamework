@@ -229,8 +229,10 @@ Linked panel supports:
 - Optional per-tool active highlights. While the command tool is equipped,
   loaded active NPCs show a continuous controller-only indicator above their
   heads in their group color. Ungrouped NPCs use neutral gold. The indicator
-  follows the NPC without using a mount slot, and is removed when the setting
-  is disabled or the equipped command tool changes.
+  uses an invisible helper mounted above the NPC for smooth movement. The
+  helper is removed while a player rides that NPC, then returns after the rider
+  dismounts. It is also removed when the setting is disabled or the equipped
+  command tool changes.
   This setting starts disabled and applies only to generic item-metadata
   rosters on Update 6. Update 5 does not run the indicator system because it
   lacks the required model-particle cleanup support.

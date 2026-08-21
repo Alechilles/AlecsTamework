@@ -15,6 +15,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
 import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
+import com.alechilles.alecstamework.npc.movement.MountedNpcSnapshotRoleResolver;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
 import com.hypixel.hytale.component.Component;
@@ -83,11 +84,21 @@ final class CommandLoadedNpcStatusSnapshotService {
         String language = player != null && player.getPlayerRef() != null ? player.getPlayerRef().getLanguage() : null;
         NpcStatusContext resolvedContext = context != null ? context : NpcStatusContext.empty(npc.getUuid());
         UUID npcUuid = resolvedContext.npcUuid() != null ? resolvedContext.npcUuid() : npc.getUuid();
+        MountedNpcSnapshotRoleResolver.Resolution roleResolution =
+                resolveSpeciesRole(npcRef, store, npc, resolvedContext.cachedRoleId());
+        String resolvedRoleId = normalize(roleResolution.roleId());
         String displayName = npcNameResolver.resolveNpcDisplayName(npcRef, store, npc);
-        if (displayName == null || displayName.isBlank()) {
+        if (roleResolution.temporarilyParked()) {
+            displayName = firstNonBlank(
+                    resolvedContext.fallbackDisplayName(),
+                    npcNameResolver.resolveRoleDisplayName(
+                            resolvedRoleId, resolvedContext.cachedNameKey()
+                    ),
+                    displayName
+            );
+        } else if (displayName == null || displayName.isBlank()) {
             displayName = resolvedContext.fallbackDisplayName();
         }
-        String resolvedRoleId = resolveSpeciesRoleId(npc, resolvedContext.cachedRoleId());
         String speciesId = resolvedRoleId;
         String speciesLabel = resolvedRoleId;
         String gender = CompanionGenderService.resolveGender(npcRef, store, resolvedRoleId, null);
@@ -562,13 +573,18 @@ final class CommandLoadedNpcStatusSnapshotService {
         return new NeedsSnapshot(roundedHunger, roundedHungerMax, roundedThirst, roundedThirstMax);
     }
 
-    private String resolveSpeciesRoleId(NPCEntity npc, @Nullable String fallbackRoleId) {
-        String roleId = firstNonBlank(
+    private MountedNpcSnapshotRoleResolver.Resolution resolveSpeciesRole(
+            Ref<EntityStore> npcRef,
+            Store<EntityStore> store,
+            NPCEntity npc,
+            @Nullable String fallbackRoleId
+    ) {
+        String liveRoleId = firstNonBlank(
                 linkPolicyService.resolveRoleId(npc),
                 npcNameResolver.resolveNpcRoleId(npc),
                 fallbackRoleId
         );
-        return normalize(roleId);
+        return MountedNpcSnapshotRoleResolver.resolve(liveRoleId, npcRef, store);
     }
 
     private String firstNonBlank(String first, String second, String third) {

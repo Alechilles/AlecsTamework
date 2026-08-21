@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -9,7 +8,6 @@ import java.util.Objects;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.joml.Vector3f;
 
 /** Tracks one helper proxy and one particle delivery for each active highlight target. */
 final class CommandActiveNpcHighlightDisplayTracker<T> {
@@ -70,21 +68,13 @@ final class CommandActiveNpcHighlightDisplayTracker<T> {
                                      @Nonnull UUID playerUuid,
                                      @Nonnull T target,
                                      @Nonnull UUID parentNpcUuid,
-                                     @Nonnull UUID proxyUuid,
-                                     @Nonnull Vector3f attachmentOffset) {
+                                     @Nonnull UUID proxyUuid) {
         PlayerState<T> state = state(storeIdentity, playerUuid);
         if (state == null || !state.targets.contains(target)
                 || !parentNpcUuid.equals(state.pendingParents.remove(target))) {
             return false;
         }
-        state.displays.put(target, new ProxyDisplay(
-                parentNpcUuid,
-                proxyUuid,
-                null,
-                new CommandActiveNpcHighlightProxyService.SyncTarget(
-                        proxyUuid, parentNpcUuid, attachmentOffset
-                )
-        ));
+        state.displays.put(target, new ProxyDisplay(parentNpcUuid, proxyUuid, null));
         return true;
     }
 
@@ -148,8 +138,7 @@ final class CommandActiveNpcHighlightDisplayTracker<T> {
                 state.displays.put(target, new ProxyDisplay(
                         display.parentNpcUuid,
                         display.proxyUuid,
-                        networkId,
-                        display.syncTarget
+                        networkId
                 ));
             }
         }
@@ -185,22 +174,6 @@ final class CommandActiveNpcHighlightDisplayTracker<T> {
         statesByStore.remove(storeIdentity);
     }
 
-    @Nonnull
-    synchronized List<CommandActiveNpcHighlightProxyService.SyncTarget> syncTargets(
-            @Nonnull Object storeIdentity,
-            @Nonnull UUID playerUuid) {
-        PlayerState<T> state = state(storeIdentity, playerUuid);
-        if (state == null || state.displays.isEmpty()) {
-            return List.of();
-        }
-        ArrayList<CommandActiveNpcHighlightProxyService.SyncTarget> targets =
-                new ArrayList<>(state.displays.size());
-        for (ProxyDisplay display : state.displays.values()) {
-            targets.add(display.syncTarget);
-        }
-        return List.copyOf(targets);
-    }
-
     private PlayerState<T> state(@Nonnull Object storeIdentity, @Nonnull UUID playerUuid) {
         Map<UUID, PlayerState<T>> states = statesByStore.get(storeIdentity);
         return states != null ? states.get(playerUuid) : null;
@@ -226,8 +199,7 @@ final class CommandActiveNpcHighlightDisplayTracker<T> {
     private record ProxyDisplay(
             @Nonnull UUID parentNpcUuid,
             @Nonnull UUID proxyUuid,
-            @Nullable Integer emittedNetworkId,
-            @Nonnull CommandActiveNpcHighlightProxyService.SyncTarget syncTarget
+            @Nullable Integer emittedNetworkId
     ) {
     }
 }

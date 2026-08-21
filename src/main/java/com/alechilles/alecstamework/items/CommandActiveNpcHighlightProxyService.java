@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.compat.HytaleMountedComponentAccess;
+import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.NonSerialized;
@@ -7,6 +9,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Rotation3f;
+import com.hypixel.hytale.protocol.MountController;
 import com.hypixel.hytale.server.core.asset.type.model.config.Model;
 import com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
@@ -23,7 +26,7 @@ import javax.annotation.Nullable;
 import org.joml.Vector3d;
 import org.joml.Vector3f;
 
-/** Creates and removes non-persistent model-particle anchors above active NPCs. */
+/** Creates and removes non-persistent model-particle anchors mounted above active NPCs. */
 final class CommandActiveNpcHighlightProxyService {
     static final String MODEL_ASSET_ID = "Tamework_Command_Active_Highlight_Anchor";
     private static final double MAX_TRACKING_DRIFT_SQUARED = 48.0 * 48.0;
@@ -39,7 +42,8 @@ final class CommandActiveNpcHighlightProxyService {
                 parentNpcRef, TransformComponent.getComponentType()
         );
         ModelAsset modelAsset = ModelAsset.getAssetMap().getAsset(MODEL_ASSET_ID);
-        if (parentTransform == null || modelAsset == null) {
+        if (parentTransform == null || modelAsset == null
+                || MountedComponent.getComponentType() == null) {
             return null;
         }
 
@@ -56,13 +60,23 @@ final class CommandActiveNpcHighlightProxyService {
         holder.addComponent(
                 TransformComponent.getComponentType(),
                 new TransformComponent(
-                        worldPosition(parentTransform.getPosition(), attachmentOffset),
+                        new Vector3d(parentTransform.getPosition()),
                         new Rotation3f(parentTransform.getRotation())
                 )
         );
         holder.addComponent(
                 ModelComponent.getComponentType(),
                 new ModelComponent(Model.createUnitScaleModel(modelAsset))
+        );
+        holder.addComponent(
+                MountedComponent.getComponentType(),
+                HytaleMountedComponentAccess.createEntityMount(
+                        parentNpcRef,
+                        attachmentOffset.x,
+                        attachmentOffset.y,
+                        attachmentOffset.z,
+                        MountController.Minecart
+                )
         );
         holder.ensureComponent(EntityTrackerSystems.Visible.getComponentType());
         Ref<EntityStore> proxyRef = store.addEntity(holder, AddReason.SPAWN);
@@ -82,17 +96,16 @@ final class CommandActiveNpcHighlightProxyService {
 
     boolean requiresRecreation(@Nonnull Store<EntityStore> store,
                                @Nonnull Ref<EntityStore> parentNpcRef,
-                               @Nonnull Ref<EntityStore> proxyRef,
-                               @Nonnull Vector3f attachmentOffset) {
+                               @Nonnull Ref<EntityStore> proxyRef) {
         TransformComponent parent = store.getComponent(
                 parentNpcRef, TransformComponent.getComponentType()
         );
         TransformComponent proxy = store.getComponent(
                 proxyRef, TransformComponent.getComponentType()
         );
-        return parent == null || proxy == null || worldPosition(
-                parent.getPosition(), attachmentOffset
-        ).distanceSquared(proxy.getPosition()) > MAX_TRACKING_DRIFT_SQUARED;
+        return parent == null || proxy == null
+                || parent.getPosition().distanceSquared(proxy.getPosition())
+                > MAX_TRACKING_DRIFT_SQUARED;
     }
 
     void syncAll(@Nonnull Store<EntityStore> store,
@@ -112,53 +125,12 @@ final class CommandActiveNpcHighlightProxyService {
                     proxyRef, TransformComponent.getComponentType()
             );
             if (parent != null && proxy != null) {
-                proxy.setPosition(worldPosition(
-                        parent.getPosition(),
-                        target.offsetX(),
-                        target.offsetY(),
-                        target.offsetZ()
-                ));
+                proxy.getPosition().set(parent.getPosition());
                 proxy.getRotation().set(parent.getRotation());
             }
         }
     }
 
-    @Nonnull
-    static Vector3d worldPosition(@Nonnull Vector3d parentPosition,
-                                  @Nonnull Vector3f attachmentOffset) {
-        return worldPosition(
-                parentPosition,
-                attachmentOffset.x,
-                attachmentOffset.y,
-                attachmentOffset.z
-        );
-    }
-
-    @Nonnull
-    private static Vector3d worldPosition(@Nonnull Vector3d parentPosition,
-                                          float offsetX,
-                                          float offsetY,
-                                          float offsetZ) {
-        return new Vector3d(parentPosition).add(offsetX, offsetY, offsetZ);
-    }
-
-    record SyncTarget(
-            @Nonnull UUID proxyUuid,
-            @Nonnull UUID parentNpcUuid,
-            float offsetX,
-            float offsetY,
-            float offsetZ
-    ) {
-        SyncTarget(@Nonnull UUID proxyUuid,
-                   @Nonnull UUID parentNpcUuid,
-                   @Nonnull Vector3f attachmentOffset) {
-            this(
-                    proxyUuid,
-                    parentNpcUuid,
-                    attachmentOffset.x,
-                    attachmentOffset.y,
-                    attachmentOffset.z
-            );
-        }
+    record SyncTarget(@Nonnull UUID proxyUuid, @Nonnull UUID parentNpcUuid) {
     }
 }

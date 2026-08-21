@@ -64,10 +64,14 @@ restoration, or spawn decisions.
   target gets one invisible, non-persistent helper entity mounted above its
   model bounds. The helper receives one persistent particle emission. A roster,
   color, setting, equipped-tool, player, or NPC lifecycle change removes the
-  helper and its particle before a replacement is created. The bounded roster
-  pass also syncs each helper's server tracking position; a large parent jump
-  recreates it. This subsystem registers only on Update 6 because Update 5
-  cannot safely clear the effect.
+  helper and its particle before a replacement is created. A rider mount also
+  removes the helper before Hytale changes the NPC mount graph. Reconciliation
+  suppresses the helper during the mount lifecycle and creates it again after
+  dismount. Native mount snapshots resolve the saved role behind `Empty_Role`,
+  so the linked panel keeps the companion's real name and species. The bounded
+  roster pass also syncs each helper's server tracking position; a large parent
+  jump recreates it. This subsystem registers only on Update 6 because Update
+  5 cannot safely clear the effect.
 
 ## Related Pages
 - [Persistence, SQLite, and Data Paths](/mod/alecs-tamework/persistence-sqlite-and-data-paths)
