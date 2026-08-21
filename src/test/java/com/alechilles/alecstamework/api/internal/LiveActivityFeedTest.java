@@ -37,13 +37,14 @@ class LiveActivityFeedTest {
 
         feed.subscribe(
                 "managed",
-                new ActivityFilter(Set.of(ActivityDomain.MANAGED_CARE), Set.of()),
+                new ActivityFilter(
+                        Set.of(ActivityDomain.MANAGED_CARE_PRODUCTION), Set.of()),
                 activity -> managed.add(activity.header().actionId())
         );
         feed.subscribe(
                 "harvest",
                 new ActivityFilter(
-                        Set.of(ActivityDomain.MANAGED_CARE),
+                        Set.of(ActivityDomain.MANAGED_CARE_PRODUCTION),
                         Set.of(ActivityIds.HARVEST)
                 ),
                 activity -> harvestOnly.add(activity.header().actionId())
@@ -68,7 +69,7 @@ class LiveActivityFeedTest {
     void rejectsDuplicateConsumerIdsAndAllowsReuseAfterUnsubscribe() {
         LiveActivityFeed feed = new LiveActivityFeed();
         ActivityFilter filter = new ActivityFilter(
-                Set.of(ActivityDomain.MANAGED_CARE), Set.of());
+                Set.of(ActivityDomain.MANAGED_CARE_PRODUCTION), Set.of());
         ActivityFeedSubscription first = feed.subscribe(
                 "husbandry", filter, ignored -> { });
 
@@ -88,13 +89,29 @@ class LiveActivityFeedTest {
         AtomicInteger healthyCalls = new AtomicInteger();
         feed.subscribe(
                 "throws",
-                new ActivityFilter(Set.of(ActivityDomain.MANAGED_CARE), Set.of()),
+                new ActivityFilter(
+                        Set.of(ActivityDomain.MANAGED_CARE_PRODUCTION), Set.of()),
                 ignored -> { throw new IllegalStateException("consumer failure"); }
         );
         feed.subscribe(
                 "healthy",
-                new ActivityFilter(Set.of(ActivityDomain.MANAGED_CARE), Set.of()),
+                new ActivityFilter(
+                        Set.of(ActivityDomain.MANAGED_CARE_PRODUCTION), Set.of()),
                 ignored -> healthyCalls.incrementAndGet()
+        );
+        feed.subscribe(
+                "feed-only",
+                new ActivityFilter(
+                        Set.of(ActivityDomain.MANAGED_CARE_PRODUCTION),
+                        Set.of(ActivityIds.FEED)),
+                ignored -> { }
+        );
+        feed.subscribe(
+                "harvest-only",
+                new ActivityFilter(
+                        Set.of(ActivityDomain.MANAGED_CARE_PRODUCTION),
+                        Set.of(ActivityIds.HARVEST)),
+                ignored -> { }
         );
 
         assertDoesNotThrow(() -> {
@@ -105,6 +122,8 @@ class LiveActivityFeedTest {
         assertEquals(2, healthyCalls.get());
         assertEquals(2L, feed.status("throws").lastAttemptedSequence());
         assertEquals(2L, feed.status("healthy").lastAttemptedSequence());
+        assertEquals(1L, feed.status("feed-only").lastAttemptedSequence());
+        assertEquals(2L, feed.status("harvest-only").lastAttemptedSequence());
         feed.close();
     }
 
@@ -112,20 +131,33 @@ class LiveActivityFeedTest {
     void changesInterestOnSubscriptionAndCloseWithoutConstructingAnActivity() {
         LiveActivityFeed feed = new LiveActivityFeed();
 
-        assertFalse(feed.hasInterest(ActivityDomain.MANAGED_CARE, ActivityIds.FEED));
+        assertFalse(
+                feed.hasInterest(
+                        ActivityDomain.MANAGED_CARE_PRODUCTION, ActivityIds.FEED));
         ActivityFeedSubscription subscription = feed.subscribe(
                 "husbandry",
                 new ActivityFilter(
-                        Set.of(ActivityDomain.MANAGED_CARE),
+                        Set.of(ActivityDomain.MANAGED_CARE_PRODUCTION),
                         Set.of(ActivityIds.FEED)
                 ),
                 ignored -> { }
         );
-        assertTrue(feed.hasInterest(ActivityDomain.MANAGED_CARE, ActivityIds.FEED));
-        assertFalse(feed.hasInterest(ActivityDomain.MANAGED_CARE, ActivityIds.HARVEST));
+        assertTrue(
+                feed.hasInterest(
+                        ActivityDomain.MANAGED_CARE_PRODUCTION, ActivityIds.FEED));
+        assertFalse(
+                feed.hasInterest(
+                        ActivityDomain.MANAGED_CARE_PRODUCTION, ActivityIds.HARVEST));
+        assertFalse(
+                feed.hasInterest(
+                        ActivityDomain.MANAGED_CARE_PRODUCTION, " tamework:feed "));
+        assertFalse(
+                feed.hasInterest(ActivityDomain.MANAGED_CARE_PRODUCTION, "feed"));
 
         subscription.close();
-        assertFalse(feed.hasInterest(ActivityDomain.MANAGED_CARE, ActivityIds.FEED));
+        assertFalse(
+                feed.hasInterest(
+                        ActivityDomain.MANAGED_CARE_PRODUCTION, ActivityIds.FEED));
         feed.close();
     }
 
@@ -135,7 +167,8 @@ class LiveActivityFeedTest {
         AtomicInteger calls = new AtomicInteger();
         ActivityFeedSubscription subscription = feed.subscribe(
                 "husbandry",
-                new ActivityFilter(Set.of(ActivityDomain.MANAGED_CARE), Set.of()),
+                new ActivityFilter(
+                        Set.of(ActivityDomain.MANAGED_CARE_PRODUCTION), Set.of()),
                 ignored -> calls.incrementAndGet()
         );
 
@@ -146,6 +179,16 @@ class LiveActivityFeedTest {
 
         assertEquals(1, calls.get());
         assertFalse(feed.status("husbandry").subscribed());
+        feed.close();
+        assertFalse(feed.isOpen());
+        assertFalse(feed.status("husbandry").available());
+        assertThrows(
+                IllegalStateException.class,
+                () -> feed.subscribe(
+                        "after-close",
+                        ActivityFilter.forDomain(ActivityDomain.MANAGED_CARE_PRODUCTION),
+                        ignored -> calls.incrementAndGet())
+        );
         feed.close();
     }
 

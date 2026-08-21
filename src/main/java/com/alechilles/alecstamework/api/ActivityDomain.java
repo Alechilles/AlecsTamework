@@ -15,6 +15,4 @@ public enum ActivityDomain {
     /** Summoning and recall lifecycle actions. */
     SUMMONING;
 
-    /** Short source-compatible name for the managed care/production domain. */
-    public static final ActivityDomain MANAGED_CARE = MANAGED_CARE_PRODUCTION;
 }
