@@ -4,7 +4,6 @@ import com.alechilles.alecstamework.api.PopulationAdmissionDecision;
 import com.alechilles.alecstamework.api.internal.ManagedBatchAdmissionAuthority;
 import com.alechilles.alecstamework.companion.population.domain.ManagedBatchSettlement;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
-import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.hypixel.hytale.component.ComponentType;
@@ -12,7 +11,6 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
-import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
@@ -67,36 +65,20 @@ final class BreedingLitterWorldExecutor {
             Map<Integer, UUID> receipts = findExisting(
                     world, store, litter
             );
+            if (!receipts.isEmpty()) {
+                initializeExisting(world, store, litter, receipts);
+            }
             if (receipts.size() < litter.requestedCount()) {
                 PopulationAdmissionDecision claim =
                         admissions.claimManagedBatch(
                                 litter.admissionToken()
                         );
                 if (!claim.accepted() && operation.attemptCount() == 0) {
-                    return BreedingLitterLiveResult.retryable(
-                            "breeding_litter_claim_unavailable", null
-                    ).completed();
+                    return settleAndResult(litter, admissions, receipts);
                 }
                 spawnMissing(world, store, litter, receipts);
             }
-            return settle(litter, admissions, receipts)
-                    .thenApply(result -> {
-                        if (result.status()
-                                == ManagedBatchSettlement.Status.UNAVAILABLE) {
-                            return BreedingLitterLiveResult.retryable(
-                                    result.reason(), null
-                            );
-                        }
-                        scheduleCompanionXp(
-                                litter.worldName(),
-                                litter.parentA().uuid(),
-                                litter.parentB().uuid(),
-                                !receipts.isEmpty()
-                        );
-                        return BreedingLitterLiveResult.confirmed(
-                                result.reason(), result.actualChildIds()
-                        );
-                    });
+            return settleAndResult(litter, admissions, receipts);
         } catch (RuntimeException | LinkageError failure) {
             return BreedingLitterLiveResult.retryable(
                     "breeding_litter_world_failed", failure
@@ -135,7 +117,6 @@ final class BreedingLitterWorldExecutor {
         }
         return receipts;
     }
-
     private void spawnMissing(
             World world,
             Store<EntityStore> store,
@@ -154,14 +135,20 @@ final class BreedingLitterWorldExecutor {
                     "breeding_litter_config_unavailable"
             );
         }
-        int allowed = allowedCount(store, litter, config);
+        int allowed = allowedCount(
+                store, litter, config, receipts.size()
+        );
         NPCPlugin plugin = NPCPlugin.get();
         if (plugin == null) {
             throw new IllegalStateException(
                     "breeding_litter_npc_plugin_unavailable"
             );
         }
-        for (int ordinal = 0; ordinal < allowed; ordinal++) {
+        int missingAllowed = Math.max(0, allowed - receipts.size());
+        int spawnedCount = 0;
+        for (int ordinal = 0;
+             ordinal < litter.children().size() && spawnedCount < missingAllowed;
+             ordinal++) {
             if (receipts.containsKey(ordinal)) {
                 continue;
             }
@@ -184,14 +171,15 @@ final class BreedingLitterWorldExecutor {
                     store, parents, litter, config, plan, spawned
             )) {
                 receipts.put(ordinal, plan.uuid());
+                spawnedCount++;
             }
         }
     }
-
     private int allowedCount(
             Store<EntityStore> store,
             BreedingLitterOperation litter,
-            @Nullable TwBreedingConfig config
+            @Nullable TwBreedingConfig config,
+            int existingPlannedChildren
     ) {
         BreedingLitterOperation.ChildPlan first = litter.children().getFirst();
         BreedingClaimLimitPolicyService.Decision claim = claimPolicy.evaluate(
@@ -205,10 +193,11 @@ final class BreedingLitterWorldExecutor {
         if (!claim.allowed()) {
             return 0;
         }
+        int existingPlanned = Math.max(0, existingPlannedChildren);
         int allowed = claim.capEnforced()
                 ? Math.min(
                         litter.requestedCount(),
-                        claim.remainingHeadroom()
+                        existingPlanned + claim.remainingHeadroom()
                 ) : litter.requestedCount();
         if (config == null) {
             return Math.max(0, allowed);
@@ -234,9 +223,56 @@ final class BreedingLitterWorldExecutor {
         int existing = populationTypes.countNearbyOfType(
                 store, position(litter), radius, config, type
         );
-        return nearby.limit(allowed, existing, max);
+        int additional = nearby.limit(
+                Math.max(0, allowed - existingPlanned),
+                existing,
+                max
+        );
+        return Math.min(
+                litter.requestedCount(),
+                existingPlanned + additional
+        );
     }
-
+    private void initializeExisting(
+            World world,
+            Store<EntityStore> store,
+            BreedingLitterOperation litter,
+            Map<Integer, UUID> receipts
+    ) {
+        ParentRefs parents = parents(world, store, litter);
+        if (parents == null) {
+            throw new IllegalStateException(
+                    "breeding_litter_parents_unavailable"
+            );
+        }
+        TwBreedingConfig config = config(litter.breedingConfigId());
+        if (litter.breedingConfigId() != null && config == null) {
+            throw new IllegalStateException(
+                    "breeding_litter_config_unavailable"
+            );
+        }
+        for (Integer ordinal : receipts.keySet()) {
+            BreedingLitterOperation.ChildPlan plan =
+                    litter.children().get(ordinal);
+            Ref<EntityStore> ref = world.getEntityRef(plan.uuid());
+            NPCEntity npc = ref == null
+                    ? null : store.getComponent(
+                            ref, NPCEntity.getComponentType()
+                    );
+            if (ref == null || npc == null || !finishChild(
+                    store,
+                    parents,
+                    litter,
+                    config,
+                    plan,
+                    Pair.of(ref, npc)
+            )) {
+                throw new IllegalStateException(
+                        "breeding_litter_child_initialization_failed"
+                );
+            }
+        }
+    }
     private boolean finishChild(
             Store<EntityStore> store,
             ParentRefs parents,
@@ -274,8 +310,42 @@ final class BreedingLitterWorldExecutor {
                                 ignored -> { }
                         )
                 ),
-                failure -> child.second().setToDespawn()
+                ignored -> { }
         );
+    }
+    @Nonnull
+    private static BreedingLitterLiveResult settlementResult(
+            @Nonnull ManagedBatchSettlement result
+    ) {
+        if (result.status() == ManagedBatchSettlement.Status.UNAVAILABLE) {
+            return BreedingLitterLiveResult.retryable(result.reason(), null);
+        }
+        if (result.status() == ManagedBatchSettlement.Status.CANCELED) {
+            return BreedingLitterLiveResult.retryable(
+                    "breeding_litter_settlement_canceled", null
+            );
+        }
+        return BreedingLitterLiveResult.confirmed(
+                result.reason(), result.actualChildIds()
+        );
+    }
+
+    private CompletionStage<BreedingLitterLiveResult> settleAndResult(
+            BreedingLitterOperation litter,
+            ManagedBatchAdmissionAuthority admissions,
+            Map<Integer, UUID> receipts
+    ) {
+        return settle(litter, admissions, receipts).thenApply(result -> {
+            if (result.status() == ManagedBatchSettlement.Status.COMMITTED
+                    && !receipts.isEmpty()) {
+                BreedingLitterRuntime.scheduleCompanionXp(
+                        litter.worldName(),
+                        litter.parentA().uuid(),
+                        litter.parentB().uuid()
+                );
+            }
+            return settlementResult(result);
+        });
     }
 
     private CompletionStage<ManagedBatchSettlement> settle(
@@ -420,37 +490,6 @@ final class BreedingLitterWorldExecutor {
                 litter.spawnPitch(),
                 litter.spawnRoll()
         );
-    }
-
-    private static void scheduleCompanionXp(
-            String worldName,
-            UUID parentA,
-            UUID parentB,
-            boolean hasChildren
-    ) {
-        if (!hasChildren) {
-            return;
-        }
-        World world = Universe.get().getWorld(worldName);
-        if (world == null) {
-            return;
-        }
-        world.execute(() -> {
-            World current = Universe.get().getWorld(worldName);
-            if (current == null || current != world
-                    || current.getEntityStore() == null) {
-                return;
-            }
-            Store<EntityStore> store = current.getEntityStore().getStore();
-            Ref<EntityStore> a = current.getEntityRef(parentA);
-            Ref<EntityStore> b = current.getEntityRef(parentB);
-            if (live(a, store)) {
-                CompanionLevelingService.awardBreedingXp(a, store);
-            }
-            if (live(b, store)) {
-                CompanionLevelingService.awardBreedingXp(b, store);
-            }
-        });
     }
 
     private record ParentRefs(

@@ -3,6 +3,8 @@ package com.alechilles.alecstamework;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import com.alechilles.alecstamework.api.internal
         .ReplacementFeatureApiDependencies;
+import com.alechilles.alecstamework.api.internal
+        .ManagedBatchAdmissionAuthority;
 import com.alechilles.alecstamework.companion.capture.runtime
         .TameworkCaptureSourceReceiptsComponent;
 import com.alechilles.alecstamework.companion.coop.runtime
@@ -83,6 +85,7 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -393,9 +396,10 @@ final class TameworkPersistenceComposition implements AutoCloseable {
         Objects.requireNonNull(identityIndex, "identityIndex");
         TameworkDataPathLayout paths = new TameworkDataPathService(logger)
                 .resolveAndInitializeDataPathLayout(pluginDataDirectory);
+        AtomicReference<ManagedBatchAdmissionAuthority> breedingAdmissions =
+                new AtomicReference<>();
         PersistenceBootstrap bootstrap = new PersistenceBootstrap(
                 configuration(
-                        plugin,
                         paths,
                         events,
                         identityBootstrap,
@@ -403,27 +407,11 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                         captureSourceReceipts,
                         coopReceipts,
                         retirement,
-                        inventoryReceipts
+                        inventoryReceipts,
+                        breedingAdmissions
                 )
         );
-        PersistenceStartupReport initial = bootstrap.start()
-                .toCompletableFuture()
-                .join();
-        requireProjectionsBuilt(initial, bootstrap);
         PersistenceDomainFacades facades = bootstrap.facades();
-        PersistenceDiagnosticExporter diagnosticsExporter =
-                new PersistenceDiagnosticExporter(
-                        paths.targetDirectory(),
-                        bootstrap.diagnosticsReader()
-                );
-        TameworkPersistenceAuthors.Bundle authors =
-                TameworkPersistenceAuthors.create(
-                        logger,
-                        events,
-                        identityIndex,
-                        facades,
-                        retirement
-                );
         TameworkRestoredFeatureComposition restoredFeatures;
         try {
             restoredFeatures = activationPlan == null
@@ -458,7 +446,25 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             bootstrap.close();
             throw failure;
         }
+        breedingAdmissions.set(restoredFeatures.managedBatchAdmissions());
         bootstrap.bindLifecycleAdmission(restoredFeatures.lifecycleAdmission());
+        PersistenceStartupReport initial = bootstrap.start()
+                .toCompletableFuture()
+                .join();
+        requireProjectionsBuilt(initial, bootstrap);
+        PersistenceDiagnosticExporter diagnosticsExporter =
+                new PersistenceDiagnosticExporter(
+                        paths.targetDirectory(),
+                        bootstrap.diagnosticsReader()
+                );
+        TameworkPersistenceAuthors.Bundle authors =
+                TameworkPersistenceAuthors.create(
+                        logger,
+                        events,
+                        identityIndex,
+                        facades,
+                        retirement
+                );
         TameworkPersistenceComposition composition =
                 new TameworkPersistenceComposition(
                 logger,
@@ -485,7 +491,6 @@ final class TameworkPersistenceComposition implements AutoCloseable {
     }
 
     private static PublicPersistenceRuntimeConfiguration configuration(
-            Tamework plugin,
             TameworkDataPathLayout paths,
             TameworkEventBus events,
             LoadedNpcIdentityBootstrapService identityBootstrap,
@@ -497,7 +502,8 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             ComponentType<EntityStore, TameworkPersistenceRetirementComponent>
                     retirement,
             ComponentType<EntityStore, TameworkInventoryOperationReceiptsComponent>
-                    inventoryReceipts
+                    inventoryReceipts,
+            AtomicReference<ManagedBatchAdmissionAuthority> breedingAdmissions
     ) {
         return new PublicPersistenceRuntimeConfiguration(
                 paths.targetDirectory(),
@@ -512,7 +518,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                         coopReceipts,
                         retirement,
                         inventoryReceipts,
-                        plugin::managedBatchAdmissions
+                        breedingAdmissions::get
                 ),
                 HytalePublicPersistenceWorldReconciliation.factory(
                         identityBootstrap,
@@ -609,6 +615,11 @@ final class TameworkPersistenceComposition implements AutoCloseable {
     @Nonnull
     PersistenceDomainFacades facades() {
         return facades;
+    }
+
+    @Nonnull
+    ManagedBatchAdmissionAuthority managedBatchAdmissions() {
+        return restoredFeatures.managedBatchAdmissions();
     }
 
     @Nonnull

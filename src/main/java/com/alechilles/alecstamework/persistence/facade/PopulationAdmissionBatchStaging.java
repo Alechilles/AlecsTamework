@@ -272,9 +272,7 @@ final class PopulationAdmissionBatchStaging {
                         token.providerGenerationToken()
                 )
                 && token.readiness()
-                == OwnerPopulationCapDecisionViewV2.Readiness.READY
-                && (!live || payload.expiresAtMs() > wallClock.getAsLong()
-                && token.expiresAtMonotonicNanos() > monotonicClock.getAsLong());
+                == OwnerPopulationCapDecisionViewV2.Readiness.READY;
     }
 
     private CompletionStage<ManagedBatchSettlement> commitAndRead(

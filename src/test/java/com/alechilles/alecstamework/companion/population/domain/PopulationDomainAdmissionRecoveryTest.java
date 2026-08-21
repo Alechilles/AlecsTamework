@@ -113,6 +113,48 @@ class PopulationDomainAdmissionRecoveryTest {
     }
 
     @Test
+    void liveBatchRecoveryDefersOwnershipToTheDurableLitterJob() {
+        AtomicInteger now = new AtomicInteger(10);
+        try (PersistenceBootstrap persistence = new PersistenceBootstrap(
+                configuration(tempDir.resolve("paired"), now::get))) {
+            assertTrue(persistence.start().toCompletableFuture().join().complete());
+            PopulationDomainAdmissionOperation operations = persistence.facades()
+                    .operations().populationDomainAdmission();
+            PopulationDomainAdmissionOperation.Payload payload = payload(
+                    100,
+                    List.of(java.util.UUID.fromString(
+                            "70000000-0000-0000-0000-000000000706"
+                    ))
+            );
+            OperationEnvelope prepared = committedEnvelope(operations.prepare(
+                    OPERATION,
+                    new IdempotencyKey("recovery-paired"),
+                    payload
+            ).completion().toCompletableFuture().join());
+            assertNotNull(prepared);
+            operations.claim(OPERATION).toCompletableFuture().join();
+            OperationEnvelope applying = operations.findByIdempotency(
+                    new IdempotencyKey("recovery-paired")
+            ).toCompletableFuture().join().orElseThrow();
+
+            OperationWorkflowResult result = operations.recover(
+                    claim(applying, payload)
+            ).toCompletableFuture().join();
+
+            assertEquals(OperationWorkflowResult.Status.LIVE_RETRYABLE,
+                    result.status());
+            assertEquals(
+                    "domain_admission_litter_recovery_owned_by_litter_job",
+                    result.failure().getMessage()
+            );
+            assertEquals(OperationPhase.LIVE_APPLYING,
+                    operations.findByIdempotency(
+                            new IdempotencyKey("recovery-paired")
+                    ).toCompletableFuture().join().orElseThrow().phase());
+        }
+    }
+
+    @Test
     void committedContainmentReportsUnknownOnlyAfterBothReadbacks()
             throws Exception {
         try (RawFixture fixture = new RawFixture(tempDir.resolve("contained"),
@@ -229,6 +271,13 @@ class PopulationDomainAdmissionRecoveryTest {
     }
 
     private PopulationDomainAdmissionOperation.Payload payload(long expiresAtMs) {
+        return payload(expiresAtMs, List.of());
+    }
+
+    private PopulationDomainAdmissionOperation.Payload payload(
+            long expiresAtMs,
+            List<java.util.UUID> provisionalChildIds
+    ) {
         return new PopulationDomainAdmissionOperation.Payload(
                 java.util.UUID.fromString("70000000-0000-0000-0000-000000000703"),
                 PROFILE,
@@ -248,7 +297,7 @@ class PopulationDomainAdmissionRecoveryTest {
                 expiresAtMs,
                 1,
                 List.of(),
-                List.of(),
+                provisionalChildIds,
                 1
         );
     }

@@ -66,6 +66,7 @@ import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.config.assets.TwMountedGlideConfig;
 import com.alechilles.alecstamework.config.assets.TwMountedDescentConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.npc.actions.BreedingLitterRuntime;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
@@ -792,6 +793,18 @@ public class Tamework extends JavaPlugin {
                 bondedCompanionComposition == null ? null : bondedCompanionComposition.api()
         );
         api = apiComposition.api();
+        BreedingLitterRuntime.install(
+                this::managedBatchAdmissions,
+                litter -> persistenceComposition == null
+                        ? java.util.concurrent.CompletableFuture
+                                .completedFuture(false)
+                        : persistenceComposition.facades().operations()
+                                .prepareBreedingLitter(litter),
+                litter -> persistenceComposition == null
+                        ? null
+                        : persistenceComposition.facades().operations()
+                                .submitBreedingLitter(litter)
+        );
         apiComposition.activateCapturePolicyRuntime(
                 itemFeatureRegistry, capturePolicyRegistry
         );
@@ -1426,9 +1439,9 @@ public class Tamework extends JavaPlugin {
 
     @Nullable
     ManagedBatchAdmissionAuthority managedBatchAdmissions() {
-        return apiComposition == null
+        return persistenceComposition == null
                 ? null
-                : apiComposition.managedBatchAdmissions();
+                : persistenceComposition.managedBatchAdmissions();
     }
 
     /** Validates setup-declared factories before persistence can mutate state. */

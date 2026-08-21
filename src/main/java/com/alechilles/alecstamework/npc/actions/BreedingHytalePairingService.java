@@ -22,24 +22,17 @@ import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
 /**
- * Matches a live pair, applies released cooldown/effects, and queues a live birth.
- *
- * <p>The pairing owns no durable job, replay identity, reservation, or persistence
- * callback. Delayed work carries stable UUIDs and resolves both parents on the
- * world thread before spawning.
+ * Matches a live pair, freezes one litter, and schedules its durable birth.
  */
 final class BreedingHytalePairingService {
     private static final double SPAWN_HEIGHT_OFFSET = 1.0;
 
     private final BreedingPartnerService partnerService;
     private final BreedingPairAdmissionRegistry admissionRegistry;
-    private final BreedingParentCooldownResolver cooldownResolver =
-            new BreedingParentCooldownResolver();
-    private final BreedingPairEffectsService pairEffects =
-            new BreedingPairEffectsService();
-    private final BreedingPairingEffectsService delayedEffects =
-            new BreedingPairingEffectsService(new BreedingParticleOffsetResolver());
-    private final BreedingOffspringBirthService birthService;
+    private final BreedingLitterPlanner litterPlanner =
+            new BreedingLitterPlanner();
+    private final BreedingLitterCommitService litterCommit =
+            new BreedingLitterCommitService(litterPlanner);
     private final BreedingClaimLimitPolicyService limitPolicy;
 
     BreedingHytalePairingService(
@@ -50,7 +43,6 @@ final class BreedingHytalePairingService {
         this.partnerService = partnerService;
         this.admissionRegistry = admissionRegistry;
         this.limitPolicy = limitPolicy;
-        this.birthService = new BreedingOffspringBirthService(limitPolicy);
     }
 
     boolean tryPassive(
@@ -108,7 +100,7 @@ final class BreedingHytalePairingService {
             @Nullable Map<BreedingClaimLimitPolicyService.PlayerReservationKey, Integer>
                     pendingOwners
     ) {
-        PairCandidate candidate = resolveCandidate(
+        BreedingPairCandidate candidate = resolveCandidate(
                 sourceRef, store, sourceBreeding, config, readiness
         );
         BreedingClaimLimitPolicyService.Decision population = candidate == null
@@ -128,49 +120,33 @@ final class BreedingHytalePairingService {
             logDebug("Breeding pairing skipped because a parent already has a scheduled birth.");
             return false;
         }
-        if (!applyPairEffects(candidate, config, commandBuffer)) {
+        BreedingLitterPlanner.Plan litter = litterPlanner.plan(
+                candidate.sourceRef(),
+                candidate.partnerRef(),
+                candidate.store(),
+                context,
+                config,
+                candidate.world().getName()
+        );
+        if (litter == null) {
             admission.close();
             return false;
+        }
+        if (litter.empty()) {
+            boolean applied = litterCommit.applyPairEffects(
+                    candidate, config, commandBuffer
+            );
+            admission.close();
+            return applied;
         }
         reserveSweepHeadroom(population, pendingClaims, pendingOwners);
-        return scheduleBirth(candidate.world(), context, admission);
-    }
-
-    private boolean scheduleBirth(
-            @Nonnull World world,
-            @Nonnull BreedingPairContext context,
-            @Nonnull BreedingPairAdmissionRegistry.Lease admission
-    ) {
-        try {
-            delayedEffects.schedule(
-                    world,
-                    context.parentAUuid(),
-                    context.parentBUuid(),
-                    () -> {
-                        try {
-                            birthService.spawn(world, context);
-                        } finally {
-                            admission.close();
-                        }
-                    },
-                    () -> {
-                        try {
-                            logDebug("Breeding delayed pairing canceled before spawn.");
-                        } finally {
-                            admission.close();
-                        }
-                    }
-            );
-            return true;
-        } catch (RuntimeException | LinkageError failure) {
-            admission.close();
-            logDebug("Breeding delayed pairing could not be scheduled.");
-            return false;
-        }
+        return litterCommit.prepare(
+                candidate.world().getName(), context, litter, admission
+        );
     }
 
     @Nullable
-    private PairCandidate resolveCandidate(
+    private BreedingPairCandidate resolveCandidate(
             @Nullable Ref<EntityStore> sourceRef,
             @Nullable Store<EntityStore> store,
             @Nullable TameworkBreedingComponent sourceBreeding,
@@ -193,7 +169,7 @@ final class BreedingHytalePairingService {
     }
 
     @Nullable
-    private PairCandidate resolveLiveCandidate(
+    private BreedingPairCandidate resolveLiveCandidate(
             @Nonnull Ref<EntityStore> sourceRef,
             @Nonnull Ref<EntityStore> partnerRef,
             @Nonnull TameworkBreedingComponent sourceBreeding,
@@ -210,7 +186,7 @@ final class BreedingHytalePairingService {
                 || world == null || !world.isAlive()) {
             return null;
         }
-        return new PairCandidate(
+        return new BreedingPairCandidate(
                 sourceRef,
                 partnerRef,
                 sourceNpc,
@@ -227,7 +203,7 @@ final class BreedingHytalePairingService {
 
     @Nonnull
     private BreedingClaimLimitPolicyService.Decision evaluatePopulation(
-            @Nonnull PairCandidate candidate,
+            @Nonnull BreedingPairCandidate candidate,
             @Nullable TwBreedingConfig config,
             @Nullable Map<BreedingClaimLimitPolicyService.ClaimReservationKey, Integer>
                     pendingClaims,
@@ -278,37 +254,9 @@ final class BreedingHytalePairingService {
         }
     }
 
-    private boolean applyPairEffects(
-            @Nonnull PairCandidate candidate,
-            @Nullable TwBreedingConfig config,
-            @Nullable CommandBuffer<EntityStore> commandBuffer
-    ) {
-        long now = BreedingTimeService.resolveCurrentTimeMs(candidate.store());
-        BreedingParentCooldownResolver.ResolvedCooldown sourceCooldown =
-                cooldownResolver.resolve(config, candidate.sourceRef(), candidate.store());
-        BreedingParentCooldownResolver.ResolvedCooldown partnerCooldown =
-                cooldownResolver.resolve(config, candidate.partnerRef(), candidate.store());
-        return pairEffects.apply(new BreedingPairEffectsService.EffectContext(
-                candidate.sourceRef(),
-                candidate.sourceNpc(),
-                candidate.sourceBreeding(),
-                candidate.partnerRef(),
-                candidate.partnerNpc(),
-                candidate.partnerBreeding(),
-                sourceCooldown,
-                partnerCooldown,
-                candidate.sourceOwner(),
-                candidate.partnerOwner(),
-                now,
-                System.currentTimeMillis(),
-                candidate.store(),
-                commandBuffer
-        ));
-    }
-
     @Nonnull
     private BreedingPairContext createContext(
-            @Nonnull PairCandidate candidate,
+            @Nonnull BreedingPairCandidate candidate,
             @Nullable TwBreedingConfig config
     ) {
         return new BreedingPairContext(
@@ -404,18 +352,4 @@ final class BreedingHytalePairingService {
         }
     }
 
-    private record PairCandidate(
-            Ref<EntityStore> sourceRef,
-            Ref<EntityStore> partnerRef,
-            NPCEntity sourceNpc,
-            NPCEntity partnerNpc,
-            TameworkBreedingComponent sourceBreeding,
-            TameworkBreedingComponent partnerBreeding,
-            Store<EntityStore> store,
-            World world,
-            @Nullable Vector3d spawnAnchor,
-            BreedingOffspringProgressionService.OwnerSnapshot sourceOwner,
-            BreedingOffspringProgressionService.OwnerSnapshot partnerOwner
-    ) {
-    }
 }

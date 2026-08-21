@@ -29,7 +29,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-
 /** Shared operation adapter for staged provider-aware domain admission. */
 public final class PopulationDomainAdmissionOperation {
     public static final String FEATURE_SCOPE = "population_domains";
@@ -62,7 +61,6 @@ public final class PopulationDomainAdmissionOperation {
         this.consumers = List.copyOf(consumers);
         this.clock = clock;
     }
-
     @Nonnull
     public SqliteUnitOfWorkRunner.Submission<OperationEnvelope> prepare(
             @Nonnull OperationId operationId,
@@ -71,7 +69,6 @@ public final class PopulationDomainAdmissionOperation {
     ) {
         return prepare(operationId, idempotencyKey, payload, null);
     }
-
     @Nonnull
     public SqliteUnitOfWorkRunner.Submission<OperationEnvelope> prepare(
             @Nonnull OperationId operationId,
@@ -113,7 +110,6 @@ public final class PopulationDomainAdmissionOperation {
                 reader, idempotencyKey
         );
     }
-
     /** Reads the frozen authority needed to authenticate a restarted batch. */
     @Nonnull
     public CompletionStage<BatchSettlementAuthority> batchSettlementAuthority(
@@ -133,7 +129,6 @@ public final class PopulationDomainAdmissionOperation {
             );
         });
     }
-
     @Nonnull
     public CompletionStage<OperationEnvelope> claim(@Nonnull OperationId operationId) {
         return read(operationId).thenCompose(operation -> {
@@ -154,7 +149,6 @@ public final class PopulationDomainAdmissionOperation {
             ));
         });
     }
-
     /** Claims one prepared token and returns its process-local cancellation proof. */
     @Nonnull
     public CompletionStage<PopulationAdmissionCancellationPermit> claimForAdmission(
@@ -168,7 +162,6 @@ public final class PopulationDomainAdmissionOperation {
                         token, operation, engine, clock, cancellationPermits
                 ));
     }
-
     @Nonnull
     public CompletionStage<OperationWorkflow> commit(
             @Nonnull OperationId operationId,
@@ -192,7 +185,6 @@ public final class PopulationDomainAdmissionOperation {
                 id -> durable(id, true, null, null, true)
         );
     }
-
     @Nonnull
     public CompletionStage<OperationWorkflow> commitBatch(
             @Nonnull OperationId operationId,
@@ -230,7 +222,6 @@ public final class PopulationDomainAdmissionOperation {
             });
         });
     }
-
     /** Re-enters the exact shared recovery route for a leased operation claim. */
     @Nonnull
     public CompletionStage<OperationWorkflowResult> recover(
@@ -244,13 +235,32 @@ public final class PopulationDomainAdmissionOperation {
             case DURABLE, PUBLISHED -> publisher.resume(
                     claim.operation(), consumers
             ).thenApply(result -> terminalResult(result, claim.operation()));
-            case LIVE_APPLYING, UNKNOWN, RETRYABLE, COMPENSATING -> containLiveClaim(claim);
+            case LIVE_APPLYING, UNKNOWN, RETRYABLE, COMPENSATING ->
+                    recoverLiveClaim(claim);
             case COMPENSATED, FAILED -> CompletableFuture.failedFuture(
                     new IllegalStateException("domain_admission_terminal_recovery")
             );
         };
     }
-
+    private CompletionStage<OperationWorkflowResult> recoverLiveClaim(
+            OperationRecoveryClaim claim
+    ) {
+        try {
+            Payload payload = PopulationDomainAdmissionDefinition.INSTANCE
+                    .decode(claim.operation().payloadJson());
+            if (payload.provisionalChildIds().isEmpty()) {
+                return containLiveClaim(claim);
+            }
+            return CompletableFuture.completedFuture(new OperationWorkflowResult(
+                    OperationWorkflowResult.Status.LIVE_RETRYABLE,
+                    claim.operation(), List.of(), new IllegalStateException(
+                    "domain_admission_litter_recovery_owned_by_litter_job")));
+        } catch (RuntimeException invalid) {
+            return CompletableFuture.completedFuture(new OperationWorkflowResult(
+                    OperationWorkflowResult.Status.LIVE_RETRYABLE,
+                    claim.operation(), List.of(), invalid));
+        }
+    }
     private CompletionStage<OperationWorkflowResult> recoverPreparedClaim(
             OperationRecoveryClaim claim
     ) {
@@ -283,7 +293,6 @@ public final class PopulationDomainAdmissionOperation {
                         "domain_admission_recovery_missing_result"))
                         : CompletableFuture.completedFuture(workflow.result()));
     }
-
     private CompletionStage<OperationWorkflow> durable(
             OperationId operationId,
             boolean canceled,
@@ -294,7 +303,6 @@ public final class PopulationDomainAdmissionOperation {
                 operationId, canceled, settledOrdinals, actualChildIds, false
         );
     }
-
     private CompletionStage<OperationWorkflow> durable(
             OperationId operationId,
             boolean canceled,

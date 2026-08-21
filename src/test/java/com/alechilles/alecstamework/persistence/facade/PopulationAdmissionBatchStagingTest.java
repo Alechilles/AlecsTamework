@@ -121,6 +121,15 @@ class PopulationAdmissionBatchStagingTest {
                     operations.findByIdempotency(new IdempotencyKey(
                             "batch-restart-test"
                     )).toCompletableFuture().join().orElseThrow().phase());
+            ManagedBatchSettlement invalidOrdinal = staging.settle(
+                    token,
+                    Set.of(2),
+                    Map.of(2, UUID.fromString(
+                            "60000000-0000-0000-0000-000000000604"
+                    ))
+            ).toCompletableFuture().join();
+            assertEquals(ManagedBatchSettlement.Status.UNAVAILABLE,
+                    invalidOrdinal.status());
             PopulationAdmissionToken expired = new PopulationAdmissionToken(
                     LITTER,
                     payload.reservationId(),
@@ -136,17 +145,9 @@ class PopulationAdmissionBatchStagingTest {
                             "60000000-0000-0000-0000-000000000604"
                     ))
             ).toCompletableFuture().join();
-            assertEquals(ManagedBatchSettlement.Status.UNAVAILABLE,
+            assertEquals(ManagedBatchSettlement.Status.COMMITTED,
                     expiredResult.status());
-            ManagedBatchSettlement invalidOrdinal = staging.settle(
-                    token,
-                    Set.of(2),
-                    Map.of(2, UUID.fromString(
-                            "60000000-0000-0000-0000-000000000604"
-                    ))
-            ).toCompletableFuture().join();
-            assertEquals(ManagedBatchSettlement.Status.UNAVAILABLE,
-                    invalidOrdinal.status());
+            assertEquals(Set.of(0), expiredResult.settledOrdinals());
             ManagedBatchSettlement settlement = staging.settle(
                     token,
                     Set.of(0),

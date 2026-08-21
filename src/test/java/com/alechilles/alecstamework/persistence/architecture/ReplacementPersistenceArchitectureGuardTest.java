@@ -193,6 +193,7 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "mutateProfile",
                         "mutateTimedSummonLease",
                         "populationDomainAdmission",
+                        "prepareBreedingLitter",
                         "provisionCompanion",
                         "reconcileOwnerPopulation",
                         "registerCoopSlot",
@@ -201,6 +202,7 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "restore",
                         "reviveCompanion",
                         "rotateAlias",
+                        "submitBreedingLitter",
                         "transitionCommandRoster",
                         "transitionOwnerPopulation",
                         "transitionTimedSummon"
@@ -228,7 +230,8 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "coopReleases",
                         "timedSummons",
                         "provisioningActivations",
-                        "paidRevivals"
+                        "paidRevivals",
+                        "breedingLitters"
                 ),
                 boundaries
         );
