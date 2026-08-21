@@ -1,11 +1,13 @@
 package com.alechilles.alecstamework.persistence.facade;
 
 import com.alechilles.alecstamework.api.OwnerPopulationCapDecisionViewV2;
+import com.alechilles.alecstamework.api.PopulationAdmissionDecision;
 import com.alechilles.alecstamework.api.PopulationAdmissionToken;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.population.domain.ManagedBatchSettlement;
+import com.alechilles.alecstamework.companion.population.domain.PopulationAdmissionCancellationPermit;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
@@ -72,7 +74,7 @@ class PopulationAdmissionBatchStagingTest {
                     "generation",
                     1,
                     1,
-                    Long.MAX_VALUE,
+                    1,
                     2,
                     List.of(),
                     provisional,
@@ -85,12 +87,10 @@ class PopulationAdmissionBatchStagingTest {
                     payload
             ).completion().toCompletableFuture().join();
             assertTrue(prepared instanceof PersistenceTransactionResult.Committed<?>);
-            operations.claim(operationId).toCompletableFuture().join();
-
             PopulationAdmissionToken token = new PopulationAdmissionToken(
                     LITTER,
                     payload.reservationId(),
-                    Long.MAX_VALUE,
+                    1,
                     1,
                     "generation",
                     OwnerPopulationCapDecisionViewV2.Readiness.READY
@@ -99,6 +99,9 @@ class PopulationAdmissionBatchStagingTest {
                     operations,
                     new java.util.concurrent.ConcurrentHashMap<>()
             );
+            assertEquals(PopulationAdmissionDecision.Status.APPLYING,
+                    staging.claimForRecovery(token).toCompletableFuture()
+                            .join().status());
             PopulationAdmissionToken forged = new PopulationAdmissionToken(
                     LITTER,
                     UUID.fromString("60000000-0000-0000-0000-000000000605"),
@@ -107,6 +110,9 @@ class PopulationAdmissionBatchStagingTest {
                     "forged-generation",
                     OwnerPopulationCapDecisionViewV2.Readiness.READY
             );
+            assertEquals(PopulationAdmissionDecision.Status.UNAVAILABLE,
+                    staging.claimForRecovery(forged).toCompletableFuture()
+                            .join().status());
             ManagedBatchSettlement rejected = staging.settle(
                     forged,
                     Set.of(0),
@@ -169,6 +175,77 @@ class PopulationAdmissionBatchStagingTest {
             assertEquals(settlement.status(), replay.status());
             assertEquals(settlement.actualChildIds(), replay.actualChildIds());
             assertFalse(operations.settlementEvidence(operationId)
+                    .toCompletableFuture().join().canceled());
+        }
+    }
+
+    @Test
+    void recoveryClaimRejectsCanceledBatchBeforeWorldMutation() {
+        UUID operationUuid = UUID.fromString(
+                "60000000-0000-0000-0000-000000000607"
+        );
+        PopulationDomainAdmissionOperation.Payload payload =
+                new PopulationDomainAdmissionOperation.Payload(
+                        UUID.nameUUIDFromBytes((operationUuid + ":reservation")
+                                .getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+                        PROFILE,
+                        new OwnerId(OWNER),
+                        null,
+                        "world",
+                        null,
+                        null,
+                        null,
+                        LifecycleState.ACTIVE,
+                        "test-group",
+                        "test-provider",
+                        1,
+                        "generation",
+                        1,
+                        1,
+                        Long.MAX_VALUE,
+                        1,
+                        List.of(),
+                        List.of(UUID.nameUUIDFromBytes((operationUuid + ":child:0")
+                                .getBytes(java.nio.charset.StandardCharsets.UTF_8))),
+                        1
+                );
+        try (PersistenceBootstrap persistence = new PersistenceBootstrap(configuration())) {
+            assertTrue(persistence.start().toCompletableFuture().join().complete());
+            PopulationDomainAdmissionOperation operations = persistence.facades()
+                    .operations().populationDomainAdmission();
+            OperationId operationId = new OperationId(operationUuid);
+            PersistenceTransactionResult<OperationEnvelope> prepared = operations.prepare(
+                    operationId,
+                    new IdempotencyKey("batch-canceled-recovery"),
+                    payload
+            ).completion().toCompletableFuture().join();
+            assertTrue(prepared instanceof PersistenceTransactionResult.Committed<?>,
+                    String.valueOf(prepared));
+            PopulationAdmissionToken token = new PopulationAdmissionToken(
+                    operationUuid,
+                    payload.reservationId(),
+                    Long.MAX_VALUE,
+                    1,
+                    "generation",
+                    OwnerPopulationCapDecisionViewV2.Readiness.READY
+            );
+            PopulationAdmissionCancellationPermit permit = operations
+                    .claimForAdmission(token).toCompletableFuture().join();
+            assertEquals(com.alechilles.alecstamework.persistence.operation
+                    .OperationWorkflowResult.Status.PUBLISHED,
+                    operations.cancelPreclaimed(permit).toCompletableFuture()
+                            .join().result().status());
+
+            PopulationAdmissionDecision decision =
+                    new PopulationAdmissionBatchStaging(
+                            operations,
+                            new java.util.concurrent.ConcurrentHashMap<>()
+                    ).claimForRecovery(token).toCompletableFuture().join();
+
+            assertEquals(PopulationAdmissionDecision.Status.CANCELED,
+                    decision.status());
+            assertFalse(decision.accepted());
+            assertTrue(operations.settlementEvidence(operationId)
                     .toCompletableFuture().join().canceled());
         }
     }

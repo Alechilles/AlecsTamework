@@ -1,5 +1,4 @@
 package com.alechilles.alecstamework.npc.actions;
-
 import com.alechilles.alecstamework.api.PopulationAdmissionDecision;
 import com.alechilles.alecstamework.api.internal.ManagedBatchAdmissionAuthority;
 import com.alechilles.alecstamework.companion.population.domain.ManagedBatchSettlement;
@@ -24,8 +23,6 @@ import java.util.concurrent.CompletionStage;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
-
-/** Reconciles planned children on the world thread, then settles one litter. */
 final class BreedingLitterWorldExecutor {
     private final BreedingOffspringSpawnService spawns =
             new BreedingOffspringSpawnService(
@@ -51,17 +48,37 @@ final class BreedingLitterWorldExecutor {
             );
     private final BreedingSpawnCompletionGuard completion =
             new BreedingSpawnCompletionGuard();
-
-    @Nonnull
-    CompletionStage<BreedingLitterLiveResult> execute(
-            @Nonnull World world,
-            @Nonnull Store<EntityStore> store,
-            @Nonnull BreedingLitterOperation litter,
-            @Nonnull OperationEnvelope operation,
-            @Nonnull ManagedBatchAdmissionAuthority admissions
-    ) {
+    CompletionStage<BreedingLitterLiveResult> execute(@Nonnull World world,
+            @Nonnull Store<EntityStore> store, @Nonnull BreedingLitterOperation litter,
+            @Nonnull OperationEnvelope operation, @Nonnull ManagedBatchAdmissionAuthority admissions) {
+        return execute(world, store, litter, operation, admissions, null);
+    }
+    CompletionStage<BreedingLitterLiveResult> executeRecovered(@Nonnull World world,
+            @Nonnull Store<EntityStore> store, @Nonnull BreedingLitterOperation litter,
+            @Nonnull OperationEnvelope operation, @Nonnull ManagedBatchAdmissionAuthority admissions,
+            @Nonnull PopulationAdmissionDecision claim) {
+        return execute(world, store, litter, operation, admissions, claim);
+    }
+    private CompletionStage<BreedingLitterLiveResult> execute(World world, Store<EntityStore> store,
+            BreedingLitterOperation litter, OperationEnvelope operation,
+            ManagedBatchAdmissionAuthority admissions, @Nullable PopulationAdmissionDecision recoveredClaim) {
         try {
             store.assertThread();
+            if (recoveredClaim == null && operation.attemptCount() > 0) {
+                return BreedingLitterRuntime.recover(this, world, litter, operation, admissions);
+            }
+            if (recoveredClaim != null
+                    && recoveredClaim.status()
+                    == PopulationAdmissionDecision.Status.COMMITTED) {
+                return settleAndResult(litter, admissions, Map.of());
+            }
+            if (recoveredClaim != null
+                    && (recoveredClaim.status()
+                    != PopulationAdmissionDecision.Status.APPLYING
+                    || !recoveredClaim.accepted()
+                    || !litter.admissionToken().equals(recoveredClaim.token()))) {
+                return BreedingLitterLiveResult.retryable("breeding_litter_batch_recovery_rejected", null).completed();
+            }
             Map<Integer, UUID> receipts = findExisting(
                     world, store, litter
             );
@@ -69,23 +86,19 @@ final class BreedingLitterWorldExecutor {
                 initializeExisting(world, store, litter, receipts);
             }
             if (receipts.size() < litter.requestedCount()) {
-                PopulationAdmissionDecision claim =
-                        admissions.claimManagedBatch(
-                                litter.admissionToken()
-                        );
-                if (!claim.accepted() && operation.attemptCount() == 0) {
+                PopulationAdmissionDecision claim = recoveredClaim == null
+                        ? admissions.claimManagedBatch(litter.admissionToken())
+                        : recoveredClaim;
+                if (!claim.accepted()) {
                     return settleAndResult(litter, admissions, receipts);
                 }
                 spawnMissing(world, store, litter, receipts);
             }
             return settleAndResult(litter, admissions, receipts);
         } catch (RuntimeException | LinkageError failure) {
-            return BreedingLitterLiveResult.retryable(
-                    "breeding_litter_world_failed", failure
-            ).completed();
+            return BreedingLitterLiveResult.retryable("breeding_litter_world_failed", failure).completed();
         }
     }
-
     private Map<Integer, UUID> findExisting(
             World world,
             Store<EntityStore> store,
@@ -329,7 +342,6 @@ final class BreedingLitterWorldExecutor {
                 result.reason(), result.actualChildIds()
         );
     }
-
     private CompletionStage<BreedingLitterLiveResult> settleAndResult(
             BreedingLitterOperation litter,
             ManagedBatchAdmissionAuthority admissions,
@@ -347,7 +359,6 @@ final class BreedingLitterWorldExecutor {
             return settlementResult(result);
         });
     }
-
     private CompletionStage<ManagedBatchSettlement> settle(
             BreedingLitterOperation litter,
             ManagedBatchAdmissionAuthority admissions,
@@ -373,7 +384,6 @@ final class BreedingLitterWorldExecutor {
             ));
         }
     }
-
     private static ManagedBatchSettlement unavailable(
             BreedingLitterOperation litter,
             String reason
@@ -386,8 +396,6 @@ final class BreedingLitterWorldExecutor {
                 Map.of()
         );
     }
-
-    @Nullable
     private static ParentRefs parents(
             World world,
             Store<EntityStore> store,
@@ -408,7 +416,6 @@ final class BreedingLitterWorldExecutor {
                         ref, NPCEntity.getComponentType()
                 ) != null;
     }
-
     private static boolean roleMatches(NPCEntity npc, String roleId) {
         String actual = npc.getRoleName();
         if (actual == null || actual.isBlank()) {
@@ -418,13 +425,9 @@ final class BreedingLitterWorldExecutor {
         }
         return actual != null && actual.equalsIgnoreCase(roleId);
     }
-
-    @Nullable
     private static TwBreedingConfig config(@Nullable String id) {
         return id == null ? null : TwBreedingConfig.resolveById(id);
     }
-
-    @Nullable
     private static TwBreedingConfig.RoleFamily family(
             @Nullable TwBreedingConfig config,
             BreedingLitterOperation.ChildPlan plan
@@ -455,7 +458,6 @@ final class BreedingLitterWorldExecutor {
         }
         return family;
     }
-
     private static BreedingOffspringProgressionService.OwnerSnapshot owner(
             BreedingLitterOperation.Parent parent
     ) {
@@ -463,13 +465,11 @@ final class BreedingLitterWorldExecutor {
                 parent.ownerId(), parent.ownerName()
         );
     }
-
     private static Vector3d position(BreedingLitterOperation litter) {
         return new Vector3d(
                 litter.spawnX(), litter.spawnY(), litter.spawnZ()
         );
     }
-
     private static Vector3d offset(
             BreedingLitterOperation litter,
             int ordinal
@@ -483,7 +483,6 @@ final class BreedingLitterWorldExecutor {
                 Math.sin(angle) * 0.35
         );
     }
-
     private static Rotation3f rotation(BreedingLitterOperation litter) {
         return new Rotation3f(
                 litter.spawnYaw(),

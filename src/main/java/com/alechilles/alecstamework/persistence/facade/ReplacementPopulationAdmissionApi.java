@@ -236,6 +236,17 @@ public final class ReplacementPopulationAdmissionApi
         return claimForApply(token);
     }
 
+    /** Internal durable recovery claim. It never blocks the world thread. */
+    @Nonnull
+    @Override
+    public CompletionStage<PopulationAdmissionDecision>
+    claimManagedBatchForRecovery(@Nonnull PopulationAdmissionToken token) {
+        if (token == null) {
+            throw new NullPointerException("token");
+        }
+        return staging.claimForRecovery(token);
+    }
+
     /** Internal exact ordinal settlement boundary for one managed litter. */
     @Nonnull
     @Override

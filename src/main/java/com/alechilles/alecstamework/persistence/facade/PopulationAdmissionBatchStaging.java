@@ -26,7 +26,6 @@ import java.util.function.LongSupplier;
 final class PopulationAdmissionBatchStaging {
     private final PopulationDomainAdmissionOperation operations;
     private final ConcurrentMap<UUID, PopulationAdmissionStaging.ActiveToken> active;
-    private final LongSupplier wallClock;
     private final LongSupplier monotonicClock;
     private final PopulationAdmissionSettlementFlights<ManagedBatchSettlement>
             settlementFlights = new PopulationAdmissionSettlementFlights<>();
@@ -46,7 +45,7 @@ final class PopulationAdmissionBatchStaging {
     ) {
         this.operations = Objects.requireNonNull(operations, "operations");
         this.active = Objects.requireNonNull(active, "active");
-        this.wallClock = Objects.requireNonNull(wallClock, "wallClock");
+        Objects.requireNonNull(wallClock, "wallClock");
         this.monotonicClock = Objects.requireNonNull(monotonicClock, "monotonicClock");
     }
 
@@ -173,7 +172,95 @@ final class PopulationAdmissionBatchStaging {
                     );
                     settlementFlights.complete(token.operationId(), flight, unavailable);
                     return unavailable;
-                });
+        });
+    }
+
+    CompletionStage<PopulationAdmissionDecision> claimForRecovery(
+            PopulationAdmissionToken token
+    ) {
+        if (token == null) {
+            throw new NullPointerException("token");
+        }
+        return operations.batchSettlementAuthority(
+                        new OperationId(token.operationId())
+                )
+                .thenCompose(authority -> {
+                    OperationEnvelope operation = authority.operation();
+                    PopulationDomainAdmissionOperation.Payload payload =
+                            authority.payload();
+                    if (!tokenMatches(token, authority)) {
+                        return CompletableFuture.completedFuture(
+                                PopulationAdmissionDecision.unavailable(
+                                        "population-admission-batch-token-invalid"
+                                )
+                        );
+                    }
+                    return switch (operation.phase()) {
+                        case LIVE_APPLYING -> CompletableFuture.completedFuture(
+                                recoveryApplying(token)
+                        );
+                        case PREPARED -> claimPreparedForRecovery(
+                                token, operation
+                        );
+                        case DURABLE, PUBLISHED ->
+                                recoveryTerminal(token, operation, payload);
+                        default -> CompletableFuture.completedFuture(
+                                PopulationAdmissionDecision.unavailable(
+                                        "population-admission-batch-token-invalid"
+                                )
+                        );
+                    };
+                })
+                .exceptionally(failure -> PopulationAdmissionDecision.unavailable(
+                        "population-admission-batch-recovery-unavailable"
+                ));
+    }
+
+    private CompletionStage<PopulationAdmissionDecision> claimPreparedForRecovery(
+            PopulationAdmissionToken token,
+            OperationEnvelope operation
+    ) {
+        return operations.claim(operation.operationId())
+                .thenApply(ignored -> recoveryApplying(token));
+    }
+
+    private CompletionStage<PopulationAdmissionDecision> recoveryTerminal(
+            PopulationAdmissionToken token,
+            OperationEnvelope operation,
+            PopulationDomainAdmissionOperation.Payload payload
+    ) {
+        return operations.settlementEvidence(operation.operationId())
+                .thenApply(evidence -> evidence.canceled()
+                        ? new PopulationAdmissionDecision(
+                                PopulationAdmissionDecision.Status.CANCELED,
+                                "population-admission-batch-canceled",
+                                null,
+                                OwnerPopulationCapDecisionViewV2.Readiness.READY,
+                                0,
+                                0
+                        )
+                        : new PopulationAdmissionDecision(
+                                PopulationAdmissionDecision.Status.COMMITTED,
+                                "population-admission-batch-committed",
+                                token,
+                                OwnerPopulationCapDecisionViewV2.Readiness.READY,
+                                evidence.settledOrdinals().size(),
+                                Math.max(0, payload.requestedCount()
+                                        - evidence.settledOrdinals().size())
+                        ));
+    }
+
+    private PopulationAdmissionDecision recoveryApplying(
+            PopulationAdmissionToken token
+    ) {
+        return new PopulationAdmissionDecision(
+                PopulationAdmissionDecision.Status.APPLYING,
+                "population-admission-applying",
+                token,
+                OwnerPopulationCapDecisionViewV2.Readiness.READY,
+                0,
+                1
+        );
     }
 
     private CompletionStage<ManagedBatchSettlement> settleRestarted(
@@ -218,8 +305,7 @@ final class PopulationAdmissionBatchStaging {
                     OperationEnvelope operation = authority.operation();
                     PopulationDomainAdmissionOperation.Payload payload =
                             authority.payload();
-                    if (!tokenMatches(token, authority,
-                            operation.phase() == OperationPhase.LIVE_APPLYING)) {
+                    if (!tokenMatches(token, authority)) {
                         return CompletableFuture.completedFuture(unavailableBatch(
                                 "population-admission-batch-token-invalid",
                                 payload.requestedCount()
@@ -260,8 +346,7 @@ final class PopulationAdmissionBatchStaging {
 
     private boolean tokenMatches(
             PopulationAdmissionToken token,
-            PopulationDomainAdmissionOperation.BatchSettlementAuthority authority,
-            boolean live
+            PopulationDomainAdmissionOperation.BatchSettlementAuthority authority
     ) {
         OperationEnvelope operation = authority.operation();
         PopulationDomainAdmissionOperation.Payload payload = authority.payload();

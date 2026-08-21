@@ -1,8 +1,10 @@
 package com.alechilles.alecstamework.companion.population.domain;
 
+import com.alechilles.alecstamework.api.OwnerPopulationCapDecisionViewV2;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.npc.actions.BreedingLitterOperation;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteOperationEngine;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteOperationStore;
@@ -32,6 +34,7 @@ import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceWorldRe
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -113,7 +116,7 @@ class PopulationDomainAdmissionRecoveryTest {
     }
 
     @Test
-    void liveBatchRecoveryDefersOwnershipToTheDurableLitterJob() {
+    void liveBatchRecoveryWithoutLitterJobCancelsAndReleasesBatch() {
         AtomicInteger now = new AtomicInteger(10);
         try (PersistenceBootstrap persistence = new PersistenceBootstrap(
                 configuration(tempDir.resolve("paired"), now::get))) {
@@ -141,6 +144,48 @@ class PopulationDomainAdmissionRecoveryTest {
                     claim(applying, payload)
             ).toCompletableFuture().join();
 
+            assertEquals(OperationWorkflowResult.Status.PUBLISHED,
+                    result.status());
+            assertTrue(operations.settlementEvidence(OPERATION)
+                    .toCompletableFuture().join().canceled());
+            assertEquals(OperationPhase.PUBLISHED,
+                    operations.findByIdempotency(
+                            new IdempotencyKey("recovery-paired")
+                    ).toCompletableFuture().join().orElseThrow().phase());
+        }
+    }
+
+    @Test
+    void liveBatchRecoveryDefersWhenDurableLitterJobExists() {
+        AtomicInteger now = new AtomicInteger(10);
+        try (PersistenceBootstrap persistence = new PersistenceBootstrap(
+                configuration(tempDir.resolve("paired-job"), now::get))) {
+            assertTrue(persistence.start().toCompletableFuture().join().complete());
+            PopulationDomainAdmissionOperation operations = persistence.facades()
+                    .operations().populationDomainAdmission();
+            PopulationDomainAdmissionOperation.Payload payload = payload(
+                    100,
+                    List.of(java.util.UUID.nameUUIDFromBytes((OPERATION
+                            + ":child:0").getBytes(
+                            java.nio.charset.StandardCharsets.UTF_8)))
+            );
+            OperationEnvelope prepared = committedEnvelope(operations.prepare(
+                    OPERATION,
+                    new IdempotencyKey("recovery-paired-job"),
+                    payload
+            ).completion().toCompletableFuture().join());
+            operations.claim(OPERATION).toCompletableFuture().join();
+            OperationEnvelope applying = operations.findByIdempotency(
+                    new IdempotencyKey("recovery-paired-job")
+            ).toCompletableFuture().join().orElseThrow();
+            assertTrue(persistence.facades().operations().prepareBreedingLitter(
+                    litter(payload)
+            ).toCompletableFuture().join());
+
+            OperationWorkflowResult result = operations.recover(
+                    claim(applying, payload)
+            ).toCompletableFuture().join();
+
             assertEquals(OperationWorkflowResult.Status.LIVE_RETRYABLE,
                     result.status());
             assertEquals(
@@ -149,7 +194,7 @@ class PopulationDomainAdmissionRecoveryTest {
             );
             assertEquals(OperationPhase.LIVE_APPLYING,
                     operations.findByIdempotency(
-                            new IdempotencyKey("recovery-paired")
+                            new IdempotencyKey("recovery-paired-job")
                     ).toCompletableFuture().join().orElseThrow().phase());
         }
     }
@@ -298,6 +343,36 @@ class PopulationDomainAdmissionRecoveryTest {
                 1,
                 List.of(),
                 provisionalChildIds,
+                1
+        );
+    }
+
+    private BreedingLitterOperation litter(
+            PopulationDomainAdmissionOperation.Payload payload
+    ) {
+        UUID litterId = OPERATION.value();
+        UUID child = BreedingLitterOperation.plannedChildIds(litterId, 1)
+                .getFirst();
+        return new BreedingLitterOperation(
+                litterId,
+                new BreedingLitterOperation.Parent(
+                        UUID.fromString("70000000-0000-0000-0000-000000000703"),
+                        "parent_a", 0, null, null, true
+                ),
+                new BreedingLitterOperation.Parent(
+                        UUID.fromString("70000000-0000-0000-0000-000000000704"),
+                        "parent_b", 0, null, null, true
+                ),
+                "world", 0, 64, 0, 0, 0, 0, null,
+                1, 1, 1, 1,
+                List.of(new BreedingLitterOperation.ChildPlan(
+                        child, "child", null, null, null, null
+                )),
+                new com.alechilles.alecstamework.api.PopulationAdmissionToken(
+                        litterId, payload.reservationId(), Long.MAX_VALUE,
+                        1, "generation",
+                        OwnerPopulationCapDecisionViewV2.Readiness.READY
+                ),
                 1
         );
     }

@@ -31,6 +31,12 @@ public interface ManagedBatchAdmissionAuthority {
             @Nonnull PopulationAdmissionToken token
     );
 
+    /** Authenticates a durable batch before a restarted world mutation. */
+    @Nonnull
+    CompletionStage<PopulationAdmissionDecision> claimManagedBatchForRecovery(
+            @Nonnull PopulationAdmissionToken token
+    );
+
     /** Settles exact live child ordinals and their actual UUID receipts. */
     @Nonnull
     CompletionStage<ManagedBatchSettlement> settleManagedBatch(
@@ -71,6 +77,19 @@ public interface ManagedBatchAdmissionAuthority {
                         }
                         return PopulationAdmissionDecision.unavailable(
                                 "population-admission-batch-authority-unavailable"
+                        );
+                    }
+
+                    @Override
+                    public CompletionStage<PopulationAdmissionDecision>
+                    claimManagedBatchForRecovery(PopulationAdmissionToken token) {
+                        if (token == null) {
+                            throw new NullPointerException("token");
+                        }
+                        return CompletableFuture.completedFuture(
+                                PopulationAdmissionDecision.unavailable(
+                                        "population-admission-batch-authority-unavailable"
+                                )
                         );
                     }
 

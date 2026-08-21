@@ -80,7 +80,6 @@ final class PopulationAdmissionStaging {
         );
         return new Identity(operation, reservation, key);
     }
-
     Identity batchIdentity(UUID litterOperationId) {
         Objects.requireNonNull(litterOperationId, "litterOperationId");
         String key = "population-domain:litter:" + litterOperationId;
@@ -93,14 +92,12 @@ final class PopulationAdmissionStaging {
                 key
         );
     }
-
     CompletionStage<PopulationAdmissionDecision> prepareOrReuse(
             Identity identity,
             ManagedAdmissionEvidenceAuthor.Authoring evidence
     ) {
         return prepareOrReuse(identity, evidence, null);
     }
-
     CompletionStage<PopulationAdmissionDecision> prepareOrReuse(
             Identity identity,
             ManagedAdmissionEvidenceAuthor.Authoring evidence,
@@ -116,7 +113,6 @@ final class PopulationAdmissionStaging {
                         : prepareNew(operationId, idempotencyKey,
                                 identity.reservationId(), evidence, composition));
     }
-
     CompletionStage<PopulationAdmissionDecision> prepareBatch(
             ManagedBatchAdmissionRequest batch,
             ManagedAdmissionEvidenceAuthor author,
@@ -124,6 +120,10 @@ final class PopulationAdmissionStaging {
             PopulationAdmissionCompositionAuthor compositionAuthor
     ) {
         return batches.prepare(batch, author, this, source, compositionAuthor);
+    }
+
+    CompletionStage<PopulationAdmissionDecision> claimForRecovery(PopulationAdmissionToken token) {
+        return batches.claimForRecovery(token);
     }
 
     CompletionStage<ManagedBatchSettlement> settleBatch(
