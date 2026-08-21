@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.compat.HytaleMovementSettingsAccess;
+import com.alechilles.alecstamework.items.CommandActiveNpcHighlightMountCleanupService;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwMountedGlideConfig;
@@ -61,6 +62,8 @@ final class InteractionMountEffects {
     private final AvatarFlightMountStarter avatarFlightStarter = new AvatarFlightMountStarter();
     private final NativeMountMovementApplication nativeMountMovementApplication;
     private final InteractionMountModeDispatcher dispatcher;
+    private final CommandActiveNpcHighlightMountCleanupService highlightCleanup =
+            new CommandActiveNpcHighlightMountCleanupService();
 
     InteractionMountEffects(ActionTameworkInteract owner) {
         this.owner = owner;
@@ -103,6 +106,7 @@ final class InteractionMountEffects {
         if (!InteractionMountMode.isKnown(mountMode)) {
             logUnknownMountMode(role, mountMode);
         }
+        highlightCleanup.removeBeforeMount(store, npcRef);
         return dispatcher.dispatch(resolvedMode, new InteractionMountRequest(
                 npcRef, playerRef, role, store, mountMode == null ? "" : mountMode));
     }

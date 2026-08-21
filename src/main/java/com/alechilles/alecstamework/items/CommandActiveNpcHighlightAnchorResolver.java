@@ -1,52 +1,22 @@
 package com.alechilles.alecstamework.items;
 
 import com.hypixel.hytale.math.shape.Box;
-import com.hypixel.hytale.server.core.asset.type.model.config.DetailBox;
 import com.hypixel.hytale.server.core.asset.type.model.config.Model;
 import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
-import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3f;
 
-/** Selects a best-effort model node or bounds-based anchor above an NPC's head. */
+/** Selects a bounds-based helper offset above an NPC's head. */
 final class CommandActiveNpcHighlightAnchorResolver {
-    private static final String HEAD_NODE = "Head";
-    private static final float HEAD_OFFSET_Y = 0.65f;
-    private static final float ROOT_MARGIN_Y = 0.45f;
-    private static final float DEFAULT_ROOT_HEIGHT = 1.15f;
+    private static final float ROOT_MARGIN_Y = 0.65f;
+    private static final float DEFAULT_ROOT_HEIGHT = 1.35f;
 
+    /** Returns the fixed root offset used by a helper entity. */
     @Nonnull
-    CommandActiveNpcHighlightAnchor resolve(@Nullable ModelComponent modelComponent) {
+    Vector3f resolveHeadOffset(@Nullable ModelComponent modelComponent) {
         Model model = modelComponent != null ? modelComponent.getModel() : null;
-        String headNode = findHeadNode(model);
-        if (headNode != null) {
-            return new CommandActiveNpcHighlightAnchor(
-                    headNode,
-                    new Vector3f(0.0f, HEAD_OFFSET_Y, 0.0f)
-            );
-        }
-        return new CommandActiveNpcHighlightAnchor(
-                null,
-                new Vector3f(0.0f, rootHeight(model), 0.0f)
-        );
-    }
-
-    @Nullable
-    private String findHeadNode(@Nullable Model model) {
-        if (model == null) {
-            return null;
-        }
-        Map<String, DetailBox[]> detailBoxes = model.getDetailBoxes();
-        if (detailBoxes == null) {
-            return null;
-        }
-        for (String name : detailBoxes.keySet()) {
-            if (name != null && HEAD_NODE.equalsIgnoreCase(name)) {
-                return name;
-            }
-        }
-        return null;
+        return new Vector3f(0.0f, rootHeight(model), 0.0f);
     }
 
     private float rootHeight(@Nullable Model model) {

@@ -32,14 +32,22 @@
   setting on Update 6. While the tool is equipped, only its controller sees a
   continuous, gently animated indicator above each loaded active NPC. The
   indicator uses the NPC's group color, or neutral gold when the NPC is
-  ungrouped. Its overlapping renewal hides animation-cycle flashes, and its
-  bounded lifetime prevents old indicators from stacking after the setting or
-  equipped command tool changes.
+  ungrouped. Each indicator now runs continuously from one invisible helper
+  mounted above the NPC's head. Disabling the setting, changing tools, or
+  removing the NPC removes that helper and its indicator without periodic
+  server respawns. Mounting the NPC removes and suppresses the helper until the
+  rider dismounts. The panel also keeps the NPC's real name and species while
+  the native mount system temporarily uses its empty parking role.
 
 ### Fixed
 
+- Update 6 pre-release clients no longer reject Tamework because the active
+  NPC indicator now supplies the particle animation data that Update 6
+  requires.
 - Update 5 servers no longer register or emit active NPC indicators because
   the feature requires Update 6 model-particle cleanup support.
+- Active NPC indicators now use the base indicator timing pattern, with a very
+  short particle overlap that prevents an empty frame between animation waves.
 - World transfers no longer disconnect players who have the command hotswap HUD active.
 - Reduced persistence stalls with large companion populations. Spawner
   releases and Recall no longer wait behind unrelated projection events or

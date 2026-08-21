@@ -1,77 +1,72 @@
 {
-  "RenderMode": "BlendLinear",
+  "RenderMode": "Erosion",
   "ParticleRotationInfluence": "BillboardY",
-  "ParticleRotateWithSpawner": false,
-  "LinearFiltering": true,
-  "LightInfluence": 0,
-  "MaxConcurrentParticles": 1,
   "ParticleLifeSpan": {
-    "Min": 2.55,
-    "Max": 2.55
+    "Min": 2.02,
+    "Max": 2.02
   },
-  "TotalParticles": {
-    "Min": 1,
-    "Max": 1
-  },
+  "ParticleRotateWithSpawner": true,
   "Particle": {
     "Texture": "Particles/Textures/Tamework/Command/TwCommandActiveMarker.png",
     "ScaleRatioConstraint": "OneToOne",
     "UVOption": "None",
-    "SoftParticles": "Disable",
     "Animation": {
-      "0": {
-        "Opacity": 1,
-        "Scale": {
-          "X": { "Min": 0.5, "Max": 0.5 },
-          "Y": { "Min": 0.5, "Max": 0.5 }
-        }
-      },
-      "20": {
-        "Opacity": 1,
-        "Scale": {
-          "X": { "Min": 0.51, "Max": 0.51 },
-          "Y": { "Min": 0.51, "Max": 0.51 }
-        }
-      },
-      "50": {
-        "Opacity": 1,
-        "Scale": {
-          "X": { "Min": 0.54, "Max": 0.54 },
-          "Y": { "Min": 0.54, "Max": 0.54 }
-        }
-      },
-      "80": {
-        "Opacity": 1,
-        "Scale": {
-          "X": { "Min": 0.51, "Max": 0.51 },
-          "Y": { "Min": 0.51, "Max": 0.51 }
-        }
-      },
-      "100": {
-        "Opacity": 1,
-        "Scale": {
-          "X": { "Min": 0.5, "Max": 0.5 },
-          "Y": { "Min": 0.5, "Max": 0.5 }
-        }
-      }
+      "0": {}
     },
+    "SoftParticles": "Disable",
     "InitialAnimationFrame": {
       "Opacity": 1,
       "Scale": {
-        "X": { "Min": 0.5, "Max": 0.5 },
-        "Y": { "Min": 0.5, "Max": 0.5 }
+        "X": {
+          "Min": 1,
+          "Max": 1
+        },
+        "Y": {
+          "Min": 1,
+          "Max": 1
+        }
       }
     }
   },
-  "InitialVelocity": {
-    "Speed": { "Min": 0.12, "Max": 0.12 },
-    "Pitch": { "Min": 90, "Max": 90 }
+  "Shape": "Sphere",
+  "SpawnRate": {
+    "Min": 1,
+    "Max": 1
   },
+  "MaxConcurrentParticles": 2,
   "Attractors": [
     {
-      "LinearAcceleration": { "Y": -0.1 }
+      "Radius": 0.25,
+      "Position": {
+        "Y": 0.25
+      },
+      "LinearAcceleration": {
+        "Y": -0.98
+      }
+    },
+    {
+      "Radius": 0.25,
+      "Position": {
+        "Y": -0.25
+      },
+      "LinearAcceleration": {
+        "Y": 0.98
+      }
     }
   ],
-  "SpawnRate": { "Min": 1, "Max": 1 },
-  "SpawnBurst": true
+  "InitialVelocity": {
+    "Speed": {
+      "Min": 0.4855,
+      "Max": 0.4855
+    },
+    "Pitch": {
+      "Min": 90,
+      "Max": 90
+    }
+  },
+  "SpawnBurst": true,
+  "WaveDelay": {
+    "Min": 2,
+    "Max": 2
+  }
 }

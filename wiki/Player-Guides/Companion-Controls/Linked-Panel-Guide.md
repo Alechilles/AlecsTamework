@@ -50,7 +50,8 @@ dead companions continue to show their saved progression snapshot.
 - Generic linked panels include a `Highlight Active` setting. It starts off.
   When enabled, loaded active companions show an indicator above their heads
   while you hold that command tool. Only you see the indicator. Its color matches
-  each companion's group; ungrouped companions use neutral gold.
+  each companion's group; ungrouped companions use neutral gold. The indicator
+  is hidden while someone rides the companion and returns after dismount.
 
 ## Per-row actions
 - `Recall`

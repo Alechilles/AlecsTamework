@@ -1,15 +1,9 @@
 {
   "Spawners": [
     {
-      "SpawnerId": "TwCommandActiveHighlightMarker",
-      "PositionOffset": {
-        "X": 0,
-        "Y": 0,
-        "Z": 0
-      }
+      "SpawnerId": "TwCommandActiveHighlightMarker"
     }
   ],
-  "CullDistance": 96,
-  "IsImportant": true,
-  "LifeSpan": 2.55
+  "CullDistance": 128,
+  "IsImportant": true
 }

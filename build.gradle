@@ -103,7 +103,9 @@ tasks.register('prepareEmbeddedAssetPack', Sync) {
     if (rootProject.findProject(':alecstelemetry:runtime') != null) {
         dependsOn(':alecstelemetry:runtime:jar')
     }
-    from(layout.projectDirectory.dir('src/main/resources'))
+    from(layout.projectDirectory.dir('src/main/resources')) {
+        exclude '**/*.bak'
+    }
     from({ configurations.telemetryAssetPack.collect { zipTree(it) } }) {
         include 'Common/**'
     }
