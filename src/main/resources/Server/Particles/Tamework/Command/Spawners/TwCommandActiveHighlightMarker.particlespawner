@@ -6,8 +6,8 @@
   "LightInfluence": 0,
   "MaxConcurrentParticles": 1,
   "ParticleLifeSpan": {
-    "Min": 3.0,
-    "Max": 3.0
+    "Min": 2.55,
+    "Max": 2.55
   },
   "TotalParticles": {
     "Min": 1,
@@ -20,46 +20,46 @@
     "SoftParticles": "Disable",
     "Animation": {
       "0": {
-        "Opacity": 0,
+        "Opacity": 1,
         "Scale": {
-          "X": { "Min": 0.94, "Max": 0.94 },
-          "Y": { "Min": 0.94, "Max": 0.94 }
+          "X": { "Min": 0.5, "Max": 0.5 },
+          "Y": { "Min": 0.5, "Max": 0.5 }
         }
       },
       "20": {
         "Opacity": 1,
         "Scale": {
-          "X": { "Min": 0.96, "Max": 0.96 },
-          "Y": { "Min": 0.96, "Max": 0.96 }
+          "X": { "Min": 0.51, "Max": 0.51 },
+          "Y": { "Min": 0.51, "Max": 0.51 }
         }
       },
       "50": {
         "Opacity": 1,
         "Scale": {
-          "X": { "Min": 1.03, "Max": 1.03 },
-          "Y": { "Min": 1.03, "Max": 1.03 }
+          "X": { "Min": 0.54, "Max": 0.54 },
+          "Y": { "Min": 0.54, "Max": 0.54 }
         }
       },
       "80": {
         "Opacity": 1,
         "Scale": {
-          "X": { "Min": 0.96, "Max": 0.96 },
-          "Y": { "Min": 0.96, "Max": 0.96 }
+          "X": { "Min": 0.51, "Max": 0.51 },
+          "Y": { "Min": 0.51, "Max": 0.51 }
         }
       },
       "100": {
-        "Opacity": 0,
+        "Opacity": 1,
         "Scale": {
-          "X": { "Min": 0.94, "Max": 0.94 },
-          "Y": { "Min": 0.94, "Max": 0.94 }
+          "X": { "Min": 0.5, "Max": 0.5 },
+          "Y": { "Min": 0.5, "Max": 0.5 }
         }
       }
     },
     "InitialAnimationFrame": {
-      "Opacity": 0,
+      "Opacity": 1,
       "Scale": {
-        "X": { "Min": 0.94, "Max": 0.94 },
-        "Y": { "Min": 0.94, "Max": 0.94 }
+        "X": { "Min": 0.5, "Max": 0.5 },
+        "Y": { "Min": 0.5, "Max": 0.5 }
       }
     }
   },
