@@ -14,6 +14,7 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
@@ -27,34 +28,7 @@ class SuccessfulActivityRuntimeTest {
     @Test
     void publishesManagedActivitiesAndSkipsUnmanagedOrMissingMappings()
             throws Exception {
-        PopulationGroupConfigRegistry groups = new PopulationGroupConfigRegistry();
-        assertTrue(groups.replace(
-                List.of(group("group", "runeteria:family", "RoleA")),
-                1L
-        ).applied());
-        ManagedActivityConfigRegistry managed =
-                new ManagedActivityConfigRegistry(groups);
-        TwManagedActivityConfig profile = decode("husbandry", """
-                {
-                  "ProfileId": "runeteria:husbandry",
-                  "ProviderId": "runeteria:provider",
-                  "ProviderContractVersion": 1,
-                  "RequiredCapabilities": ["PROFILES"],
-                  "Domains": [
-                    {"DomainId":"runeteria:owned", "Owned":true}
-                  ],
-                  "Families": [
-                    {"GroupId":"runeteria:family", "GateKey":"runeteria:gate", "Weight":1}
-                  ],
-                  "Activities": {
-                    "Feed":"runeteria:feed",
-                    "HarvestContexts":{"Milk":"runeteria:milk"},
-                    "PendingOutputItems":{"Food_Egg":"runeteria:egg"},
-                    "BreedingSuccess":"runeteria:breed"
-                  }
-                }
-                """);
-        assertTrue(managed.replace(List.of(profile), 1L).applied());
+        ManagedActivityConfigRegistry managed = managedRegistry();
 
         List<SuccessfulActivityView> published = new ArrayList<>();
         SuccessfulActivityRuntime.install(published::add, managed);
@@ -91,6 +65,86 @@ class SuccessfulActivityRuntimeTest {
         } finally {
             SuccessfulActivityRuntime.clear();
         }
+    }
+
+    @Test
+    void feedQualificationSuppressesRapidPublicationUntilAlarmExpires()
+            throws Exception {
+        ManagedActivityConfigRegistry managed = managedRegistry();
+        List<SuccessfulActivityView> published = new ArrayList<>();
+        SuccessfulActivityRuntime.install(published::add, managed);
+        AtomicLong nowSeconds = new AtomicLong();
+        AtomicLong untilSeconds = new AtomicLong(-1L);
+        SuccessfulActivityRuntime.FeedPublicationGate gate =
+                new SuccessfulActivityRuntime.FeedPublicationGate(
+                        (ignoredRef, ignoredStore) -> {
+                            if (nowSeconds.get() <= untilSeconds.get()) {
+                                return false;
+                            }
+                            untilSeconds.set(
+                                    nowSeconds.get()
+                                            + SuccessfulActivityRuntime
+                                                    .FEED_PUBLICATION_COOLDOWN_SECONDS
+                            );
+                            return true;
+                        }
+                );
+        try {
+            publishQualifiedFeed(gate);
+            publishQualifiedFeed(gate);
+            assertEquals(1, published.size());
+
+            nowSeconds.set(
+                    SuccessfulActivityRuntime.FEED_PUBLICATION_COOLDOWN_SECONDS + 1L
+            );
+            publishQualifiedFeed(gate);
+            assertEquals(2, published.size());
+        } finally {
+            SuccessfulActivityRuntime.clear();
+        }
+    }
+
+    private static void publishQualifiedFeed(
+            SuccessfulActivityRuntime.FeedPublicationGate gate
+    ) {
+        if (SuccessfulActivityRuntime.qualifyFeed(gate, null, null)) {
+            SuccessfulActivityRuntime.publishFeed(
+                    UUID.randomUUID(), "RoleA", OWNER, COMPANION
+            );
+        }
+    }
+
+    private static ManagedActivityConfigRegistry managedRegistry()
+            throws Exception {
+        PopulationGroupConfigRegistry groups = new PopulationGroupConfigRegistry();
+        assertTrue(groups.replace(
+                List.of(group("group", "runeteria:family", "RoleA")),
+                1L
+        ).applied());
+        ManagedActivityConfigRegistry managed =
+                new ManagedActivityConfigRegistry(groups);
+        TwManagedActivityConfig profile = decode("husbandry", """
+                {
+                  "ProfileId": "runeteria:husbandry",
+                  "ProviderId": "runeteria:provider",
+                  "ProviderContractVersion": 1,
+                  "RequiredCapabilities": ["PROFILES"],
+                  "Domains": [
+                    {"DomainId":"runeteria:owned", "Owned":true}
+                  ],
+                  "Families": [
+                    {"GroupId":"runeteria:family", "GateKey":"runeteria:gate", "Weight":1}
+                  ],
+                  "Activities": {
+                    "Feed":"runeteria:feed",
+                    "HarvestContexts":{"Milk":"runeteria:milk"},
+                    "PendingOutputItems":{"Food_Egg":"runeteria:egg"},
+                    "BreedingSuccess":"runeteria:breed"
+                  }
+                }
+                """);
+        assertTrue(managed.replace(List.of(profile), 1L).applied());
+        return managed;
     }
 
     private static TwManagedActivityConfig decode(String id, String json)

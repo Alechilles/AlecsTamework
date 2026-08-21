@@ -4,12 +4,14 @@ import com.alechilles.alecstamework.api.SuccessfulActivityView;
 import com.alechilles.alecstamework.api.internal.LiveActivityFeed;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.config.managed.ManagedActivityProfile;
+import com.alechilles.alecstamework.npc.compat.NpcAlarmAccess;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.util.Alarm;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
@@ -21,9 +23,13 @@ import javax.annotation.Nullable;
 
 /** Small internal bridge from successful gameplay actions to the live feed. */
 public final class SuccessfulActivityRuntime {
+    static final String FEED_PUBLICATION_ALARM = "Husbandry_Feed_Activity";
+    static final long FEED_PUBLICATION_COOLDOWN_SECONDS = 600L;
     private static final RuntimeState UNAVAILABLE = new RuntimeState(null, null);
     private static final AtomicReference<RuntimeState> CURRENT =
             new AtomicReference<>(UNAVAILABLE);
+    private static final FeedPublicationGate NPC_FEED_PUBLICATION_GATE =
+            new FeedPublicationGate(SuccessfulActivityRuntime::tryAcquireNpcFeedAlarm);
 
     private SuccessfulActivityRuntime() {
     }
@@ -42,6 +48,23 @@ public final class SuccessfulActivityRuntime {
     /** Clears the publisher before the Tamework composition shuts down. */
     public static void clear() {
         CURRENT.set(UNAVAILABLE);
+    }
+
+    /** Returns true when this NPC may publish another feed activity. */
+    static boolean qualifyFeed(
+            @Nullable Ref<EntityStore> npcRef,
+            @Nullable Store<EntityStore> store
+    ) {
+        return qualifyFeed(NPC_FEED_PUBLICATION_GATE, npcRef, store);
+    }
+
+    /** Applies one feed publication gate. Kept injectable for focused behavior tests. */
+    static boolean qualifyFeed(
+            @Nonnull FeedPublicationGate gate,
+            @Nullable Ref<EntityStore> npcRef,
+            @Nullable Store<EntityStore> store
+    ) {
+        return gate.tryAcquire(npcRef, store);
     }
 
     /** Publishes one successful owner-feed activity when the role is managed. */
@@ -131,6 +154,36 @@ public final class SuccessfulActivityRuntime {
         return npc == null ? null : npc.getUuid();
     }
 
+    private static boolean tryAcquireNpcFeedAlarm(
+            @Nullable Ref<EntityStore> npcRef,
+            @Nullable Store<EntityStore> store
+    ) {
+        if (npcRef == null || !npcRef.isValid() || store == null
+                || store.getComponent(npcRef, NPCEntity.getComponentType()) == null) {
+            return false;
+        }
+        Alarm alarm = NpcAlarmAccess.resolveAlarm(
+                npcRef, store, FEED_PUBLICATION_ALARM
+        );
+        if (alarm == null) {
+            return false;
+        }
+        Instant now = Instant.now();
+        if (alarm.isSet() && !alarm.hasPassed(now)) {
+            return false;
+        }
+        try {
+            alarm.set(
+                    npcRef,
+                    now.plusSeconds(FEED_PUBLICATION_COOLDOWN_SECONDS),
+                    store
+            );
+            return true;
+        } catch (RuntimeException | LinkageError ignored) {
+            return false;
+        }
+    }
+
     private static void publish(
             @Nonnull UUID operationId,
             @Nullable String roleId,
@@ -180,6 +233,34 @@ public final class SuccessfulActivityRuntime {
     private interface ActivityIdResolver {
         @Nullable
         String resolve(@Nonnull ManagedActivityProfile.ActivityMapping mapping);
+    }
+
+    @FunctionalInterface
+    interface FeedAlarm {
+        boolean tryAcquire(
+                @Nullable Ref<EntityStore> npcRef,
+                @Nullable Store<EntityStore> store
+        );
+    }
+
+    /** Small gate around the existing per-NPC alarm mechanism. */
+    static final class FeedPublicationGate {
+        private final FeedAlarm alarm;
+
+        FeedPublicationGate(@Nonnull FeedAlarm alarm) {
+            this.alarm = Objects.requireNonNull(alarm, "alarm");
+        }
+
+        boolean tryAcquire(
+                @Nullable Ref<EntityStore> npcRef,
+                @Nullable Store<EntityStore> store
+        ) {
+            try {
+                return alarm.tryAcquire(npcRef, store);
+            } catch (RuntimeException | LinkageError ignored) {
+                return false;
+            }
+        }
     }
 
     private record RuntimeState(

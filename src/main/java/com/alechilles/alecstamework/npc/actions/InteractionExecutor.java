@@ -116,7 +116,9 @@ final class InteractionExecutor {
                     ctx,
                     harvestInteraction
             );
-            if (applied && isInteractingOwner(npcRef, store, player)) {
+            if (applied
+                    && isInteractingOwner(npcRef, store, player)
+                    && SuccessfulActivityRuntime.qualifyFeed(npcRef, store)) {
                 SuccessfulActivityRuntime.publishFeed(
                         UUID.randomUUID(),
                         role == null ? null : role.getRoleName(),
