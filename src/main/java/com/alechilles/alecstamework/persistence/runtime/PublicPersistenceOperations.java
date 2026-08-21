@@ -31,6 +31,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.operation.PublicOperationSubmission;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 
 /**
@@ -40,7 +41,7 @@ import javax.annotation.Nonnull;
  * and shutdown workflow.</p>
  */
 public final class PublicPersistenceOperations {
-    private final SqlitePublicPersistenceAdapter adapter;
+    private final Supplier<SqlitePublicPersistenceAdapter> adapters;
     private final PublicPersistenceLiveBoundaries boundaries;
     private final PublicPersistenceWorkflowTracker workflows;
 
@@ -49,9 +50,25 @@ public final class PublicPersistenceOperations {
             PublicPersistenceLiveBoundaries boundaries,
             PublicPersistenceWorkflowTracker workflows
     ) {
-        this.adapter = adapter;
+        this(() -> adapter, boundaries, workflows);
+    }
+
+    PublicPersistenceOperations(
+            Supplier<SqlitePublicPersistenceAdapter> adapters,
+            PublicPersistenceLiveBoundaries boundaries,
+            PublicPersistenceWorkflowTracker workflows
+    ) {
+        this.adapters = java.util.Objects.requireNonNull(
+                adapters, "adapters"
+        );
         this.boundaries = boundaries;
         this.workflows = workflows;
+    }
+
+    private SqlitePublicPersistenceAdapter adapter() {
+        return java.util.Objects.requireNonNull(
+                adapters.get(), "Public persistence adapter is not open"
+        );
     }
 
     @Nonnull
@@ -60,7 +77,7 @@ public final class PublicPersistenceOperations {
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull CompanionProfileMutation mutation
     ) {
-        var submitted = adapter.profileOperations().submit(
+        var submitted = adapter().profileOperations().submit(
                 operationId, idempotencyKey, mutation
         );
         return submission(submitted.acceptance(), submitted.completion());
@@ -74,7 +91,7 @@ public final class PublicPersistenceOperations {
             IdempotencyKey idempotencyKey,
             CompanionProfileMutation.StartupReconciliation reconciliation
     ) {
-        var submitted = adapter.reconcileProfileAtStartup(
+        var submitted = adapter().reconcileProfileAtStartup(
                 operationId,
                 idempotencyKey,
                 reconciliation
@@ -88,7 +105,7 @@ public final class PublicPersistenceOperations {
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull CompanionAliasRotation rotation
     ) {
-        var submitted = adapter.aliasOperations().submit(
+        var submitted = adapter().aliasOperations().submit(
                 operationId,
                 idempotencyKey,
                 rotation
@@ -102,7 +119,7 @@ public final class PublicPersistenceOperations {
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull CompanionCaptureRequest capture
     ) {
-        var submitted = adapter.captureOperations().submit(
+        var submitted = adapter().captureOperations().submit(
                 operationId,
                 idempotencyKey,
                 capture,
@@ -117,7 +134,7 @@ public final class PublicPersistenceOperations {
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull CompanionCaptureReleaseRequest release
     ) {
-        var submitted = adapter.captureReleaseOperations().submit(
+        var submitted = adapter().captureReleaseOperations().submit(
                 operationId,
                 idempotencyKey,
                 release,
@@ -132,7 +149,7 @@ public final class PublicPersistenceOperations {
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull CompanionDormantTransitionRequest dormant
     ) {
-        var submitted = adapter.dormantOperations().submit(
+        var submitted = adapter().dormantOperations().submit(
                 operationId, idempotencyKey, dormant
         );
         return submission(submitted.acceptance(), submitted.completion());
@@ -144,7 +161,7 @@ public final class PublicPersistenceOperations {
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull CompanionRestorationRequest restoration
     ) {
-        var submitted = adapter.restorationOperations().submit(
+        var submitted = adapter().restorationOperations().submit(
                 operationId,
                 idempotencyKey,
                 restoration,
@@ -159,7 +176,7 @@ public final class PublicPersistenceOperations {
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull TimedSummonLeaseMutationRequest mutation
     ) {
-        var submitted = adapter.timedSummonOperations().submit(
+        var submitted = adapter().timedSummonOperations().submit(
                 operationId, idempotencyKey, mutation
         );
         return submission(submitted.acceptance(), submitted.completion());
@@ -171,7 +188,7 @@ public final class PublicPersistenceOperations {
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull TimedSummonTransitionRequest transition
     ) {
-        var submitted = adapter.timedSummonTransitionOperations().submit(
+        var submitted = adapter().timedSummonTransitionOperations().submit(
                 operationId,
                 idempotencyKey,
                 transition,
@@ -186,7 +203,7 @@ public final class PublicPersistenceOperations {
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull CoopSlotRegistration registration
     ) {
-        var submitted = adapter.coopSlotOperations().submit(
+        var submitted = adapter().coopSlotOperations().submit(
                 operationId, idempotencyKey, registration
         );
         return submission(submitted.acceptance(), submitted.completion());
@@ -198,7 +215,7 @@ public final class PublicPersistenceOperations {
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull CompanionCoopCaptureRequest capture
     ) {
-        var submitted = adapter.coopCaptureOperations().submit(
+        var submitted = adapter().coopCaptureOperations().submit(
                 operationId,
                 idempotencyKey,
                 capture,
@@ -213,7 +230,7 @@ public final class PublicPersistenceOperations {
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull CompanionCoopReleaseRequest release
     ) {
-        var submitted = adapter.coopReleaseOperations().submit(
+        var submitted = adapter().coopReleaseOperations().submit(
                 operationId,
                 idempotencyKey,
                 release,
@@ -228,7 +245,7 @@ public final class PublicPersistenceOperations {
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull PaidRevivalRequest revival
     ) {
-        var submitted = adapter.paidRevivalOperations().submit(
+        var submitted = adapter().paidRevivalOperations().submit(
                 operationId,
                 idempotencyKey,
                 revival,
@@ -246,7 +263,7 @@ public final class PublicPersistenceOperations {
             @Nonnull ProfileExtensionMutation mutation
     ) {
         SqliteDatabaseOperationCoordinator.Submission submitted =
-                adapter.extensionOperations().submit(
+                adapter().extensionOperations().submit(
                         operationId, idempotencyKey, mutation
                 );
         return submission(submitted.acceptance(), submitted.completion());
@@ -258,7 +275,7 @@ public final class PublicPersistenceOperations {
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull OwnerPopulationTransitionRequest transition
     ) {
-        var submitted = adapter.ownerPopulationOperations().submit(
+        var submitted = adapter().ownerPopulationOperations().submit(
                 operationId, idempotencyKey, transition
         );
         return submission(submitted.acceptance(), submitted.completion());
@@ -271,7 +288,7 @@ public final class PublicPersistenceOperations {
             @Nonnull OwnerPopulationReconciliationRequest reconciliation
     ) {
         var submitted =
-                adapter.ownerPopulationReconciliationOperations().submit(
+                adapter().ownerPopulationReconciliationOperations().submit(
                         operationId, idempotencyKey, reconciliation
                 );
         return submission(submitted.acceptance(), submitted.completion());
@@ -283,7 +300,7 @@ public final class PublicPersistenceOperations {
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull PopulationGroupAssignmentRequest assignment
     ) {
-        var submitted = adapter.populationGroupOperations().submit(
+        var submitted = adapter().populationGroupOperations().submit(
                 operationId, idempotencyKey, assignment
         );
         return submission(submitted.acceptance(), submitted.completion());
@@ -292,14 +309,14 @@ public final class PublicPersistenceOperations {
     /** Returns the staged provider-aware weighted-domain admission adapter. */
     @Nonnull
     public PopulationDomainAdmissionOperation populationDomainAdmission() {
-        return adapter.populationDomainAdmissionOperations();
+        return adapter().populationDomainAdmissionOperations();
     }
 
     /** Prepares one durable litter job before any world-thread spawn work. */
     @Nonnull
     public CompletionStage<Boolean>
     prepareBreedingLitter(@Nonnull BreedingLitterOperation litter) {
-        var submitted = adapter.breedingLitterOperations().prepare(litter);
+        var submitted = adapter().breedingLitterOperations().prepare(litter);
         if (submitted.acceptance()
                 != SqliteSingleWriter.WriteAcceptance.ACCEPTED) {
             return java.util.concurrent.CompletableFuture
@@ -315,7 +332,7 @@ public final class PublicPersistenceOperations {
     public PublicOperationSubmission submitBreedingLitter(
             @Nonnull BreedingLitterOperation litter
     ) {
-        var submitted = adapter.breedingLitterOperations().submit(
+        var submitted = adapter().breedingLitterOperations().submit(
                 litter,
                 boundaries.breedingLitters()
         );
@@ -328,7 +345,7 @@ public final class PublicPersistenceOperations {
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull CommandRosterMembershipRequest request
     ) {
-        var submitted = adapter.commandRosterOperations().submit(
+        var submitted = adapter().commandRosterOperations().submit(
                 operationId, idempotencyKey, request
         );
         return submission(submitted.acceptance(), submitted.completion());
@@ -340,7 +357,7 @@ public final class PublicPersistenceOperations {
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull CommandRosterTransitionRequest transition
     ) {
-        var submitted = adapter.commandRosterTransitionOperations().submit(
+        var submitted = adapter().commandRosterTransitionOperations().submit(
                 operationId, idempotencyKey, transition
         );
         return submission(submitted.acceptance(), submitted.completion());
@@ -351,7 +368,7 @@ public final class PublicPersistenceOperations {
             @Nonnull OperationId operationId,
             @Nonnull CompanionProvisioningRequest request
     ) {
-        var submitted = adapter.provisioningOperations().submit(
+        var submitted = adapter().provisioningOperations().submit(
                 operationId, request
         );
         return submission(submitted.acceptance(), submitted.completion());
@@ -362,7 +379,7 @@ public final class PublicPersistenceOperations {
             @Nonnull OperationId operationId,
             @Nonnull ProvisioningActivationRequest request
     ) {
-        var submitted = adapter.provisioningActivationOperations().submit(
+        var submitted = adapter().provisioningActivationOperations().submit(
                 operationId,
                 request,
                 boundaries.provisioningActivations()

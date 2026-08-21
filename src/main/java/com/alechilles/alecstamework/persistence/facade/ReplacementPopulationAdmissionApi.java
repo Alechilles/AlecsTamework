@@ -43,6 +43,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -54,13 +55,14 @@ public final class ReplacementPopulationAdmissionApi
             "population-admission-authority-unavailable";
 
     private final PersistenceBootstrap persistence;
-    private final PopulationDomainAdmissionOperation operations;
+    private final Supplier<PopulationDomainAdmissionOperation> operations;
     private final ManagedAdmissionEvidenceAuthor author;
     private final ManagedActivityConfigRegistry managed;
     private final AdmissionProviderRegistry providers;
     private final PopulationGroupConfigRegistry populationGroups;
     private final PopulationAdmissionCompositionAuthor compositionAuthor;
-    private final PopulationAdmissionStaging staging;
+    private final LongSupplier clock;
+    private volatile PopulationAdmissionStaging staging;
 
     public ReplacementPopulationAdmissionApi(
             @Nonnull PersistenceBootstrap persistence,
@@ -72,8 +74,7 @@ public final class ReplacementPopulationAdmissionApi
     ) {
         this(
                 persistence,
-                Objects.requireNonNull(publicOperations, "publicOperations")
-                        .populationDomainAdmission(),
+                deferredOperations(publicOperations),
                 new ManagedAdmissionEvidenceAuthor(
                         managed, populationGroups, providers, clock
                 ),
@@ -94,7 +95,7 @@ public final class ReplacementPopulationAdmissionApi
     ) {
         this(
                 persistence,
-                operations,
+                fixedOperations(operations),
                 author,
                 managed,
                 providers,
@@ -105,7 +106,7 @@ public final class ReplacementPopulationAdmissionApi
 
     private ReplacementPopulationAdmissionApi(
             @Nonnull PersistenceBootstrap persistence,
-            @Nonnull PopulationDomainAdmissionOperation operations,
+            @Nonnull Supplier<PopulationDomainAdmissionOperation> operations,
             @Nonnull ManagedAdmissionEvidenceAuthor author,
             @Nonnull ManagedActivityConfigRegistry managed,
             @Nonnull AdmissionProviderRegistry providers,
@@ -121,8 +122,7 @@ public final class ReplacementPopulationAdmissionApi
         this.compositionAuthor = new PopulationAdmissionCompositionAuthor(
                 this.persistence, populationGroups
         );
-        Objects.requireNonNull(clock, "clock");
-        this.staging = new PopulationAdmissionStaging(operations, clock);
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     @Override
@@ -168,7 +168,7 @@ public final class ReplacementPopulationAdmissionApi
                     )
             );
         }
-        PopulationAdmissionStaging.Identity identity = staging.identity(request);
+        PopulationAdmissionStaging.Identity identity = staging().identity(request);
         OperationId operationId = new OperationId(identity.operationId());
         return canonicalSource(request)
                 .thenCompose(source -> author.author(
@@ -184,7 +184,7 @@ public final class ReplacementPopulationAdmissionApi
                         source,
                         evidence.payload(),
                         operationId
-                ).thenCompose(composed -> staging.prepareOrReuse(
+                ).thenCompose(composed -> staging().prepareOrReuse(
                         identity, evidence, composed
                 ))))
                 .exceptionally(this::failure);
@@ -223,7 +223,7 @@ public final class ReplacementPopulationAdmissionApi
             );
         }
         return canonicalSource(request.admission()).thenCompose(source ->
-                staging.prepareBatch(request, author, source, compositionAuthor))
+                staging().prepareBatch(request, author, source, compositionAuthor))
                 .exceptionally(this::failure);
     }
 
@@ -244,7 +244,7 @@ public final class ReplacementPopulationAdmissionApi
         if (token == null) {
             throw new NullPointerException("token");
         }
-        return staging.claimForRecovery(token);
+        return staging().claimForRecovery(token);
     }
 
     /** Internal exact ordinal settlement boundary for one managed litter. */
@@ -258,7 +258,7 @@ public final class ReplacementPopulationAdmissionApi
         if (token == null || settledOrdinals == null || actualChildIds == null) {
             throw new NullPointerException("batch settlement");
         }
-        return staging.settleBatch(token, settledOrdinals, actualChildIds);
+        return staging().settleBatch(token, settledOrdinals, actualChildIds);
     }
 
     @Override
@@ -269,7 +269,7 @@ public final class ReplacementPopulationAdmissionApi
         if (token == null) {
             throw new NullPointerException("token");
         }
-        return staging.claimForApply(token);
+        return staging().claimForApply(token);
     }
 
     @Override
@@ -280,7 +280,7 @@ public final class ReplacementPopulationAdmissionApi
         if (token == null) {
             throw new NullPointerException("token");
         }
-        return staging.settle(token, false);
+        return staging().settle(token, false);
     }
 
     @Override
@@ -291,13 +291,13 @@ public final class ReplacementPopulationAdmissionApi
         if (token == null) {
             throw new NullPointerException("token");
         }
-        return staging.settle(token, true);
+        return staging().settle(token, true);
     }
 
     @Override
     @Nonnull
     public CompletionStage<Integer> cleanupExpired() {
-        return staging.cleanupExpired();
+        return staging().cleanupExpired();
     }
 
     @Override
@@ -338,6 +338,41 @@ public final class ReplacementPopulationAdmissionApi
             return false;
         }
         return managed.readiness(profileId).available();
+    }
+
+    private PopulationAdmissionStaging staging() {
+        PopulationAdmissionStaging current = staging;
+        if (current != null) {
+            return current;
+        }
+        synchronized (this) {
+            if (staging == null) {
+                staging = new PopulationAdmissionStaging(
+                        Objects.requireNonNull(
+                                operations.get(),
+                                "Population admission operations are not ready"
+                        ),
+                        clock
+                );
+            }
+            return staging;
+        }
+    }
+
+    private static Supplier<PopulationDomainAdmissionOperation>
+    deferredOperations(PublicPersistenceOperations operations) {
+        PublicPersistenceOperations required = Objects.requireNonNull(
+                operations, "publicOperations"
+        );
+        return required::populationDomainAdmission;
+    }
+
+    private static Supplier<PopulationDomainAdmissionOperation>
+    fixedOperations(PopulationDomainAdmissionOperation operations) {
+        PopulationDomainAdmissionOperation required = Objects.requireNonNull(
+                operations, "operations"
+        );
+        return () -> required;
     }
 
     private CompletionStage<CompanionLifecycle> canonicalSource(

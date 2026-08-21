@@ -44,9 +44,10 @@ final class PublicPersistenceRuntimeState {
     private PublicPersistenceTarget target;
     private SqliteSchemaV2Manager schemas;
     private SqlitePersistenceKernel kernel;
-    private SqlitePublicPersistenceAdapter adapter;
-    private PublicPersistenceOperations operations;
-    private PublicPersistenceQueries queries;
+    private volatile SqlitePublicPersistenceAdapter adapter;
+    private final PublicPersistenceOperations operations;
+    private final PublicPersistenceQueries queries;
+    private PersistenceLifecycleAdmissionGateway lifecycleAdmission;
     private PublicPersistenceWorldReconciliation worldReconciliation;
     private SqlitePublicCanonicalSnapshot canonical;
     private boolean worldQuiesced;
@@ -64,6 +65,12 @@ final class PublicPersistenceRuntimeState {
         this.workflows = workflows;
         control = new PublicPersistenceControlPlane(registry);
         targets = new PublicPersistenceTargetOpener(configuration.clock());
+        operations = new PublicPersistenceOperations(
+                this::requireMutationAdapter,
+                configuration.liveBoundaries(),
+                workflows
+        );
+        queries = new PublicPersistenceQueries(this::requireCanonicalAdapter);
     }
 
     void bind(PersistenceStartupCoordinator startup) {
@@ -117,19 +124,52 @@ final class PublicPersistenceRuntimeState {
         return adapter;
     }
 
-    void bindLifecycleAdmission(
+    private SqlitePublicPersistenceAdapter requireMutationAdapter() {
+        if (startup == null || !startup.report().completedNodes().contains(
+                PersistenceStartupNode.OPEN_TARGET
+        )) {
+            throw new IllegalStateException(
+                    "public_persistence_adapter_not_open"
+            );
+        }
+        return requireAdapter();
+    }
+
+    private SqlitePublicPersistenceAdapter requireCanonicalAdapter() {
+        if (startup == null || !startup.report().completedNodes().contains(
+                PersistenceStartupNode.LOAD_CANONICAL
+        )) {
+            throw new IllegalStateException(
+                    "public_persistence_canonical_reads_not_ready"
+            );
+        }
+        return requireAdapter();
+    }
+
+    synchronized void bindLifecycleAdmission(
             PersistenceLifecycleAdmissionGateway gateway
     ) {
-        requireAdapter().bindLifecycleAdmission(gateway);
+        if (gateway == null) {
+            throw new IllegalArgumentException(
+                    "Lifecycle admission gateway is required"
+            );
+        }
+        if (lifecycleAdmission != null) {
+            throw new IllegalStateException(
+                    "public_persistence_lifecycle_admission_already_bound"
+            );
+        }
+        lifecycleAdmission = gateway;
+        if (adapter != null) {
+            adapter.bindLifecycleAdmission(gateway);
+        }
     }
 
     PublicPersistenceOperations requireOperations() {
-        requireAdapter();
         return operations;
     }
 
     PublicPersistenceQueries requireQueries() {
-        requireAdapter();
         return queries;
     }
 
@@ -248,7 +288,8 @@ final class PublicPersistenceRuntimeState {
                 configuration.clock()
         );
         kernel = new SqlitePersistenceKernel(connections, control);
-        adapter = new SqlitePublicPersistenceAdapter(
+        SqlitePublicPersistenceAdapter openedAdapter =
+                new SqlitePublicPersistenceAdapter(
                 registry,
                 kernel,
                 control,
@@ -258,12 +299,12 @@ final class PublicPersistenceRuntimeState {
                 configuration.publicEventSink(),
                 control
         );
-        operations = new PublicPersistenceOperations(
-                adapter,
-                configuration.liveBoundaries(),
-                workflows
-        );
-        queries = new PublicPersistenceQueries(adapter);
+        synchronized (this) {
+            if (lifecycleAdmission != null) {
+                openedAdapter.bindLifecycleAdmission(lifecycleAdmission);
+            }
+            adapter = openedAdapter;
+        }
         worldReconciliation = configuration.worldReconciliationFactory()
                 .create(new PersistenceDomainFacades(
                         operations, queries, control

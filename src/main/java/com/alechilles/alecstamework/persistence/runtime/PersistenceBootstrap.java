@@ -15,8 +15,9 @@ import javax.annotation.Nonnull;
  * Repository-free composition and lifecycle boundary for replacement storage.
  *
  * <p>The bootstrap is the only object the plugin needs to start, inspect, and
- * stop persistence. Gameplay receives the focused domain facade bundle only
- * after canonical startup has completed.</p>
+ * stop persistence. Gameplay can compose the focused domain facade bundle
+ * before startup. Each facade call still enforces its startup readiness
+ * boundary.</p>
  */
 public final class PersistenceBootstrap implements AutoCloseable {
     private final PublicPersistenceRuntime runtime;
@@ -56,14 +57,10 @@ public final class PersistenceBootstrap implements AutoCloseable {
         return runtime.readiness(featureId);
     }
 
-    /** Returns gameplay capabilities without exposing storage machinery. */
+    /** Returns lazy gameplay capabilities without exposing storage machinery. */
     @Nonnull
     public PersistenceDomainFacades facades() {
-        return new PersistenceDomainFacades(
-                runtime.operations(),
-                runtime.queries(),
-                runtime.throughputMetrics()
-        );
+        return runtime.compositionFacades();
     }
 
     /** Returns the selected database after target opening completes. */

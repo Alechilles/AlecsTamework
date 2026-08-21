@@ -94,6 +94,15 @@ public final class PublicPersistenceRuntime implements AutoCloseable {
         return state.throughputMetrics();
     }
 
+    /** Returns lazy composition facades before the target is opened. */
+    PersistenceDomainFacades compositionFacades() {
+        return new PersistenceDomainFacades(
+                state.requireOperations(),
+                state.requireQueries(),
+                state.throughputMetrics()
+        );
+    }
+
     /** Returns bounded startup, queue, latency, WAL, and shutdown evidence. */
     @Nonnull
     public PublicPersistencePerformanceSnapshot performance() {
@@ -127,6 +136,14 @@ public final class PublicPersistenceRuntime implements AutoCloseable {
     /** Returns the one typed mutation facade after the target is open. */
     @Nonnull
     public PublicPersistenceOperations operations() {
+        if (!startup.report().completedNodes().contains(
+                com.alechilles.alecstamework.persistence.control
+                        .PersistenceStartupNode.OPEN_TARGET
+        )) {
+            throw new IllegalStateException(
+                    "public_persistence_adapter_not_open"
+            );
+        }
         return state.requireOperations();
     }
 

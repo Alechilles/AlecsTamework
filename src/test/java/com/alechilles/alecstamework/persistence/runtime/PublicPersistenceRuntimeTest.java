@@ -166,6 +166,66 @@ class PublicPersistenceRuntimeTest {
         }
     }
 
+    @Test
+    void domainFacadesCanBeComposedBeforePersistenceStartup() {
+        PublicPersistenceRuntime runtime = runtime(
+                PublicPersistenceWorldReconciliation.alreadyComplete()
+        );
+
+        PersistenceDomainFacades facades = runtime.compositionFacades();
+
+        assertTrue(runtime.start().toCompletableFuture().join().complete());
+        assertInstanceOf(
+                PersistenceReadResult.Absent.class,
+                facades.queries().findProfile(profileId())
+                        .toCompletableFuture().join()
+        );
+        runtime.close();
+    }
+
+    @Test
+    void precomposedFacadesKeepRuntimeReadinessChecks() {
+        PublicPersistenceRuntime runtime = runtime(
+                PublicPersistenceWorldReconciliation.alreadyComplete()
+        );
+        PersistenceDomainFacades facades = runtime.compositionFacades();
+
+        IllegalStateException mutationFailure = assertThrows(
+                IllegalStateException.class,
+                () -> facades.operations().populationDomainAdmission()
+        );
+        IllegalStateException readFailure = assertThrows(
+                IllegalStateException.class,
+                () -> facades.queries().findProfile(profileId())
+        );
+
+        assertEquals(
+                "public_persistence_adapter_not_open",
+                mutationFailure.getMessage()
+        );
+        assertEquals(
+                "public_persistence_canonical_reads_not_ready",
+                readFailure.getMessage()
+        );
+        runtime.close();
+    }
+
+    @Test
+    void lifecycleAdmissionCanBeBoundBeforePersistenceStartup() {
+        PublicPersistenceRuntime runtime = runtime(
+                PublicPersistenceWorldReconciliation.alreadyComplete()
+        );
+
+        runtime.bindLifecycleAdmission(request ->
+                CompletableFuture.completedFuture(
+                        LifecycleAdmissionEvidence.unmanaged()
+                )
+        );
+
+        assertTrue(runtime.start().toCompletableFuture().join().complete());
+        runtime.close();
+    }
+
     /** Regression: normal startup upgrades a populated v1 target before mutation. */
     @Test
     void populatedV1StartupMigratesBeforeRuntimeReadiness() throws Exception {

@@ -60,6 +60,32 @@ class ReplacementPopulationAdmissionApiTest {
     Path tempDir;
 
     @Test
+    void productionFacadeCanBeComposedBeforePersistenceStartup() {
+        try (PersistenceBootstrap persistence =
+                     new PersistenceBootstrap(configuration());
+             AdmissionProviderRegistry providers =
+                     new AdmissionProviderRegistry()) {
+            PopulationGroupConfigRegistry groups =
+                    new PopulationGroupConfigRegistry();
+            ManagedActivityConfigRegistry managed =
+                    new ManagedActivityConfigRegistry(groups);
+
+            ReplacementPopulationAdmissionApi api =
+                    new ReplacementPopulationAdmissionApi(
+                            persistence,
+                            persistence.facades().operations(),
+                            managed,
+                            groups,
+                            providers,
+                            () -> -50L
+                    );
+
+            assertTrue(persistence.start().toCompletableFuture().join().complete());
+            assertEquals(0, api.cleanupExpired().toCompletableFuture().join());
+        }
+    }
+
+    @Test
     void missingManagedProfileFailsClosedBeforeOperationPreparation() {
         try (PersistenceBootstrap persistence = new PersistenceBootstrap(configuration())) {
             assertTrue(persistence.start().toCompletableFuture().join().complete());
