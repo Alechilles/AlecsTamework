@@ -20,7 +20,7 @@
     "SoftParticles": "Disable",
     "Animation": {
       "0": {
-        "Opacity": 0,
+        "Opacity": 1,
         "Scale": {
           "X": { "Min": 0.94, "Max": 0.94 },
           "Y": { "Min": 0.94, "Max": 0.94 }
@@ -56,10 +56,10 @@
       }
     },
     "InitialAnimationFrame": {
-      "Opacity": 0,
+      "Opacity": 1,
       "Scale": {
-        "X": { "Min": 0.94, "Max": 0.94 },
-        "Y": { "Min": 0.94, "Max": 0.94 }
+        "X": { "Min": 0.5, "Max": 0.5 },
+        "Y": { "Min": 0.5, "Max": 0.5 }
       }
     }
   },
