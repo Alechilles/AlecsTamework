@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.api.ProfileDataCompareAndSetResult;
 import com.alechilles.alecstamework.api.PopulationAdmissionToken;
 import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TameworkApiCapability;
+import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
@@ -115,6 +116,48 @@ class ReplacementTameworkApiFactoryTest {
                 );
             }
             assertEquals(1, profileEvents.get());
+        } finally {
+            events.close();
+        }
+    }
+
+    @Test
+    void advertisesAdmissionCapabilitiesBeforeAProviderExists() {
+        TameworkEventBus events = new TameworkEventBus(null);
+        try (PersistenceBootstrap persistence = new PersistenceBootstrap(
+                configuration(events)
+        ); AdmissionProviderRegistry providers = new AdmissionProviderRegistry()) {
+            assertTrue(
+                    persistence.start().toCompletableFuture().join().complete()
+            );
+            ReplacementFeatureApiDependencies dependencies =
+                    admissionDependencies(providers);
+            try (ReplacementTameworkApiFactory.Composition composition =
+                         ReplacementTameworkApiFactory.compose(
+                                 persistence,
+                                 Duration.ofSeconds(5),
+                                 () -> -50L,
+                                 events,
+                                 null,
+                                 new InteractionExtensionRegistry(null),
+                                 new TraitEffectRegistry(null, null),
+                                 new SimpleClaimsTamedDamagePolicy(),
+                                 dependencies
+                         )) {
+                TameworkApi api = composition.api();
+
+                assertTrue(api.getCapabilities().containsAll(List.of(
+                        TameworkApiCapability.NAMED_CAPACITY_RESERVATIONS,
+                        TameworkApiCapability.EXTERNAL_ADMISSION_PROVIDERS,
+                        TameworkApiCapability.REQUIRED_CONTENT_PROFILES
+                )));
+                assertEquals(
+                        "profile-not-found",
+                        api.requiredContentProfiles()
+                                .status("runeteria:husbandry")
+                                .detail()
+                );
+            }
         } finally {
             events.close();
         }
@@ -331,6 +374,26 @@ class ReplacementTameworkApiFactoryTest {
                 ignored -> Optional.empty(),
                 true,
                 true
+        );
+    }
+
+    private ReplacementFeatureApiDependencies admissionDependencies(
+            AdmissionProviderRegistry providers
+    ) {
+        ReplacementFeatureApiDependencies base = restoredDependencies();
+        return new ReplacementFeatureApiDependencies(
+                base.populationGroups(),
+                base.commandRosters(),
+                base.timedSummoning(),
+                base.provisioning(),
+                base.paidRevival(),
+                base.availability(),
+                base.incidents(),
+                base.captureResolvedEventsReady(),
+                base.captureTameAndLinkReady(),
+                base.bondedCompanions(),
+                new ManagedActivityConfigRegistry(base.populationGroups()),
+                providers
         );
     }
 

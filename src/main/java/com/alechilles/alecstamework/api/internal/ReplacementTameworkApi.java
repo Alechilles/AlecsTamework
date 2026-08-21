@@ -318,7 +318,7 @@ public final class ReplacementTameworkApi
                 && live.isOpen()) {
             capabilities.add(TameworkApiCapability.SUCCESSFUL_ACTIVITY_FEED);
         }
-        if (populationAdmissionReady()) {
+        if (populationAdmissionInfrastructureReady()) {
             capabilities.add(TameworkApiCapability.NAMED_CAPACITY_RESERVATIONS);
             capabilities.add(TameworkApiCapability.EXTERNAL_ADMISSION_PROVIDERS);
             capabilities.add(TameworkApiCapability.REQUIRED_CONTENT_PROFILES);
@@ -350,26 +350,11 @@ public final class ReplacementTameworkApi
                 || readiness == PersistenceReadinessLevel.MUTATION_READY;
     }
 
-    private boolean populationAdmissionReady() {
-        if (!mutationReady(PublicPersistenceFeatureRegistry.POPULATION_DOMAINS)
-                || dependencies.managedActivities() == null
-                || dependencies.admissionProviders() == null
-                || dependencies.populationGroups() == null) {
-            return false;
-        }
-        var snapshot = dependencies.managedActivities().snapshot();
-        if (snapshot.revision() <= 0L || snapshot.profiles().isEmpty()) {
-            return false;
-        }
-        return snapshot.profiles().values().stream().allMatch(profile -> {
-            var readiness = dependencies.managedActivities()
-                    .readiness(profile.profileId());
-            return readiness.available()
-                    && readiness.configRevision() == profile.configRevision()
-                    && dependencies.admissionProviders().readiness(
-                    readiness.providerId(), readiness.providerContractVersion()
-            ).available();
-        });
+    private boolean populationAdmissionInfrastructureReady() {
+        return mutationReady(PublicPersistenceFeatureRegistry.POPULATION_DOMAINS)
+                && dependencies.managedActivities() != null
+                && dependencies.admissionProviders() != null
+                && dependencies.populationGroups() != null;
     }
 
     /** Readiness-gated policy view that keeps the legacy policy methods intact. */
