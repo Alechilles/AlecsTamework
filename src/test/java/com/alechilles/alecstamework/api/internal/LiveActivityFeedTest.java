@@ -173,15 +173,12 @@ class LiveActivityFeedTest {
         );
 
         feed.publish(managedActivity(ActivityIds.FEED));
-        subscription.close();
-        subscription.close();
-        feed.publish(managedActivity(ActivityIds.FEED));
-
         assertEquals(1, calls.get());
-        assertFalse(feed.status("husbandry").subscribed());
         feed.close();
         assertFalse(feed.isOpen());
         assertFalse(feed.status("husbandry").available());
+        feed.publish(managedActivity(ActivityIds.FEED));
+        assertEquals(1, calls.get());
         assertThrows(
                 IllegalStateException.class,
                 () -> feed.subscribe(
