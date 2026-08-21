@@ -1,8 +1,11 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.compat.HytaleApiLevel;
+import com.alechilles.alecstamework.compat.HytaleModelParticleAccess;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.Color;
+import com.hypixel.hytale.protocol.ToClientPacket;
 import com.hypixel.hytale.protocol.packets.entities.SpawnModelParticles;
 import com.hypixel.hytale.server.core.asset.type.model.config.ModelParticle;
 import com.hypixel.hytale.server.core.modules.entity.tracker.NetworkId;
@@ -12,7 +15,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3f;
 
-/** Sends one finite model-attached highlight to one controlling player. */
+/** Starts a model-attached highlight for one controlling player. */
 final class CommandActiveNpcHighlightEmitter {
     static final String PARTICLE_SYSTEM_ID = "Tamework_Command_Active_Highlight";
     private static final String FALLBACK_COLOR = "#C9A653";
@@ -32,7 +35,8 @@ final class CommandActiveNpcHighlightEmitter {
                  @Nullable String colorHex,
                  @Nonnull CommandActiveNpcHighlightAnchor anchor,
                  @Nullable Store<EntityStore> store) {
-        if (networkId == null || viewerRef == null || !viewerRef.isValid()) {
+        if (!HytaleApiLevel.isUpdate6OrLater()
+                || networkId == null || viewerRef == null || !viewerRef.isValid()) {
             return false;
         }
         Vector3f offset = anchor.positionOffset();
@@ -41,6 +45,7 @@ final class CommandActiveNpcHighlightEmitter {
         modelParticle.setTargetNodeName(anchor.targetNodeName());
         modelParticle.setPositionOffset(new Vector3f(offset));
         modelParticle.setDetachedFromModel(false);
+        HytaleModelParticleAccess.enableClearParticlesOnRemove(modelParticle);
         com.hypixel.hytale.protocol.ModelParticle packetParticle = modelParticle.toPacket();
         packetParticle.color = parseColor(colorHex);
         return packetSink.send(
@@ -66,7 +71,7 @@ final class CommandActiveNpcHighlightEmitter {
     }
 
     private static boolean sendToViewer(@Nonnull Ref<EntityStore> viewerRef,
-                                        @Nonnull SpawnModelParticles packet,
+                                        @Nonnull ToClientPacket packet,
                                         @Nullable Store<EntityStore> store) {
         if (store == null) {
             return false;
@@ -82,7 +87,7 @@ final class CommandActiveNpcHighlightEmitter {
     @FunctionalInterface
     interface PacketSink {
         boolean send(@Nonnull Ref<EntityStore> viewerRef,
-                     @Nonnull SpawnModelParticles packet,
+                     @Nonnull ToClientPacket packet,
                      @Nullable Store<EntityStore> store);
     }
 }

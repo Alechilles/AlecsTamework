@@ -227,10 +227,12 @@ Linked panel supports:
 - Filter text input for active filter mode
 - Active/inactive row toggles
 - Optional per-tool active highlights. While the command tool is equipped,
-  loaded active NPCs show a controller-only indicator above their heads in
-  their group color.
-  Ungrouped NPCs use neutral gold. This setting starts disabled and applies
-  only to generic item-metadata rosters.
+  loaded active NPCs show a continuous controller-only indicator above their
+  heads in their group color. Ungrouped NPCs use neutral gold. The indicator
+  fades after the setting is disabled or the equipped command tool changes.
+  This setting starts disabled and applies only to generic item-metadata
+  rosters on Update 6. Update 5 does not run the indicator system because it
+  lacks the required model-particle cleanup support.
 - Group active selector: `All`, `None`, or one configured group
 - Breeding enable/disable row toggles (default: disabled)
 - Group assignment overlay per row

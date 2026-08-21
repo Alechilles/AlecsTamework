@@ -16,6 +16,8 @@ Parent: [Runtime Subsystems](/mod/alecs-tamework/runtime-subsystems) | [Develope
 - Link persistence and mutation: `CommandLinkedNpcRecordStore`, `CommandLinkMutationService`, `CommandLinkPolicyService`
 - Command execution: `CommandStepExecutionService`, `CommandMenuMoveService`
 - Panel entry assembly and preferences: `CommandLinkedPanelEntryService`, `CommandLinkedPanelUnloadedNameService`, `CommandPanelEntrySourceService`, `CommandPanelPreferenceService`
+- Active-NPC indicators: `CommandActiveNpcHighlightSystem`,
+  `CommandActiveNpcHighlightDisplayTracker`, `CommandActiveNpcHighlightEmitter`
 - Group flows: `CommandGroupService`, `CommandGroupAssignPageService`, `CommandGroupManagerPageService`
 - Relocation: `CommandRelocationDispatchService`, `CommandNpcRelocationService`,
   `CommandRelocationRetryCoordinator`
@@ -58,6 +60,11 @@ restoration, or spawn decisions.
 - Relocation retry exhaustion removes the pending relocation and reports a
   warning. It does not create `LOST`; only positive destructive-removal
   evidence can author that lifecycle.
+- Active-NPC indicators are sent only to the controlling player. Each loaded
+  target is emitted once per stable tool and roster state. A roster, color,
+  setting, or equipped-tool change cancels the old indicator set before the
+  current set is sent. This subsystem registers only on Update 6 because
+  Update 5 cannot cancel persistent particle systems.
 
 ## Related Pages
 - [Persistence, SQLite, and Data Paths](/mod/alecs-tamework/persistence-sqlite-and-data-paths)

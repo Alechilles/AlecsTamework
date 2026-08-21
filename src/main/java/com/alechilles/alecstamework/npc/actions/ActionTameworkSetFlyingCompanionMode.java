@@ -111,7 +111,19 @@ public final class ActionTameworkSetFlyingCompanionMode extends TameworkActionBa
         );
         boolean modeChanged = previousMode == null || !previousMode.equalsIgnoreCase(updated.getMode());
         if (TameworkFlyingCompanionComponent.MODE_HOLD.equals(updated.getMode())) {
-            if (isGroundedByController(role) && isGroundedState(npcRef, role, store, updated.getGroundedState())) {
+            MotionController controller = role != null ? role.getActiveMotionController() : null;
+            boolean groundedByController = controller != null && controller.onGround();
+            if (groundedByController && isGroundedState(npcRef, role, store, updated.getGroundedState())) {
+                if (LandingContactTransition.canConfirm(controller.getType(), true)) {
+                    NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+                    if (npc == null || !LandingContactTransition.confirm(
+                            controller.getType(),
+                            true,
+                            () -> motionControllerSwitcher.activate(role, npcRef, npc, "Walk", store)
+                    )) {
+                        return false;
+                    }
+                }
                 if (modeChanged || !updated.isGroundedPhase()) {
                     updated.enterGroundedPhase(updated.getLastObservedY());
                 }
@@ -179,14 +191,6 @@ public final class ActionTameworkSetFlyingCompanionMode extends TameworkActionBa
             return null;
         }
         return new Vector3d(x, y, z);
-    }
-
-    private boolean isGroundedByController(Role role) {
-        if (role == null) {
-            return false;
-        }
-        MotionController controller = role.getActiveMotionController();
-        return controller != null && controller.onGround();
     }
 
     private boolean isGroundedState(@Nullable Ref<EntityStore> npcRef,

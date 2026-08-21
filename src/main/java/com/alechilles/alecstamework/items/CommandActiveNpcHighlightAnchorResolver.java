@@ -12,9 +12,9 @@ import org.joml.Vector3f;
 /** Selects a best-effort model node or bounds-based anchor above an NPC's head. */
 final class CommandActiveNpcHighlightAnchorResolver {
     private static final String HEAD_NODE = "Head";
-    private static final float HEAD_OFFSET_Y = 0.25f;
-    private static final float ROOT_MARGIN_Y = 0.2f;
-    private static final float DEFAULT_ROOT_HEIGHT = 0.85f;
+    private static final float HEAD_OFFSET_Y = 0.65f;
+    private static final float ROOT_MARGIN_Y = 0.45f;
+    private static final float DEFAULT_ROOT_HEIGHT = 1.15f;
 
     @Nonnull
     CommandActiveNpcHighlightAnchor resolve(@Nullable ModelComponent modelComponent) {

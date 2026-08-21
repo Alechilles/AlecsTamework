@@ -26,12 +26,13 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Refreshes finite, controller-only particles on active NPCs for the equipped command tool.
+ * Reconciles renewable, controller-only indicators for the equipped command tool.
  * Work runs at 100 ms only for tracked command users and is capped at 82 NPCs per player sweep.
  */
 public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityStore> {
     private static final long SWEEP_INTERVAL_MS = 100L;
-    private static final long REFRESH_INTERVAL_MS = 800L;
+    private static final long RECONCILE_INTERVAL_MS = 800L;
+    private static final long HIGHLIGHT_RENEWAL_INTERVAL_MS = 2_400L;
     static final int MAX_TARGETS_PER_PLAYER_SWEEP = 82;
     private static final int MAX_CANDIDATES_PER_PASS = 4;
     private static final int RESERVED_ACTIVE_CANDIDATES = 1;
@@ -45,6 +46,9 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
     private final CommandActiveNpcHighlightAnchorResolver anchorResolver =
             new CommandActiveNpcHighlightAnchorResolver();
     private final CommandActiveNpcHighlightEmitter emitter = new CommandActiveNpcHighlightEmitter();
+    private final CommandActiveNpcHighlightDisplayTracker<
+            CommandActiveNpcHighlightPlanService.HighlightTarget> displayTracker =
+            new CommandActiveNpcHighlightDisplayTracker<>(HIGHLIGHT_RENEWAL_INTERVAL_MS);
     private final CommandActiveNpcHighlightBatchService<
             CommandActiveNpcHighlightPlanService.HighlightTarget> batchService =
             new CommandActiveNpcHighlightBatchService<>(MAX_TARGETS_PER_PLAYER_SWEEP);
@@ -62,11 +66,13 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
             @Override
             public void onPlayerRemoved(@Nonnull Store<EntityStore> store, @Nonnull UUID playerUuid) {
                 batchService.remove(store, playerUuid);
+                displayTracker.remove(store, playerUuid);
             }
 
             @Override
             public void onStoreRemoved(@Nonnull Store<EntityStore> store) {
                 batchService.clear(store);
+                displayTracker.clear(store);
                 clearStore(store);
             }
         });
@@ -118,6 +124,7 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
         ActiveTool activeTool = resolveActiveTool(playerCandidate.player());
         if (activeTool == null) {
             batchService.remove(store, playerUuid);
+            displayTracker.remove(store, playerUuid);
             activationTracker.recordResolvedHand(store, playerUuid, null, false, nowMs);
             return;
         }
@@ -135,13 +142,20 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
                 playerUuid,
                 activeTool.toolId(),
                 nowMs,
-                REFRESH_INTERVAL_MS,
-                () -> resolveTargets(activeTool.stack())
+                RECONCILE_INTERVAL_MS,
+                () -> {
+                    List<CommandActiveNpcHighlightPlanService.HighlightTarget> desiredTargets =
+                            resolveTargets(activeTool.stack());
+                    displayTracker.reconcile(
+                            store, playerUuid, activeTool.toolId(), desiredTargets
+                    );
+                    return desiredTargets;
+                }
         );
         for (CommandActiveNpcHighlightPlanService.HighlightTarget target : targets) {
             emitForLoadedTarget(
                     store, world, loadedTargetProbe, playerCandidate.ref(), playerUuid,
-                    activeTool.toolId(), target
+                    activeTool.toolId(), target, nowMs
             );
         }
     }
@@ -197,7 +211,8 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
             @Nonnull Ref<EntityStore> viewerRef,
             @Nonnull UUID playerUuid,
             @Nonnull String toolId,
-            @Nonnull CommandActiveNpcHighlightPlanService.HighlightTarget target
+            @Nonnull CommandActiveNpcHighlightPlanService.HighlightTarget target,
+            long nowMs
     ) {
         UUID resolvedNpcUuid = targetResolver.resolve(
                 target.npcUuid(), target.profileId(), loadedTargetProbe
@@ -207,6 +222,7 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
                 : null;
         if (npcRef == null || !npcRef.isValid()
                 || !CommandGenericTargetAuthority.allowsGenericTargetMutation(npcRef, store)) {
+            displayTracker.forgetTarget(store, playerUuid, target);
             return;
         }
         NPCEntity npc = component(store, npcRef, NPCEntity.getComponentType());
@@ -220,13 +236,24 @@ public final class CommandActiveNpcHighlightSystem extends TickingSystem<EntityS
                 || !links.containsToolId(toolId)) {
             return;
         }
-        emitter.emit(
+        int resolvedNetworkId = networkId.getId();
+        if (!displayTracker.needsEmission(
+                store, playerUuid, target, resolvedNetworkId, nowMs
+        )) {
+            return;
+        }
+        boolean emitted = emitter.emit(
                 networkId,
                 viewerRef,
                 target.colorHex(),
                 anchorResolver.resolve(model),
                 store
         );
+        if (emitted) {
+            displayTracker.recordEmission(
+                    store, playerUuid, target, resolvedNetworkId, nowMs
+            );
+        }
     }
 
     @Nullable

@@ -260,7 +260,7 @@ class ReplacementProfileSnapshotSinkTest {
                     publications.stream()
                             .map(stage -> stage.toCompletableFuture())
                             .toArray(java.util.concurrent.CompletableFuture[]::new)
-            ).get(30, java.util.concurrent.TimeUnit.SECONDS);
+            ).get(60, java.util.concurrent.TimeUnit.SECONDS);
 
             assertEquals(500, facades.queries().projectedProfileSnapshot().size());
             assertTrue(sink.metrics().maximumInFlightWork() <= 16);

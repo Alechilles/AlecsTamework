@@ -72,6 +72,7 @@ import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
+import com.alechilles.alecstamework.compat.HytaleApiLevel;
 import com.alechilles.alecstamework.damage.DamageTargetMemorySystem;
 import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
 import com.alechilles.alecstamework.damage.CompanionHappinessDamageImpulseSystem;
@@ -896,7 +897,8 @@ public class Tamework extends JavaPlugin {
                 () -> new CommandLinkedNpcInventoryCanonicalizationSystem(commandItemFeatureHandler));
         CommandTargetHudActivationTracker commandTargetHudActivationTracker = new CommandTargetHudActivationTracker();
         CommandTargetHudActivationTracker commandHotswapHudActivationTracker = new CommandTargetHudActivationTracker();
-        CommandTargetHudActivationTracker commandHighlightActivationTracker = new CommandTargetHudActivationTracker();
+        CommandTargetHudActivationTracker commandHighlightActivationTracker =
+                HytaleApiLevel.isUpdate6OrLater() ? new CommandTargetHudActivationTracker() : null;
         CommandHudDirtySink commandHudDirtySink = CommandHudDirtySink.fanOut(
                 commandTargetHudActivationTracker,
                 commandHotswapHudActivationTracker,
@@ -923,13 +925,15 @@ public class Tamework extends JavaPlugin {
                         commandHotswapHudActivationTracker,
                         commandTargetInspector
                 ));
-        deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
-                "command-active-npc-highlight",
-                () -> new CommandActiveNpcHighlightSystem(
-                        commandItemRegistry,
-                        commandHighlightActivationTracker,
-                        commandLinkedNpcStateSnapshotService.getLoadedNpcIdentityIndex()
-                ));
+        if (commandHighlightActivationTracker != null) {
+            deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
+                    "command-active-npc-highlight",
+                    () -> new CommandActiveNpcHighlightSystem(
+                            commandItemRegistry,
+                            commandHighlightActivationTracker,
+                            commandLinkedNpcStateSnapshotService.getLoadedNpcIdentityIndex()
+                    ));
+        }
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,
                 "command-hud-player-lifecycle",
                 () -> new CommandHudPlayerLifecycleSystem(commandHudDirtySink));
