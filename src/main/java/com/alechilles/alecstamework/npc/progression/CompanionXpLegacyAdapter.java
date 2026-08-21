@@ -6,11 +6,11 @@ import java.util.Objects;
 import javax.annotation.Nonnull;
 
 /** Lazily projects internal XP transitions onto the released legacy event contract. */
-public final class CompanionXpLegacyAdapter implements AutoCloseable {
+final class CompanionXpLegacyAdapter implements AutoCloseable {
     private final AutoCloseable subscription;
 
-    public CompanionXpLegacyAdapter(@Nonnull CompanionProgressionSignalBus signals,
-                                    @Nonnull TameworkEventBus legacyEvents) {
+    CompanionXpLegacyAdapter(@Nonnull CompanionProgressionSignalBus signals,
+                              @Nonnull TameworkEventBus legacyEvents) {
         Objects.requireNonNull(signals, "signals");
         TameworkEventBus requiredEvents = Objects.requireNonNull(legacyEvents, "legacyEvents");
         subscription = signals.subscribe(transition -> publishIfInterested(requiredEvents, transition));

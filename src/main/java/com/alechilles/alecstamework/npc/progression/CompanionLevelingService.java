@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.npc.progression;
 
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.CompanionXpSource;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
@@ -171,6 +170,10 @@ public final class CompanionLevelingService {
         if (type == null) {
             return AwardResult.notApplied();
         }
+        UUID npcUuid = resolveNpcUuid(npcRef, store);
+        if (npcUuid == null) {
+            return AwardResult.notApplied();
+        }
         TameworkLevelingComponent component = ensureLevelingComponent(npcRef, store, commandBuffer, roleId);
         if (component == null) {
             return AwardResult.notApplied();
@@ -214,6 +217,7 @@ public final class CompanionLevelingService {
                 previousTotalXp,
                 previousCurrentXp,
                 updated,
+                npcUuid,
                 System.currentTimeMillis()
         );
         publishXpTransition(transition);
@@ -399,11 +403,8 @@ public final class CompanionLevelingService {
                                                             double previousTotalXp,
                                                             double previousCurrentXp,
                                                             @Nonnull TameworkLevelingComponent updated,
+                                                            @Nonnull UUID npcUuid,
                                                             long nowMs) {
-        UUID npcUuid = resolveNpcUuid(npcRef, store);
-        if (npcUuid == null) {
-            return null;
-        }
         CreditContext creditContext = resolveCreditContext(npcRef, store);
         int maxLevel = config.getLevels().getMaxLevel();
         boolean atMaxLevel = updated.getLevel() >= maxLevel;
@@ -435,14 +436,7 @@ public final class CompanionLevelingService {
         if (transition == null) {
             return;
         }
-        Tamework instance = Tamework.getInstance();
-        CompanionProgressionSignalBus signalBus = instance != null
-                ? instance.getCompanionProgressionSignalBus()
-                : null;
-        if (signalBus == null) {
-            return;
-        }
-        signalBus.publish(transition);
+        CompanionProgressionSignalBus.publishCommitted(transition);
     }
 
     @Nullable

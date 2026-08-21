@@ -97,7 +97,6 @@ import com.alechilles.alecstamework.npc.actions.BreedingPairAdmissionRegistry;
 import com.alechilles.alecstamework.npc.actions.HeldItemAttachmentInteractionService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionSignalBus;
-import com.alechilles.alecstamework.npc.progression.CompanionXpLegacyAdapter;
 import com.alechilles.alecstamework.integration.creditor.CreditorIntegration;
 import com.alechilles.alecstamework.integration.nameplatebuilder.NameplateBuilderBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
@@ -285,7 +284,7 @@ public class Tamework extends JavaPlugin {
     private ReplacementTameworkApiFactory.Composition apiComposition;
     private TameworkEventBus apiEventBus;
     private CompanionProgressionSignalBus companionProgressionSignalBus;
-    private CompanionXpLegacyAdapter companionXpLegacyAdapter;
+    private AutoCloseable companionXpLegacyAdapter;
     private InteractionExtensionRegistry interactionExtensionRegistry;
     private TraitEffectRegistry traitEffectRegistry;
     private CapturePolicyRegistry capturePolicyRegistry;
@@ -428,6 +427,7 @@ public class Tamework extends JavaPlugin {
 
     private void setupInternal() {
         companionProgressionSignalBus = new CompanionProgressionSignalBus();
+        CompanionProgressionSignalBus.installForTamework(companionProgressionSignalBus);
         runtimeParticipants = new TameworkRuntimeParticipantRegistry(
                 eventType -> getEntityStoreRegistry().registerEntityEventType(eventType),
                 getLogger()
@@ -617,10 +617,7 @@ public class Tamework extends JavaPlugin {
             return;
         }
         apiEventBus = new TameworkEventBus(getLogger());
-        companionXpLegacyAdapter = new CompanionXpLegacyAdapter(
-                companionProgressionSignalBus,
-                apiEventBus
-        );
+        companionXpLegacyAdapter = companionProgressionSignalBus.installLegacyAdapter(apiEventBus);
         runtimeDataDirectory = new TameworkDataPathService(getLogger())
                 .resolveAndInitializeDataPathLayout(getDataDirectory())
                 .targetDirectory();
@@ -1578,7 +1575,11 @@ public class Tamework extends JavaPlugin {
         }
         shutdownPersistence();
         if (companionXpLegacyAdapter != null) {
-            companionXpLegacyAdapter.close();
+            try {
+                companionXpLegacyAdapter.close();
+            } catch (Exception exception) {
+                getLogger().at(Level.WARNING).log("Failed to close companion XP legacy adapter.", exception);
+            }
             companionXpLegacyAdapter = null;
         }
         if (apiEventBus != null) {
@@ -1789,14 +1790,6 @@ public class Tamework extends JavaPlugin {
     @Nullable
     public TameworkEventBus getApiEventBus() {
         return apiEventBus;
-    }
-
-    @Nonnull
-    public CompanionProgressionSignalBus getCompanionProgressionSignalBus() {
-        if (companionProgressionSignalBus == null) {
-            companionProgressionSignalBus = new CompanionProgressionSignalBus();
-        }
-        return companionProgressionSignalBus;
     }
 
     @Nullable
