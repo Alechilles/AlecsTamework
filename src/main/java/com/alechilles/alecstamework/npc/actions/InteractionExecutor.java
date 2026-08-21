@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.Interactio
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModeCycleInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MountInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameInteraction;
+import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.items.CommandAutoLinkResult;
 import com.alechilles.alecstamework.items.CommandAutoLinkService;
 import com.hypixel.hytale.component.Ref;
@@ -16,6 +17,8 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
+import java.util.Objects;
+import java.util.UUID;
 
 /** Executes a resolved interaction entry using shared effect handlers. */
 final class InteractionExecutor {
@@ -100,8 +103,7 @@ final class InteractionExecutor {
             double healAmount = feedHelper.resolveFeedHeal(feed, role, ctx);
             boolean applied = effects.applyFeeding(npcRef, store, healAmount, player, ctx);
             feedHelper.consumeHeldItem(player, 1);
-            return applied
-                    | effects.applyCustomEffects(
+            boolean customApplied = effects.applyCustomEffects(
                     interactionConfigId,
                     interactionIndex,
                     entry,
@@ -114,6 +116,15 @@ final class InteractionExecutor {
                     ctx,
                     harvestInteraction
             );
+            if (applied && isInteractingOwner(npcRef, store, player)) {
+                SuccessfulActivityRuntime.publishFeed(
+                        UUID.randomUUID(),
+                        role == null ? null : role.getRoleName(),
+                        SuccessfulActivityRuntime.resolveOwnerId(npcRef, store),
+                        SuccessfulActivityRuntime.resolveCompanionId(npcRef, store)
+                );
+            }
+            return applied | customApplied;
         }
         if (entry instanceof HarvestInteraction) {
             effects.logHarvestExecution("selected", interactionConfigId, interactionIndex, role, ctx);
@@ -147,8 +158,7 @@ final class InteractionExecutor {
                     role,
                     ctx
             );
-            return true
-                    | effects.applyCustomEffects(
+            boolean customApplied = effects.applyCustomEffects(
                     interactionConfigId,
                     interactionIndex,
                     entry,
@@ -161,6 +171,16 @@ final class InteractionExecutor {
                     ctx,
                     harvestInteraction
             );
+            if (isInteractingOwner(npcRef, store, player)) {
+                SuccessfulActivityRuntime.publishHarvest(
+                        UUID.randomUUID(),
+                        role == null ? null : role.getRoleName(),
+                        resolveHarvestContext(role, ctx),
+                        SuccessfulActivityRuntime.resolveOwnerId(npcRef, store),
+                        SuccessfulActivityRuntime.resolveCompanionId(npcRef, store)
+                );
+            }
+            return true | customApplied;
         }
         if (entry instanceof MountInteraction) {
             effects.logMountExecution("selected", interactionConfigId, interactionIndex, role, ctx);
@@ -228,6 +248,29 @@ final class InteractionExecutor {
             ) | applied;
         }
         return false;
+    }
+
+    private boolean isInteractingOwner(
+            Ref<EntityStore> npcRef,
+            Store<EntityStore> store,
+            Player player
+    ) {
+        UUID ownerId = SuccessfulActivityRuntime.resolveOwnerId(npcRef, store);
+        return ownerId != null
+                && player != null
+                && Objects.equals(ownerId, player.getUuid());
+    }
+
+    private String resolveHarvestContext(
+            Role role,
+            InteractionContextSnapshot ctx
+    ) {
+        TwGlobalConfig global = TwGlobalConfig.resolveActive();
+        String paramName = global == null
+                ? "HarvestInteractionContext"
+                : global.getHarvestContextParam();
+        return new InteractionParamResolver(null, null, null)
+                .getStringParam(role, ctx, paramName);
     }
 
     private void sendTameAutoLinkFeedback(Player player, CommandAutoLinkResult result) {

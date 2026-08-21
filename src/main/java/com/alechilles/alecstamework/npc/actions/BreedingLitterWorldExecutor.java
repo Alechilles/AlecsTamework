@@ -355,6 +355,12 @@ final class BreedingLitterWorldExecutor {
                         litter.parentA().uuid(),
                         litter.parentB().uuid()
                 );
+                SuccessfulActivityRuntime.publishBreeding(
+                        litter.litterId(),
+                        litter.parentA().roleId(),
+                        litter.parentA().ownerId(),
+                        litter.parentA().uuid()
+                );
             }
             return settlementResult(result);
         });

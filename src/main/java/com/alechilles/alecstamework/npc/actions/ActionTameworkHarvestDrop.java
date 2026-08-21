@@ -31,8 +31,11 @@ import javax.annotation.Nullable;
  * one additional identical drop pass when the Bounty trait proc succeeds.
  */
 public final class ActionTameworkHarvestDrop extends ActionDropItem {
+    private final boolean awardXp;
+
     public ActionTameworkHarvestDrop(@Nonnull BuilderActionTameworkHarvestDrop builder, @Nonnull BuilderSupport support) {
         super(builder, support);
+        this.awardXp = builder.getAwardXp(support);
     }
 
     public boolean execute(@Nonnull Ref<EntityStore> ref,
@@ -69,10 +72,10 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
             dropped = true;
             droppedCount++;
         }
-        if (dropped) {
+        if (dropped && awardXp) {
             AwardResult result = CompanionLevelingService.awardHarvestXp(ref, store);
             logHarvestDropAward(ref, store, baseDrops.size(), drops.size(), droppedCount, result);
-        } else {
+        } else if (!dropped) {
             logHarvestDropAttempt("skipped reason=resolved-drops-empty baseDrops=" + baseDrops.size()
                     + " attemptedDrops=" + drops.size()
                     + " item=" + valueOrNull(this.item)

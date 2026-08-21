@@ -67,6 +67,7 @@ import com.alechilles.alecstamework.config.assets.TwMountedGlideConfig;
 import com.alechilles.alecstamework.config.assets.TwMountedDescentConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.actions.BreedingLitterRuntime;
+import com.alechilles.alecstamework.npc.actions.SuccessfulActivityRuntime;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
@@ -794,6 +795,10 @@ public class Tamework extends JavaPlugin {
                 bondedCompanionComposition == null ? null : bondedCompanionComposition.api()
         );
         api = apiComposition.api();
+        SuccessfulActivityRuntime.install(
+                apiComposition.activityPublisher(),
+                managedActivityConfigRegistry
+        );
         BreedingLitterRuntime.install(
                 this::managedBatchAdmissions,
                 litter -> persistenceComposition == null
@@ -1550,6 +1555,7 @@ public class Tamework extends JavaPlugin {
             commandItemFeatureHandler = null;
         }
         if (apiComposition != null) {
+            SuccessfulActivityRuntime.clear();
             apiComposition.close();
             apiComposition = null;
         }
