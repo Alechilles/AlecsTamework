@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TameworkApiV011ContractTest {
     private static final EnumSet<TameworkApiCapability> NEW_CAPABILITIES = EnumSet.of(
             TameworkApiCapability.ACTIVITY_FEED_V2,
+            TameworkApiCapability.REVIVAL_ACTIVITY_CONTEXT,
             TameworkApiCapability.DURABLE_OUTPUT_OPERATIONS,
             TameworkApiCapability.NAMED_CAPACITY_RESERVATIONS,
             TameworkApiCapability.EXTERNAL_ADMISSION_PROVIDERS,

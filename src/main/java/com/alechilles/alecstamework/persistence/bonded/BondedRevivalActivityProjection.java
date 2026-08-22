@@ -23,6 +23,7 @@ final class BondedRevivalActivityProjection {
                 profile.ownerUuid(),
                 profile.ownerUuid(),
                 stableUuid("profile", profile.profileId()),
+                profile.roleId(),
                 profile.profileId(),
                 "bonded",
                 "stored",

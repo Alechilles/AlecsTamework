@@ -40,7 +40,7 @@ public final class ActivityRuntime {
         CURRENT.set(new RuntimeState(
                 new ManagedActivityPublisher(publisher, managedActivities),
                 new TameActivityPublisher(publisher, managedActivities),
-                new LifecycleActivityPublisher(publisher),
+                new LifecycleActivityPublisher(publisher, managedActivities),
                 new AvatarFlightActivityPublisher(publisher),
                 new CompanionCombatActivityPublisher(publisher),
                 new CompanionCareCreditService()
@@ -56,7 +56,7 @@ public final class ActivityRuntime {
         CURRENT.set(new RuntimeState(
                 new ManagedActivityPublisher(publisher, managedActivities),
                 new TameActivityPublisher(publisher, managedActivities),
-                new LifecycleActivityPublisher(publisher),
+                new LifecycleActivityPublisher(publisher, managedActivities),
                 new AvatarFlightActivityPublisher(publisher),
                 new CompanionCombatActivityPublisher(publisher),
                 Objects.requireNonNull(careCredits, "careCredits")
@@ -266,10 +266,30 @@ public final class ActivityRuntime {
             boolean recovered,
             long occurredAtMs
     ) {
+        publishRevival(
+                operationId, actorId, ownerId, companionId, null, profileId,
+                source, lifecycleState, paymentOutcome, recovered, occurredAtMs
+        );
+    }
+
+    /** Publishes one post-commit revival activity with managed-role context. */
+    public static void publishRevival(
+            @Nonnull UUID operationId,
+            @Nullable UUID actorId,
+            @Nullable UUID ownerId,
+            @Nullable UUID companionId,
+            @Nullable String roleId,
+            @Nullable String profileId,
+            @Nullable String source,
+            @Nullable String lifecycleState,
+            @Nullable String paymentOutcome,
+            boolean recovered,
+            long occurredAtMs
+    ) {
         RuntimeState state = CURRENT.get();
         if (state.lifecyclePublisher != null) {
             state.lifecyclePublisher.publishRevival(
-                    operationId, actorId, ownerId, companionId, profileId,
+                    operationId, actorId, ownerId, companionId, roleId, profileId,
                     source, lifecycleState, paymentOutcome, recovered,
                     occurredAtMs);
         }

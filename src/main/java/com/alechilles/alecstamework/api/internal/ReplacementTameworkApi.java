@@ -319,6 +319,8 @@ public final class ReplacementTameworkApi
         if (activities instanceof LiveActivityFeed live
                 && live.isOpen()) {
             capabilities.add(TameworkApiCapability.ACTIVITY_FEED_V2);
+            capabilities.add(
+                    TameworkApiCapability.REVIVAL_ACTIVITY_CONTEXT);
         }
         if (populationAdmissionInfrastructureReady()) {
             capabilities.add(TameworkApiCapability.NAMED_CAPACITY_RESERVATIONS);

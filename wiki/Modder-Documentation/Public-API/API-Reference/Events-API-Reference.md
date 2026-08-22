@@ -55,6 +55,19 @@ AutoCloseable handle = api.events().subscribe(NpcProfileChangedEvent.class, even
 - `CompanionXpAwardedEvent` is emitted only after Tamework accepts an XP award and applies or queues the component write.
 - Companion XP does not require a command-tool link; command links only add optional tool id context.
 
+## Activity API V2
+
+`TameworkApi.activities()` provides a process-local, filtered activity feed.
+It does not retain or replay activities. Consumers must close their
+subscription during shutdown.
+
+`RevivalActivityView` includes the persistent companion profile identity and,
+when Tamework can resolve the active managed role, `roleId` and immutable
+`groupIds`. The role is nullable and the group set can be empty for older or
+unmanaged revival routes. Consumers must ignore a revival when they require
+family policy data and these fields are unavailable. Check the
+`REVIVAL_ACTIVITY_CONTEXT` capability before relying on these fields.
+
 ## `CompanionXpAwardedEvent`
 Use this successful-only event when an integration wants to credit external player progression from companion activity.
 

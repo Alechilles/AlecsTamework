@@ -4,6 +4,10 @@
 
 ### Changed
 
+- Revival activities now include the companion role and managed population
+  groups when Tamework can resolve them, so progression integrations can apply
+  the correct animal-family policy. The API advertises this contract through
+  `REVIVAL_ACTIVITY_CONTEXT`.
 - Tamework now builds one startup activation plan from effective content,
   dependency requirements, public capability requests, and durable recovery
   evidence. Unused modules install no runtime systems, feature listeners,

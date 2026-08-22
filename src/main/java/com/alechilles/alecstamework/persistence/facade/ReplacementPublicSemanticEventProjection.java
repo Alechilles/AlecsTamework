@@ -126,7 +126,7 @@ public final class ReplacementPublicSemanticEventProjection
                     context == ProjectionPublicationContext
                             .RECOVERY_CONVERGENCE,
                     emittedAtMs,
-                    claimRevivalActivity(event)
+                    false
             );
         }
         if (CommandRosterMembershipChangeCodec.EVENT_TYPE.equals(

@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.api;
 
+import java.util.LinkedHashSet;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -15,7 +17,9 @@ public record RevivalActivityView(
         @Nonnull String revivalSource,
         @Nonnull String resultingLifecycleState,
         @Nullable String paymentOutcome,
-        boolean recovered
+        boolean recovered,
+        @Nullable String roleId,
+        @Nonnull Set<String> groupIds
 ) implements ActivityView {
     public RevivalActivityView {
         header = Objects.requireNonNull(header, "header");
@@ -26,6 +30,24 @@ public record RevivalActivityView(
         resultingLifecycleState = requireText(
                 resultingLifecycleState, "resultingLifecycleState");
         paymentOutcome = optionalText(paymentOutcome);
+        roleId = optionalText(roleId);
+        groupIds = immutableTextSet(groupIds);
+    }
+
+    public RevivalActivityView(
+            @Nonnull ActivityHeader header,
+            @Nullable UUID actorId,
+            @Nonnull UUID ownerId,
+            @Nonnull UUID companionId,
+            @Nonnull String profileId,
+            @Nonnull String revivalSource,
+            @Nonnull String resultingLifecycleState,
+            @Nullable String paymentOutcome,
+            boolean recovered
+    ) {
+        this(header, actorId, ownerId, companionId, profileId, revivalSource,
+                resultingLifecycleState, paymentOutcome, recovered, null,
+                Set.of());
     }
 
     public RevivalActivityView(
@@ -39,7 +61,8 @@ public record RevivalActivityView(
             @Nullable String paymentOutcome
     ) {
         this(header, actorId, ownerId, companionId, profileId, revivalSource,
-                resultingLifecycleState, paymentOutcome, false);
+                resultingLifecycleState, paymentOutcome, false, null,
+                Set.of());
     }
 
     @Override
@@ -53,7 +76,8 @@ public record RevivalActivityView(
     public RevivalActivityView withHeader(@Nonnull ActivityHeader nextHeader) {
         return new RevivalActivityView(
                 nextHeader, actorId, ownerId, companionId, profileId,
-                revivalSource, resultingLifecycleState, paymentOutcome, recovered);
+                revivalSource, resultingLifecycleState, paymentOutcome,
+                recovered, roleId, groupIds);
     }
 
     private static String requireText(String value, String field) {
@@ -66,5 +90,17 @@ public record RevivalActivityView(
 
     private static String optionalText(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private static Set<String> immutableTextSet(Set<String> values) {
+        Set<String> source = Objects.requireNonNull(values, "groupIds");
+        LinkedHashSet<String> normalized = new LinkedHashSet<>();
+        for (String value : source) {
+            if (!normalized.add(requireText(value, "groupIds entry"))) {
+                throw new IllegalArgumentException(
+                        "groupIds contains a duplicate identifier");
+            }
+        }
+        return Set.copyOf(normalized);
     }
 }

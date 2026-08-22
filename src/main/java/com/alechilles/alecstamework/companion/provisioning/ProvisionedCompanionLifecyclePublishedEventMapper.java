@@ -94,6 +94,7 @@ public final class ProvisionedCompanionLifecyclePublishedEventMapper {
                     outcome.newAlias() == null
                             ? outcome.profileId().value()
                             : outcome.newAlias().value(),
+                    outcome.roleId(),
                     outcome.profileId().toString(),
                     "provisioned",
                     outcome.lifecycle().name().toLowerCase(

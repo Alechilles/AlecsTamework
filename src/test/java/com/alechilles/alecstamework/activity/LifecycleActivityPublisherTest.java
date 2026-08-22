@@ -9,10 +9,18 @@ import com.alechilles.alecstamework.api.ActivityIds;
 import com.alechilles.alecstamework.api.ActivityView;
 import com.alechilles.alecstamework.api.RevivalActivityView;
 import com.alechilles.alecstamework.api.SummoningActivityView;
+import com.alechilles.alecstamework.config.assets.TwManagedActivityConfig;
+import com.alechilles.alecstamework.config.assets.TwPopulationGroupConfig;
+import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
+import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegistry;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
+import com.hypixel.hytale.codec.ExtraInfo;
+import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
 /** Behavior checks for post-commit lifecycle activity payloads. */
@@ -25,13 +33,13 @@ class LifecycleActivityPublisherTest {
             "30000000-0000-0000-0000-000000000001");
 
     @Test
-    void publishesRevivalAndSummoningFromCommittedEvidence() {
+    void publishesRevivalAndSummoningFromCommittedEvidence() throws Exception {
         List<ActivityView> published = new ArrayList<>();
         LifecycleActivityPublisher publisher = new LifecycleActivityPublisher(
-                published::add);
+                published::add, managedRegistry());
 
         publisher.publishRevival(
-                OPERATION, OWNER, OWNER, COMPANION, "profile-a",
+                OPERATION, OWNER, OWNER, COMPANION, "RoleA", "profile-a",
                 "paid_command", "active", "settled", true, -3_000L);
         publisher.publishSummoning(
                 OPERATION, ActivityIds.SUMMON_SUCCESS, OWNER, "profile-a",
@@ -46,6 +54,8 @@ class LifecycleActivityPublisherTest {
         assertEquals(OPERATION, revival.header().operationId());
         assertEquals(ActivityIds.REVIVE_SUCCESS, revival.header().actionId());
         assertEquals("paid_command", revival.revivalSource());
+        assertEquals("RoleA", revival.roleId());
+        assertEquals(java.util.Set.of("runeteria:family"), revival.groupIds());
         assertEquals("settled", revival.paymentOutcome());
         assertTrue(revival.recovered());
         assertEquals(Instant.ofEpochMilli(-3_000L),
@@ -63,5 +73,69 @@ class LifecycleActivityPublisherTest {
         assertNull(recall.expiresAtMs());
         assertEquals(Instant.ofEpochMilli(-1_000L),
                 recall.header().occurredAt());
+    }
+
+    private static ManagedActivityConfigRegistry managedRegistry() throws Exception {
+        PopulationGroupConfigRegistry groups = new PopulationGroupConfigRegistry();
+        assertTrue(groups.replace(
+                List.of(group("group", "runeteria:family", "RoleA")), 1L
+        ).applied());
+        ManagedActivityConfigRegistry managed = new ManagedActivityConfigRegistry(groups);
+        TwManagedActivityConfig profile = decode("husbandry", """
+                {
+                  "ProfileId":"runeteria:husbandry",
+                  "ProviderId":"runeteria:provider",
+                  "ProviderContractVersion":1,
+                  "RequiredCapabilities":["ACTIVITY_FEED_V2"],
+                  "Domains":[{"DomainId":"runeteria:owned","Owned":true}],
+                  "Families":[{"GroupId":"runeteria:family","GateKey":"runeteria:gate","Weight":1}],
+                  "Activities":{
+                    "Feed":"runeteria:feed",
+                    "HarvestContexts":{"Milk":"runeteria:milk"},
+                    "PendingOutputItems":{"Food_Egg":"runeteria:egg"},
+                    "BreedingSuccess":"runeteria:breed",
+                    "TameSuccess":"runeteria:tame_success",
+                    "NeedSatisfied":"runeteria:feed"
+                  }
+                }
+                """);
+        ManagedActivityConfigRegistry.ReloadResult reload = managed.replace(
+                List.of(profile), 1L);
+        assertTrue(reload.applied(), reload.error());
+        return managed;
+    }
+
+    private static TwManagedActivityConfig decode(String id, String json) throws Exception {
+        TwManagedActivityConfig config = TwManagedActivityConfig.CODEC.decode(
+                BsonDocument.parse(json), new ExtraInfo());
+        set(config, "id", id);
+        return config;
+    }
+
+    private static TwPopulationGroupConfig group(
+            String id,
+            String groupId,
+            String roleId
+    ) throws Exception {
+        TwPopulationGroupConfig config = TwPopulationGroupConfig.CODEC.decode(
+                BsonDocument.parse("""
+                        {"GroupId":"%s","RoleIds":["%s"]}
+                        """.formatted(groupId, roleId)), new ExtraInfo());
+        set(config, "id", id);
+        set(config, "limits", new TwPopulationGroupConfig.LimitSettings());
+        set(field(config, "limits"), "scope", PopulationGroupScope.GLOBAL);
+        return config;
+    }
+
+    private static Object field(Object target, String name) throws Exception {
+        Field field = target.getClass().getDeclaredField(name);
+        field.setAccessible(true);
+        return field.get(target);
+    }
+
+    private static void set(Object target, String name, Object value) throws Exception {
+        Field field = target.getClass().getDeclaredField(name);
+        field.setAccessible(true);
+        field.set(target, value);
     }
 }

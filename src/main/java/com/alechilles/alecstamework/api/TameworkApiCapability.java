@@ -38,6 +38,8 @@ public enum TameworkApiCapability {
     BONDED_COMPANIONS,
     /** Process-local, best-effort filtered Activity API V2 feed. */
     ACTIVITY_FEED_V2,
+    /** Revival activities include managed role and group attribution when available. */
+    REVIVAL_ACTIVITY_CONTEXT,
     /** Durable companion output operations and pending-output claims. */
     DURABLE_OUTPUT_OPERATIONS,
     /** Named, weighted population-capacity reservations. */
