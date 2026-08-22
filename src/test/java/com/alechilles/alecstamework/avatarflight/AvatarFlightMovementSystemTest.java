@@ -1,11 +1,21 @@
 package com.alechilles.alecstamework.avatarflight;
 
+import com.alechilles.alecstamework.activity.ActivityRuntime;
+import com.alechilles.alecstamework.api.ActivityIds;
+import com.alechilles.alecstamework.api.ActivityView;
+import com.alechilles.alecstamework.api.AvatarFlightActivityView;
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.alechilles.alecstamework.api.CompanionXpSource;
+import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
+import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegistry;
 import com.hypixel.hytale.component.Ref;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -14,6 +24,59 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AvatarFlightMovementSystemTest {
     private static final double EPSILON = 0.00001;
+    private static final UUID PLAYER = UUID.fromString(
+            "10000000-0000-0000-0000-000000000701");
+
+    @AfterEach
+    void clearActivityRuntime() {
+        ActivityRuntime.clear();
+    }
+
+    @Test
+    void acceptedControllerActionsPublishOneActivityEach() {
+        List<ActivityView> activities = new ArrayList<>();
+        ActivityRuntime.install(
+                activities::add,
+                new ManagedActivityConfigRegistry(
+                        new PopulationGroupConfigRegistry()));
+
+        AvatarFlightMovementSystem.publishAcceptedActions(
+                activityOutput(true, true, true, true),
+                PLAYER,
+                "NordicDrakeFlight");
+
+        assertEquals(List.of(
+                        ActivityIds.FLIGHT_LAUNCH,
+                        ActivityIds.FLIGHT_FLAP,
+                        ActivityIds.FLIGHT_BOOST,
+                        ActivityIds.FLIGHT_AIRBRAKE),
+                activities.stream()
+                        .map(activity -> activity.header().actionId())
+                        .toList());
+        for (ActivityView activity : activities) {
+            AvatarFlightActivityView flightActivity =
+                    (AvatarFlightActivityView) activity;
+            assertEquals(PLAYER, flightActivity.playerId());
+            assertEquals("NordicDrakeFlight",
+                    flightActivity.flightConfigId());
+        }
+    }
+
+    @Test
+    void rejectedControllerOutputsPublishNothing() {
+        List<ActivityView> activities = new ArrayList<>();
+        ActivityRuntime.install(
+                activities::add,
+                new ManagedActivityConfigRegistry(
+                        new PopulationGroupConfigRegistry()));
+
+        AvatarFlightMovementSystem.publishAcceptedActions(
+                activityOutput(false, false, false, false),
+                PLAYER,
+                "NordicDrakeFlight");
+
+        assertTrue(activities.isEmpty());
+    }
 
     @Test
     void authorizeVigourPrefersFlapWhenSameTickBoostWouldExceedCharges() throws Exception {
@@ -342,6 +405,35 @@ class AvatarFlightMovementSystemTest {
                 0.0,
                 0.0
         );
+    }
+
+    private static AvatarFlightController.Output activityOutput(
+            boolean launchApplied,
+            boolean flapApplied,
+            boolean boostApplied,
+            boolean airbrakeApplied
+    ) {
+        return new AvatarFlightController.Output(
+                AvatarFlightMode.FORWARD_FLIGHT,
+                0.0,
+                0.0,
+                0.0,
+                0L,
+                0L,
+                0L,
+                0.0,
+                0.0,
+                true,
+                flapApplied,
+                boostApplied,
+                launchApplied,
+                launchApplied ? 1.0 : 0.0,
+                false,
+                false,
+                0.0,
+                0.0,
+                0.0,
+                airbrakeApplied);
     }
 
     private static void setNestedField(Object target, String nestedFieldName, String fieldName, Object value)

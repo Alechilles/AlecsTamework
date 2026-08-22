@@ -85,6 +85,14 @@ public final class LiveActivityFeed implements ActivityFeedApi, AutoCloseable {
             public void publish(@Nonnull ActivityView activity) {
                 LiveActivityFeed.this.publish(activity);
             }
+
+            @Override
+            public boolean hasInterest(
+                    @Nonnull ActivityDomain domain,
+                    @Nonnull String actionId
+            ) {
+                return LiveActivityFeed.this.hasInterest(domain, actionId);
+            }
         };
     }
 
@@ -207,9 +215,18 @@ public final class LiveActivityFeed implements ActivityFeedApi, AutoCloseable {
     }
 
     /** Narrow internal seam for publishing typed activity views. */
+    @FunctionalInterface
     public interface Publisher {
         /** Publishes one typed activity view. */
         void publish(@Nonnull ActivityView activity);
+
+        /** Returns cached interest before a producer resolves optional payload data. */
+        default boolean hasInterest(
+                @Nonnull ActivityDomain domain,
+                @Nonnull String actionId
+        ) {
+            return true;
+        }
     }
 
     private final class SubscriptionState implements ActivityFeedSubscription {

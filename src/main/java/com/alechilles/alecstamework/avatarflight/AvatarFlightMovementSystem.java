@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.avatarflight;
 
+import com.alechilles.alecstamework.activity.ActivityRuntime;
+import com.alechilles.alecstamework.api.ActivityIds;
 import com.alechilles.alecstamework.api.CompanionXpSource;
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
@@ -125,6 +127,13 @@ public final class AvatarFlightMovementSystem
                 Math.max(0.0, dt),
                 now
         );
+        if (hasAcceptedActionInterest(output)) {
+            UUIDComponent identity = commandBuffer.getComponent(ref, uuidType);
+            publishAcceptedActions(
+                    output,
+                    identity == null ? null : identity.getUuid(),
+                    flight.getConfigId());
+        }
         awardFlightXp(flight, output, ref, store, commandBuffer, now);
         groundMovementService.sync(
                 ref,
@@ -505,6 +514,50 @@ public final class AvatarFlightMovementSystem
         }
         applyVigourState(flight, state);
         flight.setVigourRechargeMode(AvatarFlightVigourService.RechargeMode.DELAYED.name());
+    }
+
+    private static boolean hasAcceptedActionInterest(
+            @Nonnull AvatarFlightController.Output output
+    ) {
+        return (output.launchApplied()
+                && ActivityRuntime.hasAvatarFlightInterest(
+                        ActivityIds.FLIGHT_LAUNCH))
+                || (output.jumpApplied()
+                && ActivityRuntime.hasAvatarFlightInterest(
+                        ActivityIds.FLIGHT_FLAP))
+                || (output.boostApplied()
+                && ActivityRuntime.hasAvatarFlightInterest(
+                        ActivityIds.FLIGHT_BOOST))
+                || (output.airbrakeApplied()
+                && ActivityRuntime.hasAvatarFlightInterest(
+                        ActivityIds.FLIGHT_AIRBRAKE));
+    }
+
+    static void publishAcceptedActions(
+            @Nonnull AvatarFlightController.Output output,
+            @Nullable UUID playerId,
+            @Nullable String flightConfigId
+    ) {
+        if (output.launchApplied()) {
+            ActivityRuntime.publishAvatarFlight(
+                    ActivityIds.FLIGHT_LAUNCH,
+                    playerId, flightConfigId, null, null);
+        }
+        if (output.jumpApplied()) {
+            ActivityRuntime.publishAvatarFlight(
+                    ActivityIds.FLIGHT_FLAP,
+                    playerId, flightConfigId, null, null);
+        }
+        if (output.boostApplied()) {
+            ActivityRuntime.publishAvatarFlight(
+                    ActivityIds.FLIGHT_BOOST,
+                    playerId, flightConfigId, null, null);
+        }
+        if (output.airbrakeApplied()) {
+            ActivityRuntime.publishAvatarFlight(
+                    ActivityIds.FLIGHT_AIRBRAKE,
+                    playerId, flightConfigId, null, null);
+        }
     }
 
     private static boolean flapEligibleThisTick(@Nonnull AvatarFlightController.Input input,

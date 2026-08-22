@@ -21,7 +21,7 @@ import javax.annotation.Nullable;
 /** Process-local owner of Activity API V2 managed producers. */
 public final class ActivityRuntime {
     private static final RuntimeState UNAVAILABLE = new RuntimeState(
-            null, null, null, null);
+            null, null, null, null, null);
     private static final AtomicReference<RuntimeState> CURRENT =
             new AtomicReference<>(UNAVAILABLE);
 
@@ -37,6 +37,7 @@ public final class ActivityRuntime {
                 new ManagedActivityPublisher(publisher, managedActivities),
                 new TameActivityPublisher(publisher, managedActivities),
                 new LifecycleActivityPublisher(publisher),
+                new AvatarFlightActivityPublisher(publisher),
                 new CompanionCareCreditService()
         ));
     }
@@ -51,6 +52,7 @@ public final class ActivityRuntime {
                 new ManagedActivityPublisher(publisher, managedActivities),
                 new TameActivityPublisher(publisher, managedActivities),
                 new LifecycleActivityPublisher(publisher),
+                new AvatarFlightActivityPublisher(publisher),
                 Objects.requireNonNull(careCredits, "careCredits")
         ));
     }
@@ -288,6 +290,30 @@ public final class ActivityRuntime {
         }
     }
 
+    /** Returns cached avatar-flight interest before optional identity reads. */
+    public static boolean hasAvatarFlightInterest(@Nonnull String actionId) {
+        AvatarFlightActivityPublisher publisher =
+                CURRENT.get().avatarFlightPublisher;
+        return publisher != null && publisher.hasInterest(actionId);
+    }
+
+    /** Publishes one accepted avatar-flight action. */
+    public static void publishAvatarFlight(
+            @Nonnull String actionId,
+            @Nullable UUID playerId,
+            @Nullable String flightConfigId,
+            @Nullable String abilitySlot,
+            @Nullable String rootInteractionId
+    ) {
+        AvatarFlightActivityPublisher publisher =
+                CURRENT.get().avatarFlightPublisher;
+        if (publisher != null) {
+            publisher.publish(
+                    actionId, playerId, flightConfigId,
+                    abilitySlot, rootInteractionId);
+        }
+    }
+
     @Nullable
     private static CompanionXpTransition transition(@Nullable AwardResult award) {
         return award == null ? null : award.transition();
@@ -297,6 +323,7 @@ public final class ActivityRuntime {
             @Nullable ManagedActivityPublisher publisher,
             @Nullable TameActivityPublisher tamePublisher,
             @Nullable LifecycleActivityPublisher lifecyclePublisher,
+            @Nullable AvatarFlightActivityPublisher avatarFlightPublisher,
             @Nullable CompanionCareCreditService careCredits
     ) {
     }

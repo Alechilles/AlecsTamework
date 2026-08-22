@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.interactions;
 
+import com.alechilles.alecstamework.activity.ActivityRuntime;
+import com.alechilles.alecstamework.api.ActivityIds;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightCombatAbilityResolver;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightComponent;
 import com.alechilles.alecstamework.config.assets.AvatarFlightCombatAbilitySlot;
@@ -13,12 +15,14 @@ import com.hypixel.hytale.protocol.InteractionState;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.protocol.WaitForDataFrom;
 import com.hypixel.hytale.server.core.entity.InteractionContext;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.CooldownHandler;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.RootInteraction;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.SimpleInteraction;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 /** Delegates a native item ability slot to the active avatar-flight config's root interaction. */
@@ -79,8 +83,12 @@ public final class TameworkAvatarFlightCombatAbilityInteraction extends SimpleIn
 
     private void executeConfiguredAbility(@Nonnull InteractionContext context) {
         AvatarFlightCombatAbilityResolver.Resolution resolution = resolver.resolve(context, slot);
-        if (!tryStartCooldown(context, resolution) || !delegate(resolution,
-                rootId -> context.execute(RootInteraction.getRootInteractionOrUnknown(rootId)))) {
+        if (!delegateAccepted(
+                tryStartCooldown(context, resolution),
+                resolution,
+                rootId -> context.execute(
+                        RootInteraction.getRootInteractionOrUnknown(rootId)),
+                rootId -> publishAcceptedAbility(context, rootId))) {
             context.getState().state = InteractionState.Failed;
         }
     }
@@ -100,9 +108,63 @@ public final class TameworkAvatarFlightCombatAbilityInteraction extends SimpleIn
 
     static boolean delegate(@Nonnull AvatarFlightCombatAbilityResolver.Resolution resolution,
                             @Nonnull Consumer<String> rootExecutor) {
-        if (!resolution.isAvailable()) return false;
+        return delegateAccepted(
+                true, resolution, rootExecutor, ignored -> { });
+    }
+
+    static boolean delegateAccepted(
+            boolean cooldownAccepted,
+            @Nonnull AvatarFlightCombatAbilityResolver.Resolution resolution,
+            @Nonnull Consumer<String> rootExecutor,
+            @Nonnull Consumer<String> acceptedObserver
+    ) {
+        if (!cooldownAccepted || !resolution.isAvailable()) return false;
         rootExecutor.accept(resolution.rootInteractionId());
+        acceptedObserver.accept(resolution.rootInteractionId());
         return true;
+    }
+
+    private void publishAcceptedAbility(
+            @Nonnull InteractionContext context,
+            @Nonnull String rootInteractionId
+    ) {
+        if (!ActivityRuntime.hasAvatarFlightInterest(
+                ActivityIds.FLIGHT_COMBAT_ABILITY)) {
+            return;
+        }
+        CommandBuffer<EntityStore> commandBuffer = context.getCommandBuffer();
+        Ref<EntityStore> playerRef = context.getEntity();
+        ComponentType<EntityStore, AvatarFlightComponent> flightType =
+                AvatarFlightComponent.getComponentType();
+        ComponentType<EntityStore, UUIDComponent> uuidType =
+                UUIDComponent.getComponentType();
+        if (commandBuffer == null || playerRef == null
+                || flightType == null || uuidType == null) {
+            return;
+        }
+        AvatarFlightComponent flight = commandBuffer.getComponent(
+                playerRef, flightType);
+        UUIDComponent identity = commandBuffer.getComponent(
+                playerRef, uuidType);
+        publishAcceptedAbility(
+                identity == null ? null : identity.getUuid(),
+                flight == null ? null : flight.getConfigId(),
+                slot,
+                rootInteractionId);
+    }
+
+    static void publishAcceptedAbility(
+            @Nullable UUID playerId,
+            @Nullable String flightConfigId,
+            @Nonnull AvatarFlightCombatAbilitySlot slot,
+            @Nullable String rootInteractionId
+    ) {
+        ActivityRuntime.publishAvatarFlight(
+                ActivityIds.FLIGHT_COMBAT_ABILITY,
+                playerId,
+                flightConfigId,
+                slot.getSerializedKey(),
+                rootInteractionId);
     }
 
     private void setSlot(@Nullable String serializedSlot) {
