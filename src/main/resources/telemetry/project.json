@@ -406,7 +406,10 @@
     },
     "breadcrumbs": {
       "enabled": true,
-      "automatic": true
+      "automatic": true,
+      "profilerCorrelationCategories": [
+        "companion.needs.slow-task"
+      ]
     }
   },
   "performance": {

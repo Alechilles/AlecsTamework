@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Added a privacy-safe profiler correlation breadcrumb when one companion-needs
+  worker batch takes at least 50 milliseconds. The timing check stays off the
+  per-companion path and creates no telemetry context for normal batches.
+
 ## 3.2.0 - Runtime Activation and Performance Update - 2026-08-19
 
 ### Changed
