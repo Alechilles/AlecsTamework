@@ -366,7 +366,9 @@ public final class ManagedActivityConfigRegistry {
                         normalize(settings.getFeed()),
                         settings.getHarvestContexts(),
                         settings.getPendingOutputItems(),
-                        normalize(settings.getBreedingSuccess())
+                        normalize(settings.getBreedingSuccess()),
+                        normalize(settings.getTameSuccess()),
+                        normalize(settings.getNeedSatisfied())
                 );
         return new ManagedActivityProfile(
                 normalize(config.getProfileId()),

@@ -28,6 +28,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameIntera
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.UiMessageEffect;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
+import com.alechilles.alecstamework.npc.progression.CompanionLevelingService.AwardResult;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.hypixel.hytale.component.Ref;
@@ -307,6 +308,14 @@ final class TameworkInteractEffects {
                          double healAmount,
                          Player player,
                          InteractionContextSnapshot ctx) {
+        return applyFeedingOutcome(npcRef, store, healAmount, player, ctx).applied();
+    }
+
+    FeedOutcome applyFeedingOutcome(Ref<EntityStore> npcRef,
+                                    Store<EntityStore> store,
+                                    double healAmount,
+                                    Player player,
+                                    InteractionContextSnapshot ctx) {
         if (healAmount > 0) {
             stateEffects.applyHeal(npcRef, store, healAmount);
             presentationEffects.showFeedingCombatText(npcRef, store, player, healAmount);
@@ -321,8 +330,8 @@ final class TameworkInteractEffects {
                 heldItemId,
                 null
         );
-        CompanionLevelingService.awardFeedXp(npcRef, store);
-        return true;
+        AwardResult award = CompanionLevelingService.awardFeedXp(npcRef, store);
+        return new FeedOutcome(true, award);
     }
 
     boolean applyStartHarvest(Ref<EntityStore> npcRef, Role role, Store<EntityStore> store) {
@@ -569,6 +578,24 @@ final class TameworkInteractEffects {
         HarvestContainerOutcome(HarvestContainerResult result, boolean preserveCooldown) {
             this.result = result;
             this.preserveCooldown = preserveCooldown;
+        }
+    }
+
+    static final class FeedOutcome {
+        private final boolean applied;
+        private final AwardResult award;
+
+        FeedOutcome(boolean applied, AwardResult award) {
+            this.applied = applied;
+            this.award = award;
+        }
+
+        boolean applied() {
+            return applied;
+        }
+
+        AwardResult award() {
+            return award;
         }
     }
 

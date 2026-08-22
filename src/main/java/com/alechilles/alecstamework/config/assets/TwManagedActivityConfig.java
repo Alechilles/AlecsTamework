@@ -155,6 +155,24 @@ public final class TwManagedActivityConfig
                             "Namespaced activity emitted after a successful breeding operation."
                     )
                     .add()
+                    .<String>append(
+                            new KeyedCodec<>("TameSuccess", Codec.STRING),
+                            (settings, value) -> settings.tameSuccess = value,
+                            settings -> settings.tameSuccess
+                    )
+                    .documentation(
+                            "Namespaced activity emitted after a committed wild-to-tamed acquisition."
+                    )
+                    .add()
+                    .<String>append(
+                            new KeyedCodec<>("NeedSatisfied", Codec.STRING),
+                            (settings, value) -> settings.needSatisfied = value,
+                            settings -> settings.needSatisfied
+                    )
+                    .documentation(
+                            "Namespaced activity emitted after a committed autonomous food or water need change."
+                    )
+                    .add()
                     .build();
 
     public static final AssetBuilderCodec<String, TwManagedActivityConfig>
@@ -401,6 +419,12 @@ public final class TwManagedActivityConfig
         if (!nested.contains("BreedingSuccess")) {
             activities.breedingSuccess = parent.activities.breedingSuccess;
         }
+        if (!nested.contains("TameSuccess")) {
+            activities.tameSuccess = parent.activities.tameSuccess;
+        }
+        if (!nested.contains("NeedSatisfied")) {
+            activities.needSatisfied = parent.activities.needSatisfied;
+        }
     }
 
     /** Validates fields that do not require the population-group registry. */
@@ -502,6 +526,8 @@ public final class TwManagedActivityConfig
         }
         requireNamespaced(settings.feed, "Feed", configId);
         requireNamespaced(settings.breedingSuccess, "BreedingSuccess", configId);
+        requireNamespaced(settings.tameSuccess, "TameSuccess", configId);
+        requireNamespaced(settings.needSatisfied, "NeedSatisfied", configId);
         validateMapping(
                 settings.harvestContexts,
                 "HarvestContexts",
@@ -655,6 +681,8 @@ public final class TwManagedActivityConfig
         private Map<String, String> harvestContexts = Map.of();
         private Map<String, String> pendingOutputItems = Map.of();
         private String breedingSuccess;
+        private String tameSuccess;
+        private String needSatisfied;
 
         private ActivitySettings() {
         }
@@ -677,6 +705,14 @@ public final class TwManagedActivityConfig
 
         public String getBreedingSuccess() {
             return breedingSuccess;
+        }
+
+        public String getTameSuccess() {
+            return tameSuccess;
+        }
+
+        public String getNeedSatisfied() {
+            return needSatisfied;
         }
     }
 }

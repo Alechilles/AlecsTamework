@@ -8,8 +8,6 @@ import com.alechilles.alecstamework.api.ActivityFeedSubscription;
 import com.alechilles.alecstamework.api.ActivityFilter;
 import com.alechilles.alecstamework.api.ActivityHeader;
 import com.alechilles.alecstamework.api.ActivityView;
-import com.alechilles.alecstamework.api.ManagedActivityView;
-import com.alechilles.alecstamework.api.SuccessfulActivityView;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -79,44 +77,12 @@ public final class LiveActivityFeed implements ActivityFeedApi, AutoCloseable {
         }
     }
 
-    /** Transitional bridge for the unreleased producer while it is migrated to V2. */
-    void publish(@Nonnull SuccessfulActivityView activity) {
-        Objects.requireNonNull(activity, "activity");
-        try {
-            publish(new ManagedActivityView(
-                    new ActivityHeader(
-                            activity.operationId(),
-                            0L,
-                            activity.activityId(),
-                            activity.committedAt()
-                    ),
-                    activity.profileId(),
-                    activity.groupIds(),
-                    activity.sourceRoleId(),
-                    activity.ownerId(),
-                    activity.companionId(),
-                    activity.activityId(),
-                    activity.itemQuantities(),
-                    List.of(),
-                    null,
-                    null
-            ));
-        } catch (IllegalArgumentException ignored) {
-            // The old producer is removed with its unreleased contract.
-        }
-    }
-
     /** Returns the narrow internal publisher seam for composition wiring. */
     @Nonnull
     Publisher publisher() {
         return new Publisher() {
             @Override
             public void publish(@Nonnull ActivityView activity) {
-                LiveActivityFeed.this.publish(activity);
-            }
-
-            @Override
-            public void publish(@Nonnull SuccessfulActivityView activity) {
                 LiveActivityFeed.this.publish(activity);
             }
         };
@@ -242,13 +208,8 @@ public final class LiveActivityFeed implements ActivityFeedApi, AutoCloseable {
 
     /** Narrow internal seam for publishing typed activity views. */
     public interface Publisher {
-        /** Transitional overload for the unreleased producer. */
-        void publish(@Nonnull SuccessfulActivityView activity);
-
         /** Publishes one typed activity view. */
-        default void publish(@Nonnull ActivityView activity) {
-            throw new UnsupportedOperationException("Use ActivityView.");
-        }
+        void publish(@Nonnull ActivityView activity);
     }
 
     private final class SubscriptionState implements ActivityFeedSubscription {

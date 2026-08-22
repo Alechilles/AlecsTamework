@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModeCycleI
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MountInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameInteraction;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.items.CommandAutoLinkResult;
 import com.alechilles.alecstamework.items.CommandAutoLinkService;
 import com.hypixel.hytale.component.Ref;
@@ -101,7 +102,9 @@ final class InteractionExecutor {
         if (entry instanceof FeedInteraction) {
             FeedInteraction feed = (FeedInteraction) entry;
             double healAmount = feedHelper.resolveFeedHeal(feed, role, ctx);
-            boolean applied = effects.applyFeeding(npcRef, store, healAmount, player, ctx);
+            UUID operationId = UUID.randomUUID();
+            TameworkInteractEffects.FeedOutcome feedOutcome =
+                    effects.applyFeedingOutcome(npcRef, store, healAmount, player, ctx);
             feedHelper.consumeHeldItem(player, 1);
             boolean customApplied = effects.applyCustomEffects(
                     interactionConfigId,
@@ -116,17 +119,19 @@ final class InteractionExecutor {
                     ctx,
                     harvestInteraction
             );
-            if (applied
-                    && isInteractingOwner(npcRef, store, player)
-                    && SuccessfulActivityRuntime.qualifyFeed(npcRef, store)) {
-                SuccessfulActivityRuntime.publishFeed(
-                        UUID.randomUUID(),
+            if (feedOutcome.applied()
+                    && isInteractingOwner(npcRef, store, player)) {
+                boolean careCredit = ActivityRuntime.tryAcquireCareCredit(npcRef, store);
+                ActivityRuntime.publishFeed(
+                        operationId,
                         role == null ? null : role.getRoleName(),
-                        SuccessfulActivityRuntime.resolveOwnerId(npcRef, store),
-                        SuccessfulActivityRuntime.resolveCompanionId(npcRef, store)
+                        resolveOwnerId(npcRef, store),
+                        resolveCompanionId(npcRef, store),
+                        feedOutcome.award(),
+                        careCredit
                 );
             }
-            return applied | customApplied;
+            return feedOutcome.applied() | customApplied;
         }
         if (entry instanceof HarvestInteraction) {
             effects.logHarvestExecution("selected", interactionConfigId, interactionIndex, role, ctx);
@@ -173,15 +178,6 @@ final class InteractionExecutor {
                     ctx,
                     harvestInteraction
             );
-            if (isInteractingOwner(npcRef, store, player)) {
-                SuccessfulActivityRuntime.publishHarvest(
-                        UUID.randomUUID(),
-                        role == null ? null : role.getRoleName(),
-                        resolveHarvestContext(role, ctx),
-                        SuccessfulActivityRuntime.resolveOwnerId(npcRef, store),
-                        SuccessfulActivityRuntime.resolveCompanionId(npcRef, store)
-                );
-            }
             return true | customApplied;
         }
         if (entry instanceof MountInteraction) {
@@ -257,10 +253,49 @@ final class InteractionExecutor {
             Store<EntityStore> store,
             Player player
     ) {
-        UUID ownerId = SuccessfulActivityRuntime.resolveOwnerId(npcRef, store);
+        UUID ownerId = resolveOwnerId(npcRef, store);
         return ownerId != null
                 && player != null
                 && Objects.equals(ownerId, player.getUuid());
+    }
+
+    private UUID resolveOwnerId(
+            Ref<EntityStore> npcRef,
+            Store<EntityStore> store
+    ) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return null;
+        }
+        var ownerType = com.alechilles.alecstamework.npc.components
+                .TameworkOwnerComponent.getComponentType();
+        if (ownerType == null) {
+            return null;
+        }
+        var owner = store.getComponent(npcRef, ownerType);
+        return owner == null ? null : owner.getOwnerId();
+    }
+
+    private UUID resolveCompanionId(
+            Ref<EntityStore> npcRef,
+            Store<EntityStore> store
+    ) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return null;
+        }
+        var uuidType = com.hypixel.hytale.server.core.entity.UUIDComponent
+                .getComponentType();
+        if (uuidType != null) {
+            var uuid = store.getComponent(npcRef, uuidType);
+            if (uuid != null && uuid.getUuid() != null) {
+                return uuid.getUuid();
+            }
+        }
+        var npc = store.getComponent(
+                npcRef,
+                com.hypixel.hytale.server.npc.entities.NPCEntity
+                        .getComponentType()
+        );
+        return npc == null ? null : npc.getUuid();
     }
 
     private String resolveHarvestContext(

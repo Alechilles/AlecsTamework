@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.BondedCompanionApi;
+import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.api.AdmissionProviderApi;
 import com.alechilles.alecstamework.api.ActivityFeedApi;
 import com.alechilles.alecstamework.api.CommandFamilyRosterApi;
@@ -265,6 +266,7 @@ public final class ReplacementTameworkApi
     @Override
     public void close() {
         if (closed.compareAndSet(false, true)) {
+            ActivityRuntime.clear();
             if (activities instanceof AutoCloseable closeable) {
                 try {
                     closeable.close();

@@ -15,9 +15,7 @@ public record ManagedActivityView(
         @Nonnull ActivityHeader header,
         @Nonnull String profileId,
         @Nonnull Set<String> groupIds,
-        @Nonnull String roleId,
-        @Nonnull UUID ownerId,
-        @Nonnull UUID companionId,
+        @Nonnull List<ActivityParticipantView> participants,
         @Nonnull String mappedActivityId,
         @Nonnull Map<String, Integer> itemQuantities,
         @Nonnull List<UUID> offspringIds,
@@ -28,26 +26,11 @@ public record ManagedActivityView(
         header = Objects.requireNonNull(header, "header");
         profileId = requireText(profileId, "profileId");
         groupIds = immutableTextSet(groupIds, "groupIds");
-        roleId = requireText(roleId, "roleId");
-        ownerId = Objects.requireNonNull(ownerId, "ownerId");
-        companionId = Objects.requireNonNull(companionId, "companionId");
+        participants = immutableParticipants(participants);
         mappedActivityId = ActivityHeader.requireNamespacedText(
                 mappedActivityId, "mappedActivityId");
         itemQuantities = immutablePositiveQuantities(itemQuantities);
         offspringIds = immutableIds(offspringIds, "offspringIds");
-    }
-
-    public ManagedActivityView(
-            @Nonnull ActivityHeader header,
-            @Nonnull String profileId,
-            @Nonnull Set<String> groupIds,
-            @Nonnull String roleId,
-            @Nonnull UUID ownerId,
-            @Nonnull UUID companionId,
-            @Nonnull String mappedActivityId
-    ) {
-        this(header, profileId, groupIds, roleId, ownerId, companionId,
-                mappedActivityId, Map.of(), List.of(), null, null);
     }
 
     @Override
@@ -60,7 +43,7 @@ public record ManagedActivityView(
     @Nonnull
     public ManagedActivityView withHeader(@Nonnull ActivityHeader nextHeader) {
         return new ManagedActivityView(
-                nextHeader, profileId, groupIds, roleId, ownerId, companionId,
+                nextHeader, profileId, groupIds, participants,
                 mappedActivityId, itemQuantities, offspringIds,
                 companionXpOutcome, careCreditOutcome);
     }
@@ -96,6 +79,21 @@ public record ManagedActivityView(
             }
         }
         return Map.copyOf(normalized);
+    }
+
+    private static List<ActivityParticipantView> immutableParticipants(
+            List<ActivityParticipantView> values
+    ) {
+        List<ActivityParticipantView> source = Objects.requireNonNull(
+                values, "participants");
+        if (source.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "participants must contain at least one participant.");
+        }
+        for (ActivityParticipantView value : source) {
+            Objects.requireNonNull(value, "participants entry");
+        }
+        return List.copyOf(source);
     }
 
     private static List<UUID> immutableIds(List<UUID> values, String field) {

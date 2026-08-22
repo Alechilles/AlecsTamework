@@ -12,6 +12,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import com.alechilles.alecstamework.api.TameworkApi;
+import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.api.TameworkConfigFamily;
 import com.alechilles.alecstamework.api.TameworkProgressionTimeScales;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
@@ -67,7 +68,6 @@ import com.alechilles.alecstamework.config.assets.TwMountedGlideConfig;
 import com.alechilles.alecstamework.config.assets.TwMountedDescentConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.actions.BreedingLitterRuntime;
-import com.alechilles.alecstamework.npc.actions.SuccessfulActivityRuntime;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
@@ -817,10 +817,7 @@ public class Tamework extends JavaPlugin {
                 bondedCompanionComposition == null ? null : bondedCompanionComposition.api()
         );
         api = apiComposition.api();
-        SuccessfulActivityRuntime.install(
-                apiComposition.activityPublisher(),
-                managedActivityConfigRegistry
-        );
+        apiComposition.installActivityRuntime(managedActivityConfigRegistry);
         BreedingLitterRuntime.install(
                 this::managedBatchAdmissions,
                 litter -> persistenceComposition == null
@@ -1578,7 +1575,7 @@ public class Tamework extends JavaPlugin {
             commandItemFeatureHandler = null;
         }
         if (apiComposition != null) {
-            SuccessfulActivityRuntime.clear();
+            ActivityRuntime.clear();
             apiComposition.close();
             apiComposition = null;
         }

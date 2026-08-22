@@ -217,9 +217,12 @@ class TameworkApiV011ContractTest {
                 ),
                 "profile:test",
                 groups,
-                "role:cow",
-                UUID.randomUUID(),
-                UUID.randomUUID(),
+                java.util.List.of(new ActivityParticipantView(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        "profile:test",
+                        "role:cow"
+                )),
                 "tamework:feed",
                 quantities,
                 java.util.List.of(),

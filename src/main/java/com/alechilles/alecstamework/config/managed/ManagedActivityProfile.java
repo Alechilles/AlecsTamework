@@ -126,7 +126,9 @@ public record ManagedActivityProfile(
             @Nonnull String feed,
             @Nonnull Map<String, String> harvestContexts,
             @Nonnull Map<String, String> pendingOutputItems,
-            @Nonnull String breedingSuccess
+            @Nonnull String breedingSuccess,
+            @Nonnull String tameSuccess,
+            @Nonnull String needSatisfied
     ) {
         public ActivityMapping {
             feed = requireText(feed, "activities.feed");
@@ -141,6 +143,14 @@ public record ManagedActivityProfile(
             breedingSuccess = requireText(
                     breedingSuccess,
                     "activities.breedingSuccess"
+            );
+            tameSuccess = requireText(
+                    tameSuccess,
+                    "activities.tameSuccess"
+            );
+            needSatisfied = requireText(
+                    needSatisfied,
+                    "activities.needSatisfied"
             );
         }
 

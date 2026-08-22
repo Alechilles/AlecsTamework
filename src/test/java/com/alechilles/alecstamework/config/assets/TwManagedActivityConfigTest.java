@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
+import com.alechilles.alecstamework.config.managed.ManagedActivityProfile;
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegistry;
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
@@ -76,6 +77,60 @@ class TwManagedActivityConfigTest {
                 Map.of()
         );
         assertEquals(0, replacementChild.getFamilies().length);
+    }
+
+    @Test
+    void resolvesFeedHarvestBreedingTameAndNeedMappingsWithNestedInheritance()
+            throws Exception {
+        PopulationGroupConfigRegistry groups = new PopulationGroupConfigRegistry();
+        assertTrue(groups.replace(
+                List.of(group("group", "runeteria:family", "RoleA")), 1L
+        ).applied());
+        TwManagedActivityConfig parent = decode("parent", """
+                {
+                  "ProfileId":"runeteria:husbandry",
+                  "ProviderId":"runeteria:provider",
+                  "ProviderContractVersion":1,
+                  "RequiredCapabilities":["ACTIVITY_FEED_V2"],
+                  "Domains":[{"DomainId":"runeteria:owned","Owned":true}],
+                  "Families":[{"GroupId":"runeteria:family","GateKey":"runeteria:gate","Weight":1}],
+                  "Activities":{
+                    "Feed":"runeteria:feed",
+                    "HarvestContexts":{"Milk":"runeteria:milk"},
+                    "PendingOutputItems":{"Food_Egg":"runeteria:egg"},
+                    "BreedingSuccess":"runeteria:breed_success",
+                    "TameSuccess":"runeteria:tame_success",
+                    "NeedSatisfied":"runeteria:need_satisfied"
+                  }
+                }
+                """);
+        TwManagedActivityConfig child = decode("child", """
+                {
+                  "ProfileId":"runeteria:husbandry-child",
+                  "Activities":{"Feed":"runeteria:child/feed"}
+                }
+                """);
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("ProfileId", "Activities"),
+                Map.of("Activities", Set.of("Feed"))
+        );
+
+        assertEquals("runeteria:child/feed", child.getActivities().getFeed());
+        assertEquals("runeteria:breed_success", child.getActivities().getBreedingSuccess());
+        assertEquals("runeteria:tame_success", child.getActivities().getTameSuccess());
+        assertEquals("runeteria:need_satisfied", child.getActivities().getNeedSatisfied());
+
+        ManagedActivityConfigRegistry registry =
+                new ManagedActivityConfigRegistry(groups);
+        assertTrue(registry.replace(List.of(parent), 1L).applied());
+        ManagedActivityProfile profile = registry.resolveRole("RoleA")
+                .orElseThrow().profile();
+        assertEquals("runeteria:feed", profile.activities().feed());
+        assertEquals("runeteria:milk", profile.activities().harvestContexts().get("Milk"));
+        assertEquals("runeteria:breed_success", profile.activities().breedingSuccess());
+        assertEquals("runeteria:tame_success", profile.activities().tameSuccess());
+        assertEquals("runeteria:need_satisfied", profile.activities().needSatisfied());
     }
 
     @Test
@@ -346,7 +401,9 @@ class TwManagedActivityConfigTest {
                     "Feed":"runeteria:feed",
                     "HarvestContexts":{"Milk":"runeteria:milk"},
                     "PendingOutputItems":{"Food_Egg":"runeteria:egg"},
-                    "BreedingSuccess":"runeteria:breed"
+                    "BreedingSuccess":"runeteria:breed",
+                    "TameSuccess":"runeteria:tame_success",
+                    "NeedSatisfied":"runeteria:need_satisfied"
                   }
                 }
                 """
@@ -495,7 +552,9 @@ class TwManagedActivityConfigTest {
                     "Feed":"%s",
                     "HarvestContexts":{"Milk":"runeteria:milk"},
                     "PendingOutputItems":{"Food_Egg":"runeteria:egg"},
-                    "BreedingSuccess":"runeteria:breed"
+                    "BreedingSuccess":"runeteria:breed",
+                    "TameSuccess":"runeteria:tame_success",
+                    "NeedSatisfied":"runeteria:need_satisfied"
                   }
                 }
                 """.formatted(profileId, groupId, gateKey, feed);

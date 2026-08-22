@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.BondedCompanionApi;
+import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.api.InteractionExtensionApi;
 import com.alechilles.alecstamework.api.CommandFamilyRosterApi;
 import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
@@ -15,6 +16,7 @@ import com.alechilles.alecstamework.api.RequiredContentProfileApi;
 import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TraitEffectApi;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
+import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.damage.SimpleClaimsTamedDamagePolicy;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
@@ -317,6 +319,13 @@ public final class ReplacementTameworkApiFactory {
         @Nonnull
         public LiveActivityFeed.Publisher activityPublisher() {
             return activityFeed.publisher();
+        }
+
+        /** Installs managed Activity API V2 producers for this composition. */
+        public void installActivityRuntime(
+                @Nonnull ManagedActivityConfigRegistry managedActivities
+        ) {
+            ActivityRuntime.install(activityFeed.publisher(), managedActivities);
         }
 
         public void activateCapturePolicyRuntime(

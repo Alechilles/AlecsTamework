@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.api.PopulationAdmissionDecision;
 import com.alechilles.alecstamework.api.internal.ManagedBatchAdmissionAuthority;
+import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.companion.population.domain.ManagedBatchSettlement;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
@@ -349,17 +350,21 @@ final class BreedingLitterWorldExecutor {
     ) {
         return settle(litter, admissions, receipts).thenApply(result -> {
             if (result.status() == ManagedBatchSettlement.Status.COMMITTED
-                    && !receipts.isEmpty()) {
+                    && !result.actualChildIds().isEmpty()) {
                 BreedingLitterRuntime.scheduleCompanionXp(
                         litter.worldName(),
                         litter.parentA().uuid(),
                         litter.parentB().uuid()
                 );
-                SuccessfulActivityRuntime.publishBreeding(
+                ActivityRuntime.publishBreeding(
                         litter.litterId(),
                         litter.parentA().roleId(),
                         litter.parentA().ownerId(),
-                        litter.parentA().uuid()
+                        litter.parentA().uuid(),
+                        litter.parentB().roleId(),
+                        litter.parentB().ownerId(),
+                        litter.parentB().uuid(),
+                        result.actualChildIds().values().stream().toList()
                 );
             }
             return settlementResult(result);

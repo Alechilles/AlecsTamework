@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.debug.CompanionXpEventDebugLogService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService.AwardResult;
@@ -20,7 +21,10 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import com.hypixel.hytale.server.npc.util.InventoryHelper;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -57,6 +61,7 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
         List<ItemStack> drops = CompanionHarvestBonusService.shouldDuplicateDrops(ref, store, role)
                 ? duplicateDrops(baseDrops)
                 : baseDrops;
+        UUID operationId = UUID.randomUUID();
 
         ModelComponent modelComponent = store.getComponent(ref, ModelComponent.getComponentType());
         float eyeHeight = modelComponent != null ? modelComponent.getModel().getEyeHeight(ref, store) : 0.0F;
@@ -75,6 +80,25 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
         if (dropped && awardXp) {
             AwardResult result = CompanionLevelingService.awardHarvestXp(ref, store);
             logHarvestDropAward(ref, store, baseDrops.size(), drops.size(), droppedCount, result);
+            ActivityRuntime.publishHarvest(
+                    operationId,
+                    role == null ? null : role.getRoleName(),
+                    null,
+                    ActivityRuntime.resolveOwnerId(ref, store),
+                    ActivityRuntime.resolveCompanionId(ref, store),
+                    quantities(drops),
+                    result
+            );
+        } else if (dropped) {
+            ActivityRuntime.publishHarvest(
+                    operationId,
+                    role == null ? null : role.getRoleName(),
+                    null,
+                    ActivityRuntime.resolveOwnerId(ref, store),
+                    ActivityRuntime.resolveCompanionId(ref, store),
+                    quantities(drops),
+                    null
+            );
         } else if (!dropped) {
             logHarvestDropAttempt("skipped reason=resolved-drops-empty baseDrops=" + baseDrops.size()
                     + " attemptedDrops=" + drops.size()
@@ -82,6 +106,19 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
                     + " dropList=" + valueOrNull(this.dropList));
         }
         return true;
+    }
+
+    private Map<String, Integer> quantities(List<ItemStack> drops) {
+        LinkedHashMap<String, Integer> quantities = new LinkedHashMap<>();
+        for (ItemStack drop : drops) {
+            if (drop == null || drop.isEmpty()
+                    || drop.getItemId() == null || drop.getItemId().isBlank()
+                    || drop.getQuantity() <= 0) {
+                continue;
+            }
+            quantities.merge(drop.getItemId(), drop.getQuantity(), Integer::sum);
+        }
+        return Map.copyOf(quantities);
     }
 
     /** Bridges the Update 6 callback while retaining the Update 5 Role overload above. */

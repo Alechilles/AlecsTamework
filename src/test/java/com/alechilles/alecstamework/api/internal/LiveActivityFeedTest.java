@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.api.ActivityFeedSubscription;
 import com.alechilles.alecstamework.api.ActivityFilter;
 import com.alechilles.alecstamework.api.ActivityHeader;
 import com.alechilles.alecstamework.api.ActivityIds;
+import com.alechilles.alecstamework.api.ActivityParticipantView;
 import com.alechilles.alecstamework.api.ManagedActivityView;
 import com.alechilles.alecstamework.api.TameActivityView;
 import java.time.Instant;
@@ -194,10 +195,17 @@ class LiveActivityFeedTest {
                 header(actionId),
                 "runeteria:husbandry",
                 Set.of("family:cow"),
-                "role:cow",
-                OWNER,
-                COMPANION,
-                "runeteria:husbandry/feed"
+                List.of(new ActivityParticipantView(
+                        COMPANION,
+                        OWNER,
+                        "runeteria:husbandry",
+                        "role:cow"
+                )),
+                "runeteria:husbandry/feed",
+                java.util.Map.of(),
+                List.of(),
+                null,
+                null
         );
     }
 
