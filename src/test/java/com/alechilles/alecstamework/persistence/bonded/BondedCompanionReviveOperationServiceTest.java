@@ -235,14 +235,14 @@ class BondedCompanionReviveOperationServiceTest {
     }
 
     @Test
-    void freshCommitPublishesBeforeSettlementAndRetryNeverPublishesTwice()
+    void freshCommitPublishesOnlyAfterPaymentSettlementAndAcknowledgement()
             throws Exception {
         StoreDouble store = new StoreDouble(false, true);
         ServiceHarness harness = harness(store);
         FlakySettlementInventory inventory = new FlakySettlementInventory(
                 () -> harness.support.publications);
         BondedCompanionReviveRequest request = request(
-                "publish-before-settlement", inventory,
+                "publish-after-settlement", inventory,
                 harness.rosters.snapshot().revision());
 
         BondedCompanionResult<BondedCompanionProfileView> first =
@@ -250,7 +250,7 @@ class BondedCompanionReviveOperationServiceTest {
         harness.service.revive(request).toCompletableFuture().join();
 
         assertEquals(BondedCompanionResultCode.INTERNAL_FAILURE, first.code());
-        assertEquals(1, inventory.publicationsAtFirstSettlement);
+        assertEquals(0, inventory.publicationsAtFirstSettlement);
         assertEquals(2, inventory.settlementAttempts);
         assertEquals(1, harness.support.publications);
         assertEquals(1, store.acknowledgments);
@@ -839,6 +839,8 @@ class BondedCompanionReviveOperationServiceTest {
             return failure(code, result.reason());
         }
         @Override public void publishRevived(
-                BondedCompanionRecord.Profile profile) { publications++; }
+                BondedCompanionRecord.Profile profile,
+                String operationId,
+                boolean recovered) { publications++; }
     }
 }

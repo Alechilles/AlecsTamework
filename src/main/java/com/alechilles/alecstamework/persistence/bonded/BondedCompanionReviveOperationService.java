@@ -167,7 +167,6 @@ final class BondedCompanionReviveOperationService {
         }
         if (saved.code() == BondedCompanionStoreResult.Code.APPLIED
                 && saved.value() != null) {
-            if (!saved.replayed()) publishRevived(saved.value());
             return settle(receipt, true).thenApply(settled -> {
                 if (!settled) return support.internal(
                         "bonded-revive-payment-receipt-release-pending");
@@ -175,6 +174,10 @@ final class BondedCompanionReviveOperationService {
                         action, saved, operation.retainedUntilMs())) {
                     return support.internal(
                             "bonded-revive-payment-retention-pending");
+                }
+                if (!saved.replayed()) {
+                    publishRevived(
+                            saved.value(), operationId(action), false);
                 }
                 return support.success(saved.value());
             });
@@ -254,10 +257,15 @@ final class BondedCompanionReviveOperationService {
                     if (!settled) return support.internal(success
                             ? "bonded-revive-payment-receipt-release-pending"
                             : "bonded-revive-payment-compensation-pending");
-                    return acknowledge(action, stored, retainedUntil())
-                            ? support.storedResult(stored)
-                            : support.internal(
-                            "bonded-revive-payment-retention-pending");
+                    if (!acknowledge(action, stored, retainedUntil())) {
+                        return support.internal(
+                                "bonded-revive-payment-retention-pending");
+                    }
+                    if (success && stored.value() != null) {
+                        publishRevived(
+                                stored.value(), operationId(action), true);
+                    }
+                    return support.storedResult(stored);
                 });
     }
 
@@ -274,9 +282,13 @@ final class BondedCompanionReviveOperationService {
         }
     }
 
-    private void publishRevived(BondedCompanionRecord.Profile profile) {
+    private void publishRevived(
+            BondedCompanionRecord.Profile profile,
+            String operationId,
+            boolean recovered
+    ) {
         try {
-            support.publishRevived(profile);
+            support.publishRevived(profile, operationId, recovered);
         } catch (RuntimeException | LinkageError ignored) {
             // Listener failures cannot invalidate the unique durable commit.
         }
@@ -431,6 +443,9 @@ final class BondedCompanionReviveOperationService {
         BondedCompanionResult<BondedCompanionProfileView> storeFailure(
                 BondedCompanionStoreResult<?> result);
 
-        void publishRevived(BondedCompanionRecord.Profile profile);
+        void publishRevived(
+                BondedCompanionRecord.Profile profile,
+                String operationId,
+                boolean recovered);
     }
 }

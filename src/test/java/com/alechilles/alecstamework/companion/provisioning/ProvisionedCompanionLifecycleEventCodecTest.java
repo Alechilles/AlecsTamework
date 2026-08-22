@@ -1,9 +1,12 @@
 package com.alechilles.alecstamework.companion.provisioning;
 
+import com.alechilles.alecstamework.activity.ActivityRuntime;
+import com.alechilles.alecstamework.api.ActivityView;
 import com.alechilles.alecstamework.api.CompanionProvisioningProjectionStatus;
 import com.alechilles.alecstamework.api.PopulationCompanionLifecycle;
 import com.alechilles.alecstamework.api.ProvisionedCompanionDeathRecordedEvent;
 import com.alechilles.alecstamework.api.ProvisionedCompanionRevivedEvent;
+import com.alechilles.alecstamework.api.RevivalActivityView;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
@@ -18,10 +21,16 @@ import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
 import com.alechilles.alecstamework.persistence.projection.ProjectionSequence;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
+import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegistry;
 import java.util.ArrayList;
+import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -38,6 +47,11 @@ class ProvisionedCompanionLifecycleEventCodecTest {
             NpcAlias.parse("20000000-0000-0000-0000-000000000002");
     private static final OperationId OPERATION =
             OperationId.parse("60000000-0000-0000-0000-000000000001");
+
+    @AfterEach
+    void clearActivityRuntime() {
+        ActivityRuntime.clear();
+    }
 
     @Test
     void deathRoundTripMapsEverySelfContainedPublicFact() {
@@ -89,6 +103,7 @@ class ProvisionedCompanionLifecycleEventCodecTest {
 
     @Test
     void revivalRoundTripMapsEverySelfContainedPublicFact() {
+        List<ActivityView> activities = installActivityRuntime();
         ProvisionedCompanionRevivalOutcome outcome =
                 new ProvisionedCompanionRevivalOutcome(
                         ORIGIN,
@@ -127,10 +142,22 @@ class ProvisionedCompanionLifecycleEventCodecTest {
         assertEquals(5, mapped.oldProfileRevision());
         assertEquals(7, mapped.newProfileRevision());
         assertEquals(-2_000, mapped.revivedAtMs());
+        RevivalActivityView activity = assertInstanceOf(
+                RevivalActivityView.class, activities.getFirst());
+        assertEquals(OPERATION.value(), activity.header().operationId());
+        assertNull(activity.actorId());
+        assertEquals(OWNER.value(), activity.ownerId());
+        assertEquals(NEW_ALIAS.value(), activity.companionId());
+        assertEquals(ORIGIN.profileId().toString(), activity.profileId());
+        assertEquals("provisioned", activity.revivalSource());
+        assertEquals("active", activity.resultingLifecycleState());
+        assertNull(activity.paymentOutcome());
+        assertFalse(activity.recovered());
     }
 
     @Test
     void dormantRevivalCarriesNoAliasAndReportsNoProjectionRequested() {
+        List<ActivityView> activities = installActivityRuntime();
         ProvisionedCompanionRevivalOutcome outcome =
                 new ProvisionedCompanionRevivalOutcome(
                         ORIGIN,
@@ -170,6 +197,21 @@ class ProvisionedCompanionLifecycleEventCodecTest {
                 mapped.projectionStatus()
         );
         assertTrue(mapped.recovered());
+        RevivalActivityView activity = assertInstanceOf(
+                RevivalActivityView.class, activities.getFirst());
+        assertEquals(ORIGIN.profileId().value(), activity.companionId());
+        assertEquals("provisioned_dormant",
+                activity.resultingLifecycleState());
+        assertTrue(activity.recovered());
+    }
+
+    private static List<ActivityView> installActivityRuntime() {
+        List<ActivityView> activities = new ArrayList<>();
+        ActivityRuntime.install(
+                activities::add,
+                new ManagedActivityConfigRegistry(
+                        new PopulationGroupConfigRegistry()));
+        return activities;
     }
 
     @Test

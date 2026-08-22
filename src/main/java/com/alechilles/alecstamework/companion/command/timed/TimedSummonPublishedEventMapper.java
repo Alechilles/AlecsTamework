@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.companion.command.timed;
 
+import com.alechilles.alecstamework.activity.ActivityRuntime;
+import com.alechilles.alecstamework.api.ActivityIds;
 import com.alechilles.alecstamework.api.CommandTimedSummoningChangedEvent;
 import com.alechilles.alecstamework.api.CommandTimedSummoningState;
 import com.alechilles.alecstamework.api.CommandTimedSummoningView;
@@ -33,7 +35,8 @@ public final class TimedSummonPublishedEventMapper {
         // The payload owns domain time. Early replacement writers used the
         // later transaction time in the envelope, which is storage metadata.
         long occurredAtMs = evidence.leaseChange().after().updatedAtMs();
-        return new CommandTimedSummoningChangedEvent(
+        CommandTimedSummoningChangedEvent mapped =
+                new CommandTimedSummoningChangedEvent(
                 view(
                         evidence.leaseChange().before(),
                         evidence,
@@ -50,6 +53,8 @@ public final class TimedSummonPublishedEventMapper {
                 occurredAtMs,
                 emittedAtMs
         );
+        publishActivity(event, evidence, occurredAtMs);
+        return mapped;
     }
 
     /** Maps synchronous delivery with emitted time equal to durable time. */
@@ -71,6 +76,62 @@ public final class TimedSummonPublishedEventMapper {
                     "Timed summon projection envelope does not match payload"
             );
         }
+    }
+
+    private static void publishActivity(
+            ProjectionEvent event,
+            TimedSummonLeaseChangeEvidence evidence,
+            long occurredAtMs
+    ) {
+        String actionId = actionId(evidence, occurredAtMs);
+        if (actionId == null) {
+            return;
+        }
+        TimedSummonLease relevant = ActivityIds.SUMMON_SUCCESS.equals(actionId)
+                ? evidence.leaseChange().after()
+                : evidence.leaseChange().before();
+        ActivityRuntime.publishSummoning(
+                event.operationId().value(),
+                actionId,
+                evidence.membership().familyKey().ownerId().value(),
+                evidence.leaseChange().after().profileId().toString(),
+                evidence.membership().familyKey().familyId(),
+                evidence.leaseChange().after().profileId().value(),
+                evidence.reason().publicValue(),
+                expiresAt(relevant)
+        );
+    }
+
+    @Nullable
+    private static String actionId(
+            TimedSummonLeaseChangeEvidence evidence,
+            long occurredAtMs
+    ) {
+        if (evidence.reason()
+                == TimedSummonLeaseChangeEvidence.Reason.SUMMON_STARTED) {
+            return ActivityIds.SUMMON_SUCCESS;
+        }
+        if (evidence.reason()
+                != TimedSummonLeaseChangeEvidence.Reason.STORED
+                || evidence.leaseChange().before() == null) {
+            return null;
+        }
+        TimedSummonLease before = evidence.leaseChange().before();
+        Long remaining = remaining(before, occurredAtMs);
+        return remaining != null && remaining == 0L
+                ? ActivityIds.SUMMON_EXPIRED
+                : ActivityIds.RECALL;
+    }
+
+    @Nullable
+    private static Long expiresAt(@Nullable TimedSummonLease lease) {
+        if (lease == null || !lease.activeSession()
+                || lease.remainingMs() == null
+                || lease.checkpointedAtMs() == null) {
+            return null;
+        }
+        return TimedSummonTime.saturatingAdd(
+                lease.checkpointedAtMs(), lease.remainingMs());
     }
 
     @Nullable

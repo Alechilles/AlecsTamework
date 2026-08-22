@@ -243,10 +243,6 @@ public final class BondedCompanionPaymentRecoveryService {
                 == BondedCompanionStoreResult.Code.IDEMPOTENCY_CONFLICT) {
             return completed(Outcome.QUARANTINED);
         }
-        if (saved.code() == BondedCompanionStoreResult.Code.APPLIED
-                && saved.value() != null && !saved.replayed()) {
-            publishRevived(saved.value());
-        }
         return recover(operationId, probe, saved, receipt);
     }
 
@@ -276,17 +272,27 @@ public final class BondedCompanionPaymentRecoveryService {
             if (!acknowledge(probe, terminal)) {
                 return Outcome.RETENTION_PENDING;
             }
+            if (committed && terminal.value() != null) {
+                publishRevived(
+                        terminal.value(), operationId, true);
+            }
             return committed
                     ? Outcome.SETTLED_COMMITTED : Outcome.SETTLED_REJECTED;
         });
     }
 
-    private void publishRevived(BondedCompanionRecord.Profile profile) {
+    private void publishRevived(
+            BondedCompanionRecord.Profile profile,
+            String operationId,
+            boolean recovered
+    ) {
         try {
             revivedPublisher.accept(profile);
         } catch (RuntimeException | LinkageError ignored) {
             // Listener failures cannot invalidate a committed payment result.
         }
+        BondedRevivalActivityProjection.publish(
+                operationId, profile, recovered);
     }
 
     private CompletionStage<Boolean> settle(

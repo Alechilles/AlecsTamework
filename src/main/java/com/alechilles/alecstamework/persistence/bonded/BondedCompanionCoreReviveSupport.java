@@ -110,9 +110,15 @@ final class BondedCompanionCoreReviveSupport
     }
 
     @Override
-    public void publishRevived(BondedCompanionRecord.Profile profile) {
+    public void publishRevived(
+            BondedCompanionRecord.Profile profile,
+            String operationId,
+            boolean recovered
+    ) {
         core.publish(profile, BondedCompanionState.DEAD,
                 BondedCompanionState.STORED, "revived",
                 BondedCompanionChangePublisher.WorldEffectOutcome.CONFIRMED);
+        BondedRevivalActivityProjection.publish(
+                operationId, profile, recovered);
     }
 }

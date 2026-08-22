@@ -1,7 +1,11 @@
 package com.alechilles.alecstamework.companion.command.timed;
 
+import com.alechilles.alecstamework.activity.ActivityRuntime;
+import com.alechilles.alecstamework.api.ActivityIds;
+import com.alechilles.alecstamework.api.ActivityView;
 import com.alechilles.alecstamework.api.CommandTimedSummoningChangedEvent;
 import com.alechilles.alecstamework.api.CommandTimedSummoningState;
+import com.alechilles.alecstamework.api.SummoningActivityView;
 import com.alechilles.alecstamework.companion.command.CommandFamilyKey;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembership;
 import com.alechilles.alecstamework.companion.command.CommandRosterSlotId;
@@ -24,12 +28,17 @@ import com.alechilles.alecstamework.persistence.projection
         .ProjectionApplyOutcome;
 import com.alechilles.alecstamework.persistence.projection
         .ProjectionPublicationContext;
+import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
+import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegistry;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -51,8 +60,14 @@ class TimedSummonPublishedEventMapperTest {
             "40000000-0000-0000-0000-000000000252"
     );
 
+    @AfterEach
+    void clearActivityRuntime() {
+        ActivityRuntime.clear();
+    }
+
     @Test
     void durableEventMapsPolicySessionStatusAndLimitsWithoutReads() {
+        List<ActivityView> activities = installActivityRuntime();
         TimedSummonLeaseChangeEvidence expected = evidence();
         ProjectionEvent event = committed(
                 TimedSummonLeaseChangeCodec.draft(
@@ -82,6 +97,44 @@ class TimedSummonPublishedEventMapperTest {
         assertNull(mapped.current().summonSessionId());
         assertNull(mapped.current().remainingMs());
         assertEquals(4_000L, mapped.current().cooldownUntilMs());
+        SummoningActivityView activity = assertInstanceOf(
+                SummoningActivityView.class, activities.getFirst());
+        assertEquals(OPERATION.value(), activity.header().operationId());
+        assertEquals(ActivityIds.RECALL, activity.header().actionId());
+        assertEquals(OWNER.value(), activity.ownerId());
+        assertEquals(PROFILE.toString(), activity.profileId());
+        assertEquals(FAMILY.familyId(), activity.commandFamilyId());
+        assertEquals(PROFILE.value(), activity.companionId());
+        assertEquals("stored", activity.lifecycleSource());
+        assertEquals(3_000L, activity.expiresAtMs());
+    }
+
+    @Test
+    void summonStartAndExpiredStorePublishDistinctLifecycleActions() {
+        List<ActivityView> activities = installActivityRuntime();
+        TimedSummonLeaseChangeEvidence started = summonStartedEvidence();
+        TimedSummonLeaseChangeEvidence expired = expiredEvidence();
+
+        TimedSummonPublishedEventMapper.map(committed(
+                TimedSummonLeaseChangeCodec.draft(OPERATION, started)));
+        TimedSummonPublishedEventMapper.map(committed(
+                TimedSummonLeaseChangeCodec.draft(
+                        OperationId.parse(
+                                "40000000-0000-0000-0000-000000000253"),
+                        expired)));
+
+        SummoningActivityView summon = assertInstanceOf(
+                SummoningActivityView.class, activities.get(0));
+        assertEquals(ActivityIds.SUMMON_SUCCESS,
+                summon.header().actionId());
+        assertEquals("summon_started", summon.lifecycleSource());
+        assertEquals(4_000L, summon.expiresAtMs());
+        SummoningActivityView expiry = assertInstanceOf(
+                SummoningActivityView.class, activities.get(1));
+        assertEquals(ActivityIds.SUMMON_EXPIRED,
+                expiry.header().actionId());
+        assertEquals("stored", expiry.lifecycleSource());
+        assertEquals(-1_000L, expiry.expiresAtMs());
     }
 
     @Test
@@ -211,6 +264,70 @@ class TimedSummonPublishedEventMapperTest {
                 ),
                 TimedSummonLeaseChangeEvidence.Reason.STORED
         );
+    }
+
+    private TimedSummonLeaseChangeEvidence summonStartedEvidence() {
+        TimedSummonLease before = new TimedSummonLease(
+                PROFILE, 1, null, null, null, policy(), Set.of(),
+                null, -3_000, -2_000);
+        TimedSummonLease after = new TimedSummonLease(
+                PROFILE,
+                2,
+                TimedSummonSessionId.parse(
+                        "50000000-0000-0000-0000-000000000253"),
+                5_000L,
+                null,
+                policy(),
+                Set.of(),
+                -1_000L,
+                -3_000,
+                -1_000);
+        return new TimedSummonLeaseChangeEvidence(
+                new TimedSummonLeaseChange(before, after),
+                membership(),
+                "Miniwyvern",
+                6,
+                LifecycleState.ROSTER_STORED,
+                LifecycleState.ACTIVE,
+                7L,
+                8,
+                TimedSummonLeaseChangeEvidence.Reason.SUMMON_STARTED);
+    }
+
+    private TimedSummonLeaseChangeEvidence expiredEvidence() {
+        TimedSummonLeaseChangeEvidence base = evidence();
+        TimedSummonLease current = base.leaseChange().before();
+        TimedSummonLease expiring = new TimedSummonLease(
+                current.profileId(),
+                current.leaseRevision(),
+                current.sessionId(),
+                1_000L,
+                current.cooldownUntilMs(),
+                current.policy(),
+                current.emittedWarningThresholdsMs(),
+                current.checkpointedAtMs(),
+                current.createdAtMs(),
+                current.updatedAtMs());
+        return new TimedSummonLeaseChangeEvidence(
+                new TimedSummonLeaseChange(
+                        expiring, base.leaseChange().after()),
+                base.membership(),
+                base.roleId(),
+                base.profileRevision(),
+                base.previousLifecycleState(),
+                base.currentLifecycleState(),
+                base.previousLifecycleRevision(),
+                base.currentLifecycleRevision(),
+                base.reason());
+    }
+
+    private static List<ActivityView> installActivityRuntime() {
+        List<ActivityView> activities = new ArrayList<>();
+        ActivityRuntime.install(
+                activities::add,
+                new ManagedActivityConfigRegistry(
+                        new PopulationGroupConfigRegistry()));
+        return activities;
     }
 
     private TimedSummonPolicy policy() {

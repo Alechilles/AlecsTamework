@@ -1,7 +1,10 @@
 package com.alechilles.alecstamework.companion.revival;
 
+import com.alechilles.alecstamework.activity.ActivityRuntime;
+import com.alechilles.alecstamework.api.ActivityView;
 import com.alechilles.alecstamework.api.ItemCostComponentView;
 import com.alechilles.alecstamework.api.PaidCommandRevivedEvent;
+import com.alechilles.alecstamework.api.RevivalActivityView;
 import com.alechilles.alecstamework.companion.command.CommandRosterSlotId;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
@@ -12,10 +15,15 @@ import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEvent;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
 import com.alechilles.alecstamework.persistence.projection.ProjectionSequence;
+import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
+import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegistry;
+import java.util.ArrayList;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -32,8 +40,18 @@ class PaidRevivalPublishedEventMapperTest {
     );
     private static final long REVIVED_AT = -2_000;
 
+    @AfterEach
+    void clearActivityRuntime() {
+        ActivityRuntime.clear();
+    }
+
     @Test
     void durableEventMapsWithoutCanonicalReadJoin() {
+        List<ActivityView> activities = new ArrayList<>();
+        ActivityRuntime.install(
+                activities::add,
+                new ManagedActivityConfigRegistry(
+                        new PopulationGroupConfigRegistry()));
         PaidRevivalOutcome expected = outcome();
         ProjectionEvent event = committed(
                 PaidRevivalEventCodec.draft(OPERATION, expected)
@@ -65,6 +83,17 @@ class PaidRevivalPublishedEventMapperTest {
         assertTrue(mapped.recovered());
         assertEquals(REVIVED_AT, mapped.revivedAtMs());
         assertEquals(-1_900, mapped.emittedAtMs());
+        RevivalActivityView activity = assertInstanceOf(
+                RevivalActivityView.class, activities.getFirst());
+        assertEquals(OPERATION.value(), activity.header().operationId());
+        assertEquals(OWNER.value(), activity.actorId());
+        assertEquals(OWNER.value(), activity.ownerId());
+        assertEquals(expected.liveAlias().value(), activity.companionId());
+        assertEquals(PROFILE.toString(), activity.profileId());
+        assertEquals("paid_command", activity.revivalSource());
+        assertEquals("active", activity.resultingLifecycleState());
+        assertEquals("settled", activity.paymentOutcome());
+        assertTrue(activity.recovered());
     }
 
     @Test

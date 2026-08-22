@@ -21,7 +21,7 @@ import javax.annotation.Nullable;
 /** Process-local owner of Activity API V2 managed producers. */
 public final class ActivityRuntime {
     private static final RuntimeState UNAVAILABLE = new RuntimeState(
-            null, null, null);
+            null, null, null, null);
     private static final AtomicReference<RuntimeState> CURRENT =
             new AtomicReference<>(UNAVAILABLE);
 
@@ -36,6 +36,7 @@ public final class ActivityRuntime {
         CURRENT.set(new RuntimeState(
                 new ManagedActivityPublisher(publisher, managedActivities),
                 new TameActivityPublisher(publisher, managedActivities),
+                new LifecycleActivityPublisher(publisher),
                 new CompanionCareCreditService()
         ));
     }
@@ -49,6 +50,7 @@ public final class ActivityRuntime {
         CURRENT.set(new RuntimeState(
                 new ManagedActivityPublisher(publisher, managedActivities),
                 new TameActivityPublisher(publisher, managedActivities),
+                new LifecycleActivityPublisher(publisher),
                 Objects.requireNonNull(careCredits, "careCredits")
         ));
     }
@@ -243,6 +245,46 @@ public final class ActivityRuntime {
         }
     }
 
+    /** Publishes one post-commit revival activity. */
+    public static void publishRevival(
+            @Nonnull UUID operationId,
+            @Nullable UUID actorId,
+            @Nullable UUID ownerId,
+            @Nullable UUID companionId,
+            @Nullable String profileId,
+            @Nullable String source,
+            @Nullable String lifecycleState,
+            @Nullable String paymentOutcome,
+            boolean recovered
+    ) {
+        RuntimeState state = CURRENT.get();
+        if (state.lifecyclePublisher != null) {
+            state.lifecyclePublisher.publishRevival(
+                    operationId, actorId, ownerId, companionId, profileId,
+                    source, lifecycleState, paymentOutcome, recovered);
+        }
+    }
+
+    /** Publishes one post-commit summoning lifecycle activity. */
+    public static void publishSummoning(
+            @Nonnull UUID operationId,
+            @Nonnull String actionId,
+            @Nullable UUID ownerId,
+            @Nullable String profileId,
+            @Nullable String commandFamilyId,
+            @Nullable UUID companionId,
+            @Nullable String lifecycleSource,
+            @Nullable Long expiresAtMs
+    ) {
+        RuntimeState state = CURRENT.get();
+        if (state.lifecyclePublisher != null) {
+            state.lifecyclePublisher.publishSummoning(
+                    operationId, actionId, ownerId, profileId,
+                    commandFamilyId, companionId, lifecycleSource,
+                    expiresAtMs);
+        }
+    }
+
     @Nullable
     private static CompanionXpTransition transition(@Nullable AwardResult award) {
         return award == null ? null : award.transition();
@@ -251,6 +293,7 @@ public final class ActivityRuntime {
     private record RuntimeState(
             @Nullable ManagedActivityPublisher publisher,
             @Nullable TameActivityPublisher tamePublisher,
+            @Nullable LifecycleActivityPublisher lifecyclePublisher,
             @Nullable CompanionCareCreditService careCredits
     ) {
     }

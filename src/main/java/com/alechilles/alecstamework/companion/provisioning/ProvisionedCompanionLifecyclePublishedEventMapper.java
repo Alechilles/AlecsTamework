@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.provisioning;
 
+import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.api.ProvisionedCompanionDeathRecordedEvent;
 import com.alechilles.alecstamework.api.ProvisionedCompanionRevivedEvent;
 import com.alechilles.alecstamework.api.PopulationCompanionLifecycle;
@@ -74,6 +75,20 @@ public final class ProvisionedCompanionLifecyclePublishedEventMapper {
                 ),
                 outcome.newLifecycleRevision().value(),
                 outcome.revivedAtMs()
+        );
+        ActivityRuntime.publishRevival(
+                event.operationId().value(),
+                null,
+                outcome.ownerId().value(),
+                outcome.newAlias() == null
+                        ? outcome.profileId().value()
+                        : outcome.newAlias().value(),
+                outcome.profileId().toString(),
+                "provisioned",
+                outcome.lifecycle().name().toLowerCase(
+                        java.util.Locale.ROOT),
+                null,
+                recovered
         );
         return new ProvisionedCompanionRevivedEvent(
                 event.operationId().value(),

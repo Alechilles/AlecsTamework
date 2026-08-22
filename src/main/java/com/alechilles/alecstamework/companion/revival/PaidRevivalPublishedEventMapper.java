@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.revival;
 
+import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.api.ItemCostComponentView;
 import com.alechilles.alecstamework.api.PaidCommandRevivedEvent;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEvent;
@@ -34,6 +35,17 @@ public final class PaidRevivalPublishedEventMapper {
                 event.payloadVersion(), event.payloadJson()
         );
         requireMatchingEnvelope(event, outcome);
+        ActivityRuntime.publishRevival(
+                event.operationId().value(),
+                outcome.ownerId().value(),
+                outcome.ownerId().value(),
+                outcome.liveAlias().value(),
+                outcome.profileId().toString(),
+                "paid_command",
+                "active",
+                "settled",
+                recovered
+        );
         return new PaidCommandRevivedEvent(
                 event.operationId().value(),
                 outcome.callerNamespace(),
