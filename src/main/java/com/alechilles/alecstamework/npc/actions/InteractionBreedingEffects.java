@@ -52,40 +52,44 @@ final class InteractionBreedingEffects {
         );
     }
 
-    boolean applyStartBreeding(@Nullable BreedInteraction interaction,
-                               @Nullable Ref<EntityStore> npcRef,
-                               @Nullable Role role,
-                               @Nullable Store<EntityStore> store,
-                               @Nullable Player player) {
+    BreedingInteractionOutcome applyStartBreeding(
+            @Nullable BreedInteraction interaction,
+            @Nullable Ref<EntityStore> npcRef,
+            @Nullable Role role,
+            @Nullable Store<EntityStore> store,
+            @Nullable Player player
+    ) {
         if (interaction == null || npcRef == null || !npcRef.isValid() || store == null) {
-            return false;
+            return finish(player, BreedingInteractionOutcome.unavailable());
         }
         UUID playerUuid = player != null ? player.getUuid() : null;
         if (playerUuid == null) {
             owner.logDebug("TameworkInteract: breeding blocked. No interacting player UUID resolved.");
-            return false;
+            return finish(player, BreedingInteractionOutcome.unavailable());
         }
         CompanionProgressionBootstrapService.ensureProgressionComponents(npcRef, store);
         ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
         if (breedingType == null) {
             owner.logDebug("TameworkInteract: breeding component type unavailable.");
-            return false;
+            return finish(player, BreedingInteractionOutcome.unavailable());
         }
         TameworkBreedingComponent breeding = store.getComponent(npcRef, breedingType);
         if (breeding == null) {
             owner.logDebug("TameworkInteract: no breeding component found for NPC.");
-            return false;
+            return finish(player, BreedingInteractionOutcome.unavailable());
         }
         long breedingNowMs = BreedingTimeService.resolveCurrentTimeMs(store);
         if (breeding.isCooldownActive(breedingNowMs)) {
             breeding.clearManualBreedingReady();
             store.putComponent(npcRef, breedingType, breeding);
-            return false;
+            return finish(player, BreedingInteractionOutcome.cooldown());
         }
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
         TwBreedingConfig config = BreedingConfigResolver.resolveConfig(npcRef, store, breeding);
-        if (!passesEligibilityGates(config, role, npcRef, store, roleId)) {
-            return false;
+        BreedingInteractionOutcome eligibilityFailure = eligibilityFailure(
+                config, role, npcRef, store, roleId);
+        if (eligibilityFailure != null) {
+            return finish(player, eligibilityFailure);
         }
         if ((breeding.getConfigId() == null || breeding.getConfigId().isBlank())
                 && config != null
@@ -115,18 +119,23 @@ final class InteractionBreedingEffects {
                     effectiveHappiness,
                     threshold
             ));
-            return false;
+            return finish(player, BreedingInteractionOutcome.lowHappiness(threshold));
         }
         long manualSelectionUntilMs = ManualBreedingClock.nowMs() + (long) resolveManualSelectionSeconds(interaction) * 1000L;
         breeding.markManualBreedingReady(playerUuid, manualSelectionUntilMs);
         breeding.setLastHappinessUpdateMs(System.currentTimeMillis());
         store.putComponent(npcRef, breedingType, breeding);
-        if (offspringService.tryCompleteManualPairing(npcRef, store, breeding, config, playerUuid)) {
+        BreedingInteractionOutcome outcome = offspringService.tryCompleteManualPairing(
+                npcRef, store, breeding, config, playerUuid);
+        if (outcome.completedPair()) {
             owner.logDebug("TameworkInteract: breeding pair matched and offspring spawn queued.");
-        } else {
+        } else if (outcome.status() == BreedingInteractionOutcome.Status.WAITING_FOR_MATE) {
             owner.logDebug("TameworkInteract: manual breeding selection marked; waiting for second selected partner.");
+        } else {
+            owner.logDebug("TameworkInteract: breeding blocked. reason="
+                    + outcome.status().name().toLowerCase());
         }
-        return true;
+        return finish(player, outcome);
     }
 
     private int resolveManualSelectionSeconds(@Nullable BreedInteraction interaction) {
@@ -137,23 +146,26 @@ final class InteractionBreedingEffects {
         return configured;
     }
 
-    private boolean passesEligibilityGates(@Nullable TwBreedingConfig config,
-                                           @Nullable Role role,
-                                           Ref<EntityStore> npcRef,
-                                           Store<EntityStore> store,
-                                           @Nullable String roleId) {
+    @Nullable
+    private BreedingInteractionOutcome eligibilityFailure(
+            @Nullable TwBreedingConfig config,
+            @Nullable Role role,
+            Ref<EntityStore> npcRef,
+            Store<EntityStore> store,
+            @Nullable String roleId
+    ) {
         if (config == null) {
-            return true;
+            return null;
         }
         TwBreedingConfig.EligibilitySettings eligibility = config.resolveEligibility(roleId);
         if (eligibility.isRequireTamed() && !TamedStateResolver.isTamed(npcRef, store)) {
             owner.logDebug("TameworkInteract: breeding blocked. NPC is not tamed.");
-            return false;
+            return BreedingInteractionOutcome.notTamed();
         }
         if (eligibility.isRequireAdult()) {
             if (!CompanionLifeStageService.isAdult(npcRef, store, roleId)) {
                 owner.logDebug("TameworkInteract: breeding blocked. NPC is not adult. role=" + roleId);
-                return false;
+                return BreedingInteractionOutcome.notAdult();
             }
         }
         String currentStateName = resolveCurrentStateName(role);
@@ -163,9 +175,26 @@ final class InteractionBreedingEffects {
                 eligibility.isRequireNotInCombat()
         )) {
             owner.logDebug("TameworkInteract: breeding blocked by state gate. state=" + currentStateName);
-            return false;
+            return BreedingInteractionOutcome.stateBlocked();
         }
-        return true;
+        return null;
+    }
+
+    private BreedingInteractionOutcome finish(
+            @Nullable Player player,
+            BreedingInteractionOutcome outcome
+    ) {
+        if (player == null || outcome == null) {
+            return outcome == null ? BreedingInteractionOutcome.unavailable() : outcome;
+        }
+        BreedingInteractionOutcome.Feedback feedback = outcome.feedback();
+        InteractionUiMessageService ui = new InteractionUiMessageService();
+        if (outcome.warning()) {
+            ui.showWarningKey(player, feedback.key(), feedback.arguments());
+        } else {
+            ui.showSuccessKey(player, feedback.key(), feedback.arguments());
+        }
+        return outcome;
     }
 
     @Nullable

@@ -269,8 +269,9 @@ final class InteractionExecutor {
         }
         if (entry instanceof BreedInteraction) {
             BreedInteraction breeding = (BreedInteraction) entry;
-            boolean applied = effects.applyStartBreeding(breeding, npcRef, role, store, player);
-            if (!applied) {
+            BreedingInteractionOutcome outcome = effects.applyStartBreeding(
+                    breeding, npcRef, role, store, player);
+            if (!outcome.accepted()) {
                 return false;
             }
             return effects.applyCustomEffects(
@@ -285,7 +286,7 @@ final class InteractionExecutor {
                     player,
                     ctx,
                     harvestInteraction
-            ) | applied;
+            ) | outcome.accepted();
         }
         return false;
     }

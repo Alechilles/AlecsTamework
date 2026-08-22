@@ -26,10 +26,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.StringRequ
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RequirementBucket;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RequirementGroup;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameInteraction;
-import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
-import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
-import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -727,26 +724,8 @@ final class TameworkInteractRequirements {
         if (requireTamed && !owner.isTamed(npcRef, store, ctx)) {
             return false;
         }
-        if (isBreedingCooldownActive(npcRef, store)) {
-            return false;
-        }
+        // Keep the action selectable so execution can explain the cooldown.
         return true;
-    }
-
-    private boolean isBreedingCooldownActive(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        if (npcRef == null || !npcRef.isValid() || store == null) {
-            return false;
-        }
-        ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
-        if (breedingType == null) {
-            return false;
-        }
-        TameworkBreedingComponent breeding = store.getComponent(npcRef, breedingType);
-        if (breeding == null) {
-            return false;
-        }
-        long now = BreedingTimeService.resolveCurrentTimeMs(store);
-        return breeding.isCooldownActive(now);
     }
 
     private boolean evaluateCustomPresetRequirements(CustomInteraction interaction,

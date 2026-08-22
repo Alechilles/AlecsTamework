@@ -447,11 +447,13 @@ final class TameworkInteractEffects {
         return modeCycleEffects.applyToggleMode(cycle, showFloatingText, showUiMessage, npcRef, role, store, player);
     }
 
-    boolean applyStartBreeding(BreedInteraction interaction,
-                               Ref<EntityStore> npcRef,
-                               Role role,
-                               Store<EntityStore> store,
-                               Player player) {
+    BreedingInteractionOutcome applyStartBreeding(
+            BreedInteraction interaction,
+            Ref<EntityStore> npcRef,
+            Role role,
+            Store<EntityStore> store,
+            Player player
+    ) {
         return breedingEffects.applyStartBreeding(interaction, npcRef, role, store, player);
     }
 

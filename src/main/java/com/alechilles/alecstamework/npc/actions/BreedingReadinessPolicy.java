@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import java.util.UUID;
+import javax.annotation.Nullable;
 
 /**
  * Defines which readiness marker is accepted while resolving a breeding partner.
@@ -31,6 +32,11 @@ final class BreedingReadinessPolicy {
 
     boolean requiresBreedingEnabled() {
         return !manual;
+    }
+
+    @Nullable
+    UUID manualPlayerUuid() {
+        return manualPlayerUuid;
     }
 
     boolean accepts(TameworkBreedingComponent breeding) {

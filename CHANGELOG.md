@@ -41,6 +41,9 @@
 
 ### Fixed
 
+- Manual breeding now explains animal breeding cooldown, happiness, maturity, state, mate,
+  capacity, integration, and pending-birth failures instead of failing
+  without player feedback.
 - Update 6 pre-release clients no longer reject Tamework because the active
   NPC indicator now supplies the particle animation data that Update 6
   requires.

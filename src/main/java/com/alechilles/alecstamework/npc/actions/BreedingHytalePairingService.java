@@ -66,10 +66,10 @@ final class BreedingHytalePairingService {
                 BreedingReadinessPolicy.passive(now),
                 pendingClaims,
                 pendingOwners
-        );
+        ).completedPair();
     }
 
-    boolean tryManual(
+    BreedingInteractionOutcome tryManual(
             @Nullable Ref<EntityStore> sourceRef,
             @Nullable Store<EntityStore> store,
             @Nullable TameworkBreedingComponent sourceBreeding,
@@ -88,7 +88,7 @@ final class BreedingHytalePairingService {
         );
     }
 
-    private boolean tryPair(
+    private BreedingInteractionOutcome tryPair(
             @Nullable Ref<EntityStore> sourceRef,
             @Nullable Store<EntityStore> store,
             @Nullable TameworkBreedingComponent sourceBreeding,
@@ -106,8 +106,19 @@ final class BreedingHytalePairingService {
         BreedingClaimLimitPolicyService.Decision population = candidate == null
                 ? null
                 : evaluatePopulation(candidate, config, pendingClaims, pendingOwners);
-        if (candidate == null || population == null || !population.allowed()) {
-            return false;
+        if (candidate == null) {
+            return BreedingInteractionOutcome.waitingForMate();
+        }
+        if (population == null) {
+            return BreedingInteractionOutcome.integrationUnavailable();
+        }
+        if (!population.allowed()) {
+            if (population.capEnforced()) {
+                return BreedingInteractionOutcome.capacityReached();
+            }
+            return "claim-required".equals(population.reason())
+                    ? BreedingInteractionOutcome.claimRequired()
+                    : BreedingInteractionOutcome.integrationUnavailable();
         }
         BreedingPairContext context = createContext(candidate, config);
         BreedingPairAdmissionRegistry.Lease admission =
@@ -118,7 +129,7 @@ final class BreedingHytalePairingService {
                 );
         if (admission == null) {
             logDebug("Breeding pairing skipped because a parent already has a scheduled birth.");
-            return false;
+            return BreedingInteractionOutcome.birthPending();
         }
         BreedingLitterPlanner.Plan litter = litterPlanner.plan(
                 candidate.sourceRef(),
@@ -130,19 +141,23 @@ final class BreedingHytalePairingService {
         );
         if (litter == null) {
             admission.close();
-            return false;
+            return BreedingInteractionOutcome.unavailable();
         }
         if (litter.empty()) {
             boolean applied = litterCommit.applyPairEffects(
                     candidate, config, commandBuffer
             );
             admission.close();
-            return applied;
+            return applied
+                    ? BreedingInteractionOutcome.noOffspring()
+                    : BreedingInteractionOutcome.unavailable();
         }
         reserveSweepHeadroom(population, pendingClaims, pendingOwners);
         return litterCommit.prepare(
-                candidate.world().getName(), context, litter, admission
-        );
+                candidate.world().getName(), context, litter, admission,
+                readiness.manualPlayerUuid()
+        ) ? BreedingInteractionOutcome.submitted()
+                : BreedingInteractionOutcome.unavailable();
     }
 
     @Nullable

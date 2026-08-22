@@ -58,11 +58,13 @@ final class BreedingOffspringService {
         );
     }
 
-    boolean tryCompleteManualPairing(@Nullable Ref<EntityStore> sourceRef,
-                                     @Nullable Store<EntityStore> store,
-                                     @Nullable TameworkBreedingComponent sourceBreeding,
-                                     @Nullable TwBreedingConfig config,
-                                     @Nonnull UUID playerUuid) {
+    BreedingInteractionOutcome tryCompleteManualPairing(
+            @Nullable Ref<EntityStore> sourceRef,
+            @Nullable Store<EntityStore> store,
+            @Nullable TameworkBreedingComponent sourceBreeding,
+            @Nullable TwBreedingConfig config,
+            @Nonnull UUID playerUuid
+    ) {
         return pairingService.tryManual(
                 sourceRef,
                 store,

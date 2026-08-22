@@ -9,11 +9,13 @@ import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.Objects;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -37,7 +39,8 @@ final class BreedingLitterCommitService {
             String worldName,
             BreedingPairContext context,
             BreedingLitterPlanner.Plan plan,
-            BreedingPairAdmissionRegistry.Lease lease
+            BreedingPairAdmissionRegistry.Lease lease,
+            @Nullable UUID playerUuid
     ) {
         BreedingLitterRuntime runtime = BreedingLitterRuntime.current();
         if (plan.admission() == null) {
@@ -53,7 +56,8 @@ final class BreedingLitterCommitService {
                             plan,
                             lease,
                             decision,
-                            failure
+                            failure,
+                            playerUuid
                     ));
             return true;
         } catch (RuntimeException | LinkageError failure) {
@@ -107,11 +111,16 @@ final class BreedingLitterCommitService {
             BreedingLitterPlanner.Plan plan,
             BreedingPairAdmissionRegistry.Lease lease,
             PopulationAdmissionDecision decision,
-            Throwable failure
+            Throwable failure,
+            @Nullable UUID playerUuid
     ) {
-        if (failure != null || decision == null || !decision.accepted()
+        BreedingInteractionOutcome admissionFailure = admissionFailure(
+                decision, failure
+        );
+        if (admissionFailure != null || decision == null
                 || decision.token() == null) {
             lease.close();
+            notifyPlayer(worldName, playerUuid, admissionFailure);
             return;
         }
         BreedingLitterOperation litter;
@@ -138,6 +147,67 @@ final class BreedingLitterCommitService {
                             runtime, worldName, context, litter, lease
                     );
                 });
+    }
+
+    @Nullable
+    static BreedingInteractionOutcome admissionFailure(
+            @Nullable PopulationAdmissionDecision decision,
+            @Nullable Throwable failure
+    ) {
+        if (failure != null || decision == null) {
+            return BreedingInteractionOutcome.integrationUnavailable();
+        }
+        if (decision.accepted() && decision.token() != null) {
+            return null;
+        }
+        String reason = decision.reason();
+        if ("population_domain_owned_capacity_reached".equals(reason)
+                || "population_domain_deployable_capacity_reached".equals(reason)) {
+            return BreedingInteractionOutcome.capacityReached();
+        }
+        if ("runehusbandry.admission.family_locked".equals(reason)) {
+            return BreedingInteractionOutcome.progressionRequired();
+        }
+        return BreedingInteractionOutcome.integrationUnavailable();
+    }
+
+    private static void notifyPlayer(
+            String worldName,
+            @Nullable UUID playerUuid,
+            @Nullable BreedingInteractionOutcome outcome
+    ) {
+        if (playerUuid == null || outcome == null) {
+            return;
+        }
+        World world = Universe.get().getWorld(worldName);
+        if (world == null || !world.isAlive()) {
+            return;
+        }
+        try {
+            world.execute(() -> {
+                World current = Universe.get().getWorld(worldName);
+                if (current != world || !world.isAlive()
+                        || world.getEntityStore() == null) {
+                    return;
+                }
+                Ref<EntityStore> playerRef = world.getEntityRef(playerUuid);
+                if (playerRef == null || !playerRef.isValid()) {
+                    return;
+                }
+                Player player = world.getEntityStore().getStore().getComponent(
+                        playerRef, Player.getComponentType()
+                );
+                if (player == null) {
+                    return;
+                }
+                BreedingInteractionOutcome.Feedback feedback = outcome.feedback();
+                new InteractionUiMessageService().showWarningKey(
+                        player, feedback.key(), feedback.arguments()
+                );
+            });
+        } catch (RuntimeException | LinkageError ignored) {
+            // The world can close between the liveness check and dispatch.
+        }
     }
 
     private void dispatchPrepared(
