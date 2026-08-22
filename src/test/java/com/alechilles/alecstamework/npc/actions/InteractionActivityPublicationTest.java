@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,8 @@ class InteractionActivityPublicationTest {
         InteractionExecutor executor = new InteractionExecutor(null, null);
         UUID appliedOperation = UUID.randomUUID();
         CompanionXpTransition transition = harvestTransition();
+        AwardResult award = new AwardResult(true, 2.0, 1, 2, 5.0, transition);
+        AtomicInteger awards = new AtomicInteger();
 
         executor.publishContainerHarvest(
                 appliedOperation,
@@ -58,7 +61,11 @@ class InteractionActivityPublicationTest {
                         false,
                         Map.of("Container_Bucket_State_Filled_Milk", 1)
                 ),
-                new AwardResult(true, 2.0, 1, 2, 5.0, transition)
+                false,
+                () -> {
+                    awards.incrementAndGet();
+                    return award;
+                }
         );
         executor.publishContainerHarvest(
                 UUID.randomUUID(),
@@ -71,10 +78,32 @@ class InteractionActivityPublicationTest {
                         false,
                         Map.of("Container_Bucket_State_Filled_Milk", 1)
                 ),
-                new AwardResult(true, 2.0, 1, 2, 5.0, transition)
+                false,
+                () -> {
+                    awards.incrementAndGet();
+                    return award;
+                }
+        );
+        executor.publishContainerHarvest(
+                UUID.randomUUID(),
+                "RoleA",
+                "Milk",
+                OWNER,
+                COMPANION,
+                new TameworkInteractEffects.HarvestContainerOutcome(
+                        TameworkInteractEffects.HarvestContainerResult.APPLIED,
+                        false,
+                        Map.of("Container_Bucket_State_Filled_Milk", 1)
+                ),
+                true,
+                () -> {
+                    awards.incrementAndGet();
+                    return award;
+                }
         );
 
         assertEquals(1, published.size());
+        assertEquals(1, awards.get());
         ManagedActivityView activity = assertInstanceOf(
                 ManagedActivityView.class, published.get(0));
         assertEquals(appliedOperation, activity.header().operationId());

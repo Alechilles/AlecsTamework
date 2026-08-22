@@ -22,6 +22,7 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 /** Executes a resolved interaction entry using shared effect handlers. */
 final class InteractionExecutor {
@@ -185,7 +186,6 @@ final class InteractionExecutor {
             );
             if (containerOutcome.result == TameworkInteractEffects.HarvestContainerResult.APPLIED
                     && isInteractingOwner(npcRef, store, player)) {
-                AwardResult award = CompanionLevelingService.awardHarvestXp(npcRef, store);
                 publishContainerHarvest(
                         operationId,
                         role == null ? null : role.getRoleName(),
@@ -193,7 +193,8 @@ final class InteractionExecutor {
                         resolveOwnerId(npcRef, store),
                         resolveCompanionId(npcRef, store),
                         containerOutcome,
-                        award
+                        hasHarvestDropAction(role, ctx),
+                        () -> CompanionLevelingService.awardHarvestXp(npcRef, store)
                 );
             }
             return true | customApplied;
@@ -273,12 +274,15 @@ final class InteractionExecutor {
             UUID ownerId,
             UUID companionId,
             TameworkInteractEffects.HarvestContainerOutcome outcome,
-            AwardResult award
+            boolean dropActionExpected,
+            Supplier<AwardResult> awardSupplier
     ) {
         if (outcome == null
-                || outcome.result != TameworkInteractEffects.HarvestContainerResult.APPLIED) {
+                || outcome.result != TameworkInteractEffects.HarvestContainerResult.APPLIED
+                || dropActionExpected) {
             return;
         }
+        AwardResult award = awardSupplier == null ? null : awardSupplier.get();
         ActivityRuntime.publishHarvest(
                 operationId,
                 roleId,
@@ -288,6 +292,15 @@ final class InteractionExecutor {
                 outcome.itemQuantities,
                 award
         );
+    }
+
+    private boolean hasHarvestDropAction(
+            Role role,
+            InteractionContextSnapshot ctx
+    ) {
+        String dropList = new InteractionParamResolver(null, null, null)
+                .getStringParam(role, ctx, "HarvestDropList");
+        return dropList != null && !dropList.isBlank();
     }
 
     private boolean isInteractingOwner(
