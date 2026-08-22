@@ -199,7 +199,10 @@ public final class CompanionCombatExperienceSystem extends DamageEventSystem {
     }
 
     @Nullable
-    private Ref<EntityStore> resolveNpcSourceRef(@Nullable Damage.Source source, @Nonnull Store<EntityStore> store) {
+    static Ref<EntityStore> resolveNpcSourceRef(
+            @Nullable Damage.Source source,
+            @Nonnull Store<EntityStore> store
+    ) {
         if (source instanceof Damage.EntitySource entitySource) {
             return isNpcRef(entitySource.getRef(), store) ? entitySource.getRef() : null;
         }
@@ -280,7 +283,7 @@ public final class CompanionCombatExperienceSystem extends DamageEventSystem {
                 : String.valueOf(damage.getCause().getId());
     }
 
-    private boolean isNpcRef(@Nullable Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
+    private static boolean isNpcRef(@Nullable Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
         return ref != null && ref.isValid() && CompanionRoleIdResolver.resolveRoleId(ref, store) != null;
     }
 

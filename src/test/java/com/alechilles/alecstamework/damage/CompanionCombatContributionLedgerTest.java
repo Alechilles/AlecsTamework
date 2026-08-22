@@ -36,7 +36,7 @@ class CompanionCombatContributionLedgerTest {
                 2.0, 200L);
 
         CompanionCombatContributionLedger.DefeatCredit credit =
-                ledger.remove(TARGET, 250L).orElseThrow();
+                ledger.remove(TARGET, COMPANION_A, 250L).orElseThrow();
 
         assertEquals(finalOperation, credit.operationId());
         assertEquals(COMPANION_A, credit.finalBlowCredit().companionId());
@@ -45,7 +45,7 @@ class CompanionCombatContributionLedgerTest {
         assertEquals(5.0, credit.contributors().stream()
                 .filter(value -> value.companionId().equals(COMPANION_A))
                 .findFirst().orElseThrow().contribution());
-        assertFalse(ledger.remove(TARGET, 250L).isPresent());
+        assertFalse(ledger.remove(TARGET, COMPANION_A, 250L).isPresent());
     }
 
     @Test
@@ -62,12 +62,27 @@ class CompanionCombatContributionLedgerTest {
                 1.0, 75L);
 
         assertEquals(2, ledger.size());
-        assertFalse(ledger.remove(TARGET, 75L).isPresent());
+        assertFalse(ledger.remove(TARGET, COMPANION_A, 75L).isPresent());
         ledger.record(UUID.randomUUID(), UUID.randomUUID(),
                 COMPANION_B, OWNER_B, 1.0, 200L);
-        assertTrue(ledger.remove(targetB, 200L).isEmpty());
+        assertTrue(ledger.remove(targetB, COMPANION_A, 200L).isEmpty());
 
         ledger.clear();
         assertEquals(0, ledger.size());
+    }
+
+    @Test
+    void nonCompanionKillingBlowKeepsContributorsWithoutFinalCredit() {
+        CompanionCombatContributionLedger ledger =
+                new CompanionCombatContributionLedger(8, 1_000L, 4);
+        ledger.record(UUID.randomUUID(), TARGET, COMPANION_A, OWNER_A,
+                3.0, 100L);
+
+        CompanionCombatContributionLedger.DefeatCredit credit =
+                ledger.remove(TARGET, null, 150L).orElseThrow();
+
+        assertEquals(1, credit.contributors().size());
+        assertEquals(null, credit.finalBlowCredit());
+        assertEquals(null, credit.ownerCredit());
     }
 }

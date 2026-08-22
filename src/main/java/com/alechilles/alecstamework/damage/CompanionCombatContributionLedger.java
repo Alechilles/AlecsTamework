@@ -79,6 +79,7 @@ public final class CompanionCombatContributionLedger {
     @Nonnull
     public Optional<DefeatCredit> remove(
             @Nonnull UUID targetId,
+            @Nullable UUID finalCompanionId,
             long occurredAtMs
     ) {
         Objects.requireNonNull(targetId, "targetId");
@@ -86,7 +87,7 @@ public final class CompanionCombatContributionLedger {
         TargetEntry target = targets.remove(targetId);
         return target == null
                 ? Optional.empty()
-                : Optional.of(target.toCredit());
+                : Optional.of(target.toCredit(finalCompanionId));
     }
 
     /** Clears this world's ledger. */
@@ -105,6 +106,8 @@ public final class CompanionCombatContributionLedger {
             TargetEntry target = iterator.next().getValue();
             if (elapsed(occurredAtMs, target.lastOccurredAtMs) >= expiryMs) {
                 iterator.remove();
+            } else {
+                break;
             }
         }
     }
@@ -123,13 +126,12 @@ public final class CompanionCombatContributionLedger {
     /** Immutable credit removed at confirmed death. */
     public record DefeatCredit(
             @Nonnull UUID operationId,
-            @Nonnull CombatContributionView finalBlowCredit,
+            @Nullable CombatContributionView finalBlowCredit,
             @Nonnull List<CombatContributionView> contributors,
             @Nullable UUID ownerCredit
     ) {
         public DefeatCredit {
             Objects.requireNonNull(operationId, "operationId");
-            Objects.requireNonNull(finalBlowCredit, "finalBlowCredit");
             contributors = List.copyOf(
                     Objects.requireNonNull(contributors, "contributors"));
         }
@@ -139,7 +141,6 @@ public final class CompanionCombatContributionLedger {
         private final LinkedHashMap<UUID, MutableContribution> contributors =
                 new LinkedHashMap<>();
         private UUID operationId;
-        private UUID finalCompanionId;
         private long lastOccurredAtMs;
 
         private void record(
@@ -163,11 +164,10 @@ public final class CompanionCombatContributionLedger {
                 iterator.remove();
             }
             operationId = nextOperationId;
-            finalCompanionId = companionId;
             lastOccurredAtMs = occurredAtMs;
         }
 
-        private DefeatCredit toCredit() {
+        private DefeatCredit toCredit(@Nullable UUID finalCompanionId) {
             ArrayList<CombatContributionView> views =
                     new ArrayList<>(contributors.size());
             CombatContributionView finalBlow = null;
@@ -178,15 +178,11 @@ public final class CompanionCombatContributionLedger {
                     finalBlow = view;
                 }
             }
-            if (finalBlow == null) {
-                throw new IllegalStateException(
-                        "Final combat contributor was evicted");
-            }
             return new DefeatCredit(
                     operationId,
                     finalBlow,
                     views,
-                    finalBlow.ownerId());
+                    finalBlow == null ? null : finalBlow.ownerId());
         }
     }
 

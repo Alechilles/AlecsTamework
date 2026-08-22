@@ -50,8 +50,11 @@ public final class CompanionCombatDefeatSystem
             return;
         }
         long occurredAtMs = System.currentTimeMillis();
+        UUID finalCompanionId = resolveFinalCompanionId(
+                component, store);
         Optional<CompanionCombatContributionLedger.DefeatCredit> credit =
-                remove(world, identity.getUuid(), occurredAtMs);
+                remove(world, identity.getUuid(), finalCompanionId,
+                        occurredAtMs);
         if (credit.isEmpty()
                 || !ActivityRuntime.hasCombatInterest(
                 ActivityIds.COMBAT_DEFEAT)) {
@@ -112,12 +115,35 @@ public final class CompanionCombatDefeatSystem
     }
 
     private static Optional<CompanionCombatContributionLedger.DefeatCredit>
-            remove(World world, UUID targetId, long occurredAtMs) {
+            remove(
+                    World world,
+                    UUID targetId,
+                    @Nullable UUID finalCompanionId,
+                    long occurredAtMs
+            ) {
         CompanionCombatContributionLedger ledger =
                 WORLD_LEDGERS.get(world.getName());
         return ledger == null
                 ? Optional.empty()
-                : ledger.remove(targetId, occurredAtMs);
+                : ledger.remove(targetId, finalCompanionId, occurredAtMs);
+    }
+
+    @Nullable
+    private static UUID resolveFinalCompanionId(
+            DeathComponent component,
+            Store<EntityStore> store
+    ) {
+        if (component.getDeathInfo() == null) {
+            return null;
+        }
+        Ref<EntityStore> source =
+                CompanionCombatExperienceSystem.resolveNpcSourceRef(
+                        component.getDeathInfo().getSource(), store);
+        if (CompanionCombatExperienceSystem.resolveOwnerId(source, store)
+                == null) {
+            return null;
+        }
+        return CompanionCombatExperienceSystem.resolveEntityId(source, store);
     }
 
     @Nullable
