@@ -125,10 +125,20 @@ public final class LegacyTamedOwnershipBridge {
         publishClaimedTame(
                 ownerId,
                 resolveNpcUuid(npcRef, store),
-                npc == null || npc.getRole() == null
-                        ? null
-                        : npc.getRole().getRoleName()
+                resolveRoleId(npc)
         );
+    }
+
+    @Nullable
+    private static String resolveRoleId(@Nullable NPCEntity npc) {
+        if (npc == null) {
+            return null;
+        }
+        String roleId = npc.getRoleName();
+        if (roleId != null && !roleId.isBlank()) {
+            return roleId;
+        }
+        return npc.getRole() == null ? null : npc.getRole().getRoleName();
     }
 
     static void publishClaimedTame(

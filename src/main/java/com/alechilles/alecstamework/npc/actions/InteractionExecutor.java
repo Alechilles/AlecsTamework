@@ -19,6 +19,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.Objects;
@@ -77,11 +78,13 @@ final class InteractionExecutor {
                         InteractionContextSnapshot liveContext = effects.refreshContext(livePlayer, liveRole);
                         String targetRoleId = effects.resolveTameRoleId(
                                 tame, liveRole, liveContext);
-                        effects.applyTameRoleChange(
+                        boolean tameRoleChanged = effects.applyTameRoleChange(
                                 tame, liveNpcRef, liveRole, liveStore, liveContext);
                         if (livePlayer != null) {
                             feedHelper.consumeHeldItem(livePlayer, 1);
                         }
+                        String[] appliedRole = {
+                                tameRoleChanged ? targetRoleId : null};
                         effects.applyCustomEffects(
                                 interactionConfigId,
                                 interactionIndex,
@@ -93,10 +96,14 @@ final class InteractionExecutor {
                                 liveStore,
                                 livePlayer,
                                 liveContext,
-                                harvestInteraction
+                                harvestInteraction,
+                                roleId -> appliedRole[0] = roleId
                         );
-                        String finalRoleId = effects.resolveFinalTameRoleId(
-                                tame, entry.getEffects(), liveRole, liveContext);
+                        String finalRoleId = appliedRole[0];
+                        if (finalRoleId == null || finalRoleId.isBlank()) {
+                            finalRoleId = resolveRoleId(
+                                    liveNpcRef, liveStore, liveRole);
+                        }
                         publishTameIfCommitted(
                                 UUID.randomUUID(),
                                 acquired,
@@ -104,7 +111,7 @@ final class InteractionExecutor {
                                 resolveOwnerId(liveNpcRef, liveStore),
                                 TamedStateResolver.isTamed(
                                         liveNpcRef, liveStore),
-                                finalRoleId == null ? targetRoleId : finalRoleId,
+                                finalRoleId,
                                 resolveCompanionId(liveNpcRef, liveStore)
                         );
                         if (livePlayer != null) {
@@ -298,6 +305,24 @@ final class InteractionExecutor {
         }
         ActivityRuntime.publishTame(
                 operationId, finalRoleId, finalOwnerId, companionId);
+    }
+
+    private static String resolveRoleId(
+            Ref<EntityStore> npcRef,
+            Store<EntityStore> store,
+            Role fallback
+    ) {
+        NPCEntity npc =
+                NPCEntity.getComponentType() == null
+                        ? null
+                        : store.getComponent(
+                                npcRef,
+                                NPCEntity.getComponentType());
+        String roleId = npc == null ? null : npc.getRoleName();
+        if (roleId != null && !roleId.isBlank()) {
+            return roleId;
+        }
+        return fallback == null ? null : fallback.getRoleName();
     }
 
     void publishContainerHarvest(

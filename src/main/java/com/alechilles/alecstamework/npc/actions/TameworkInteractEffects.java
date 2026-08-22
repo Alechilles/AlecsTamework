@@ -40,6 +40,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -91,6 +92,34 @@ final class TameworkInteractEffects {
                                Player player,
                                InteractionContextSnapshot ctx,
                                boolean harvestInteraction) {
+        return applyCustomEffects(
+                interactionConfigId,
+                interactionIndex,
+                entry,
+                effects,
+                npcRef,
+                role,
+                infoProvider,
+                store,
+                player,
+                ctx,
+                harvestInteraction,
+                null
+        );
+    }
+
+    boolean applyCustomEffects(@Nullable String interactionConfigId,
+                               int interactionIndex,
+                               @Nonnull InteractionEntry entry,
+                               Effects effects,
+                               Ref<EntityStore> npcRef,
+                               Role role,
+                               InfoProvider infoProvider,
+                               Store<EntityStore> store,
+                               Player player,
+                               InteractionContextSnapshot ctx,
+                               boolean harvestInteraction,
+                               @Nullable Consumer<String> appliedRoleObserver) {
         InteractionOwnerContinuationEffects.OwnerEffectAttempt ownerAttempt =
                 ownerContinuationEffects.applyOwnerEffect(
                         effects,
@@ -110,7 +139,8 @@ final class TameworkInteractEffects {
                                 liveStore,
                                 livePlayer,
                                 liveContext,
-                                harvestInteraction
+                                harvestInteraction,
+                                appliedRoleObserver
                         )
                 );
         if (ownerAttempt.present()) {
@@ -127,7 +157,8 @@ final class TameworkInteractEffects {
                 store,
                 player,
                 ctx,
-                harvestInteraction
+                harvestInteraction,
+                appliedRoleObserver
         );
     }
 
@@ -141,7 +172,8 @@ final class TameworkInteractEffects {
                                                    Store<EntityStore> store,
                                                    Player player,
                                                    InteractionContextSnapshot ctx,
-                                                   boolean harvestInteraction) {
+                                                   boolean harvestInteraction,
+                                                   @Nullable Consumer<String> appliedRoleObserver) {
         boolean applied = false;
         if (entry instanceof CustomInteraction customInteraction) {
             applied |= applyPresetEffects(
@@ -162,7 +194,8 @@ final class TameworkInteractEffects {
         }
         SetRoleEffect setRole = effects.getSetRole();
         if (setRole != null) {
-            applied |= applySetRole(setRole, npcRef, role, store, ctx);
+            applied |= applySetRole(
+                    setRole, npcRef, role, store, ctx, appliedRoleObserver);
         }
         SetTamedEffect setTamed = effects.getSetTamed();
         if (setTamed != null) {
@@ -287,31 +320,20 @@ final class TameworkInteractEffects {
                         interaction.getRole(), interaction.getRoleParam(), role, ctx);
     }
 
-    @Nullable
-    String resolveFinalTameRoleId(
-            @Nullable TameInteraction interaction,
-            @Nullable com.alechilles.alecstamework.config.assets
-                    .TwInteractionConfig.Effects configuredEffects,
-            @Nullable Role role,
-            @Nullable InteractionContextSnapshot ctx
-    ) {
-        String roleId = resolveTameRoleId(interaction, role, ctx);
-        SetRoleEffect finalRole = configuredEffects == null
-                ? null
-                : configuredEffects.getSetRole();
-        if (finalRole == null) {
-            return roleId;
-        }
-        String resolved = resolveRoleId(
-                finalRole.getRole(), finalRole.getRoleParam(), role, ctx);
-        return resolved == null || resolved.isBlank() ? roleId : resolved;
+    private boolean applySetRole(SetRoleEffect effect,
+                                 Ref<EntityStore> npcRef,
+                                 Role role,
+                                 Store<EntityStore> store,
+                                 InteractionContextSnapshot ctx) {
+        return applySetRole(effect, npcRef, role, store, ctx, null);
     }
 
     private boolean applySetRole(SetRoleEffect effect,
                                  Ref<EntityStore> npcRef,
                                  Role role,
                                  Store<EntityStore> store,
-                                 InteractionContextSnapshot ctx) {
+                                 InteractionContextSnapshot ctx,
+                                 @Nullable Consumer<String> appliedRoleObserver) {
         if (effect == null) {
             return false;
         }
@@ -319,7 +341,12 @@ final class TameworkInteractEffects {
         if (roleId == null || roleId.isBlank()) {
             return false;
         }
-        return roleChangeEffects.applySetRole(roleId, effect.getChangeAppearance(), npcRef, role, store);
+        boolean applied = roleChangeEffects.applySetRole(
+                roleId, effect.getChangeAppearance(), npcRef, role, store);
+        if (applied && appliedRoleObserver != null) {
+            appliedRoleObserver.accept(roleId);
+        }
+        return applied;
     }
 
     private String resolveRoleId(String roleId, String roleParam, Role role, InteractionContextSnapshot ctx) {
