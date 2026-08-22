@@ -336,7 +336,9 @@ class ReplacementLifecycleAdmissionGatewayTest {
                             "Feed":"runeteria:feed",
                             "HarvestContexts":{"Milk":"runeteria:milk"},
                             "PendingOutputItems":{"Food_Egg":"runeteria:egg"},
-                            "BreedingSuccess":"runeteria:breed"
+                            "BreedingSuccess":"runeteria:breed",
+                            "TameSuccess":"runeteria:tame_success",
+                            "NeedSatisfied":"runeteria:need_satisfied"
                           }
                         }
                         """),
