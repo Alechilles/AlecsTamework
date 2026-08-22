@@ -34,6 +34,7 @@ import com.alechilles.alecstamework.persistence.projection.ProjectionSubscriptio
 import com.alechilles.alecstamework.persistence.projection
         .ProjectionPublicationContext;
 import java.util.function.LongSupplier;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 
 /**
@@ -52,6 +53,7 @@ public final class ReplacementPublicSemanticEventProjection
     private final ReplacementPublicApiEventSink sink;
     private final LongSupplier clock;
     private long appliedThroughSequence;
+    private UUID lastRevivalActivityOperationId;
 
     public ReplacementPublicSemanticEventProjection(
             @Nonnull ReplacementPublicApiEventSink sink,
@@ -123,7 +125,8 @@ public final class ReplacementPublicSemanticEventProjection
                     event,
                     context == ProjectionPublicationContext
                             .RECOVERY_CONVERGENCE,
-                    emittedAtMs
+                    emittedAtMs,
+                    claimRevivalActivity(event)
             );
         }
         if (CommandRosterMembershipChangeCodec.EVENT_TYPE.equals(
@@ -150,9 +153,20 @@ public final class ReplacementPublicSemanticEventProjection
         if (ProvisionedCompanionLifecycleEventCodec.REVIVED_EVENT_TYPE
                 .equals(event.eventType())) {
             return ProvisionedCompanionLifecyclePublishedEventMapper
-                    .mapRevival(event, recovered, emittedAtMs);
+                    .mapRevival(
+                            event, recovered, emittedAtMs,
+                            claimRevivalActivity(event));
         }
         return null;
+    }
+
+    private boolean claimRevivalActivity(ProjectionEvent event) {
+        UUID operationId = event.operationId().value();
+        if (operationId.equals(lastRevivalActivityOperationId)) {
+            return false;
+        }
+        lastRevivalActivityOperationId = operationId;
+        return true;
     }
 
     private TameworkEvent mapCapture(

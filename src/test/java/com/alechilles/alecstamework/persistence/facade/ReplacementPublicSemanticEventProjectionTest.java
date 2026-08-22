@@ -1,9 +1,11 @@
 package com.alechilles.alecstamework.persistence.facade;
 
 import com.alechilles.alecstamework.api.CaptureAttemptResolvedEvent;
+import com.alechilles.alecstamework.api.ActivityView;
 import com.alechilles.alecstamework.api.PaidCommandRevivedEvent;
 import com.alechilles.alecstamework.api.TameworkEvent;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
+import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.companion.capture
         .CaptureAttemptResolutionEventCodec;
 import com.alechilles.alecstamework.companion.capture
@@ -15,6 +17,11 @@ import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.provisioning.ProvisionedCompanionLifecycleEventCodec;
+import com.alechilles.alecstamework.companion.provisioning.ProvisionedCompanionRevivalOutcome;
+import com.alechilles.alecstamework.companion.provisioning.ProvisioningOrigin;
+import com.alechilles.alecstamework.api.CompanionProvisioningProjectionStatus;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalEventCodec;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalOutcome;
 import com.alechilles.alecstamework.companion.revival.RevivalCostItem;
@@ -29,10 +36,12 @@ import com.alechilles.alecstamework.persistence.projection
 import com.alechilles.alecstamework.persistence.projection
         .ProjectionPublicationContext;
 import com.alechilles.alecstamework.persistence.projection.ProjectionSequence;
+import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -42,6 +51,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Checkpointed, join-free public semantic event delivery contracts. */
 class ReplacementPublicSemanticEventProjectionTest {
     private static final long EMITTED_AT = -1_500;
+
+    @AfterEach
+    void clearActivityRuntime() {
+        ActivityRuntime.clear();
+    }
 
     @Test
     void mapsCaptureV3AndPaidRevivalV2WithoutProjectionJoins() {
@@ -129,6 +143,26 @@ class ReplacementPublicSemanticEventProjectionTest {
         assertFalse(delivered.get().recovered());
     }
 
+    @Test
+    void paidProvisionedRevivalPublishesOneV2ActivityForOneOperation() {
+        ArrayList<TameworkEvent> events = new ArrayList<>();
+        ArrayList<ActivityView> activities = new ArrayList<>();
+        ActivityRuntime.install(
+                activities::add, new ManagedActivityConfigRegistry());
+        ReplacementPublicSemanticEventProjection projection =
+                new ReplacementPublicSemanticEventProjection(
+                        events::add, () -> EMITTED_AT);
+
+        assertEquals(ProjectionApplyOutcome.APPLIED, projection.apply(
+                paidEvent(61), ProjectionPublicationContext.LIVE_COMMIT));
+        assertEquals(ProjectionApplyOutcome.APPLIED, projection.apply(
+                provisionedEvent(62),
+                ProjectionPublicationContext.LIVE_COMMIT));
+
+        assertEquals(2, events.size());
+        assertEquals(1, activities.size());
+    }
+
     private ProjectionEvent captureEvent(long sequence) {
         CompanionCaptureRequest request =
                 CaptureTameAndLinkTestFixtures.request();
@@ -168,6 +202,37 @@ class ReplacementPublicSemanticEventProjectionTest {
                 draft.payloadJson(),
                 draft.createdAtMs()
         );
+    }
+
+    private ProjectionEvent provisionedEvent(long sequence) {
+        ProvisioningOrigin origin = new ProvisioningOrigin(
+                "hydragon", "paid-revival-provisioned");
+        ProjectionEventDraft draft =
+                ProvisionedCompanionLifecycleEventCodec.revivalDraft(
+                        OperationId.parse(
+                                "60000000-0000-0000-0000-000000000211"),
+                        new ProvisionedCompanionRevivalOutcome(
+                                origin,
+                                origin.profileId(),
+                                OwnerId.parse(
+                                        "20000000-0000-0000-0000-000000000211"),
+                                "Tamed_Wyvern_Mini",
+                                NpcAlias.parse(
+                                        "30000000-0000-0000-0000-000000000211"),
+                                LifecycleState.ACTIVE,
+                                CompanionProvisioningProjectionStatus.ACTIVE,
+                                new LifecycleRevision(6),
+                                new LifecycleRevision(7),
+                                -2_000L));
+        return new ProjectionEvent(
+                new ProjectionSequence(sequence),
+                draft.operationId(),
+                draft.eventType(),
+                draft.aggregateId(),
+                draft.aggregateRevision(),
+                draft.payloadVersion(),
+                draft.payloadJson(),
+                draft.createdAtMs());
     }
 
     private PaidRevivalOutcome paidOutcome() {

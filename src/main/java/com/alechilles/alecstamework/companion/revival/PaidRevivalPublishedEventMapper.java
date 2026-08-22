@@ -24,6 +24,16 @@ public final class PaidRevivalPublishedEventMapper {
             boolean recovered,
             long emittedAtMs
     ) {
+        return map(event, recovered, emittedAtMs, true);
+    }
+
+    @Nonnull
+    public static PaidCommandRevivedEvent map(
+            @Nonnull ProjectionEvent event,
+            boolean recovered,
+            long emittedAtMs,
+            boolean publishActivity
+    ) {
         if (event == null || !PaidRevivalEventCodec.EVENT_TYPE.equals(
                 event.eventType()
         )) {
@@ -35,17 +45,20 @@ public final class PaidRevivalPublishedEventMapper {
                 event.payloadVersion(), event.payloadJson()
         );
         requireMatchingEnvelope(event, outcome);
-        ActivityRuntime.publishRevival(
-                event.operationId().value(),
-                outcome.ownerId().value(),
-                outcome.ownerId().value(),
-                outcome.liveAlias().value(),
-                outcome.profileId().toString(),
-                "paid_command",
-                "active",
-                "settled",
-                recovered
-        );
+        if (publishActivity) {
+            ActivityRuntime.publishRevival(
+                    event.operationId().value(),
+                    outcome.ownerId().value(),
+                    outcome.ownerId().value(),
+                    outcome.liveAlias().value(),
+                    outcome.profileId().toString(),
+                    "paid_command",
+                    "active",
+                    "settled",
+                    recovered,
+                    outcome.revivedAtMs()
+            );
+        }
         return new PaidCommandRevivedEvent(
                 event.operationId().value(),
                 outcome.callerNamespace(),

@@ -255,13 +255,15 @@ public final class ActivityRuntime {
             @Nullable String source,
             @Nullable String lifecycleState,
             @Nullable String paymentOutcome,
-            boolean recovered
+            boolean recovered,
+            long occurredAtMs
     ) {
         RuntimeState state = CURRENT.get();
         if (state.lifecyclePublisher != null) {
             state.lifecyclePublisher.publishRevival(
                     operationId, actorId, ownerId, companionId, profileId,
-                    source, lifecycleState, paymentOutcome, recovered);
+                    source, lifecycleState, paymentOutcome, recovered,
+                    occurredAtMs);
         }
     }
 
@@ -274,14 +276,15 @@ public final class ActivityRuntime {
             @Nullable String commandFamilyId,
             @Nullable UUID companionId,
             @Nullable String lifecycleSource,
-            @Nullable Long expiresAtMs
+            @Nullable Long expiresAtMs,
+            long occurredAtMs
     ) {
         RuntimeState state = CURRENT.get();
         if (state.lifecyclePublisher != null) {
             state.lifecyclePublisher.publishSummoning(
                     operationId, actionId, ownerId, profileId,
                     commandFamilyId, companionId, lifecycleSource,
-                    expiresAtMs);
+                    expiresAtMs, occurredAtMs);
         }
     }
 

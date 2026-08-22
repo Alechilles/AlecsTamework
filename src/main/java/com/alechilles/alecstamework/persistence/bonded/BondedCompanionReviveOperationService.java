@@ -300,10 +300,15 @@ final class BondedCompanionReviveOperationService {
                     BondedCompanionStoreResult<
                             BondedCompanionRecord.Profile> stored
             ) {
-        return acknowledge(action, stored, retainedUntil())
-                ? support.storedResult(stored)
-                : support.internal(
-                "bonded-revive-payment-retention-pending");
+        if (!acknowledge(action, stored, retainedUntil())) {
+            return support.internal(
+                    "bonded-revive-payment-retention-pending");
+        }
+        if (terminalApplied(stored)) {
+            publishRevived(
+                    stored.value(), operationId(action), true);
+        }
+        return support.storedResult(stored);
     }
 
     private boolean acknowledge(

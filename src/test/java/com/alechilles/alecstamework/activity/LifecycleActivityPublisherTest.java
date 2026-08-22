@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.api.ActivityIds;
 import com.alechilles.alecstamework.api.ActivityView;
 import com.alechilles.alecstamework.api.RevivalActivityView;
 import com.alechilles.alecstamework.api.SummoningActivityView;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -31,13 +32,14 @@ class LifecycleActivityPublisherTest {
 
         publisher.publishRevival(
                 OPERATION, OWNER, OWNER, COMPANION, "profile-a",
-                "paid_command", "active", "settled", true);
+                "paid_command", "active", "settled", true, -3_000L);
         publisher.publishSummoning(
                 OPERATION, ActivityIds.SUMMON_SUCCESS, OWNER, "profile-a",
-                "family-a", COMPANION, "summon_started", 5_000L);
+                "family-a", COMPANION, "summon_started", 5_000L,
+                -2_000L);
         publisher.publishSummoning(
                 UUID.randomUUID(), ActivityIds.RECALL, OWNER, "profile-a",
-                "family-a", COMPANION, "stored", null);
+                "family-a", COMPANION, "stored", null, -1_000L);
 
         RevivalActivityView revival = assertInstanceOf(
                 RevivalActivityView.class, published.get(0));
@@ -46,14 +48,20 @@ class LifecycleActivityPublisherTest {
         assertEquals("paid_command", revival.revivalSource());
         assertEquals("settled", revival.paymentOutcome());
         assertTrue(revival.recovered());
+        assertEquals(Instant.ofEpochMilli(-3_000L),
+                revival.header().occurredAt());
 
         SummoningActivityView summon = assertInstanceOf(
                 SummoningActivityView.class, published.get(1));
         assertEquals(ActivityIds.SUMMON_SUCCESS, summon.header().actionId());
         assertEquals(5_000L, summon.expiresAtMs());
+        assertEquals(Instant.ofEpochMilli(-2_000L),
+                summon.header().occurredAt());
         SummoningActivityView recall = assertInstanceOf(
                 SummoningActivityView.class, published.get(2));
         assertEquals(ActivityIds.RECALL, recall.header().actionId());
         assertNull(recall.expiresAtMs());
+        assertEquals(Instant.ofEpochMilli(-1_000L),
+                recall.header().occurredAt());
     }
 }

@@ -98,7 +98,8 @@ public final class TimedSummonPublishedEventMapper {
                 evidence.membership().familyKey().familyId(),
                 evidence.leaseChange().after().profileId().value(),
                 evidence.reason().publicValue(),
-                expiresAt(relevant)
+                expiresAt(relevant),
+                occurredAtMs
         );
     }
 

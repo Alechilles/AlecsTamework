@@ -205,6 +205,40 @@ class BondedCompanionReviveOperationServiceTest {
     }
 
     @Test
+    void committedTerminalWithoutEscrowStillPublishesRecoveredRevival()
+            throws Exception {
+        StoreDouble store = new StoreDouble(false, true);
+        ServiceHarness harness = harness(store);
+        BondedCompanionActionContext.Inventory inventory =
+                new BondedCompanionActionContext.Inventory() {
+                    @Override public int availableQuantity(String itemId) {
+                        return 0;
+                    }
+
+                    @Override public CompletionStage<
+                            BondedCompanionActionContext.ChargeReceipt>
+                            findChargeAsync(String operationId) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+
+                    @Override public BondedCompanionActionContext.ChargeReceipt
+                            consumeExact(String operationId, String itemId,
+                                         int quantity) {
+                        return null;
+                    }
+                };
+        BondedCompanionReviveRequest request = request(
+                "committed-without-escrow", inventory,
+                harness.rosters.snapshot().revision());
+        store.seedTerminalSuccess(request.action());
+
+        harness.service.revive(request).toCompletableFuture().join();
+
+        assertEquals(1, store.acknowledgments);
+        assertEquals(1, harness.support.publications);
+    }
+
+    @Test
     void directTerminalRetryRejectsMismatchedEscrowRequestHash()
             throws Exception {
         StoreDouble store = new StoreDouble(false);
@@ -438,6 +472,16 @@ class BondedCompanionReviveOperationServiceTest {
                     + action.idempotencyKey(), terminalRejection());
             requestHashes.put(action.callerNamespace() + ":"
                     + action.idempotencyKey(), requestHash);
+        }
+
+        private void seedTerminalSuccess(
+                BondedCompanionActionRequest action) {
+            terminals.put(action.callerNamespace() + ":"
+                    + action.idempotencyKey(), terminalSuccess());
+            requestHashes.put(action.callerNamespace() + ":"
+                    + action.idempotencyKey(),
+                    BondedCompanionRevivePaymentProof.requestHash(
+                            "Ingredient_Life_Essence", 2));
         }
 
         private BondedCompanionStoreResult<BondedCompanionRecord.Profile>

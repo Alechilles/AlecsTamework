@@ -60,6 +60,16 @@ public final class ProvisionedCompanionLifecyclePublishedEventMapper {
             boolean recovered,
             long emittedAtMs
     ) {
+        return mapRevival(event, recovered, emittedAtMs, true);
+    }
+
+    @Nonnull
+    public static ProvisionedCompanionRevivedEvent mapRevival(
+            @Nonnull ProjectionEvent event,
+            boolean recovered,
+            long emittedAtMs,
+            boolean publishActivity
+    ) {
         requireType(
                 event,
                 ProvisionedCompanionLifecycleEventCodec.REVIVED_EVENT_TYPE
@@ -76,20 +86,23 @@ public final class ProvisionedCompanionLifecyclePublishedEventMapper {
                 outcome.newLifecycleRevision().value(),
                 outcome.revivedAtMs()
         );
-        ActivityRuntime.publishRevival(
-                event.operationId().value(),
-                null,
-                outcome.ownerId().value(),
-                outcome.newAlias() == null
-                        ? outcome.profileId().value()
-                        : outcome.newAlias().value(),
-                outcome.profileId().toString(),
-                "provisioned",
-                outcome.lifecycle().name().toLowerCase(
-                        java.util.Locale.ROOT),
-                null,
-                recovered
-        );
+        if (publishActivity) {
+            ActivityRuntime.publishRevival(
+                    event.operationId().value(),
+                    null,
+                    outcome.ownerId().value(),
+                    outcome.newAlias() == null
+                            ? outcome.profileId().value()
+                            : outcome.newAlias().value(),
+                    outcome.profileId().toString(),
+                    "provisioned",
+                    outcome.lifecycle().name().toLowerCase(
+                            java.util.Locale.ROOT),
+                    null,
+                    recovered,
+                    outcome.revivedAtMs()
+            );
+        }
         return new ProvisionedCompanionRevivedEvent(
                 event.operationId().value(),
                 outcome.origin().callerNamespace(),

@@ -252,8 +252,16 @@ public final class BondedCompanionPaymentRecoveryService {
             BondedCompanionStoreResult<BondedCompanionRecord.Profile> terminal,
             BondedCompanionActionContext.ChargeReceipt receipt
     ) {
-        if (receipt == null) return completed(acknowledge(probe, terminal)
-                ? Outcome.ALREADY_SETTLED : Outcome.RETENTION_PENDING);
+        if (receipt == null) {
+            if (!acknowledge(probe, terminal)) {
+                return completed(Outcome.RETENTION_PENDING);
+            }
+            if (terminalApplied(terminal)) {
+                publishRevived(
+                        terminal.value(), operationId, true);
+            }
+            return completed(Outcome.ALREADY_SETTLED);
+        }
         if (!operationId.equals(safeOperationId(receipt))) {
             return completed(Outcome.QUARANTINED);
         }

@@ -140,6 +140,64 @@ class BondedCompanionPaymentRecoverySqliteTest {
     }
 
     @Test
+    void committedReviveWithoutEscrowPublishesBeforeAcknowledgement()
+            throws Exception {
+        Path database = tempDir.resolve("bonded-no-escrow.sqlite");
+        assertTrue(new BondedCompanionSchemaManager(database, () -> -20_000L)
+                .initialize().availability().available());
+        BondedCompanionStore store = new SqliteBondedCompanionDatabase(database);
+        assertEquals(BondedCompanionStoreResult.Code.APPLIED,
+                store.createProfile(operation(
+                        "no-escrow-profile",
+                        BondedCompanionOperation.Type.PROVISION,
+                        "a"), profile()).code());
+        markDead(database);
+        String key = "revive:no-escrow";
+        assertEquals(BondedCompanionStoreResult.Code.APPLIED,
+                store.reviveProfile(
+                        BondedCompanionRevivePaymentProof.operation(
+                                CALLER, key, OWNER, "roster-a", "profile-a",
+                                ITEM, 2, -8_000L, Long.MAX_VALUE),
+                        1L, -8_000L).code());
+        String paymentId = BondedCompanionPaymentOperationId.create(
+                CALLER, key, OWNER, "roster-a", "profile-a", 1L);
+        AtomicInteger publications = new AtomicInteger();
+        BondedCompanionActionContext.Inventory inventory =
+                new BondedCompanionActionContext.Inventory() {
+                    @Override public int availableQuantity(String itemId) {
+                        return 0;
+                    }
+
+                    @Override public CompletionStage<
+                            BondedCompanionActionContext.ChargeReceipt>
+                            findChargeAsync(String operationId) {
+                        return java.util.concurrent.CompletableFuture
+                                .completedFuture(null);
+                    }
+
+                    @Override public BondedCompanionActionContext.ChargeReceipt
+                            consumeExact(String operationId, String itemId,
+                                         int quantity) {
+                        return null;
+                    }
+                };
+
+        BondedCompanionPaymentRecoveryService.Outcome outcome =
+                new BondedCompanionPaymentRecoveryService(
+                        store, () -> -7_000L,
+                        ignored -> publications.incrementAndGet())
+                        .recover(BondedCompanionPaymentOperationId
+                                        .parse(paymentId).orElseThrow(),
+                                inventory)
+                        .toCompletableFuture().join();
+
+        assertEquals(BondedCompanionPaymentRecoveryService.Outcome
+                .ALREADY_SETTLED, outcome);
+        assertEquals(1, publications.get());
+        assertNotEquals(Long.MAX_VALUE, expiry(database, CALLER, key));
+    }
+
+    @Test
     void savedEscrowBeforeFirstClaimIsClaimedAfterRestartWithoutPolicy()
             throws Exception {
         Path database = tempDir.resolve("prepared-revive.sqlite");

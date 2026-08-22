@@ -31,7 +31,8 @@ public final class LifecycleActivityPublisher {
             @Nullable String source,
             @Nullable String lifecycleState,
             @Nullable String paymentOutcome,
-            boolean recovered
+            boolean recovered,
+            long occurredAtMs
     ) {
         if (operationId == null || ownerId == null || companionId == null
                 || profileId == null || source == null
@@ -42,7 +43,7 @@ public final class LifecycleActivityPublisher {
             publisher.publish(new RevivalActivityView(
                     new ActivityHeader(
                             operationId, ActivityIds.REVIVE_SUCCESS,
-                            Instant.now()),
+                            Instant.ofEpochMilli(occurredAtMs)),
                     actorId,
                     ownerId,
                     companionId,
@@ -66,7 +67,8 @@ public final class LifecycleActivityPublisher {
             @Nullable String commandFamilyId,
             @Nullable UUID companionId,
             @Nullable String lifecycleSource,
-            @Nullable Long expiresAtMs
+            @Nullable Long expiresAtMs,
+            long occurredAtMs
     ) {
         if (operationId == null || !isSummoningAction(actionId)
                 || ownerId == null || profileId == null
@@ -75,7 +77,9 @@ public final class LifecycleActivityPublisher {
         }
         try {
             publisher.publish(new SummoningActivityView(
-                    new ActivityHeader(operationId, actionId, Instant.now()),
+                    new ActivityHeader(
+                            operationId, actionId,
+                            Instant.ofEpochMilli(occurredAtMs)),
                     ownerId,
                     profileId,
                     commandFamilyId,

@@ -27,7 +27,8 @@ final class BondedRevivalActivityProjection {
                 "bonded",
                 "stored",
                 "settled",
-                recovered
+                recovered,
+                profile.updatedAtMs()
         );
     }
 
