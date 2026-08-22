@@ -1,12 +1,33 @@
 # Changelog
 
-## Unreleased
+## 3.2.1 - Runtime Performance and Active Companion Indicators - 2026-08-22
 
 ### Added
 
-- Added a privacy-safe profiler correlation breadcrumb when one companion-needs
-  worker batch takes at least 50 milliseconds. The timing check stays off the
-  per-companion path and creates no telemetry context for normal batches.
+- Added optional per-tool `Highlight Active` indicators for generic linked
+  panels on Update 6. The controller sees group-colored indicators above loaded
+  active companions. Ungrouped companions use neutral gold. The setting is
+  disabled by default.
+- Added privacy-safe persistence throughput diagnostics and slow-needs profiler
+  correlation breadcrumbs. Diagnostics exclude player names, companion IDs,
+  and saved payloads.
+
+### Changed
+
+- Persistence maintenance now coalesces and bounds latest-state work while
+  preserving critical checkpoint, flush, shutdown, and recovery work.
+- Large companion groups now spread needs work across world ticks and reuse
+  resource snapshots, successful path checks, compiled settings, and bounded
+  population searches.
+- Lowered the supported Hytale server floor from `0.5.7` to `0.5.0`.
+
+### Fixed
+
+- Active companion indicators now handle Update 6 particle requirements,
+  restored companions, tool changes, duplicate prevention, invalid anchors,
+  and mount transitions. Update 5 does not run this feature.
+- Fixed command hotswap HUD cleanup during world transfers.
+- Grounded flying companions now hand off correctly to the Walk controller.
 
 ## 3.2.0 - Runtime Activation and Performance Update - 2026-08-19
 
@@ -36,35 +57,9 @@
 - Captured spawner tooltips now show a compact companion summary, level and maximum level, trait
   names with color-coded values, and a separate appearance section. Gender markers use pink
   for female companions and blue for male companions.
-- Generic linked panels now include an optional per-tool `Highlight Active`
-  setting on Update 6. While the tool is equipped, only its controller sees a
-  continuous, gently animated indicator above each loaded active NPC. The
-  indicator uses the NPC's group color, or neutral gold when the NPC is
-  ungrouped. Each indicator now runs continuously from one invisible helper
-  mounted above the NPC's head. Disabling the setting, changing tools, or
-  removing the NPC removes that helper and its indicator without periodic
-  server respawns. Mounting the NPC removes and suppresses the helper until the
-  rider dismounts. The panel also keeps the NPC's real name and species while
-  the native mount system temporarily uses its empty parking role.
 
 ### Fixed
 
-- Update 6 pre-release clients no longer reject Tamework because the active
-  NPC indicator now supplies the particle animation data that Update 6
-  requires.
-- Update 5 servers no longer register or emit active NPC indicators because
-  the feature requires Update 6 model-particle cleanup support.
-- Active NPC indicators now use the base indicator timing pattern, with a very
-  short particle overlap that prevents an empty frame between animation waves.
-- World transfers no longer disconnect players who have the command hotswap HUD active.
-- Reduced persistence stalls with large companion populations. Spawner
-  releases and Recall no longer wait behind unrelated projection events or
-  repeated older live-state snapshots. Profile and checkpoint maintenance now
-  use bounded, newest-state queues while unload and destructive-removal
-  checkpoints keep priority.
-- Added privacy-safe persistence throughput diagnostics. They report queue
-  counts, merged work, batch acknowledgements, and pending age without player
-  names, companion IDs, or saved payloads.
 - Restored the shared Nametag and Soul Lantern models, textures, icons,
   particles, and audio to the main Tamework pack. Dependent mods no longer
   require the optional examples pack to validate these reusable assets.
@@ -92,11 +87,7 @@
   queries between the target and hotswap HUDs, and selecting bounded player batches.
 - Reduced command HUD server work when many players are online.
 - Large companion groups now spread due needs updates and cold food or water searches across world
-  ticks. Nearby companions share resource and request snapshots, while each companion reuses its
-  own successful path checks. Confirmed targets renew their path leases while in active use,
-  repeated pending lookups wait for the next worker window, and need-threshold sensors reuse their
-  compiled config until a reload. Happiness population modifiers reuse one five-second world
-  snapshot and cap their configured search radius at 240 blocks to keep each query local and bounded.
+  ticks. Nearby companions share cached resource results instead of repeating the same search.
 - Command HUD cleanup now stays on the world thread and completes in order when players or stores
   unload. This prevents stale HUD state and unload races.
 - Cache-first needs resource sensors can omit the duplicate need gate, so dependent NPC assets load

@@ -13,7 +13,7 @@ This subsection is the parent category for all public Java API docs.
 > **Experimental API Contract (`0.9.0`, introduced in Tamework 3.0.0)**
 > This is a public integration surface, but the contract is still experimental. Keep capability checks in downstream mods.
 
-These pages describe the current Tamework 3.2.0 source. The previous public
+These pages describe the current Tamework 3.2.1 source. The previous public
 release predates this API; it did not ship an earlier `0.8` public contract.
 
 ## Child Pages
