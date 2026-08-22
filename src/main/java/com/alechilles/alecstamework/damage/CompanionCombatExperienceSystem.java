@@ -1,11 +1,15 @@
 package com.alechilles.alecstamework.damage;
 
+import com.alechilles.alecstamework.activity.ActivityRuntime;
+import com.alechilles.alecstamework.api.ActivityIds;
+import com.alechilles.alecstamework.api.CombatParticipantView;
 import com.alechilles.alecstamework.api.CompanionXpSource;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
+import com.alechilles.alecstamework.npc.progression.CompanionXpTransition;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -14,10 +18,13 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.SystemGroup;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageEventSystem;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageModule;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -50,13 +57,58 @@ public final class CompanionCombatExperienceSystem extends DamageEventSystem {
             return;
         }
         Ref<EntityStore> sourceRef = resolveNpcSourceRef(damage.getSource(), store);
-        awardTakenXp(sourceRef, targetRef, store, commandBuffer, damage);
+        CompanionXpTransition takenXp = awardTakenXp(
+                sourceRef, targetRef, store, commandBuffer, damage);
+        CompanionXpTransition dealtXp = null;
         if (sourceRef != null && sourceRef.isValid() && !sourceRef.equals(targetRef)) {
-            awardDealtXp(sourceRef, targetRef, store, commandBuffer, damage);
+            dealtXp = awardDealtXp(
+                    sourceRef, targetRef, store, commandBuffer, damage);
+        }
+
+        boolean damageInterested = ActivityRuntime.hasCombatInterest(
+                ActivityIds.COMBAT_DAMAGE);
+        boolean defeatInterested = ActivityRuntime.hasCombatInterest(
+                ActivityIds.COMBAT_DEFEAT);
+        if (!damageInterested && !defeatInterested) {
+            return;
+        }
+        Ref<EntityStore> attributedSource = resolveSourceRef(
+                damage.getSource(), store);
+        CombatParticipantView source = participant(attributedSource, store);
+        CombatParticipantView target = participant(targetRef, store);
+        if (source == null || target == null) {
+            return;
+        }
+        long occurredAtMs = System.currentTimeMillis();
+        UUID operationId = UUID.randomUUID();
+        if (defeatInterested && sourceRef != null
+                && source.entityId().equals(resolveEntityId(sourceRef, store))
+                && source.ownerId() != null) {
+            World world = store.getExternalData() == null
+                    ? null : store.getExternalData().getWorld();
+            if (world != null) {
+                CompanionCombatDefeatSystem.record(
+                        world, operationId, target.entityId(),
+                        source.entityId(), source.ownerId(),
+                        damage.getAmount(), occurredAtMs);
+            }
+        }
+        if (damageInterested) {
+            ActivityRuntime.publishCombatDamage(
+                    operationId,
+                    source,
+                    target,
+                    damage.getAmount(),
+                    damageType(damage),
+                    dealtXp == null ? null : dealtXp.toOutcomeView(),
+                    takenXp == null ? null : takenXp.toOutcomeView(),
+                    occurredAtMs);
         }
     }
 
-    private void awardTakenXp(@Nullable Ref<EntityStore> sourceRef,
+    @Nullable
+    private CompanionXpTransition awardTakenXp(
+                              @Nullable Ref<EntityStore> sourceRef,
                               @Nonnull Ref<EntityStore> targetRef,
                               @Nonnull Store<EntityStore> store,
                               @Nonnull CommandBuffer<EntityStore> commandBuffer,
@@ -64,26 +116,31 @@ public final class CompanionCombatExperienceSystem extends DamageEventSystem {
         String roleId = CompanionRoleIdResolver.resolveRoleId(targetRef, store);
         TwLevelingConfig config = roleId != null ? TwLevelingConfig.resolveForRole(roleId) : null;
         if (config == null || !config.isEnabled()) {
-            return;
+            return null;
         }
         TwLevelingConfig.CombatXpSourceSettings combat = config.getXpSources().getCombat();
         if (!combat.isEnabled()) {
-            return;
+            return null;
         }
         float finalDamage = damage.getAmount();
         if (!(finalDamage >= combat.getMinimumDamageEvent())) {
-            return;
+            return null;
         }
         if (!isCombatPairEligible(sourceRef, targetRef, store, combat, damage.getSource())) {
-            return;
+            return null;
         }
         double xp = finalDamage * combat.getDamageTakenXpPerPoint();
         if (xp > 0.0) {
-            CompanionLevelingService.awardXp(targetRef, store, commandBuffer, roleId, CompanionXpSource.COMBAT_DAMAGE_TAKEN, xp);
+            return CompanionLevelingService.awardXp(
+                    targetRef, store, commandBuffer, roleId,
+                    CompanionXpSource.COMBAT_DAMAGE_TAKEN, xp).transition();
         }
+        return null;
     }
 
-    private void awardDealtXp(@Nonnull Ref<EntityStore> sourceRef,
+    @Nullable
+    private CompanionXpTransition awardDealtXp(
+                              @Nonnull Ref<EntityStore> sourceRef,
                               @Nonnull Ref<EntityStore> targetRef,
                               @Nonnull Store<EntityStore> store,
                               @Nonnull CommandBuffer<EntityStore> commandBuffer,
@@ -91,23 +148,26 @@ public final class CompanionCombatExperienceSystem extends DamageEventSystem {
         String roleId = CompanionRoleIdResolver.resolveRoleId(sourceRef, store);
         TwLevelingConfig config = roleId != null ? TwLevelingConfig.resolveForRole(roleId) : null;
         if (config == null || !config.isEnabled()) {
-            return;
+            return null;
         }
         TwLevelingConfig.CombatXpSourceSettings combat = config.getXpSources().getCombat();
         if (!combat.isEnabled()) {
-            return;
+            return null;
         }
         float finalDamage = damage.getAmount();
         if (!(finalDamage >= combat.getMinimumDamageEvent())) {
-            return;
+            return null;
         }
         if (!isCombatPairEligible(sourceRef, targetRef, store, combat, damage.getSource())) {
-            return;
+            return null;
         }
         double xp = finalDamage * combat.getDamageDealtXpPerPoint();
         if (xp > 0.0) {
-            CompanionLevelingService.awardXp(sourceRef, store, commandBuffer, roleId, CompanionXpSource.COMBAT_DAMAGE_DEALT, xp);
+            return CompanionLevelingService.awardXp(
+                    sourceRef, store, commandBuffer, roleId,
+                    CompanionXpSource.COMBAT_DAMAGE_DEALT, xp).transition();
         }
+        return null;
     }
 
     private boolean isCombatPairEligible(@Nullable Ref<EntityStore> sourceRef,
@@ -154,6 +214,72 @@ public final class CompanionCombatExperienceSystem extends DamageEventSystem {
         return null;
     }
 
+    @Nullable
+    private Ref<EntityStore> resolveSourceRef(
+            @Nullable Damage.Source source,
+            @Nonnull Store<EntityStore> store
+    ) {
+        if (source instanceof Damage.EntitySource entitySource) {
+            return valid(entitySource.getRef()) ? entitySource.getRef() : null;
+        }
+        if (source instanceof Damage.ProjectileSource projectileSource) {
+            if (valid(projectileSource.getRef())) {
+                return projectileSource.getRef();
+            }
+            if (valid(projectileSource.getProjectile())) {
+                return projectileSource.getProjectile();
+            }
+        }
+        return null;
+    }
+
+    private boolean valid(@Nullable Ref<EntityStore> ref) {
+        return ref != null && ref.isValid();
+    }
+
+    @Nullable
+    private CombatParticipantView participant(
+            @Nullable Ref<EntityStore> ref,
+            @Nonnull Store<EntityStore> store
+    ) {
+        UUID entityId = resolveEntityId(ref, store);
+        return entityId == null
+                ? null
+                : new CombatParticipantView(
+                        entityId, resolveOwnerId(ref, store));
+    }
+
+    @Nullable
+    static UUID resolveEntityId(
+            @Nullable Ref<EntityStore> ref,
+            @Nonnull Store<EntityStore> store
+    ) {
+        if (ref == null || !ref.isValid()) {
+            return null;
+        }
+        ComponentType<EntityStore, UUIDComponent> uuidType =
+                UUIDComponent.getComponentType();
+        if (uuidType != null) {
+            UUIDComponent identity = store.getComponent(ref, uuidType);
+            if (identity != null && identity.getUuid() != null) {
+                return identity.getUuid();
+            }
+        }
+        Player player = store.getComponent(ref, Player.getComponentType());
+        if (player != null && player.getUuid() != null) {
+            return player.getUuid();
+        }
+        NPCEntity npc = store.getComponent(ref, NPCEntity.getComponentType());
+        return npc == null ? null : npc.getUuid();
+    }
+
+    @Nonnull
+    private String damageType(@Nonnull Damage damage) {
+        return damage.getCause() == null || damage.getCause().getId() == null
+                ? "unknown"
+                : String.valueOf(damage.getCause().getId());
+    }
+
     private boolean isNpcRef(@Nullable Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
         return ref != null && ref.isValid() && CompanionRoleIdResolver.resolveRoleId(ref, store) != null;
     }
@@ -184,7 +310,7 @@ public final class CompanionCombatExperienceSystem extends DamageEventSystem {
     }
 
     @Nullable
-    private UUID resolveOwnerId(@Nullable Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
+    static UUID resolveOwnerId(@Nullable Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
         if (ref == null || !ref.isValid()) {
             return null;
         }

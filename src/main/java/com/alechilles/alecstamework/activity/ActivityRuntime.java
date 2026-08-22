@@ -1,8 +1,12 @@
 package com.alechilles.alecstamework.activity;
 
 import com.alechilles.alecstamework.api.CareCreditOutcomeView;
+import com.alechilles.alecstamework.api.CombatContributionView;
+import com.alechilles.alecstamework.api.CombatParticipantView;
+import com.alechilles.alecstamework.api.CompanionXpOutcomeView;
 import com.alechilles.alecstamework.api.internal.LiveActivityFeed;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
+import com.alechilles.alecstamework.damage.CompanionCombatActivityPublisher;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService.AwardResult;
 import com.alechilles.alecstamework.npc.progression.CompanionXpTransition;
 import com.hypixel.hytale.component.Ref;
@@ -21,7 +25,7 @@ import javax.annotation.Nullable;
 /** Process-local owner of Activity API V2 managed producers. */
 public final class ActivityRuntime {
     private static final RuntimeState UNAVAILABLE = new RuntimeState(
-            null, null, null, null, null);
+            null, null, null, null, null, null);
     private static final AtomicReference<RuntimeState> CURRENT =
             new AtomicReference<>(UNAVAILABLE);
 
@@ -38,6 +42,7 @@ public final class ActivityRuntime {
                 new TameActivityPublisher(publisher, managedActivities),
                 new LifecycleActivityPublisher(publisher),
                 new AvatarFlightActivityPublisher(publisher),
+                new CompanionCombatActivityPublisher(publisher),
                 new CompanionCareCreditService()
         ));
     }
@@ -53,6 +58,7 @@ public final class ActivityRuntime {
                 new TameActivityPublisher(publisher, managedActivities),
                 new LifecycleActivityPublisher(publisher),
                 new AvatarFlightActivityPublisher(publisher),
+                new CompanionCombatActivityPublisher(publisher),
                 Objects.requireNonNull(careCredits, "careCredits")
         ));
     }
@@ -314,6 +320,51 @@ public final class ActivityRuntime {
         }
     }
 
+    /** Returns cached combat interest before optional entity reads. */
+    public static boolean hasCombatInterest(@Nonnull String actionId) {
+        CompanionCombatActivityPublisher publisher =
+                CURRENT.get().combatPublisher;
+        return publisher != null && publisher.hasInterest(actionId);
+    }
+
+    /** Publishes one final combat damage packet. */
+    public static void publishCombatDamage(
+            @Nonnull UUID operationId,
+            @Nonnull CombatParticipantView source,
+            @Nonnull CombatParticipantView target,
+            double finalDamage,
+            @Nonnull String damageType,
+            @Nullable CompanionXpOutcomeView sourceXpOutcome,
+            @Nullable CompanionXpOutcomeView targetXpOutcome,
+            long occurredAtMs
+    ) {
+        CompanionCombatActivityPublisher publisher =
+                CURRENT.get().combatPublisher;
+        if (publisher != null) {
+            publisher.publishDamage(
+                    operationId, source, target, finalDamage, damageType,
+                    sourceXpOutcome, targetXpOutcome, occurredAtMs);
+        }
+    }
+
+    /** Publishes one confirmed combat defeat. */
+    public static void publishCombatDefeat(
+            @Nonnull UUID operationId,
+            @Nonnull CombatParticipantView target,
+            @Nullable CombatContributionView finalBlowCredit,
+            @Nonnull List<CombatContributionView> contributors,
+            @Nullable UUID ownerCredit,
+            long occurredAtMs
+    ) {
+        CompanionCombatActivityPublisher publisher =
+                CURRENT.get().combatPublisher;
+        if (publisher != null) {
+            publisher.publishDefeat(
+                    operationId, target, finalBlowCredit, contributors,
+                    ownerCredit, occurredAtMs);
+        }
+    }
+
     @Nullable
     private static CompanionXpTransition transition(@Nullable AwardResult award) {
         return award == null ? null : award.transition();
@@ -324,6 +375,7 @@ public final class ActivityRuntime {
             @Nullable TameActivityPublisher tamePublisher,
             @Nullable LifecycleActivityPublisher lifecyclePublisher,
             @Nullable AvatarFlightActivityPublisher avatarFlightPublisher,
+            @Nullable CompanionCombatActivityPublisher combatPublisher,
             @Nullable CompanionCareCreditService careCredits
     ) {
     }

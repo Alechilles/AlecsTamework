@@ -78,6 +78,7 @@ import com.alechilles.alecstamework.damage.DamageTargetMemorySystem;
 import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
 import com.alechilles.alecstamework.damage.CompanionHappinessDamageImpulseSystem;
 import com.alechilles.alecstamework.damage.CompanionCombatExperienceSystem;
+import com.alechilles.alecstamework.damage.CompanionCombatDefeatSystem;
 import com.alechilles.alecstamework.damage.RespawnFallDamageGraceSystem;
 import com.alechilles.alecstamework.damage.ExpiryDismountFallDamageProtectionSystem;
 import com.alechilles.alecstamework.damage.ExpiryDismountLandingProtectionSystem;
@@ -1175,6 +1176,16 @@ public class Tamework extends JavaPlugin {
                 )
         );
         deferGlobalListener(
+                TameworkRuntimeModule.LEVELING,
+                "combat-contribution-world-cleanup",
+                () -> TameworkEventRegistrationSupport.registerGlobal(
+                        this,
+                        RemoveWorldEvent.class,
+                        this::onWorldRemovedForCombatContributions,
+                        "combat contribution world cleanup"
+                )
+        );
+        deferGlobalListener(
                 TameworkRuntimeModule.CORE_OWNERSHIP,
                 "spawn-beacon-world-cleanup",
                 () -> TameworkEventRegistrationSupport.registerGlobal(
@@ -1244,6 +1255,10 @@ public class Tamework extends JavaPlugin {
                 "companion-happiness-damage-impulse", CompanionHappinessDamageImpulseSystem::new);
         deferEntitySystem(TameworkRuntimeModule.LEVELING,
                 "companion-combat-experience", CompanionCombatExperienceSystem::new);
+        deferEntitySystem(TameworkRuntimeModule.LEVELING,
+                "companion-combat-defeat", () ->
+                        new CompanionCombatDefeatSystem(
+                                UUIDComponent.getComponentType()));
         deferEntitySystem(TameworkRuntimeModule.DAMAGE_PROJECTILES,
                 "projectile-impact-effect", () -> new TameworkProjectileImpactEffectSystem(
                         projectileImpactEffectComponentType,
@@ -1547,6 +1562,7 @@ public class Tamework extends JavaPlugin {
             }
             runtimeHandle = null;
         }
+        CompanionCombatDefeatSystem.clearAll();
         spawnBeaconVisualizationService.close();
         if (patchworkRuntime != null) {
             try {
@@ -1669,6 +1685,14 @@ public class Tamework extends JavaPlugin {
     private void onWorldRemovedForProgressionTiming(@Nonnull RemoveWorldEvent event) {
         if (event != null) {
             TameworkProgressionTimeScales.clearWorldScale(event.getWorld());
+        }
+    }
+
+    private void onWorldRemovedForCombatContributions(
+            @Nonnull RemoveWorldEvent event
+    ) {
+        if (event != null) {
+            CompanionCombatDefeatSystem.clearWorld(event.getWorld());
         }
     }
 
