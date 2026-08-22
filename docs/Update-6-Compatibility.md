@@ -1,8 +1,8 @@
 # Update 6 Compatibility
 
-Last reviewed: 2026-08-11
+Last reviewed: 2026-08-22
 
-Branch: `update6`
+Branch: `main`
 
 ## Supported baseline
 
@@ -17,11 +17,13 @@ The compatibility target is:
 | Update 5 | `0.5.7` | Compatibility adapters and dual NPC callback bases initialize on an isolated Update 5 classpath. |
 | Update 6 | `0.6.0-pre.11` | Production compile, manifest validation, and the full Java test suite pass. |
 
-Real server smoke tests are still required before release. The Update 5 probe loads
-the compiled compatibility boundary. It does not prove full plugin setup or gameplay.
-External Update 5 reflection that enumerates every method on a dual callback base can
-also resolve the absent Update 6 `ExecutionSupport` type. The indexed Update 5 NPC
-engine does not do this, but third-party instrumentation remains a live-load risk.
+Stable release validation uses the isolated Update 5 classpath probe, manifest
+validation, and the full Java and packaging test suites. A dual-version live
+smoke test is required before Update 6 prerelease support is advertised. External
+Update 5 reflection that enumerates every method on a dual callback base can
+resolve the absent Update 6 `ExecutionSupport` type. The indexed Update 5 NPC
+engine does not do this. Third-party instrumentation remains an accepted,
+non-blocking risk for the stable release.
 
 ## Evidence reviewed
 
@@ -171,7 +173,8 @@ exist.
 These items need live or asset-specific evidence before Update 6 prerelease
 support is advertised. They do not block a stable-range release.
 
-1. Load the packaged JAR on real `0.5.7` and `0.6.0-pre.11` servers.
+1. Load the packaged JAR on a real `0.6.0-pre.11` server and repeat the `0.5.7`
+   baseline as a comparison.
 2. Confirm NPC builder registration and one action, sensor, filter, and motion path
    on each version.
 3. Smoke-test naming, command targets, capture and restore, breeding cooldowns,
