@@ -567,6 +567,54 @@ public final class CompanionNeedsEnvironmentService {
         );
     }
 
+    boolean isWorldWaterAt(@Nullable Store<EntityStore> store,
+                           @Nullable Vector3d consumeOrigin) {
+        TargetBlock target = resolveTargetBlock(store, consumeOrigin);
+        return target != null
+                && target.worldChunk().getFluidId(
+                        target.x(), target.y(), target.z()) != 0;
+    }
+
+    boolean isNearWorldWater(@Nullable Ref<EntityStore> npcRef,
+                             @Nullable Store<EntityStore> store,
+                             @Nonnull TwNeedsConfig config,
+                             @Nullable Vector3d scanCenterOverride) {
+        if (npcRef == null || store == null || !npcRef.isValid()) {
+            return false;
+        }
+        TransformComponent transform = store.getComponent(
+                npcRef, TransformComponent.getComponentType());
+        World world = resolveWorld(store);
+        if (transform == null || world == null || world.getChunkStore() == null) {
+            return false;
+        }
+        TwNeedsConfig.PassiveRefillSettings passiveRefill = config.getPassiveRefill();
+        double radius = passiveRefill.getWaterConsumeRadius();
+        int verticalScanRadius = passiveRefill.getWaterVerticalScanRadius();
+        if (!Double.isFinite(radius) || radius <= 0.0) {
+            return false;
+        }
+        Vector3d scanCenter = scanCenterOverride;
+        if (scanCenter == null
+                || !Double.isFinite(scanCenter.x)
+                || !Double.isFinite(scanCenter.y)
+                || !Double.isFinite(scanCenter.z)) {
+            scanCenter = transform.getPosition();
+        }
+        NeedsWaterTargetSearchService.WaterRequest request =
+                new NeedsWaterTargetSearchService.WaterRequest(
+                        scanCenter.x,
+                        scanCenter.y,
+                        scanCenter.z,
+                        radius,
+                        verticalScanRadius,
+                        radius,
+                        0
+                );
+        return WATER_TARGET_SEARCH_SERVICE.searchWorldWater(store, npcRef, request)
+                .foundSource();
+    }
+
     boolean consumeNearbyWaterTroughCharge(@Nullable Ref<EntityStore> npcRef,
                                            @Nullable Store<EntityStore> store,
                                            @Nonnull TwNeedsConfig config,

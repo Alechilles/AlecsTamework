@@ -267,19 +267,20 @@ public final class CompanionNeedsConsumeService {
                     );
                 }
                 boolean nearWater = consumedTroughCharge
-                        || (targetFirstProbe && ENVIRONMENT_SERVICE.isConsumableWaterAt(store, consumeOriginOverride));
+                        || (targetFirstProbe && ENVIRONMENT_SERVICE.isWorldWaterAt(
+                                store, consumeOriginOverride));
                 if (!nearWater) {
-                    nearWater = ENVIRONMENT_SERVICE.isNearWater(npcRef, store, config, consumeOriginOverride);
+                    nearWater = ENVIRONMENT_SERVICE.isNearWorldWater(
+                            npcRef, store, config, consumeOriginOverride);
                 }
                 if (!nearWater && targetFirstProbe) {
-                    nearWater = ENVIRONMENT_SERVICE.isNearWater(npcRef, store, config);
+                    nearWater = ENVIRONMENT_SERVICE.isNearWorldWater(
+                            npcRef, store, config, null);
                 }
                 if (nearWater) {
                     thirstGain = passiveRefill.getThirstGainPerSweepNearWater();
                     waterRefillApplied = true;
-                    waterSource = consumedTroughCharge
-                            ? "water_trough"
-                            : "world_water";
+                    waterSource = "water";
                 } else {
                     NeedsConsumeDiagnostics.appendFailureReason(failureReasons, "not_near_water");
                 }
@@ -315,7 +316,8 @@ public final class CompanionNeedsConsumeService {
                 null,
                 null
         );
-        boolean happinessChanged = CompanionHappinessService.reconcileWithFeedEffects(
+        CompanionHappinessService.FeedReconciliationResult happinessResult =
+                CompanionHappinessService.reconcileWithFeedEffectsResult(
                 npcRef,
                 store,
                 null,
@@ -323,6 +325,7 @@ public final class CompanionNeedsConsumeService {
                 null,
                 consumedItemCountsByItemId
         );
+        boolean happinessChanged = happinessResult.changed();
         TameworkNeedsComponent current = store.getComponent(npcRef, needsType);
         double currentHunger = current == null
                 ? previousHunger
@@ -337,7 +340,7 @@ public final class CompanionNeedsConsumeService {
                         previousThirst,
                         currentThirst,
                         consumedItemCountsByItemId,
-                        consumedItems > 0 && happinessChanged,
+                        consumedItems > 0 && happinessResult.feedEffectApplied(),
                         waterRefillApplied ? waterSource : null
                 );
         publishCommittedOutcomes(npcRef, store, roleId, outcomes);

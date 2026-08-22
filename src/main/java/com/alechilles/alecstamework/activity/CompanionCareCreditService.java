@@ -106,7 +106,7 @@ public final class CompanionCareCreditService {
     }
 
     /** Applies the existing alarm policy to a live NPC. */
-    private static boolean tryAcquireNpcAlarm(
+    public static boolean tryAcquireNpcAlarm(
             @Nullable Ref<EntityStore> npcRef,
             @Nullable Store<EntityStore> store
     ) {

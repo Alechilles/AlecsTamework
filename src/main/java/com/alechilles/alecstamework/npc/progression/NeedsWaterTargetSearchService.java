@@ -47,7 +47,12 @@ public final class NeedsWaterTargetSearchService {
         if (chunkStoreStore == null) {
             return emptySnapshot(false);
         }
-        return search(request, new WorldSearchAccess(world.getChunkStore(), chunkStoreStore), candidateFilter);
+        return search(
+                request,
+                new WorldSearchAccess(world.getChunkStore(), chunkStoreStore),
+                candidateFilter,
+                true
+        );
     }
     @Nonnull
     NeedsResourceCandidates.Snapshot search(@Nonnull WaterRequest request,
@@ -58,14 +63,58 @@ public final class NeedsWaterTargetSearchService {
     NeedsResourceCandidates.Snapshot search(@Nonnull WaterRequest request,
                                              @Nonnull WaterSearchAccess access,
                                              @Nullable CandidateFilter candidateFilter) {
+        return search(request, access, candidateFilter, true);
+    }
+
+    @Nonnull
+    NeedsResourceCandidates.Snapshot searchWorldWater(
+            @Nullable Store<EntityStore> store,
+            @Nullable Ref<EntityStore> npcRef,
+            @Nonnull WaterRequest request
+    ) {
+        if (store == null || npcRef == null || !npcRef.isValid() || request == null) {
+            return emptySnapshot(false);
+        }
+        World world = resolveWorld(store);
+        if (world == null || world.getChunkStore() == null) {
+            return emptySnapshot(false);
+        }
+        Store<ChunkStore> chunkStoreStore = world.getChunkStore().getStore();
+        if (chunkStoreStore == null) {
+            return emptySnapshot(false);
+        }
+        return search(
+                request,
+                new WorldSearchAccess(world.getChunkStore(), chunkStoreStore),
+                null,
+                false
+        );
+    }
+
+    @Nonnull
+    NeedsResourceCandidates.Snapshot searchWorldWater(
+            @Nonnull WaterRequest request,
+            @Nonnull WaterSearchAccess access
+    ) {
+        return search(request, access, null, false);
+    }
+
+    @Nonnull
+    private NeedsResourceCandidates.Snapshot search(
+            @Nonnull WaterRequest request,
+            @Nonnull WaterSearchAccess access,
+            @Nullable CandidateFilter candidateFilter,
+            boolean includeTroughs
+    ) {
         if (request == null || access == null || !request.hasValidRange()) {
             return emptySnapshot(false);
         }
-        return scan(request, access, candidateFilter);
+        return scan(request, access, candidateFilter, includeTroughs);
     }
     private static NeedsResourceCandidates.Snapshot scan(@Nonnull WaterRequest request,
                                                          @Nonnull WaterSearchAccess access,
-                                                         @Nullable CandidateFilter candidateFilter) {
+                                                         @Nullable CandidateFilter candidateFilter,
+                                                         boolean includeTroughs) {
         int blockX = floorBlock(request.originX());
         int blockY = floorBlock(request.originY());
         int blockZ = floorBlock(request.originZ());
@@ -95,7 +144,9 @@ public final class NeedsWaterTargetSearchService {
                         if (horizontalDistanceSquared > radiusSquared + SCORE_EPSILON) {
                             continue;
                         }
-                        if (!isConsumableSource(access, sectionCache, x, y, z)) {
+                        if (!isConsumableSource(
+                                access, sectionCache, x, y, z,
+                                includeTroughs)) {
                             continue;
                         }
                         foundSource = true;
@@ -129,13 +180,14 @@ public final class NeedsWaterTargetSearchService {
                                               @Nonnull SectionCache sectionCache,
                                               int x,
                                               int y,
-                                              int z) {
+                                              int z,
+                                              boolean includeTroughs) {
         SectionState section = sectionCache.get(x, y, z);
         if (section.section() != null && !section.empty()
                 && access.fluidId(section.section(), x, y, z) != 0) {
             return true;
         }
-        return access.hasConsumableTrough(x, y, z);
+        return includeTroughs && access.hasConsumableTrough(x, y, z);
     }
 
     private static boolean isHorizontalRingCell(int originX,
@@ -231,7 +283,8 @@ public final class NeedsWaterTargetSearchService {
                             double radius,
                             int verticalScanRadius,
                             double consumeRadius) {
-            this(originX, originY, originZ, radius, verticalScanRadius, consumeRadius, MAX_CANDIDATES);
+            this(originX, originY, originZ, radius, verticalScanRadius,
+                    consumeRadius, MAX_CANDIDATES);
         }
 
         public WaterRequest(@Nonnull Vector3d origin,
@@ -239,7 +292,8 @@ public final class NeedsWaterTargetSearchService {
                             int verticalScanRadius,
                             double consumeRadius,
                             int maxCandidates) {
-            this(origin.x, origin.y, origin.z, radius, verticalScanRadius, consumeRadius, maxCandidates);
+            this(origin.x, origin.y, origin.z, radius, verticalScanRadius,
+                    consumeRadius, maxCandidates);
         }
 
         public WaterRequest(@Nonnull Vector3d origin,

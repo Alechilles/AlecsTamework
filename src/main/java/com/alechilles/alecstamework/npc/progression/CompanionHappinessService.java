@@ -102,14 +102,36 @@ public final class CompanionHappinessService {
                                                    boolean includeHandFeedImpulse,
                                                    @Nullable String consumedItemId,
                                                    @Nullable Map<String, Integer> consumedItemCountsByItemId) {
+        return reconcileWithFeedEffectsResult(
+                npcRef,
+                store,
+                commandBuffer,
+                includeHandFeedImpulse,
+                consumedItemId,
+                consumedItemCountsByItemId
+        ).changed();
+    }
+
+    static FeedReconciliationResult reconcileWithFeedEffectsResult(
+            @Nullable Ref<EntityStore> npcRef,
+            @Nullable Store<EntityStore> store,
+            @Nullable CommandBuffer<EntityStore> commandBuffer,
+            boolean includeHandFeedImpulse,
+            @Nullable String consumedItemId,
+            @Nullable Map<String, Integer> consumedItemCountsByItemId
+    ) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
-            return false;
+            return new FeedReconciliationResult(false, false);
         }
         ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
         TameworkHappinessComponent happiness = happinessType != null ? store.getComponent(npcRef, happinessType) : null;
         TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(npcRef, store, happiness);
         if (!HappinessConfigResolver.isRuntimeEnabled(happinessConfig)) {
-            return removeHappinessRuntimeState(npcRef, store, commandBuffer, happinessType, happiness);
+            return new FeedReconciliationResult(
+                    removeHappinessRuntimeState(
+                            npcRef, store, commandBuffer, happinessType, happiness),
+                    false
+            );
         }
         HappinessRules rules = resolveRules(happinessConfig);
         ArrayList<TimedImpulseActivation> activations = new ArrayList<>();
@@ -136,7 +158,16 @@ public final class CompanionHappinessService {
                 );
             }
         }
-        return updateHappiness(npcRef, store, commandBuffer, 0.0, false, activations);
+        boolean feedEffectPresent = !activations.isEmpty();
+        boolean changed = updateHappiness(
+                npcRef, store, commandBuffer, 0.0, false, activations);
+        return new FeedReconciliationResult(
+                changed,
+                changed && feedEffectPresent
+        );
+    }
+
+    record FeedReconciliationResult(boolean changed, boolean feedEffectApplied) {
     }
 
     public static boolean applyPetGain(@Nullable Ref<EntityStore> npcRef,

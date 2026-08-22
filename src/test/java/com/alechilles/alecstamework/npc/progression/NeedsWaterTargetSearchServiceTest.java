@@ -107,6 +107,31 @@ class NeedsWaterTargetSearchServiceTest {
     }
 
     @Test
+    void worldWaterOnlySearchIgnoresTroughsButFindsFluid() {
+        FakeWaterAccess access = new FakeWaterAccess();
+        access.sourceCoordinates.add("0:64:0");
+
+        NeedsResourceCandidates.Snapshot troughOnly =
+                new NeedsWaterTargetSearchService().searchWorldWater(
+                        new NeedsWaterTargetSearchService.WaterRequest(
+                                0.5, 64.0, 0.5, 1.0, 0, 1.0, 0),
+                        access
+                );
+
+        assertFalse(troughOnly.foundSource());
+
+        access.addFluid(0, 64, 0);
+        NeedsResourceCandidates.Snapshot fluid =
+                new NeedsWaterTargetSearchService().searchWorldWater(
+                        new NeedsWaterTargetSearchService.WaterRequest(
+                                0.5, 64.0, 0.5, 1.0, 0, 1.0, 0),
+                        access
+                );
+
+        assertTrue(fluid.foundSource());
+    }
+
+    @Test
     void compatibilityFilterContinuesToAnAcceptedOuterRing() {
         FakeWaterAccess access = new FakeWaterAccess();
         access.addFluid(1, 64, 0);

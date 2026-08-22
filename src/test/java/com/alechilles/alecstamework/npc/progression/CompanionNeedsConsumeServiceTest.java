@@ -38,11 +38,11 @@ class CompanionNeedsConsumeServiceTest {
                         45.0,
                         Map.of(),
                         false,
-                        "water_trough"
+                        "water"
                 );
 
         assertEquals(List.of(new NeedsSatisfactionOutcome(
-                "thirst", "water_trough", "water", 5.0, 45.0, 40.0
+                "thirst", "water", "water", 5.0, 45.0, 40.0
         )), outcomes);
     }
 
@@ -56,13 +56,13 @@ class CompanionNeedsConsumeServiceTest {
                         40.0,
                         Map.of("Food_Wheat", 1),
                         false,
-                        "world_water"
+                        "water"
                 );
 
         assertEquals(2, outcomes.size());
         assertEquals("hunger", outcomes.get(0).needType());
         assertEquals("thirst", outcomes.get(1).needType());
-        assertEquals("world_water", outcomes.get(1).resourceSource());
+        assertEquals("water", outcomes.get(1).resourceSource());
     }
 
     @Test
@@ -89,7 +89,7 @@ class CompanionNeedsConsumeServiceTest {
         ).isEmpty());
         assertTrue(NeedsSatisfactionOutcome.resolveCommitted(
                 10.0, 10.0, 20.0, 20.0,
-                Map.of("Food_Wheat", 1), false, "world_water"
+                Map.of("Food_Wheat", 1), false, "water"
         ).isEmpty());
     }
 
