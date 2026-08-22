@@ -123,7 +123,7 @@ public final class ActivityRuntime {
                 companionId,
                 Map.of(),
                 transition(award),
-                careCredit && companionId != null
+                careCredit && companionId != null && ownerId != null
                         ? new CareCreditOutcomeView(companionId, ownerId)
                         : null
         );
@@ -187,6 +187,43 @@ public final class ActivityRuntime {
                     offspringIds
             );
         }
+    }
+
+    /** Publishes one committed autonomous need change. */
+    public static void publishNeedSatisfied(
+            @Nonnull UUID operationId,
+            @Nullable String roleId,
+            @Nullable UUID ownerId,
+            @Nullable UUID companionId,
+            @Nonnull String needType,
+            @Nonnull String resourceSource,
+            @Nonnull String resourceId,
+            double previousValue,
+            double currentValue,
+            double restoredAmount,
+            @Nullable AwardResult award,
+            boolean careCredit
+    ) {
+        RuntimeState state = CURRENT.get();
+        if (state.publisher == null) {
+            return;
+        }
+        state.publisher.publishNeedSatisfied(
+                operationId,
+                roleId,
+                ownerId,
+                companionId,
+                needType,
+                resourceSource,
+                resourceId,
+                previousValue,
+                currentValue,
+                restoredAmount,
+                transition(award),
+                careCredit && companionId != null && ownerId != null
+                        ? new CareCreditOutcomeView(companionId, ownerId)
+                        : null
+        );
     }
 
     @Nullable

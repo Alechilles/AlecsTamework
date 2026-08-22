@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.progression;
 
+import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
@@ -13,8 +14,10 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -185,11 +188,19 @@ public final class CompanionNeedsConsumeService {
         }
 
         TwNeedsConfig.PassiveRefillSettings passiveRefill = config.getPassiveRefill();
+        TwNeedsConfig.ValueSettings values = config.getValues();
+        double previousHunger = component == null
+                ? values.getHungerDefault()
+                : finiteOrDefault(component.getHunger(), values.getHungerDefault());
+        double previousThirst = component == null
+                ? values.getThirstDefault()
+                : finiteOrDefault(component.getThirst(), values.getThirstDefault());
         double hungerGain = 0.0;
         double thirstGain = 0.0;
         int consumedItems = 0;
         boolean waterRefillApplied = false;
         Map<String, Integer> consumedItemCountsByItemId = null;
+        String waterSource = null;
 
         if (mode.consumesFood()) {
             if (!passiveRefill.isNearbyContainerFeedEnabled()) {
@@ -266,6 +277,9 @@ public final class CompanionNeedsConsumeService {
                 if (nearWater) {
                     thirstGain = passiveRefill.getThirstGainPerSweepNearWater();
                     waterRefillApplied = true;
+                    waterSource = consumedTroughCharge
+                            ? "water_trough"
+                            : "world_water";
                 } else {
                     NeedsConsumeDiagnostics.appendFailureReason(failureReasons, "not_near_water");
                 }
@@ -309,9 +323,24 @@ public final class CompanionNeedsConsumeService {
                 null,
                 consumedItemCountsByItemId
         );
-        if (shouldAwardFeedXpForResourceConsume(consumedItems, waterRefillApplied, updated, happinessChanged)) {
-            CompanionLevelingService.awardFeedXp(npcRef, store);
-        }
+        TameworkNeedsComponent current = store.getComponent(npcRef, needsType);
+        double currentHunger = current == null
+                ? previousHunger
+                : finiteOrDefault(current.getHunger(), previousHunger);
+        double currentThirst = current == null
+                ? previousThirst
+                : finiteOrDefault(current.getThirst(), previousThirst);
+        List<NeedsSatisfactionOutcome> outcomes =
+                NeedsSatisfactionOutcome.resolveCommitted(
+                        previousHunger,
+                        currentHunger,
+                        previousThirst,
+                        currentThirst,
+                        consumedItemCountsByItemId,
+                        consumedItems > 0 && happinessChanged,
+                        waterRefillApplied ? waterSource : null
+                );
+        publishCommittedOutcomes(npcRef, store, roleId, outcomes);
         if (updated) {
             NeedsConsumeDiagnostics.maybeLogConsume(
                     diagnostics,
@@ -381,13 +410,6 @@ public final class CompanionNeedsConsumeService {
         return false;
     }
 
-    static boolean shouldAwardFeedXpForResourceConsume(int consumedItems,
-                                                       boolean waterRefillApplied,
-                                                       boolean updated,
-                                                       boolean happinessChanged) {
-        return (updated || happinessChanged) && (consumedItems > 0 || waterRefillApplied);
-    }
-
     static boolean canUseTargetFirstConsumeProbeForTests(@Nullable Vector3d consumeOrigin) {
         return isFiniteConsumeOrigin(consumeOrigin);
     }
@@ -397,6 +419,46 @@ public final class CompanionNeedsConsumeService {
                 && Double.isFinite(consumeOrigin.x)
                 && Double.isFinite(consumeOrigin.y)
                 && Double.isFinite(consumeOrigin.z);
+    }
+
+    private static void publishCommittedOutcomes(
+            Ref<EntityStore> npcRef,
+            Store<EntityStore> store,
+            String roleId,
+            List<NeedsSatisfactionOutcome> outcomes
+    ) {
+        if (outcomes == null || outcomes.isEmpty()) {
+            return;
+        }
+        boolean careCredit = ActivityRuntime.tryAcquireCareCredit(npcRef, store);
+        CompanionLevelingService.AwardResult award = careCredit
+                ? CompanionLevelingService.awardFeedXp(npcRef, store)
+                : null;
+        UUID operationId = UUID.randomUUID();
+        UUID ownerId = ActivityRuntime.resolveOwnerId(npcRef, store);
+        UUID companionId = ActivityRuntime.resolveCompanionId(npcRef, store);
+        for (int index = 0; index < outcomes.size(); index++) {
+            NeedsSatisfactionOutcome outcome = outcomes.get(index);
+            boolean carriesCredit = index == 0 && careCredit;
+            ActivityRuntime.publishNeedSatisfied(
+                    operationId,
+                    roleId,
+                    ownerId,
+                    companionId,
+                    outcome.needType(),
+                    outcome.resourceSource(),
+                    outcome.resourceId(),
+                    outcome.previousValue(),
+                    outcome.currentValue(),
+                    outcome.restoredAmount(),
+                    carriesCredit ? award : null,
+                    carriesCredit
+            );
+        }
+    }
+
+    private static double finiteOrDefault(double value, double defaultValue) {
+        return Double.isFinite(value) ? value : defaultValue;
     }
 
     @Nonnull

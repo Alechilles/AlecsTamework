@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.api.ActivityView;
 import com.alechilles.alecstamework.api.CareCreditOutcomeView;
 import com.alechilles.alecstamework.api.ManagedActivityView;
 import com.alechilles.alecstamework.api.CompanionXpSource;
+import com.alechilles.alecstamework.api.NeedSatisfiedActivityView;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
 import com.alechilles.alecstamework.config.assets.TwManagedActivityConfig;
 import com.alechilles.alecstamework.config.assets.TwPopulationGroupConfig;
@@ -175,6 +176,45 @@ class ManagedActivityPublisherTest {
         assertEquals(new CareCreditOutcomeView(COMPANION, OWNER), first.careCreditOutcome());
         assertNull(second.companionXpOutcome());
         assertNull(second.careCreditOutcome());
+    }
+
+    @Test
+    void publishesMappedAutonomousNeedWithOneQualifiedCareOutcome() throws Exception {
+        List<ActivityView> published = new ArrayList<>();
+        ManagedActivityPublisher publisher = new ManagedActivityPublisher(
+                published::add,
+                managedRegistry()
+        );
+        CompanionXpTransition transition = feedTransition();
+        CareCreditOutcomeView care = new CareCreditOutcomeView(COMPANION, OWNER);
+        UUID operationId = UUID.randomUUID();
+
+        publisher.publishNeedSatisfied(
+                operationId,
+                "RoleA",
+                OWNER,
+                COMPANION,
+                "hunger",
+                "container",
+                "Food_Wheat",
+                10.0,
+                35.0,
+                25.0,
+                transition,
+                care
+        );
+
+        NeedSatisfiedActivityView activity = assertInstanceOf(
+                NeedSatisfiedActivityView.class, published.get(0));
+        assertEquals(operationId, activity.header().operationId());
+        assertEquals(ActivityIds.NEED_SATISFIED, activity.header().actionId());
+        assertEquals("runeteria:husbandry", activity.profileId());
+        assertEquals(Set.of("runeteria:family"), activity.groupIds());
+        assertEquals("RoleA", activity.roleId());
+        assertEquals("runeteria:feed", activity.mappedActivityId());
+        assertEquals("Food_Wheat", activity.resourceId());
+        assertEquals(transition.toOutcomeView(), activity.companionXpOutcome());
+        assertEquals(care, activity.careCreditOutcome());
     }
 
     private static CompanionXpTransition feedTransition() {

@@ -61,6 +61,9 @@ public final class CompanionCareCreditService {
     ) {
         UUID companionId = companionId(npcRef, store);
         UUID ownerId = ownerId(npcRef, store);
+        if (companionId == null || ownerId == null) {
+            return false;
+        }
         if (liveAlarm) {
             return tryAcquireNpcAlarm(npcRef, store);
         }
@@ -103,7 +106,7 @@ public final class CompanionCareCreditService {
     }
 
     /** Applies the existing alarm policy to a live NPC. */
-    public static boolean tryAcquireNpcAlarm(
+    private static boolean tryAcquireNpcAlarm(
             @Nullable Ref<EntityStore> npcRef,
             @Nullable Store<EntityStore> store
     ) {

@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.api.ActivityIds;
 import com.alechilles.alecstamework.api.ActivityParticipantView;
 import com.alechilles.alecstamework.api.CareCreditOutcomeView;
 import com.alechilles.alecstamework.api.ManagedActivityView;
+import com.alechilles.alecstamework.api.NeedSatisfiedActivityView;
 import com.alechilles.alecstamework.api.internal.LiveActivityFeed;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.config.managed.ManagedActivityProfile;
@@ -142,6 +143,57 @@ public final class ManagedActivityPublisher {
                 null,
                 null
         );
+    }
+
+    /** Publishes one committed autonomous food or water need change. */
+    public void publishNeedSatisfied(
+            @Nonnull UUID operationId,
+            @Nullable String roleId,
+            @Nullable UUID ownerId,
+            @Nullable UUID companionId,
+            @Nonnull String needType,
+            @Nonnull String resourceSource,
+            @Nonnull String resourceId,
+            double previousValue,
+            double currentValue,
+            double restoredAmount,
+            @Nullable CompanionXpTransition xpTransition,
+            @Nullable CareCreditOutcomeView careCredit
+    ) {
+        if (ownerId == null || companionId == null) {
+            return;
+        }
+        ManagedActivityConfigRegistry.RoleResolution resolution =
+                resolveRole(roleId, companionId);
+        if (resolution == null) {
+            return;
+        }
+        String mappedActivityId = resolution.profile().activities().needSatisfied();
+        try {
+            publisher.publish(new NeedSatisfiedActivityView(
+                    new ActivityHeader(
+                            operationId,
+                            ActivityIds.NEED_SATISFIED,
+                            Instant.now()
+                    ),
+                    companionId,
+                    ownerId,
+                    resolution.profile().profileId(),
+                    groupIds(resolution),
+                    resolution.roleId(),
+                    mappedActivityId,
+                    needType,
+                    resourceSource,
+                    resourceId,
+                    previousValue,
+                    currentValue,
+                    restoredAmount,
+                    xpTransition == null ? null : xpTransition.toOutcomeView(),
+                    careCredit
+            ));
+        } catch (RuntimeException | LinkageError ignored) {
+            // Publication cannot undo the already committed need change.
+        }
     }
 
     private void publish(
