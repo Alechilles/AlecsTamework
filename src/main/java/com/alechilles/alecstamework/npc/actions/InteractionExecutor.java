@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.items.CommandAutoLinkResult;
 import com.alechilles.alecstamework.items.CommandAutoLinkService;
+import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService.AwardResult;
 import com.hypixel.hytale.component.Ref;
@@ -76,7 +77,7 @@ final class InteractionExecutor {
                         InteractionContextSnapshot liveContext = effects.refreshContext(livePlayer, liveRole);
                         String targetRoleId = effects.resolveTameRoleId(
                                 tame, liveRole, liveContext);
-                        boolean roleChanged = effects.applyTameRoleChange(
+                        effects.applyTameRoleChange(
                                 tame, liveNpcRef, liveRole, liveStore, liveContext);
                         if (livePlayer != null) {
                             feedHelper.consumeHeldItem(livePlayer, 1);
@@ -94,18 +95,18 @@ final class InteractionExecutor {
                                 liveContext,
                                 harvestInteraction
                         );
-                        if (acquired) {
-                            ActivityRuntime.publishTame(
-                                    UUID.randomUUID(),
-                                    roleChanged
-                                            ? targetRoleId
-                                            : liveRole == null
-                                                    ? null
-                                                    : liveRole.getRoleName(),
-                                    resolveOwnerId(liveNpcRef, liveStore),
-                                    resolveCompanionId(liveNpcRef, liveStore)
-                            );
-                        }
+                        String finalRoleId = effects.resolveFinalTameRoleId(
+                                tame, entry.getEffects(), liveRole, liveContext);
+                        publishTameIfCommitted(
+                                UUID.randomUUID(),
+                                acquired,
+                                livePlayer == null ? null : livePlayer.getUuid(),
+                                resolveOwnerId(liveNpcRef, liveStore),
+                                TamedStateResolver.isTamed(
+                                        liveNpcRef, liveStore),
+                                finalRoleId == null ? targetRoleId : finalRoleId,
+                                resolveCompanionId(liveNpcRef, liveStore)
+                        );
                         if (livePlayer != null) {
                             CommandAutoLinkResult autoLink = CommandAutoLinkService.autoLinkNewlyTamedNpc(
                                     livePlayer,
@@ -280,6 +281,23 @@ final class InteractionExecutor {
             ) | applied;
         }
         return false;
+    }
+
+    static void publishTameIfCommitted(
+            UUID operationId,
+            boolean acquired,
+            UUID acquiringOwnerId,
+            UUID finalOwnerId,
+            boolean finalTamed,
+            String finalRoleId,
+            UUID companionId
+    ) {
+        if (!acquired || !finalTamed || acquiringOwnerId == null
+                || !acquiringOwnerId.equals(finalOwnerId)) {
+            return;
+        }
+        ActivityRuntime.publishTame(
+                operationId, finalRoleId, finalOwnerId, companionId);
     }
 
     void publishContainerHarvest(

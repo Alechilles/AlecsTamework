@@ -287,6 +287,26 @@ final class TameworkInteractEffects {
                         interaction.getRole(), interaction.getRoleParam(), role, ctx);
     }
 
+    @Nullable
+    String resolveFinalTameRoleId(
+            @Nullable TameInteraction interaction,
+            @Nullable com.alechilles.alecstamework.config.assets
+                    .TwInteractionConfig.Effects configuredEffects,
+            @Nullable Role role,
+            @Nullable InteractionContextSnapshot ctx
+    ) {
+        String roleId = resolveTameRoleId(interaction, role, ctx);
+        SetRoleEffect finalRole = configuredEffects == null
+                ? null
+                : configuredEffects.getSetRole();
+        if (finalRole == null) {
+            return roleId;
+        }
+        String resolved = resolveRoleId(
+                finalRole.getRole(), finalRole.getRoleParam(), role, ctx);
+        return resolved == null || resolved.isBlank() ? roleId : resolved;
+    }
+
     private boolean applySetRole(SetRoleEffect effect,
                                  Ref<EntityStore> npcRef,
                                  Role role,

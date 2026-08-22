@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.api.ActivityView;
 import com.alechilles.alecstamework.api.CompanionXpSource;
 import com.alechilles.alecstamework.api.ManagedActivityView;
+import com.alechilles.alecstamework.api.TameActivityView;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
 import com.alechilles.alecstamework.config.assets.TwManagedActivityConfig;
 import com.alechilles.alecstamework.config.assets.TwPopulationGroupConfig;
@@ -113,6 +114,31 @@ class InteractionActivityPublicationTest {
         assertNull(activity.careCreditOutcome());
     }
 
+    @Test
+    void tamePublicationUsesFinalOwnerTamedStateAndRole() throws Exception {
+        List<ActivityView> published = new ArrayList<>();
+        ActivityRuntime.install(published::add, managedRegistry());
+
+        InteractionExecutor.publishTameIfCommitted(
+                UUID.randomUUID(), true, OWNER, OWNER, true,
+                "RoleB", COMPANION);
+        InteractionExecutor.publishTameIfCommitted(
+                UUID.randomUUID(), true, OWNER, OWNER, false,
+                "RoleA", COMPANION);
+        InteractionExecutor.publishTameIfCommitted(
+                UUID.randomUUID(), true, OWNER, UUID.randomUUID(), true,
+                "RoleA", COMPANION);
+        InteractionExecutor.publishTameIfCommitted(
+                UUID.randomUUID(), false, OWNER, OWNER, true,
+                "RoleA", COMPANION);
+
+        assertEquals(1, published.size());
+        TameActivityView activity = assertInstanceOf(
+                TameActivityView.class, published.getFirst());
+        assertEquals("RoleB", activity.roleId());
+        assertEquals(OWNER, activity.ownerId());
+    }
+
     private static CompanionXpTransition harvestTransition() {
         return new CompanionXpTransition(
                 COMPANION,
@@ -140,7 +166,8 @@ class InteractionActivityPublicationTest {
     private static ManagedActivityConfigRegistry managedRegistry() throws Exception {
         PopulationGroupConfigRegistry groups = new PopulationGroupConfigRegistry();
         assertTrue(groups.replace(
-                List.of(group("group", "runeteria:family", "RoleA")), 1L
+                List.of(group(
+                        "group", "runeteria:family", "RoleA", "RoleB")), 1L
         ).applied());
         ManagedActivityConfigRegistry managed = new ManagedActivityConfigRegistry(groups);
         TwManagedActivityConfig profile = decode("husbandry", """
@@ -172,12 +199,21 @@ class InteractionActivityPublicationTest {
         return config;
     }
 
-    private static TwPopulationGroupConfig group(String id, String groupId, String roleId)
+    private static TwPopulationGroupConfig group(
+            String id,
+            String groupId,
+            String... roleIds
+    )
             throws Exception {
         TwPopulationGroupConfig config = TwPopulationGroupConfig.CODEC.decode(
                 BsonDocument.parse("""
-                        {"GroupId":"%s","RoleIds":["%s"]}
-                        """.formatted(groupId, roleId)), new ExtraInfo());
+                        {"GroupId":"%s","RoleIds":%s}
+                        """.formatted(
+                        groupId,
+                        java.util.Arrays.stream(roleIds)
+                                .map(roleId -> "\"" + roleId + "\"")
+                                .collect(java.util.stream.Collectors.joining(",", "[", "]"))
+                )), new ExtraInfo());
         set(config, "id", id);
         set(config, "limits", new TwPopulationGroupConfig.LimitSettings());
         set(field(config, "limits"), "scope", PopulationGroupScope.GLOBAL);

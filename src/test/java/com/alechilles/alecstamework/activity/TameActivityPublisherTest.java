@@ -10,12 +10,17 @@ import com.alechilles.alecstamework.api.TameActivityView;
 import com.alechilles.alecstamework.companion.capture.CaptureAttemptPublicEventMapper;
 import com.alechilles.alecstamework.companion.capture.CaptureAttemptResolvedEvent;
 import com.alechilles.alecstamework.companion.capture.CaptureTameAndLinkTestFixtures;
+import com.alechilles.alecstamework.companion.capture.CaptureAttemptResolutionEventCodec;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
 import com.alechilles.alecstamework.config.assets.TwManagedActivityConfig;
 import com.alechilles.alecstamework.config.assets.TwPopulationGroupConfig;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegistry;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
+import com.alechilles.alecstamework.persistence.projection.ProjectionEvent;
+import com.alechilles.alecstamework.persistence.projection.ProjectionPublicationContext;
+import com.alechilles.alecstamework.persistence.projection.ProjectionSequence;
+import com.alechilles.alecstamework.persistence.facade.ReplacementPublicSemanticEventProjection;
 import com.hypixel.hytale.codec.ExtraInfo;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -81,6 +86,47 @@ class TameActivityPublisherTest {
         assertEquals(CaptureTameAndLinkTestFixtures.ALIAS.value(),
                 activity.companionId());
         assertEquals("Tamed_Dragon_Fire", activity.roleId());
+    }
+
+    @Test
+    void captureProjectionPublishesTameOnlyForLiveCommit() throws Exception {
+        List<ActivityView> published = new ArrayList<>();
+        ActivityRuntime.install(published::add, managedRegistry());
+        try {
+            ProjectionEvent event = captureEvent();
+            new ReplacementPublicSemanticEventProjection(
+                    ignored -> { }, () -> CaptureTameAndLinkTestFixtures.NOW
+            ).apply(event, ProjectionPublicationContext.LIVE_COMMIT);
+            assertEquals(1, published.size());
+
+            published.clear();
+            new ReplacementPublicSemanticEventProjection(
+                    ignored -> { }, () -> CaptureTameAndLinkTestFixtures.NOW
+            ).apply(event, ProjectionPublicationContext.RECOVERY_CONVERGENCE);
+            assertTrue(published.isEmpty());
+        } finally {
+            ActivityRuntime.clear();
+        }
+    }
+
+    private static ProjectionEvent captureEvent() {
+        var request = CaptureTameAndLinkTestFixtures.request();
+        long resolvedAtMs = CaptureTameAndLinkTestFixtures.NOW;
+        return new ProjectionEvent(
+                new ProjectionSequence(1),
+                CaptureTameAndLinkTestFixtures.OPERATION,
+                CaptureAttemptResolutionEventCodec.EVENT_TYPE,
+                "capture-attempt:" + request.resolution().attemptId(),
+                1,
+                CaptureAttemptResolutionEventCodec.VERSION,
+                CaptureAttemptResolutionEventCodec.encode(
+                        CaptureTameAndLinkTestFixtures.OPERATION,
+                        new IdempotencyKey("capture-tame-projection"),
+                        request,
+                        resolvedAtMs
+                ),
+                resolvedAtMs
+        );
     }
 
     private static ManagedActivityConfigRegistry managedRegistry() throws Exception {

@@ -122,14 +122,22 @@ public final class LegacyTamedOwnershipBridge {
         NPCEntity npc = NPCEntity.getComponentType() == null
                 ? null
                 : store.getComponent(npcRef, NPCEntity.getComponentType());
-        ActivityRuntime.publishTame(
-                UUID.randomUUID(),
+        publishClaimedTame(
+                ownerId,
+                resolveNpcUuid(npcRef, store),
                 npc == null || npc.getRole() == null
                         ? null
-                        : npc.getRole().getRoleName(),
-                ownerId,
-                resolveNpcUuid(npcRef, store)
+                        : npc.getRole().getRoleName()
         );
+    }
+
+    static void publishClaimedTame(
+            UUID ownerId,
+            UUID companionId,
+            String roleId
+    ) {
+        ActivityRuntime.publishTame(
+                UUID.randomUUID(), roleId, ownerId, companionId);
     }
 
     private static void sendCapDenial(
