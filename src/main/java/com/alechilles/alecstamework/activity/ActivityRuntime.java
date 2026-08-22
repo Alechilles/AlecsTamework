@@ -20,7 +20,8 @@ import javax.annotation.Nullable;
 
 /** Process-local owner of Activity API V2 managed producers. */
 public final class ActivityRuntime {
-    private static final RuntimeState UNAVAILABLE = new RuntimeState(null, null);
+    private static final RuntimeState UNAVAILABLE = new RuntimeState(
+            null, null, null);
     private static final AtomicReference<RuntimeState> CURRENT =
             new AtomicReference<>(UNAVAILABLE);
 
@@ -34,6 +35,7 @@ public final class ActivityRuntime {
     ) {
         CURRENT.set(new RuntimeState(
                 new ManagedActivityPublisher(publisher, managedActivities),
+                new TameActivityPublisher(publisher, managedActivities),
                 new CompanionCareCreditService()
         ));
     }
@@ -46,6 +48,7 @@ public final class ActivityRuntime {
     ) {
         CURRENT.set(new RuntimeState(
                 new ManagedActivityPublisher(publisher, managedActivities),
+                new TameActivityPublisher(publisher, managedActivities),
                 Objects.requireNonNull(careCredits, "careCredits")
         ));
     }
@@ -226,6 +229,20 @@ public final class ActivityRuntime {
         );
     }
 
+    /** Publishes one committed wild-to-tamed acquisition. */
+    public static void publishTame(
+            @Nonnull UUID operationId,
+            @Nullable String roleId,
+            @Nullable UUID ownerId,
+            @Nullable UUID companionId
+    ) {
+        RuntimeState state = CURRENT.get();
+        if (state.tamePublisher != null) {
+            state.tamePublisher.publish(
+                    operationId, roleId, ownerId, companionId);
+        }
+    }
+
     @Nullable
     private static CompanionXpTransition transition(@Nullable AwardResult award) {
         return award == null ? null : award.transition();
@@ -233,6 +250,7 @@ public final class ActivityRuntime {
 
     private record RuntimeState(
             @Nullable ManagedActivityPublisher publisher,
+            @Nullable TameActivityPublisher tamePublisher,
             @Nullable CompanionCareCreditService careCredits
     ) {
     }

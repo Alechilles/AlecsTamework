@@ -245,7 +245,7 @@ final class TameworkInteractEffects {
     boolean applyStartTaming(Ref<EntityStore> npcRef,
                              Store<EntityStore> store,
                              Player player,
-                             @Nullable InteractionStateEffects.OwnerAppliedContinuation continuation) {
+                             @Nullable InteractionStateEffects.TameAppliedContinuation continuation) {
         return ownerContinuationEffects.applyStartTaming(npcRef, store, player, continuation);
     }
 
@@ -264,10 +264,7 @@ final class TameworkInteractEffects {
                                 Role role,
                                 Store<EntityStore> store,
                                 InteractionContextSnapshot ctx) {
-        if (interaction == null) {
-            return false;
-        }
-        String roleId = resolveRoleId(interaction.getRole(), interaction.getRoleParam(), role, ctx);
+        String roleId = resolveTameRoleId(interaction, role, ctx);
         if (roleId == null || roleId.isBlank()) {
             return false;
         }
@@ -276,6 +273,18 @@ final class TameworkInteractEffects {
             CompanionProgressionBootstrapService.ensureProgressionComponents(npcRef, store, roleId);
         }
         return changed;
+    }
+
+    @Nullable
+    String resolveTameRoleId(
+            @Nullable TameInteraction interaction,
+            @Nullable Role role,
+            @Nullable InteractionContextSnapshot ctx
+    ) {
+        return interaction == null
+                ? null
+                : resolveRoleId(
+                        interaction.getRole(), interaction.getRoleParam(), role, ctx);
     }
 
     private boolean applySetRole(SetRoleEffect effect,

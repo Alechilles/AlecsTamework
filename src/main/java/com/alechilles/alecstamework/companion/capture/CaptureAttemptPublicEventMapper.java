@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.capture;
 
+import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.api.CaptureAttemptOutcome;
 import com.alechilles.alecstamework.api.CaptureAttemptReplayEvidence;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
@@ -103,6 +104,27 @@ public final class CaptureAttemptPublicEventMapper {
                 event.resolvedAtMs(),
                 emittedAtMs,
                 replay
+        );
+    }
+
+    /** Publishes the tame activity carried by a committed capture-and-tame event. */
+    public static void publishTameActivity(
+            @Nonnull CaptureAttemptResolvedEvent event
+    ) {
+        if (event == null || !event.replayComplete()) {
+            return;
+        }
+        CompanionCaptureRequest request = event.request();
+        if (!request.tameAndCommandLink()
+                || request.resultingOwnerId() == null
+                || event.operationId() == null) {
+            return;
+        }
+        ActivityRuntime.publishTame(
+                event.operationId().value(),
+                request.tameAndLinkEvidence().targetIdentity().roleId(),
+                request.resultingOwnerId().value(),
+                request.targetAlias().value()
         );
     }
 

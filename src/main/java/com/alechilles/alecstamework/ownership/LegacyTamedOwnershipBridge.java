@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ownership;
 
+import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
@@ -10,6 +11,7 @@ import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -74,6 +76,7 @@ public final class LegacyTamedOwnershipBridge {
         );
         ensureTamedComponent(store, npcRef);
         ClaimResult result = ClaimResult.claimed(playerId, ownerName);
+        publishClaimedTame(npcRef, store, playerId);
         invokeContinuation(continuation, npcRef, store, player, result);
         return result;
     }
@@ -109,6 +112,24 @@ public final class LegacyTamedOwnershipBridge {
         if (tamed == null || !tamed.isTamed()) {
             store.putComponent(npcRef, tamedType, new TameworkTamedComponent(true));
         }
+    }
+
+    private static void publishClaimedTame(
+            Ref<EntityStore> npcRef,
+            Store<EntityStore> store,
+            UUID ownerId
+    ) {
+        NPCEntity npc = NPCEntity.getComponentType() == null
+                ? null
+                : store.getComponent(npcRef, NPCEntity.getComponentType());
+        ActivityRuntime.publishTame(
+                UUID.randomUUID(),
+                npc == null || npc.getRole() == null
+                        ? null
+                        : npc.getRole().getRoleName(),
+                ownerId,
+                resolveNpcUuid(npcRef, store)
+        );
     }
 
     private static void sendCapDenial(

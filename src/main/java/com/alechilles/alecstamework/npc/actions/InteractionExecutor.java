@@ -71,10 +71,13 @@ final class InteractionExecutor {
                     npcRef,
                     store,
                     player,
-                    (liveNpcRef, liveStore, livePlayer) -> {
+                    (liveNpcRef, liveStore, livePlayer, acquired) -> {
                         Role liveRole = effects.resolveLiveRole(liveNpcRef, liveStore, role);
                         InteractionContextSnapshot liveContext = effects.refreshContext(livePlayer, liveRole);
-                        effects.applyTameRoleChange(tame, liveNpcRef, liveRole, liveStore, liveContext);
+                        String targetRoleId = effects.resolveTameRoleId(
+                                tame, liveRole, liveContext);
+                        boolean roleChanged = effects.applyTameRoleChange(
+                                tame, liveNpcRef, liveRole, liveStore, liveContext);
                         if (livePlayer != null) {
                             feedHelper.consumeHeldItem(livePlayer, 1);
                         }
@@ -91,6 +94,18 @@ final class InteractionExecutor {
                                 liveContext,
                                 harvestInteraction
                         );
+                        if (acquired) {
+                            ActivityRuntime.publishTame(
+                                    UUID.randomUUID(),
+                                    roleChanged
+                                            ? targetRoleId
+                                            : liveRole == null
+                                                    ? null
+                                                    : liveRole.getRoleName(),
+                                    resolveOwnerId(liveNpcRef, liveStore),
+                                    resolveCompanionId(liveNpcRef, liveStore)
+                            );
+                        }
                         if (livePlayer != null) {
                             CommandAutoLinkResult autoLink = CommandAutoLinkService.autoLinkNewlyTamedNpc(
                                     livePlayer,

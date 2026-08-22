@@ -55,7 +55,7 @@ final class InteractionOwnerContinuationEffects {
     boolean applyStartTaming(@Nonnull Ref<EntityStore> npcRef,
                              @Nonnull Store<EntityStore> store,
                              @Nullable Player player,
-                             @Nullable InteractionStateEffects.OwnerAppliedContinuation continuation) {
+                             @Nullable InteractionStateEffects.TameAppliedContinuation continuation) {
         return stateEffects.applyStartTaming(npcRef, store, player, continuation);
     }
 

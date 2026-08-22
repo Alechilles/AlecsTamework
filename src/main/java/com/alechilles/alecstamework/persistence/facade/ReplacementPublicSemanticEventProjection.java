@@ -116,7 +116,7 @@ public final class ReplacementPublicSemanticEventProjection
         if (CaptureAttemptResolutionEventCodec.EVENT_TYPE.equals(
                 event.eventType()
         )) {
-            return mapCapture(event, emittedAtMs);
+            return mapCapture(event, context, emittedAtMs);
         }
         if (PaidRevivalEventCodec.EVENT_TYPE.equals(event.eventType())) {
             return PaidRevivalPublishedEventMapper.map(
@@ -157,6 +157,7 @@ public final class ReplacementPublicSemanticEventProjection
 
     private TameworkEvent mapCapture(
             ProjectionEvent event,
+            ProjectionPublicationContext context,
             long emittedAtMs
     ) {
         if (event.payloadVersion()
@@ -180,6 +181,9 @@ public final class ReplacementPublicSemanticEventProjection
             throw new IllegalArgumentException(
                     "capture_attempt_public_event_envelope_mismatch"
             );
+        }
+        if (context == ProjectionPublicationContext.LIVE_COMMIT) {
+            CaptureAttemptPublicEventMapper.publishTameActivity(resolved);
         }
         return CaptureAttemptPublicEventMapper.map(resolved, emittedAtMs);
     }

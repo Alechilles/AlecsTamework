@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModifyStatsEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.OwnerSource;
@@ -64,7 +65,7 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
     boolean applyStartTaming(Ref<EntityStore> npcRef,
                              Store<EntityStore> store,
                              Player player,
-                             @Nullable OwnerAppliedContinuation continuation) {
+                             @Nullable TameAppliedContinuation continuation) {
         ComponentType<EntityStore, TameworkOwnerComponent> ownerType =
                 TameworkOwnerComponent.getComponentType();
         if (isNewPlayerOwnershipAcquisitionDenied(
@@ -72,8 +73,13 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
         )) {
             return false;
         }
-        OwnerAppliedContinuation safeContinuation = continuation == null
-                ? OwnerAppliedContinuation.NOOP
+        TameworkOwnerComponent previousOwner = ownerType == null
+                ? null
+                : store.getComponent(npcRef, ownerType);
+        boolean wasWild = !TamedStateResolver.isTamed(npcRef, store)
+                && (previousOwner == null || previousOwner.getOwnerId() == null);
+        TameAppliedContinuation safeContinuation = continuation == null
+                ? TameAppliedContinuation.NOOP
                 : continuation;
         if (ownerType != null && player != null) {
             PlayerRef ref = player.getPlayerRef();
@@ -86,7 +92,16 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
             );
         }
         applyTameBundleAfterOwnership(npcRef, store);
-        safeContinuation.onApplied(npcRef, store, player);
+        TameworkOwnerComponent committedOwner = ownerType == null
+                ? null
+                : store.getComponent(npcRef, ownerType);
+        boolean acquired = wasWild
+                && player != null
+                && player.getUuid() != null
+                && committedOwner != null
+                && player.getUuid().equals(committedOwner.getOwnerId())
+                && TamedStateResolver.isTamed(npcRef, store);
+        safeContinuation.onApplied(npcRef, store, player, acquired);
         return true;
     }
 
@@ -264,6 +279,17 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
         void onApplied(Ref<EntityStore> npcRef,
                        Store<EntityStore> store,
                        @Nullable Player player);
+    }
+
+    @FunctionalInterface
+    interface TameAppliedContinuation {
+        TameAppliedContinuation NOOP = (npcRef, store, player, acquired) -> {
+        };
+
+        void onApplied(Ref<EntityStore> npcRef,
+                       Store<EntityStore> store,
+                       @Nullable Player player,
+                       boolean acquired);
     }
 
     private record ResolvedOwner(@Nullable UUID id, @Nullable String name) {
