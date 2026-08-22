@@ -37,7 +37,6 @@
     "projectId": "3145c0f3-a890-49b3-bc87-0648b8bd736c",
     "releaseChannel": "release",
     "gameVersions": [
-      "0.6.0-pre.12.2",
       "0.5.9",
       "0.5.8",
       "0.5.7"
@@ -62,7 +61,6 @@
     "releaseChannel": "release",
     "versionPrefix": "v",
     "gameVersions": [
-      "0.6.0-pre.12.2",
       "0.5.9",
       "0.5.8",
       "0.5.7"

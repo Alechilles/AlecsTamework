@@ -19,7 +19,8 @@
 - Large companion groups now spread needs work across world ticks and reuse
   resource snapshots, successful path checks, compiled settings, and bounded
   population searches.
-- Lowered the supported Hytale server floor from `0.5.7` to `0.5.0`.
+- The release manifest now supports stable Hytale versions from `0.5.0` up to,
+  but not including, `0.7.0`.
 
 ### Fixed
 
