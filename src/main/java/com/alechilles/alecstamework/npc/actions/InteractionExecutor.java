@@ -12,6 +12,8 @@ import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.items.CommandAutoLinkResult;
 import com.alechilles.alecstamework.items.CommandAutoLinkService;
+import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
+import com.alechilles.alecstamework.npc.progression.CompanionLevelingService.AwardResult;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -103,8 +105,8 @@ final class InteractionExecutor {
             FeedInteraction feed = (FeedInteraction) entry;
             double healAmount = feedHelper.resolveFeedHeal(feed, role, ctx);
             UUID operationId = UUID.randomUUID();
-            TameworkInteractEffects.FeedOutcome feedOutcome =
-                    effects.applyFeedingOutcome(npcRef, store, healAmount, player, ctx);
+            boolean applied = effects.applyFeeding(
+                    npcRef, store, healAmount, player, ctx);
             feedHelper.consumeHeldItem(player, 1);
             boolean customApplied = effects.applyCustomEffects(
                     interactionConfigId,
@@ -119,19 +121,21 @@ final class InteractionExecutor {
                     ctx,
                     harvestInteraction
             );
-            if (feedOutcome.applied()
-                    && isInteractingOwner(npcRef, store, player)) {
+            if (applied && isInteractingOwner(npcRef, store, player)) {
                 boolean careCredit = ActivityRuntime.tryAcquireCareCredit(npcRef, store);
+                AwardResult award = careCredit
+                        ? CompanionLevelingService.awardFeedXp(npcRef, store)
+                        : null;
                 ActivityRuntime.publishFeed(
                         operationId,
                         role == null ? null : role.getRoleName(),
                         resolveOwnerId(npcRef, store),
                         resolveCompanionId(npcRef, store),
-                        feedOutcome.award(),
+                        award,
                         careCredit
                 );
             }
-            return feedOutcome.applied() | customApplied;
+            return applied | customApplied;
         }
         if (entry instanceof HarvestInteraction) {
             effects.logHarvestExecution("selected", interactionConfigId, interactionIndex, role, ctx);
@@ -140,6 +144,7 @@ final class InteractionExecutor {
                 return false;
             }
             effects.logHarvestExecution("cooldown-ready", interactionConfigId, interactionIndex, role, ctx);
+            UUID operationId = UUID.randomUUID();
             TameworkInteractEffects.HarvestContainerOutcome containerOutcome =
                     effects.applyHarvestContainerTransform(npcRef, store, role, player, ctx);
             if (containerOutcome.result == TameworkInteractEffects.HarvestContainerResult.FAILED) {
@@ -178,6 +183,19 @@ final class InteractionExecutor {
                     ctx,
                     harvestInteraction
             );
+            if (containerOutcome.result == TameworkInteractEffects.HarvestContainerResult.APPLIED
+                    && isInteractingOwner(npcRef, store, player)) {
+                AwardResult award = CompanionLevelingService.awardHarvestXp(npcRef, store);
+                publishContainerHarvest(
+                        operationId,
+                        role == null ? null : role.getRoleName(),
+                        resolveHarvestContext(role, ctx),
+                        resolveOwnerId(npcRef, store),
+                        resolveCompanionId(npcRef, store),
+                        containerOutcome,
+                        award
+                );
+            }
             return true | customApplied;
         }
         if (entry instanceof MountInteraction) {
@@ -246,6 +264,30 @@ final class InteractionExecutor {
             ) | applied;
         }
         return false;
+    }
+
+    void publishContainerHarvest(
+            UUID operationId,
+            String roleId,
+            String harvestContext,
+            UUID ownerId,
+            UUID companionId,
+            TameworkInteractEffects.HarvestContainerOutcome outcome,
+            AwardResult award
+    ) {
+        if (outcome == null
+                || outcome.result != TameworkInteractEffects.HarvestContainerResult.APPLIED) {
+            return;
+        }
+        ActivityRuntime.publishHarvest(
+                operationId,
+                roleId,
+                harvestContext,
+                ownerId,
+                companionId,
+                outcome.itemQuantities,
+                award
+        );
     }
 
     private boolean isInteractingOwner(

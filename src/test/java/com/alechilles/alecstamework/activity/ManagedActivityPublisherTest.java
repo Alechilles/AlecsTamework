@@ -10,11 +10,13 @@ import com.alechilles.alecstamework.api.ActivityParticipantView;
 import com.alechilles.alecstamework.api.ActivityView;
 import com.alechilles.alecstamework.api.CareCreditOutcomeView;
 import com.alechilles.alecstamework.api.ManagedActivityView;
+import com.alechilles.alecstamework.api.CompanionXpSource;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
 import com.alechilles.alecstamework.config.assets.TwManagedActivityConfig;
 import com.alechilles.alecstamework.config.assets.TwPopulationGroupConfig;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegistry;
+import com.alechilles.alecstamework.npc.progression.CompanionXpTransition;
 import com.hypixel.hytale.codec.ExtraInfo;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -22,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
@@ -135,6 +138,67 @@ class ManagedActivityPublisherTest {
                 breeding.participants()
         );
         assertEquals(List.of(offspring), breeding.offspringIds());
+    }
+
+    @Test
+    void publishesRepeatedFeedButCreditsOnlyTheFirstDuringCooldown() throws Exception {
+        List<ActivityView> published = new ArrayList<>();
+        ManagedActivityPublisher publisher = new ManagedActivityPublisher(
+                published::add,
+                managedRegistry()
+        );
+        AtomicBoolean available = new AtomicBoolean(true);
+        CompanionCareCreditService credits = new CompanionCareCreditService(
+                (companionId, ownerId) -> available.compareAndSet(true, false)
+        );
+        CompanionXpTransition transition = feedTransition();
+
+        boolean firstCredit = credits.tryAcquire(COMPANION, OWNER);
+        publisher.publishFeed(
+                UUID.randomUUID(), "RoleA", OWNER, COMPANION, Map.of(),
+                transition,
+                firstCredit ? new CareCreditOutcomeView(COMPANION, OWNER) : null
+        );
+        boolean secondCredit = credits.tryAcquire(COMPANION, OWNER);
+        publisher.publishFeed(
+                UUID.randomUUID(), "RoleA", OWNER, COMPANION, Map.of(),
+                null,
+                secondCredit ? new CareCreditOutcomeView(COMPANION, OWNER) : null
+        );
+
+        assertEquals(2, published.size());
+        ManagedActivityView first = assertInstanceOf(
+                ManagedActivityView.class, published.get(0));
+        ManagedActivityView second = assertInstanceOf(
+                ManagedActivityView.class, published.get(1));
+        assertEquals(transition.toOutcomeView(), first.companionXpOutcome());
+        assertEquals(new CareCreditOutcomeView(COMPANION, OWNER), first.careCreditOutcome());
+        assertNull(second.companionXpOutcome());
+        assertNull(second.careCreditOutcome());
+    }
+
+    private static CompanionXpTransition feedTransition() {
+        return new CompanionXpTransition(
+                COMPANION,
+                OWNER,
+                Set.of(),
+                "RoleA",
+                "runeteria:levels",
+                CompanionXpSource.FEED,
+                2.0,
+                1,
+                2,
+                3.0,
+                5.0,
+                0.0,
+                2.0,
+                10.0,
+                20,
+                false,
+                true,
+                1L,
+                1L
+        );
     }
 
     private static ManagedActivityConfigRegistry managedRegistry() throws Exception {

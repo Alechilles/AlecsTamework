@@ -9,6 +9,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.Map;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -121,7 +122,14 @@ final class InteractionHarvestEffects {
         }
         logContainer(role, context, HarvestContainerResult.APPLIED,
                 bucketOutput, decoBucketOutput, bonusMode, preserveCooldown);
-        return new HarvestContainerOutcome(HarvestContainerResult.APPLIED, preserveCooldown);
+        String outputItem = CONTAINER_BUCKET_ITEM_ID.equalsIgnoreCase(activeItem)
+                ? bucketOutput
+                : decoBucketOutput;
+        return new HarvestContainerOutcome(
+                HarvestContainerResult.APPLIED,
+                preserveCooldown,
+                Map.of(outputItem, 1)
+        );
     }
 
     private boolean transformHeldContainer(Player player,

@@ -80,6 +80,26 @@ class TameworkApiV011ContractTest {
         assertEquals(Set.of("family:cow"), activity.groupIds());
         assertEquals(Map.of("Item_Milk", 2), activity.itemQuantities());
 
+        NeedSatisfiedActivityView need = new NeedSatisfiedActivityView(
+                new ActivityHeader(UUID.randomUUID(), ActivityIds.NEED_SATISFIED, Instant.now()),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                " runeteria:husbandry ",
+                Set.of(" family:cow "),
+                " Cow_Role ",
+                "runeteria:husbandry/feed",
+                "hunger",
+                "container",
+                "Food_Wheat",
+                20.0,
+                40.0,
+                20.0
+        );
+        assertEquals("runeteria:husbandry", need.profileId());
+        assertEquals(Set.of("family:cow"), need.groupIds());
+        assertEquals("Cow_Role", need.roleId());
+        assertEquals("runeteria:husbandry/feed", need.mappedActivityId());
+
         PopulationAdmissionProviderRequest providerRequest =
                 new PopulationAdmissionProviderRequest(
                         "provider:test",
