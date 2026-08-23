@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.activity.ActivityRuntime;
+import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.debug.CompanionXpEventDebugLogService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService.AwardResult;
@@ -62,6 +63,7 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
                 ? duplicateDrops(baseDrops)
                 : baseDrops;
         UUID operationId = UUID.randomUUID();
+        String activityContext = resolveActivityContext(role, awardXp);
 
         ModelComponent modelComponent = store.getComponent(ref, ModelComponent.getComponentType());
         float eyeHeight = modelComponent != null ? modelComponent.getModel().getEyeHeight(ref, store) : 0.0F;
@@ -83,7 +85,7 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
             ActivityRuntime.publishHarvest(
                     operationId,
                     role == null ? null : role.getRoleName(),
-                    null,
+                    activityContext,
                     ActivityRuntime.resolveOwnerId(ref, store),
                     ActivityRuntime.resolveCompanionId(ref, store),
                     quantities(drops),
@@ -93,7 +95,7 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
             ActivityRuntime.publishHarvest(
                     operationId,
                     role == null ? null : role.getRoleName(),
-                    null,
+                    activityContext,
                     ActivityRuntime.resolveOwnerId(ref, store),
                     ActivityRuntime.resolveCompanionId(ref, store),
                     quantities(drops),
@@ -106,6 +108,19 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
                     + " dropList=" + valueOrNull(this.dropList));
         }
         return true;
+    }
+
+    @Nullable
+    static String resolveActivityContext(@Nullable Role role, boolean manualHarvest) {
+        if (!manualHarvest || role == null) {
+            return null;
+        }
+        TwGlobalConfig global = TwGlobalConfig.resolveActive();
+        String paramName = global == null
+                ? "HarvestInteractionContext"
+                : global.getHarvestContextParam();
+        return new InteractionParamResolver(null, null, null)
+                .getStringParam(role, null, paramName);
     }
 
     private Map<String, Integer> quantities(List<ItemStack> drops) {
