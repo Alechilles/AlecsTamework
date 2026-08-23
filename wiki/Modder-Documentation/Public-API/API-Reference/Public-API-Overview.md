@@ -41,7 +41,8 @@ authorize optional behavior.
 - `bondedCompanions()` for the separate three-state profile, temporary lease,
   paid revive, capture-evidence, and namespaced extension-data authority; and
 - `commandUi()` for registered Java command-menu providers with detached
-  snapshots, opaque Tamework action handles, and partial UI updates.
+  snapshots, opaque Tamework action handles, partial UI updates, and optional
+  managed group and talent flows.
 
 The current capability enum contains `PROFILES`, `COMMAND_LINKS`,
 `PROGRESSION`, `PROGRESSION_MUTATIONS`, `POLICY`,
@@ -51,7 +52,8 @@ The current capability enum contains `PROFILES`, `COMMAND_LINKS`,
 `COMPANION_PROVISIONING`, `COMMAND_TIMED_SUMMONING`,
 `PAID_COMMAND_REVIVAL`, `COMMAND_FAMILY_ROSTERS`,
 `CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION`, `CAPTURE_TAME_AND_LINK`, and
-`BONDED_COMPANIONS`, and `COMMAND_UI_PROVIDERS`. The separate bonded surface advertises its capability only
+`BONDED_COMPANIONS`, `COMMAND_UI_PROVIDERS`, and
+`COMMAND_UI_MANAGED_FLOWS`. The separate bonded surface advertises its capability only
 when its own database and runtime are ready.
 
 ## Bonded companion boundary

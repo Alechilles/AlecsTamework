@@ -61,6 +61,23 @@ The readiness-gated persistence capabilities are:
 | `CAPTURE_TAME_AND_LINK` | successful capture tame/link contract |
 | `PERSISTENCE_RESILIENCE` | replacement persistence health and resilience |
 
+Command UI features use two separate capabilities:
+
+```java
+EnumSet<TameworkApiCapability> requiredUi = EnumSet.of(
+        TameworkApiCapability.COMMAND_UI_PROVIDERS,
+        TameworkApiCapability.COMMAND_UI_MANAGED_FLOWS
+);
+if (!capabilities.containsAll(requiredUi)) {
+    return; // Keep the provider inactive and use Tamework's standard UI.
+}
+```
+
+`COMMAND_UI_PROVIDERS` supplies registration, snapshots, opaque main actions,
+and partial updates. `COMMAND_UI_MANAGED_FLOWS` adds bounded text requests and
+detached group and talent flows. A provider that needs only the original main
+page can check only `COMMAND_UI_PROVIDERS`.
+
 Capabilities can become available after startup readiness completes or become
 unavailable when their own persistence scope is quarantined. Resolve the
 capability and API for each player action; do not cache startup availability as

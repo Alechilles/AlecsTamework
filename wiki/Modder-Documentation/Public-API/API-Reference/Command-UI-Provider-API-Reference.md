@@ -8,10 +8,10 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Experimental API Contract (`0.9.0`)**
+> **Experimental API Contract (`0.11.0`)**
 > This reference tracks the current `commandUi()` contract in `TameworkApi`.
 
-Capability: `COMMAND_UI_PROVIDERS`
+Capabilities: `COMMAND_UI_PROVIDERS` and `COMMAND_UI_MANAGED_FLOWS`
 
 ## Entry Point
 
@@ -110,9 +110,11 @@ Version 1 exposes only Tamework-defined actions. Each enabled
 `CommandUiActionHandle`.
 
 Pass only that token through the provider event payload. Call
-`CommandUiSession.invoke(handle)` or `handleEvent(CommandUiEvent)`. Do not send
-a target, route, owner, roster, profile, or cost from the client. Tamework
-holds that authority and validates it again in the player's current world.
+`CommandUiSession.invoke(handle)` for a handle-only action. Call
+`session.invoke(new CommandUiActionRequest(handle, textInput))` when an issued
+action accepts text. Do not send a target, action kind, route, owner, roster,
+profile, or cost from the client. Tamework holds that authority and validates
+it again in the player's current world.
 
 `CommandUiActionStatus` values are `APPLIED`, `ACCEPTED`,
 `CONFIRMATION_REQUIRED`, `DENIED`, `STALE`, `NOT_FOUND`, `UNAVAILABLE`,
@@ -123,6 +125,28 @@ return a new confirmation handle. Invoke that new handle only after the
 provider shows its confirmation flow. A canceled or expired confirmation does
 not consume the initiating action. The provider can start a new confirmation
 flow from the same visible action.
+
+## Managed Group and Talent Flows
+
+Require `COMMAND_UI_MANAGED_FLOWS` before you depend on custom group or talent
+pages. An action result can contain one detached `flowView()`:
+
+- `CommandUiGroupFlowView` has complete group rows, colors, active selection,
+  create, rename, recolor, delete, select-all, and select-none actions.
+- `CommandUiTalentFlowView` has companion identity, level and point summaries,
+  reset, and complete talent-node presentation and purchase actions.
+
+The provider selects a layout. Tamework supplies every action and remains the
+authority for targets, costs, prerequisites, ownership, revisions, and
+mutations. A successful managed mutation returns a new flow view. Replace the
+old local flow with it. If `refreshSnapshot()` is true, Tamework also schedules
+a new main command snapshot.
+
+Text input is action-specific and bounded by Tamework before authority checks.
+Group names accept at most 24 characters. Group colors use `#RRGGBB`. Filter
+text uses the panel filter limit. A handle that does not accept text rejects
+injected text. Reset and delete operations return a confirmation handle before
+they mutate state.
 
 ## Session and Cleanup
 
@@ -135,7 +159,9 @@ provider-local partial UI update. The host always forces partial submission to
 `clear=false`.
 
 Tamework invalidates all handles when the session closes, the provider
-generation ends, authority is lost, or an action generation changes.
+generation ends, or authority is lost. Main snapshot handles also expire when
+their action generation changes. Managed-flow handles survive main snapshot
+refreshes, but expire when a newer managed flow replaces them.
 
 ## Asset Selection
 

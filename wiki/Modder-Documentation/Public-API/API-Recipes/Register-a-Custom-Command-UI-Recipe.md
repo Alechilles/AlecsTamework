@@ -19,8 +19,10 @@ Keep the registration handle as plugin state.
 private CommandUiProviderRegistration commandUiRegistration;
 
 void registerCommandUi(TameworkApi api) {
-    if (!api.getCapabilities().contains(
-            TameworkApiCapability.COMMAND_UI_PROVIDERS)) {
+    EnumSet<TameworkApiCapability> required = EnumSet.of(
+            TameworkApiCapability.COMMAND_UI_PROVIDERS,
+            TameworkApiCapability.COMMAND_UI_MANAGED_FLOWS);
+    if (!api.getCapabilities().containsAll(required)) {
         return;
     }
 
@@ -116,8 +118,16 @@ final class HusbandryCommandPage
             CommandUiSession session,
             CommandUiSnapshot snapshot
     ) {
-        session.handleEvent(new CommandUiEvent(
-                "runeteria:action", event.actionToken));
+        CommandUiActionHandle handle =
+                new CommandUiActionHandle(event.actionToken);
+        CommandUiActionRequest request = new CommandUiActionRequest(
+                handle, event.inputProvided ? event.textInput : null);
+        session.invoke(request).thenAccept(result -> {
+            UICommandBuilder commands = new UICommandBuilder();
+            UIEventBuilder events = new UIEventBuilder();
+            renderResult(result, commands, events);
+            session.updateSink().submit(commands, events, false);
+        });
     }
 
     static final class EventPayload {
@@ -128,15 +138,30 @@ final class HusbandryCommandPage
                         (event, value) -> event.actionToken = value,
                         event -> event.actionToken)
                 .add()
+                .<String>append(
+                        new KeyedCodec<>("TextInput", Codec.STRING),
+                        (event, value) -> event.textInput = value,
+                        event -> event.textInput)
+                .add()
+                .<Boolean>append(
+                        new KeyedCodec<>("InputProvided", Codec.BOOLEAN),
+                        (event, value) -> event.inputProvided = value,
+                        event -> event.inputProvided)
+                .add()
                 .build();
 
         String actionToken;
+        String textInput = "";
+        boolean inputProvided;
     }
 }
 ```
 
 When you bind a button, put only `action.handle().token()` in its
 `ActionToken` event value. Disabled actions have no usable handle.
+
+Set `InputProvided` only for actions that accept text. Tamework rejects all
+text, including an empty string, on a handle-only action.
 
 ## 4. Render small changes
 
@@ -173,6 +198,29 @@ handles expire after five seconds.
 Treat `APPLIED` as a confirmed state change. Treat `ACCEPTED` as a successful
 dispatch whose callback did not report whether it changed state. In both
 cases, use the next Tamework snapshot as the source of visible state.
+
+## 6. Render managed flows
+
+Inspect `result.flowView()` after invocation. Keep this navigation local to the
+provider page:
+
+```java
+CommandUiFlowView flow = result.flowView();
+if (flow instanceof CommandUiGroupFlowView groups) {
+    renderGroups(groups, commands, events);
+} else if (flow instanceof CommandUiTalentFlowView talents) {
+    renderTalents(talents, commands, events);
+}
+```
+
+Use only the handles in the returned flow. Create and rename actions accept a
+group-name value. Recolor accepts `#RRGGBB`. Purchase, selection, and ordinary
+navigation actions accept no text. Reset and delete use the same confirmation
+rule as main command actions.
+
+Each managed mutation returns a fresh flow and retires the older managed
+handles. Back navigation can show the retained main command snapshot. Main
+snapshot refreshes do not invalidate the current managed flow.
 
 ## Notes
 
