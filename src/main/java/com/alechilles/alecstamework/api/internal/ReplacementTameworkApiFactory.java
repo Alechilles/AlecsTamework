@@ -62,7 +62,8 @@ public final class ReplacementTameworkApiFactory {
                 interactionExtensions,
                 traitEffects,
                 damagePolicy,
-                new ReplacementPersistenceDiagnosticsApi(persistence)
+                new ReplacementPersistenceDiagnosticsApi(persistence),
+                new CommandUiProviderRegistry()
         );
     }
 
@@ -123,7 +124,8 @@ public final class ReplacementTameworkApiFactory {
                 interactionExtensions,
                 traitEffects,
                 damagePolicy,
-                diagnostics
+                diagnostics,
+                new CommandUiProviderRegistry()
         );
         PopulationGroupApi populationGroups =
                 dependencies.populationGroups() == null
@@ -209,7 +211,8 @@ public final class ReplacementTameworkApiFactory {
             InteractionExtensionApi interactionExtensions,
             TraitEffectApi traitEffects,
             SimpleClaimsTamedDamagePolicy damagePolicy,
-            DiagnosticsApi diagnostics
+            DiagnosticsApi diagnostics,
+            CommandUiProviderRegistry commandUiProviderRegistry
     ) {
         if (persistence == null || readTimeout == null || clock == null) {
             throw new IllegalArgumentException(
@@ -229,7 +232,8 @@ public final class ReplacementTameworkApiFactory {
                 snapshots,
                 interactionExtensions,
                 traitEffects,
-                damagePolicy
+                damagePolicy,
+                commandUiProviderRegistry
         );
     }
 

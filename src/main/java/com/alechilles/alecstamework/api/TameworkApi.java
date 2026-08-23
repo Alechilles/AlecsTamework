@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.api;
 
+import com.alechilles.alecstamework.api.commandui.CommandUiApi;
 import java.util.EnumSet;
 
 public interface TameworkApi {
@@ -58,6 +59,16 @@ public interface TameworkApi {
     /** Returns the separate bonded-companion authority when advertised. */
     default BondedCompanionApi bondedCompanions() {
         return BondedCompanionApi.unavailable();
+    }
+
+    /**
+     * Returns the optional command-menu provider registration facade.
+     *
+     * <p>This default keeps source and binary compatibility with API
+     * implementations compiled before command UI providers existed.</p>
+     */
+    default CommandUiApi commandUi() {
+        return CommandUiApi.unavailable();
     }
 }
 

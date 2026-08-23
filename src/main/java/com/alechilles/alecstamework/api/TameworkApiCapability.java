@@ -30,6 +30,8 @@ public enum TameworkApiCapability {
     /** Successful capture can tame the live NPC and commit command-roster membership. */
     CAPTURE_TAME_AND_LINK,
     /** Separate canonical profile, lease, revive, and extension-data authority. */
-    BONDED_COMPANIONS
+    BONDED_COMPANIONS,
+    /** External command-menu providers can register with the live runtime. */
+    COMMAND_UI_PROVIDERS
 }
 
