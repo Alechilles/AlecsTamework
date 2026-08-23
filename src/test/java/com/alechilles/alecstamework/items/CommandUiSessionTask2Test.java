@@ -14,8 +14,10 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -146,6 +148,53 @@ class CommandUiSessionTask2Test {
         assertEquals(CommandUiActionStatus.STALE,
                 session.invoke(canceled.confirmationHandle())
                         .toCompletableFuture().join().status());
+        session.close();
+    }
+
+    @Test
+    void concurrentSiblingConfirmationsApplyOnlyOnce() throws Exception {
+        UUID sessionId = UUID.randomUUID();
+        CommandUiSessionImpl session = session(sessionId,
+                CommandUiSessionImpl.Mode.GENERIC,
+                new CommandUiActionGateway(), 4L);
+        AtomicInteger mutations = new AtomicInteger();
+        AtomicBoolean synchronizeConfirmations = new AtomicBoolean();
+        CountDownLatch confirmationsReady = new CountDownLatch(2);
+        var handle = session.issueGeneric(
+                new CommandUiAction("ABANDON", UUID.randomUUID(), null, true),
+                () -> {
+                    if (!synchronizeConfirmations.get()) return true;
+                    confirmationsReady.countDown();
+                    try {
+                        return confirmationsReady.await(5L, TimeUnit.SECONDS);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        return false;
+                    }
+                },
+                () -> {
+                    mutations.incrementAndGet();
+                    return CompletableFuture.completedFuture(
+                            CommandUiActionResult.applied());
+                }, true);
+        var first = session.invoke(handle).toCompletableFuture().join();
+        var second = session.invoke(handle).toCompletableFuture().join();
+        synchronizeConfirmations.set(true);
+
+        try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+            var left = executor.submit(() -> session.invoke(
+                    first.confirmationHandle()).toCompletableFuture().join());
+            var right = executor.submit(() -> session.invoke(
+                    second.confirmationHandle()).toCompletableFuture().join());
+            List<CommandUiActionStatus> statuses = List.of(
+                    left.get().status(), right.get().status());
+
+            assertEquals(1, statuses.stream().filter(
+                    status -> status == CommandUiActionStatus.APPLIED).count());
+            assertEquals(1, statuses.stream().filter(
+                    status -> status == CommandUiActionStatus.STALE).count());
+            assertEquals(1, mutations.get());
+        }
         session.close();
     }
 

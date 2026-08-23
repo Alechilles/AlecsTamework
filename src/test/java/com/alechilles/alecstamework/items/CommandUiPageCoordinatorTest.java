@@ -79,6 +79,30 @@ class CommandUiPageCoordinatorTest {
         assertEquals(1, controller.closeCount);
     }
 
+    @Test
+    void providerSessionCloseCleansHostWhenWorldDispatchIsRejected() {
+        CommandUiProviderRegistry registry = new CommandUiProviderRegistry();
+        RecordingController controller = new RecordingController();
+        registry.register("runeteria:husbandry", ignored -> controller);
+        CommandUiPageCoordinator coordinator = new CommandUiPageCoordinator(
+                registry, new CommandSelectionPageService(
+                        null, null, null, null, null));
+        PlayerRef playerRef = new PlayerRef(
+                null, UUID.randomUUID(), "CoordinatorTester", "en-US", null, null);
+        CommandUiOpenContext context = new CommandUiOpenContext(
+                playerRef.getUuid(), "en-US", "tool-1", "config-1",
+                CommandUiProviderId.of("runeteria:husbandry"), "generic");
+        CommandUiPageCoordinator.Created created = coordinator.create(
+                playerRef, context, snapshot(), RecordingController::new,
+                List.of(), List.of(), (current, handles) -> current,
+                (ignoredUuid, ignoredOperation) -> false, ignored -> { });
+
+        created.session().close();
+
+        assertFalse(created.host().isOpen());
+        assertEquals(1, controller.closeCount);
+    }
+
     private static CommandUiHostPage.WorldDispatcher directDispatcher() {
         return (playerUuid, operation) -> {
             operation.run(null, null);

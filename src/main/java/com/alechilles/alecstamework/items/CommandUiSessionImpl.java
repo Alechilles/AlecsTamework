@@ -50,6 +50,7 @@ final class CommandUiSessionImpl implements CommandUiSession {
     private final AtomicReference<CommandUiSnapshot> currentSnapshot;
     private final AtomicReference<State> state = new AtomicReference<>(State.OPEN);
     private final AtomicBoolean actionRebindRequired = new AtomicBoolean();
+    private final AtomicBoolean closeEffectsStarted = new AtomicBoolean();
     private final CommandUiUpdateSink updateSink;
 
     CommandUiSessionImpl(
@@ -344,27 +345,27 @@ final class CommandUiSessionImpl implements CommandUiSession {
         if (!state.compareAndSet(State.OPEN, State.CLOSING)) return;
         try {
             CompletionStage<?> queued = dispatcher.dispatch(() -> {
-                actionGateway.closeSession(sessionId);
-                try {
-                    closeCallback.accept(reason);
-                } catch (RuntimeException | LinkageError ignored) {
-                    // Provider cleanup must not leave the session half-closed.
-                } finally {
-                    state.set(State.CLOSED);
-                }
+                finishClose(reason);
                 return null;
             });
             queued.whenComplete((ignored, failure) -> {
-                if (failure != null) finishCloseAfterDispatchFailure();
+                if (failure != null) finishClose(reason);
             });
         } catch (RuntimeException | LinkageError ignored) {
-            finishCloseAfterDispatchFailure();
+            finishClose(reason);
         }
     }
 
-    private void finishCloseAfterDispatchFailure() {
+    private void finishClose(CommandUiCloseReason reason) {
+        if (!closeEffectsStarted.compareAndSet(false, true)) return;
         actionGateway.closeSession(sessionId);
-        state.set(State.CLOSED);
+        try {
+            closeCallback.accept(reason);
+        } catch (RuntimeException | LinkageError ignored) {
+            // Provider cleanup must not leave the session half-closed.
+        } finally {
+            state.set(State.CLOSED);
+        }
     }
 
     @Nonnull

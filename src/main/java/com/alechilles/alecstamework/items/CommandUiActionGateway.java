@@ -176,6 +176,12 @@ final class CommandUiActionGateway {
             return completed(CommandUiActionResult.stale(
                     "command UI action handle was already used"));
         }
+        if (binding.confirmationToken
+                && !binding.confirmationFamilyConsumed.compareAndSet(false, true)) {
+            bindings.remove(handle.token(), binding);
+            return completed(CommandUiActionResult.stale(
+                    "command UI confirmation was already used"));
+        }
 
         if (binding.requiresConfirmation && !binding.confirmationToken) {
             binding.consumed.set(false);
@@ -190,7 +196,8 @@ final class CommandUiActionGateway {
                     false,
                     true,
                     System.nanoTime() + CONFIRMATION_LIFETIME.toNanos(),
-                    handle.token()
+                    handle.token(),
+                    binding.confirmationFamilyConsumed
             );
             return completed(CommandUiActionResult.confirmationRequired(
                     confirmation, "confirmation required", null));
@@ -258,14 +265,16 @@ final class CommandUiActionGateway {
             boolean confirmationRequired,
             boolean confirmationToken,
             long expiresAtNanos,
-            @Nullable String initiatingToken
+            @Nullable String initiatingToken,
+            AtomicBoolean confirmationFamilyConsumed
     ) {
         CommandUiActionHandle handle = new CommandUiActionHandle(
                 UUID.randomUUID().toString());
         bindings.put(handle.token(), new Binding(
                 sessionId, route, action, generation, providerGeneration,
                 authority, executor, confirmationRequired,
-                confirmationToken, expiresAtNanos, initiatingToken));
+                confirmationToken, expiresAtNanos, initiatingToken,
+                confirmationFamilyConsumed, new AtomicBoolean()));
         return handle;
     }
 
@@ -315,6 +324,7 @@ final class CommandUiActionGateway {
             boolean confirmationToken,
             long expiresAtNanos,
             @Nullable String initiatingToken,
+            AtomicBoolean confirmationFamilyConsumed,
             AtomicBoolean consumed
     ) {
         private Binding(
@@ -333,7 +343,7 @@ final class CommandUiActionGateway {
             this(sessionId, route, action, generation, providerGeneration,
                     authority, executor,
                     requiresConfirmation, confirmationToken, expiresAtNanos,
-                    initiatingToken, new AtomicBoolean());
+                    initiatingToken, new AtomicBoolean(), new AtomicBoolean());
         }
     }
 }
