@@ -52,7 +52,12 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer;
 import com.hypixel.hytale.server.core.io.PacketHandler;
 import com.hypixel.hytale.server.core.io.ProtocolVersion;
+import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
+import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.Universe;
+import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
+import com.hypixel.hytale.server.core.modules.entity.EntityModule;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.lang.reflect.Field;
@@ -447,6 +452,11 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
             destinationPlayer.setLegacyUUID(OWNER);
             destinationPlayer.loadIntoWorld(destinationWorld);
             destinationPlayer.setReference(destinationRef);
+            PlayerRef destinationUiRef = playerRef();
+            putObject(destinationUiRef, PlayerRef.class, "entity", destinationRef);
+            putObject(destinationPlayer, Player.class, "playerRef", destinationUiRef);
+            ComponentType<EntityStore, Player> playerType = new ComponentType<>();
+            destinationStore.put(destinationRef, playerType, destinationPlayer);
 
             AtomicReference<BondedCompanionActionRequest> captured = new AtomicReference<>();
             AtomicReference<Store<EntityStore>> resolvedStore = new AtomicReference<>();
@@ -463,6 +473,8 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
 
             ItemStack horn = commandStack("test:horn", "horn-tool");
             installInventory(sourcePlayer, horn);
+            installInventory(destinationPlayer,
+                    commandStack("test:horn", "horn-tool"));
             BondedCompanionApi api = recordingApi(captured);
             BondedCompanionPanelEntrySourceService bondedSource =
                     new BondedCompanionPanelEntrySourceService(
@@ -484,12 +496,14 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                         authorityPlayer.set(currentPlayer);
                         return currentPlayer == destinationPlayer;
                     });
-            refresh(page);
-
-            page.handleDataEvent(destinationRef, destinationStore, event(
-                    "__roster_dismiss__:" +
-                            BondedCompanionPanelRecordSource.presentationUuid(
-                                    "profile-7")));
+            try (AutoCloseable ignored = installRuntime(
+                    destinationUiRef, playerType)) {
+                refresh(page);
+                page.handleDataEvent(destinationRef, destinationStore, event(
+                        "__roster_dismiss__:" +
+                                BondedCompanionPanelRecordSource.presentationUuid(
+                                        "profile-7")));
+            }
 
             assertSame(destinationStore, resolvedStore.get());
             assertNotSame(sourceStore, resolvedStore.get());
@@ -498,6 +512,75 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
             assertNotNull(captured.get());
             assertEquals(destinationWorld.getName(), captured.get().worldKey());
             assertNotSame(sourceRef, destinationPlayer.getReference());
+        }
+    }
+
+    @Test
+    void transferredStandardPageReadsPanelStateFromCurrentPlayer()
+            throws Exception {
+        TestWorld sourceWorld = (TestWorld) unsafe().allocateInstance(TestWorld.class);
+        TestWorld destinationWorld = (TestWorld) unsafe().allocateInstance(TestWorld.class);
+        TestEntityStore sourceEntityStore = new TestEntityStore(sourceWorld);
+        TestEntityStore destinationEntityStore = new TestEntityStore(destinationWorld);
+        try (TestEntityComponentStore sourceStore =
+                     new TestEntityComponentStore(sourceEntityStore);
+             TestEntityComponentStore destinationStore =
+                     new TestEntityComponentStore(destinationEntityStore)) {
+            sourceEntityStore.store = sourceStore;
+            destinationEntityStore.store = destinationStore;
+            Ref<EntityStore> sourceRef = sourceStore.createReference();
+            Ref<EntityStore> destinationRef = destinationStore.createReference();
+            Player sourcePlayer = (Player) unsafe().allocateInstance(Player.class);
+            sourcePlayer.setLegacyUUID(OWNER);
+            sourcePlayer.loadIntoWorld(sourceWorld);
+            sourcePlayer.setReference(sourceRef);
+            PlayerRef sourceUiRef = playerRef();
+            putObject(sourcePlayer, Player.class, "playerRef", sourceUiRef);
+            Player destinationPlayer = (Player) unsafe().allocateInstance(Player.class);
+            destinationPlayer.setLegacyUUID(OWNER);
+            destinationPlayer.loadIntoWorld(destinationWorld);
+            destinationPlayer.setReference(destinationRef);
+            PlayerRef destinationUiRef = playerRef();
+            putObject(destinationUiRef, PlayerRef.class, "entity", destinationRef);
+            putObject(destinationPlayer, Player.class, "playerRef", destinationUiRef);
+            ComponentType<EntityStore, Player> playerType = new ComponentType<>();
+            destinationStore.put(destinationRef, playerType, destinationPlayer);
+
+            ItemStack sourceTool = metadataCommandStack(
+                    "test:horn", "horn-tool").withMetadata(
+                    com.alechilles.alecstamework.config.TameworkMetadataKeys
+                            .COMMAND_PANEL_MODE,
+                    Codec.STRING, "NearbyMode");
+            ItemStack destinationTool = metadataCommandStack(
+                    "test:horn", "horn-tool").withMetadata(
+                    com.alechilles.alecstamework.config.TameworkMetadataKeys
+                            .COMMAND_PANEL_MODE,
+                    Codec.STRING, "LinkedMode");
+            installInventory(sourcePlayer, sourceTool);
+            installInventory(destinationPlayer, destinationTool);
+            CommandPanelPreferenceService preferences =
+                    new CommandPanelPreferenceService();
+            CommandToolInventoryService tools = new CommandToolInventoryService(
+                    null, null, preferences, null);
+            CommandSelectionPageService service = new CommandSelectionPageService(
+                    tools, new CommandGroupAssignPageService(null, tools, null),
+                    null, null, null);
+            TameworkCommandSelectionPage page = createBoundPage(
+                    service, sourcePlayer, sourceStore, emptyCommandConfig(),
+                    sourceTool, () -> true, ignored -> true);
+            UICommandBuilder commands = new UICommandBuilder();
+
+            try (AutoCloseable ignored = installRuntime(
+                    destinationUiRef, playerType)) {
+                page.build(destinationRef, commands, new UIEventBuilder(),
+                        destinationStore);
+            }
+
+            assertTrue(java.util.Arrays.stream(commands.getCommands()).anyMatch(
+                    command -> "#TameworkLinkedPanelModeDropdown.Value"
+                            .equals(command.selector)
+                            && command.data.contains("LinkedMode")),
+                    () -> java.util.Arrays.toString(commands.getCommands()));
         }
     }
 
@@ -539,9 +622,13 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
             Ref<EntityStore> actor = store.createReference();
             Player player = (Player) unsafe().allocateInstance(Player.class);
             player.setLegacyUUID(OWNER);
-            putObject(player, Player.class, "playerRef", playerRef());
+            PlayerRef uiPlayerRef = playerRef();
+            putObject(uiPlayerRef, PlayerRef.class, "entity", actor);
+            putObject(player, Player.class, "playerRef", uiPlayerRef);
             player.loadIntoWorld(world);
             player.setReference(actor);
+            ComponentType<EntityStore, Player> playerType = new ComponentType<>();
+            store.put(actor, playerType, player);
             AtomicReference<BondedCompanionActionRequest> captured = new AtomicReference<>();
             BondedCompanionApi api = recordingApi(captured);
             BondedCompanionPanelActionRouter router = new BondedCompanionPanelActionRouter(
@@ -569,15 +656,17 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                     null, panelSource, new CommandPanelPreferenceService(), null);
             CommandSelectionPageService service = new CommandSelectionPageService(
                     tools, null, null, null, null, null, null, router);
-            TameworkCommandSelectionPage page = createBoundPage(
-                    service, player, store, bondedConfig(), horn,
-                    genericAuthority, ignored -> bondedAuthority.getAsBoolean());
-            refresh(page);
-
-            page.handleDataEvent(actor, store, event(
-                    "__roster_dismiss__:" +
-                            BondedCompanionPanelRecordSource.presentationUuid(
-                                    "profile-7")));
+            try (AutoCloseable ignored = installRuntime(uiPlayerRef, playerType)) {
+                TameworkCommandSelectionPage page = createBoundPage(
+                        service, player, store, bondedConfig(), horn,
+                        genericAuthority,
+                        ignoredPlayer -> bondedAuthority.getAsBoolean());
+                refresh(page);
+                page.handleDataEvent(actor, store, event(
+                        "__roster_dismiss__:" +
+                                BondedCompanionPanelRecordSource.presentationUuid(
+                                        "profile-7")));
+            }
 
             return captured.get();
         }
@@ -820,6 +909,12 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                 BsonDocument.parse("{}"), new ExtraInfo());
     }
 
+    private TwCommandItemConfig emptyCommandConfig() {
+        return TwCommandItemConfig.CODEC.decode(
+                BsonDocument.parse("{\"CommandList\":[]}"),
+                new ExtraInfo());
+    }
+
     private TwCommandItemConfig genericRosterConfig() {
         return TwCommandItemConfig.CODEC.decode(BsonDocument.parse("""
                 {
@@ -951,6 +1046,31 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
         return (Unsafe) field.get(null);
     }
 
+    private static AutoCloseable installRuntime(
+            PlayerRef currentPlayer,
+            ComponentType<EntityStore, Player> playerType)
+            throws Exception {
+        Field universeInstance = Universe.class.getDeclaredField("instance");
+        universeInstance.setAccessible(true);
+        Object previousUniverse = universeInstance.get(null);
+        Field entityInstance = EntityModule.class.getDeclaredField("instance");
+        entityInstance.setAccessible(true);
+        Object previousEntityModule = entityInstance.get(null);
+        TestUniverse universe = (TestUniverse) unsafe().allocateInstance(
+                TestUniverse.class);
+        universe.currentPlayer = currentPlayer;
+        EntityModule entityModule = (EntityModule) unsafe().allocateInstance(
+                EntityModule.class);
+        putObject(entityModule, EntityModule.class, "playerComponentType",
+                playerType);
+        universeInstance.set(null, universe);
+        entityInstance.set(null, entityModule);
+        return () -> {
+            universeInstance.set(null, previousUniverse);
+            entityInstance.set(null, previousEntityModule);
+        };
+    }
+
     private static final class TestPacketHandler extends PacketHandler {
         private TestPacketHandler() {
             super((ChannelConnection) null, new ProtocolVersion(0));
@@ -959,6 +1079,20 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
         @Override public String getIdentifier() { return "bonded-test"; }
         @Override public void accept(ToServerPacket packet) { }
         @Override public void write(ToClientPacket packet) { }
+    }
+
+    private static final class TestUniverse extends Universe {
+        private PlayerRef currentPlayer;
+
+        private TestUniverse(JavaPluginInit init) {
+            super(init);
+        }
+
+        @Override
+        public PlayerRef getPlayer(UUID uuid) {
+            return currentPlayer != null && currentPlayer.getUuid().equals(uuid)
+                    ? currentPlayer : null;
+        }
     }
 
     /** Asset-store-free stack that preserves the metadata write under test. */

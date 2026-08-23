@@ -50,6 +50,12 @@ public final class CommandUiActionResult {
                 message, null, null, Map.of());
     }
 
+    /** Returns a truthful outcome for a dispatched legacy void callback. */
+    @Nonnull
+    public static CommandUiActionResult accepted() {
+        return new CommandUiActionResult(CommandUiActionStatus.ACCEPTED);
+    }
+
     @Nonnull
     public static CommandUiActionResult confirmationRequired(
             @Nonnull CommandUiActionHandle handle

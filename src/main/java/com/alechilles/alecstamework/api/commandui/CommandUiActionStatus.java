@@ -4,6 +4,8 @@ package com.alechilles.alecstamework.api.commandui;
 public enum CommandUiActionStatus {
     /** The current authority accepted and applied the action. */
     APPLIED,
+    /** The current authority dispatched the action but did not confirm a mutation. */
+    ACCEPTED,
     /** The action needs a fresh confirmation handle and did not mutate state. */
     CONFIRMATION_REQUIRED,
     /** The handle or current authority does not permit the action. */

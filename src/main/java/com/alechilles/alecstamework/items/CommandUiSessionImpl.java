@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.commandui.CommandUiActionHandle;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
+import com.alechilles.alecstamework.api.commandui.CommandUiActionStatus;
 import com.alechilles.alecstamework.api.commandui.CommandUiChangeSet;
 import com.alechilles.alecstamework.api.commandui.CommandUiCloseReason;
 import com.alechilles.alecstamework.api.commandui.CommandUiEvent;
@@ -210,9 +211,8 @@ final class CommandUiSessionImpl implements CommandUiSession {
                             expectedRoute()));
             return flatten(queued).whenComplete((result, failure) -> {
                 if (failure == null && result != null
-                        && result.status()
-                        == com.alechilles.alecstamework.api.commandui
-                        .CommandUiActionStatus.APPLIED) {
+                        && (result.status() == CommandUiActionStatus.APPLIED
+                        || result.status() == CommandUiActionStatus.ACCEPTED)) {
                     actionRebindRequired.set(true);
                     requestRefresh();
                 }

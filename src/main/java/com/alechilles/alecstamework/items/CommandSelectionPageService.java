@@ -624,20 +624,24 @@ final class CommandSelectionPageService {
             addPanel(catalog, "TOGGLE_AUTO_LINK", "Toggle automatic linking",
                     Boolean.toString(!toolInventoryService
                             .resolvePanelAutoLinkEnabledForTool(
-                                    context.player(), context.toolId())),
+                                    resolveCurrentPlayer(context.ownerUuid()),
+                                    context.toolId())),
                     context.genericAuthority(), () -> panel.setAutoLinkEnabled()
                             .accept(!toolInventoryService
                                     .resolvePanelAutoLinkEnabledForTool(
-                                            context.player(), context.toolId())));
+                                            resolveCurrentPlayer(context.ownerUuid()),
+                                            context.toolId())));
             addPanel(catalog, "TOGGLE_ACTIVE_HIGHLIGHT",
                     "Toggle active highlight",
                     Boolean.toString(!toolInventoryService
                             .resolvePanelActiveHighlightEnabledForTool(
-                                    context.player(), context.toolId())),
+                                    resolveCurrentPlayer(context.ownerUuid()),
+                                    context.toolId())),
                     context.genericAuthority(), () -> panel
                             .setActiveHighlightEnabled().accept(!toolInventoryService
                                     .resolvePanelActiveHighlightEnabledForTool(
-                                            context.player(), context.toolId())));
+                                            resolveCurrentPlayer(context.ownerUuid()),
+                                            context.toolId())));
             catalog.addGlobal("MANAGE_GROUPS", "Manage groups",
                     genericBinding("MANAGE_GROUPS", null,
                             context.genericAuthority(), panel.manageGroups(), false));
@@ -696,12 +700,12 @@ final class CommandSelectionPageService {
                 () -> apply(operation), confirmation);
     }
 
-    private static CompletionStage<CommandUiActionResult> apply(Runnable action) {
+    static CompletionStage<CommandUiActionResult> apply(Runnable action) {
         if (action == null) return CompletableFuture.completedFuture(
                 CommandUiActionResult.unavailable("action is unavailable"));
         try {
             action.run();
-            return CompletableFuture.completedFuture(CommandUiActionResult.applied());
+            return CompletableFuture.completedFuture(CommandUiActionResult.accepted());
         } catch (RuntimeException | LinkageError failure) {
             return CompletableFuture.completedFuture(
                     CommandUiActionResult.failed("action failed"));
@@ -719,7 +723,7 @@ final class CommandSelectionPageService {
         try {
             action.accept(value);
             return CompletableFuture.completedFuture(
-                    CommandUiActionResult.applied());
+                    CommandUiActionResult.accepted());
         } catch (RuntimeException | LinkageError failure) {
             return CompletableFuture.completedFuture(
                     CommandUiActionResult.failed("action failed"));
@@ -868,7 +872,7 @@ final class CommandSelectionPageService {
                         () -> {
                             operation.accept(target, groupId);
                             return CompletableFuture.completedFuture(
-                                    CommandUiActionResult.applied());
+                                    CommandUiActionResult.accepted());
                         }, false));
     }
 
@@ -981,7 +985,7 @@ final class CommandSelectionPageService {
                                 "current command world is unavailable"));
             }
             action.accept(target, ref, store);
-            return CompletableFuture.completedFuture(CommandUiActionResult.applied());
+            return CompletableFuture.completedFuture(CommandUiActionResult.accepted());
         } catch (RuntimeException | LinkageError failure) {
             return CompletableFuture.completedFuture(
                     CommandUiActionResult.failed("action failed"));
@@ -1106,23 +1110,23 @@ final class CommandSelectionPageService {
             BooleanSupplier genericCallbackAuthority,
             BondedLifecycleAuthority bondedLifecycleAuthority
     ) {
+        UUID ownerUuid = player.getUuid();
         boolean genericRosterActions = CommandRosterStorageBoundary
                 .allowsGenericRosterActions(config);
         CommandPanelSnapshotState panelSnapshot = new CommandPanelSnapshotState(
                 () -> toolInventoryService.buildLinkedPanelSnapshotForTool(
-                        player, toolId, config
-                )
+                        resolveCurrentPlayer(ownerUuid), toolId, config)
         );
-        LinkedPanelRefreshSignalSource pageSignals = pageSignals(player, config);
+        LinkedPanelRefreshSignalSource pageSignals = pageSignals(ownerUuid, config);
         BooleanSupplier toolAuthority = config.usesBondedCompanionRoster()
                 ? () -> {
-                    Player current = resolveCurrentPlayer(player.getUuid());
+                    Player current = resolveCurrentPlayer(ownerUuid);
                     return current != null
                             && bondedLifecycleAuthority.allows(current);
                 }
                 : genericCallbackAuthority;
-        return new PageContext(player, uiPlayerRef, config,
-                toolId, actions, player.getUuid(), genericRosterActions,
+        return new PageContext(uiPlayerRef, config,
+                toolId, actions, ownerUuid, genericRosterActions,
                 toolAuthority,
                 genericRosterActions ? genericCallbackAuthority : () -> false,
                 toolAuthority,
@@ -1158,31 +1162,37 @@ final class CommandSelectionPageService {
                 context.config().usesBondedCompanionRoster()
                         ? () -> TameworkCommandSelectionPage.PANEL_MODE_LINKED
                         : () -> toolInventoryService.resolvePanelModeValueForTool(
-                        context.player(), context.toolId(), context.config()),
+                        resolveCurrentPlayer(context.ownerUuid()),
+                        context.toolId(), context.config()),
                 context.config().usesBondedCompanionRoster()
                         ? () -> true : context.genericRosterActions()
                         ? () -> toolInventoryService.resolvePanelAutoLinkEnabledForTool(
-                                context.player(), context.toolId())
+                                resolveCurrentPlayer(context.ownerUuid()),
+                                context.toolId())
                         : () -> false,
                 () -> toolInventoryService.resolvePanelRadiusLabelForTool(
-                        context.player(), context.toolId(), context.config()),
+                        resolveCurrentPlayer(context.ownerUuid()),
+                        context.toolId(), context.config()),
                 () -> toolInventoryService.resolvePanelSortValueForTool(
-                        context.player(), context.toolId()),
+                        resolveCurrentPlayer(context.ownerUuid()), context.toolId()),
                 () -> toolInventoryService.resolvePanelFilterModeValueForTool(
-                        context.player(), context.toolId()),
+                        resolveCurrentPlayer(context.ownerUuid()), context.toolId()),
                 () -> toolInventoryService.resolvePanelFilterInputForTool(
-                        context.player(), context.toolId()),
+                        resolveCurrentPlayer(context.ownerUuid()), context.toolId()),
                 context.genericRosterActions()
                         ? () -> groupAssignPageService.resolveGroupActivationDropdownEntries(
-                                context.player(), context.toolId())
+                                resolveCurrentPlayer(context.ownerUuid()),
+                                context.toolId())
                         : java.util.List::of,
                 context.genericRosterActions()
                         ? () -> groupAssignPageService.resolveGroupActivationValue(
-                                context.player(), context.toolId())
+                                resolveCurrentPlayer(context.ownerUuid()),
+                                context.toolId())
                         : () -> "",
                 context.genericRosterActions()
                         ? () -> groupAssignPageService.resolveGroupDropdownEntries(
-                                context.player(), context.toolId())
+                                resolveCurrentPlayer(context.ownerUuid()),
+                                context.toolId())
                         : java.util.List::of,
                 command -> context.recallTeleportingEnabled()
                         || !resolutionService.isRecallCommand(command),
@@ -1208,15 +1218,17 @@ final class CommandSelectionPageService {
                 context.genericRosterActions() && HytaleApiLevel.isUpdate6OrLater(),
                 context.genericRosterActions()
                         ? () -> toolInventoryService.resolvePanelActiveHighlightEnabledForTool(
-                                context.player(), context.toolId())
+                                resolveCurrentPlayer(context.ownerUuid()),
+                                context.toolId())
                         : () -> false,
                 panelCallbacks.setActiveHighlightEnabled()
         ));
         page.configureShoulderRideCallback(shoulderRideCallback(context));
         page.configureHotswapAssignments(
-                () -> toolInventoryService.findActiveToolStack(context.player(), context.toolId()),
+                () -> toolInventoryService.findActiveToolStack(
+                        resolveCurrentPlayer(context.ownerUuid()), context.toolId()),
                 (slot, commandId) -> toolInventoryService.mutateActiveToolStack(
-                        context.player(), context.toolId(), stack ->
+                        resolveCurrentPlayer(context.ownerUuid()), context.toolId(), stack ->
                                 new CommandHotswapAssignmentStore().write(stack, slot, commandId))
         );
         return page;
@@ -1236,14 +1248,19 @@ final class CommandSelectionPageService {
                     ignoredUuid, ignoredUuid, ignoredUuid, ignoredUuid,
                     openBondedTalents, context.actions().selectCommand());
         }
-        Player player = context.player();
         String toolId = context.toolId();
         TwCommandItemConfig config = context.config();
         return new NpcCallbacks(
-                guardedUuid(authority, uuid -> panelActionService.applyLink(player, toolId, config, uuid)),
+                guardedUuid(authority, uuid -> withCurrentPlayer(
+                        context.ownerUuid(), player -> panelActionService
+                                .applyLink(player, toolId, config, uuid))),
                 guardedUuid(authority, context.actions().unlink()),
-                guardedUuid(authority, uuid -> panelActionService.applyToggleActive(player, toolId, config, uuid)),
-                guardedUuid(authority, uuid -> panelActionService.applyToggleBreeding(player, toolId, config, uuid)),
+                guardedUuid(authority, uuid -> withCurrentPlayer(
+                        context.ownerUuid(), player -> panelActionService
+                                .applyToggleActive(player, toolId, config, uuid))),
+                guardedUuid(authority, uuid -> withCurrentPlayer(
+                        context.ownerUuid(), player -> panelActionService
+                                .applyToggleBreeding(player, toolId, config, uuid))),
                 guardedUuid(authority, context.actions().release()),
                 guardedUuid(authority, context.actions().cull()),
                 guardedUuid(authority, context.actions().respawn()),
@@ -1251,8 +1268,10 @@ final class CommandSelectionPageService {
                 guardedUuid(authority, context.actions().recall()),
                 guardedUuid(authority, context.actions().setHome()),
                 guardedUuid(authority, context.actions().returnHome()),
-                guardedUuid(authority, uuid -> talentPageService.openTalentPage(
-                        player, toolId, uuid, context.actions().reopenMenu())),
+                guardedUuid(authority, uuid -> withCurrentPlayer(
+                        context.ownerUuid(), player -> talentPageService.openTalentPage(
+                                player, toolId, uuid,
+                                context.actions().reopenMenu()))),
                 guardedString(authority, context.actions().selectCommand()));
     }
 
@@ -1263,8 +1282,9 @@ final class CommandSelectionPageService {
         CommandPanelFeaturePresentation feature = context.snapshot()
                 .presentation(presentationUuid);
         if (feature != null && feature.bonded() != null) {
-            bondedTalentPages.open(context.player(), feature.bonded(),
-                    context.actions().reopenMenu());
+            withCurrentPlayer(context.ownerUuid(), player ->
+                    bondedTalentPages.open(player, feature.bonded(),
+                            context.actions().reopenMenu()));
         }
     }
 
@@ -1620,7 +1640,6 @@ final class CommandSelectionPageService {
     }
 
     private record PageContext(
-            Player player,
             PlayerRef uiPlayerRef,
             TwCommandItemConfig config,
             String toolId,

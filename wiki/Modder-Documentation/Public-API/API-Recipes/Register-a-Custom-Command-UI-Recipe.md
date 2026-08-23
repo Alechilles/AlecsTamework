@@ -167,6 +167,10 @@ If an invocation returns `CONFIRMATION_REQUIRED`, show a provider-owned
 confirmation overlay with the returned presentation. Bind the returned
 confirmation handle to the confirm button. Do not reuse the first handle.
 
+Treat `APPLIED` as a confirmed state change. Treat `ACCEPTED` as a successful
+dispatch whose callback did not report whether it changed state. In both
+cases, use the next Tamework snapshot as the source of visible state.
+
 ## Notes
 
 - Do not retain a `Player`, ECS reference, store, item stack, or mutable

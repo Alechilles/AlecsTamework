@@ -114,10 +114,13 @@ Pass only that token through the provider event payload. Call
 a target, route, owner, roster, profile, or cost from the client. Tamework
 holds that authority and validates it again in the player's current world.
 
-`CommandUiActionStatus` values are `APPLIED`, `CONFIRMATION_REQUIRED`,
-`DENIED`, `STALE`, `NOT_FOUND`, `UNAVAILABLE`, `CONFLICT`, and `FAILED`.
-Destructive and paid actions can return a new confirmation handle. Invoke that
-new handle only after the provider shows its confirmation flow.
+`CommandUiActionStatus` values are `APPLIED`, `ACCEPTED`,
+`CONFIRMATION_REQUIRED`, `DENIED`, `STALE`, `NOT_FOUND`, `UNAVAILABLE`,
+`CONFLICT`, and `FAILED`. `APPLIED` confirms a state change. `ACCEPTED` means
+that Tamework dispatched a legacy callback but could not confirm its result.
+Both values can cause a presentation refresh. Destructive and paid actions can
+return a new confirmation handle. Invoke that new handle only after the
+provider shows its confirmation flow.
 
 ## Session and Cleanup
 

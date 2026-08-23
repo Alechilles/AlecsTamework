@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -259,6 +260,39 @@ class CommandUiSessionTask2Test {
         assertEquals(CommandUiActionStatus.DENIED,
                 session.invoke(denied).toCompletableFuture().join().status());
         assertFalse(operationCalled.get());
+        session.close();
+    }
+
+    @Test
+    void legacyVoidCallbackDoesNotClaimThatItAppliedAMutation() {
+        CompletionStage<CommandUiActionResult> outcome =
+                CommandSelectionPageService.apply(() -> { });
+
+        assertEquals(CommandUiActionStatus.ACCEPTED,
+                outcome.toCompletableFuture().join().status());
+    }
+
+    @Test
+    void acceptedLegacyCallbackRequestsPresentationRefresh() {
+        UUID sessionId = UUID.randomUUID();
+        AtomicInteger refreshes = new AtomicInteger();
+        CommandUiSessionImpl session = new CommandUiSessionImpl(
+                sessionId, snapshot(sessionId, 1L, 1L),
+                new CommandUiActionGateway(), CommandUiWorldDispatcher.direct(),
+                CommandUiSessionImpl.Mode.GENERIC,
+                refreshes::incrementAndGet, ignored -> { }, null);
+        var handle = session.issueGeneric(
+                new CommandUiAction("SELECT_COMMAND"), () -> true,
+                () -> CompletableFuture.completedFuture(
+                        CommandUiActionResult.of(
+                                CommandUiActionStatus.ACCEPTED)),
+                false);
+
+        CommandUiActionResult result = session.invoke(handle)
+                .toCompletableFuture().join();
+
+        assertEquals(CommandUiActionStatus.ACCEPTED, result.status());
+        assertEquals(1, refreshes.get());
         session.close();
     }
 
