@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.api.internal;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.api.InteractionExtensionApi;
@@ -138,7 +139,11 @@ public final class ReplacementTameworkApiFactory {
                         persistence,
                         facades.queries(),
                         dependencies.populationGroups(),
-                        clock
+                        clock,
+                        Tamework.getInstance() == null
+                                ? null
+                                : Tamework.getInstance()
+                                .getOwnerPopulationLiveIndex()
                 );
         CommandFamilyRosterApi rosters =
                 dependencies.commandRosters() == null

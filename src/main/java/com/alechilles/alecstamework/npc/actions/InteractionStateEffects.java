@@ -29,6 +29,7 @@ import com.hypixel.hytale.server.core.modules.entity.component.TransformComponen
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -381,10 +382,37 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
                 changeAppearance,
                 store
         );
+        observeOwnedRole(npcRef, store, roleId);
         CompanionTalentService.reconcileTalentsComponent(npcRef, store, roleId);
         applyDisableSpawnDrivenDespawn(npcRef, store);
         logDespawnDebug("set_role", npcRef, store, roleId);
         return true;
+    }
+
+    private static void observeOwnedRole(
+            Ref<EntityStore> npcRef,
+            Store<EntityStore> store,
+            String roleId
+    ) {
+        Tamework plugin = Tamework.getInstance();
+        ComponentType<EntityStore, NPCEntity> npcType =
+                NPCEntity.getComponentType();
+        ComponentType<EntityStore, TameworkOwnerComponent> ownerType =
+                TameworkOwnerComponent.getComponentType();
+        if (plugin == null || npcType == null || ownerType == null) {
+            return;
+        }
+        NPCEntity npc = store.getComponent(npcRef, npcType);
+        TameworkOwnerComponent owner = store.getComponent(npcRef, ownerType);
+        World world = store.getExternalData() == null
+                ? null
+                : store.getExternalData().getWorld();
+        plugin.getOwnerPopulationLiveIndex().observe(
+                npc == null ? null : npc.getUuid(),
+                owner == null ? null : owner.getOwnerId(),
+                world == null ? null : world.getName(),
+                roleId
+        );
     }
 
     // Immediately opts this NPC out of spawn-configuration-driven despawn checks.

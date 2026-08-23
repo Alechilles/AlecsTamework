@@ -30,6 +30,7 @@ import com.alechilles.alecstamework.api.TameworkEventsApi;
 import com.alechilles.alecstamework.api.TraitEffectApi;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureId;
 import com.alechilles.alecstamework.persistence.control.PersistenceReadinessLevel;
+import com.alechilles.alecstamework.persistence.facade.ReplacementPopulationGroupApi;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceFeatureRegistry;
 import java.util.EnumSet;
@@ -284,6 +285,12 @@ public final class ReplacementTameworkApi
         if (readReady(PublicPersistenceFeatureRegistry.POPULATION_GROUPS)
                 && dependencies.populationGroups() != null) {
             capabilities.add(TameworkApiCapability.POPULATION_GROUPS);
+            if (populationGroups instanceof ReplacementPopulationGroupApi groups
+                    && groups.supportsLoadedOwnedCounts()) {
+                capabilities.add(
+                        TameworkApiCapability.LOADED_POPULATION_GROUP_COUNTS
+                );
+            }
         }
         if (mutationReady(PublicPersistenceFeatureRegistry.COMMAND_ROSTER)
                 && dependencies.commandRosters() != null) {

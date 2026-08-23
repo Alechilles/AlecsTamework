@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ownership.live;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
@@ -20,6 +21,13 @@ public final class OwnerPopulationLiveIndex {
     public void observe(@Nullable UUID npcId,
                         @Nullable UUID ownerId,
                         @Nullable String worldName) {
+        observe(npcId, ownerId, worldName, null);
+    }
+
+    public void observe(@Nullable UUID npcId,
+                        @Nullable UUID ownerId,
+                        @Nullable String worldName,
+                        @Nullable String roleId) {
         if (npcId == null) {
             return;
         }
@@ -28,7 +36,9 @@ public final class OwnerPopulationLiveIndex {
             entries.remove(npcId);
             return;
         }
-        entries.put(npcId, new OwnedNpc(ownerId, normalizedWorld));
+        entries.put(npcId, new OwnedNpc(
+                ownerId, normalizedWorld, normalizeRole(roleId)
+        ));
     }
 
     public void remove(@Nullable UUID npcId) {
@@ -70,6 +80,26 @@ public final class OwnerPopulationLiveIndex {
         return count;
     }
 
+    /** Counts globally loaded owned NPCs whose current role is in the supplied set. */
+    public int countOwnedRoles(@Nonnull UUID ownerId,
+                               @Nonnull Set<String> roleIds) {
+        if (ownerId == null || roleIds == null) {
+            throw new IllegalArgumentException("Owner and role IDs are required");
+        }
+        int count = 0;
+        for (OwnedNpc entry : entries.values()) {
+            if (ownerId.equals(entry.ownerId())
+                    && entry.roleId() != null
+                    && roleIds.contains(entry.roleId())) {
+                if (count == Integer.MAX_VALUE) {
+                    return count;
+                }
+                count++;
+            }
+        }
+        return count;
+    }
+
     int size() {
         return entries.size();
     }
@@ -79,6 +109,12 @@ public final class OwnerPopulationLiveIndex {
         return worldName == null || worldName.isBlank() ? null : worldName.trim();
     }
 
-    private record OwnedNpc(UUID ownerId, String worldName) {
+    @Nullable
+    private static String normalizeRole(@Nullable String roleId) {
+        return roleId == null || roleId.isBlank() ? null : roleId.trim();
+    }
+
+    private record OwnedNpc(UUID ownerId, String worldName,
+                            @Nullable String roleId) {
     }
 }

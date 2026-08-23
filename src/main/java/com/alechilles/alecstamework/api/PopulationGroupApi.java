@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.api;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
+import java.util.Set;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -18,6 +20,22 @@ public interface PopulationGroupApi {
     Optional<PopulationGroupCountsView> getCounts(@Nonnull UUID ownerUuid,
                                                    @Nonnull String groupId,
                                                    @Nullable String ownershipWorldName);
+
+    /**
+     * Counts loaded NPCs owned by one player whose roles belong to the supplied groups.
+     *
+     * <p>This read is process-local and best-effort. It does not replace durable
+     * population admission.</p>
+     */
+    @Nonnull
+    default OptionalLong getLoadedOwnedCount(
+            @Nonnull UUID ownerUuid,
+            @Nonnull Set<String> groupIds
+    ) {
+        if (ownerUuid == null) throw new NullPointerException("ownerUuid");
+        if (groupIds == null) throw new NullPointerException("groupIds");
+        return OptionalLong.empty();
+    }
 
     @Nonnull
     PopulationGroupReconciliationView getReconciliationStatus();

@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ownership.live;
 
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -73,7 +74,8 @@ public final class OwnerPopulationOwnerChangeSystem
         index.observe(
                 npc == null ? null : npc.getUuid(),
                 owner == null ? null : owner.getOwnerId(),
-                worldName(store)
+                worldName(store),
+                CompanionRoleIdResolver.resolveRoleId(ref, store)
         );
     }
 

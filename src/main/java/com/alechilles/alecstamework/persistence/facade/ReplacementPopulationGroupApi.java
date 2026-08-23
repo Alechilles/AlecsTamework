@@ -11,13 +11,17 @@ import com.alechilles.alecstamework.companion.population.group.PopulationGroupPo
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigDefinition;
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigIndex;
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegistry;
+import com.alechilles.alecstamework.ownership.live.OwnerPopulationLiveIndex;
 import com.alechilles.alecstamework.persistence.control.PersistenceReadinessLevel;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceQueries;
 import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
@@ -33,6 +37,7 @@ public final class ReplacementPopulationGroupApi
     private final PublicPersistenceQueries queries;
     private final PopulationGroupConfigRegistry configs;
     private final LongSupplier clock;
+    private final OwnerPopulationLiveIndex liveIndex;
 
     public ReplacementPopulationGroupApi(
             @Nonnull PersistenceBootstrap persistence,
@@ -40,12 +45,54 @@ public final class ReplacementPopulationGroupApi
             @Nonnull PopulationGroupConfigRegistry configs,
             @Nonnull LongSupplier clock
     ) {
+        this(persistence, queries, configs, clock, null);
+    }
+
+    public ReplacementPopulationGroupApi(
+            @Nonnull PersistenceBootstrap persistence,
+            @Nonnull PublicPersistenceQueries queries,
+            @Nonnull PopulationGroupConfigRegistry configs,
+            @Nonnull LongSupplier clock,
+            @Nullable OwnerPopulationLiveIndex liveIndex
+    ) {
         this.persistence = Objects.requireNonNull(
                 persistence, "persistence"
         );
         this.queries = Objects.requireNonNull(queries, "queries");
         this.configs = Objects.requireNonNull(configs, "configs");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.liveIndex = liveIndex;
+    }
+
+    @Override
+    @Nonnull
+    public OptionalLong getLoadedOwnedCount(
+            @Nonnull UUID ownerUuid,
+            @Nonnull Set<String> groupIds
+    ) {
+        Objects.requireNonNull(ownerUuid, "ownerUuid");
+        Objects.requireNonNull(groupIds, "groupIds");
+        if (liveIndex == null) {
+            return OptionalLong.empty();
+        }
+        PopulationGroupConfigIndex snapshot = configs.snapshot();
+        LinkedHashSet<String> roleIds = new LinkedHashSet<>();
+        for (String groupId : groupIds) {
+            if (groupId == null || groupId.isBlank()) {
+                return OptionalLong.empty();
+            }
+            Optional<PopulationGroupConfigDefinition> definition =
+                    snapshot.getDefinition(groupId.trim());
+            if (definition.isEmpty()) {
+                return OptionalLong.empty();
+            }
+            roleIds.addAll(definition.orElseThrow().roleIds());
+        }
+        return OptionalLong.of(liveIndex.countOwnedRoles(ownerUuid, roleIds));
+    }
+
+    public boolean supportsLoadedOwnedCounts() {
+        return liveIndex != null;
     }
 
     @Override

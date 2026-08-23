@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.ownership.live;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -88,6 +89,19 @@ class OwnerPopulationLiveIndexTest {
                         TwGlobalConfig.PerPlayerLimitScope.PER_WORLD,
                         null
                 )
+        );
+    }
+
+    @Test
+    void countsOnlyLoadedNpcRolesInTheRequestedPopulationGroups() {
+        OwnerPopulationLiveIndex index = new OwnerPopulationLiveIndex();
+        index.observe(FIRST_NPC, OWNER, "alpha", "Tamed_Cow");
+        index.observe(SECOND_NPC, OWNER, "beta", "Tamed_Dragon");
+        index.observe(UUID.randomUUID(), OTHER_OWNER, "alpha", "Tamed_Cow");
+
+        assertEquals(
+                1,
+                index.countOwnedRoles(OWNER, Set.of("Tamed_Cow", "Tamed_Sheep"))
         );
     }
 }
