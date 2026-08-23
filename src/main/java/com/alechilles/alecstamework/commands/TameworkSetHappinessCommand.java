@@ -29,7 +29,7 @@ public final class TameworkSetHappinessCommand extends AbstractPlayerCommand {
     private static final double DEFAULT_HAPPINESS_MAX = 100.0;
 
     public TameworkSetHappinessCommand() {
-        super("sethappiness", "Set happiness of the NPC you are looking at.");
+        super("happiness", "Set happiness of the NPC you are looking at.");
         setAllowsExtraArguments(true);
     }
 

@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
 public final class TameworkDebugHarvestCommand extends AbstractTameworkServerCommand {
 
     public TameworkDebugHarvestCommand() {
-        super("debugharvest", "Toggle Tamework harvest diagnostics logging.");
+        super("harvest", "Toggle Tamework harvest diagnostics logging.");
         setAllowsExtraArguments(true);
     }
 
@@ -33,15 +33,7 @@ public final class TameworkDebugHarvestCommand extends AbstractTameworkServerCom
     }
 
     private static String getFirstArg(CommandContext commandContext) {
-        String input = commandContext.getInputString();
-        if (input == null) {
-            return null;
-        }
-        String[] tokens = input.trim().split("\\s+");
-        if (tokens.length < 3) {
-            return null;
-        }
-        return tokens[2];
+        return TameworkCommandInput.firstArgument(commandContext.getInputString(), "harvest");
     }
 
     private static Boolean parseBoolean(String raw) {

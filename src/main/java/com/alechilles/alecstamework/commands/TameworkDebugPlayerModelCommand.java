@@ -27,7 +27,7 @@ public final class TameworkDebugPlayerModelCommand extends AbstractPlayerCommand
     private static final ConcurrentHashMap<UUID, Model> SAVED_MODELS = new ConcurrentHashMap<>();
 
     public TameworkDebugPlayerModelCommand() {
-        super("debugplayermodel", "Temporarily swap your player model for mount-control testing.");
+        super("player-model", "Temporarily swap your player model for mount-control testing.");
         setAllowsExtraArguments(true);
     }
 

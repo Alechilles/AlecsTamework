@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
 public final class TameworkDebugLagCommand extends AbstractTameworkServerCommand {
 
     public TameworkDebugLagCommand() {
-        super("debuglag", "Toggle Tamework lag diagnostics logging.");
+        super("lag", "Toggle Tamework lag diagnostics logging.");
         setAllowsExtraArguments(true);
     }
 
@@ -33,15 +33,7 @@ public final class TameworkDebugLagCommand extends AbstractTameworkServerCommand
     }
 
     private static String getFirstArg(CommandContext commandContext) {
-        String input = commandContext.getInputString();
-        if (input == null) {
-            return null;
-        }
-        String[] tokens = input.trim().split("\\s+");
-        if (tokens.length < 3) {
-            return null;
-        }
-        return tokens[2];
+        return TameworkCommandInput.firstArgument(commandContext.getInputString(), "lag");
     }
 
     private static Boolean parseBoolean(String raw) {

@@ -12,7 +12,7 @@ public final class TameworkDebugRespawnTraceCommand extends AbstractTameworkServ
 
     public TameworkDebugRespawnTraceCommand() {
         super(
-                "debugrespawntrace",
+                "respawn-trace",
                 "Toggle Tamework capture, release, and revival health trace logging."
         );
         setAllowsExtraArguments(true);

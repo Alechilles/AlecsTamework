@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
 public final class TameworkDebugSpawnerLocationCommand extends AbstractTameworkServerCommand {
 
     public TameworkDebugSpawnerLocationCommand() {
-        super("debugspawnerlocation", "Toggle Tamework spawn-position debug logging.");
+        super("spawner-location", "Toggle Tamework spawn-position debug logging.");
         setAllowsExtraArguments(true);
     }
 
@@ -33,15 +33,7 @@ public final class TameworkDebugSpawnerLocationCommand extends AbstractTameworkS
     }
 
     private static String getFirstArg(CommandContext commandContext) {
-        String input = commandContext.getInputString();
-        if (input == null) {
-            return null;
-        }
-        String[] tokens = input.trim().split("\\s+");
-        if (tokens.length < 3) {
-            return null;
-        }
-        return tokens[2];
+        return TameworkCommandInput.firstArgument(commandContext.getInputString(), "spawner-location");
     }
 
     private static Boolean parseBoolean(String raw) {

@@ -21,7 +21,7 @@ import javax.annotation.Nonnull;
 public final class TameworkGetOwnerCommand extends AbstractPlayerCommand {
 
     public TameworkGetOwnerCommand() {
-        super("getowner", "Get owner of the NPC you are looking at.");
+        super("owner", "Get owner of the NPC you are looking at.");
         setAllowsExtraArguments(true);
     }
 

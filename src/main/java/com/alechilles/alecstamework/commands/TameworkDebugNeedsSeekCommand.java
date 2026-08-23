@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
 public final class TameworkDebugNeedsSeekCommand extends AbstractTameworkServerCommand {
 
     public TameworkDebugNeedsSeekCommand() {
-        super("debugneedsseek", "Toggle Tamework needs seek diagnostics logging.");
+        super("seek", "Toggle Tamework needs seek diagnostics logging.");
         setAllowsExtraArguments(true);
     }
 
@@ -33,15 +33,7 @@ public final class TameworkDebugNeedsSeekCommand extends AbstractTameworkServerC
     }
 
     private static String getFirstArg(CommandContext commandContext) {
-        String input = commandContext.getInputString();
-        if (input == null) {
-            return null;
-        }
-        String[] tokens = input.trim().split("\\s+");
-        if (tokens.length < 3) {
-            return null;
-        }
-        return tokens[2];
+        return TameworkCommandInput.firstArgument(commandContext.getInputString(), "seek");
     }
 
     private static Boolean parseBoolean(String raw) {

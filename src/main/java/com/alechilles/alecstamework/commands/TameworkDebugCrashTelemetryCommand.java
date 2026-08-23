@@ -25,7 +25,7 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractTameworkSe
     );
 
     public TameworkDebugCrashTelemetryCommand() {
-        super("debugcrashtelemetry", "Show crash telemetry diagnostics. Optional: flush|simulate|eventerror|eventlifecycle");
+        super("crash", "Show crash telemetry diagnostics. Optional: flush|simulate|eventerror|eventlifecycle");
         setAllowsExtraArguments(true);
     }
 

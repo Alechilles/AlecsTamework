@@ -12,7 +12,7 @@ import javax.annotation.Nonnull;
 /** Shows the frozen runtime topology and passive per-module counters. */
 public final class TameworkActivationStatusCommand extends AbstractTameworkServerCommand {
     public TameworkActivationStatusCommand() {
-        super("activation", "Show Tamework runtime activation status.");
+        super("status", "Show Tamework runtime activation status.");
     }
 
     @Override

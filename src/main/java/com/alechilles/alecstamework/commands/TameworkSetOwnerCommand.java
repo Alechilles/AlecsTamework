@@ -21,7 +21,7 @@ import javax.annotation.Nonnull;
 public final class TameworkSetOwnerCommand extends AbstractPlayerCommand {
 
     public TameworkSetOwnerCommand() {
-        super("setowner", "Set owner of the NPC you are looking at.");
+        super("owner", "Set owner of the NPC you are looking at.");
         setAllowsExtraArguments(true);
     }
 
