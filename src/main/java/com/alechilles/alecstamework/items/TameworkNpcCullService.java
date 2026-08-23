@@ -83,7 +83,7 @@ public final class TameworkNpcCullService {
         if (cause == null) {
             return Outcome.UNAVAILABLE;
         }
-        clearCommandLinks(target, store);
+        unlinkCommandTarget(target, store);
         removeCommandToolRecords(player, npc.getUuid());
         DeathComponent.tryAddComponent(
                 store,
@@ -93,19 +93,21 @@ public final class TameworkNpcCullService {
         return Outcome.CULLED;
     }
 
-    private void clearCommandLinks(Ref<EntityStore> target,
-                                   Store<EntityStore> store) {
+    /**
+     * Removes the link component before death systems observe the target.
+     *
+     * <p>An empty link component still marks an NPC as a persistent command
+     * companion. Removing it prevents culling from creating a revivable
+     * dormant profile.</p>
+     */
+    private void unlinkCommandTarget(Ref<EntityStore> target,
+                                     Store<EntityStore> store) {
         ComponentType<EntityStore, TameworkCommandLinksComponent> linksType =
                 TameworkCommandLinksComponent.getComponentType();
-        TameworkCommandLinksComponent links = linksType == null
-                ? null : store.getComponent(target, linksType);
-        if (links == null) {
+        if (linksType == null || store.getComponent(target, linksType) == null) {
             return;
         }
-        links.setOwnerId(null);
-        links.setToolIds(new String[0]);
-        links.setHomePosition(null);
-        store.putComponent(target, linksType, links);
+        store.removeComponent(target, linksType);
     }
 
     private void removeCommandToolRecords(Player player, @Nullable UUID npcUuid) {

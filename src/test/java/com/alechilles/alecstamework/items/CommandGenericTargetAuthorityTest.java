@@ -287,6 +287,36 @@ class CommandGenericTargetAuthorityTest {
     }
 
     @Test
+    void reusableCullUnlinksTargetBeforeDeathCanPersistIt()
+            throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            LiveTarget target = scope.liveOrdinaryTarget(true);
+            DamageCause previousCommandCause = DamageCause.COMMAND;
+            DamageCause.COMMAND = new DamageCause("test-command");
+            TameworkNpcCullService service = new TameworkNpcCullService(
+                    new TameworkCullEligibility(new CommandLinkPolicyService()),
+                    new CommandItemRegistry(),
+                    new CommandLinkMutationService(null,
+                            new CommandLinkPolicyService(), null, null));
+
+            try {
+                try {
+                    service.cull(target.player, target.reference, scope.store,
+                            true, true);
+                } catch (NullPointerException fixtureOnlyDamageCauseFailure) {
+                    // The bare ECS fixture has no DamageCause asset store.
+                    assertTrue(fixtureOnlyDamageCauseFailure.getStackTrace()[0]
+                            .getClassName().equals(DamageCause.class.getName()));
+                }
+                assertEquals(null, scope.store.getComponent(target.reference,
+                        scope.linksType));
+            } finally {
+                DamageCause.COMMAND = previousCommandCause;
+            }
+        }
+    }
+
+    @Test
     void forgedGenericReleaseLeavesBondedTargetOwnershipUntouched()
             throws Exception {
         try (ProjectionScope scope = ProjectionScope.install()) {
