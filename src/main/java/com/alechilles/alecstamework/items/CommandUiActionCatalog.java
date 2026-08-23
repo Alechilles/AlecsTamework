@@ -145,6 +145,42 @@ final class CommandUiActionCatalog {
                 base.disabledReason());
     }
 
+    /** Returns whether the published action surface still matches this catalog. */
+    boolean matchesActions(CommandUiSnapshot snapshot) {
+        Objects.requireNonNull(snapshot, "snapshot");
+        Map<ActionKey, ActionShape> published = new LinkedHashMap<>();
+        snapshot.commandActions().forEach((key, view) -> published.put(
+                new ActionKey(Scope.COMMAND, key, null), ActionShape.of(view)));
+        snapshot.globalActions().forEach((key, view) -> published.put(
+                new ActionKey(Scope.GLOBAL, key, null), ActionShape.of(view)));
+        snapshot.panelState().actions().forEach((key, view) -> published.put(
+                new ActionKey(Scope.PANEL, key, null), ActionShape.of(view)));
+        snapshot.hotswapChoices().forEach((slot, choices) -> choices.forEach(option -> {
+            if (option.action() != null) {
+                published.put(new ActionKey(Scope.HOTSWAP,
+                                slot + ":" + option.commandId(), null),
+                        ActionShape.of(option.action()));
+            }
+        }));
+        snapshot.companionRows().forEach(row -> row.actions().forEach(
+                (key, view) -> published.put(
+                        new ActionKey(Scope.ROW, key, row.rowId()),
+                        ActionShape.of(view))));
+
+        Map<ActionKey, ActionShape> expected = new LinkedHashMap<>();
+        entries().forEach(entry -> expected.put(
+                new ActionKey(entry.scope(), entry.key(), entry.rowId()),
+                entry.shape()));
+        return expected.equals(published);
+    }
+
+    private List<Entry> entries() {
+        List<Entry> entries = new ArrayList<>(generic.size() + bonded.size());
+        entries.addAll(generic);
+        entries.addAll(bonded);
+        return entries;
+    }
+
     /** Keeps valid action views while replacing only presentation values. */
     static CommandUiSnapshot retainActions(
             CommandUiSnapshot fresh,
@@ -214,6 +250,16 @@ final class CommandUiActionCatalog {
 
     private enum Scope { COMMAND, GLOBAL, PANEL, HOTSWAP, ROW }
 
+    private record ActionKey(Scope scope, String key, UUID rowId) { }
+
+    private record ActionShape(String kind, String label,
+                               boolean confirmationRequired) {
+        static ActionShape of(CommandUiActionView view) {
+            return new ActionShape(view.kind(), view.label(),
+                    view.confirmationRequired());
+        }
+    }
+
     private record Entry(
             Scope scope,
             String key,
@@ -240,6 +286,15 @@ final class CommandUiActionCatalog {
                     : bondedBinding.confirmationRequired();
             return new CommandUiActionView(action.kind(), label, true, null,
                     confirmation, handle);
+        }
+
+        ActionShape shape() {
+            CommandUiAction action = genericBinding != null
+                    ? genericBinding.action() : bondedBinding.action();
+            boolean confirmation = genericBinding != null
+                    ? genericBinding.confirmationRequired()
+                    : bondedBinding.confirmationRequired();
+            return new ActionShape(action.kind(), label, confirmation);
         }
     }
 }

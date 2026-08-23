@@ -6,7 +6,10 @@ import com.alechilles.alecstamework.api.commandui.CommandUiPageController;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
 import com.alechilles.alecstamework.api.internal.CommandUiProviderRegistry;
 import com.alechilles.alecstamework.ui.CommandUiHostPage;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -125,13 +128,27 @@ final class CommandUiPageCoordinator {
             public <T> CompletionStage<T> dispatch(Supplier<T> operation) {
                 CompletableFuture<T> result = new CompletableFuture<>();
                 try {
-                    boolean accepted = dispatcher.dispatch(playerUuid, (ref, store) -> {
-                        try {
-                            result.complete(operation.get());
-                        } catch (RuntimeException | LinkageError failure) {
-                            result.completeExceptionally(failure);
-                        }
-                    });
+                    boolean accepted = dispatcher.dispatch(playerUuid,
+                            new CommandUiHostPage.WorldOperation() {
+                                @Override
+                                public void run(
+                                        Ref<EntityStore> ref,
+                                        Store<EntityStore> store
+                                ) {
+                                    try {
+                                        result.complete(operation.get());
+                                    } catch (RuntimeException | LinkageError failure) {
+                                        result.completeExceptionally(failure);
+                                    }
+                                }
+
+                                @Override
+                                public void unavailable() {
+                                    result.completeExceptionally(
+                                            new IllegalStateException(
+                                                    "Current command UI world is unavailable."));
+                                }
+                            });
                     if (!accepted) {
                         result.completeExceptionally(new IllegalStateException(
                                 "Current command UI world is unavailable."));

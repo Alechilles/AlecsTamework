@@ -43,6 +43,7 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
     private final WorldDispatcher worldDispatcher;
     private final FallbackOpener fallbackOpener;
     private final UpdateEmitter updateEmitter;
+    private final boolean customProvider;
     private final AtomicBoolean open = new AtomicBoolean(true);
     private final AutoCloseable unregisterSubscription;
     private final CopyOnWriteArrayList<AutoCloseable> ownedResources =
@@ -78,7 +79,13 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
                 fallbackOpener, "fallbackOpener");
         this.updateEmitter = updateEmitter == null
                 ? this::sendHostUpdate : updateEmitter;
-        this.unregisterSubscription = subscribeProviderRemoval(providerRegistry);
+        this.customProvider = providerId != null && providerGeneration > 0L;
+        CommandUiProviderRegistry.ExactSubscription providerSubscription =
+                subscribeProviderRemoval(providerRegistry);
+        this.unregisterSubscription = providerSubscription.handle();
+        if (!providerSubscription.active()) {
+            terminateHere(CommandUiCloseReason.PROVIDER_UNREGISTERED);
+        }
     }
 
     @Override
@@ -99,7 +106,7 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
                         ref, store, commandBuilder, eventBuilder);
             }
         } catch (RuntimeException | LinkageError failure) {
-            fail("initial build", failure, true);
+            fail("initial build", failure, customProvider);
         }
     }
 
@@ -202,12 +209,14 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
         return false;
     }
 
-    private AutoCloseable subscribeProviderRemoval(
+    private CommandUiProviderRegistry.ExactSubscription subscribeProviderRemoval(
             @Nullable CommandUiProviderRegistry registry) {
         if (registry == null || providerId == null || providerGeneration <= 0L) {
-            return () -> { };
+            return new CommandUiProviderRegistry.ExactSubscription(
+                    true, () -> { });
         }
-        return registry.subscribeUnregister((removedId, removedGeneration) -> {
+        return registry.subscribeExactUnregister(providerId, providerGeneration,
+                (removedId, removedGeneration) -> {
             if (providerId.equals(removedId)
                     && providerGeneration == removedGeneration) {
                 terminate(CommandUiCloseReason.PROVIDER_UNREGISTERED);
@@ -307,6 +316,11 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
     public interface WorldOperation {
         void run(@Nullable Ref<EntityStore> ref,
                  @Nullable Store<EntityStore> store);
+
+        /** Completes deferred work when no current player world remains. */
+        default void unavailable() {
+            run(null, null);
+        }
     }
 
     @FunctionalInterface

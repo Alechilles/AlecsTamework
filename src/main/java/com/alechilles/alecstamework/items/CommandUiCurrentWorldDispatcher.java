@@ -45,12 +45,17 @@ final class CommandUiCurrentWorldDispatcher
             int handoffs
     ) {
         ResolvedWorld current = resolve(playerUuid);
-        if (current == null) return;
+        if (current == null) {
+            operation.unavailable();
+            return;
+        }
         if (!Objects.equals(scheduled.worldIdentity(),
                 current.worldIdentity())) {
-            if (handoffs >= MAX_WORLD_HANDOFFS) return;
-            current.executor().execute(() -> executeCurrent(
-                    playerUuid, current, operation, handoffs + 1));
+            if (handoffs >= MAX_WORLD_HANDOFFS
+                    || !current.executor().execute(() -> executeCurrent(
+                    playerUuid, current, operation, handoffs + 1))) {
+                operation.unavailable();
+            }
             return;
         }
         operation.run(current.playerRef(), current.store());

@@ -40,6 +40,8 @@ import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -548,30 +550,65 @@ public final class CommandItemFeatureHandler {
             return false;
         }
         long openedRegistryRevision = callbackAuthority.revision();
+        UUID ownerUuid = player.getUuid();
         CommandSelectionPageService.Actions actions = new CommandSelectionPageService.Actions(
-                npcUuid -> applyMenuUnlink(player, toolId, config, npcUuid),
-                npcUuid -> applyMenuRelease(player, toolId, config, npcUuid),
-                npcUuid -> applyMenuCull(player, toolId, config, npcUuid),
-                npcUuid -> applyMenuRespawn(player, toolId, config, npcUuid),
-                npcUuid -> applyMenuLocate(player, toolId, config, npcUuid),
-                npcUuid -> applyMenuRecall(player, toolId, config, npcUuid),
-                npcUuid -> applyMenuSetHome(player, toolId, config, npcUuid),
-                npcUuid -> applyMenuReturnHome(player, toolId, config, npcUuid),
-                () -> openGroupManagerFromSelection(
-                        player, config, toolId, genericBinding),
-                () -> reopenSelectionMenu(
-                        player, config, toolId, genericBinding),
-                commandId -> applyMenuSelection(player, toolId, config, commandId)
+                npcUuid -> withCurrentPlayer(ownerUuid,
+                        current -> applyMenuUnlink(current, toolId, config, npcUuid)),
+                npcUuid -> withCurrentPlayer(ownerUuid,
+                        current -> applyMenuRelease(current, toolId, config, npcUuid)),
+                npcUuid -> withCurrentPlayer(ownerUuid,
+                        current -> applyMenuCull(current, toolId, config, npcUuid)),
+                npcUuid -> withCurrentPlayer(ownerUuid,
+                        current -> applyMenuRespawn(current, toolId, config, npcUuid)),
+                npcUuid -> withCurrentPlayer(ownerUuid,
+                        current -> applyMenuLocate(current, toolId, config, npcUuid)),
+                npcUuid -> withCurrentPlayer(ownerUuid,
+                        current -> applyMenuRecall(current, toolId, config, npcUuid)),
+                npcUuid -> withCurrentPlayer(ownerUuid,
+                        current -> applyMenuSetHome(current, toolId, config, npcUuid)),
+                npcUuid -> withCurrentPlayer(ownerUuid,
+                        current -> applyMenuReturnHome(current, toolId, config, npcUuid)),
+                () -> withCurrentPlayer(ownerUuid, current ->
+                        openGroupManagerFromSelection(
+                                current, config, toolId, genericBinding)),
+                () -> withCurrentPlayer(ownerUuid, current ->
+                        reopenSelectionMenu(
+                                current, config, toolId, genericBinding)),
+                commandId -> withCurrentPlayer(ownerUuid,
+                        current -> applyMenuSelection(
+                                current, toolId, config, commandId))
         );
         return selectionPageService.open(
                 player, store, config, working, toolId, actions,
-                () -> callbackAuthority.allowsGeneric(
-                        player, toolId, genericBinding),
+                () -> {
+                    Player current = resolveCurrentPlayer(ownerUuid);
+                    return current != null && callbackAuthority.allowsGeneric(
+                            current, toolId, genericBinding);
+                },
                 currentPlayer -> callbackAuthority.allowsBonded(
                         currentPlayer, toolId,
                         working == null ? null : working.getItemId(),
                         config, openedRegistryRevision)
         );
+    }
+
+    private static void withCurrentPlayer(
+            UUID ownerUuid,
+            java.util.function.Consumer<Player> action
+    ) {
+        Player current = resolveCurrentPlayer(ownerUuid);
+        if (current != null) action.accept(current);
+    }
+
+    @Nullable
+    private static Player resolveCurrentPlayer(UUID ownerUuid) {
+        Universe universe = Universe.get();
+        PlayerRef playerRef = universe == null ? null : universe.getPlayer(ownerUuid);
+        Ref<EntityStore> ref = playerRef == null ? null : playerRef.getReference();
+        Store<EntityStore> store = ref == null || !ref.isValid()
+                ? null : ref.getStore();
+        return store == null ? null
+                : store.getComponent(ref, Player.getComponentType());
     }
 
     private void openGroupManagerFromSelection(Player player,

@@ -335,6 +335,10 @@ final class CommandSelectionPageService {
                         currentWorld, config, toolId, actions,
                         genericAuthority, bondedAuthority));
         createdRef.set(created);
+        if (!created.host().isOpen()) {
+            return open(player, store, config, working, toolId, actions,
+                    genericAuthority, bondedAuthority, true);
+        }
         try {
             created.host().own(pageContext.refreshSignals().subscribe(
                     ignored -> created.session().requestRefresh()));
@@ -342,7 +346,18 @@ final class CommandSelectionPageService {
             LOGGER.log(Level.WARNING,
                     "[tw-command-menu] refresh subscription failed", failure);
         }
-        return openPage(player, playerRef, store, created.host());
+        if (created.custom()) {
+            CommandUiAutomaticRefresh automaticRefresh =
+                    new CommandUiAutomaticRefresh(created.session());
+            if (created.host().own(automaticRefresh)) automaticRefresh.start();
+        }
+        boolean opened = openPage(player, playerRef, store, created.host());
+        if (!opened) {
+            created.host().closeSession(
+                    com.alechilles.alecstamework.api.commandui
+                            .CommandUiCloseReason.FAILURE);
+        }
+        return opened;
     }
 
     private void refreshHosted(
@@ -385,14 +400,15 @@ final class CommandSelectionPageService {
                     working, toolId, selected, previous.rosterMode(),
                     context.snapshot()).snapshot()
                     .withPresentationRevision(previous.presentationRevision() + 1L);
+            CommandUiActionCatalog catalog = commandActions(context, fresh);
             CommandUiSnapshot next;
-            if (created.session().consumeActionRebindRequired()) {
+            if (created.session().consumeActionRebindRequired()
+                    || !catalog.matchesActions(previous)) {
                 fresh = fresh.withActionGeneration(
                         previous.actionGeneration() + 1L);
                 created.session().publishInternal(fresh,
                         com.alechilles.alecstamework.api.commandui
                                 .CommandUiChangeSet.empty());
-                CommandUiActionCatalog catalog = commandActions(context, fresh);
                 List<CommandUiActionHandle> handles = issueHandles(
                         created.session(), catalog);
                 next = catalog.attach(fresh, handles);
@@ -520,7 +536,6 @@ final class CommandSelectionPageService {
         CommandUiActionCatalog catalog = new CommandUiActionCatalog();
         TwCommandItemConfig config = context.config();
         Actions actions = context.actions();
-        BooleanSupplier authority = context.genericAuthority();
         if (config == null || config.getCommandList() == null) return catalog;
         for (TwCommandItemConfig.CommandEntry command : config.getCommandList()) {
             if (command == null || command.getId() == null
@@ -533,7 +548,7 @@ final class CommandSelectionPageService {
                     new GenericUiActionBinding(
                             new CommandUiAction("SELECT_COMMAND", null,
                                     commandId, false),
-                            authority,
+                            context.toolAuthority(),
                             () -> apply(actions.selectCommand(), commandId),
                             false));
         }
@@ -562,7 +577,7 @@ final class CommandSelectionPageService {
                         new GenericUiActionBinding(
                                 new CommandUiAction("ASSIGN_HOTSWAP", null,
                                         slot.name() + ":" + commandId, false),
-                                context.genericAuthority(),
+                                context.toolAuthority(),
                                 () -> applyHotswap(context, slot, commandId), false));
             }
         }
@@ -574,8 +589,14 @@ final class CommandSelectionPageService {
             String commandId
     ) {
         try {
+            Player currentPlayer = resolveCurrentPlayer(context.ownerUuid());
+            if (currentPlayer == null) {
+                return CompletableFuture.completedFuture(
+                        CommandUiActionResult.unavailable(
+                                "current command player is unavailable"));
+            }
             boolean changed = toolInventoryService.mutateActiveToolStack(
-                    context.player(), context.toolId(), stack ->
+                    currentPlayer, context.toolId(), stack ->
                             new CommandHotswapAssignmentStore().write(
                                     stack, slot, commandId));
             return CompletableFuture.completedFuture(changed
@@ -622,11 +643,33 @@ final class CommandSelectionPageService {
                             context.genericAuthority(), panel.manageGroups(), false));
         }
         addPanel(catalog, "RADIUS_DECREASE", "Decrease radius", "decrease",
-                context.genericAuthority(), panel.decreaseRadius());
+                context.toolAuthority(), panel.decreaseRadius());
         addPanel(catalog, "RADIUS_INCREASE", "Increase radius", "increase",
-                context.genericAuthority(), panel.increaseRadius());
+                context.toolAuthority(), panel.increaseRadius());
         addPanel(catalog, "CLEAR_FILTERS", "Clear filters", "clear",
                 context.preferenceAuthority(), panel.clearFilters());
+        for (String sort : List.of("Default", "Name", "Species", "Group")) {
+            addPanel(catalog, "SORT_" + sort.toUpperCase(java.util.Locale.ROOT),
+                    "Sort by " + sort.toLowerCase(java.util.Locale.ROOT),
+                    "sort:" + sort, context.preferenceAuthority(),
+                    () -> panel.setSort().accept(sort));
+        }
+        for (String filter : List.of("None", "Name", "Species", "Group")) {
+            addPanel(catalog,
+                    "FILTER_" + filter.toUpperCase(java.util.Locale.ROOT),
+                    "Filter by " + filter.toLowerCase(java.util.Locale.ROOT),
+                    "filter:" + filter, context.preferenceAuthority(),
+                    () -> panel.setFilterMode().accept(filter));
+        }
+        if (context.genericRosterActions()) {
+            addPanel(catalog, "GROUP_ALL", "Use all companion groups",
+                    "group:", context.genericAuthority(),
+                    () -> panel.setGroupActivation().accept(""));
+            snapshotGroups(context).forEach((groupId, label) -> addPanel(
+                    catalog, "GROUP_" + groupId, "Use group " + label,
+                    "group:" + groupId, context.genericAuthority(),
+                    () -> panel.setGroupActivation().accept(groupId)));
+        }
     }
 
     private void addPanel(
@@ -698,7 +741,8 @@ final class CommandSelectionPageService {
             UUID rowId = rowId(snapshot, entry.npcUuid());
             if (rowId == null) continue;
             if (feature != null && feature.bonded() != null) {
-                addBondedActions(catalog, context, rowId, feature);
+                addBondedActions(catalog, context, rowId, entry.npcUuid(),
+                        feature, features);
             } else {
                 addGenericActions(catalog, context, rowId, entry, feature,
                         npc, features);
@@ -786,13 +830,55 @@ final class CommandSelectionPageService {
                         features.revive(), context, true);
             }
         }
+        if (linked && context.genericRosterActions()) {
+            PanelCallbacks panel = buildPanelCallbacks(context);
+            addGroupAssignment(catalog, context, rowId, npcId, "", "No group",
+                    panel.assignGroup());
+            snapshotGroups(context).forEach((groupId, label) ->
+                    addGroupAssignment(catalog, context, rowId, npcId, groupId,
+                            "Assign to " + label, panel.assignGroup()));
+        }
+    }
+
+    private Map<String, String> snapshotGroups(PageContext context) {
+        Map<String, String> groups = new java.util.LinkedHashMap<>();
+        for (var entry : context.snapshot().snapshot().entries()) {
+            if (entry == null || entry.groupId() == null
+                    || entry.groupId().isBlank()) continue;
+            groups.putIfAbsent(entry.groupId(), entry.groupName() == null
+                    || entry.groupName().isBlank()
+                    ? entry.groupId() : entry.groupName());
+        }
+        return Map.copyOf(groups);
+    }
+
+    private void addGroupAssignment(
+            CommandUiActionCatalog catalog,
+            PageContext context,
+            UUID rowId,
+            UUID target,
+            String groupId,
+            String label,
+            BiConsumer<UUID, String> operation
+    ) {
+        catalog.addRow(rowId, "ASSIGN_GROUP:" + groupId, label,
+                new GenericUiActionBinding(
+                        new CommandUiAction("ASSIGN_GROUP", target, groupId, false),
+                        context.genericAuthority(),
+                        () -> {
+                            operation.accept(target, groupId);
+                            return CompletableFuture.completedFuture(
+                                    CommandUiActionResult.applied());
+                        }, false));
     }
 
     private void addBondedActions(
             CommandUiActionCatalog catalog,
             PageContext context,
             UUID rowId,
-            CommandPanelFeaturePresentation feature
+            UUID presentationId,
+            CommandPanelFeaturePresentation feature,
+            FeatureCallbacks features
     ) {
         if (bondedActions == null || feature.bonded() == null) return;
         var bonded = feature.bonded();
@@ -813,6 +899,17 @@ final class CommandSelectionPageService {
         }
         addBondedRow(catalog, context, rowId, feature, "ABANDON",
                 "Abandon", true);
+        if (BondedCompanionFlightToggleActionService
+                .isFlightToggleAvailable(feature.bonded())) {
+            addFeatureRow(catalog, rowId, "TOGGLE_FLIGHT", "Toggle flight",
+                    presentationId, features.flightToggle(), context, false);
+        }
+        if (BondedCompanionShoulderRideActionService
+                .isAvailable(feature.bonded())) {
+            addFeatureRow(catalog, rowId, "TOGGLE_SHOULDER_RIDE",
+                    "Toggle shoulder ride", presentationId,
+                    shoulderRideCallback(context), context, false);
+        }
     }
 
     private void addGenericRow(
@@ -843,7 +940,8 @@ final class CommandSelectionPageService {
     ) {
         catalog.addRow(rowId, kind, label, new GenericUiActionBinding(
                 new CommandUiAction(kind, target, null, confirmation),
-                context.genericAuthority(),
+                context.config().usesBondedCompanionRoster()
+                        ? context.toolAuthority() : context.genericAuthority(),
                 () -> apply(operation, target, context.ownerUuid()), confirmation));
     }
 
@@ -1016,10 +1114,18 @@ final class CommandSelectionPageService {
                 )
         );
         LinkedPanelRefreshSignalSource pageSignals = pageSignals(player, config);
+        BooleanSupplier toolAuthority = config.usesBondedCompanionRoster()
+                ? () -> {
+                    Player current = resolveCurrentPlayer(player.getUuid());
+                    return current != null
+                            && bondedLifecycleAuthority.allows(current);
+                }
+                : genericCallbackAuthority;
         return new PageContext(player, uiPlayerRef, config,
                 toolId, actions, player.getUuid(), genericRosterActions,
+                toolAuthority,
                 genericRosterActions ? genericCallbackAuthority : () -> false,
-                genericRosterActions ? genericCallbackAuthority : () -> true,
+                toolAuthority,
                 bondedLifecycleAuthority, panelSnapshot,
                 pageSignals,
                 working == null ? null : working.getFromMetadataOrNull(
@@ -1219,40 +1325,72 @@ final class CommandSelectionPageService {
         Consumer<String> ignoredString = ignored -> { };
         Consumer<Boolean> ignoredBoolean = ignored -> { };
         Runnable ignoredAction = () -> { };
-        Player player = context.player();
         String toolId = context.toolId();
+        TwCommandItemConfig config = context.config();
         BooleanSupplier genericAuthority = context.genericAuthority();
+        BooleanSupplier toolAuthority = context.toolAuthority();
         BooleanSupplier preferenceAuthority = context.preferenceAuthority();
         return new PanelCallbacks(
                 context.config().usesBondedCompanionRoster() ? ignoredString
-                        : guardedString(preferenceAuthority, value -> panelActionService.applySetPanelMode(player, toolId, value)),
+                        : guardedString(preferenceAuthority, value -> withCurrentPlayer(
+                                context.ownerUuid(), player -> panelActionService
+                                        .applySetPanelMode(player, toolId, value))),
                 context.genericRosterActions() ? guardedBoolean(genericAuthority,
-                        enabled -> panelActionService.applySetAutoLinkEnabled(
-                                player, toolId, context.config(), enabled)) : ignoredBoolean,
+                        enabled -> withCurrentPlayer(context.ownerUuid(), player ->
+                                panelActionService.applySetAutoLinkEnabled(
+                                        player, toolId, config, enabled))) : ignoredBoolean,
                 context.genericRosterActions() ? guardedBoolean(genericAuthority,
-                        enabled -> panelActionService.applySetActiveHighlightEnabled(
-                                player, toolId, context.config(), enabled)) : ignoredBoolean,
-                guardedAction(genericAuthority, () -> panelActionService.applyAdjustPanelRadius(
-                        player, toolId, context.config(), false)),
-                guardedAction(genericAuthority, () -> panelActionService.applyAdjustPanelRadius(
-                        player, toolId, context.config(), true)),
+                        enabled -> withCurrentPlayer(context.ownerUuid(), player ->
+                                panelActionService.applySetActiveHighlightEnabled(
+                                        player, toolId, config, enabled))) : ignoredBoolean,
+                guardedAction(toolAuthority, () -> withCurrentPlayer(
+                        context.ownerUuid(), player -> panelActionService
+                                .applyAdjustPanelRadius(player, toolId, config, false))),
+                guardedAction(toolAuthority, () -> withCurrentPlayer(
+                        context.ownerUuid(), player -> panelActionService
+                                .applyAdjustPanelRadius(player, toolId, config, true))),
                 context.genericRosterActions() ? guardedAction(genericAuthority,
                         context.actions().manageGroups()) : ignoredAction,
-                guardedString(preferenceAuthority,
-                        value -> panelActionService.applySetSort(player, toolId, value)),
-                guardedString(preferenceAuthority,
-                        value -> panelActionService.applySetFilterMode(player, toolId, value)),
-                guardedString(preferenceAuthority, value -> panelActionService
-                        .applySetSelectedFilterText(player, toolId, value)),
-                guardedAction(preferenceAuthority,
-                        () -> panelActionService.applyClearFilters(player, toolId)),
+                guardedString(preferenceAuthority, value -> withCurrentPlayer(
+                        context.ownerUuid(), player -> panelActionService
+                                .applySetSort(player, toolId, value))),
+                guardedString(preferenceAuthority, value -> withCurrentPlayer(
+                        context.ownerUuid(), player -> panelActionService
+                                .applySetFilterMode(player, toolId, value))),
+                guardedString(preferenceAuthority, value -> withCurrentPlayer(
+                        context.ownerUuid(), player -> panelActionService
+                                .applySetSelectedFilterText(player, toolId, value))),
+                guardedAction(preferenceAuthority, () -> withCurrentPlayer(
+                        context.ownerUuid(), player -> panelActionService
+                                .applyClearFilters(player, toolId))),
                 context.genericRosterActions() ? guardedString(genericAuthority,
-                        value -> groupAssignPageService.applyGroupActivation(
-                                player, toolId, context.config(), value)) : ignoredString,
+                        value -> withCurrentPlayer(context.ownerUuid(), player ->
+                                groupAssignPageService.applyGroupActivation(
+                                        player, toolId, config, value))) : ignoredString,
                 context.genericRosterActions() ? guardedPair(genericAuthority,
-                        (uuid, group) -> groupAssignPageService.applyGroupAssignment(
-                                player, toolId, context.config(), uuid, group))
+                        (uuid, group) -> withCurrentPlayer(context.ownerUuid(), player ->
+                                groupAssignPageService.applyGroupAssignment(
+                                        player, toolId, config, uuid, group)))
                         : (ignoredUuid, ignoredGroup) -> { });
+    }
+
+    private static void withCurrentPlayer(
+            UUID ownerUuid,
+            Consumer<Player> action
+    ) {
+        Player player = resolveCurrentPlayer(ownerUuid);
+        if (player != null) action.accept(player);
+    }
+
+    @Nullable
+    private static Player resolveCurrentPlayer(UUID ownerUuid) {
+        PlayerRef playerRef = Universe.get() == null ? null
+                : Universe.get().getPlayer(ownerUuid);
+        Ref<EntityStore> ref = playerRef == null ? null : playerRef.getReference();
+        Store<EntityStore> store = ref == null || !ref.isValid()
+                ? null : ref.getStore();
+        return store == null ? null
+                : store.getComponent(ref, Player.getComponentType());
     }
 
     private void applyFeatureAction(
@@ -1489,6 +1627,7 @@ final class CommandSelectionPageService {
             Actions actions,
             UUID ownerUuid,
             boolean genericRosterActions,
+            BooleanSupplier toolAuthority,
             BooleanSupplier genericAuthority,
             BooleanSupplier preferenceAuthority,
             BondedLifecycleAuthority bondedLifecycleAuthority,

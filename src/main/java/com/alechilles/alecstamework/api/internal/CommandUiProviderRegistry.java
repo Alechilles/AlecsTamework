@@ -115,6 +115,26 @@ public final class CommandUiProviderRegistry implements CommandUiApi, AutoClosea
         return () -> unregisterListeners.remove(required);
     }
 
+    /** Subscribes to one exact generation and reports an already-ended generation. */
+    @Nonnull
+    public synchronized ExactSubscription subscribeExactUnregister(
+            @Nonnull CommandUiProviderId providerId,
+            long generation,
+            @Nonnull UnregisterListener listener
+    ) {
+        UnregisterListener required = java.util.Objects.requireNonNull(
+                listener, "listener");
+        Entry current = providers.get(java.util.Objects.requireNonNull(
+                providerId, "providerId"));
+        if (closed.get() || current == null || !current.active()
+                || current.generation != generation) {
+            return new ExactSubscription(false, () -> { });
+        }
+        unregisterListeners.add(required);
+        return new ExactSubscription(true,
+                () -> unregisterListeners.remove(required));
+    }
+
     @Override
     @Nonnull
     public synchronized Set<CommandUiProviderId> listProviderIds() {
@@ -165,6 +185,13 @@ public final class CommandUiProviderRegistry implements CommandUiApi, AutoClosea
             @Nonnull CommandUiProvider provider,
             long generation
     ) {
+    }
+
+    /** Atomic result for exact provider-generation host subscription. */
+    public record ExactSubscription(boolean active, AutoCloseable handle) {
+        public ExactSubscription {
+            java.util.Objects.requireNonNull(handle, "handle");
+        }
     }
 
     /** Internal exact-generation removal callback. */

@@ -94,6 +94,37 @@ class CommandUiActionCatalogTest {
         assertFalse(changes.changedCompanionIds().contains(second));
     }
 
+    @Test
+    void externalRosterAndLifecycleChangesRequireFreshActionHandles() {
+        UUID first = UUID.randomUUID();
+        UUID added = UUID.randomUUID();
+        CommandUiSnapshot previous = new CommandUiSnapshot(
+                UUID.randomUUID(), 1L, 1L, null, List.of(),
+                List.of(row(first, "One", "first-handle")),
+                new CommandUiPanelState("linked"));
+        CommandUiActionCatalog same = rowCatalog(first, "LOCATE", "Locate");
+        CommandUiActionCatalog changed = rowCatalog(first, "RECALL", "Recall");
+        changed.addRow(added, "LOCATE", "Locate", binding("LOCATE"));
+
+        assertTrue(same.matchesActions(previous));
+        assertFalse(changed.matchesActions(previous));
+    }
+
+    private static CommandUiActionCatalog rowCatalog(
+            UUID rowId, String kind, String label) {
+        CommandUiActionCatalog catalog = new CommandUiActionCatalog();
+        catalog.addRow(rowId, kind, label, binding(kind));
+        return catalog;
+    }
+
+    private static CommandSelectionPageService.GenericUiActionBinding binding(
+            String kind) {
+        return new CommandSelectionPageService.GenericUiActionBinding(
+                new CommandUiAction(kind, null, null, false), () -> true,
+                () -> CompletableFuture.completedFuture(
+                        CommandUiActionResult.applied()), false);
+    }
+
     private static CommandUiCompanionRow row(
             UUID id,
             String name,

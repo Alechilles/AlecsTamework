@@ -111,6 +111,28 @@ class CommandUiHostPageTest {
     }
 
     @Test
+    void standardBuildFailureDoesNotOpenAnotherStandardHost() {
+        TestSession session = new TestSession(snapshot(1L));
+        TestController controller = new TestController();
+        controller.failBuild = true;
+        AtomicInteger fallbackOpenCount = new AtomicInteger();
+        PlayerRef playerRef = new PlayerRef(
+                null, UUID.randomUUID(), "HostTester", "en-US", null, null);
+        CommandUiHostPage<TestEvent> host = new CommandUiHostPage<>(
+                playerRef, new CommandUiOpenContext(playerRef.getUuid(),
+                "en-US", "tool-1", "config-1",
+                (CommandUiProviderId) null, "generic"), session, controller,
+                null, 0L, null, directDispatcher(),
+                ignored -> fallbackOpenCount.incrementAndGet(),
+                new RecordingEmitter());
+
+        host.build(null, new UICommandBuilder(), new UIEventBuilder(), null);
+
+        assertEquals(CommandUiCloseReason.FAILURE, session.closeReason);
+        assertEquals(0, fallbackOpenCount.get());
+    }
+
+    @Test
     void eventFailureClosesOnlyThisSessionAndSuppressesLaterCallbacks() {
         TestSession session = new TestSession(snapshot(1L));
         TestController controller = new TestController();
@@ -153,6 +175,23 @@ class CommandUiHostPageTest {
         replacementRegistration.close();
         assertEquals(CommandUiCloseReason.PROVIDER_UNREGISTERED,
                 replacementSession.closeReason);
+    }
+
+    @Test
+    void hostClosesWhenProviderGenerationEndedBeforeSubscription() {
+        CommandUiProviderRegistry registry = new CommandUiProviderRegistry();
+        var registration = registry.register(
+                "example:menu", ignored -> null).registration();
+        long generation = registration.generation();
+        registration.close();
+        TestSession session = new TestSession(snapshot(1L));
+
+        CommandUiHostPage<TestEvent> host = hostForRegistration(
+                registry, generation, session);
+
+        assertFalse(host.isOpen());
+        assertEquals(CommandUiCloseReason.PROVIDER_UNREGISTERED,
+                session.closeReason);
     }
 
     @Test
@@ -220,7 +259,7 @@ class CommandUiHostPageTest {
                 controller,
                 CommandUiProviderId.of("example:menu"),
                 7L,
-                new CommandUiProviderRegistry(),
+                null,
                 dispatcher,
                 fallback,
                 emitter);
