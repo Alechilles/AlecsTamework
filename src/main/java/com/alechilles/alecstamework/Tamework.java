@@ -852,6 +852,7 @@ public class Tamework extends JavaPlugin {
                 api::bondedCompanions,
                 api.events()
         );
+        commandItemFeatureHandler.configureCommandUi(api.commandUi());
         CommandWorldChangeTravelEventHandler commandWorldChangeTravelEventHandler =
                 new CommandWorldChangeTravelEventHandler(commandItemFeatureHandler);
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,

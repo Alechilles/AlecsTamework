@@ -4,6 +4,12 @@ import static com.alechilles.alecstamework.items.CommandSelectionCallbackGuards.
 
 import com.alechilles.alecstamework.api.commandui.CommandUiActionHandle;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
+import com.alechilles.alecstamework.api.commandui.CommandUiCommandOption;
+import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
+import com.alechilles.alecstamework.api.commandui.CommandUiPanelState;
+import com.alechilles.alecstamework.api.commandui.CommandUiProviderId;
+import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
+import com.alechilles.alecstamework.api.internal.CommandUiProviderRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.compat.HytaleApiLevel;
@@ -14,10 +20,13 @@ import com.alechilles.alecstamework.ui.LinkedNpcPanelFeatureAction;
 import com.alechilles.alecstamework.ui.LinkedPanelRefreshSignalSource;
 import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
 import com.alechilles.alecstamework.ui.CommandActiveHighlightBinding;
+import com.alechilles.alecstamework.ui.CommandUiHostPage;
+import com.alechilles.alecstamework.ui.StandardCommandUiController;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.entity.entities.player.pages.CustomUIPage;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -25,6 +34,8 @@ import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.Map;
+import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.concurrent.CompletionStage;
 import java.util.Objects;
@@ -51,6 +62,9 @@ final class CommandSelectionPageService {
     private ShoulderRideAction shoulderRideActions;
     private LinkedShoulderRideAction linkedShoulderRideActions;
     @javax.annotation.Nullable private final BondedCompanionPanelRefreshSignalSource bondedRefreshSignals;
+    @Nullable private volatile CommandUiPageCoordinator commandUiCoordinator;
+    private final CommandUiHostPage.WorldDispatcher commandUiWorldDispatcher =
+            CommandUiCurrentWorldDispatcher.production();
 
     CommandSelectionPageService(CommandToolInventoryService toolInventoryService,
                                 CommandGroupAssignPageService groupAssignPageService,
@@ -203,6 +217,12 @@ final class CommandSelectionPageService {
         this.bondedRefreshSignals = bondedRefreshSignals;
     }
 
+    /** Enables the shared host with Tamework's live provider registry. */
+    void configureCommandUi(@Nullable CommandUiProviderRegistry registry) {
+        commandUiCoordinator = registry == null
+                ? null : new CommandUiPageCoordinator(registry, this);
+    }
+
     /**
      * Opens a page whose generic callbacks are checked against the physical
      * tool again when the player presses them.
@@ -215,6 +235,19 @@ final class CommandSelectionPageService {
                  Actions actions,
                  BooleanSupplier genericCallbackAuthority,
                  BondedLifecycleAuthority bondedLifecycleAuthority) {
+        return open(player, store, config, working, toolId, actions,
+                genericCallbackAuthority, bondedLifecycleAuthority, false);
+    }
+
+    private boolean open(Player player,
+                 Store<EntityStore> store,
+                 TwCommandItemConfig config,
+                 ItemStack working,
+                 String toolId,
+                 Actions actions,
+                 BooleanSupplier genericCallbackAuthority,
+                 BondedLifecycleAuthority bondedLifecycleAuthority,
+                 boolean forceStandard) {
         if (!canOpen(player, store, config, toolId, actions)) {
             LOGGER.warning("[tw-command-menu] selection page prerequisites failed: config="
                     + (config == null ? "null" : config.getId())
@@ -230,14 +263,125 @@ final class CommandSelectionPageService {
                     + toolId);
             return false;
         }
-        TameworkCommandSelectionPage page = createPage(
-                player, store, uiPlayerRef, config, working, toolId, actions,
-                genericCallbackAuthority != null
-                        ? genericCallbackAuthority : () -> false,
-                bondedLifecycleAuthority != null
-                        ? bondedLifecycleAuthority : ignored -> false
-        );
-        return openPage(player, playerRef, store, page);
+        BooleanSupplier genericAuthority = genericCallbackAuthority != null
+                ? genericCallbackAuthority : () -> false;
+        BondedLifecycleAuthority bondedAuthority = bondedLifecycleAuthority != null
+                ? bondedLifecycleAuthority : ignored -> false;
+        CommandUiPageCoordinator coordinator = commandUiCoordinator;
+        if (coordinator == null) {
+            TameworkCommandSelectionPage page = createPage(
+                    player, store, uiPlayerRef, config, working, toolId, actions,
+                    genericAuthority, bondedAuthority);
+            return openPage(player, playerRef, store, page);
+        }
+        return openHostedPage(coordinator, player, store, playerRef, uiPlayerRef,
+                config, working, toolId, actions, genericAuthority,
+                bondedAuthority, forceStandard);
+    }
+
+    private boolean openHostedPage(
+            CommandUiPageCoordinator coordinator,
+            Player player,
+            Store<EntityStore> store,
+            Ref<EntityStore> playerRef,
+            PlayerRef uiPlayerRef,
+            TwCommandItemConfig config,
+            ItemStack working,
+            String toolId,
+            Actions actions,
+            BooleanSupplier genericAuthority,
+            BondedLifecycleAuthority bondedAuthority,
+            boolean forceStandard
+    ) {
+        UUID sessionId = UUID.randomUUID();
+        String selected = working == null ? null : working.getFromMetadataOrNull(
+                TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING);
+        CommandUiProviderId configuredProvider = forceStandard ? null
+                : CommandUiProviderId.tryParse(config.getUiProviderId()).orElse(null);
+        String rosterMode = config.usesBondedCompanionRoster()
+                ? "bonded" : "generic";
+        CommandUiOpenContext openContext = new CommandUiOpenContext(
+                uiPlayerRef.getUuid(), uiPlayerRef.getLanguage(), toolId,
+                config.getId(), configuredProvider, rosterMode);
+        CommandUiSnapshot snapshot = initialSnapshot(
+                sessionId, configuredProvider, player, config, working,
+                toolId, selected, rosterMode);
+        CommandUiPageCoordinator.Created created = coordinator.create(
+                uiPlayerRef, openContext, snapshot,
+                () -> new StandardCommandUiController(createPage(
+                        player, store, uiPlayerRef, config, working, toolId,
+                        actions, genericAuthority, bondedAuthority)),
+                List.of(), List.of(), (base, handles) -> base,
+                commandUiWorldDispatcher,
+                currentWorld -> openStandardFallback(
+                        currentWorld, config, toolId, actions,
+                        genericAuthority, bondedAuthority));
+        return openPage(player, playerRef, store, created.host());
+    }
+
+    private CommandUiSnapshot initialSnapshot(
+            UUID sessionId,
+            @Nullable CommandUiProviderId providerId,
+            Player player,
+            TwCommandItemConfig config,
+            @Nullable ItemStack working,
+            String toolId,
+            @Nullable String selected,
+            String rosterMode
+    ) {
+        CommandPanelSnapshotState panelSnapshot = new CommandPanelSnapshotState(
+                () -> toolInventoryService.buildLinkedPanelSnapshotForTool(
+                        player, toolId, config));
+        panelSnapshot.refreshSnapshot();
+        String mode = config.usesBondedCompanionRoster()
+                ? TameworkCommandSelectionPage.PANEL_MODE_LINKED
+                : toolInventoryService.resolvePanelModeValueForTool(
+                        player, toolId, config);
+        CommandUiPanelState panelState = new CommandUiPanelState(
+                mode,
+                !config.usesBondedCompanionRoster()
+                        && toolInventoryService.resolvePanelAutoLinkEnabledForTool(
+                                player, toolId),
+                !config.usesBondedCompanionRoster()
+                        && toolInventoryService.resolvePanelActiveHighlightEnabledForTool(
+                                player, toolId),
+                Math.max(0.0, config.getRadius()),
+                toolInventoryService.resolvePanelRadiusLabelForTool(
+                        player, toolId, config),
+                toolInventoryService.resolvePanelSortValueForTool(player, toolId),
+                toolInventoryService.resolvePanelFilterModeValueForTool(player, toolId),
+                toolInventoryService.resolvePanelFilterInputForTool(player, toolId),
+                panelSnapshot.emptyStateKey(), Map.of(), Map.of());
+        List<CommandUiCommandOption> commandOptions =
+                CommandUiSnapshotAssembler.commandOptions(
+                        config, selected, Map.of());
+        return CommandUiSnapshotAssembler.assemble(
+                sessionId, 1L, 1L,
+                providerId == null ? null : providerId.value(),
+                toolId, working == null ? null : working.getItemId(),
+                config.getId(), rosterMode,
+                Set.of("commands", "companions", "panel", "partial-updates"),
+                selected, commandOptions, panelSnapshot, panelState,
+                Map.of(), Map.of(), System.currentTimeMillis(), Map.of(), null);
+    }
+
+    private void openStandardFallback(
+            CommandUiHostPage.CurrentWorld currentWorld,
+            TwCommandItemConfig config,
+            String toolId,
+            Actions actions,
+            BooleanSupplier genericAuthority,
+            BondedLifecycleAuthority bondedAuthority
+    ) {
+        Ref<EntityStore> ref = currentWorld.playerRef();
+        Store<EntityStore> store = currentWorld.store();
+        Player currentPlayer = ref == null || store == null || !ref.isValid()
+                ? null : store.getComponent(ref, Player.getComponentType());
+        ItemStack currentTool = currentPlayer == null ? null
+                : toolInventoryService.findUniqueToolStack(currentPlayer, toolId);
+        if (currentPlayer == null || currentTool == null || currentTool.isEmpty()) return;
+        open(currentPlayer, store, config, currentTool, toolId, actions,
+                genericAuthority, bondedAuthority, true);
     }
 
     private boolean canOpen(Player player,
@@ -640,7 +784,7 @@ final class CommandSelectionPageService {
     private boolean openPage(Player player,
                              Ref<EntityStore> playerRef,
                              Store<EntityStore> store,
-                             TameworkCommandSelectionPage page) {
+                             CustomUIPage page) {
         try {
             player.getPageManager().openCustomPage(playerRef, store, page);
             return true;

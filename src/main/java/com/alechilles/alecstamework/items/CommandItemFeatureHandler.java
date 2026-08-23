@@ -1,5 +1,8 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.api.commandui.CommandUiApi;
+import com.alechilles.alecstamework.api.internal.CommandUiProviderRegistry;
+
 import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
 import com.alechilles.alecstamework.api.PaidCommandRevivalApi;
@@ -515,6 +518,13 @@ public final class CommandItemFeatureHandler {
     /** Stops the owned bonded panel loader before durable persistence closes. */
     public void close() {
         bondedPanelLifecycle.close();
+    }
+
+    /** Connects command menu opening to the live public provider registry. */
+    public void configureCommandUi(@Nullable CommandUiApi commandUi) {
+        selectionPageService.configureCommandUi(
+                commandUi instanceof CommandUiProviderRegistry registry
+                        ? registry : null);
     }
     private boolean openSelectionMenu(Player player,
                                       Store<EntityStore> store,
