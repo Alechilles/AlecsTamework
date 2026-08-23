@@ -107,8 +107,15 @@ final class CommandTalentPageService {
             @Nonnull Player player,
             @Nonnull TalentTargetResolver targetResolver
     ) {
-        String language = resolveLanguage(player);
-        TalentTarget context = targetResolver.resolve();
+        return buildTalentPageData(
+                resolveLanguage(player), targetResolver.resolve());
+    }
+
+    @Nonnull
+    private TameworkCompanionTalentsPage.PageData buildTalentPageData(
+            @Nullable String language,
+            @Nullable TalentTarget context
+    ) {
         if (context == null) {
             return TameworkCompanionTalentsPage.PageData.empty();
         }
@@ -239,6 +246,66 @@ final class CommandTalentPageService {
                 canReset,
                 entries
         );
+    }
+
+    @Nullable
+    ManagedSnapshot managedSnapshot(
+            @Nullable Player player,
+            @Nullable String toolId,
+            @Nullable UUID npcUuid
+    ) {
+        if (player == null || toolId == null || npcUuid == null) return null;
+        TalentTarget target = resolveLinkedCompanionTalentContext(
+                player, toolId, npcUuid);
+        if (target == null) return null;
+        CompanionLevelingService.LevelingSnapshot leveling =
+                CompanionLevelingService.resolveSnapshot(
+                        target.npcRef(), target.store(), target.roleId());
+        int level = leveling == null ? 0 : Math.max(0, leveling.level());
+        int points = CompanionTalentService.resolveAvailablePoints(
+                target.npcRef(), target.store());
+        return new ManagedSnapshot(
+                buildTalentPageData(resolveLanguage(player), target),
+                level, Math.max(0, points));
+    }
+
+    @Nonnull
+    ManagedMutation purchaseManaged(
+            @Nullable Player player,
+            @Nullable String toolId,
+            @Nullable UUID npcUuid,
+            @Nullable String talentId
+    ) {
+        TalentTarget target = player == null || toolId == null || npcUuid == null
+                ? null : resolveLinkedCompanionTalentContext(
+                        player, toolId, npcUuid);
+        if (target == null) {
+            return ManagedMutation.notFound(
+                    "Companion is no longer loaded.");
+        }
+        CompanionTalentService.PurchaseResult result =
+                CompanionTalentService.purchaseTalent(
+                        target.npcRef(), target.store(), talentId);
+        return new ManagedMutation(result.applied(), false, result.message());
+    }
+
+    @Nonnull
+    ManagedMutation resetManaged(
+            @Nullable Player player,
+            @Nullable String toolId,
+            @Nullable UUID npcUuid
+    ) {
+        TalentTarget target = player == null || toolId == null || npcUuid == null
+                ? null : resolveLinkedCompanionTalentContext(
+                        player, toolId, npcUuid);
+        if (target == null) {
+            return ManagedMutation.notFound(
+                    "Companion is no longer loaded.");
+        }
+        CompanionTalentService.ResetResult result =
+                CompanionTalentService.resetTalents(
+                        target.npcRef(), target.store());
+        return new ManagedMutation(result.applied(), false, result.message());
     }
 
     @Nonnull
@@ -479,6 +546,23 @@ final class CommandTalentPageService {
             if (displayName == null || displayName.isBlank()) {
                 displayName = "Companion";
             }
+        }
+    }
+
+    record ManagedSnapshot(
+            @Nonnull TameworkCompanionTalentsPage.PageData pageData,
+            int level,
+            int availablePoints
+    ) {
+    }
+
+    record ManagedMutation(
+            boolean applied,
+            boolean notFound,
+            @Nonnull String message
+    ) {
+        private static ManagedMutation notFound(String message) {
+            return new ManagedMutation(false, true, message);
         }
     }
 }

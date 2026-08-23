@@ -461,6 +461,30 @@ class CommandUiSessionTask2Test {
     }
 
     @Test
+    void bondedManagedFlowDoesNotRequireALifecycleActionRouter() {
+        CommandSelectionPageService service =
+                new CommandSelectionPageService(null, null, null, null, null);
+        UUID sessionId = UUID.randomUUID();
+        CommandUiSessionImpl session = session(sessionId,
+                CommandUiSessionImpl.Mode.BONDED,
+                new CommandUiActionGateway(), 1L);
+        var binding = new CommandSelectionPageService.BondedUiActionBinding(
+                new CommandUiAction("OPEN_TALENTS"), UUID.randomUUID(),
+                "test:roster", "profile-1",
+                (owner, roster, profile) -> null, false,
+                ignored -> CompletableFuture.completedFuture(
+                        CommandUiActionResult.presented(() -> "talents")));
+
+        var handle = service.bindBondedUiAction(session, binding);
+        CommandUiActionResult result = session.invoke(handle)
+                .toCompletableFuture().join();
+
+        assertEquals(CommandUiActionStatus.ACCEPTED, result.status());
+        assertEquals("talents", result.flowView().kind());
+        session.close();
+    }
+
+    @Test
     void genericBinderRequiresOutcomeBearingOperation() {
         CommandSelectionPageService service =
                 new CommandSelectionPageService(null, null, null, null, null);

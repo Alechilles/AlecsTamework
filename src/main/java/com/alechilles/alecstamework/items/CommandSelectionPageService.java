@@ -58,8 +58,10 @@ final class CommandSelectionPageService {
     private final CommandPanelActionService panelActionService;
     private final CommandTalentPageService talentPageService;
     private final CommandUiManagedPanelActions managedPanelActions;
+    private final CommandUiManagedTalentActions managedTalentActions;
     private final CommandPanelFeatureActionService featureActions;
     private final BondedCompanionPanelActionRouter bondedActions;
+    private final CommandUiActionBindingService actionBindingService;
     private final BondedCompanionTalentPageService bondedTalentPages;
     private final FlightToggleAction flightToggleActions;
     private final LinkedFlightToggleAction linkedFlightToggleActions;
@@ -215,8 +217,12 @@ final class CommandSelectionPageService {
         this.talentPageService = talentPageService;
         this.managedPanelActions = new CommandUiManagedPanelActions(
                 toolInventoryService, panelActionService);
+        this.managedTalentActions = new CommandUiManagedTalentActions(
+                talentPageService, bondedTalentPages);
         this.featureActions = featureActions;
         this.bondedActions = bondedActions;
+        this.actionBindingService = new CommandUiActionBindingService(
+                bondedActions);
         this.bondedTalentPages = bondedTalentPages;
         this.flightToggleActions = flightToggleActions;
         this.linkedFlightToggleActions = linkedFlightToggleActions;
@@ -716,7 +722,8 @@ final class CommandSelectionPageService {
             if (rowId == null) continue;
             if (feature != null && feature.bonded() != null) {
                 addBondedActions(catalog, context, rowId, entry.npcUuid(),
-                        feature, features);
+                        feature, entry.isTalentsActionVisible()
+                                && entry.isTalentsActionEnabled(), features);
             } else {
                 addGenericActions(catalog, context, snapshot, rowId, entry,
                         feature, npc, features);
@@ -793,6 +800,9 @@ final class CommandSelectionPageService {
                     "Toggle shoulder ride", npcId, shoulderRideCallback(context),
                     context, false);
         }
+        managedTalentActions.addGenericAction(catalog, rowId, entry,
+                context.toolId(), context.genericAuthority(),
+                () -> resolveCurrentPlayer(context.ownerUuid()));
         if (feature != null && feature.roster() != null) {
             if (feature.roster().summonEnabled()) addFeatureRow(catalog, rowId,
                     "SUMMON", "Summon", npcId, features.summon(), context, false);
@@ -841,10 +851,16 @@ final class CommandSelectionPageService {
             UUID rowId,
             UUID presentationId,
             CommandPanelFeaturePresentation feature,
+            boolean talentsAvailable,
             FeatureCallbacks features
     ) {
-        if (bondedActions == null || feature.bonded() == null) return;
+        if (feature.bonded() == null) return;
         var bonded = feature.bonded();
+        managedTalentActions.addBondedAction(catalog, rowId,
+                context.ownerUuid(), bonded, talentsAvailable,
+                (owner, roster, profile) -> resolveBondedContext(
+                        context, owner, roster, profile));
+        if (bondedActions == null) return;
         var status = bonded.status();
         String kind = switch (status.action()) {
             case SUMMON -> "SUMMON";
@@ -1493,23 +1509,7 @@ final class CommandSelectionPageService {
             CommandUiSessionImpl session,
             GenericUiActionBinding binding
     ) {
-        Objects.requireNonNull(session, "session");
-        Objects.requireNonNull(binding, "binding");
-        if (binding.sessionOperation() != null) {
-            return session.issueGeneric(binding.action(), binding.authority(),
-                    () -> binding.sessionOperation().execute(session),
-                    binding.confirmationRequired());
-        }
-        if (binding.requestOperation() != null) {
-            return session.issueRequest(
-                    CommandUiActionGateway.Route.GENERIC, binding.action(),
-                    ignored -> binding.authority().getAsBoolean(),
-                    binding.requestOperation(), binding.inputPolicy(),
-                    binding.maximumInputLength(),
-                    binding.confirmationRequired());
-        }
-        return session.issueGeneric(binding.action(), binding.authority(),
-                binding.operation(), binding.confirmationRequired());
+        return actionBindingService.bindGeneric(session, binding);
     }
 
     /** Binds one bonded action to stable IDs and a current-world resolver. */
@@ -1518,26 +1518,7 @@ final class CommandSelectionPageService {
             CommandUiSessionImpl session,
             BondedUiActionBinding binding
     ) {
-        Objects.requireNonNull(session, "session");
-        Objects.requireNonNull(binding, "binding");
-        BondedCompanionPanelActionService.Action bondedAction = switch (
-                binding.action().builtInKind()) {
-            case SUMMON -> BondedCompanionPanelActionService.Action.SUMMON;
-            case DISMISS -> BondedCompanionPanelActionService.Action.STORE;
-            case REVIVE -> BondedCompanionPanelActionService.Action.REVIVE;
-            case ABANDON -> BondedCompanionPanelActionService.Action.ABANDON;
-            default -> null;
-        };
-        if (bondedActions == null || bondedAction == null) return null;
-        // The bonded gateway binding carries profile/roster identity. Do not
-        // retain a replaceable current-NPC UUID from a rendered row.
-        CommandUiAction boundAction = new CommandUiAction(
-                binding.action().kind(), null, binding.action().value(),
-                binding.action().confirmationRequired());
-        return session.issueBonded(boundAction, () -> true, () ->
-                bondedActions.routeForUi(binding.ownerUuid(), binding.rosterId(),
-                        binding.profileId(), bondedAction, binding.contextResolver()),
-                binding.confirmationRequired());
+        return actionBindingService.bindBonded(session, binding);
     }
 
     record GenericUiActionBinding(
@@ -1585,8 +1566,21 @@ final class CommandSelectionPageService {
             String rosterId,
             String profileId,
             BondedCompanionPanelActionRouter.CurrentUiContextResolver contextResolver,
-            boolean confirmationRequired
+            boolean confirmationRequired,
+            @Nullable SessionUiActionExecutor sessionOperation
     ) {
+        BondedUiActionBinding(
+                CommandUiAction action,
+                UUID ownerUuid,
+                String rosterId,
+                String profileId,
+                BondedCompanionPanelActionRouter.CurrentUiContextResolver contextResolver,
+                boolean confirmationRequired
+        ) {
+            this(action, ownerUuid, rosterId, profileId, contextResolver,
+                    confirmationRequired, null);
+        }
+
         BondedUiActionBinding {
             Objects.requireNonNull(action, "action");
             Objects.requireNonNull(ownerUuid, "ownerUuid");
