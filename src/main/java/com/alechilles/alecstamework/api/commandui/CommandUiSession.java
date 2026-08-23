@@ -29,6 +29,30 @@ public interface CommandUiSession extends AutoCloseable {
             @Nullable CommandUiActionHandle handle
     );
 
+    /**
+     * Invokes one opaque handle with optional action-specific text input.
+     *
+     * <p>The default keeps older session implementations compatible. Such
+     * implementations accept handle-only requests and fail closed when a
+     * provider supplies text.</p>
+     */
+    @Nonnull
+    default CompletionStage<CommandUiActionResult> invoke(
+            @Nullable CommandUiActionRequest request
+    ) {
+        if (request == null) {
+            return CompletableFuture.completedFuture(
+                    CommandUiActionResult.denied(
+                            "command UI action request is invalid"));
+        }
+        if (request.textInput() != null) {
+            return CompletableFuture.completedFuture(
+                    CommandUiActionResult.denied(
+                            "command UI action does not accept text input"));
+        }
+        return invoke(request.handle());
+    }
+
     /** Decodes and routes an untrusted fixed event payload. */
     @Nonnull
     default CompletionStage<CommandUiActionResult> handleEvent(

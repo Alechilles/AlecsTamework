@@ -276,7 +276,8 @@ public final class TameworkApiImpl
             TameworkApiCapability.COMPANION_XP_EVENTS,
             TameworkApiCapability.CONFIG_READ,
             TameworkApiCapability.DIAGNOSTICS,
-            TameworkApiCapability.COMMAND_UI_PROVIDERS
+            TameworkApiCapability.COMMAND_UI_PROVIDERS,
+            TameworkApiCapability.COMMAND_UI_MANAGED_FLOWS
     );
     private final Gson gson = new Gson();
     @Nullable
@@ -346,6 +347,7 @@ public final class TameworkApiImpl
             EnumSet<TameworkApiCapability> current = capabilities.clone();
             if (!commandUiProviderRegistry.available()) {
                 current.remove(TameworkApiCapability.COMMAND_UI_PROVIDERS);
+                current.remove(TameworkApiCapability.COMMAND_UI_MANAGED_FLOWS);
             }
             return current;
         }
@@ -373,6 +375,7 @@ public final class TameworkApiImpl
             commandUiProviderRegistry.close();
             synchronized (capabilities) {
                 capabilities.remove(TameworkApiCapability.COMMAND_UI_PROVIDERS);
+                capabilities.remove(TameworkApiCapability.COMMAND_UI_MANAGED_FLOWS);
             }
         } finally {
             damagePolicy.close();
