@@ -12,7 +12,7 @@ import javax.annotation.Nullable;
  */
 public final class TameworkDebugXpEventsCommand extends AbstractTameworkServerCommand {
     public TameworkDebugXpEventsCommand() {
-        super("debugxpevents", "Toggle Tamework companion XP API event debug logging.");
+        super("xp-events", "Toggle Tamework companion XP API event debug logging.");
         setAllowsExtraArguments(true);
     }
 

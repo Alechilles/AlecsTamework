@@ -19,7 +19,7 @@ import javax.annotation.Nonnull;
  */
 public final class TameworkGetLifeStageCommand extends AbstractPlayerCommand {
     public TameworkGetLifeStageCommand() {
-        super("getlifestage", "Get life stage of the NPC you are looking at.");
+        super("lifestage", "Get life stage of the NPC you are looking at.");
         setAllowsExtraArguments(true);
     }
 

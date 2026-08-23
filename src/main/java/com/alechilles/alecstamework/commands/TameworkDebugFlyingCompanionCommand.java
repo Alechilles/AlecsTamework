@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
 public final class TameworkDebugFlyingCompanionCommand extends AbstractTameworkServerCommand {
 
     public TameworkDebugFlyingCompanionCommand() {
-        super("debugflyingcompanion", "Toggle Tamework flying companion diagnostics logging.");
+        super("flight", "Toggle Tamework flying companion diagnostics logging.");
         setAllowsExtraArguments(true);
     }
 

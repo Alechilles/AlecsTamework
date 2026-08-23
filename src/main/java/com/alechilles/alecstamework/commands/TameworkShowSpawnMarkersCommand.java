@@ -51,7 +51,7 @@ public final class TameworkShowSpawnMarkersCommand extends AbstractPlayerCommand
     private static final ConcurrentHashMap<UUID, TrackingSession> ACTIVE_TRACKING = new ConcurrentHashMap<>();
 
     public TameworkShowSpawnMarkersCommand() {
-        super("showspawnmarkers", "Toggle player-local spawn marker debug rendering.");
+        super("spawn-markers", "Toggle player-local spawn marker debug rendering.");
         setAllowsExtraArguments(true);
     }
 

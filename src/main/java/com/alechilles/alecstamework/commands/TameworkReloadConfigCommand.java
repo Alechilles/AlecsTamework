@@ -21,10 +21,10 @@ import javax.annotation.Nonnull;
  * Reloads Tamework item feature configs from disk.
  */
 public final class TameworkReloadConfigCommand extends AbstractWorldCommand {
-    private static final String COMMAND_NAME = "/tw reloadconfig";
+    private static final String COMMAND_NAME = "/tw config reload";
 
     public TameworkReloadConfigCommand() {
-        super("reloadconfig", "Reload Tamework item feature configs.");
+        super("reload", "Reload Tamework item feature configs.");
         setAllowsExtraArguments(true);
     }
 

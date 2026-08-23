@@ -34,7 +34,7 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
     private static final String BREED_COOLDOWN_MULTIPLIER_KEY = "BreedCooldownMultiplier";
 
     public TameworkGetHappinessCommand() {
-        super("gethappiness", "Get happiness of the NPC you are looking at.");
+        super("happiness", "Get happiness of the NPC you are looking at.");
         setAllowsExtraArguments(true);
     }
 

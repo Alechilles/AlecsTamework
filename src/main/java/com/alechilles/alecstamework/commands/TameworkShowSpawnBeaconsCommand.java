@@ -24,7 +24,7 @@ public final class TameworkShowSpawnBeaconsCommand extends AbstractPlayerCommand
     public TameworkShowSpawnBeaconsCommand(
             @Nonnull SpawnBeaconVisualizationService visualizationService
     ) {
-        super("showspawnbeacons", "Toggle natural spawn beacon visualization.");
+        super("spawn-beacons", "Toggle natural spawn beacon visualization.");
         this.visualizationService = visualizationService;
         setAllowsExtraArguments(true);
     }

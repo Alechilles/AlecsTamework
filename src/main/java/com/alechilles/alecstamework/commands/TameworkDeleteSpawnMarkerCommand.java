@@ -39,7 +39,7 @@ public final class TameworkDeleteSpawnMarkerCommand extends AbstractPlayerComman
     private static final int MAX_NPC_SUMMARY_ROWS = 4;
 
     public TameworkDeleteSpawnMarkerCommand() {
-        super("deletespawnmarker", "Delete the loaded spawn marker you are looking at.");
+        super("delete", "Delete the loaded spawn marker you are looking at.");
         setAllowsExtraArguments(true);
     }
 

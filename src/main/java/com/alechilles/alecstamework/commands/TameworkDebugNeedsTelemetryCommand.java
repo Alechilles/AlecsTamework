@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
 public final class TameworkDebugNeedsTelemetryCommand extends AbstractTameworkServerCommand {
 
     public TameworkDebugNeedsTelemetryCommand() {
-        super("debugneedstelemetry", "Toggle Tamework needs telemetry context events.");
+        super("needs", "Toggle Tamework needs telemetry context events.");
         setAllowsExtraArguments(true);
     }
 

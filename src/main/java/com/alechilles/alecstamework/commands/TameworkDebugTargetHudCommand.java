@@ -8,7 +8,7 @@ import javax.annotation.Nonnull;
 /** Toggles command target HUD diagnostics logging on the server. */
 public final class TameworkDebugTargetHudCommand extends AbstractTameworkServerCommand {
     public TameworkDebugTargetHudCommand() {
-        super("debugtargethud", "Toggle Tamework command target HUD diagnostics logging.");
+        super("target-hud", "Toggle Tamework command target HUD diagnostics logging.");
         setAllowsExtraArguments(true);
     }
 

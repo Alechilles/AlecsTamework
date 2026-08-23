@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
 public final class TameworkDebugHookCommand extends AbstractTameworkServerCommand {
 
     public TameworkDebugHookCommand() {
-        super("debughook", "Toggle Tamework hook debug logging.");
+        super("hook", "Toggle Tamework hook debug logging.");
         setAllowsExtraArguments(true);
     }
 
@@ -33,15 +33,7 @@ public final class TameworkDebugHookCommand extends AbstractTameworkServerComman
     }
 
     private static String getFirstArg(CommandContext commandContext) {
-        String input = commandContext.getInputString();
-        if (input == null) {
-            return null;
-        }
-        String[] tokens = input.trim().split("\\s+");
-        if (tokens.length < 3) {
-            return null;
-        }
-        return tokens[2];
+        return TameworkCommandInput.firstArgument(commandContext.getInputString(), "hook");
     }
 
     private static Boolean parseBoolean(String raw) {

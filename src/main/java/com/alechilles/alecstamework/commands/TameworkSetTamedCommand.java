@@ -18,7 +18,7 @@ import javax.annotation.Nonnull;
 public final class TameworkSetTamedCommand extends AbstractPlayerCommand {
 
     public TameworkSetTamedCommand() {
-        super("settamed", "Set or toggle tamed status of the NPC you are looking at.");
+        super("tamed", "Set or toggle tamed status of the NPC you are looking at.");
         setAllowsExtraArguments(true);
     }
 

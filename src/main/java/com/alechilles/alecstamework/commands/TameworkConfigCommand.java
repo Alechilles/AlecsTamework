@@ -21,7 +21,7 @@ import javax.annotation.Nonnull;
 public final class TameworkConfigCommand extends AbstractPlayerCommand {
 
     public TameworkConfigCommand() {
-        super("config", "Open the Tamework config editor.");
+        super("open", "Open the Tamework config editor.");
         requirePermission(TameworkConfigPermission.NODE);
         setPermissionGroups(TameworkConfigPermission.adminPermissionGroups());
         setAllowsExtraArguments(true);

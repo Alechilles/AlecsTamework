@@ -25,7 +25,7 @@ import javax.annotation.Nullable;
  */
 public final class TameworkGetTraitsCommand extends AbstractPlayerCommand {
     public TameworkGetTraitsCommand() {
-        super("gettraits", "Get traits of the NPC you are looking at.");
+        super("traits", "Get traits of the NPC you are looking at.");
         setAllowsExtraArguments(true);
     }
 

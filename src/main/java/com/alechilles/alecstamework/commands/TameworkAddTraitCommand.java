@@ -23,7 +23,7 @@ import javax.annotation.Nonnull;
  */
 public final class TameworkAddTraitCommand extends AbstractPlayerCommand {
     public TameworkAddTraitCommand() {
-        super("addtrait", "Append one trait to the NPC you are looking at.");
+        super("trait", "Append one trait to the NPC you are looking at.");
         setAllowsExtraArguments(true);
     }
 
