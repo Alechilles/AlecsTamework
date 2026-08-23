@@ -129,7 +129,7 @@ final class CommandUiActionGateway {
             @Nonnull UUID sessionId,
             @Nullable CommandUiActionHandle handle,
             long currentGeneration,
-            @Nonnull Route expectedRoute
+            @Nullable Route expectedRoute
     ) {
         Long providerGeneration = activeSessions.get(sessionId);
         if (providerGeneration == null || handle == null) {
@@ -145,7 +145,7 @@ final class CommandUiActionGateway {
             return completed(CommandUiActionResult.denied(
                     "command UI action handle belongs to another session"));
         }
-        if (binding.route != expectedRoute) {
+        if (expectedRoute != null && binding.route != expectedRoute) {
             bindings.remove(handle.token(), binding);
             return completed(CommandUiActionResult.denied(
                     "command UI action route is not valid for this session"));

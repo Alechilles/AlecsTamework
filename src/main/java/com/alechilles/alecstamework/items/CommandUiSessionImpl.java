@@ -24,7 +24,7 @@ import javax.annotation.Nullable;
 
 /** Tamework-owned implementation of one command UI session. */
 final class CommandUiSessionImpl implements CommandUiSession {
-    enum Mode { GENERIC, BONDED }
+    enum Mode { GENERIC, BONDED, MIXED }
 
     @FunctionalInterface
     interface PartialUpdateSubmitter {
@@ -200,9 +200,7 @@ final class CommandUiSessionImpl implements CommandUiSession {
                     dispatcher.dispatch(() -> actionGateway.invoke(
                             sessionId, handle,
                             currentSnapshot.get().actionGeneration(),
-                            mode == Mode.GENERIC
-                                    ? CommandUiActionGateway.Route.GENERIC
-                                    : CommandUiActionGateway.Route.BONDED));
+                            expectedRoute()));
             return flatten(queued);
         } catch (RuntimeException | LinkageError failure) {
             return completed(CommandUiActionResult.failed(
@@ -404,11 +402,21 @@ final class CommandUiSessionImpl implements CommandUiSession {
     }
 
     private void requireRoute(CommandUiActionGateway.Route route) {
+        if (mode == Mode.MIXED) return;
         boolean generic = mode == Mode.GENERIC;
         if ((generic && route != CommandUiActionGateway.Route.GENERIC)
                 || (!generic && route != CommandUiActionGateway.Route.BONDED)) {
             throw new IllegalArgumentException("Action route does not match session mode.");
         }
+    }
+
+    @Nullable
+    private CommandUiActionGateway.Route expectedRoute() {
+        return switch (mode) {
+            case GENERIC -> CommandUiActionGateway.Route.GENERIC;
+            case BONDED -> CommandUiActionGateway.Route.BONDED;
+            case MIXED -> null;
+        };
     }
 
     @Nonnull

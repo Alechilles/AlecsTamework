@@ -316,6 +316,26 @@ class CommandUiSessionTask2Test {
         session.close();
     }
 
+    @Test
+    void mixedMenuKeepsGenericAndBondedAuthorityRoutesSeparate() {
+        UUID sessionId = UUID.randomUUID();
+        CommandUiActionGateway gateway = new CommandUiActionGateway();
+        CommandUiSessionImpl session = session(sessionId,
+                CommandUiSessionImpl.Mode.MIXED, gateway, 1L);
+        var generic = session.issueGeneric(new CommandUiAction("SELECT_COMMAND"),
+                () -> true, () -> CompletableFuture.completedFuture(
+                        CommandUiActionResult.applied()), false);
+        var bonded = session.issueBonded(new CommandUiAction("SUMMON"),
+                () -> true, () -> CompletableFuture.completedFuture(
+                        CommandUiActionResult.applied()), false);
+
+        assertEquals(CommandUiActionStatus.APPLIED,
+                session.invoke(generic).toCompletableFuture().join().status());
+        assertEquals(CommandUiActionStatus.APPLIED,
+                session.invoke(bonded).toCompletableFuture().join().status());
+        session.close();
+    }
+
     private static CommandUiSessionImpl session(
             UUID sessionId,
             CommandUiSessionImpl.Mode mode,
