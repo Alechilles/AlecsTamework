@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc;
 
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -21,17 +22,23 @@ public final class TamedStateResolver {
     }
 
     public static boolean isTamed(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        if (npcRef == null || store == null || !npcRef.isValid()) {
+        return isTamed(npcRef, (ComponentAccessor<EntityStore>) store);
+    }
+
+    public static boolean isTamed(Ref<EntityStore> npcRef,
+                                  ComponentAccessor<EntityStore> components) {
+        if (npcRef == null || components == null || !npcRef.isValid()) {
             return false;
         }
         ComponentType<EntityStore, TameworkTamedComponent> type = TameworkTamedComponent.getComponentType();
         if (type != null) {
-            TameworkTamedComponent component = store.getComponent(npcRef, type);
+            TameworkTamedComponent component = components.getComponent(
+                    npcRef, type);
             if (component != null && component.isTamed()) {
                 return true;
             }
         }
-        return isTamedRoleId(resolveRoleId(npcRef, store));
+        return isTamedRoleId(resolveRoleId(npcRef, components));
     }
 
     public static boolean isTamedRoleId(String roleId) {
@@ -41,8 +48,12 @@ public final class TamedStateResolver {
         return roleId.trim().toLowerCase(Locale.ROOT).startsWith(VANILLA_TAMED_ROLE_PREFIX);
     }
 
-    private static String resolveRoleId(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+    private static String resolveRoleId(
+            Ref<EntityStore> npcRef,
+            ComponentAccessor<EntityStore> components
+    ) {
+        NPCEntity npc = components.getComponent(
+                npcRef, NPCEntity.getComponentType());
         if (npc == null) {
             return null;
         }

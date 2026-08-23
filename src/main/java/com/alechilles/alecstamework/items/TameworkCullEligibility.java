@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
 import javax.annotation.Nullable;
@@ -18,11 +18,13 @@ final class TameworkCullEligibility {
                    boolean requireOwner,
                    boolean requireTamed,
                    @Nullable Ref<EntityStore> target,
-                   @Nullable Store<EntityStore> store) {
+                   @Nullable ComponentAccessor<EntityStore> components) {
         return playerUuid != null
                 && linkPolicyService != null
-                && CommandGenericTargetAuthority.allowsGenericTargetMutation(target, store)
+                && CommandGenericTargetAuthority.allowsGenericTargetMutation(
+                        target, components)
                 && linkPolicyService.passesOwnerAndTamed(
-                        requireOwner, requireTamed, target, playerUuid, store);
+                        requireOwner, requireTamed, target, playerUuid,
+                        components);
     }
 }

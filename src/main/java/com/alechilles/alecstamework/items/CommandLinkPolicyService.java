@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -69,22 +70,25 @@ final class CommandLinkPolicyService {
                                 boolean requireTamed,
                                 Ref<EntityStore> npcRef,
                                 UUID playerUuid,
-                                Store<EntityStore> store) {
-        UUID ownerId = resolveOwnerId(npcRef, store);
+                                ComponentAccessor<EntityStore> components) {
+        UUID ownerId = resolveOwnerId(npcRef, components);
         if (requireOwner && ownerId != null && !ownerId.equals(playerUuid)) {
             return false;
         }
         if (requireOwner && ownerId == null) {
             return false;
         }
-        if (requireTamed && !TamedStateResolver.isTamed(npcRef, store)) {
+        if (requireTamed && !TamedStateResolver.isTamed(
+                npcRef, components)) {
             return false;
         }
         return true;
     }
 
-    UUID resolveOwnerId(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        TameworkOwnerComponent owner = store.getComponent(npcRef, TameworkOwnerComponent.getComponentType());
+    UUID resolveOwnerId(Ref<EntityStore> npcRef,
+                        ComponentAccessor<EntityStore> components) {
+        TameworkOwnerComponent owner = components.getComponent(
+                npcRef, TameworkOwnerComponent.getComponentType());
         return owner != null ? owner.getOwnerId() : null;
     }
 

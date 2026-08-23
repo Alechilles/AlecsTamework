@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.hypixel.hytale.codec.Codec;
+import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -63,6 +64,25 @@ public final class TameworkNpcCullService {
         this.rosterUnlinkService = new CommandRosterCullUnlinkService(
                 registry, api
         );
+    }
+
+    /** Checks item-interaction eligibility while its context is still active. */
+    public static boolean canCullFromItemInteraction(
+            @Nullable Player player,
+            @Nullable Ref<EntityStore> target,
+            @Nullable ComponentAccessor<EntityStore> components,
+            boolean requireOwner,
+            boolean requireTamed
+    ) {
+        if (player == null || target == null || !target.isValid()
+                || components == null
+                || components.getComponent(
+                target, NPCEntity.getComponentType()) == null) {
+            return false;
+        }
+        return new TameworkCullEligibility(new CommandLinkPolicyService())
+                .allows(player.getUuid(), requireOwner, requireTamed,
+                        target, components);
     }
 
     /** Culls a target from a registered item interaction. */

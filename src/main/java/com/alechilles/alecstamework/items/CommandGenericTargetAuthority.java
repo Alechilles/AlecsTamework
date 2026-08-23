@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
+import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -39,7 +40,15 @@ final class CommandGenericTargetAuthority {
             @Nullable Ref<EntityStore> reference,
             @Nullable Store<EntityStore> store
     ) {
-        if (reference == null || !reference.isValid() || store == null) {
+        return allowsGenericTargetMutation(
+                reference, (ComponentAccessor<EntityStore>) store);
+    }
+
+    static boolean allowsGenericTargetMutation(
+            @Nullable Ref<EntityStore> reference,
+            @Nullable ComponentAccessor<EntityStore> components
+    ) {
+        if (reference == null || !reference.isValid() || components == null) {
             return false;
         }
         ComponentType<EntityStore, TameworkProjectionIdentityComponent> type =
@@ -49,7 +58,7 @@ final class CommandGenericTargetAuthority {
         }
         try {
             TameworkProjectionIdentityComponent marker =
-                    store.getComponent(reference, type);
+                    components.getComponent(reference, type);
             return marker == null || isRecognizedGenericMarker(marker);
         } catch (RuntimeException ignored) {
             return false;

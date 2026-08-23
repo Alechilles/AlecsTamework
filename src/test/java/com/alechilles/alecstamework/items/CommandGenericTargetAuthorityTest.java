@@ -231,6 +231,9 @@ class CommandGenericTargetAuthorityTest {
 
             assertFalse(eligibility.allows(target.player.getUuid(), true, true,
                     target.reference, scope.store));
+            assertFalse(TameworkNpcCullService.canCullFromItemInteraction(
+                    target.player, target.reference, scope.store, true, true
+            ));
             assertTrue(scope.store.getComponent(target.reference,
                     scope.linksType).containsToolId("generic-tool"));
 
@@ -241,6 +244,9 @@ class CommandGenericTargetAuthorityTest {
 
             assertFalse(eligibility.allows(target.player.getUuid(), true, true,
                     target.reference, scope.store));
+            assertFalse(TameworkNpcCullService.canCullFromItemInteraction(
+                    target.player, target.reference, scope.store, true, true
+            ));
             assertTrue(scope.store.getComponent(target.reference,
                     scope.linksType).containsToolId("generic-tool"));
         }

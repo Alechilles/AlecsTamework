@@ -81,16 +81,13 @@ public final class TameworkCullNpcInteraction extends SimpleInteraction {
             return;
         }
         Player player = commandBuffer.getComponent(playerRef, Player.getComponentType());
-        if (player == null) {
+        if (player == null || !TameworkNpcCullService.canCullFromItemInteraction(
+                player, target, commandBuffer, requireOwner, requireTamed)) {
             fail(context, time, type, cooldownHandler);
             return;
         }
-        commandBuffer.run(store -> {
-            if (!TameworkNpcCullService.cullFromItemInteraction(
-                    player, target, store, requireOwner, requireTamed)) {
-                context.getState().state = InteractionState.Failed;
-            }
-        });
+        commandBuffer.run(store -> TameworkNpcCullService.cullFromItemInteraction(
+                player, target, store, requireOwner, requireTamed));
         context.setHeldItem(heldItem);
         super.tick0(true, time, type, context, cooldownHandler);
     }
