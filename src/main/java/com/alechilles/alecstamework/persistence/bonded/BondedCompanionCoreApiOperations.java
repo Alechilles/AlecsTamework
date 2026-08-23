@@ -273,9 +273,13 @@ public final class BondedCompanionCoreApiOperations {
         BondedCompanionPolicy.RevivePrice price = policy.revivePriceFor(profile.roleId());
         List<BondedCompanionReviveQuote.CostLine> costs = price == null
                 ? List.of() : reviveQuotes.costs(request, price);
+        long cooldown = profile.diedAtMs() == null ? 0L : cooldownRemaining(
+                policy.reviveCooldownUntilMs(profile.diedAtMs()), clock.getAsLong());
         return success(new BondedCompanionReviveQuote(
-                profile.profileId(), policy.features().revive(),
-                costs, 0L,
+                profile.profileId(), policy.features().revive()
+                        && profile.state() == BondedCompanionState.DEAD
+                        && cooldown == 0L,
+                costs, cooldown,
                 revision
         ));
     }
@@ -423,8 +427,8 @@ public final class BondedCompanionCoreApiOperations {
         if (until == 0L || now >= until) return 0L;
         long delta;
         try { delta = Math.subtractExact(until, now); }
-        catch (ArithmeticException overflow) { return Long.MAX_VALUE; }
-        return Math.max(1L, (delta + 999L) / 1000L);
+        catch (ArithmeticException overflow) { delta = Long.MAX_VALUE; }
+        return delta / 1_000L + (delta % 1_000L == 0L ? 0L : 1L);
     }
 
     void publish(BondedCompanionRecord.Profile profile,

@@ -190,6 +190,17 @@ public final class TwBondedCompanionRosterCodecs {
                             + "An omitted value inherits."
             )
             .add()
+            .<Long>append(
+                    new KeyedCodec<>("ReviveCooldownSeconds", Codec.LONG),
+                    (asset, value) -> asset.reviveCooldownSeconds = value == null
+                            ? 0L : value,
+                    asset -> asset.reviveCooldownSeconds
+            )
+            .documentation(
+                    "Revive cooldown in seconds after confirmed death; exactly "
+                            + "0 disables the timer. An omitted value inherits."
+            )
+            .add()
             .<String>append(
                     new KeyedCodec<>("SummonAuraEffectId", Codec.STRING),
                     (asset, value) -> asset.summonAuraEffectId = value,

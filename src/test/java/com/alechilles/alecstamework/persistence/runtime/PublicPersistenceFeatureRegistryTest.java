@@ -49,7 +49,7 @@ class PublicPersistenceFeatureRegistryTest {
                         .containsKey(definition.kind()));
             });
         }
-        assertEquals(20, operationKinds.size());
+        assertEquals(21, operationKinds.size());
 
         PersistenceFeatureDescriptor economics = registry.requireFeature(
                 PublicPersistenceFeatureRegistry.ECONOMIC_COMPENSATION

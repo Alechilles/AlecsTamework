@@ -4,6 +4,11 @@
 
 ### Added
 
+- Added `/tw debug persistence reviveready <profile UUID>` for server staff to
+  make one generic dead companion ready for its normal revival flow.
+- Added optional bonded roster `ReviveCooldownSeconds`. It defaults to `0`, so
+  existing bonded companions can still revive immediately unless a roster sets
+  a positive cooldown.
 - Added `TameworkCullNpc`, a reusable item interaction that lets a player cull
   an eligible owned and tamed NPC without opening a command panel. Consumer
   mods control the item, hold time, and other item behavior.

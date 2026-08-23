@@ -1390,7 +1390,9 @@ public class Tamework extends JavaPlugin {
                     persistenceComposition == null ? null : persistenceComposition.diagnosticsReader(),
                     persistenceComposition == null ? null : persistenceComposition.diagnosticsExporter(),
                     bondedCompanionComposition == null ? null : bondedCompanionComposition.diagnostics(),
-                    spawnBeaconVisualizationService
+                    spawnBeaconVisualizationService,
+                    persistenceComposition == null
+                            ? null : persistenceComposition.facades().operations()
             ));
         }
     }
@@ -2047,7 +2049,8 @@ public class Tamework extends JavaPlugin {
                     null,
                     exporter,
                     bondedCompanionComposition.diagnostics(),
-                    spawnBeaconVisualizationService
+                    spawnBeaconVisualizationService,
+                    null
             ));
         }
         getLogger().at(Level.SEVERE).withCause(failure).log(

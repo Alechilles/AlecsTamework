@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureDefinitio
 import com.alechilles.alecstamework.companion.coop.CompanionCoopReleaseDefinition;
 import com.alechilles.alecstamework.companion.coop.CoopSlotRegistrationDefinition;
 import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransitionDefinition;
+import com.alechilles.alecstamework.companion.revival.ReviveReadyDefinition;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutationDefinition;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionProjectionIndex;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationDefinition;
@@ -367,12 +368,15 @@ public final class PublicPersistenceFeatureRegistry {
                 Set.of("dormant_transition"),
                 List.of(
                         CompanionDormantTransitionDefinition.INSTANCE,
-                        CompanionRestorationDefinition.INSTANCE
+                        CompanionRestorationDefinition.INSTANCE,
+                        ReviveReadyDefinition.INSTANCE
                 ),
                 PublicPersistenceFeatureDescriptorFactory.scopes(
                         CompanionDormantTransitionDefinition.INSTANCE,
                         Set.of(OperationScopeType.PROFILE),
                         CompanionRestorationDefinition.INSTANCE,
+                        Set.of(OperationScopeType.PROFILE),
+                        ReviveReadyDefinition.INSTANCE,
                         Set.of(OperationScopeType.PROFILE)
                 ),
                 Set.of(IDENTITY, LIFECYCLE),

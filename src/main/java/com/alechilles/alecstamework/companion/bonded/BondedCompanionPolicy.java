@@ -18,6 +18,7 @@ public record BondedCompanionPolicy(
         int maximumActive,
         long sessionDurationSeconds,
         long summonCooldownSeconds,
+        long reviveCooldownSeconds,
         @Nullable String summonAuraEffectId,
         @Nullable String expiryWarningEffectId,
         @Nullable RevivePrice revivePrice,
@@ -38,7 +39,8 @@ public record BondedCompanionPolicy(
                 ? null : expiryWarningEffectId.trim();
         if (revision < 0L || maximumOwned < 0 || maximumActive < 0
                 || sessionDurationSeconds < 0L
-                || summonCooldownSeconds < 0L) {
+                || summonCooldownSeconds < 0L
+                || reviveCooldownSeconds < 0L) {
             throw new IllegalArgumentException("negative bonded policy value");
         }
     }
@@ -52,7 +54,7 @@ public record BondedCompanionPolicy(
     ) {
         this(revision, rosterId, familyId, allowedRoles, maximumOwned,
                 maximumActive, sessionDurationSeconds, summonCooldownSeconds,
-                summonAuraEffectId, null, revivePrice, features);
+                0L, summonAuraEffectId, null, revivePrice, features);
     }
 
     public BondedCompanionPolicy(
@@ -63,7 +65,21 @@ public record BondedCompanionPolicy(
     ) {
         this(revision, rosterId, familyId, allowedRoles, maximumOwned,
                 maximumActive, sessionDurationSeconds, summonCooldownSeconds,
-                null, null, revivePrice, features);
+                0L, null, null, revivePrice, features);
+    }
+
+    /** Resolves the revive deadline while preserving zero as the disabled sentinel. */
+    public long reviveCooldownUntilMs(long diedAtMs) {
+        if (reviveCooldownSeconds == 0L) {
+            return 0L;
+        }
+        try {
+            long deadline = Math.addExact(diedAtMs,
+                    Math.multiplyExact(reviveCooldownSeconds, 1_000L));
+            return deadline == 0L ? 1L : deadline;
+        } catch (ArithmeticException overflow) {
+            return Long.MAX_VALUE;
+        }
     }
 
     @Nullable

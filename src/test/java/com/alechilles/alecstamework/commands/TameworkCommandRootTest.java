@@ -16,21 +16,24 @@ class TameworkCommandRootTest {
 
         assertEquals(TameworkCommandRoot.ROOT_PERMISSION, root.getPermission());
         assertEquals(
-                "tamework.command.tw.setowner",
-                root.getSubCommands().get("setowner").getPermission()
-        );
-        assertEquals(TameworkConfigPermission.NODE, root.getSubCommands().get("config").getPermission());
-        assertEquals(
-                "tamework.command.tw.reloadconfig",
-                root.getSubCommands().get("reloadconfig").getPermission()
+                "tamework.command.tw.debug.set.owner",
+                command(root, "debug", "set", "owner").getPermission()
         );
         assertEquals(
-                "tamework.command.tw.activation",
-                root.getSubCommands().get("activation").getPermission()
+                TameworkConfigPermission.NODE,
+                command(root, "config", "open").getPermission()
         );
         assertEquals(
-                "tamework.command.tw.setlevel",
-                root.getSubCommands().get("setlevel").getPermission()
+                "tamework.command.tw.config.reload",
+                command(root, "config", "reload").getPermission()
+        );
+        assertEquals(
+                "tamework.command.tw.runtime.status",
+                command(root, "runtime", "status").getPermission()
+        );
+        assertEquals(
+                "tamework.command.tw.debug.set.level",
+                command(root, "debug", "set", "level").getPermission()
         );
         assertEquals(
                 "tamework.command.tw.debug.set.needs",
@@ -38,16 +41,35 @@ class TameworkCommandRootTest {
                         .getSubCommands().get("needs").getPermission()
         );
         assertEquals(
-                "tamework.command.tw.spawntamed",
-                root.getSubCommands().get("spawntamed").getPermission()
+                "tamework.command.tw.npc.spawn.tamed",
+                command(root, "npc", "spawn", "tamed").getPermission()
         );
-        var debugDb = root.getSubCommands().get("debugdb");
+        var debugDb = command(root, "debug", "persistence", "debugdb");
         assertNotNull(debugDb, "replacement persistence diagnostics must remain registered");
-        assertEquals("tamework.command.tw.debugdb", debugDb.getPermission());
+        assertEquals(
+                "tamework.command.tw.debug.persistence.debugdb",
+                debugDb.getPermission()
+        );
+        assertEquals(
+                "tamework.command.tw.debug.persistence.reviveready",
+                command(root, "debug", "persistence", "reviveready").getPermission()
+        );
         assertFalse(
                 root.getSubCommands().containsKey("persistencecircuit"),
                 "the unreleased persistence circuit command must not be restored"
         );
+    }
+
+    private static com.hypixel.hytale.server.core.command.system.AbstractCommand command(
+            TameworkCommandRoot root,
+            String... path
+    ) {
+        com.hypixel.hytale.server.core.command.system.AbstractCommand current = root;
+        for (String part : path) {
+            current = current.getSubCommands().get(part);
+            assertNotNull(current, "Missing command path segment: " + part);
+        }
+        return current;
     }
 
     private static final class DisplayNameOwner implements CommandOwner {

@@ -223,6 +223,7 @@ public final class BondedCompanionRosterRegistry {
                 config.getMaximumActive(),
                 config.getSessionDurationSeconds(),
                 config.getSummonCooldownSeconds(),
+                config.getReviveCooldownSeconds(),
                 config.getSummonAuraEffectId(),
                 config.getExpiryWarningEffectId(),
                 revivePrice,
@@ -412,6 +413,7 @@ public final class BondedCompanionRosterRegistry {
             int maximumActive,
             long sessionDurationSeconds,
             long summonCooldownSeconds,
+            long reviveCooldownSeconds,
             @Nullable String summonAuraEffectId,
             @Nullable String expiryWarningEffectId,
             @Nullable RevivePrice revivePrice,
@@ -426,6 +428,9 @@ public final class BondedCompanionRosterRegistry {
                     "allowedRoles"
             ));
             features = Objects.requireNonNull(features, "features");
+            if (reviveCooldownSeconds < 0L) {
+                throw new IllegalArgumentException("revive cooldown cannot be negative");
+            }
             summonAuraEffectId = summonAuraEffectId == null
                     || summonAuraEffectId.isBlank()
                     ? null : summonAuraEffectId.trim();
@@ -442,7 +447,7 @@ public final class BondedCompanionRosterRegistry {
         ) {
             this(configId, priority, rosterId, familyId, allowedRoles,
                     maximumOwned, maximumActive, sessionDurationSeconds,
-                    summonCooldownSeconds, null, null, revivePrice, features);
+                    summonCooldownSeconds, 0L, null, null, revivePrice, features);
         }
     }
 

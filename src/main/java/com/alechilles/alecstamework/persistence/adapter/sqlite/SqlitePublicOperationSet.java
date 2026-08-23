@@ -20,6 +20,7 @@ import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioning
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalDefinition;
+import com.alechilles.alecstamework.companion.revival.ReviveReadyDefinition;
 import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceContainmentListener;
@@ -58,6 +59,7 @@ final class SqlitePublicOperationSet {
     private final SqliteCompanionCoopReleaseOperations coopReleases;
     private final SqlitePaidRevivalOperations paidRevivals;
     private final SqliteProfileExtensionOperations extensions;
+    private final SqliteReviveReadyOperations reviveReady;
 
     SqlitePublicOperationSet(
             @Nonnull PersistenceFeatureRegistry registry,
@@ -245,6 +247,8 @@ final class SqlitePublicOperationSet {
                         ProfileExtensionMutationDefinition.INSTANCE.kind()
                 )
         );
+        reviveReady = new SqliteReviveReadyOperations(database,
+                consumers.apply(ReviveReadyDefinition.INSTANCE.kind()));
     }
 
     SqliteOperationEngine engine() {
@@ -331,4 +335,6 @@ final class SqlitePublicOperationSet {
     SqliteProfileExtensionOperations extensions() {
         return extensions;
     }
+
+    SqliteReviveReadyOperations reviveReady() { return reviveReady; }
 }

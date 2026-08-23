@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureDefinitio
 import com.alechilles.alecstamework.companion.coop.CompanionCoopReleaseDefinition;
 import com.alechilles.alecstamework.companion.coop.CoopSlotRegistrationDefinition;
 import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransitionDefinition;
+import com.alechilles.alecstamework.companion.revival.ReviveReadyDefinition;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutationDefinition;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationDefinition;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationReconciliationDefinition;
@@ -103,6 +104,8 @@ public final class SqliteOperationFeatureScopeCatalog {
                 SqliteCompanionDormantOperations.FEATURE_SCOPE);
         put(scopes, CompanionRestorationDefinition.KIND,
                 SqliteCompanionRestorationOperations.FEATURE_SCOPE);
+        put(scopes, ReviveReadyDefinition.KIND,
+                SqliteReviveReadyOperations.FEATURE_SCOPE);
         put(scopes, CoopSlotRegistrationDefinition.KIND,
                 SqliteCoopSlotOperations.FEATURE_SCOPE);
         put(scopes, CompanionCoopCaptureDefinition.KIND,

@@ -50,19 +50,25 @@ final class BondedCompanionProfileViewService {
                 && policy.allowedRoles().contains(profile.roleId());
         int active = BondedCompanionFamilyScope.counts(rosterProfiles,
                 profile.familyId()).active();
-        boolean revive = matches && profile.state() == BondedCompanionState.DEAD
+        long now = clock.getAsLong();
+        boolean reviveConfigured = matches
+                && profile.state() == BondedCompanionState.DEAD
                 && policy.features().revive();
+        long reviveCooldownRemaining = reviveConfigured
+                ? remaining(policy.reviveCooldownUntilMs(profile.diedAtMs()), now)
+                : 0L;
+        boolean revive = reviveConfigured && reviveCooldownRemaining == 0L;
         return views.view(profile, lease,
                 matches && profile.state() == BondedCompanionState.STORED
                         && policy.features().summon()
-                        && remaining(profile.summonCooldownUntilMs(),
-                                clock.getAsLong()) == 0L
+                        && remaining(profile.summonCooldownUntilMs(), now) == 0L
                         && BondedCompanionFamilyScope.hasActiveCapacity(active,
                                 policy.maximumActive()),
                 matches && profile.state() == BondedCompanionState.ACTIVE
                         && policy.features().dismiss(),
                 revive, extensions(profile),
-                revive ? reviveQuotes.profileQuote(profile, policy) : null,
+                reviveConfigured ? reviveQuotes.profileQuote(
+                        profile, policy, seconds(reviveCooldownRemaining)) : null,
                 matches
                         ? BondedCompanionFamilyCapacityPresentation.attributes(
                                 policy, active)
@@ -82,6 +88,17 @@ final class BondedCompanionProfileViewService {
     }
 
     private long remaining(long until, long now) {
-        return until == 0L || now >= until ? 0L : until - now;
+        if (until == 0L || now >= until) return 0L;
+        try {
+            return Math.subtractExact(until, now);
+        } catch (ArithmeticException overflow) {
+            return Long.MAX_VALUE;
+        }
+    }
+
+    private long seconds(long remainingMs) {
+        if (remainingMs == 0L) return 0L;
+        return remainingMs / 1_000L
+                + (remainingMs % 1_000L == 0L ? 0L : 1L);
     }
 }

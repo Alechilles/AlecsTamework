@@ -296,6 +296,11 @@ public final class SqlitePublicPersistenceAdapter {
     }
 
     @Nonnull
+    public SqliteReviveReadyOperations reviveReadyOperations() {
+        return publicOperations.reviveReady();
+    }
+
+    @Nonnull
     public SqliteCompanionProfileReader profileReader() {
         return profiles;
     }

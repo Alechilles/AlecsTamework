@@ -188,6 +188,7 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "capture",
                         "captureToCoop",
                         "makeDormant",
+                        "markReviveReady",
                         "mutateCommandRoster",
                         "mutateExtension",
                         "mutateProfile",
