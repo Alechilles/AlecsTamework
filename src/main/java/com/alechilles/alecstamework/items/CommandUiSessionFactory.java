@@ -69,6 +69,34 @@ final class CommandUiSessionFactory {
         return new CreatedSession(session, List.copyOf(handles));
     }
 
+    /** Creates a menu that exposes separately authorized generic and bonded actions. */
+    @Nonnull
+    CreatedSession createMixed(
+            @Nonnull UUID sessionId,
+            @Nonnull CommandUiSnapshot snapshot,
+            long providerGeneration,
+            @Nonnull CommandUiWorldDispatcher dispatcher,
+            @Nullable Runnable refresh,
+            @Nullable Consumer<CommandUiCloseReason> close,
+            @Nullable CommandUiSessionImpl.PartialUpdateSubmitter submitter,
+            @Nonnull List<CommandSelectionPageService.GenericUiActionBinding> genericActions,
+            @Nonnull List<CommandSelectionPageService.BondedUiActionBinding> bondedActions
+    ) {
+        CommandUiSessionImpl session = new CommandUiSessionImpl(
+                sessionId, snapshot, gateway, dispatcher,
+                providerGeneration, CommandUiSessionImpl.Mode.MIXED,
+                refresh, close, submitter);
+        java.util.ArrayList<CommandUiActionHandle> handles = new java.util.ArrayList<>();
+        for (CommandSelectionPageService.GenericUiActionBinding action : genericActions) {
+            handles.add(actions.bindGenericUiAction(session, action));
+        }
+        for (CommandSelectionPageService.BondedUiActionBinding action : bondedActions) {
+            CommandUiActionHandle handle = actions.bindBondedUiAction(session, action);
+            if (handle != null) handles.add(handle);
+        }
+        return new CreatedSession(session, List.copyOf(handles));
+    }
+
     record CreatedSession(
             @Nonnull CommandUiSessionImpl session,
             @Nonnull List<CommandUiActionHandle> handles
