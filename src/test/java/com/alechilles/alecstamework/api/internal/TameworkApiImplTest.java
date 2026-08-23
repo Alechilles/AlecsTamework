@@ -344,7 +344,8 @@ class TameworkApiImplTest {
                 TameworkApiCapability.COMPANION_XP_EVENTS,
                 TameworkApiCapability.CONFIG_READ,
                 TameworkApiCapability.DIAGNOSTICS,
-                TameworkApiCapability.PROFILE_DATA_TRANSACTIONS
+                TameworkApiCapability.PROFILE_DATA_TRANSACTIONS,
+                TameworkApiCapability.COMMAND_UI_PROVIDERS
         );
     }
 
