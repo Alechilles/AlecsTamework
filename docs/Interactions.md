@@ -282,9 +282,13 @@ targets, targets that do not meet the selected owner/tame policy, and bonded
 companion projections. It clears ordinary command links before the death path
 and removes the NPC from eligible generic command tools in the hotbar.
 
-For a butcher-style item, put this interaction on the successful completion
-branch of the item's native `Charging` interaction. Tamework supplies no
-standalone culling item or confirmation UI.
+For a butcher-style item, put this interaction in a named interaction asset,
+then reference that asset on the successful completion branch of the item's
+native `Charging` interaction. For example, use
+`"0.8": "My_Butchers_Knife_Cull_Complete"` in `Next`, and define
+`My_Butchers_Knife_Cull_Complete` as `{ "Type": "TameworkCullNpc" }` in a
+separate interaction file. Tamework supplies no standalone culling item or
+confirmation UI.
 
 ### `TameworkCaptureChannel`
 

@@ -36,9 +36,12 @@ bonded companion projection.
 { "Type": "TameworkCullNpc" }
 ```
 
-The item owns its range, cooldown, durability, prompt, and hold behavior. Put
-the cull interaction on the successful completion branch of a native
-`Charging` interaction when the item needs a hold confirmation.
+The item owns its range, cooldown, durability, prompt, and hold behavior. For
+a hold confirmation, define the cull as a named interaction asset and reference
+it on the successful completion branch of a native `Charging` interaction. For
+example, use `"0.8": "My_Butchers_Knife_Cull_Complete"` in `Next`, then
+define `My_Butchers_Knife_Cull_Complete` as `{ "Type": "TameworkCullNpc" }`
+in a separate interaction file.
 
 ## Recommended Wiring Flow
 1. Create or choose the NPC role and template.
