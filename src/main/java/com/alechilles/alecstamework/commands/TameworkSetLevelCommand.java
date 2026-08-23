@@ -61,16 +61,11 @@ public final class TameworkSetLevelCommand extends AbstractPlayerCommand {
 
     @Nullable
     static Integer parseRequestedLevel(@Nonnull CommandContext commandContext) {
-        String input = commandContext.getInputString();
-        if (input == null) {
-            return null;
-        }
-        String[] tokens = input.trim().split("\\s+");
-        if (tokens.length < 3) {
-            return null;
-        }
         try {
-            return Integer.parseInt(tokens[2]);
+            String argument = TameworkCommandInput.firstArgument(
+                    commandContext.getInputString(), "level"
+            );
+            return argument == null ? null : Integer.parseInt(argument);
         } catch (NumberFormatException ignored) {
             return null;
         }
