@@ -219,6 +219,21 @@ Selection UI:
 - `TameworkCommandSelectionPage`
 - Target HUD: `Common/UI/Custom/TameworkCommandTargetHud.ui`
 
+### Custom Java command-menu providers
+
+An effective `TwCommandItemConfig` can set a namespaced `UiProviderId`. A Java
+plugin registers that ID through `TameworkApi.commandUi()` and returns one
+custom page controller per open menu.
+
+The controller can use a different layout and different UI assets. Tamework
+still supplies the full detached snapshot, row and section change hints,
+opaque built-in action handles, current-world action validation, page cleanup,
+and standard-menu fallback. Provider updates are partial (`clear=false`), so a
+controller can update one card indicator without rebuilding the page.
+
+Version 1 exposes only Tamework-defined actions. See the durable wiki pages
+for the public contract and registration recipe.
+
 Linked panel supports:
 - Mode toggle: `LinkedMode` / `NearbyMode`
 - Nearby radius controls in nearby mode

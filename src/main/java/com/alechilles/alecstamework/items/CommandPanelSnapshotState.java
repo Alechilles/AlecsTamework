@@ -26,8 +26,22 @@ final class CommandPanelSnapshotState {
         return current.entries();
     }
 
+    /**
+     * Refreshes and returns the immutable source snapshot used by the page.
+     * The public command UI assembler copies each row into detached values.
+     */
+    CommandPanelEntrySourceService.CommandPanelSnapshot refreshSnapshot() {
+        refreshEntries();
+        return current;
+    }
+
+    /** Returns the latest source snapshot without triggering a second read. */
+    CommandPanelEntrySourceService.CommandPanelSnapshot snapshot() {
+        return current;
+    }
+
     Map<UUID, CommandPanelFeaturePresentation> featurePresentations() {
-        return current.featurePresentations();
+        return Map.copyOf(current.featurePresentations());
     }
 
     String emptyStateKey() {

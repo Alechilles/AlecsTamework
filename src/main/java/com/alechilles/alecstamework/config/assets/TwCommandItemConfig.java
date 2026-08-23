@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.config.assets;
 
+import com.alechilles.alecstamework.api.commandui.CommandUiProviderId;
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
 import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.assetstore.AssetStore;
@@ -214,6 +215,14 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         .documentation("Stable owner-scoped command family shared by equivalent access items. "
                 + "Required when RosterStorage is OwnerCommandFamily. Inheritance: omitted value inherits.")
         .add()
+        .<String>append(
+            new KeyedCodec<>("UiProviderId", Codec.STRING),
+            (asset, value) -> asset.uiProviderId = normalizeUiProviderId(value),
+            asset -> asset.uiProviderId
+        )
+        .documentation("Optional namespaced command-menu provider. Blank or omitted selects the standard Tamework menu. "
+                + "Provider IDs are normalized to lowercase. Inheritance: omitted value inherits.")
+        .add()
         .<RosterStorage>append(
             new KeyedCodec<>(
                     "RosterStorage",
@@ -329,6 +338,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     private double radius = -1.0;
     private MembershipMode membershipMode = MembershipMode.LinkedOnly;
     private String commandFamilyId;
+    private String uiProviderId;
     private RosterStorage rosterStorage = RosterStorage.ItemMetadata;
     private String bondedRosterId;
     private Boolean projectRosterToItemMetadata;
@@ -412,6 +422,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         if (!explicitTopLevelKeys.contains("Radius")) radius = parent.radius;
         if (!explicitTopLevelKeys.contains("MembershipMode")) membershipMode = parent.membershipMode;
         if (!explicitTopLevelKeys.contains("CommandFamilyId")) commandFamilyId = parent.commandFamilyId;
+        if (!explicitTopLevelKeys.contains("UiProviderId")) uiProviderId = parent.uiProviderId;
         if (!explicitTopLevelKeys.contains("RosterStorage")) rosterStorage = parent.rosterStorage;
         if (!explicitTopLevelKeys.contains("BondedRosterId")) bondedRosterId = parent.bondedRosterId;
         if (!explicitTopLevelKeys.contains("ProjectRosterToItemMetadata")) {
@@ -472,6 +483,14 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    @Nullable
+    private static String normalizeUiProviderId(@Nullable String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return CommandUiProviderId.of(value).value();
+    }
+
     public boolean isEnabled() {
         return enabled;
     }
@@ -491,6 +510,12 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     @Nullable
     public String getCommandFamilyId() {
         return commandFamilyId;
+    }
+
+    /** Returns the normalized custom menu provider ID, or null for the standard menu. */
+    @Nullable
+    public String getUiProviderId() {
+        return uiProviderId;
     }
 
     public RosterStorage getRosterStorage() {

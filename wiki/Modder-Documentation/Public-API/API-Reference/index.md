@@ -32,6 +32,7 @@ This subsection contains the reference contract for each public API family.
 - [Companion Provisioning API Reference](/mod/alecs-tamework/companion-provisioning-api-reference)
 - [Paid Command Revival API Reference](/mod/alecs-tamework/paid-command-revival-api-reference)
 - [Bonded Companion API Reference](/mod/alecs-tamework/bonded-companion-api-reference)
+- [Command UI Provider API Reference](/mod/alecs-tamework/command-ui-provider-api-reference)
 
 
 

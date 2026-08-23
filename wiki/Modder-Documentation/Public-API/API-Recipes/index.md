@@ -32,6 +32,7 @@ This subsection provides task-focused examples for common Tamework API integrati
 - [Check the Live Owner Cap before Taming](/mod/alecs-tamework/check-population-cap-before-spawning-or-taming-recipe)
 - [Register Interaction Extensions in Plugin Lifecycle Recipe](/mod/alecs-tamework/register-interaction-extensions-in-plugin-lifecycle-recipe)
 - [Register Custom Trait Effect Key Recipe](/mod/alecs-tamework/register-custom-trait-effect-key-recipe)
+- [Register a Custom Command UI Recipe](/mod/alecs-tamework/register-a-custom-command-ui-recipe)
 
 ## Additional Recipes
 - [API Bootstrap and Capability Checks Recipe](/mod/alecs-tamework/api-bootstrap-and-capability-checks-recipe)

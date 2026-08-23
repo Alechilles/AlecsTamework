@@ -49,6 +49,8 @@ public enum TameworkApiCapability {
     /** External admission-policy provider registration and evaluation. */
     EXTERNAL_ADMISSION_PROVIDERS,
     /** Validated managed-content profiles and readiness state. */
-    REQUIRED_CONTENT_PROFILES
+    REQUIRED_CONTENT_PROFILES,
+    /** External command-menu providers can register with the live runtime. */
+    COMMAND_UI_PROVIDERS
 }
 

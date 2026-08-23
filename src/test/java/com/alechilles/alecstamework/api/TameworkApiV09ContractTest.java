@@ -15,6 +15,9 @@ class TameworkApiV09ContractTest {
     void legacyImplementationsReceiveFailClosedRootFacades() {
         TameworkApi legacy = new LegacyApiImplementation();
 
+        assertFalse(legacy.commandUi().available());
+        assertTrue(legacy.commandUi().find("example:menu").isEmpty());
+
         assertEquals(
                 CompanionProvisioningResult.Status.UNAVAILABLE,
                 legacy.companionProvisioning().provision(request()).toCompletableFuture().join().status()

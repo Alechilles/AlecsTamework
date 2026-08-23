@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.api.AdmissionProviderApi;
 import com.alechilles.alecstamework.api.ActivityFeedApi;
+import com.alechilles.alecstamework.api.commandui.CommandUiApi;
 import com.alechilles.alecstamework.api.CommandFamilyRosterApi;
 import com.alechilles.alecstamework.api.CommandLinksApi;
 import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
@@ -156,6 +157,11 @@ public final class ReplacementTameworkApi
     @Override
     public CommandLinksApi commandLinks() {
         return base.commandLinks();
+    }
+
+    @Override
+    public CommandUiApi commandUi() {
+        return base.commandUi();
     }
 
     @Override

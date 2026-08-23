@@ -2,6 +2,15 @@ package com.alechilles.alecstamework.items;
 
 import static com.alechilles.alecstamework.items.CommandSelectionCallbackGuards.*;
 
+import com.alechilles.alecstamework.api.commandui.CommandUiActionHandle;
+import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
+import com.alechilles.alecstamework.api.commandui.CommandUiCommandOption;
+import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
+import com.alechilles.alecstamework.api.commandui.CommandUiPanelState;
+import com.alechilles.alecstamework.api.commandui.CommandUiProviderId;
+import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
+import com.alechilles.alecstamework.api.commandui.CommandUiUpdate;
+import com.alechilles.alecstamework.api.internal.CommandUiProviderRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.compat.HytaleApiLevel;
@@ -12,20 +21,31 @@ import com.alechilles.alecstamework.ui.LinkedNpcPanelFeatureAction;
 import com.alechilles.alecstamework.ui.LinkedPanelRefreshSignalSource;
 import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
 import com.alechilles.alecstamework.ui.CommandActiveHighlightBinding;
+import com.alechilles.alecstamework.ui.CommandUiHostPage;
+import com.alechilles.alecstamework.ui.StandardCommandUiController;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.entity.entities.player.pages.CustomUIPage;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.Map;
+import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
 /**
  * Builds and opens the command selection page from focused panel services and bound actions.
@@ -46,6 +66,9 @@ final class CommandSelectionPageService {
     private ShoulderRideAction shoulderRideActions;
     private LinkedShoulderRideAction linkedShoulderRideActions;
     @javax.annotation.Nullable private final BondedCompanionPanelRefreshSignalSource bondedRefreshSignals;
+    @Nullable private volatile CommandUiPageCoordinator commandUiCoordinator;
+    private final CommandUiHostPage.WorldDispatcher commandUiWorldDispatcher =
+            CommandUiCurrentWorldDispatcher.production();
 
     CommandSelectionPageService(CommandToolInventoryService toolInventoryService,
                                 CommandGroupAssignPageService groupAssignPageService,
@@ -198,6 +221,12 @@ final class CommandSelectionPageService {
         this.bondedRefreshSignals = bondedRefreshSignals;
     }
 
+    /** Enables the shared host with Tamework's live provider registry. */
+    void configureCommandUi(@Nullable CommandUiProviderRegistry registry) {
+        commandUiCoordinator = registry == null
+                ? null : new CommandUiPageCoordinator(registry, this);
+    }
+
     /**
      * Opens a page whose generic callbacks are checked against the physical
      * tool again when the player presses them.
@@ -210,6 +239,19 @@ final class CommandSelectionPageService {
                  Actions actions,
                  BooleanSupplier genericCallbackAuthority,
                  BondedLifecycleAuthority bondedLifecycleAuthority) {
+        return open(player, store, config, working, toolId, actions,
+                genericCallbackAuthority, bondedLifecycleAuthority, false);
+    }
+
+    private boolean open(Player player,
+                 Store<EntityStore> store,
+                 TwCommandItemConfig config,
+                 ItemStack working,
+                 String toolId,
+                 Actions actions,
+                 BooleanSupplier genericCallbackAuthority,
+                 BondedLifecycleAuthority bondedLifecycleAuthority,
+                 boolean forceStandard) {
         if (!canOpen(player, store, config, toolId, actions)) {
             LOGGER.warning("[tw-command-menu] selection page prerequisites failed: config="
                     + (config == null ? "null" : config.getId())
@@ -225,14 +267,791 @@ final class CommandSelectionPageService {
                     + toolId);
             return false;
         }
-        TameworkCommandSelectionPage page = createPage(
-                player, store, uiPlayerRef, config, working, toolId, actions,
-                genericCallbackAuthority != null
-                        ? genericCallbackAuthority : () -> false,
-                bondedLifecycleAuthority != null
-                        ? bondedLifecycleAuthority : ignored -> false
-        );
-        return openPage(player, playerRef, store, page);
+        BooleanSupplier genericAuthority = genericCallbackAuthority != null
+                ? genericCallbackAuthority : () -> false;
+        BondedLifecycleAuthority bondedAuthority = bondedLifecycleAuthority != null
+                ? bondedLifecycleAuthority : ignored -> false;
+        CommandUiPageCoordinator coordinator = commandUiCoordinator;
+        if (coordinator == null) {
+            TameworkCommandSelectionPage page = createPage(
+                    player, store, uiPlayerRef, config, working, toolId, actions,
+                    genericAuthority, bondedAuthority);
+            return openPage(player, playerRef, store, page);
+        }
+        return openHostedPage(coordinator, player, store, playerRef, uiPlayerRef,
+                config, working, toolId, actions, genericAuthority,
+                bondedAuthority, forceStandard);
+    }
+
+    private boolean openHostedPage(
+            CommandUiPageCoordinator coordinator,
+            Player player,
+            Store<EntityStore> store,
+            Ref<EntityStore> playerRef,
+            PlayerRef uiPlayerRef,
+            TwCommandItemConfig config,
+            ItemStack working,
+            String toolId,
+            Actions actions,
+            BooleanSupplier genericAuthority,
+            BondedLifecycleAuthority bondedAuthority,
+            boolean forceStandard
+    ) {
+        UUID sessionId = UUID.randomUUID();
+        String selected = working == null ? null : working.getFromMetadataOrNull(
+                TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING);
+        CommandUiProviderId configuredProvider = forceStandard ? null
+                : CommandUiProviderId.tryParse(config.getUiProviderId()).orElse(null);
+        String rosterMode = config.usesBondedCompanionRoster()
+                ? "bonded" : "generic";
+        CommandUiOpenContext openContext = new CommandUiOpenContext(
+                uiPlayerRef.getUuid(), uiPlayerRef.getLanguage(), toolId,
+                config.getId(), configuredProvider, rosterMode);
+        PageContext pageContext = pageContext(
+                player, uiPlayerRef, config, working, toolId, actions,
+                genericAuthority, bondedAuthority);
+        InitialUiState initial = initialSnapshot(
+                sessionId, configuredProvider, player, config, working,
+                toolId, selected, rosterMode, pageContext.snapshot());
+        CommandUiSnapshot snapshot = initial.snapshot();
+        CommandUiActionCatalog actionCatalog = commandActions(
+                pageContext, snapshot);
+        AtomicReference<CommandUiPageCoordinator.Created> createdRef =
+                new AtomicReference<>();
+        Runnable refreshRequest = () -> refreshHosted(
+                createdRef.get(), uiPlayerRef.getUuid(), config, toolId, actions,
+                genericAuthority, bondedAuthority);
+        CommandUiPageCoordinator.Created created = coordinator.create(
+                uiPlayerRef, openContext, snapshot,
+                () -> new StandardCommandUiController(createSelectionPage(
+                        pageContext, buildNpcCallbacks(pageContext),
+                        buildFeatureCallbacks(pageContext),
+                        buildPanelCallbacks(pageContext))),
+                actionCatalog.genericBindings(), actionCatalog.bondedBindings(),
+                actionCatalog::attach,
+                refreshRequest,
+                commandUiWorldDispatcher,
+                currentWorld -> openStandardFallback(
+                        currentWorld, config, toolId, actions,
+                        genericAuthority, bondedAuthority));
+        createdRef.set(created);
+        if (!created.host().isOpen()) {
+            return open(player, store, config, working, toolId, actions,
+                    genericAuthority, bondedAuthority, true);
+        }
+        try {
+            created.host().own(pageContext.refreshSignals().subscribe(
+                    ignored -> created.session().requestRefresh()));
+        } catch (RuntimeException | LinkageError failure) {
+            LOGGER.log(Level.WARNING,
+                    "[tw-command-menu] refresh subscription failed", failure);
+        }
+        if (created.custom()) {
+            CommandUiAutomaticRefresh automaticRefresh =
+                    new CommandUiAutomaticRefresh(created.session());
+            if (created.host().own(automaticRefresh)) automaticRefresh.start();
+        }
+        boolean opened = openPage(player, playerRef, store, created.host());
+        if (!opened) {
+            created.host().closeSession(
+                    com.alechilles.alecstamework.api.commandui
+                            .CommandUiCloseReason.FAILURE);
+        }
+        return opened;
+    }
+
+    private void refreshHosted(
+            @Nullable CommandUiPageCoordinator.Created created,
+            UUID ownerUuid,
+            TwCommandItemConfig config,
+            String toolId,
+            Actions actions,
+            BooleanSupplier genericAuthority,
+            BondedLifecycleAuthority bondedAuthority
+    ) {
+        if (created == null || !created.host().isOpen()
+                || !created.session().isOpen()) return;
+        try {
+            PlayerRef currentRef = ownerUuid == null || Universe.get() == null
+                    ? null : Universe.get().getPlayer(ownerUuid);
+            Ref<EntityStore> entityRef = currentRef == null ? null
+                    : currentRef.getReference();
+            Store<EntityStore> store = entityRef == null ? null
+                    : entityRef.getStore();
+            Player player = entityRef == null || !entityRef.isValid()
+                    || store == null ? null
+                    : store.getComponent(entityRef, Player.getComponentType());
+            ItemStack working = player == null ? null
+                    : toolInventoryService.findUniqueToolStack(player, toolId);
+            if (player == null || currentRef == null || working == null
+                    || working.isEmpty()) {
+                created.host().closeSession(
+                        com.alechilles.alecstamework.api.commandui
+                                .CommandUiCloseReason.AUTHORITY_LOST);
+                return;
+            }
+            CommandUiSnapshot previous = created.session().snapshot();
+            String selected = working.getFromMetadataOrNull(
+                    TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING);
+            PageContext context = pageContext(player, currentRef, config, working,
+                    toolId, actions, genericAuthority, bondedAuthority);
+            CommandUiSnapshot fresh = initialSnapshot(
+                    previous.sessionId(), previous.providerId(), player, config,
+                    working, toolId, selected, previous.rosterMode(),
+                    context.snapshot()).snapshot()
+                    .withPresentationRevision(previous.presentationRevision() + 1L);
+            CommandUiActionCatalog catalog = commandActions(context, fresh);
+            CommandUiSnapshot next;
+            if (created.session().consumeActionRebindRequired()
+                    || !catalog.matchesActions(previous)) {
+                fresh = fresh.withActionGeneration(
+                        previous.actionGeneration() + 1L);
+                created.session().publishInternal(fresh,
+                        com.alechilles.alecstamework.api.commandui
+                                .CommandUiChangeSet.empty());
+                List<CommandUiActionHandle> handles = issueHandles(
+                        created.session(), catalog);
+                next = catalog.attach(fresh, handles);
+            } else {
+                next = CommandUiActionCatalog.retainActions(fresh, previous);
+            }
+            var changes = CommandUiSnapshotDiffer.diff(previous, next);
+            created.session().publishInternal(next, changes);
+            CommandUiSnapshot published = created.session().snapshot();
+            created.host().applyUpdate(new CommandUiUpdate(
+                    published, previous,
+                    CommandUiSnapshotDiffer.diff(previous, published)));
+        } catch (RuntimeException | LinkageError failure) {
+            LOGGER.log(Level.WARNING,
+                    "[tw-command-menu] hosted refresh failed", failure);
+        }
+    }
+
+    private List<CommandUiActionHandle> issueHandles(
+            CommandUiSessionImpl session,
+            CommandUiActionCatalog catalog
+    ) {
+        java.util.ArrayList<CommandUiActionHandle> handles =
+                new java.util.ArrayList<>();
+        for (GenericUiActionBinding binding : catalog.genericBindings()) {
+            handles.add(bindGenericUiAction(session, binding));
+        }
+        for (BondedUiActionBinding binding : catalog.bondedBindings()) {
+            CommandUiActionHandle handle = bindBondedUiAction(session, binding);
+            if (handle != null) handles.add(handle);
+        }
+        return List.copyOf(handles);
+    }
+
+    private InitialUiState initialSnapshot(
+            UUID sessionId,
+            @Nullable CommandUiProviderId providerId,
+            Player player,
+            TwCommandItemConfig config,
+            @Nullable ItemStack working,
+            String toolId,
+            @Nullable String selected,
+            String rosterMode,
+            CommandPanelSnapshotState panelSnapshot
+    ) {
+        panelSnapshot.refreshSnapshot();
+        String mode = config.usesBondedCompanionRoster()
+                ? TameworkCommandSelectionPage.PANEL_MODE_LINKED
+                : toolInventoryService.resolvePanelModeValueForTool(
+                        player, toolId, config);
+        CommandUiPanelState panelState = new CommandUiPanelState(
+                mode,
+                !config.usesBondedCompanionRoster()
+                        && toolInventoryService.resolvePanelAutoLinkEnabledForTool(
+                                player, toolId),
+                !config.usesBondedCompanionRoster()
+                        && toolInventoryService.resolvePanelActiveHighlightEnabledForTool(
+                                player, toolId),
+                Math.max(0.0, config.getRadius()),
+                toolInventoryService.resolvePanelRadiusLabelForTool(
+                        player, toolId, config),
+                toolInventoryService.resolvePanelSortValueForTool(player, toolId),
+                toolInventoryService.resolvePanelFilterModeValueForTool(player, toolId),
+                toolInventoryService.resolvePanelFilterInputForTool(player, toolId),
+                panelSnapshot.emptyStateKey(), Map.of(), Map.of());
+        List<CommandUiCommandOption> commandOptions =
+                CommandUiSnapshotAssembler.commandOptions(
+                        config, selected, Map.of());
+        CommandUiSnapshot snapshot = CommandUiSnapshotAssembler.assemble(
+                sessionId, 1L, 1L,
+                providerId == null ? null : providerId.value(),
+                toolId, working == null ? null : working.getItemId(),
+                config.getId(), rosterMode,
+                Set.of("commands", "companions", "panel", "partial-updates"),
+                selected, commandOptions, panelSnapshot, panelState,
+                Map.of(), Map.of(), System.currentTimeMillis(), Map.of(), null);
+        return new InitialUiState(withAssignments(snapshot, working), panelSnapshot);
+    }
+
+    private CommandUiSnapshot withAssignments(
+            CommandUiSnapshot base,
+            @Nullable ItemStack working
+    ) {
+        CommandHotswapAssignmentStore assignments =
+                new CommandHotswapAssignmentStore();
+        Map<String, String> assigned = new java.util.LinkedHashMap<>();
+        Map<String, List<CommandUiCommandOption>> choices =
+                new java.util.LinkedHashMap<>();
+        for (CommandHotswapAssignmentStore.Slot slot
+                : CommandHotswapAssignmentStore.Slot.values()) {
+            String slotName = slot.name();
+            String selected = assignments.read(working, slot);
+            if (selected != null) assigned.put(slotName, selected);
+            choices.put(slotName, base.commandOptions().stream()
+                    .map(option -> new CommandUiCommandOption(
+                            option.commandId(), option.label(),
+                            option.localizationSource(), option.iconAssetId(),
+                            option.radialVisible(),
+                            option.commandId().equals(selected), null))
+                    .toList());
+        }
+        Map<String, String> groups = new java.util.LinkedHashMap<>();
+        for (var row : base.companionRows()) {
+            String groupId = row.presentation().get("groupId");
+            if (groupId != null && !groupId.isBlank()) {
+                groups.putIfAbsent(groupId,
+                        row.presentation().getOrDefault("groupName", groupId));
+            }
+        }
+        return new CommandUiSnapshot(
+                base.sessionId(), base.presentationRevision(),
+                base.actionGeneration(), base.providerId(), base.toolId(),
+                base.itemId(), base.configId(), base.rosterMode(),
+                base.enabledCapabilities(), base.selectedCommand(),
+                base.commandOptions(), base.companionRows(), base.panelState(),
+                base.globalActions(), base.commandActions(), assigned, choices,
+                groups, base.serverTimeMillis(), base.deadlines(),
+                base.emptyStateKey(), base.disabledReason());
+    }
+
+    private CommandUiActionCatalog commandActions(
+            PageContext context,
+            CommandUiSnapshot snapshot
+    ) {
+        CommandUiActionCatalog catalog = new CommandUiActionCatalog();
+        TwCommandItemConfig config = context.config();
+        Actions actions = context.actions();
+        if (config == null || config.getCommandList() == null) return catalog;
+        for (TwCommandItemConfig.CommandEntry command : config.getCommandList()) {
+            if (command == null || command.getId() == null
+                    || command.getId().isBlank()) continue;
+            String commandId = command.getId().trim();
+            String label = command.getDisplayName() == null
+                    || command.getDisplayName().isBlank()
+                    ? commandId : command.getDisplayName();
+            catalog.addCommand(commandId, label,
+                    new GenericUiActionBinding(
+                            new CommandUiAction("SELECT_COMMAND", null,
+                                    commandId, false),
+                            context.toolAuthority(),
+                            () -> apply(actions.selectCommand(), commandId),
+                            false));
+        }
+        addHotswapActions(catalog, context, snapshot);
+        addPanelActions(catalog, context);
+        addCompanionActions(catalog, context, snapshot,
+                buildNpcCallbacks(context), buildFeatureCallbacks(context));
+        return catalog;
+    }
+
+    private void addHotswapActions(
+            CommandUiActionCatalog catalog,
+            PageContext context,
+            CommandUiSnapshot snapshot
+    ) {
+        for (var slotEntry : snapshot.hotswapChoices().entrySet()) {
+            CommandHotswapAssignmentStore.Slot slot;
+            try {
+                slot = CommandHotswapAssignmentStore.Slot.valueOf(slotEntry.getKey());
+            } catch (IllegalArgumentException ignored) {
+                continue;
+            }
+            for (CommandUiCommandOption option : slotEntry.getValue()) {
+                String commandId = option.commandId();
+                catalog.addHotswap(slot.name(), commandId, option.label(),
+                        new GenericUiActionBinding(
+                                new CommandUiAction("ASSIGN_HOTSWAP", null,
+                                        slot.name() + ":" + commandId, false),
+                                context.toolAuthority(),
+                                () -> applyHotswap(context, slot, commandId), false));
+            }
+        }
+    }
+
+    private CompletionStage<CommandUiActionResult> applyHotswap(
+            PageContext context,
+            CommandHotswapAssignmentStore.Slot slot,
+            String commandId
+    ) {
+        try {
+            Player currentPlayer = resolveCurrentPlayer(context.ownerUuid());
+            if (currentPlayer == null) {
+                return CompletableFuture.completedFuture(
+                        CommandUiActionResult.unavailable(
+                                "current command player is unavailable"));
+            }
+            boolean changed = toolInventoryService.mutateActiveToolStack(
+                    currentPlayer, context.toolId(), stack ->
+                            new CommandHotswapAssignmentStore().write(
+                                    stack, slot, commandId));
+            return CompletableFuture.completedFuture(changed
+                    ? CommandUiActionResult.applied()
+                    : CommandUiActionResult.conflict(
+                            "command item changed before assignment"));
+        } catch (RuntimeException | LinkageError failure) {
+            return CompletableFuture.completedFuture(
+                    CommandUiActionResult.failed("hotswap assignment failed"));
+        }
+    }
+
+    private void addPanelActions(
+            CommandUiActionCatalog catalog,
+            PageContext context
+    ) {
+        PanelCallbacks panel = buildPanelCallbacks(context);
+        addPanel(catalog, "MODE_LINKED", "Show linked companions",
+                "LinkedMode", context.preferenceAuthority(),
+                () -> panel.setMode().accept("LinkedMode"));
+        if (!context.config().usesBondedCompanionRoster()) {
+            addPanel(catalog, "MODE_NEARBY", "Show nearby companions",
+                    "NearbyMode", context.preferenceAuthority(),
+                    () -> panel.setMode().accept("NearbyMode"));
+            addPanel(catalog, "TOGGLE_AUTO_LINK", "Toggle automatic linking",
+                    Boolean.toString(!toolInventoryService
+                            .resolvePanelAutoLinkEnabledForTool(
+                                    resolveCurrentPlayer(context.ownerUuid()),
+                                    context.toolId())),
+                    context.genericAuthority(), () -> panel.setAutoLinkEnabled()
+                            .accept(!toolInventoryService
+                                    .resolvePanelAutoLinkEnabledForTool(
+                                            resolveCurrentPlayer(context.ownerUuid()),
+                                            context.toolId())));
+            addPanel(catalog, "TOGGLE_ACTIVE_HIGHLIGHT",
+                    "Toggle active highlight",
+                    Boolean.toString(!toolInventoryService
+                            .resolvePanelActiveHighlightEnabledForTool(
+                                    resolveCurrentPlayer(context.ownerUuid()),
+                                    context.toolId())),
+                    context.genericAuthority(), () -> panel
+                            .setActiveHighlightEnabled().accept(!toolInventoryService
+                                    .resolvePanelActiveHighlightEnabledForTool(
+                                            resolveCurrentPlayer(context.ownerUuid()),
+                                            context.toolId())));
+            catalog.addGlobal("MANAGE_GROUPS", "Manage groups",
+                    genericBinding("MANAGE_GROUPS", null,
+                            context.genericAuthority(), panel.manageGroups(), false));
+        }
+        addPanel(catalog, "RADIUS_DECREASE", "Decrease radius", "decrease",
+                context.toolAuthority(), panel.decreaseRadius());
+        addPanel(catalog, "RADIUS_INCREASE", "Increase radius", "increase",
+                context.toolAuthority(), panel.increaseRadius());
+        addPanel(catalog, "CLEAR_FILTERS", "Clear filters", "clear",
+                context.preferenceAuthority(), panel.clearFilters());
+        for (String sort : List.of("Default", "Name", "Species", "Group")) {
+            addPanel(catalog, "SORT_" + sort.toUpperCase(java.util.Locale.ROOT),
+                    "Sort by " + sort.toLowerCase(java.util.Locale.ROOT),
+                    "sort:" + sort, context.preferenceAuthority(),
+                    () -> panel.setSort().accept(sort));
+        }
+        for (String filter : List.of("None", "Name", "Species", "Group")) {
+            addPanel(catalog,
+                    "FILTER_" + filter.toUpperCase(java.util.Locale.ROOT),
+                    "Filter by " + filter.toLowerCase(java.util.Locale.ROOT),
+                    "filter:" + filter, context.preferenceAuthority(),
+                    () -> panel.setFilterMode().accept(filter));
+        }
+        if (context.genericRosterActions()) {
+            addPanel(catalog, "GROUP_ALL", "Use all companion groups",
+                    "group:", context.genericAuthority(),
+                    () -> panel.setGroupActivation().accept(""));
+            snapshotGroups(context).forEach((groupId, label) -> addPanel(
+                    catalog, "GROUP_" + groupId, "Use group " + label,
+                    "group:" + groupId, context.genericAuthority(),
+                    () -> panel.setGroupActivation().accept(groupId)));
+        }
+    }
+
+    private void addPanel(
+            CommandUiActionCatalog catalog,
+            String key,
+            String label,
+            String value,
+            BooleanSupplier authority,
+            Runnable operation
+    ) {
+        catalog.addPanel(key, label, genericBinding(
+                "PANEL_PREFERENCE", value, authority, operation, false));
+    }
+
+    private GenericUiActionBinding genericBinding(
+            String kind,
+            @Nullable String value,
+            BooleanSupplier authority,
+            Runnable operation,
+            boolean confirmation
+    ) {
+        return new GenericUiActionBinding(
+                new CommandUiAction(kind, null, value, confirmation), authority,
+                () -> apply(operation), confirmation);
+    }
+
+    static CompletionStage<CommandUiActionResult> apply(Runnable action) {
+        if (action == null) return CompletableFuture.completedFuture(
+                CommandUiActionResult.unavailable("action is unavailable"));
+        try {
+            action.run();
+            return CompletableFuture.completedFuture(CommandUiActionResult.accepted());
+        } catch (RuntimeException | LinkageError failure) {
+            return CompletableFuture.completedFuture(
+                    CommandUiActionResult.failed("action failed"));
+        }
+    }
+
+    private static <T> CompletionStage<CommandUiActionResult> apply(
+            Consumer<T> action,
+            T value
+    ) {
+        if (action == null) {
+            return CompletableFuture.completedFuture(
+                    CommandUiActionResult.unavailable("action is unavailable"));
+        }
+        try {
+            action.accept(value);
+            return CompletableFuture.completedFuture(
+                    CommandUiActionResult.accepted());
+        } catch (RuntimeException | LinkageError failure) {
+            return CompletableFuture.completedFuture(
+                    CommandUiActionResult.failed("action failed"));
+        }
+    }
+
+    private void addCompanionActions(
+            CommandUiActionCatalog catalog,
+            PageContext context,
+            CommandUiSnapshot snapshot,
+            NpcCallbacks npc,
+            FeatureCallbacks features
+    ) {
+        for (com.alechilles.alecstamework.ui.LinkedNpcEntry entry
+                : context.snapshot().snapshot().entries()) {
+            if (entry == null || entry.npcUuid() == null) continue;
+            CommandPanelFeaturePresentation feature =
+                    context.snapshot().presentation(entry.npcUuid());
+            UUID rowId = rowId(snapshot, entry.npcUuid());
+            if (rowId == null) continue;
+            if (feature != null && feature.bonded() != null) {
+                addBondedActions(catalog, context, rowId, entry.npcUuid(),
+                        feature, features);
+            } else {
+                addGenericActions(catalog, context, rowId, entry, feature,
+                        npc, features);
+            }
+        }
+    }
+
+    private void addGenericActions(
+            CommandUiActionCatalog catalog,
+            PageContext context,
+            UUID rowId,
+            com.alechilles.alecstamework.ui.LinkedNpcEntry entry,
+            @Nullable CommandPanelFeaturePresentation feature,
+            NpcCallbacks npc,
+            FeatureCallbacks features
+    ) {
+        UUID npcId = entry.npcUuid();
+        boolean managed = context.config().usesOwnerCommandFamilyRoster()
+                || feature != null && feature.managesRosterRow();
+        boolean linked = entry.linked() && !managed;
+        boolean releasable = !linked && !managed && entry.loaded()
+                && !entry.dead() && !entry.captured() && !entry.inCoop()
+                && !entry.lost();
+        if (!linked && !managed) addGenericRow(catalog, rowId, "LINK", "Link",
+                npcId, null, npc.link(), context.genericAuthority(), false);
+        if (linked) addGenericRow(catalog, rowId, "UNLINK", "Unlink",
+                npcId, null, npc.unlink(), context.genericAuthority(),
+                context.requireUnlinkConfirm());
+        if (releasable) {
+            addGenericRow(catalog, rowId, "RELEASE", "Release", npcId, null,
+                    npc.release(), context.genericAuthority(), true);
+            addGenericRow(catalog, rowId, "CULL", "Cull", npcId, null,
+                    npc.cull(), context.genericAuthority(), true);
+        }
+        if (linked) addGenericRow(catalog, rowId, "TOGGLE_ACTIVE",
+                entry.active() ? "Set inactive" : "Set active", npcId, null,
+                npc.toggleActive(), context.genericAuthority(), false);
+        if (linked && entry.loaded() && entry.breedingAvailable()) {
+            addGenericRow(catalog, rowId, "TOGGLE_BREEDING",
+                    entry.breedingEnabled() ? "Disable breeding" : "Enable breeding",
+                    npcId, null, npc.toggleBreeding(), context.genericAuthority(), false);
+        }
+        boolean revive = linked && (entry.dead() || entry.lost())
+                && entry.deadRespawnRemainingMs() == 0L
+                && (feature == null || !feature.managesPaidRevival());
+        if (revive) addGenericRow(catalog, rowId, "RESPAWN", "Respawn",
+                npcId, null, npc.respawn(), context.genericAuthority(), false);
+        if (linked && !entry.dead() && !entry.lost()) {
+            addGenericRow(catalog, rowId, "LOCATE", "Locate", npcId, null,
+                    npc.locate(), context.genericAuthority(), false);
+        }
+        if (linked && context.recallTeleportingEnabled() && !entry.dead()
+                && !entry.captured() && !entry.inCoop() && !entry.lost()) {
+            addGenericRow(catalog, rowId, "RECALL", "Recall", npcId, null,
+                    npc.recall(), context.genericAuthority(), false);
+        }
+        if (linked && entry.loaded() && !entry.dead() && !entry.captured()
+                && !entry.inCoop() && !entry.lost()) {
+            addGenericRow(catalog, rowId, "SET_HOME", "Set home", npcId, null,
+                    npc.setHome(), context.genericAuthority(), false);
+        }
+        if (linked && entry.hasHome() && !entry.dead() && !entry.captured()
+                && !entry.inCoop() && !entry.lost()) {
+            addGenericRow(catalog, rowId, "RETURN_HOME", "Return home",
+                    npcId, null, npc.returnHome(), context.genericAuthority(), false);
+        }
+        if (linked && entry.loaded() && entry.flightToggleAvailable()) {
+            addFeatureRow(catalog, rowId, "TOGGLE_FLIGHT", "Toggle flight",
+                    npcId, features.flightToggle(), context, false);
+        }
+        if (linked && entry.loaded() && entry.shoulderRideAvailable()) {
+            addFeatureRow(catalog, rowId, "TOGGLE_SHOULDER_RIDE",
+                    "Toggle shoulder ride", npcId, shoulderRideCallback(context),
+                    context, false);
+        }
+        if (feature != null && feature.roster() != null) {
+            if (feature.roster().summonEnabled()) addFeatureRow(catalog, rowId,
+                    "SUMMON", "Summon", npcId, features.summon(), context, false);
+            if (feature.roster().dismissEnabled()) addFeatureRow(catalog, rowId,
+                    "DISMISS", "Dismiss", npcId, features.dismiss(), context, false);
+            if (feature.revival() != null
+                    && feature.revival().status()
+                    == com.alechilles.alecstamework.api.PaidCommandRevivalQuote.Status.READY) {
+                addFeatureRow(catalog, rowId, "REVIVE", "Revive", npcId,
+                        features.revive(), context, true);
+            }
+        }
+        if (linked && context.genericRosterActions()) {
+            PanelCallbacks panel = buildPanelCallbacks(context);
+            addGroupAssignment(catalog, context, rowId, npcId, "", "No group",
+                    panel.assignGroup());
+            snapshotGroups(context).forEach((groupId, label) ->
+                    addGroupAssignment(catalog, context, rowId, npcId, groupId,
+                            "Assign to " + label, panel.assignGroup()));
+        }
+    }
+
+    private Map<String, String> snapshotGroups(PageContext context) {
+        Map<String, String> groups = new java.util.LinkedHashMap<>();
+        for (var entry : context.snapshot().snapshot().entries()) {
+            if (entry == null || entry.groupId() == null
+                    || entry.groupId().isBlank()) continue;
+            groups.putIfAbsent(entry.groupId(), entry.groupName() == null
+                    || entry.groupName().isBlank()
+                    ? entry.groupId() : entry.groupName());
+        }
+        return Map.copyOf(groups);
+    }
+
+    private void addGroupAssignment(
+            CommandUiActionCatalog catalog,
+            PageContext context,
+            UUID rowId,
+            UUID target,
+            String groupId,
+            String label,
+            BiConsumer<UUID, String> operation
+    ) {
+        catalog.addRow(rowId, "ASSIGN_GROUP:" + groupId, label,
+                new GenericUiActionBinding(
+                        new CommandUiAction("ASSIGN_GROUP", target, groupId, false),
+                        context.genericAuthority(),
+                        () -> {
+                            operation.accept(target, groupId);
+                            return CompletableFuture.completedFuture(
+                                    CommandUiActionResult.accepted());
+                        }, false));
+    }
+
+    private void addBondedActions(
+            CommandUiActionCatalog catalog,
+            PageContext context,
+            UUID rowId,
+            UUID presentationId,
+            CommandPanelFeaturePresentation feature,
+            FeatureCallbacks features
+    ) {
+        if (bondedActions == null || feature.bonded() == null) return;
+        var bonded = feature.bonded();
+        var status = bonded.status();
+        String kind = switch (status.action()) {
+            case SUMMON -> "SUMMON";
+            case DISMISS -> "DISMISS";
+            case REVIVE -> "REVIVE";
+            case NONE -> null;
+        };
+        if (kind != null && status.actionEnabled()) {
+            addBondedRow(catalog, context, rowId, feature, kind,
+                    switch (kind) {
+                        case "SUMMON" -> "Summon";
+                        case "DISMISS" -> "Dismiss";
+                        default -> "Revive";
+                    }, "REVIVE".equals(kind));
+        }
+        addBondedRow(catalog, context, rowId, feature, "ABANDON",
+                "Abandon", true);
+        if (BondedCompanionFlightToggleActionService
+                .isFlightToggleAvailable(feature.bonded())) {
+            addFeatureRow(catalog, rowId, "TOGGLE_FLIGHT", "Toggle flight",
+                    presentationId, features.flightToggle(), context, false);
+        }
+        if (BondedCompanionShoulderRideActionService
+                .isAvailable(feature.bonded())) {
+            addFeatureRow(catalog, rowId, "TOGGLE_SHOULDER_RIDE",
+                    "Toggle shoulder ride", presentationId,
+                    shoulderRideCallback(context), context, false);
+        }
+    }
+
+    private void addGenericRow(
+            CommandUiActionCatalog catalog,
+            UUID rowId,
+            String kind,
+            String label,
+            UUID target,
+            @Nullable String value,
+            Consumer<UUID> operation,
+            BooleanSupplier authority,
+            boolean confirmation
+    ) {
+        catalog.addRow(rowId, kind, label, new GenericUiActionBinding(
+                new CommandUiAction(kind, target, value, confirmation),
+                authority, () -> apply(operation, target), confirmation));
+    }
+
+    private void addFeatureRow(
+            CommandUiActionCatalog catalog,
+            UUID rowId,
+            String kind,
+            String label,
+            UUID target,
+            LinkedNpcPanelFeatureAction operation,
+            PageContext context,
+            boolean confirmation
+    ) {
+        catalog.addRow(rowId, kind, label, new GenericUiActionBinding(
+                new CommandUiAction(kind, target, null, confirmation),
+                context.config().usesBondedCompanionRoster()
+                        ? context.toolAuthority() : context.genericAuthority(),
+                () -> apply(operation, target, context.ownerUuid()), confirmation));
+    }
+
+    private void addBondedRow(
+            CommandUiActionCatalog catalog,
+            PageContext context,
+            UUID rowId,
+            CommandPanelFeaturePresentation feature,
+            String kind,
+            String label,
+            boolean confirmation
+    ) {
+        var bonded = feature.bonded();
+        catalog.addBondedRow(rowId, kind, label, new BondedUiActionBinding(
+                new CommandUiAction(kind, null, null, confirmation),
+                context.ownerUuid(), bonded.rosterId(), bonded.profileId(),
+                (owner, roster, profile) -> resolveBondedContext(
+                        context, owner, roster, profile), confirmation));
+    }
+
+    private CompletionStage<CommandUiActionResult> apply(
+            LinkedNpcPanelFeatureAction action,
+            UUID target,
+            UUID ownerUuid
+    ) {
+        if (action == null) return CompletableFuture.completedFuture(
+                CommandUiActionResult.unavailable("action is unavailable"));
+        try {
+            PlayerRef playerRef = Universe.get() == null ? null
+                    : Universe.get().getPlayer(ownerUuid);
+            Ref<EntityStore> ref = playerRef == null ? null
+                    : playerRef.getReference();
+            Store<EntityStore> store = ref == null ? null : ref.getStore();
+            if (ref == null || !ref.isValid() || store == null) {
+                return CompletableFuture.completedFuture(
+                        CommandUiActionResult.unavailable(
+                                "current command world is unavailable"));
+            }
+            action.accept(target, ref, store);
+            return CompletableFuture.completedFuture(CommandUiActionResult.accepted());
+        } catch (RuntimeException | LinkageError failure) {
+            return CompletableFuture.completedFuture(
+                    CommandUiActionResult.failed("action failed"));
+        }
+    }
+
+    @Nullable
+    private BondedCompanionPanelActionRouter.CurrentUiContext resolveBondedContext(
+            PageContext opened,
+            UUID ownerUuid,
+            String rosterId,
+            String profileId
+    ) {
+        try {
+            PlayerRef playerRef = Universe.get() == null ? null
+                    : Universe.get().getPlayer(ownerUuid);
+            Ref<EntityStore> ref = playerRef == null ? null
+                    : playerRef.getReference();
+            Store<EntityStore> store = ref == null ? null : ref.getStore();
+            Player player = ref == null || !ref.isValid() || store == null
+                    ? null : store.getComponent(ref, Player.getComponentType());
+            if (player == null) return null;
+            var snapshot = toolInventoryService.buildLinkedPanelSnapshotForTool(
+                    player, opened.toolId(), opened.config());
+            CommandPanelFeaturePresentation current = snapshot == null ? null
+                    : snapshot.featurePresentations().values().stream()
+                    .filter(candidate -> candidate != null
+                            && candidate.bonded() != null
+                            && rosterId.equals(candidate.bonded().rosterId())
+                            && profileId.equals(candidate.bonded().profileId()))
+                    .findFirst().orElse(null);
+            return new BondedCompanionPanelActionRouter.CurrentUiContext(
+                    ref, store, opened.config(), current,
+                    opened.bondedLifecycleAuthority());
+        } catch (RuntimeException | LinkageError failure) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private static UUID rowId(CommandUiSnapshot snapshot, UUID companionUuid) {
+        for (var row : snapshot.companionRows()) {
+            if (Objects.equals(companionUuid, row.companionUuid())) {
+                return row.rowId();
+            }
+        }
+        return null;
+    }
+
+    private void openStandardFallback(
+            CommandUiHostPage.CurrentWorld currentWorld,
+            TwCommandItemConfig config,
+            String toolId,
+            Actions actions,
+            BooleanSupplier genericAuthority,
+            BondedLifecycleAuthority bondedAuthority
+    ) {
+        Ref<EntityStore> ref = currentWorld.playerRef();
+        Store<EntityStore> store = currentWorld.store();
+        Player currentPlayer = ref == null || store == null || !ref.isValid()
+                ? null : store.getComponent(ref, Player.getComponentType());
+        ItemStack currentTool = currentPlayer == null ? null
+                : toolInventoryService.findUniqueToolStack(currentPlayer, toolId);
+        if (currentPlayer == null || currentTool == null || currentTool.isEmpty()) return;
+        open(currentPlayer, store, config, currentTool, toolId, actions,
+                genericAuthority, bondedAuthority, true);
     }
 
     private boolean canOpen(Player player,
@@ -274,26 +1093,49 @@ final class CommandSelectionPageService {
                                                    Actions actions,
                                                    BooleanSupplier genericCallbackAuthority,
                                                    BondedLifecycleAuthority bondedLifecycleAuthority) {
+        PageContext context = pageContext(player, uiPlayerRef, config, working,
+                toolId, actions, genericCallbackAuthority,
+                bondedLifecycleAuthority);
+        return createSelectionPage(context, buildNpcCallbacks(context),
+                buildFeatureCallbacks(context), buildPanelCallbacks(context));
+    }
+
+    private PageContext pageContext(
+            Player player,
+            PlayerRef uiPlayerRef,
+            TwCommandItemConfig config,
+            @Nullable ItemStack working,
+            String toolId,
+            Actions actions,
+            BooleanSupplier genericCallbackAuthority,
+            BondedLifecycleAuthority bondedLifecycleAuthority
+    ) {
+        UUID ownerUuid = player.getUuid();
         boolean genericRosterActions = CommandRosterStorageBoundary
                 .allowsGenericRosterActions(config);
         CommandPanelSnapshotState panelSnapshot = new CommandPanelSnapshotState(
                 () -> toolInventoryService.buildLinkedPanelSnapshotForTool(
-                        player, toolId, config
-                )
+                        resolveCurrentPlayer(ownerUuid), toolId, config)
         );
-        LinkedPanelRefreshSignalSource pageSignals = pageSignals(player, config);
-        PageContext context = new PageContext(player, uiPlayerRef, config,
-                toolId, actions, player.getUuid(), genericRosterActions,
+        LinkedPanelRefreshSignalSource pageSignals = pageSignals(ownerUuid, config);
+        BooleanSupplier toolAuthority = config.usesBondedCompanionRoster()
+                ? () -> {
+                    Player current = resolveCurrentPlayer(ownerUuid);
+                    return current != null
+                            && bondedLifecycleAuthority.allows(current);
+                }
+                : genericCallbackAuthority;
+        return new PageContext(uiPlayerRef, config,
+                toolId, actions, ownerUuid, genericRosterActions,
+                toolAuthority,
                 genericRosterActions ? genericCallbackAuthority : () -> false,
-                genericRosterActions ? genericCallbackAuthority : () -> true,
+                toolAuthority,
                 bondedLifecycleAuthority, panelSnapshot,
                 pageSignals,
                 working == null ? null : working.getFromMetadataOrNull(
                         TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING),
                 resolveRequireUnlinkConfirm(),
                 CommandTravelSettings.isRecallTeleportingEnabled());
-        return createSelectionPage(context, buildNpcCallbacks(context),
-                buildFeatureCallbacks(context), buildPanelCallbacks(context));
     }
 
     LinkedPanelRefreshSignalSource pageSignals(Player player,
@@ -320,31 +1162,37 @@ final class CommandSelectionPageService {
                 context.config().usesBondedCompanionRoster()
                         ? () -> TameworkCommandSelectionPage.PANEL_MODE_LINKED
                         : () -> toolInventoryService.resolvePanelModeValueForTool(
-                        context.player(), context.toolId(), context.config()),
+                        resolveCurrentPlayer(context.ownerUuid()),
+                        context.toolId(), context.config()),
                 context.config().usesBondedCompanionRoster()
                         ? () -> true : context.genericRosterActions()
                         ? () -> toolInventoryService.resolvePanelAutoLinkEnabledForTool(
-                                context.player(), context.toolId())
+                                resolveCurrentPlayer(context.ownerUuid()),
+                                context.toolId())
                         : () -> false,
                 () -> toolInventoryService.resolvePanelRadiusLabelForTool(
-                        context.player(), context.toolId(), context.config()),
+                        resolveCurrentPlayer(context.ownerUuid()),
+                        context.toolId(), context.config()),
                 () -> toolInventoryService.resolvePanelSortValueForTool(
-                        context.player(), context.toolId()),
+                        resolveCurrentPlayer(context.ownerUuid()), context.toolId()),
                 () -> toolInventoryService.resolvePanelFilterModeValueForTool(
-                        context.player(), context.toolId()),
+                        resolveCurrentPlayer(context.ownerUuid()), context.toolId()),
                 () -> toolInventoryService.resolvePanelFilterInputForTool(
-                        context.player(), context.toolId()),
+                        resolveCurrentPlayer(context.ownerUuid()), context.toolId()),
                 context.genericRosterActions()
                         ? () -> groupAssignPageService.resolveGroupActivationDropdownEntries(
-                                context.player(), context.toolId())
+                                resolveCurrentPlayer(context.ownerUuid()),
+                                context.toolId())
                         : java.util.List::of,
                 context.genericRosterActions()
                         ? () -> groupAssignPageService.resolveGroupActivationValue(
-                                context.player(), context.toolId())
+                                resolveCurrentPlayer(context.ownerUuid()),
+                                context.toolId())
                         : () -> "",
                 context.genericRosterActions()
                         ? () -> groupAssignPageService.resolveGroupDropdownEntries(
-                                context.player(), context.toolId())
+                                resolveCurrentPlayer(context.ownerUuid()),
+                                context.toolId())
                         : java.util.List::of,
                 command -> context.recallTeleportingEnabled()
                         || !resolutionService.isRecallCommand(command),
@@ -370,15 +1218,17 @@ final class CommandSelectionPageService {
                 context.genericRosterActions() && HytaleApiLevel.isUpdate6OrLater(),
                 context.genericRosterActions()
                         ? () -> toolInventoryService.resolvePanelActiveHighlightEnabledForTool(
-                                context.player(), context.toolId())
+                                resolveCurrentPlayer(context.ownerUuid()),
+                                context.toolId())
                         : () -> false,
                 panelCallbacks.setActiveHighlightEnabled()
         ));
         page.configureShoulderRideCallback(shoulderRideCallback(context));
         page.configureHotswapAssignments(
-                () -> toolInventoryService.findActiveToolStack(context.player(), context.toolId()),
+                () -> toolInventoryService.findActiveToolStack(
+                        resolveCurrentPlayer(context.ownerUuid()), context.toolId()),
                 (slot, commandId) -> toolInventoryService.mutateActiveToolStack(
-                        context.player(), context.toolId(), stack ->
+                        resolveCurrentPlayer(context.ownerUuid()), context.toolId(), stack ->
                                 new CommandHotswapAssignmentStore().write(stack, slot, commandId))
         );
         return page;
@@ -398,14 +1248,19 @@ final class CommandSelectionPageService {
                     ignoredUuid, ignoredUuid, ignoredUuid, ignoredUuid,
                     openBondedTalents, context.actions().selectCommand());
         }
-        Player player = context.player();
         String toolId = context.toolId();
         TwCommandItemConfig config = context.config();
         return new NpcCallbacks(
-                guardedUuid(authority, uuid -> panelActionService.applyLink(player, toolId, config, uuid)),
+                guardedUuid(authority, uuid -> withCurrentPlayer(
+                        context.ownerUuid(), player -> panelActionService
+                                .applyLink(player, toolId, config, uuid))),
                 guardedUuid(authority, context.actions().unlink()),
-                guardedUuid(authority, uuid -> panelActionService.applyToggleActive(player, toolId, config, uuid)),
-                guardedUuid(authority, uuid -> panelActionService.applyToggleBreeding(player, toolId, config, uuid)),
+                guardedUuid(authority, uuid -> withCurrentPlayer(
+                        context.ownerUuid(), player -> panelActionService
+                                .applyToggleActive(player, toolId, config, uuid))),
+                guardedUuid(authority, uuid -> withCurrentPlayer(
+                        context.ownerUuid(), player -> panelActionService
+                                .applyToggleBreeding(player, toolId, config, uuid))),
                 guardedUuid(authority, context.actions().release()),
                 guardedUuid(authority, context.actions().cull()),
                 guardedUuid(authority, context.actions().respawn()),
@@ -413,8 +1268,10 @@ final class CommandSelectionPageService {
                 guardedUuid(authority, context.actions().recall()),
                 guardedUuid(authority, context.actions().setHome()),
                 guardedUuid(authority, context.actions().returnHome()),
-                guardedUuid(authority, uuid -> talentPageService.openTalentPage(
-                        player, toolId, uuid, context.actions().reopenMenu())),
+                guardedUuid(authority, uuid -> withCurrentPlayer(
+                        context.ownerUuid(), player -> talentPageService.openTalentPage(
+                                player, toolId, uuid,
+                                context.actions().reopenMenu()))),
                 guardedString(authority, context.actions().selectCommand()));
     }
 
@@ -425,8 +1282,9 @@ final class CommandSelectionPageService {
         CommandPanelFeaturePresentation feature = context.snapshot()
                 .presentation(presentationUuid);
         if (feature != null && feature.bonded() != null) {
-            bondedTalentPages.open(context.player(), feature.bonded(),
-                    context.actions().reopenMenu());
+            withCurrentPlayer(context.ownerUuid(), player ->
+                    bondedTalentPages.open(player, feature.bonded(),
+                            context.actions().reopenMenu()));
         }
     }
 
@@ -487,40 +1345,72 @@ final class CommandSelectionPageService {
         Consumer<String> ignoredString = ignored -> { };
         Consumer<Boolean> ignoredBoolean = ignored -> { };
         Runnable ignoredAction = () -> { };
-        Player player = context.player();
         String toolId = context.toolId();
+        TwCommandItemConfig config = context.config();
         BooleanSupplier genericAuthority = context.genericAuthority();
+        BooleanSupplier toolAuthority = context.toolAuthority();
         BooleanSupplier preferenceAuthority = context.preferenceAuthority();
         return new PanelCallbacks(
                 context.config().usesBondedCompanionRoster() ? ignoredString
-                        : guardedString(preferenceAuthority, value -> panelActionService.applySetPanelMode(player, toolId, value)),
+                        : guardedString(preferenceAuthority, value -> withCurrentPlayer(
+                                context.ownerUuid(), player -> panelActionService
+                                        .applySetPanelMode(player, toolId, value))),
                 context.genericRosterActions() ? guardedBoolean(genericAuthority,
-                        enabled -> panelActionService.applySetAutoLinkEnabled(
-                                player, toolId, context.config(), enabled)) : ignoredBoolean,
+                        enabled -> withCurrentPlayer(context.ownerUuid(), player ->
+                                panelActionService.applySetAutoLinkEnabled(
+                                        player, toolId, config, enabled))) : ignoredBoolean,
                 context.genericRosterActions() ? guardedBoolean(genericAuthority,
-                        enabled -> panelActionService.applySetActiveHighlightEnabled(
-                                player, toolId, context.config(), enabled)) : ignoredBoolean,
-                guardedAction(genericAuthority, () -> panelActionService.applyAdjustPanelRadius(
-                        player, toolId, context.config(), false)),
-                guardedAction(genericAuthority, () -> panelActionService.applyAdjustPanelRadius(
-                        player, toolId, context.config(), true)),
+                        enabled -> withCurrentPlayer(context.ownerUuid(), player ->
+                                panelActionService.applySetActiveHighlightEnabled(
+                                        player, toolId, config, enabled))) : ignoredBoolean,
+                guardedAction(toolAuthority, () -> withCurrentPlayer(
+                        context.ownerUuid(), player -> panelActionService
+                                .applyAdjustPanelRadius(player, toolId, config, false))),
+                guardedAction(toolAuthority, () -> withCurrentPlayer(
+                        context.ownerUuid(), player -> panelActionService
+                                .applyAdjustPanelRadius(player, toolId, config, true))),
                 context.genericRosterActions() ? guardedAction(genericAuthority,
                         context.actions().manageGroups()) : ignoredAction,
-                guardedString(preferenceAuthority,
-                        value -> panelActionService.applySetSort(player, toolId, value)),
-                guardedString(preferenceAuthority,
-                        value -> panelActionService.applySetFilterMode(player, toolId, value)),
-                guardedString(preferenceAuthority, value -> panelActionService
-                        .applySetSelectedFilterText(player, toolId, value)),
-                guardedAction(preferenceAuthority,
-                        () -> panelActionService.applyClearFilters(player, toolId)),
+                guardedString(preferenceAuthority, value -> withCurrentPlayer(
+                        context.ownerUuid(), player -> panelActionService
+                                .applySetSort(player, toolId, value))),
+                guardedString(preferenceAuthority, value -> withCurrentPlayer(
+                        context.ownerUuid(), player -> panelActionService
+                                .applySetFilterMode(player, toolId, value))),
+                guardedString(preferenceAuthority, value -> withCurrentPlayer(
+                        context.ownerUuid(), player -> panelActionService
+                                .applySetSelectedFilterText(player, toolId, value))),
+                guardedAction(preferenceAuthority, () -> withCurrentPlayer(
+                        context.ownerUuid(), player -> panelActionService
+                                .applyClearFilters(player, toolId))),
                 context.genericRosterActions() ? guardedString(genericAuthority,
-                        value -> groupAssignPageService.applyGroupActivation(
-                                player, toolId, context.config(), value)) : ignoredString,
+                        value -> withCurrentPlayer(context.ownerUuid(), player ->
+                                groupAssignPageService.applyGroupActivation(
+                                        player, toolId, config, value))) : ignoredString,
                 context.genericRosterActions() ? guardedPair(genericAuthority,
-                        (uuid, group) -> groupAssignPageService.applyGroupAssignment(
-                                player, toolId, context.config(), uuid, group))
+                        (uuid, group) -> withCurrentPlayer(context.ownerUuid(), player ->
+                                groupAssignPageService.applyGroupAssignment(
+                                        player, toolId, config, uuid, group)))
                         : (ignoredUuid, ignoredGroup) -> { });
+    }
+
+    private static void withCurrentPlayer(
+            UUID ownerUuid,
+            Consumer<Player> action
+    ) {
+        Player player = resolveCurrentPlayer(ownerUuid);
+        if (player != null) action.accept(player);
+    }
+
+    @Nullable
+    private static Player resolveCurrentPlayer(UUID ownerUuid) {
+        PlayerRef playerRef = Universe.get() == null ? null
+                : Universe.get().getPlayer(ownerUuid);
+        Ref<EntityStore> ref = playerRef == null ? null : playerRef.getReference();
+        Store<EntityStore> store = ref == null || !ref.isValid()
+                ? null : ref.getStore();
+        return store == null ? null
+                : store.getComponent(ref, Player.getComponentType());
     }
 
     private void applyFeatureAction(
@@ -635,7 +1525,7 @@ final class CommandSelectionPageService {
     private boolean openPage(Player player,
                              Ref<EntityStore> playerRef,
                              Store<EntityStore> store,
-                             TameworkCommandSelectionPage page) {
+                             CustomUIPage page) {
         try {
             player.getPageManager().openCustomPage(playerRef, store, page);
             return true;
@@ -663,6 +1553,79 @@ final class CommandSelectionPageService {
         return config.getCommandList().length;
     }
 
+    /** Binds one generic action only when its caller supplies a real outcome. */
+    CommandUiActionHandle bindGenericUiAction(
+            CommandUiSessionImpl session,
+            GenericUiActionBinding binding
+    ) {
+        Objects.requireNonNull(session, "session");
+        Objects.requireNonNull(binding, "binding");
+        return session.issueGeneric(binding.action(), binding.authority(),
+                binding.operation(), binding.confirmationRequired());
+    }
+
+    /** Binds one bonded action to stable IDs and a current-world resolver. */
+    @Nullable
+    CommandUiActionHandle bindBondedUiAction(
+            CommandUiSessionImpl session,
+            BondedUiActionBinding binding
+    ) {
+        Objects.requireNonNull(session, "session");
+        Objects.requireNonNull(binding, "binding");
+        BondedCompanionPanelActionService.Action bondedAction = switch (
+                binding.action().builtInKind()) {
+            case SUMMON -> BondedCompanionPanelActionService.Action.SUMMON;
+            case DISMISS -> BondedCompanionPanelActionService.Action.STORE;
+            case REVIVE -> BondedCompanionPanelActionService.Action.REVIVE;
+            case ABANDON -> BondedCompanionPanelActionService.Action.ABANDON;
+            default -> null;
+        };
+        if (bondedActions == null || bondedAction == null) return null;
+        // The bonded gateway binding carries profile/roster identity. Do not
+        // retain a replaceable current-NPC UUID from a rendered row.
+        CommandUiAction boundAction = new CommandUiAction(
+                binding.action().kind(), null, binding.action().value(),
+                binding.action().confirmationRequired());
+        return session.issueBonded(boundAction, () -> true, () ->
+                bondedActions.routeForUi(binding.ownerUuid(), binding.rosterId(),
+                        binding.profileId(), bondedAction, binding.contextResolver()),
+                binding.confirmationRequired());
+    }
+
+    record GenericUiActionBinding(
+            CommandUiAction action,
+            BooleanSupplier authority,
+            java.util.function.Supplier<CompletionStage<CommandUiActionResult>> operation,
+            boolean confirmationRequired
+    ) {
+        GenericUiActionBinding {
+            Objects.requireNonNull(action, "action");
+            Objects.requireNonNull(authority, "authority");
+            Objects.requireNonNull(operation, "operation");
+        }
+    }
+
+    record BondedUiActionBinding(
+            CommandUiAction action,
+            UUID ownerUuid,
+            String rosterId,
+            String profileId,
+            BondedCompanionPanelActionRouter.CurrentUiContextResolver contextResolver,
+            boolean confirmationRequired
+    ) {
+        BondedUiActionBinding {
+            Objects.requireNonNull(action, "action");
+            Objects.requireNonNull(ownerUuid, "ownerUuid");
+            if (rosterId == null || rosterId.isBlank()) {
+                throw new IllegalArgumentException("rosterId is required");
+            }
+            if (profileId == null || profileId.isBlank()) {
+                throw new IllegalArgumentException("profileId is required");
+            }
+            Objects.requireNonNull(contextResolver, "contextResolver");
+        }
+    }
+
     record Actions(Consumer<UUID> unlink,
                    Consumer<UUID> release,
                    Consumer<UUID> cull,
@@ -677,13 +1640,13 @@ final class CommandSelectionPageService {
     }
 
     private record PageContext(
-            Player player,
             PlayerRef uiPlayerRef,
             TwCommandItemConfig config,
             String toolId,
             Actions actions,
             UUID ownerUuid,
             boolean genericRosterActions,
+            BooleanSupplier toolAuthority,
             BooleanSupplier genericAuthority,
             BooleanSupplier preferenceAuthority,
             BondedLifecycleAuthority bondedLifecycleAuthority,
@@ -692,6 +1655,12 @@ final class CommandSelectionPageService {
             String selectedId,
             boolean requireUnlinkConfirm,
             boolean recallTeleportingEnabled) {
+    }
+
+    private record InitialUiState(
+            CommandUiSnapshot snapshot,
+            CommandPanelSnapshotState panelSnapshot
+    ) {
     }
 
     private record NpcCallbacks(
