@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.compat.HytaleApiLevel;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
 import com.alechilles.alecstamework.ui.LinkedNpcPanelFeatureAction;
 import com.alechilles.alecstamework.ui.LinkedPanelRefreshSignalSource;
@@ -482,10 +483,13 @@ final class CommandSelectionPageService {
                 toolInventoryService.resolvePanelSortValueForTool(player, toolId),
                 toolInventoryService.resolvePanelFilterModeValueForTool(player, toolId),
                 toolInventoryService.resolvePanelFilterInputForTool(player, toolId),
-                panelSnapshot.emptyStateKey(), Map.of(), Map.of());
+                localized(player, panelSnapshot.emptyStateKey()),
+                Map.of(), Map.of());
         List<CommandUiCommandOption> commandOptions =
                 CommandUiSnapshotAssembler.commandOptions(
-                        config, selected, Map.of());
+                        config, selected, Map.of(),
+                        player.getPlayerRef() == null ? null
+                                : player.getPlayerRef().getLanguage());
         CommandUiSnapshot snapshot = CommandUiSnapshotAssembler.assemble(
                 sessionId, 1L, 1L,
                 providerId == null ? null : providerId.value(),
@@ -493,7 +497,9 @@ final class CommandSelectionPageService {
                 config.getId(), rosterMode,
                 Set.of("commands", "companions", "panel", "partial-updates"),
                 selected, commandOptions, panelSnapshot, panelState,
-                Map.of(), Map.of(), System.currentTimeMillis(), Map.of(), null);
+                Map.of(), Map.of(), System.currentTimeMillis(), Map.of(), null)
+                .withEmptyStateText(localized(
+                        player, panelSnapshot.emptyStateKey()));
         return new InitialUiState(withAssignments(snapshot, working), panelSnapshot);
     }
 
@@ -543,9 +549,9 @@ final class CommandSelectionPageService {
             if (command == null || command.getId() == null
                     || command.getId().isBlank()) continue;
             String commandId = command.getId().trim();
-            String label = command.getDisplayName() == null
-                    || command.getDisplayName().isBlank()
-                    ? commandId : command.getDisplayName();
+            String label = LocalizedText.resolveConfigValue(
+                    context.uiPlayerRef().getLanguage(),
+                    command.getDisplayName(), commandId);
             catalog.addCommand(commandId, label,
                     new GenericUiActionBinding(
                             new CommandUiAction("SELECT_COMMAND", null,
@@ -560,6 +566,13 @@ final class CommandSelectionPageService {
         addCompanionActions(catalog, context, snapshot,
                 buildNpcCallbacks(context), buildFeatureCallbacks(context));
         return catalog;
+    }
+
+    @Nullable
+    private static String localized(@Nullable Player player,
+                                    @Nullable String key) {
+        return key == null || key.isBlank() ? null
+                : LocalizedText.resolve(player, key);
     }
 
     private void addHotswapActions(
