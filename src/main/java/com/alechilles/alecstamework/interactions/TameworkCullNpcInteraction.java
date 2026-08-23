@@ -7,6 +7,7 @@ import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.protocol.InteractionState;
+import com.hypixel.hytale.protocol.InteractionSyncData;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.protocol.WaitForDataFrom;
 import com.hypixel.hytale.server.core.entity.InteractionContext;
@@ -85,10 +86,11 @@ public final class TameworkCullNpcInteraction extends SimpleInteraction {
             fail(context, time, type, cooldownHandler);
             return;
         }
+        InteractionSyncData state = context.getState();
         commandBuffer.run(store -> {
             if (!TameworkNpcCullService.cullFromItemInteraction(
                     player, target, store, requireOwner, requireTamed)) {
-                context.getState().state = InteractionState.Failed;
+                state.state = InteractionState.Failed;
             }
         });
         context.setHeldItem(heldItem);
