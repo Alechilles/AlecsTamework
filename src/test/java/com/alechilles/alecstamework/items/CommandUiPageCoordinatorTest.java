@@ -17,6 +17,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -54,6 +55,30 @@ class CommandUiPageCoordinatorTest {
         created.session().close();
     }
 
+    @Test
+    void providerSessionCloseAlsoClosesHostAndController() {
+        CommandUiProviderRegistry registry = new CommandUiProviderRegistry();
+        RecordingController controller = new RecordingController();
+        registry.register("runeteria:husbandry", ignored -> controller);
+        CommandUiPageCoordinator coordinator = new CommandUiPageCoordinator(
+                registry, new CommandSelectionPageService(
+                        null, null, null, null, null));
+        PlayerRef playerRef = new PlayerRef(
+                null, UUID.randomUUID(), "CoordinatorTester", "en-US", null, null);
+        CommandUiOpenContext context = new CommandUiOpenContext(
+                playerRef.getUuid(), "en-US", "tool-1", "config-1",
+                CommandUiProviderId.of("runeteria:husbandry"), "generic");
+        CommandUiPageCoordinator.Created created = coordinator.create(
+                playerRef, context, snapshot(), RecordingController::new,
+                List.of(), List.of(), (current, handles) -> current,
+                directDispatcher(), ignored -> { });
+
+        created.session().close();
+
+        assertFalse(created.host().isOpen());
+        assertEquals(1, controller.closeCount);
+    }
+
     private static CommandUiHostPage.WorldDispatcher directDispatcher() {
         return (playerUuid, operation) -> {
             operation.run(null, null);
@@ -70,6 +95,7 @@ class CommandUiPageCoordinatorTest {
     private static final class RecordingController
             implements CommandUiPageController<TestEvent> {
         private CommandUiSnapshot initialSnapshot;
+        private int closeCount;
 
         @Override
         public BuilderCodec<TestEvent> eventCodec() {
@@ -83,6 +109,11 @@ class CommandUiPageCoordinatorTest {
                                  UICommandBuilder commands,
                                  UIEventBuilder events) {
             initialSnapshot = snapshot;
+        }
+
+        @Override
+        public void close() {
+            closeCount++;
         }
     }
 

@@ -116,6 +116,40 @@ class CommandUiSessionTask2Test {
     }
 
     @Test
+    void confirmationInitiatorCanBeRetriedAfterProviderCancelsFlow() {
+        UUID sessionId = UUID.randomUUID();
+        CommandUiSessionImpl session = session(sessionId,
+                CommandUiSessionImpl.Mode.GENERIC,
+                new CommandUiActionGateway(), 3L);
+        AtomicInteger mutations = new AtomicInteger();
+        var handle = session.issueGeneric(
+                new CommandUiAction("ABANDON", UUID.randomUUID(), null, true),
+                () -> true,
+                () -> {
+                    mutations.incrementAndGet();
+                    return CompletableFuture.completedFuture(
+                            CommandUiActionResult.applied());
+                }, true);
+
+        var canceled = session.invoke(handle).toCompletableFuture().join();
+        var retried = session.invoke(handle).toCompletableFuture().join();
+
+        assertEquals(CommandUiActionStatus.CONFIRMATION_REQUIRED,
+                canceled.status());
+        assertEquals(CommandUiActionStatus.CONFIRMATION_REQUIRED,
+                retried.status());
+        assertEquals(0, mutations.get());
+        assertEquals(CommandUiActionStatus.APPLIED,
+                session.invoke(retried.confirmationHandle())
+                        .toCompletableFuture().join().status());
+        assertEquals(1, mutations.get());
+        assertEquals(CommandUiActionStatus.STALE,
+                session.invoke(canceled.confirmationHandle())
+                        .toCompletableFuture().join().status());
+        session.close();
+    }
+
+    @Test
     void providerSinkCannotReplaceSnapshotAndOnlySubmitsHostWork() {
         UUID sessionId = UUID.randomUUID();
         CommandUiActionGateway gateway = new CommandUiActionGateway();

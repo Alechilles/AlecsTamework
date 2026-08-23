@@ -110,6 +110,25 @@ class CommandUiActionCatalogTest {
         assertFalse(changed.matchesActions(previous));
     }
 
+    @Test
+    void stableProfileRowRebindsWhenLiveAliasChanges() {
+        UUID rowId = UUID.randomUUID();
+        UUID oldAlias = UUID.randomUUID();
+        UUID newAlias = UUID.randomUUID();
+        CommandUiSnapshot previous = new CommandUiSnapshot(
+                UUID.randomUUID(), 1L, 1L, null, List.of(),
+                List.of(row(rowId, oldAlias, "profile-7", "Companion",
+                        "old-handle")), new CommandUiPanelState("linked"));
+        CommandUiActionCatalog refreshed = new CommandUiActionCatalog();
+        refreshed.addRow(rowId, "LOCATE", "Locate",
+                new CommandSelectionPageService.GenericUiActionBinding(
+                        new CommandUiAction("LOCATE", newAlias), () -> true,
+                        () -> CompletableFuture.completedFuture(
+                                CommandUiActionResult.accepted()), false));
+
+        assertFalse(refreshed.matchesActions(previous));
+    }
+
     private static CommandUiActionCatalog rowCatalog(
             UUID rowId, String kind, String label) {
         CommandUiActionCatalog catalog = new CommandUiActionCatalog();
@@ -130,8 +149,18 @@ class CommandUiActionCatalogTest {
             String name,
             String token
     ) {
+        return row(id, id, null, name, token);
+    }
+
+    private static CommandUiCompanionRow row(
+            UUID rowId,
+            UUID companionId,
+            String profileId,
+            String name,
+            String token
+    ) {
         return new CommandUiCompanionRow(
-                id, id, null, name, null, null, null, null,
+                rowId, companionId, profileId, name, null, null, null, null,
                 true, true, true, true, null, null, null, null,
                 token == null ? Map.of() : Map.of("LOCATE",
                         new CommandUiActionView(

@@ -120,12 +120,15 @@ holds that authority and validates it again in the player's current world.
 that Tamework dispatched a legacy callback but could not confirm its result.
 Both values can cause a presentation refresh. Destructive and paid actions can
 return a new confirmation handle. Invoke that new handle only after the
-provider shows its confirmation flow.
+provider shows its confirmation flow. A canceled or expired confirmation does
+not consume the initiating action. The provider can start a new confirmation
+flow from the same visible action.
 
 ## Session and Cleanup
 
 `CommandUiSession` is valid for one open page. It provides the latest snapshot,
-action invocation, refresh requests, and a guarded update sink.
+action invocation, refresh requests, and a guarded update sink. Closing the
+session also closes the host and releases the controller and its listeners.
 
 The update sink can request a Tamework snapshot refresh or submit a
 provider-local partial UI update. The host always forces partial submission to

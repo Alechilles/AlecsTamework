@@ -89,7 +89,8 @@ final class CommandUiActionGateway {
                 executor,
                 confirmationRequired || action.confirmationRequired(),
                 false,
-                0L
+                0L,
+                null
         );
         bindings.put(handle.token(), binding);
         return handle;
@@ -177,7 +178,7 @@ final class CommandUiActionGateway {
         }
 
         if (binding.requiresConfirmation && !binding.confirmationToken) {
-            bindings.remove(handle.token(), binding);
+            binding.consumed.set(false);
             CommandUiActionHandle confirmation = issue(
                     binding.sessionId,
                     binding.route,
@@ -188,11 +189,13 @@ final class CommandUiActionGateway {
                     binding.executor,
                     false,
                     true,
-                    System.nanoTime() + CONFIRMATION_LIFETIME.toNanos()
+                    System.nanoTime() + CONFIRMATION_LIFETIME.toNanos(),
+                    handle.token()
             );
             return completed(CommandUiActionResult.confirmationRequired(
                     confirmation, "confirmation required", null));
         }
+        retireConfirmationFamily(handle.token(), binding);
         try {
             CompletionStage<CommandUiActionResult> stage = binding.executor.execute(
                     binding.action);
@@ -254,15 +257,24 @@ final class CommandUiActionGateway {
             ActionExecutor executor,
             boolean confirmationRequired,
             boolean confirmationToken,
-            long expiresAtNanos
+            long expiresAtNanos,
+            @Nullable String initiatingToken
     ) {
         CommandUiActionHandle handle = new CommandUiActionHandle(
                 UUID.randomUUID().toString());
         bindings.put(handle.token(), new Binding(
                 sessionId, route, action, generation, providerGeneration,
                 authority, executor, confirmationRequired,
-                confirmationToken, expiresAtNanos));
+                confirmationToken, expiresAtNanos, initiatingToken));
         return handle;
+    }
+
+    private void retireConfirmationFamily(String token, Binding binding) {
+        String initiatingToken = binding.initiatingToken;
+        if (!binding.confirmationToken || initiatingToken == null) return;
+        bindings.remove(initiatingToken);
+        bindings.entrySet().removeIf(entry -> !token.equals(entry.getKey())
+                && initiatingToken.equals(entry.getValue().initiatingToken));
     }
 
     private void retireOlderGeneration(UUID sessionId, long generation) {
@@ -302,6 +314,7 @@ final class CommandUiActionGateway {
             boolean requiresConfirmation,
             boolean confirmationToken,
             long expiresAtNanos,
+            @Nullable String initiatingToken,
             AtomicBoolean consumed
     ) {
         private Binding(
@@ -314,12 +327,13 @@ final class CommandUiActionGateway {
                 ActionExecutor executor,
                 boolean requiresConfirmation,
                 boolean confirmationToken,
-                long expiresAtNanos
+                long expiresAtNanos,
+                @Nullable String initiatingToken
         ) {
             this(sessionId, route, action, generation, providerGeneration,
                     authority, executor,
                     requiresConfirmation, confirmationToken, expiresAtNanos,
-                    new AtomicBoolean());
+                    initiatingToken, new AtomicBoolean());
         }
     }
 }

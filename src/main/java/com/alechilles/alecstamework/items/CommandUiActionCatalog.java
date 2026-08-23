@@ -171,7 +171,24 @@ final class CommandUiActionCatalog {
         entries().forEach(entry -> expected.put(
                 new ActionKey(entry.scope(), entry.key(), entry.rowId()),
                 entry.shape()));
-        return expected.equals(published);
+        if (!expected.equals(published)) return false;
+        Map<UUID, CommandUiCompanionRow> rows = new LinkedHashMap<>();
+        snapshot.companionRows().forEach(row -> rows.put(row.rowId(), row));
+        for (Entry entry : entries()) {
+            if (entry.scope() != Scope.ROW) continue;
+            CommandUiCompanionRow row = rows.get(entry.rowId());
+            if (row == null) return false;
+            if (entry.genericBinding() != null) {
+                UUID target = entry.genericBinding().action().targetId();
+                if (target != null && !target.equals(row.companionUuid())) {
+                    return false;
+                }
+            } else if (!entry.bondedBinding().profileId()
+                    .equals(row.profileId())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private List<Entry> entries() {

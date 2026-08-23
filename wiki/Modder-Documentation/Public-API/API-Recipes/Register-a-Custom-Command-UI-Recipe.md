@@ -166,6 +166,9 @@ builder with `clear=false`.
 If an invocation returns `CONFIRMATION_REQUIRED`, show a provider-owned
 confirmation overlay with the returned presentation. Bind the returned
 confirmation handle to the confirm button. Do not reuse the first handle.
+If the player cancels, discard the confirmation handle. The initiating action
+stays available, so the player can start a new confirmation flow. Confirmation
+handles expire after five seconds.
 
 Treat `APPLIED` as a confirmed state change. Treat `ACCEPTED` as a successful
 dispatch whose callback did not report whether it changed state. In both

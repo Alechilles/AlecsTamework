@@ -78,7 +78,10 @@ final class CommandUiPageCoordinator {
                 baseSnapshot.sessionId(), baseSnapshot,
                 resolved.providerGeneration(),
                 sessionDispatcher(playerRef.getUuid(), worldDispatcher),
-                Objects.requireNonNull(refreshRequest, "refreshRequest"), ignored -> { },
+                Objects.requireNonNull(refreshRequest, "refreshRequest"), reason -> {
+                    CommandUiHostPage<?> current = host.get();
+                    if (current != null) current.closeSession(reason);
+                },
                 (commands, events, clear) -> {
                     CommandUiHostPage<?> current = host.get();
                     return current != null && current.submitPartialUpdate(

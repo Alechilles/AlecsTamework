@@ -75,7 +75,7 @@ public interface CommandUiSession extends AutoCloseable {
         close(CommandUiCloseReason.DISMISSED);
     }
 
-    /** Closes the session once and invalidates all issued handles. */
+    /** Closes the session and its host once, then invalidates all issued handles. */
     void close(@Nonnull CommandUiCloseReason reason);
 
     /** Returns a stable failed result for a null or closed session. */
