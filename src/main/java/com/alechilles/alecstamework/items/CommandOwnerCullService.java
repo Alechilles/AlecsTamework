@@ -57,7 +57,8 @@ final class CommandOwnerCullService {
             warn(player, "tamework.ui.notifications.command.cull.ownedNearbyOnly");
             return;
         }
-        if (outcome != TameworkNpcCullService.Outcome.CULLED) {
+        if (outcome != TameworkNpcCullService.Outcome.CULLED
+                && outcome != TameworkNpcCullService.Outcome.QUEUED) {
             warn(player, "tamework.ui.notifications.command.cull.unavailable");
             return;
         }

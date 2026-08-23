@@ -291,6 +291,7 @@ class CommandGenericTargetAuthorityTest {
             throws Exception {
         try (ProjectionScope scope = ProjectionScope.install()) {
             LiveTarget target = scope.liveOrdinaryTarget(true);
+            scope.store.removeComponent(target.reference, scope.markerType);
             DamageCause previousCommandCause = DamageCause.COMMAND;
             DamageCause.COMMAND = new DamageCause("test-command");
             TameworkNpcCullService service = new TameworkNpcCullService(
