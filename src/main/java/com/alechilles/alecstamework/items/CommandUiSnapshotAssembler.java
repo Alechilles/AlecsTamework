@@ -200,6 +200,11 @@ final class CommandUiSnapshotAssembler {
         String species = entry.speciesId();
         UUID rowId = entry.npcUuid();
         Map<String, String> presentation = new java.util.LinkedHashMap<>();
+        if (entry.groupId() != null) presentation.put("groupId", entry.groupId());
+        if (entry.groupName() != null) presentation.put("groupName", entry.groupName());
+        if (entry.groupColorHex() != null) {
+            presentation.put("groupColor", entry.groupColorHex());
+        }
         if (feature != null) {
             if (feature.roster() != null) {
                 profileId = feature.roster().profileId();

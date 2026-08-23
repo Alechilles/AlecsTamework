@@ -18,6 +18,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nonnull;
@@ -44,6 +45,8 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
     private final UpdateEmitter updateEmitter;
     private final AtomicBoolean open = new AtomicBoolean(true);
     private final AutoCloseable unregisterSubscription;
+    private final CopyOnWriteArrayList<AutoCloseable> ownedResources =
+            new CopyOnWriteArrayList<>();
 
     public CommandUiHostPage(
             @Nonnull PlayerRef playerRef,
@@ -186,6 +189,19 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
         return open.get();
     }
 
+    /** Gives the host cleanup ownership of one refresh or listener resource. */
+    public boolean own(@Nonnull AutoCloseable resource) {
+        Objects.requireNonNull(resource, "resource");
+        if (!open.get()) {
+            closeQuietly(resource);
+            return false;
+        }
+        ownedResources.add(resource);
+        if (open.get()) return true;
+        if (ownedResources.remove(resource)) closeQuietly(resource);
+        return false;
+    }
+
     private AutoCloseable subscribeProviderRemoval(
             @Nullable CommandUiProviderRegistry registry) {
         if (registry == null || providerId == null || providerGeneration <= 0L) {
@@ -241,6 +257,9 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
     }
 
     private void closeResources(CommandUiCloseReason reason) {
+        for (AutoCloseable resource : ownedResources) {
+            if (ownedResources.remove(resource)) closeQuietly(resource);
+        }
         try {
             unregisterSubscription.close();
         } catch (Exception ignored) {
@@ -252,6 +271,14 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
             // Provider cleanup cannot keep action authority alive.
         }
         session.close(reason);
+    }
+
+    private static void closeQuietly(AutoCloseable resource) {
+        try {
+            resource.close();
+        } catch (Exception ignored) {
+            // Page cleanup continues for all other resources.
+        }
     }
 
     private void sendHostUpdate(

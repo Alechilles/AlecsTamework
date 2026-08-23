@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
 import com.alechilles.alecstamework.api.commandui.CommandUiPanelState;
 import com.alechilles.alecstamework.api.commandui.CommandUiProviderId;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
+import com.alechilles.alecstamework.api.commandui.CommandUiUpdate;
 import com.alechilles.alecstamework.api.internal.CommandUiProviderRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
@@ -29,6 +30,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.CustomUIPage;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
 import java.util.function.BiConsumer;
@@ -38,6 +40,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -303,23 +307,127 @@ final class CommandSelectionPageService {
         CommandUiOpenContext openContext = new CommandUiOpenContext(
                 uiPlayerRef.getUuid(), uiPlayerRef.getLanguage(), toolId,
                 config.getId(), configuredProvider, rosterMode);
-        CommandUiSnapshot snapshot = initialSnapshot(
+        PageContext pageContext = pageContext(
+                player, uiPlayerRef, config, working, toolId, actions,
+                genericAuthority, bondedAuthority);
+        InitialUiState initial = initialSnapshot(
                 sessionId, configuredProvider, player, config, working,
-                toolId, selected, rosterMode);
+                toolId, selected, rosterMode, pageContext.snapshot());
+        CommandUiSnapshot snapshot = initial.snapshot();
+        CommandUiActionCatalog actionCatalog = commandActions(
+                pageContext, snapshot);
+        AtomicReference<CommandUiPageCoordinator.Created> createdRef =
+                new AtomicReference<>();
+        Runnable refreshRequest = () -> refreshHosted(
+                createdRef.get(), uiPlayerRef.getUuid(), config, toolId, actions,
+                genericAuthority, bondedAuthority);
         CommandUiPageCoordinator.Created created = coordinator.create(
                 uiPlayerRef, openContext, snapshot,
-                () -> new StandardCommandUiController(createPage(
-                        player, store, uiPlayerRef, config, working, toolId,
-                        actions, genericAuthority, bondedAuthority)),
-                List.of(), List.of(), (base, handles) -> base,
+                () -> new StandardCommandUiController(createSelectionPage(
+                        pageContext, buildNpcCallbacks(pageContext),
+                        buildFeatureCallbacks(pageContext),
+                        buildPanelCallbacks(pageContext))),
+                actionCatalog.genericBindings(), actionCatalog.bondedBindings(),
+                actionCatalog::attach,
+                refreshRequest,
                 commandUiWorldDispatcher,
                 currentWorld -> openStandardFallback(
                         currentWorld, config, toolId, actions,
                         genericAuthority, bondedAuthority));
+        createdRef.set(created);
+        try {
+            created.host().own(pageContext.refreshSignals().subscribe(
+                    ignored -> created.session().requestRefresh()));
+        } catch (RuntimeException | LinkageError failure) {
+            LOGGER.log(Level.WARNING,
+                    "[tw-command-menu] refresh subscription failed", failure);
+        }
         return openPage(player, playerRef, store, created.host());
     }
 
-    private CommandUiSnapshot initialSnapshot(
+    private void refreshHosted(
+            @Nullable CommandUiPageCoordinator.Created created,
+            UUID ownerUuid,
+            TwCommandItemConfig config,
+            String toolId,
+            Actions actions,
+            BooleanSupplier genericAuthority,
+            BondedLifecycleAuthority bondedAuthority
+    ) {
+        if (created == null || !created.host().isOpen()
+                || !created.session().isOpen()) return;
+        try {
+            PlayerRef currentRef = ownerUuid == null || Universe.get() == null
+                    ? null : Universe.get().getPlayer(ownerUuid);
+            Ref<EntityStore> entityRef = currentRef == null ? null
+                    : currentRef.getReference();
+            Store<EntityStore> store = entityRef == null ? null
+                    : entityRef.getStore();
+            Player player = entityRef == null || !entityRef.isValid()
+                    || store == null ? null
+                    : store.getComponent(entityRef, Player.getComponentType());
+            ItemStack working = player == null ? null
+                    : toolInventoryService.findUniqueToolStack(player, toolId);
+            if (player == null || currentRef == null || working == null
+                    || working.isEmpty()) {
+                created.host().closeSession(
+                        com.alechilles.alecstamework.api.commandui
+                                .CommandUiCloseReason.AUTHORITY_LOST);
+                return;
+            }
+            CommandUiSnapshot previous = created.session().snapshot();
+            String selected = working.getFromMetadataOrNull(
+                    TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING);
+            PageContext context = pageContext(player, currentRef, config, working,
+                    toolId, actions, genericAuthority, bondedAuthority);
+            CommandUiSnapshot fresh = initialSnapshot(
+                    previous.sessionId(), previous.providerId(), player, config,
+                    working, toolId, selected, previous.rosterMode(),
+                    context.snapshot()).snapshot()
+                    .withPresentationRevision(previous.presentationRevision() + 1L);
+            CommandUiSnapshot next;
+            if (created.session().consumeActionRebindRequired()) {
+                fresh = fresh.withActionGeneration(
+                        previous.actionGeneration() + 1L);
+                created.session().publishInternal(fresh,
+                        com.alechilles.alecstamework.api.commandui
+                                .CommandUiChangeSet.empty());
+                CommandUiActionCatalog catalog = commandActions(context, fresh);
+                List<CommandUiActionHandle> handles = issueHandles(
+                        created.session(), catalog);
+                next = catalog.attach(fresh, handles);
+            } else {
+                next = CommandUiActionCatalog.retainActions(fresh, previous);
+            }
+            var changes = CommandUiSnapshotDiffer.diff(previous, next);
+            created.session().publishInternal(next, changes);
+            CommandUiSnapshot published = created.session().snapshot();
+            created.host().applyUpdate(new CommandUiUpdate(
+                    published, previous,
+                    CommandUiSnapshotDiffer.diff(previous, published)));
+        } catch (RuntimeException | LinkageError failure) {
+            LOGGER.log(Level.WARNING,
+                    "[tw-command-menu] hosted refresh failed", failure);
+        }
+    }
+
+    private List<CommandUiActionHandle> issueHandles(
+            CommandUiSessionImpl session,
+            CommandUiActionCatalog catalog
+    ) {
+        java.util.ArrayList<CommandUiActionHandle> handles =
+                new java.util.ArrayList<>();
+        for (GenericUiActionBinding binding : catalog.genericBindings()) {
+            handles.add(bindGenericUiAction(session, binding));
+        }
+        for (BondedUiActionBinding binding : catalog.bondedBindings()) {
+            CommandUiActionHandle handle = bindBondedUiAction(session, binding);
+            if (handle != null) handles.add(handle);
+        }
+        return List.copyOf(handles);
+    }
+
+    private InitialUiState initialSnapshot(
             UUID sessionId,
             @Nullable CommandUiProviderId providerId,
             Player player,
@@ -327,11 +435,9 @@ final class CommandSelectionPageService {
             @Nullable ItemStack working,
             String toolId,
             @Nullable String selected,
-            String rosterMode
+            String rosterMode,
+            CommandPanelSnapshotState panelSnapshot
     ) {
-        CommandPanelSnapshotState panelSnapshot = new CommandPanelSnapshotState(
-                () -> toolInventoryService.buildLinkedPanelSnapshotForTool(
-                        player, toolId, config));
         panelSnapshot.refreshSnapshot();
         String mode = config.usesBondedCompanionRoster()
                 ? TameworkCommandSelectionPage.PANEL_MODE_LINKED
@@ -355,7 +461,7 @@ final class CommandSelectionPageService {
         List<CommandUiCommandOption> commandOptions =
                 CommandUiSnapshotAssembler.commandOptions(
                         config, selected, Map.of());
-        return CommandUiSnapshotAssembler.assemble(
+        CommandUiSnapshot snapshot = CommandUiSnapshotAssembler.assemble(
                 sessionId, 1L, 1L,
                 providerId == null ? null : providerId.value(),
                 toolId, working == null ? null : working.getItemId(),
@@ -363,6 +469,468 @@ final class CommandSelectionPageService {
                 Set.of("commands", "companions", "panel", "partial-updates"),
                 selected, commandOptions, panelSnapshot, panelState,
                 Map.of(), Map.of(), System.currentTimeMillis(), Map.of(), null);
+        return new InitialUiState(withAssignments(snapshot, working), panelSnapshot);
+    }
+
+    private CommandUiSnapshot withAssignments(
+            CommandUiSnapshot base,
+            @Nullable ItemStack working
+    ) {
+        CommandHotswapAssignmentStore assignments =
+                new CommandHotswapAssignmentStore();
+        Map<String, String> assigned = new java.util.LinkedHashMap<>();
+        Map<String, List<CommandUiCommandOption>> choices =
+                new java.util.LinkedHashMap<>();
+        for (CommandHotswapAssignmentStore.Slot slot
+                : CommandHotswapAssignmentStore.Slot.values()) {
+            String slotName = slot.name();
+            String selected = assignments.read(working, slot);
+            if (selected != null) assigned.put(slotName, selected);
+            choices.put(slotName, base.commandOptions().stream()
+                    .map(option -> new CommandUiCommandOption(
+                            option.commandId(), option.label(),
+                            option.localizationSource(), option.iconAssetId(),
+                            option.radialVisible(),
+                            option.commandId().equals(selected), null))
+                    .toList());
+        }
+        Map<String, String> groups = new java.util.LinkedHashMap<>();
+        for (var row : base.companionRows()) {
+            String groupId = row.presentation().get("groupId");
+            if (groupId != null && !groupId.isBlank()) {
+                groups.putIfAbsent(groupId,
+                        row.presentation().getOrDefault("groupName", groupId));
+            }
+        }
+        return new CommandUiSnapshot(
+                base.sessionId(), base.presentationRevision(),
+                base.actionGeneration(), base.providerId(), base.toolId(),
+                base.itemId(), base.configId(), base.rosterMode(),
+                base.enabledCapabilities(), base.selectedCommand(),
+                base.commandOptions(), base.companionRows(), base.panelState(),
+                base.globalActions(), base.commandActions(), assigned, choices,
+                groups, base.serverTimeMillis(), base.deadlines(),
+                base.emptyStateKey(), base.disabledReason());
+    }
+
+    private CommandUiActionCatalog commandActions(
+            PageContext context,
+            CommandUiSnapshot snapshot
+    ) {
+        CommandUiActionCatalog catalog = new CommandUiActionCatalog();
+        TwCommandItemConfig config = context.config();
+        Actions actions = context.actions();
+        BooleanSupplier authority = context.genericAuthority();
+        if (config == null || config.getCommandList() == null) return catalog;
+        for (TwCommandItemConfig.CommandEntry command : config.getCommandList()) {
+            if (command == null || command.getId() == null
+                    || command.getId().isBlank()) continue;
+            String commandId = command.getId().trim();
+            String label = command.getDisplayName() == null
+                    || command.getDisplayName().isBlank()
+                    ? commandId : command.getDisplayName();
+            catalog.addCommand(commandId, label,
+                    new GenericUiActionBinding(
+                            new CommandUiAction("SELECT_COMMAND", null,
+                                    commandId, false),
+                            authority,
+                            () -> apply(actions.selectCommand(), commandId),
+                            false));
+        }
+        addHotswapActions(catalog, context, snapshot);
+        addPanelActions(catalog, context);
+        addCompanionActions(catalog, context, snapshot,
+                buildNpcCallbacks(context), buildFeatureCallbacks(context));
+        return catalog;
+    }
+
+    private void addHotswapActions(
+            CommandUiActionCatalog catalog,
+            PageContext context,
+            CommandUiSnapshot snapshot
+    ) {
+        for (var slotEntry : snapshot.hotswapChoices().entrySet()) {
+            CommandHotswapAssignmentStore.Slot slot;
+            try {
+                slot = CommandHotswapAssignmentStore.Slot.valueOf(slotEntry.getKey());
+            } catch (IllegalArgumentException ignored) {
+                continue;
+            }
+            for (CommandUiCommandOption option : slotEntry.getValue()) {
+                String commandId = option.commandId();
+                catalog.addHotswap(slot.name(), commandId, option.label(),
+                        new GenericUiActionBinding(
+                                new CommandUiAction("ASSIGN_HOTSWAP", null,
+                                        slot.name() + ":" + commandId, false),
+                                context.genericAuthority(),
+                                () -> applyHotswap(context, slot, commandId), false));
+            }
+        }
+    }
+
+    private CompletionStage<CommandUiActionResult> applyHotswap(
+            PageContext context,
+            CommandHotswapAssignmentStore.Slot slot,
+            String commandId
+    ) {
+        try {
+            boolean changed = toolInventoryService.mutateActiveToolStack(
+                    context.player(), context.toolId(), stack ->
+                            new CommandHotswapAssignmentStore().write(
+                                    stack, slot, commandId));
+            return CompletableFuture.completedFuture(changed
+                    ? CommandUiActionResult.applied()
+                    : CommandUiActionResult.conflict(
+                            "command item changed before assignment"));
+        } catch (RuntimeException | LinkageError failure) {
+            return CompletableFuture.completedFuture(
+                    CommandUiActionResult.failed("hotswap assignment failed"));
+        }
+    }
+
+    private void addPanelActions(
+            CommandUiActionCatalog catalog,
+            PageContext context
+    ) {
+        PanelCallbacks panel = buildPanelCallbacks(context);
+        addPanel(catalog, "MODE_LINKED", "Show linked companions",
+                "LinkedMode", context.preferenceAuthority(),
+                () -> panel.setMode().accept("LinkedMode"));
+        if (!context.config().usesBondedCompanionRoster()) {
+            addPanel(catalog, "MODE_NEARBY", "Show nearby companions",
+                    "NearbyMode", context.preferenceAuthority(),
+                    () -> panel.setMode().accept("NearbyMode"));
+            addPanel(catalog, "TOGGLE_AUTO_LINK", "Toggle automatic linking",
+                    Boolean.toString(!toolInventoryService
+                            .resolvePanelAutoLinkEnabledForTool(
+                                    context.player(), context.toolId())),
+                    context.genericAuthority(), () -> panel.setAutoLinkEnabled()
+                            .accept(!toolInventoryService
+                                    .resolvePanelAutoLinkEnabledForTool(
+                                            context.player(), context.toolId())));
+            addPanel(catalog, "TOGGLE_ACTIVE_HIGHLIGHT",
+                    "Toggle active highlight",
+                    Boolean.toString(!toolInventoryService
+                            .resolvePanelActiveHighlightEnabledForTool(
+                                    context.player(), context.toolId())),
+                    context.genericAuthority(), () -> panel
+                            .setActiveHighlightEnabled().accept(!toolInventoryService
+                                    .resolvePanelActiveHighlightEnabledForTool(
+                                            context.player(), context.toolId())));
+            catalog.addGlobal("MANAGE_GROUPS", "Manage groups",
+                    genericBinding("MANAGE_GROUPS", null,
+                            context.genericAuthority(), panel.manageGroups(), false));
+        }
+        addPanel(catalog, "RADIUS_DECREASE", "Decrease radius", "decrease",
+                context.genericAuthority(), panel.decreaseRadius());
+        addPanel(catalog, "RADIUS_INCREASE", "Increase radius", "increase",
+                context.genericAuthority(), panel.increaseRadius());
+        addPanel(catalog, "CLEAR_FILTERS", "Clear filters", "clear",
+                context.preferenceAuthority(), panel.clearFilters());
+    }
+
+    private void addPanel(
+            CommandUiActionCatalog catalog,
+            String key,
+            String label,
+            String value,
+            BooleanSupplier authority,
+            Runnable operation
+    ) {
+        catalog.addPanel(key, label, genericBinding(
+                "PANEL_PREFERENCE", value, authority, operation, false));
+    }
+
+    private GenericUiActionBinding genericBinding(
+            String kind,
+            @Nullable String value,
+            BooleanSupplier authority,
+            Runnable operation,
+            boolean confirmation
+    ) {
+        return new GenericUiActionBinding(
+                new CommandUiAction(kind, null, value, confirmation), authority,
+                () -> apply(operation), confirmation);
+    }
+
+    private static CompletionStage<CommandUiActionResult> apply(Runnable action) {
+        if (action == null) return CompletableFuture.completedFuture(
+                CommandUiActionResult.unavailable("action is unavailable"));
+        try {
+            action.run();
+            return CompletableFuture.completedFuture(CommandUiActionResult.applied());
+        } catch (RuntimeException | LinkageError failure) {
+            return CompletableFuture.completedFuture(
+                    CommandUiActionResult.failed("action failed"));
+        }
+    }
+
+    private static <T> CompletionStage<CommandUiActionResult> apply(
+            Consumer<T> action,
+            T value
+    ) {
+        if (action == null) {
+            return CompletableFuture.completedFuture(
+                    CommandUiActionResult.unavailable("action is unavailable"));
+        }
+        try {
+            action.accept(value);
+            return CompletableFuture.completedFuture(
+                    CommandUiActionResult.applied());
+        } catch (RuntimeException | LinkageError failure) {
+            return CompletableFuture.completedFuture(
+                    CommandUiActionResult.failed("action failed"));
+        }
+    }
+
+    private void addCompanionActions(
+            CommandUiActionCatalog catalog,
+            PageContext context,
+            CommandUiSnapshot snapshot,
+            NpcCallbacks npc,
+            FeatureCallbacks features
+    ) {
+        for (com.alechilles.alecstamework.ui.LinkedNpcEntry entry
+                : context.snapshot().snapshot().entries()) {
+            if (entry == null || entry.npcUuid() == null) continue;
+            CommandPanelFeaturePresentation feature =
+                    context.snapshot().presentation(entry.npcUuid());
+            UUID rowId = rowId(snapshot, entry.npcUuid());
+            if (rowId == null) continue;
+            if (feature != null && feature.bonded() != null) {
+                addBondedActions(catalog, context, rowId, feature);
+            } else {
+                addGenericActions(catalog, context, rowId, entry, feature,
+                        npc, features);
+            }
+        }
+    }
+
+    private void addGenericActions(
+            CommandUiActionCatalog catalog,
+            PageContext context,
+            UUID rowId,
+            com.alechilles.alecstamework.ui.LinkedNpcEntry entry,
+            @Nullable CommandPanelFeaturePresentation feature,
+            NpcCallbacks npc,
+            FeatureCallbacks features
+    ) {
+        UUID npcId = entry.npcUuid();
+        boolean managed = context.config().usesOwnerCommandFamilyRoster()
+                || feature != null && feature.managesRosterRow();
+        boolean linked = entry.linked() && !managed;
+        boolean releasable = !linked && !managed && entry.loaded()
+                && !entry.dead() && !entry.captured() && !entry.inCoop()
+                && !entry.lost();
+        if (!linked && !managed) addGenericRow(catalog, rowId, "LINK", "Link",
+                npcId, null, npc.link(), context.genericAuthority(), false);
+        if (linked) addGenericRow(catalog, rowId, "UNLINK", "Unlink",
+                npcId, null, npc.unlink(), context.genericAuthority(),
+                context.requireUnlinkConfirm());
+        if (releasable) {
+            addGenericRow(catalog, rowId, "RELEASE", "Release", npcId, null,
+                    npc.release(), context.genericAuthority(), true);
+            addGenericRow(catalog, rowId, "CULL", "Cull", npcId, null,
+                    npc.cull(), context.genericAuthority(), true);
+        }
+        if (linked) addGenericRow(catalog, rowId, "TOGGLE_ACTIVE",
+                entry.active() ? "Set inactive" : "Set active", npcId, null,
+                npc.toggleActive(), context.genericAuthority(), false);
+        if (linked && entry.loaded() && entry.breedingAvailable()) {
+            addGenericRow(catalog, rowId, "TOGGLE_BREEDING",
+                    entry.breedingEnabled() ? "Disable breeding" : "Enable breeding",
+                    npcId, null, npc.toggleBreeding(), context.genericAuthority(), false);
+        }
+        boolean revive = linked && (entry.dead() || entry.lost())
+                && entry.deadRespawnRemainingMs() == 0L
+                && (feature == null || !feature.managesPaidRevival());
+        if (revive) addGenericRow(catalog, rowId, "RESPAWN", "Respawn",
+                npcId, null, npc.respawn(), context.genericAuthority(), false);
+        if (linked && !entry.dead() && !entry.lost()) {
+            addGenericRow(catalog, rowId, "LOCATE", "Locate", npcId, null,
+                    npc.locate(), context.genericAuthority(), false);
+        }
+        if (linked && context.recallTeleportingEnabled() && !entry.dead()
+                && !entry.captured() && !entry.inCoop() && !entry.lost()) {
+            addGenericRow(catalog, rowId, "RECALL", "Recall", npcId, null,
+                    npc.recall(), context.genericAuthority(), false);
+        }
+        if (linked && entry.loaded() && !entry.dead() && !entry.captured()
+                && !entry.inCoop() && !entry.lost()) {
+            addGenericRow(catalog, rowId, "SET_HOME", "Set home", npcId, null,
+                    npc.setHome(), context.genericAuthority(), false);
+        }
+        if (linked && entry.hasHome() && !entry.dead() && !entry.captured()
+                && !entry.inCoop() && !entry.lost()) {
+            addGenericRow(catalog, rowId, "RETURN_HOME", "Return home",
+                    npcId, null, npc.returnHome(), context.genericAuthority(), false);
+        }
+        if (linked && entry.loaded() && entry.flightToggleAvailable()) {
+            addFeatureRow(catalog, rowId, "TOGGLE_FLIGHT", "Toggle flight",
+                    npcId, features.flightToggle(), context, false);
+        }
+        if (linked && entry.loaded() && entry.shoulderRideAvailable()) {
+            addFeatureRow(catalog, rowId, "TOGGLE_SHOULDER_RIDE",
+                    "Toggle shoulder ride", npcId, shoulderRideCallback(context),
+                    context, false);
+        }
+        if (feature != null && feature.roster() != null) {
+            if (feature.roster().summonEnabled()) addFeatureRow(catalog, rowId,
+                    "SUMMON", "Summon", npcId, features.summon(), context, false);
+            if (feature.roster().dismissEnabled()) addFeatureRow(catalog, rowId,
+                    "DISMISS", "Dismiss", npcId, features.dismiss(), context, false);
+            if (feature.revival() != null
+                    && feature.revival().status()
+                    == com.alechilles.alecstamework.api.PaidCommandRevivalQuote.Status.READY) {
+                addFeatureRow(catalog, rowId, "REVIVE", "Revive", npcId,
+                        features.revive(), context, true);
+            }
+        }
+    }
+
+    private void addBondedActions(
+            CommandUiActionCatalog catalog,
+            PageContext context,
+            UUID rowId,
+            CommandPanelFeaturePresentation feature
+    ) {
+        if (bondedActions == null || feature.bonded() == null) return;
+        var bonded = feature.bonded();
+        var status = bonded.status();
+        String kind = switch (status.action()) {
+            case SUMMON -> "SUMMON";
+            case DISMISS -> "DISMISS";
+            case REVIVE -> "REVIVE";
+            case NONE -> null;
+        };
+        if (kind != null && status.actionEnabled()) {
+            addBondedRow(catalog, context, rowId, feature, kind,
+                    switch (kind) {
+                        case "SUMMON" -> "Summon";
+                        case "DISMISS" -> "Dismiss";
+                        default -> "Revive";
+                    }, "REVIVE".equals(kind));
+        }
+        addBondedRow(catalog, context, rowId, feature, "ABANDON",
+                "Abandon", true);
+    }
+
+    private void addGenericRow(
+            CommandUiActionCatalog catalog,
+            UUID rowId,
+            String kind,
+            String label,
+            UUID target,
+            @Nullable String value,
+            Consumer<UUID> operation,
+            BooleanSupplier authority,
+            boolean confirmation
+    ) {
+        catalog.addRow(rowId, kind, label, new GenericUiActionBinding(
+                new CommandUiAction(kind, target, value, confirmation),
+                authority, () -> apply(operation, target), confirmation));
+    }
+
+    private void addFeatureRow(
+            CommandUiActionCatalog catalog,
+            UUID rowId,
+            String kind,
+            String label,
+            UUID target,
+            LinkedNpcPanelFeatureAction operation,
+            PageContext context,
+            boolean confirmation
+    ) {
+        catalog.addRow(rowId, kind, label, new GenericUiActionBinding(
+                new CommandUiAction(kind, target, null, confirmation),
+                context.genericAuthority(),
+                () -> apply(operation, target, context.ownerUuid()), confirmation));
+    }
+
+    private void addBondedRow(
+            CommandUiActionCatalog catalog,
+            PageContext context,
+            UUID rowId,
+            CommandPanelFeaturePresentation feature,
+            String kind,
+            String label,
+            boolean confirmation
+    ) {
+        var bonded = feature.bonded();
+        catalog.addBondedRow(rowId, kind, label, new BondedUiActionBinding(
+                new CommandUiAction(kind, null, null, confirmation),
+                context.ownerUuid(), bonded.rosterId(), bonded.profileId(),
+                (owner, roster, profile) -> resolveBondedContext(
+                        context, owner, roster, profile), confirmation));
+    }
+
+    private CompletionStage<CommandUiActionResult> apply(
+            LinkedNpcPanelFeatureAction action,
+            UUID target,
+            UUID ownerUuid
+    ) {
+        if (action == null) return CompletableFuture.completedFuture(
+                CommandUiActionResult.unavailable("action is unavailable"));
+        try {
+            PlayerRef playerRef = Universe.get() == null ? null
+                    : Universe.get().getPlayer(ownerUuid);
+            Ref<EntityStore> ref = playerRef == null ? null
+                    : playerRef.getReference();
+            Store<EntityStore> store = ref == null ? null : ref.getStore();
+            if (ref == null || !ref.isValid() || store == null) {
+                return CompletableFuture.completedFuture(
+                        CommandUiActionResult.unavailable(
+                                "current command world is unavailable"));
+            }
+            action.accept(target, ref, store);
+            return CompletableFuture.completedFuture(CommandUiActionResult.applied());
+        } catch (RuntimeException | LinkageError failure) {
+            return CompletableFuture.completedFuture(
+                    CommandUiActionResult.failed("action failed"));
+        }
+    }
+
+    @Nullable
+    private BondedCompanionPanelActionRouter.CurrentUiContext resolveBondedContext(
+            PageContext opened,
+            UUID ownerUuid,
+            String rosterId,
+            String profileId
+    ) {
+        try {
+            PlayerRef playerRef = Universe.get() == null ? null
+                    : Universe.get().getPlayer(ownerUuid);
+            Ref<EntityStore> ref = playerRef == null ? null
+                    : playerRef.getReference();
+            Store<EntityStore> store = ref == null ? null : ref.getStore();
+            Player player = ref == null || !ref.isValid() || store == null
+                    ? null : store.getComponent(ref, Player.getComponentType());
+            if (player == null) return null;
+            var snapshot = toolInventoryService.buildLinkedPanelSnapshotForTool(
+                    player, opened.toolId(), opened.config());
+            CommandPanelFeaturePresentation current = snapshot == null ? null
+                    : snapshot.featurePresentations().values().stream()
+                    .filter(candidate -> candidate != null
+                            && candidate.bonded() != null
+                            && rosterId.equals(candidate.bonded().rosterId())
+                            && profileId.equals(candidate.bonded().profileId()))
+                    .findFirst().orElse(null);
+            return new BondedCompanionPanelActionRouter.CurrentUiContext(
+                    ref, store, opened.config(), current,
+                    opened.bondedLifecycleAuthority());
+        } catch (RuntimeException | LinkageError failure) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private static UUID rowId(CommandUiSnapshot snapshot, UUID companionUuid) {
+        for (var row : snapshot.companionRows()) {
+            if (Objects.equals(companionUuid, row.companionUuid())) {
+                return row.rowId();
+            }
+        }
+        return null;
     }
 
     private void openStandardFallback(
@@ -423,6 +991,23 @@ final class CommandSelectionPageService {
                                                    Actions actions,
                                                    BooleanSupplier genericCallbackAuthority,
                                                    BondedLifecycleAuthority bondedLifecycleAuthority) {
+        PageContext context = pageContext(player, uiPlayerRef, config, working,
+                toolId, actions, genericCallbackAuthority,
+                bondedLifecycleAuthority);
+        return createSelectionPage(context, buildNpcCallbacks(context),
+                buildFeatureCallbacks(context), buildPanelCallbacks(context));
+    }
+
+    private PageContext pageContext(
+            Player player,
+            PlayerRef uiPlayerRef,
+            TwCommandItemConfig config,
+            @Nullable ItemStack working,
+            String toolId,
+            Actions actions,
+            BooleanSupplier genericCallbackAuthority,
+            BondedLifecycleAuthority bondedLifecycleAuthority
+    ) {
         boolean genericRosterActions = CommandRosterStorageBoundary
                 .allowsGenericRosterActions(config);
         CommandPanelSnapshotState panelSnapshot = new CommandPanelSnapshotState(
@@ -431,7 +1016,7 @@ final class CommandSelectionPageService {
                 )
         );
         LinkedPanelRefreshSignalSource pageSignals = pageSignals(player, config);
-        PageContext context = new PageContext(player, uiPlayerRef, config,
+        return new PageContext(player, uiPlayerRef, config,
                 toolId, actions, player.getUuid(), genericRosterActions,
                 genericRosterActions ? genericCallbackAuthority : () -> false,
                 genericRosterActions ? genericCallbackAuthority : () -> true,
@@ -441,8 +1026,6 @@ final class CommandSelectionPageService {
                         TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING),
                 resolveRequireUnlinkConfirm(),
                 CommandTravelSettings.isRecallTeleportingEnabled());
-        return createSelectionPage(context, buildNpcCallbacks(context),
-                buildFeatureCallbacks(context), buildPanelCallbacks(context));
     }
 
     LinkedPanelRefreshSignalSource pageSignals(Player player,
@@ -914,6 +1497,12 @@ final class CommandSelectionPageService {
             String selectedId,
             boolean requireUnlinkConfirm,
             boolean recallTeleportingEnabled) {
+    }
+
+    private record InitialUiState(
+            CommandUiSnapshot snapshot,
+            CommandPanelSnapshotState panelSnapshot
+    ) {
     }
 
     private record NpcCallbacks(

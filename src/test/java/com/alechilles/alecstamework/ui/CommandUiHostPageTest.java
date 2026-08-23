@@ -172,6 +172,20 @@ class CommandUiHostPageTest {
     }
 
     @Test
+    void dismissalClosesOwnedRefreshSubscription() {
+        TestSession session = new TestSession(snapshot(1L));
+        CommandUiHostPage<TestEvent> host = host(
+                session, new TestController(), directDispatcher(), ignored -> { },
+                new RecordingEmitter());
+        AtomicInteger closes = new AtomicInteger();
+        assertTrue(host.own(() -> closes.incrementAndGet()));
+
+        host.onDismiss(null, null);
+
+        assertEquals(1, closes.get());
+    }
+
+    @Test
     void internalStandardControllerReceivesCurrentWorldContext() {
         TestSession session = new TestSession(snapshot(1L));
         ContextualTestController controller = new ContextualTestController();

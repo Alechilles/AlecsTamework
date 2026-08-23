@@ -45,6 +45,24 @@ final class CommandUiPageCoordinator {
             @Nonnull CommandUiHostPage.WorldDispatcher worldDispatcher,
             @Nonnull CommandUiHostPage.FallbackOpener fallbackOpener
     ) {
+        return create(playerRef, context, baseSnapshot, standardFactory,
+                genericActions, bondedActions, snapshotFinalizer, () -> { },
+                worldDispatcher, fallbackOpener);
+    }
+
+    @Nonnull
+    Created create(
+            @Nonnull PlayerRef playerRef,
+            @Nonnull CommandUiOpenContext context,
+            @Nonnull CommandUiSnapshot baseSnapshot,
+            @Nonnull Supplier<CommandUiPageController<?>> standardFactory,
+            @Nonnull List<CommandSelectionPageService.GenericUiActionBinding> genericActions,
+            @Nonnull List<CommandSelectionPageService.BondedUiActionBinding> bondedActions,
+            @Nonnull SnapshotFinalizer snapshotFinalizer,
+            @Nonnull Runnable refreshRequest,
+            @Nonnull CommandUiHostPage.WorldDispatcher worldDispatcher,
+            @Nonnull CommandUiHostPage.FallbackOpener fallbackOpener
+    ) {
         Objects.requireNonNull(playerRef, "playerRef");
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(baseSnapshot, "baseSnapshot");
@@ -57,7 +75,7 @@ final class CommandUiPageCoordinator {
                 baseSnapshot.sessionId(), baseSnapshot,
                 resolved.providerGeneration(),
                 sessionDispatcher(playerRef.getUuid(), worldDispatcher),
-                () -> { }, ignored -> { },
+                Objects.requireNonNull(refreshRequest, "refreshRequest"), ignored -> { },
                 (commands, events, clear) -> {
                     CommandUiHostPage<?> current = host.get();
                     return current != null && current.submitPartialUpdate(

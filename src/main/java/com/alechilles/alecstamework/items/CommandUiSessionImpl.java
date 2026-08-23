@@ -16,6 +16,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -47,6 +48,7 @@ final class CommandUiSessionImpl implements CommandUiSession {
     private final PartialUpdateSubmitter partialUpdateSubmitter;
     private final AtomicReference<CommandUiSnapshot> currentSnapshot;
     private final AtomicReference<State> state = new AtomicReference<>(State.OPEN);
+    private final AtomicBoolean actionRebindRequired = new AtomicBoolean();
     private final CommandUiUpdateSink updateSink;
 
     CommandUiSessionImpl(
@@ -183,6 +185,11 @@ final class CommandUiSessionImpl implements CommandUiSession {
         return mode;
     }
 
+    /** Returns and clears whether a consumed action requires fresh handles. */
+    boolean consumeActionRebindRequired() {
+        return actionRebindRequired.getAndSet(false);
+    }
+
     @Nonnull
     @Override
     public CommandUiSnapshot snapshot() {
@@ -201,7 +208,15 @@ final class CommandUiSessionImpl implements CommandUiSession {
                             sessionId, handle,
                             currentSnapshot.get().actionGeneration(),
                             expectedRoute()));
-            return flatten(queued);
+            return flatten(queued).whenComplete((result, failure) -> {
+                if (failure == null && result != null
+                        && result.status()
+                        == com.alechilles.alecstamework.api.commandui
+                        .CommandUiActionStatus.APPLIED) {
+                    actionRebindRequired.set(true);
+                    requestRefresh();
+                }
+            });
         } catch (RuntimeException | LinkageError failure) {
             return completed(CommandUiActionResult.failed(
                     "command UI dispatch failed"));
