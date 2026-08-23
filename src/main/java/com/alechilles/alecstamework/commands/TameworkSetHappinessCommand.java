@@ -130,16 +130,14 @@ public final class TameworkSetHappinessCommand extends AbstractPlayerCommand {
 
     @Nullable
     private static Double parseRequestedValue(@Nonnull CommandContext commandContext) {
-        String input = commandContext.getInputString();
-        if (input == null) {
-            return null;
-        }
-        String[] tokens = input.trim().split("\\s+");
-        if (tokens.length < 3) {
-            return null;
-        }
         try {
-            double parsed = Double.parseDouble(tokens[2]);
+            String argument = TameworkCommandInput.firstArgument(
+                    commandContext.getInputString(), "happiness"
+            );
+            if (argument == null) {
+                return null;
+            }
+            double parsed = Double.parseDouble(argument);
             return Double.isFinite(parsed) ? parsed : null;
         } catch (NumberFormatException ignored) {
             return null;
