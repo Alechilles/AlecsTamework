@@ -21,6 +21,7 @@ import com.hypixel.hytale.server.npc.instructions.ExecutionSupport;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import com.hypixel.hytale.server.npc.util.InventoryHelper;
+import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -37,10 +38,12 @@ import javax.annotation.Nullable;
  */
 public final class ActionTameworkHarvestDrop extends ActionDropItem {
     private final boolean awardXp;
+    private final StdScope roleParameterScopeSnapshot;
 
     public ActionTameworkHarvestDrop(@Nonnull BuilderActionTameworkHarvestDrop builder, @Nonnull BuilderSupport support) {
         super(builder, support);
         this.awardXp = builder.getAwardXp(support);
+        this.roleParameterScopeSnapshot = InteractionRoleParameterScope.snapshot(support);
     }
 
     public boolean execute(@Nonnull Ref<EntityStore> ref,
@@ -63,7 +66,11 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
                 ? duplicateDrops(baseDrops)
                 : baseDrops;
         UUID operationId = UUID.randomUUID();
-        String activityContext = resolveActivityContext(role, awardXp);
+        String activityContext = resolveActivityContext(
+                role,
+                awardXp,
+                roleParameterScopeSnapshot
+        );
 
         ModelComponent modelComponent = store.getComponent(ref, ModelComponent.getComponentType());
         float eyeHeight = modelComponent != null ? modelComponent.getModel().getEyeHeight(ref, store) : 0.0F;
@@ -111,7 +118,11 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
     }
 
     @Nullable
-    static String resolveActivityContext(@Nullable Role role, boolean manualHarvest) {
+    static String resolveActivityContext(
+            @Nullable Role role,
+            boolean manualHarvest,
+            @Nullable StdScope roleParameterScopeSnapshot
+    ) {
         if (!manualHarvest || role == null) {
             return null;
         }
@@ -119,7 +130,12 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
         String paramName = global == null
                 ? "HarvestInteractionContext"
                 : global.getHarvestContextParam();
-        return new InteractionParamResolver(null, null, null)
+        return new InteractionParamResolver(
+                roleParameterScopeSnapshot,
+                null,
+                null,
+                null
+        )
                 .getStringParam(role, null, paramName);
     }
 

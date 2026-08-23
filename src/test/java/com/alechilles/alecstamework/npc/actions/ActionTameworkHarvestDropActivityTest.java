@@ -17,15 +17,16 @@ class ActionTameworkHarvestDropActivityTest {
     }
 
     @Test
-    void manualHarvestUsesRoleContextButPassiveOutputDoesNot() throws Exception {
-        StdScope scope = new StdScope(null);
-        scope.addConst("HarvestInteractionContext", "Shear");
-        Role role = NpcSupportTestFixture.bindRoleWithSensorScope(scope);
+    void manualHarvestUsesCapturedRoleParametersWhenLiveScopeHasNoContext() throws Exception {
+        StdScope liveScope = new StdScope(null);
+        StdScope roleParameters = new StdScope(null);
+        roleParameters.addConst("HarvestInteractionContext", "Shear");
+        Role role = NpcSupportTestFixture.bindRoleWithSensorScope(liveScope);
 
         assertEquals(
                 "Shear",
-                ActionTameworkHarvestDrop.resolveActivityContext(role, true)
+                ActionTameworkHarvestDrop.resolveActivityContext(role, true, roleParameters)
         );
-        assertNull(ActionTameworkHarvestDrop.resolveActivityContext(role, false));
+        assertNull(ActionTameworkHarvestDrop.resolveActivityContext(role, false, roleParameters));
     }
 }
