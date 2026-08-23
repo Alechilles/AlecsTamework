@@ -17,6 +17,7 @@ import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -82,6 +83,33 @@ class CommandUiProviderRegistryTest {
         registry.close();
         assertFalse(registry.available());
         assertTrue(registry.find("example:menu").isEmpty());
+    }
+
+    @Test
+    void unregisterNotifiesOnlyTheExactRemovedGeneration() throws Exception {
+        CommandUiProviderRegistry registry = new CommandUiProviderRegistry();
+        CopyOnWriteArrayList<String> removed = new CopyOnWriteArrayList<>();
+        AutoCloseable listener = registry.subscribeUnregister((providerId, generation) ->
+                removed.add(providerId.value() + "@" + generation));
+
+        CommandUiProviderRegistrationResult first = registry.register(
+                "example:menu", ignored -> null);
+        long firstGeneration = registry.resolve("example:menu")
+                .orElseThrow().generation();
+        first.registration().close();
+        CommandUiProviderRegistrationResult replacement = registry.register(
+                "example:menu", ignored -> null);
+        long replacementGeneration = registry.resolve("example:menu")
+                .orElseThrow().generation();
+        first.registration().close();
+
+        assertEquals(List.of("example:menu@" + firstGeneration), removed);
+        assertTrue(replacement.registration().active());
+        assertTrue(replacementGeneration > firstGeneration);
+
+        listener.close();
+        replacement.registration().close();
+        assertEquals(List.of("example:menu@" + firstGeneration), removed);
     }
 
     @Test

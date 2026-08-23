@@ -10,6 +10,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -27,6 +28,8 @@ import javax.annotation.Nullable;
  */
 public final class CommandUiProviderRegistry implements CommandUiApi, AutoCloseable {
     private final ConcurrentMap<CommandUiProviderId, Entry> providers = new ConcurrentHashMap<>();
+    private final CopyOnWriteArrayList<UnregisterListener> unregisterListeners =
+            new CopyOnWriteArrayList<>();
     private final AtomicLong nextGeneration = new AtomicLong();
     private final AtomicBoolean closed = new AtomicBoolean();
 
@@ -89,6 +92,29 @@ public final class CommandUiProviderRegistry implements CommandUiApi, AutoClosea
                 : Optional.of(entry.provider);
     }
 
+    /** Resolves one active provider and its exact registration generation. */
+    @Nonnull
+    public synchronized Optional<ResolvedProvider> resolve(
+            @Nullable String rawProviderId) {
+        Optional<CommandUiProviderId> parsed = CommandUiProviderId.tryParse(rawProviderId);
+        if (parsed.isEmpty() || closed.get()) return Optional.empty();
+        Entry entry = providers.get(parsed.orElseThrow());
+        if (entry == null || !entry.active()) return Optional.empty();
+        return Optional.of(new ResolvedProvider(
+                entry.providerId, entry.provider, entry.generation));
+    }
+
+    /** Adds an internal listener for exact provider-generation removal. */
+    @Nonnull
+    public AutoCloseable subscribeUnregister(
+            @Nonnull UnregisterListener listener) {
+        UnregisterListener required = java.util.Objects.requireNonNull(
+                listener, "listener");
+        if (closed.get()) return () -> { };
+        unregisterListeners.add(required);
+        return () -> unregisterListeners.remove(required);
+    }
+
     @Override
     @Nonnull
     public synchronized Set<CommandUiProviderId> listProviderIds() {
@@ -117,8 +143,34 @@ public final class CommandUiProviderRegistry implements CommandUiApi, AutoClosea
         }
         for (Entry entry : providers.values()) {
             entry.closed.set(true);
+            notifyUnregister(entry.providerId, entry.generation);
         }
         providers.clear();
+        unregisterListeners.clear();
+    }
+
+    private void notifyUnregister(CommandUiProviderId providerId, long generation) {
+        for (UnregisterListener listener : unregisterListeners) {
+            try {
+                listener.unregistered(providerId, generation);
+            } catch (RuntimeException | LinkageError ignored) {
+                // One host listener must not block provider removal.
+            }
+        }
+    }
+
+    /** Internal provider lookup result with exact registration identity. */
+    public record ResolvedProvider(
+            @Nonnull CommandUiProviderId providerId,
+            @Nonnull CommandUiProvider provider,
+            long generation
+    ) {
+    }
+
+    /** Internal exact-generation removal callback. */
+    @FunctionalInterface
+    public interface UnregisterListener {
+        void unregistered(CommandUiProviderId providerId, long generation);
     }
 
     private final class Entry implements CommandUiProviderRegistration {
@@ -160,7 +212,9 @@ public final class CommandUiProviderRegistry implements CommandUiApi, AutoClosea
             if (!closed.compareAndSet(false, true)) {
                 return;
             }
-            providers.remove(providerId, this);
+            if (providers.remove(providerId, this)) {
+                notifyUnregister(providerId, generation);
+            }
         }
     }
 }
