@@ -87,8 +87,14 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
     ) {
         if (!open.get()) return;
         try {
-            controller.buildInitial(context, session, session.snapshot(),
-                    commandBuilder, eventBuilder);
+            CommandUiHostController<T> contextual = contextualController();
+            if (contextual == null) {
+                controller.buildInitial(context, session, session.snapshot(),
+                        commandBuilder, eventBuilder);
+            } else {
+                contextual.buildInitial(context, session, session.snapshot(),
+                        ref, store, commandBuilder, eventBuilder);
+            }
         } catch (RuntimeException | LinkageError failure) {
             fail("initial build", failure, true);
         }
@@ -104,8 +110,14 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
         try {
             UICommandBuilder commands = new UICommandBuilder();
             UIEventBuilder events = new UIEventBuilder();
-            controller.handleEvent(event, session, session.snapshot(),
-                    commands, events);
+            CommandUiHostController<T> contextual = contextualController();
+            if (contextual == null) {
+                controller.handleEvent(event, session, session.snapshot(),
+                        commands, events);
+            } else {
+                contextual.handleEvent(event, session, session.snapshot(),
+                        ref, store, commands, events);
+            }
             updateEmitter.send(commands, events, false);
         } catch (RuntimeException | LinkageError failure) {
             fail("event callback", failure, false);
@@ -248,6 +260,13 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
             boolean clear
     ) {
         sendUpdate(commands, events, false);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Nullable
+    private CommandUiHostController<T> contextualController() {
+        return controller instanceof CommandUiHostController<?> contextual
+                ? (CommandUiHostController<T>) contextual : null;
     }
 
     /** Resolves the current player world before one deferred host callback. */

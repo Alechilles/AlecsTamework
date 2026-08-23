@@ -171,6 +171,23 @@ class CommandUiHostPageTest {
         assertFalse(host.isOpen());
     }
 
+    @Test
+    void internalStandardControllerReceivesCurrentWorldContext() {
+        TestSession session = new TestSession(snapshot(1L));
+        ContextualTestController controller = new ContextualTestController();
+        CommandUiHostPage<TestEvent> host = host(
+                session, controller, directDispatcher(), ignored -> { },
+                new RecordingEmitter());
+
+        host.build(null, new UICommandBuilder(), new UIEventBuilder(), null);
+        host.handleDataEvent(null, null, new TestEvent());
+
+        assertEquals(1, controller.contextualBuildCount);
+        assertEquals(1, controller.contextualEventCount);
+        assertEquals(0, controller.detachedBuildCount);
+        assertEquals(0, controller.detachedEventCount);
+    }
+
     private static CommandUiHostPage<TestEvent> host(
             TestSession session,
             TestController controller,
@@ -261,7 +278,7 @@ class CommandUiHostPageTest {
         }
     }
 
-    private static final class TestController
+    private static class TestController
             implements CommandUiPageController<TestEvent> {
         private UICommandBuilder initialCommands;
         private UIEventBuilder initialEvents;
@@ -304,6 +321,50 @@ class CommandUiHostPageTest {
         @Override
         public void close() {
             closeCount++;
+        }
+    }
+
+    private static final class ContextualTestController extends TestController
+            implements CommandUiHostController<TestEvent> {
+        private int contextualBuildCount;
+        private int contextualEventCount;
+        private int detachedBuildCount;
+        private int detachedEventCount;
+
+        @Override
+        public void buildInitial(CommandUiOpenContext context,
+                                 CommandUiSession session,
+                                 CommandUiSnapshot snapshot,
+                                 UICommandBuilder commands,
+                                 UIEventBuilder events) {
+            detachedBuildCount++;
+        }
+
+        @Override
+        public void buildInitial(CommandUiOpenContext context,
+                                 CommandUiSession session,
+                                 CommandUiSnapshot snapshot,
+                                 com.hypixel.hytale.component.Ref<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> ref,
+                                 com.hypixel.hytale.component.Store<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> store,
+                                 UICommandBuilder commands,
+                                 UIEventBuilder events) {
+            contextualBuildCount++;
+        }
+
+        @Override
+        public void handleEvent(TestEvent event, CommandUiSession session,
+                                CommandUiSnapshot snapshot) {
+            detachedEventCount++;
+        }
+
+        @Override
+        public void handleEvent(TestEvent event, CommandUiSession session,
+                                CommandUiSnapshot snapshot,
+                                com.hypixel.hytale.component.Ref<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> ref,
+                                com.hypixel.hytale.component.Store<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> store,
+                                UICommandBuilder commands,
+                                UIEventBuilder events) {
+            contextualEventCount++;
         }
     }
 
