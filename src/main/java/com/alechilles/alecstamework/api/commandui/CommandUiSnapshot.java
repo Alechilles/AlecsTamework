@@ -38,6 +38,9 @@ public final class CommandUiSnapshot {
     private final CommandUiPanelState panelState;
     private final Map<String, CommandUiActionView> globalActions;
     private final Map<String, CommandUiActionView> commandActions;
+    private final Map<String, String> hotswapAssignments;
+    private final Map<String, List<CommandUiCommandOption>> hotswapChoices;
+    private final Map<String, String> groups;
     private final long serverTimeMillis;
     private final Map<String, Long> deadlines;
     @Nullable
@@ -55,10 +58,11 @@ public final class CommandUiSnapshot {
             @Nonnull List<CommandUiCompanionRow> companionRows,
             @Nonnull CommandUiPanelState panelState
     ) {
-        this(sessionId, presentationRevision, actionGeneration, (String) null, null, null,
+        this(sessionId, presentationRevision, actionGeneration,
+                (CommandUiProviderId) null, null, null,
                 null, null, Set.of(), selectedCommand, commandOptions,
-                companionRows, panelState, Map.of(), Map.of(), 0L, Map.of(),
-                null, null);
+                companionRows, panelState, Map.of(), Map.of(), Map.of(), Map.of(),
+                Map.of(), 0L, Map.of(), null, null);
     }
 
     /** Full snapshot constructor used by Tamework assemblers. */
@@ -87,6 +91,36 @@ public final class CommandUiSnapshot {
                 parseProviderId(providerId), toolId, itemId, configId, rosterMode,
                 enabledCapabilities, selectedCommand, commandOptions,
                 companionRows, panelState, globalActions, commandActions,
+                Map.of(), Map.of(), Map.of(), serverTimeMillis, deadlines,
+                emptyStateKey, disabledReason);
+    }
+
+    /** Full constructor retaining the compact pre-assignment form. */
+    public CommandUiSnapshot(
+            @Nonnull UUID sessionId,
+            long presentationRevision,
+            long actionGeneration,
+            @Nullable CommandUiProviderId providerId,
+            @Nullable String toolId,
+            @Nullable String itemId,
+            @Nullable String configId,
+            @Nullable String rosterMode,
+            @Nullable Set<String> enabledCapabilities,
+            @Nullable String selectedCommand,
+            @Nullable List<CommandUiCommandOption> commandOptions,
+            @Nullable List<CommandUiCompanionRow> companionRows,
+            @Nullable CommandUiPanelState panelState,
+            @Nullable Map<String, CommandUiActionView> globalActions,
+            @Nullable Map<String, CommandUiActionView> commandActions,
+            long serverTimeMillis,
+            @Nullable Map<String, Long> deadlines,
+            @Nullable String emptyStateKey,
+            @Nullable String disabledReason
+    ) {
+        this(sessionId, presentationRevision, actionGeneration, providerId,
+                toolId, itemId, configId, rosterMode, enabledCapabilities,
+                selectedCommand, commandOptions, companionRows, panelState,
+                globalActions, commandActions, Map.of(), Map.of(), Map.of(),
                 serverTimeMillis, deadlines, emptyStateKey, disabledReason);
     }
 
@@ -107,6 +141,9 @@ public final class CommandUiSnapshot {
             @Nullable CommandUiPanelState panelState,
             @Nullable Map<String, CommandUiActionView> globalActions,
             @Nullable Map<String, CommandUiActionView> commandActions,
+            @Nullable Map<String, String> hotswapAssignments,
+            @Nullable Map<String, List<CommandUiCommandOption>> hotswapChoices,
+            @Nullable Map<String, String> groups,
             long serverTimeMillis,
             @Nullable Map<String, Long> deadlines,
             @Nullable String emptyStateKey,
@@ -136,6 +173,9 @@ public final class CommandUiSnapshot {
                 ? new CommandUiPanelState(null) : panelState;
         this.globalActions = copyActions(globalActions);
         this.commandActions = copyActions(commandActions);
+        this.hotswapAssignments = copyStringMap(hotswapAssignments);
+        this.hotswapChoices = copyChoices(hotswapChoices);
+        this.groups = copyStringMap(groups);
         this.serverTimeMillis = serverTimeMillis;
         this.deadlines = copyDeadlines(deadlines);
         this.emptyStateKey = normalize(emptyStateKey);
@@ -162,17 +202,7 @@ public final class CommandUiSnapshot {
         return sessionId;
     }
 
-    @Nonnull
-    public UUID id() {
-        return sessionId;
-    }
-
     public long presentationRevision() {
-        return presentationRevision;
-    }
-
-    /** Short alias used by page hosts. */
-    public long revision() {
         return presentationRevision;
     }
 
@@ -183,11 +213,6 @@ public final class CommandUiSnapshot {
     @Nullable
     public CommandUiProviderId providerId() {
         return providerId;
-    }
-
-    @Nullable
-    public String providerIdValue() {
-        return providerId == null ? null : providerId.value();
     }
 
     @Nullable
@@ -215,19 +240,8 @@ public final class CommandUiSnapshot {
         return enabledCapabilities;
     }
 
-    /** Alias for capability-aware providers. */
-    @Nonnull
-    public Set<String> capabilities() {
-        return enabledCapabilities;
-    }
-
     @Nullable
     public String selectedCommand() {
-        return selectedCommand;
-    }
-
-    @Nullable
-    public String currentCommand() {
         return selectedCommand;
     }
 
@@ -241,24 +255,26 @@ public final class CommandUiSnapshot {
         return companionRows;
     }
 
-    /** Alias for card-oriented providers. */
+    /** Current Q/E/R command assignments keyed by slot name. */
     @Nonnull
-    public List<CommandUiCompanionRow> rows() {
-        return companionRows;
+    public Map<String, String> hotswapAssignments() {
+        return hotswapAssignments;
+    }
+
+    /** Detached choices keyed by Q/E/R slot name. */
+    @Nonnull
+    public Map<String, List<CommandUiCommandOption>> hotswapChoices() {
+        return hotswapChoices;
+    }
+
+    /** Detached group labels keyed by stable group ID. */
+    @Nonnull
+    public Map<String, String> groups() {
+        return groups;
     }
 
     @Nonnull
     public CommandUiPanelState panelState() {
-        return panelState;
-    }
-
-    @Nonnull
-    public CommandUiPanelState panel() {
-        return panelState;
-    }
-
-    @Nonnull
-    public CommandUiPanelState panelPresentation() {
         return panelState;
     }
 
@@ -272,22 +288,7 @@ public final class CommandUiSnapshot {
         return commandActions;
     }
 
-    @Nonnull
-    public Map<String, CommandUiActionView> actions() {
-        LinkedHashMap<String, CommandUiActionView> merged = new LinkedHashMap<>();
-        merged.putAll(globalActions);
-        merged.putAll(commandActions);
-        merged.putAll(panelState.actions());
-        companionRows.forEach(row -> row.actions().forEach(
-                (key, value) -> merged.put(row.rowId() + ":" + key, value)));
-        return Map.copyOf(merged);
-    }
-
     public long serverTimeMillis() {
-        return serverTimeMillis;
-    }
-
-    public long serverTime() {
         return serverTimeMillis;
     }
 
@@ -332,7 +333,8 @@ public final class CommandUiSnapshot {
         return new CommandUiSnapshot(sessionId, revision, generation, providerId,
                 toolId, itemId, configId, rosterMode, enabledCapabilities,
                 selectedCommand, commandOptions, companionRows, panelState,
-                globalActions, commandActions, serverTimeMillis, deadlines,
+                globalActions, commandActions, hotswapAssignments,
+                hotswapChoices, groups, serverTimeMillis, deadlines,
                 emptyStateKey, disabledReason);
     }
 
@@ -356,6 +358,9 @@ public final class CommandUiSnapshot {
                 && panelState.equals(that.panelState)
                 && globalActions.equals(that.globalActions)
                 && commandActions.equals(that.commandActions)
+                && hotswapAssignments.equals(that.hotswapAssignments)
+                && hotswapChoices.equals(that.hotswapChoices)
+                && groups.equals(that.groups)
                 && deadlines.equals(that.deadlines)
                 && Objects.equals(emptyStateKey, that.emptyStateKey)
                 && Objects.equals(disabledReason, that.disabledReason);
@@ -367,7 +372,8 @@ public final class CommandUiSnapshot {
                 providerId, toolId, itemId, configId, rosterMode,
                 enabledCapabilities, selectedCommand, commandOptions,
                 companionRows, panelState, globalActions, commandActions,
-                serverTimeMillis, deadlines, emptyStateKey, disabledReason);
+                hotswapAssignments, hotswapChoices, groups, serverTimeMillis,
+                deadlines, emptyStateKey, disabledReason);
     }
 
     @Nullable
@@ -381,6 +387,33 @@ public final class CommandUiSnapshot {
         return source.stream().filter(Objects::nonNull).map(String::trim)
                 .filter(value -> !value.isEmpty())
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    @Nonnull
+    private static Map<String, String> copyStringMap(
+            @Nullable Map<String, String> source) {
+        if (source == null || source.isEmpty()) return Map.of();
+        LinkedHashMap<String, String> copy = new LinkedHashMap<>();
+        source.forEach((key, value) -> {
+            if (key != null && !key.isBlank() && value != null) {
+                copy.put(key.trim(), value.trim());
+            }
+        });
+        return Map.copyOf(copy);
+    }
+
+    @Nonnull
+    private static Map<String, List<CommandUiCommandOption>> copyChoices(
+            @Nullable Map<String, List<CommandUiCommandOption>> source) {
+        if (source == null || source.isEmpty()) return Map.of();
+        LinkedHashMap<String, List<CommandUiCommandOption>> copy =
+                new LinkedHashMap<>();
+        source.forEach((key, value) -> {
+            if (key != null && !key.isBlank() && value != null) {
+                copy.put(key.trim(), List.copyOf(value));
+            }
+        });
+        return Map.copyOf(copy);
     }
 
     @Nonnull

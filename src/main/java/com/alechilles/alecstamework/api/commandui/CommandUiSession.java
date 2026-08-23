@@ -23,12 +23,6 @@ public interface CommandUiSession extends AutoCloseable {
     @Nonnull
     CommandUiSnapshot snapshot();
 
-    /** Alias for callbacks that use the current-state wording. */
-    @Nonnull
-    default CommandUiSnapshot currentSnapshot() {
-        return snapshot();
-    }
-
     /** Invokes one opaque handle after current authority revalidation. */
     @Nonnull
     CompletionStage<CommandUiActionResult> invoke(
@@ -44,12 +38,8 @@ public interface CommandUiSession extends AutoCloseable {
             return CompletableFuture.completedFuture(
                     CommandUiActionResult.denied("command UI event is invalid"));
         }
-        try {
-            return invoke(CommandUiActionHandle.of(event.actionToken()));
-        } catch (RuntimeException ignored) {
-            return CompletableFuture.completedFuture(
-                    CommandUiActionResult.denied("command UI event is invalid"));
-        }
+        return CompletableFuture.completedFuture(
+                CommandUiActionResult.denied("command UI event is not handled"));
     }
 
     /** Requests a Tamework-owned refresh. Returns false after close. */

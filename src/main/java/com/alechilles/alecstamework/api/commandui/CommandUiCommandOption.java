@@ -55,30 +55,8 @@ public final class CommandUiCommandOption {
         this.action = action;
     }
 
-    /** Convenience form for a command selection handle. */
-    public CommandUiCommandOption(
-            @Nonnull String commandId,
-            @Nonnull String label,
-            @Nullable String localizationSource,
-            @Nullable String iconAssetId,
-            boolean radialVisible,
-            boolean selected,
-            @Nullable CommandUiActionHandle actionHandle
-    ) {
-        this(commandId, label, localizationSource, iconAssetId, radialVisible,
-                selected, actionHandle == null ? null
-                        : CommandUiActionView.enabled(
-                                actionHandle, "SELECT_COMMAND", label));
-    }
-
     @Nonnull
     public String commandId() {
-        return commandId;
-    }
-
-    /** Alias for renderers that use a generic ID accessor. */
-    @Nonnull
-    public String id() {
         return commandId;
     }
 
@@ -106,14 +84,6 @@ public final class CommandUiCommandOption {
         return radialVisible;
     }
 
-    public boolean visibleInRadial() {
-        return radialVisible;
-    }
-
-    public boolean showInRadial() {
-        return radialVisible;
-    }
-
     public boolean selected() {
         return selected;
     }
@@ -121,11 +91,6 @@ public final class CommandUiCommandOption {
     @Nullable
     public CommandUiActionView action() {
         return action;
-    }
-
-    @Nullable
-    public CommandUiActionHandle actionHandle() {
-        return action == null ? null : action.handle();
     }
 
     @Override

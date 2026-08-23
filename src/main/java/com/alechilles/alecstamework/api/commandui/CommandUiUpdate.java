@@ -39,18 +39,8 @@ public final class CommandUiUpdate {
         return snapshot;
     }
 
-    @Nonnull
-    public CommandUiSnapshot currentSnapshot() {
-        return snapshot;
-    }
-
     @Nullable
     public CommandUiSnapshot previousSnapshot() {
-        return previousSnapshot;
-    }
-
-    @Nullable
-    public CommandUiSnapshot priorSnapshot() {
         return previousSnapshot;
     }
 

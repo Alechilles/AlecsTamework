@@ -4,12 +4,14 @@ import com.alechilles.alecstamework.api.commandui.CommandUiActionView;
 import com.alechilles.alecstamework.api.commandui.CommandUiCommandOption;
 import com.alechilles.alecstamework.api.commandui.CommandUiCompanionRow;
 import com.alechilles.alecstamework.api.commandui.CommandUiPanelState;
+import com.alechilles.alecstamework.api.commandui.CommandUiProviderId;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.ui.BondedCompanionPanelPresentation;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import java.util.ArrayList;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -97,11 +99,60 @@ final class CommandUiSnapshotAssembler {
         CommandUiPanelState panel = panelState == null
                 ? new CommandUiPanelState(null) : panelState;
         return new CommandUiSnapshot(
-                sessionId, presentationRevision, actionGeneration, providerId,
+                sessionId, presentationRevision, actionGeneration,
+                CommandUiProviderId.tryParse(providerId).orElse(null),
                 toolId, itemId, configId, rosterMode, capabilities,
                 selectedCommand, commandOptions, rows, panel, globalActions,
                 commandActions, serverTimeMillis, deadlines, emptyStateKey,
                 disabledReason);
+    }
+
+    /** Assembles a snapshot with detached Q/E/R and group presentation values. */
+    @Nonnull
+    static CommandUiSnapshot assemble(
+            @Nonnull UUID sessionId,
+            long presentationRevision,
+            long actionGeneration,
+            @Nullable String providerId,
+            @Nullable String toolId,
+            @Nullable String itemId,
+            @Nullable String configId,
+            @Nullable String rosterMode,
+            @Nullable Set<String> capabilities,
+            @Nullable String selectedCommand,
+            @Nullable List<CommandUiCommandOption> commandOptions,
+            @Nullable List<LinkedNpcEntry> entries,
+            @Nullable Map<UUID, CommandPanelFeaturePresentation> features,
+            @Nullable Map<UUID, Map<String, CommandUiActionView>> rowActions,
+            @Nullable CommandUiPanelState panelState,
+            @Nullable Map<String, CommandUiActionView> globalActions,
+            @Nullable Map<String, CommandUiActionView> commandActions,
+            @Nullable Map<String, String> hotswapAssignments,
+            @Nullable Map<String, List<CommandUiCommandOption>> hotswapChoices,
+            @Nullable Map<String, String> groups,
+            long serverTimeMillis,
+            @Nullable Map<String, Long> deadlines,
+            @Nullable String emptyStateKey,
+            @Nullable String disabledReason
+    ) {
+        List<CommandUiCompanionRow> rows = new ArrayList<>();
+        if (entries != null) {
+            for (LinkedNpcEntry entry : entries) {
+                if (entry == null || entry.npcUuid() == null) continue;
+                rows.add(toRow(entry,
+                        features == null ? null : features.get(entry.npcUuid()),
+                        rowActions == null ? Map.of()
+                                : rowActions.getOrDefault(entry.npcUuid(), Map.of())));
+            }
+        }
+        return new CommandUiSnapshot(
+                sessionId, presentationRevision, actionGeneration,
+                CommandUiProviderId.tryParse(providerId).orElse(null),
+                toolId, itemId, configId, rosterMode, capabilities,
+                selectedCommand, commandOptions, rows,
+                panelState == null ? new CommandUiPanelState(null) : panelState,
+                globalActions, commandActions, hotswapAssignments, hotswapChoices,
+                groups, serverTimeMillis, deadlines, emptyStateKey, disabledReason);
     }
 
     /** Assembles a snapshot directly from the current panel state. */
@@ -147,10 +198,12 @@ final class CommandUiSnapshotAssembler {
         String lifecycleStatus = lifecycleStatus(entry);
         String role = entry.speciesLabel();
         String species = entry.speciesId();
+        UUID rowId = entry.npcUuid();
         Map<String, String> presentation = new java.util.LinkedHashMap<>();
         if (feature != null) {
             if (feature.roster() != null) {
                 profileId = feature.roster().profileId();
+                rowId = stableProfileRowId(profileId, rowId);
                 lifecycleStatus = feature.roster().state().name();
                 presentation.put("commandFamilyId",
                         feature.roster().commandFamilyId());
@@ -164,6 +217,7 @@ final class CommandUiSnapshotAssembler {
             BondedCompanionPanelPresentation bonded = feature.bonded();
             if (bonded != null) {
                 profileId = bonded.profileId();
+                rowId = stableProfileRowId(profileId, rowId);
                 role = bonded.rolePresentation();
                 species = bonded.species();
                 lifecycleStatus = bonded.status().state().name();
@@ -175,7 +229,7 @@ final class CommandUiSnapshotAssembler {
             }
         }
         return new CommandUiCompanionRow(
-                entry.npcUuid(), entry.npcUuid(), profileId,
+                rowId, entry.npcUuid(), profileId,
                 entry.displayName() == null || entry.displayName().isBlank()
                         ? "Unknown" : entry.displayName(), role,
                 species, entry.gender(), lifecycleStatus, entry.linked(),
@@ -221,5 +275,16 @@ final class CommandUiSnapshotAssembler {
         if (entry.lost()) return "LOST";
         if (!entry.loaded()) return "UNLOADED";
         return entry.active() ? "ACTIVE" : "INACTIVE";
+    }
+
+    /** Uses durable profile identity for bonded rows and current NPC UUID otherwise. */
+    @Nonnull
+    private static UUID stableProfileRowId(
+            @Nullable String profileId,
+            @Nonnull UUID fallback
+    ) {
+        if (profileId == null || profileId.isBlank()) return fallback;
+        return UUID.nameUUIDFromBytes(("tamework:command-ui:profile:" +
+                profileId.trim()).getBytes(StandardCharsets.UTF_8));
     }
 }

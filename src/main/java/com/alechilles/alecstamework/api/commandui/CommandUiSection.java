@@ -13,9 +13,7 @@ public enum CommandUiSection {
     COMPANIONS,
     PANEL,
     ACTIONS,
-    GLOBAL_PRESENTATION,
-    /** Short alias section for integrations that group all global fields. */
-    GLOBAL;
+    GLOBAL_PRESENTATION;
 
     /** Returns a detached set containing every section. */
     public static Set<CommandUiSection> all() {

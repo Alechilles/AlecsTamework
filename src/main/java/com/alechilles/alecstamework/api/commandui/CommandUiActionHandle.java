@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.api.commandui;
 
 import java.util.Objects;
-import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -24,27 +23,9 @@ public final class CommandUiActionHandle {
         this.token = requireToken(token);
     }
 
-    /** Creates a fresh unguessable token for internal adapters and tests. */
-    @Nonnull
-    public static CommandUiActionHandle create() {
-        return new CommandUiActionHandle(UUID.randomUUID().toString());
-    }
-
-    /** Creates a wrapper for an event token received from an untrusted client. */
-    @Nonnull
-    public static CommandUiActionHandle of(@Nullable String token) {
-        return new CommandUiActionHandle(token == null ? "" : token);
-    }
-
     /** Returns the opaque event token. It contains no route or authority data. */
     @Nonnull
     public String token() {
-        return token;
-    }
-
-    /** Alias used by event adapters. */
-    @Nonnull
-    public String actionToken() {
         return token;
     }
 

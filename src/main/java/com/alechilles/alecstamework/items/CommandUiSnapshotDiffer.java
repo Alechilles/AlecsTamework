@@ -42,6 +42,13 @@ final class CommandUiSnapshotDiffer {
                 || !Objects.equals(previous.commandActions(), current.commandActions())) {
             sections.add(CommandUiSection.COMMANDS);
         }
+        if (!Objects.equals(previous.hotswapAssignments(), current.hotswapAssignments())
+                || !Objects.equals(previous.hotswapChoices(), current.hotswapChoices())) {
+            sections.add(CommandUiSection.HOTSWAPS);
+        }
+        if (!Objects.equals(previous.groups(), current.groups())) {
+            sections.add(CommandUiSection.GROUPS);
+        }
         if (!Objects.equals(previous.panelState(), current.panelState())) {
             sections.add(CommandUiSection.PANEL);
         }

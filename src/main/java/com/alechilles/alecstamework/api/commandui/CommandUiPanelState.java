@@ -81,16 +81,7 @@ public final class CommandUiPanelState {
         return mode;
     }
 
-    @Nullable
-    public String panelMode() {
-        return mode;
-    }
-
     public boolean autoLinkEnabled() {
-        return autoLinkEnabled;
-    }
-
-    public boolean autoLink() {
         return autoLinkEnabled;
     }
 
@@ -113,27 +104,12 @@ public final class CommandUiPanelState {
     }
 
     @Nullable
-    public String sortValue() {
-        return sort;
-    }
-
-    @Nullable
     public String filterMode() {
         return filterMode;
     }
 
     @Nullable
-    public String filterModeValue() {
-        return filterMode;
-    }
-
-    @Nullable
     public String filterInput() {
-        return filterInput;
-    }
-
-    @Nullable
-    public String filterText() {
         return filterInput;
     }
 

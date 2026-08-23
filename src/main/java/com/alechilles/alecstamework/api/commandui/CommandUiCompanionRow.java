@@ -134,26 +134,8 @@ public final class CommandUiCompanionRow {
         return rowId;
     }
 
-    /** Alias used by row-level change hints. */
-    @Nonnull
-    public UUID id() {
-        return rowId;
-    }
-
     @Nullable
     public UUID companionUuid() {
-        return companionUuid;
-    }
-
-    /** Alias matching the existing linked-panel model. */
-    @Nullable
-    public UUID npcUuid() {
-        return companionUuid;
-    }
-
-    /** Alias for the optional current-world identity wording. */
-    @Nullable
-    public UUID currentNpcUuid() {
         return companionUuid;
     }
 
@@ -173,17 +155,7 @@ public final class CommandUiCompanionRow {
     }
 
     @Nullable
-    public String roleId() {
-        return role;
-    }
-
-    @Nullable
     public String species() {
-        return species;
-    }
-
-    @Nullable
-    public String speciesId() {
         return species;
     }
 
@@ -194,11 +166,6 @@ public final class CommandUiCompanionRow {
 
     @Nullable
     public String lifecycleStatus() {
-        return lifecycleStatus;
-    }
-
-    @Nullable
-    public String status() {
         return lifecycleStatus;
     }
 
@@ -240,11 +207,6 @@ public final class CommandUiCompanionRow {
 
     @Nonnull
     public Map<String, CommandUiActionView> actions() {
-        return actions;
-    }
-
-    @Nonnull
-    public Map<String, CommandUiActionView> actionViews() {
         return actions;
     }
 

@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.api.commandui.CommandUiAction;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionHandle;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
 import java.time.Duration;
@@ -25,6 +24,7 @@ import javax.annotation.Nullable;
  */
 final class CommandUiActionGateway {
     static final Duration CONFIRMATION_LIFETIME = Duration.ofSeconds(5L);
+    private static final int MAX_ACTIVE_HANDLES_PER_SESSION = 256;
 
     enum Route {
         GENERIC,
@@ -77,7 +77,9 @@ final class CommandUiActionGateway {
         }
         activeSessions.putIfAbsent(sessionId, 0L);
         long providerGeneration = activeSessions.get(sessionId);
-        CommandUiActionHandle handle = CommandUiActionHandle.create();
+        retireOlderGeneration(sessionId, generation);
+        CommandUiActionHandle handle = new CommandUiActionHandle(
+                UUID.randomUUID().toString());
         Binding binding = new Binding(
                 sessionId,
                 route,
@@ -91,6 +93,7 @@ final class CommandUiActionGateway {
                 0L
         );
         bindings.put(handle.token(), binding);
+        trimSession(sessionId);
         return handle;
     }
 
@@ -145,7 +148,8 @@ final class CommandUiActionGateway {
     CompletionStage<CommandUiActionResult> invoke(
             @Nonnull UUID sessionId,
             @Nullable CommandUiActionHandle handle,
-            long currentGeneration
+            long currentGeneration,
+            @Nonnull Route expectedRoute
     ) {
         Long providerGeneration = activeSessions.get(sessionId);
         if (providerGeneration == null || handle == null) {
@@ -161,11 +165,18 @@ final class CommandUiActionGateway {
             return completed(CommandUiActionResult.denied(
                     "command UI action handle belongs to another session"));
         }
+        if (binding.route != expectedRoute) {
+            bindings.remove(handle.token(), binding);
+            return completed(CommandUiActionResult.denied(
+                    "command UI action route is not valid for this session"));
+        }
         if (binding.generation != currentGeneration) {
+            bindings.remove(handle.token(), binding);
             return completed(CommandUiActionResult.stale(
                     "command UI action generation is stale"));
         }
         if (binding.providerGeneration != providerGeneration) {
+            bindings.remove(handle.token(), binding);
             return completed(CommandUiActionResult.stale(
                     "command UI provider generation is stale"));
         }
@@ -175,15 +186,18 @@ final class CommandUiActionGateway {
                     "confirmation handle expired"));
         }
         if (!allows(binding)) {
+            bindings.remove(handle.token(), binding);
             return completed(CommandUiActionResult.denied(
                     "current command authority denied the action"));
         }
         if (!binding.consumed.compareAndSet(false, true)) {
+            bindings.remove(handle.token(), binding);
             return completed(CommandUiActionResult.stale(
                     "command UI action handle was already used"));
         }
 
         if (binding.requiresConfirmation && !binding.confirmationToken) {
+            bindings.remove(handle.token(), binding);
             CommandUiActionHandle confirmation = issue(
                     binding.sessionId,
                     binding.route,
@@ -202,12 +216,27 @@ final class CommandUiActionGateway {
         try {
             CompletionStage<CommandUiActionResult> stage = binding.executor.execute(
                     binding.action);
-            return stage == null
-                    ? completed(CommandUiActionResult.failed("action returned no result"))
-                    : stage;
+            if (stage == null) {
+                bindings.remove(handle.token(), binding);
+                return completed(CommandUiActionResult.failed(
+                        "action returned no result"));
+            }
+            return stage.whenComplete((ignored, failure) ->
+                    bindings.remove(handle.token(), binding));
         } catch (RuntimeException | LinkageError failure) {
+            bindings.remove(handle.token(), binding);
             return completed(CommandUiActionResult.failed("action execution failed"));
         }
+    }
+
+    /** Retires handles that cannot be valid after an authority generation change. */
+    void advanceGeneration(@Nonnull UUID sessionId, long generation) {
+        if (generation < 0L) {
+            throw new IllegalArgumentException("Action generation cannot be negative.");
+        }
+        bindings.entrySet().removeIf(entry ->
+                sessionId.equals(entry.getValue().sessionId)
+                        && entry.getValue().generation < generation);
     }
 
     /** Invalidates all handles for one session and rejects later invocations. */
@@ -247,12 +276,47 @@ final class CommandUiActionGateway {
             boolean confirmationToken,
             long expiresAtNanos
     ) {
-        CommandUiActionHandle handle = CommandUiActionHandle.create();
+        CommandUiActionHandle handle = new CommandUiActionHandle(
+                UUID.randomUUID().toString());
         bindings.put(handle.token(), new Binding(
                 sessionId, route, action, generation, providerGeneration,
                 authority, executor, confirmationRequired,
                 confirmationToken, expiresAtNanos));
+        trimSession(sessionId);
         return handle;
+    }
+
+    /** Keeps the registry proportional to the current page rather than its lifetime. */
+    private void trimSession(UUID sessionId) {
+        while (countSessionHandles(sessionId) > MAX_ACTIVE_HANDLES_PER_SESSION) {
+            String oldestToken = null;
+            long oldestIssuedAt = Long.MAX_VALUE;
+            for (var entry : bindings.entrySet()) {
+                Binding binding = entry.getValue();
+                if (sessionId.equals(binding.sessionId)
+                        && binding.issuedAtNanos < oldestIssuedAt) {
+                    oldestToken = entry.getKey();
+                    oldestIssuedAt = binding.issuedAtNanos;
+                }
+            }
+            if (oldestToken == null || bindings.remove(oldestToken) == null) {
+                return;
+            }
+        }
+    }
+
+    private int countSessionHandles(UUID sessionId) {
+        int count = 0;
+        for (Binding binding : bindings.values()) {
+            if (sessionId.equals(binding.sessionId)) count++;
+        }
+        return count;
+    }
+
+    private void retireOlderGeneration(UUID sessionId, long generation) {
+        bindings.entrySet().removeIf(entry ->
+                sessionId.equals(entry.getValue().sessionId)
+                        && entry.getValue().generation < generation);
     }
 
     @Nonnull
@@ -286,6 +350,7 @@ final class CommandUiActionGateway {
             boolean requiresConfirmation,
             boolean confirmationToken,
             long expiresAtNanos,
+            long issuedAtNanos,
             AtomicBoolean consumed
     ) {
         private Binding(
@@ -303,6 +368,7 @@ final class CommandUiActionGateway {
             this(sessionId, route, action, generation, providerGeneration,
                     authority, executor,
                     requiresConfirmation, confirmationToken, expiresAtNanos,
+                    System.nanoTime(),
                     new AtomicBoolean());
         }
     }

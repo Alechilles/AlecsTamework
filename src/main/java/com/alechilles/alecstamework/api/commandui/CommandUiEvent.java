@@ -74,22 +74,12 @@ public final class CommandUiEvent {
     }
 
     @Nullable
-    public String token() {
-        return actionToken;
-    }
-
-    @Nullable
     public String value() {
         return value;
     }
 
     @Nullable
     public Boolean booleanValue() {
-        return booleanValue;
-    }
-
-    @Nullable
-    public Boolean boolValue() {
         return booleanValue;
     }
 

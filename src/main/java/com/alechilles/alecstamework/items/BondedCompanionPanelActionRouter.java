@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.BondedCompanionActionBlockReason;
 import com.alechilles.alecstamework.api.BondedCompanionApi;
+import com.alechilles.alecstamework.api.BondedCompanionActionContext;
+import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
 import com.hypixel.hytale.component.Ref;
@@ -10,6 +12,8 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.function.BiConsumer;
 
 /** Routes only explicitly bonded command-item rows to bonded mutations. */
@@ -130,6 +134,89 @@ final class BondedCompanionPanelActionRouter {
                 // A changed world is already an unavailable action context.
             }
         });
+    }
+
+    /**
+     * Routes one opaque command-UI action through the existing bonded service
+     * and returns its durable outcome instead of inferring success from the
+     * legacy page callback.
+     */
+    CompletionStage<CommandUiActionResult> routeForUi(
+            UUID ownerUuid,
+            Ref<EntityStore> eventPlayerRef,
+            Store<EntityStore> eventStore,
+            TwCommandItemConfig config,
+            CommandPanelFeaturePresentation feature,
+            BondedCompanionPanelActionService.Action action,
+            CommandSelectionPageService.BondedLifecycleAuthority lifecycleAuthority
+    ) {
+        if (ownerUuid == null || config == null
+                || !config.usesBondedCompanionRoster()) {
+            return completed(CommandUiActionResult.unavailable(
+                    "bonded action route is unavailable"));
+        }
+        if (feature == null || feature.bonded() == null) {
+            return completed(CommandUiActionResult.notFound(
+                    "bonded companion is unavailable"));
+        }
+        Player player = players.resolve(ownerUuid, eventPlayerRef, eventStore);
+        if (player == null || lifecycleAuthority == null
+                || !lifecycleAuthority.allows(player)) {
+            return completed(CommandUiActionResult.denied(
+                    "current bonded authority denied the action"));
+        }
+        String world = player.getWorld() == null
+                ? null : player.getWorld().getName();
+        var presentation = feature.bonded();
+        BondedCompanionActionContext context;
+        try {
+            context = action == BondedCompanionPanelActionService.Action.ABANDON
+                    ? null : contexts.create(player, eventStore, presentation.roleId(),
+                            action == BondedCompanionPanelActionService.Action.SUMMON);
+        } catch (RuntimeException | LinkageError failure) {
+            return completed(CommandUiActionResult.failed(
+                    "bonded action context failed"));
+        }
+        CompletionStage<BondedCompanionPanelActionService.Outcome> outcome;
+        try {
+            outcome = actions.performAsync(action, ownerUuid, world, context,
+                    presentation);
+        } catch (RuntimeException | LinkageError failure) {
+            return completed(CommandUiActionResult.failed(
+                    "bonded action failed"));
+        }
+        if (outcome == null) {
+            return completed(CommandUiActionResult.failed(
+                    "bonded action returned no result"));
+        }
+        return outcome.handle((resolved, failure) -> {
+            if (failure != null || resolved == null) {
+                return CommandUiActionResult.failed("bonded action failed");
+            }
+            return toUiResult(resolved);
+        });
+    }
+
+    private static CommandUiActionResult toUiResult(
+            BondedCompanionPanelActionService.Outcome outcome) {
+        if (outcome.applied()) return CommandUiActionResult.applied();
+        BondedCompanionActionBlockReason reason = outcome.blockReason();
+        if (reason == BondedCompanionActionBlockReason.NOT_FOUND) {
+            return CommandUiActionResult.notFound("bonded companion is unavailable");
+        }
+        if (reason == BondedCompanionActionBlockReason.REVISION_CONFLICT) {
+            return CommandUiActionResult.conflict("bonded presentation is stale");
+        }
+        if (reason == BondedCompanionActionBlockReason.WORLD_UNAVAILABLE
+                || reason == BondedCompanionActionBlockReason.AUTHORITY_UNAVAILABLE) {
+            return CommandUiActionResult.unavailable("bonded action is unavailable");
+        }
+        return CommandUiActionResult.denied("bonded action was denied");
+    }
+
+    private static CompletionStage<CommandUiActionResult> completed(
+            CommandUiActionResult result) {
+        return CompletableFuture.completedFuture(result);
     }
 
     static Player resolvePlayerFromEvent(

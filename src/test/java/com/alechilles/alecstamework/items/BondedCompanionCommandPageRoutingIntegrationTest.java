@@ -18,6 +18,10 @@ import com.alechilles.alecstamework.api.BondedCompanionResultCode;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.api.CommandTimedSummoningState;
 import com.alechilles.alecstamework.api.PaidCommandRevivalQuote;
+import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
+import com.alechilles.alecstamework.api.commandui.CommandUiActionStatus;
+import com.alechilles.alecstamework.api.commandui.CommandUiPanelState;
+import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.items.components
         .TameworkBondedReviveEscrowComponent;
@@ -127,6 +131,68 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
             assertNotNull(request.actionContext());
             assertNotNull(request.actionContext().inventory());
             assertSame(store, player.getReference().getStore());
+        }
+    }
+
+    /** Regression: an opaque bonded handle must use the durable bonded route. */
+    @Test
+    void commandUiBondedBinderUsesBondedRouterOutcomeAndRouteMode() throws Exception {
+        TestWorld world = (TestWorld) unsafe().allocateInstance(TestWorld.class);
+        TestEntityStore entityStore = new TestEntityStore(world);
+        try (TestEntityComponentStore store =
+                     new TestEntityComponentStore(entityStore)) {
+            entityStore.store = store;
+            Ref<EntityStore> actor = store.createReference();
+            Player player = (Player) unsafe().allocateInstance(Player.class);
+            player.setLegacyUUID(OWNER);
+            player.loadIntoWorld(world);
+            player.setReference(actor);
+
+            AtomicReference<BondedCompanionActionRequest> captured =
+                    new AtomicReference<>();
+            BondedCompanionPanelActionRouter router =
+                    new BondedCompanionPanelActionRouter(
+                            new BondedCompanionPanelActionService(
+                                    () -> recordingApi(captured)),
+                            new CommandFeedbackService(null),
+                            new HytaleBondedCompanionActionContextFactory(null, null),
+                            (owner, roster) -> { },
+                            (owner, currentRef, currentStore) -> player);
+            CommandSelectionPageService service = new CommandSelectionPageService(
+                    null, null, null, null, null, null, null, router);
+            UUID sessionId = UUID.randomUUID();
+            CommandUiActionGateway gateway = new CommandUiActionGateway();
+            CommandUiSessionImpl bonded = new CommandUiSessionImpl(
+                    sessionId,
+                    new CommandUiSnapshot(sessionId, 0L, 0L, null, List.of(),
+                            List.of(), new CommandUiPanelState("bonded")),
+                    gateway, CommandUiWorldDispatcher.direct(),
+                    CommandUiSessionImpl.Mode.BONDED);
+            CommandUiSessionImpl generic = new CommandUiSessionImpl(
+                    sessionId,
+                    new CommandUiSnapshot(sessionId, 0L, 0L, null, List.of(),
+                            List.of(), new CommandUiPanelState("generic")),
+                    gateway, CommandUiWorldDispatcher.direct(),
+                    CommandUiSessionImpl.Mode.GENERIC);
+            var routeProbe = service.bindBondedUiAction(
+                    bonded, new CommandUiAction("DISMISS", CARD), OWNER, actor,
+                    store, bondedConfig(), bondedDismissFeature(), ignored -> true,
+                    false);
+            assertEquals(CommandUiActionStatus.DENIED,
+                    generic.invoke(routeProbe).toCompletableFuture().join().status());
+
+            var handle = service.bindBondedUiAction(
+                    bonded, new CommandUiAction("DISMISS", CARD), OWNER, actor,
+                    store, bondedConfig(), bondedDismissFeature(), ignored -> true,
+                    false);
+            CommandUiActionResult applied = bonded.invoke(handle)
+                    .toCompletableFuture().join();
+            assertEquals(CommandUiActionStatus.APPLIED, applied.status());
+            assertNotNull(captured.get());
+            assertEquals(OWNER, captured.get().ownerUuid());
+            assertEquals("profile-7", captured.get().profileId());
+
+            bonded.close();
         }
     }
 

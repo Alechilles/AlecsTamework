@@ -72,10 +72,6 @@ public final class CommandUiChangeSet {
         return fullRefresh;
     }
 
-    public boolean isFullRefresh() {
-        return fullRefresh;
-    }
-
     @Nonnull
     public Set<CommandUiSection> changedSections() {
         return changedSections;
@@ -86,19 +82,8 @@ public final class CommandUiChangeSet {
         return changedCompanionIds;
     }
 
-    /** Alias for providers that call a companion row a presentation row. */
-    @Nonnull
-    public Set<UUID> changedRowIds() {
-        return changedCompanionIds;
-    }
-
     @Nonnull
     public Set<UUID> removedCompanionIds() {
-        return removedCompanionIds;
-    }
-
-    @Nonnull
-    public Set<UUID> removedRowIds() {
         return removedCompanionIds;
     }
 

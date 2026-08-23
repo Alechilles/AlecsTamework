@@ -121,12 +121,6 @@ public final class CommandUiActionResult {
         return confirmationHandle;
     }
 
-    /** Alias for callers that use the shorter handle name. */
-    @Nullable
-    public CommandUiActionHandle handle() {
-        return confirmationHandle;
-    }
-
     @Nullable
     public CommandUiActionView confirmationView() {
         return confirmationView;
@@ -135,18 +129,6 @@ public final class CommandUiActionResult {
     @Nonnull
     public Map<String, String> metadata() {
         return metadata;
-    }
-
-    public boolean isApplied() {
-        return status == CommandUiActionStatus.APPLIED;
-    }
-
-    public boolean successful() {
-        return isApplied();
-    }
-
-    public boolean confirmationRequired() {
-        return status == CommandUiActionStatus.CONFIRMATION_REQUIRED;
     }
 
     @Override

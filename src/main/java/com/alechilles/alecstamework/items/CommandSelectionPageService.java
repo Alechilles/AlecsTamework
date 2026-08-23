@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.items;
 
 import static com.alechilles.alecstamework.items.CommandSelectionCallbackGuards.*;
 
-import com.alechilles.alecstamework.api.commandui.CommandUiAction;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionHandle;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
@@ -27,6 +26,7 @@ import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.logging.Level;
@@ -680,19 +680,74 @@ final class CommandSelectionPageService {
             BooleanSupplier authority,
             boolean confirmationRequired
     ) {
+        return bindGenericUiAction(session, action, callbacks, authority,
+                ignored -> true, confirmationRequired);
+    }
+
+    /** Binds a generic action with a world-thread target prevalidation fence. */
+    CommandUiActionHandle bindGenericUiAction(
+            CommandUiSessionImpl session,
+            CommandUiAction action,
+            Actions callbacks,
+            BooleanSupplier authority,
+            Predicate<CommandUiAction> targetAvailable,
+            boolean confirmationRequired
+    ) {
         if (session == null || action == null || callbacks == null) {
             throw new IllegalArgumentException("Generic command UI action inputs are required.");
         }
         return session.issueGeneric(action, authority,
-                () -> applyGenericUiAction(action, callbacks), confirmationRequired);
+                () -> applyGenericUiAction(action, callbacks, targetAvailable),
+                confirmationRequired);
+    }
+
+    /** Binds a bonded action to the existing router and durable outcome service. */
+    CommandUiActionHandle bindBondedUiAction(
+            CommandUiSessionImpl session,
+            CommandUiAction action,
+            UUID ownerUuid,
+            Ref<EntityStore> eventPlayerRef,
+            Store<EntityStore> eventStore,
+            TwCommandItemConfig config,
+            CommandPanelFeaturePresentation feature,
+            BondedLifecycleAuthority lifecycleAuthority,
+            boolean confirmationRequired
+    ) {
+        if (session == null || action == null || ownerUuid == null
+                || config == null || feature == null) {
+            throw new IllegalArgumentException("Bonded command UI action inputs are required.");
+        }
+        BondedCompanionPanelActionService.Action bondedAction = switch (
+                action.builtInKind()) {
+            case SUMMON -> BondedCompanionPanelActionService.Action.SUMMON;
+            case DISMISS -> BondedCompanionPanelActionService.Action.STORE;
+            case REVIVE -> BondedCompanionPanelActionService.Action.REVIVE;
+            case ABANDON -> BondedCompanionPanelActionService.Action.ABANDON;
+            default -> null;
+        };
+        return session.issueBonded(action, () -> true, () -> {
+            if (bondedActions == null || bondedAction == null) {
+                return completedUiAction(CommandUiActionResult.unavailable(
+                        "bonded action route is unavailable"));
+            }
+            return bondedActions.routeForUi(ownerUuid, eventPlayerRef,
+                    eventStore, config, feature, bondedAction,
+                    lifecycleAuthority);
+        }, confirmationRequired);
     }
 
     private CompletionStage<CommandUiActionResult> applyGenericUiAction(
             CommandUiAction action,
-            Actions callbacks
+            Actions callbacks,
+            Predicate<CommandUiAction> targetAvailable
     ) {
         UUID target = action.targetId();
         try {
+            if (target != null && (targetAvailable == null
+                    || !targetAvailable.test(action))) {
+                return completedUiAction(CommandUiActionResult.notFound(
+                        "target is unavailable"));
+            }
             switch (action.builtInKind()) {
                 case UNLINK -> {
                     if (target == null || callbacks.unlink() == null) {
