@@ -57,6 +57,7 @@ final class CommandSelectionPageService {
     private final CommandResolutionService resolutionService;
     private final CommandPanelActionService panelActionService;
     private final CommandTalentPageService talentPageService;
+    private final CommandUiManagedPanelActions managedPanelActions;
     private final CommandPanelFeatureActionService featureActions;
     private final BondedCompanionPanelActionRouter bondedActions;
     private final BondedCompanionTalentPageService bondedTalentPages;
@@ -212,6 +213,8 @@ final class CommandSelectionPageService {
         this.resolutionService = resolutionService;
         this.panelActionService = panelActionService;
         this.talentPageService = talentPageService;
+        this.managedPanelActions = new CommandUiManagedPanelActions(
+                toolInventoryService, panelActionService);
         this.featureActions = featureActions;
         this.bondedActions = bondedActions;
         this.bondedTalentPages = bondedTalentPages;
@@ -510,14 +513,7 @@ final class CommandSelectionPageService {
                             option.commandId().equals(selected), null))
                     .toList());
         }
-        Map<String, String> groups = new java.util.LinkedHashMap<>();
-        for (var row : base.companionRows()) {
-            String groupId = row.presentation().get("groupId");
-            if (groupId != null && !groupId.isBlank()) {
-                groups.putIfAbsent(groupId,
-                        row.presentation().getOrDefault("groupName", groupId));
-            }
-        }
+        Map<String, String> groups = CommandUiSnapshotAssembler.groups(working);
         return new CommandUiSnapshot(
                 base.sessionId(), base.presentationRevision(),
                 base.actionGeneration(), base.providerId(), base.toolId(),
@@ -549,11 +545,12 @@ final class CommandSelectionPageService {
                             new CommandUiAction("SELECT_COMMAND", null,
                                     commandId, false),
                             context.toolAuthority(),
-                            () -> apply(actions.selectCommand(), commandId),
+                            () -> CommandUiActionResults.apply(
+                                    actions.selectCommand(), commandId),
                             false));
         }
         addHotswapActions(catalog, context, snapshot);
-        addPanelActions(catalog, context);
+        addPanelActions(catalog, context, snapshot);
         addCompanionActions(catalog, context, snapshot,
                 buildNpcCallbacks(context), buildFeatureCallbacks(context));
         return catalog;
@@ -578,40 +575,20 @@ final class CommandSelectionPageService {
                                 new CommandUiAction("ASSIGN_HOTSWAP", null,
                                         slot.name() + ":" + commandId, false),
                                 context.toolAuthority(),
-                                () -> applyHotswap(context, slot, commandId), false));
+                                () -> CommandUiActionResults.applyHotswap(
+                                        toolInventoryService,
+                                        () -> resolveCurrentPlayer(
+                                                context.ownerUuid()),
+                                        context.toolId(), slot, commandId),
+                                false));
             }
-        }
-    }
-
-    private CompletionStage<CommandUiActionResult> applyHotswap(
-            PageContext context,
-            CommandHotswapAssignmentStore.Slot slot,
-            String commandId
-    ) {
-        try {
-            Player currentPlayer = resolveCurrentPlayer(context.ownerUuid());
-            if (currentPlayer == null) {
-                return CompletableFuture.completedFuture(
-                        CommandUiActionResult.unavailable(
-                                "current command player is unavailable"));
-            }
-            boolean changed = toolInventoryService.mutateActiveToolStack(
-                    currentPlayer, context.toolId(), stack ->
-                            new CommandHotswapAssignmentStore().write(
-                                    stack, slot, commandId));
-            return CompletableFuture.completedFuture(changed
-                    ? CommandUiActionResult.applied()
-                    : CommandUiActionResult.conflict(
-                            "command item changed before assignment"));
-        } catch (RuntimeException | LinkageError failure) {
-            return CompletableFuture.completedFuture(
-                    CommandUiActionResult.failed("hotswap assignment failed"));
         }
     }
 
     private void addPanelActions(
             CommandUiActionCatalog catalog,
-            PageContext context
+            PageContext context,
+            CommandUiSnapshot snapshot
     ) {
         PanelCallbacks panel = buildPanelCallbacks(context);
         addPanel(catalog, "MODE_LINKED", "Show linked companions",
@@ -643,8 +620,8 @@ final class CommandSelectionPageService {
                                             resolveCurrentPlayer(context.ownerUuid()),
                                             context.toolId())));
             catalog.addGlobal("MANAGE_GROUPS", "Manage groups",
-                    genericBinding("MANAGE_GROUPS", null,
-                            context.genericAuthority(), panel.manageGroups(), false));
+                    managedPanelActions.groupFlowBinding(
+                            managedPanelContext(context)));
         }
         addPanel(catalog, "RADIUS_DECREASE", "Decrease radius", "decrease",
                 context.toolAuthority(), panel.decreaseRadius());
@@ -665,11 +642,21 @@ final class CommandSelectionPageService {
                     "filter:" + filter, context.preferenceAuthority(),
                     () -> panel.setFilterMode().accept(filter));
         }
+        catalog.addPanel("SET_FILTER_TEXT", "Set filter text",
+                managedPanelActions.filterTextBinding(
+                        managedPanelContext(context)));
         if (context.genericRosterActions()) {
             addPanel(catalog, "GROUP_ALL", "Use all companion groups",
-                    "group:", context.genericAuthority(),
-                    () -> panel.setGroupActivation().accept(""));
-            snapshotGroups(context).forEach((groupId, label) -> addPanel(
+                    "group:" + CommandGroupActivationService.ALL_VALUE,
+                    context.genericAuthority(), () -> panel
+                            .setGroupActivation().accept(
+                                    CommandGroupActivationService.ALL_VALUE));
+            addPanel(catalog, "GROUP_NONE", "Use no companion groups",
+                    "group:" + CommandGroupActivationService.NONE_VALUE,
+                    context.genericAuthority(), () -> panel
+                            .setGroupActivation().accept(
+                                    CommandGroupActivationService.NONE_VALUE));
+            snapshot.groups().forEach((groupId, label) -> addPanel(
                     catalog, "GROUP_" + groupId, "Use group " + label,
                     "group:" + groupId, context.genericAuthority(),
                     () -> panel.setGroupActivation().accept(groupId)));
@@ -700,34 +687,17 @@ final class CommandSelectionPageService {
                 () -> apply(operation), confirmation);
     }
 
-    static CompletionStage<CommandUiActionResult> apply(Runnable action) {
-        if (action == null) return CompletableFuture.completedFuture(
-                CommandUiActionResult.unavailable("action is unavailable"));
-        try {
-            action.run();
-            return CompletableFuture.completedFuture(CommandUiActionResult.accepted());
-        } catch (RuntimeException | LinkageError failure) {
-            return CompletableFuture.completedFuture(
-                    CommandUiActionResult.failed("action failed"));
-        }
+    private CommandUiManagedPanelActions.Context managedPanelContext(
+            PageContext context
+    ) {
+        return new CommandUiManagedPanelActions.Context(
+                context.toolId(), context.preferenceAuthority(),
+                context.genericAuthority(),
+                () -> resolveCurrentPlayer(context.ownerUuid()));
     }
 
-    private static <T> CompletionStage<CommandUiActionResult> apply(
-            Consumer<T> action,
-            T value
-    ) {
-        if (action == null) {
-            return CompletableFuture.completedFuture(
-                    CommandUiActionResult.unavailable("action is unavailable"));
-        }
-        try {
-            action.accept(value);
-            return CompletableFuture.completedFuture(
-                    CommandUiActionResult.accepted());
-        } catch (RuntimeException | LinkageError failure) {
-            return CompletableFuture.completedFuture(
-                    CommandUiActionResult.failed("action failed"));
-        }
+    static CompletionStage<CommandUiActionResult> apply(Runnable action) {
+        return CommandUiActionResults.apply(action);
     }
 
     private void addCompanionActions(
@@ -748,8 +718,8 @@ final class CommandSelectionPageService {
                 addBondedActions(catalog, context, rowId, entry.npcUuid(),
                         feature, features);
             } else {
-                addGenericActions(catalog, context, rowId, entry, feature,
-                        npc, features);
+                addGenericActions(catalog, context, snapshot, rowId, entry,
+                        feature, npc, features);
             }
         }
     }
@@ -757,6 +727,7 @@ final class CommandSelectionPageService {
     private void addGenericActions(
             CommandUiActionCatalog catalog,
             PageContext context,
+            CommandUiSnapshot snapshot,
             UUID rowId,
             com.alechilles.alecstamework.ui.LinkedNpcEntry entry,
             @Nullable CommandPanelFeaturePresentation feature,
@@ -838,22 +809,10 @@ final class CommandSelectionPageService {
             PanelCallbacks panel = buildPanelCallbacks(context);
             addGroupAssignment(catalog, context, rowId, npcId, "", "No group",
                     panel.assignGroup());
-            snapshotGroups(context).forEach((groupId, label) ->
+            snapshot.groups().forEach((groupId, label) ->
                     addGroupAssignment(catalog, context, rowId, npcId, groupId,
                             "Assign to " + label, panel.assignGroup()));
         }
-    }
-
-    private Map<String, String> snapshotGroups(PageContext context) {
-        Map<String, String> groups = new java.util.LinkedHashMap<>();
-        for (var entry : context.snapshot().snapshot().entries()) {
-            if (entry == null || entry.groupId() == null
-                    || entry.groupId().isBlank()) continue;
-            groups.putIfAbsent(entry.groupId(), entry.groupName() == null
-                    || entry.groupName().isBlank()
-                    ? entry.groupId() : entry.groupName());
-        }
-        return Map.copyOf(groups);
     }
 
     private void addGroupAssignment(
@@ -929,7 +888,8 @@ final class CommandSelectionPageService {
     ) {
         catalog.addRow(rowId, kind, label, new GenericUiActionBinding(
                 new CommandUiAction(kind, target, value, confirmation),
-                authority, () -> apply(operation, target), confirmation));
+                authority, () -> CommandUiActionResults.apply(
+                        operation, target), confirmation));
     }
 
     private void addFeatureRow(
@@ -946,7 +906,8 @@ final class CommandSelectionPageService {
                 new CommandUiAction(kind, target, null, confirmation),
                 context.config().usesBondedCompanionRoster()
                         ? context.toolAuthority() : context.genericAuthority(),
-                () -> apply(operation, target, context.ownerUuid()), confirmation));
+                () -> CommandUiActionResults.apply(
+                        operation, target, context.ownerUuid()), confirmation));
     }
 
     private void addBondedRow(
@@ -964,32 +925,6 @@ final class CommandSelectionPageService {
                 context.ownerUuid(), bonded.rosterId(), bonded.profileId(),
                 (owner, roster, profile) -> resolveBondedContext(
                         context, owner, roster, profile), confirmation));
-    }
-
-    private CompletionStage<CommandUiActionResult> apply(
-            LinkedNpcPanelFeatureAction action,
-            UUID target,
-            UUID ownerUuid
-    ) {
-        if (action == null) return CompletableFuture.completedFuture(
-                CommandUiActionResult.unavailable("action is unavailable"));
-        try {
-            PlayerRef playerRef = Universe.get() == null ? null
-                    : Universe.get().getPlayer(ownerUuid);
-            Ref<EntityStore> ref = playerRef == null ? null
-                    : playerRef.getReference();
-            Store<EntityStore> store = ref == null ? null : ref.getStore();
-            if (ref == null || !ref.isValid() || store == null) {
-                return CompletableFuture.completedFuture(
-                        CommandUiActionResult.unavailable(
-                                "current command world is unavailable"));
-            }
-            action.accept(target, ref, store);
-            return CompletableFuture.completedFuture(CommandUiActionResult.accepted());
-        } catch (RuntimeException | LinkageError failure) {
-            return CompletableFuture.completedFuture(
-                    CommandUiActionResult.failed("action failed"));
-        }
     }
 
     @Nullable
@@ -1560,6 +1495,19 @@ final class CommandSelectionPageService {
     ) {
         Objects.requireNonNull(session, "session");
         Objects.requireNonNull(binding, "binding");
+        if (binding.sessionOperation() != null) {
+            return session.issueGeneric(binding.action(), binding.authority(),
+                    () -> binding.sessionOperation().execute(session),
+                    binding.confirmationRequired());
+        }
+        if (binding.requestOperation() != null) {
+            return session.issueRequest(
+                    CommandUiActionGateway.Route.GENERIC, binding.action(),
+                    ignored -> binding.authority().getAsBoolean(),
+                    binding.requestOperation(), binding.inputPolicy(),
+                    binding.maximumInputLength(),
+                    binding.confirmationRequired());
+        }
         return session.issueGeneric(binding.action(), binding.authority(),
                 binding.operation(), binding.confirmationRequired());
     }
@@ -1596,13 +1544,39 @@ final class CommandSelectionPageService {
             CommandUiAction action,
             BooleanSupplier authority,
             java.util.function.Supplier<CompletionStage<CommandUiActionResult>> operation,
-            boolean confirmationRequired
+            boolean confirmationRequired,
+            @Nullable CommandUiActionGateway.RequestActionExecutor requestOperation,
+            CommandUiActionGateway.InputPolicy inputPolicy,
+            int maximumInputLength,
+            @Nullable SessionUiActionExecutor sessionOperation
     ) {
+        GenericUiActionBinding(
+                CommandUiAction action,
+                BooleanSupplier authority,
+                java.util.function.Supplier<CompletionStage<CommandUiActionResult>> operation,
+                boolean confirmationRequired
+        ) {
+            this(action, authority, operation, confirmationRequired, null,
+                    CommandUiActionGateway.InputPolicy.NONE, 0, null);
+        }
+
         GenericUiActionBinding {
             Objects.requireNonNull(action, "action");
             Objects.requireNonNull(authority, "authority");
             Objects.requireNonNull(operation, "operation");
+            Objects.requireNonNull(inputPolicy, "inputPolicy");
+            if (requestOperation == null
+                    && inputPolicy != CommandUiActionGateway.InputPolicy.NONE) {
+                throw new IllegalArgumentException(
+                        "Text input policy requires a request operation.");
+            }
         }
+    }
+
+    @FunctionalInterface
+    interface SessionUiActionExecutor {
+        CompletionStage<CommandUiActionResult> execute(
+                CommandUiSessionImpl session);
     }
 
     record BondedUiActionBinding(

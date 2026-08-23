@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.ui.BondedCompanionPanelPresentation;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
 import java.util.ArrayList;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -22,6 +23,21 @@ import javax.annotation.Nullable;
 /** Builds detached public snapshots from existing command-panel read models. */
 final class CommandUiSnapshotAssembler {
     CommandUiSnapshotAssembler() {
+    }
+
+    /** Returns every stored group, including groups with no assigned row. */
+    @Nonnull
+    static Map<String, String> groups(@Nullable ItemStack stack) {
+        Map<String, String> result = new java.util.LinkedHashMap<>();
+        for (CommandGroupService.GroupRecord group
+                : new CommandGroupService().readGroups(stack)) {
+            if (group == null || group.groupId == null
+                    || group.groupId.isBlank()) continue;
+            result.putIfAbsent(group.groupId,
+                    group.name == null || group.name.isBlank()
+                            ? group.groupId : group.name);
+        }
+        return Map.copyOf(result);
     }
 
     /**

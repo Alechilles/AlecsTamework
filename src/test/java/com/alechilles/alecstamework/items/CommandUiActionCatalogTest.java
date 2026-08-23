@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionHandle;
+import com.alechilles.alecstamework.api.commandui.CommandUiActionRequest;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionView;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionStatus;
 import com.alechilles.alecstamework.api.commandui.CommandUiCommandOption;
@@ -23,6 +24,46 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Observable action exposure for provider snapshots. */
 class CommandUiActionCatalogTest {
+    @Test
+    void panelTextActionUsesItsBoundedRequestExecutor() {
+        UUID sessionId = UUID.randomUUID();
+        CommandUiSnapshot base = new CommandUiSnapshot(
+                sessionId, 1L, 1L, null, List.of(), List.of(),
+                new CommandUiPanelState("linked"));
+        AtomicReference<String> filter = new AtomicReference<>();
+        CommandUiActionCatalog catalog = new CommandUiActionCatalog();
+        catalog.addPanel("SET_FILTER_TEXT", "Set filter text",
+                new CommandSelectionPageService.GenericUiActionBinding(
+                        new CommandUiAction("SET_FILTER_TEXT"), () -> true,
+                        () -> CompletableFuture.completedFuture(
+                                CommandUiActionResult.unavailable(
+                                        "text is required")), false,
+                        (ignored, input) -> {
+                            filter.set(input);
+                            return CompletableFuture.completedFuture(
+                                    CommandUiActionResult.applied());
+                        }, CommandUiActionGateway.InputPolicy.OPTIONAL_TEXT,
+                        40, null));
+        CommandUiSessionFactory.CreatedSession created =
+                new CommandUiSessionFactory(new CommandUiActionGateway(),
+                        new CommandSelectionPageService(
+                                null, null, null, null, null))
+                        .createGeneric(sessionId, base, 0L,
+                                CommandUiWorldDispatcher.direct(), null, null,
+                                null, catalog.genericBindings());
+        CommandUiSnapshot exposed = catalog.attach(base, created.handles());
+
+        CommandUiActionResult result = created.session().invoke(
+                new CommandUiActionRequest(
+                        exposed.panelState().action("SET_FILTER_TEXT").handle(),
+                        " alpaca "))
+                .toCompletableFuture().join();
+
+        assertEquals(CommandUiActionStatus.APPLIED, result.status());
+        assertEquals("alpaca", filter.get());
+        created.session().close();
+    }
+
     @Test
     void commandChoiceCarriesAnInvokableTameworkHandle() {
         UUID sessionId = UUID.randomUUID();
