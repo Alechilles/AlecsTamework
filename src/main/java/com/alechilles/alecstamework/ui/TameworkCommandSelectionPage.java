@@ -74,7 +74,7 @@ public final class TameworkCommandSelectionPage
     private final Supplier<String> panelGroupActivationValueSupplier;
     private final Supplier<List<DropdownEntryInfo>> panelGroupAssignEntriesSupplier;
     private final LinkedNpcPanelRefreshLifecycle refreshLifecycle;
-    private final LinkedNpcPanelPacketSender packetSender;
+    private LinkedNpcPanelPacketSender packetSender;
     private final LinkedNpcPanelDeferredNavigator deferredNavigator;
     private LinkedNpcEntry[] baseLinkedNpcEntries;
     private LinkedNpcEntry[] linkedNpcEntries;
@@ -369,6 +369,11 @@ public final class TameworkCommandSelectionPage
     /** Configures the generic-roster active highlight preference. */
     public void configureActiveHighlight(@Nonnull CommandActiveHighlightBinding binding) {
         this.activeHighlightBinding = binding;
+    }
+
+    /** Routes background panel updates through the owning command UI host. */
+    void configureHostPacketSender(@Nonnull LinkedNpcPanelPacketSender sender) {
+        this.packetSender = Objects.requireNonNull(sender, "sender");
     }
 
     @Override
@@ -893,6 +898,11 @@ public final class TameworkCommandSelectionPage
 
     @Override
     public void onDismiss(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
+        closeForHost();
+    }
+
+    /** Releases standard renderer state when its owning host closes. */
+    void closeForHost() {
         dismissed = true;
         navigationPending = false;
         clearLinkedPanelOwner();
