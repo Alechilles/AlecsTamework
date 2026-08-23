@@ -187,14 +187,20 @@ public final class BondedCompanionTransitionService {
         }
         BondedCompanionPolicyGate.Check checked = policies.forProfile(profile,
                 request.expectedPolicyRevision());
+        BondedCompanionPolicy policy = checked.policy();
         ResultCode denial = validateExistingPolicy(
-                checked, profile, policy -> policy.features().revive()
+                checked, profile, candidate -> candidate.features().revive()
         );
         if (denial != null) {
             return rejected(denial, profile);
         }
         if (profile.state() != BondedCompanionState.DEAD) {
             return rejected(ResultCode.INVALID_STATE, profile);
+        }
+        if (policy.reviveCooldownUntilMs(profile.diedAtMs()) != 0L
+                && request.nowMs() < policy.reviveCooldownUntilMs(
+                        profile.diedAtMs())) {
+            return rejected(ResultCode.COOLDOWN_ACTIVE, profile);
         }
         if (!BondedCompanionReviveRecipe.matches(
                 checked.policy().revivePriceFor(profile.roleId()), payment.costs())) {

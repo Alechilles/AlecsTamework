@@ -50,6 +50,12 @@ class TameworkCommandRootTest {
                 root.getSubCommands().get("debug").getSubCommands().get("persistence")
                         .getSubCommands().get("debugdb").getPermission()
         );
+        assertEquals(
+                "tamework.command.tw.debug.persistence.reviveready",
+                root.getSubCommands().get("debug").getSubCommands()
+                        .get("persistence").getSubCommands()
+                        .get("reviveready").getPermission()
+        );
     }
 
     private static final class DisplayNameOwner implements CommandOwner {

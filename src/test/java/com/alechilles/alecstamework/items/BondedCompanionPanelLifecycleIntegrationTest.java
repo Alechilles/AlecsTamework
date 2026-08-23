@@ -174,6 +174,71 @@ class BondedCompanionPanelLifecycleIntegrationTest {
         }
     }
 
+    /** Regression: bonded revive cooldown must reject before any item charge. */
+    @Test
+    void reviveCooldownBlocksPaymentUntilTheDeadProfileIsReady()
+            throws Exception {
+        Path database = temporaryDirectory.resolve("revive-cooldown.db");
+        BondedCompanionRosterRegistry rosters = registry(0L, 30L);
+        AtomicLong clock = new AtomicLong(10_000L);
+        TestWorld world = new TestWorld();
+        Harness runtime = harness(database, rosters, clock, world);
+        try {
+            BondedCompanionProfileView dead = deadProfile(
+                    runtime, world, clock,
+                    UUID.fromString("73000000-0000-0000-0000-000000000021"));
+            TestInventory inventory = new TestInventory(
+                    Map.of("Ingredient_Life_Essence", 2));
+            BondedCompanionReviveQuote quote = runtime.api.quoteRevive(action(
+                    "quote-cooling", dead,
+                    new BondedCompanionActionContext(null, inventory))).join().value();
+
+            assertEquals(30L, quote.cooldownRemainingSeconds());
+            assertFalse(dead.reviveAvailable());
+            assertFalse(runtime.api.revive(reviveRequest(
+                    "revive-cooling", dead, inventory, rosters)).join().successful());
+            assertEquals(2, inventory.availableQuantity("Ingredient_Life_Essence"));
+
+            clock.addAndGet(30_000L);
+            BondedCompanionProfileView ready = runtime.api.list(OWNER, ROSTER)
+                    .join().value().getFirst();
+            assertTrue(runtime.api.revive(reviveRequest(
+                    "revive-ready", ready, inventory, rosters)).join().successful());
+            assertEquals(0, inventory.availableQuantity("Ingredient_Life_Essence"));
+        } finally {
+            runtime.close();
+        }
+    }
+
+    /** Regression: extreme valid cooldowns keep the panel and quote consistent. */
+    @Test
+    void reviveCooldownDisplaySaturatesForExtremeConfiguredDuration()
+            throws Exception {
+        Path database = temporaryDirectory.resolve("extreme-revive-cooldown.db");
+        BondedCompanionRosterRegistry rosters = registry(0L, Long.MAX_VALUE);
+        AtomicLong clock = new AtomicLong(-10L);
+        TestWorld world = new TestWorld();
+        Harness runtime = harness(database, rosters, clock, world);
+        try {
+            BondedCompanionProfileView dead = deadProfile(
+                    runtime, world, clock,
+                    UUID.fromString("73000000-0000-0000-0000-000000000022"));
+            long expectedSeconds = Long.MAX_VALUE / 1_000L + 1L;
+
+            assertFalse(dead.reviveAvailable());
+            assertEquals(expectedSeconds,
+                    dead.reviveQuote().cooldownRemainingSeconds());
+            BondedCompanionReviveQuote quote = runtime.api.quoteRevive(action(
+                    "quote-extreme-cooling", dead,
+                    new BondedCompanionActionContext(null,
+                            new TestInventory(Map.of())))).join().value();
+            assertFalse(quote.enabled());
+            assertEquals(expectedSeconds, quote.cooldownRemainingSeconds());
+        } finally {
+            runtime.close();
+        }
+    }
+
     /**
      * A duplicate live SUMMON is rejected after restart, while terminal STORE
      * replays without repeating either world effect.
@@ -573,11 +638,17 @@ class BondedCompanionPanelLifecycleIntegrationTest {
     }
 
     private BondedCompanionRosterRegistry registry() throws Exception {
-        return registry(0L);
+        return registry(0L, 0L);
     }
 
     private BondedCompanionRosterRegistry registry(long cooldownSeconds)
             throws Exception {
+        return registry(cooldownSeconds, 0L);
+    }
+
+    private BondedCompanionRosterRegistry registry(
+            long summonCooldownSeconds, long reviveCooldownSeconds
+    ) throws Exception {
         TwBondedCompanionRosterConfig config =
                 TwBondedCompanionRosterConfig.CODEC.decode(
                         BsonDocument.parse("""
@@ -589,6 +660,7 @@ class BondedCompanionPanelLifecycleIntegrationTest {
                                   "MaximumActive": 1,
                                   "SessionDurationSeconds": 600,
                                   "SummonCooldownSeconds": %d,
+                                  "ReviveCooldownSeconds": %d,
                                   "RevivePrice": {"Costs": [{
                                     "ItemId": "Ingredient_Life_Essence",
                                     "Quantity": 2
@@ -601,7 +673,9 @@ class BondedCompanionPanelLifecycleIntegrationTest {
                                     "Revive": true
                                   }
                                 }
-                                """.formatted(cooldownSeconds)),
+                                """.formatted(
+                                        summonCooldownSeconds,
+                                        reviveCooldownSeconds)),
                         new ExtraInfo());
         Field id = config.getClass().getDeclaredField("id");
         id.setAccessible(true);

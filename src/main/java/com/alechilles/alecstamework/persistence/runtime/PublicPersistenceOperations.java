@@ -22,6 +22,7 @@ import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivatio
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalRequest;
 import com.alechilles.alecstamework.npc.actions.BreedingLitterOperation;
+import com.alechilles.alecstamework.companion.revival.ReviveReadyRequest;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteDatabaseOperationCoordinator;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicPersistenceAdapter;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSingleWriter;
@@ -253,6 +254,17 @@ public final class PublicPersistenceOperations {
                 boundaries.paidRevivals().releases(),
                 boundaries.paidRevivals().cleanups()
         );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission markReviveReady(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull ReviveReadyRequest request
+    ) {
+        var submitted = adapter().reviveReadyOperations().submit(
+                operationId, idempotencyKey, request);
         return submission(submitted.acceptance(), submitted.completion());
     }
 

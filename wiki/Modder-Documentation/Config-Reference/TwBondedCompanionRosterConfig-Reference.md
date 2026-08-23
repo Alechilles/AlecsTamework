@@ -66,6 +66,7 @@ is rejected and the last accepted generation remains active.
   "MaximumActive": 1,
   "SessionDurationSeconds": 600,
   "SummonCooldownSeconds": 300,
+  "ReviveCooldownSeconds": 60,
   "RevivePrice": {
     "Costs": [
       { "ItemId": "Example_Revive_Essence", "Quantity": 2 },
@@ -97,6 +98,9 @@ is rejected and the last accepted generation remains active.
   positive values expire to `STORED`.
 - `SummonCooldownSeconds`: cooldown applied when an active projection is
   stored. `0` disables the cooldown.
+- `ReviveCooldownSeconds`: cooldown applied after a bonded companion dies.
+  The panel shows the remaining time and blocks revival until it ends. `0`
+  disables the cooldown. Omission inherits from the parent roster policy.
 - `RevivePrice`: optional paid-revival definition. If present, `Costs` must be
   a non-empty ordered AND recipe.
 - `Features`: action-specific policy toggles. Every toggle defaults to `true`
@@ -145,7 +149,8 @@ Two assets can route distinct families into one item:
   "MaximumOwned": 0,
   "MaximumActive": 1,
   "SessionDurationSeconds": 600,
-  "SummonCooldownSeconds": 300
+  "SummonCooldownSeconds": 300,
+  "ReviveCooldownSeconds": 60
 }
 ```
 
@@ -158,6 +163,7 @@ Two assets can route distinct families into one item:
   "MaximumActive": 1,
   "SessionDurationSeconds": 0,
   "SummonCooldownSeconds": 0,
+  "ReviveCooldownSeconds": 0,
   "Features": {
     "Capture": false,
     "Provision": true,

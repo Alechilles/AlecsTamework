@@ -42,6 +42,8 @@ import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRe
 import com.alechilles.alecstamework.companion.revival.PaidRevivalDefinition;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalRequest;
 import com.alechilles.alecstamework.npc.actions.BreedingLitterOperation;
+import com.alechilles.alecstamework.companion.revival.ReviveReadyDefinition;
+import com.alechilles.alecstamework.companion.revival.ReviveReadyRequest;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
@@ -272,6 +274,14 @@ final class SqlitePublicRecoveryRegistry {
                                 boundaries.paidRevivals().revivals(),
                                 boundaries.paidRevivals().releases(),
                                 boundaries.paidRevivals().cleanups()
+                        ).completion()
+                ),
+                Map.entry(
+                        ReviveReadyDefinition.INSTANCE.kind(),
+                        claim -> operations.reviveReady().submit(
+                                claim.operation().operationId(),
+                                claim.operation().idempotencyKey(),
+                                payload(claim, ReviveReadyRequest.class)
                         ).completion()
                 ),
                 Map.entry(

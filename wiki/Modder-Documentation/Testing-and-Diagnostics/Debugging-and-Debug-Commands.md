@@ -17,40 +17,41 @@ Use this page when an asset or integration loads but behaves incorrectly.
 
 ## Useful commands
 
-- `/tw getowner`, `/tw setowner`
-- `/tw gettamed`, `/tw settamed`
-- `/tw getalarm [AlarmName] [NpcUuid]`
-- `/tw config`, `/tw settings`
-- `/tw reloadconfig`
-- `/tw gethappiness`, `/tw gettraits`, `/tw getlifestage`
-- `/tw findnpc <uuid>`
-- `/tw npcclean <roleId>`
-- `/tw showhitboxes`
-- `/tw showspawnbeacons [radius|off]`
-- `/tw debugdb [status|health|integrity|detail|export]`
+- `/tw debug get owner`, `/tw debug set owner`
+- `/tw debug get tamed`, `/tw debug set tamed`
+- `/tw debug get alarm [AlarmName] [NpcUuid]`
+- `/tw config open`, `/tw settings`
+- `/tw config reload`
+- `/tw debug get happiness`, `/tw debug get traits`, `/tw debug get lifestage`
+- `/tw npc find <uuid>`
+- `/tw npc clean <roleId>`
+- `/tw debug view hitboxes`
+- `/tw debug view spawnbeacons [radius|off]`
+- `/tw debug persistence debugdb [status|health|integrity|detail|export]`
+- `/tw debug persistence reviveready <profile UUID>`
 
-`/tw showspawnbeacons` tracks loaded natural spawn beacons around the caller
+`/tw debug view spawnbeacons` tracks loaded natural spawn beacons around the caller
 and reveals them to nearby Creative-mode players with the same configured model
 and nameplate used by a manually created beacon. Its presentation-only proxies
 do not participate in spawning and are removed when tracking ends.
 
 ## Debug toggles
 
-- `/tw debughook`
-- `/tw debugprompt`
-- `/tw debugspawner`
-- `/tw debugspawnerlocation`
-- `/tw debugdespawn`
-- `/tw debuglag`
-- `/tw debugcoop`
-- `/tw debugneedsconsume`
-- `/tw debugneedsdamage`
-- `/tw debugneedsseek`
-- `/tw debugneedstelemetry`
-- `/tw debugrespawntrace`
-- `/tw debugxpevents`
+- `/tw debug log hook`
+- `/tw debug log prompt`
+- `/tw debug log spawner`
+- `/tw debug log spawnerlocation`
+- `/tw debug log despawn`
+- `/tw debug log lag`
+- `/tw debug log coop`
+- `/tw debug log needs consume`
+- `/tw debug log needs damage`
+- `/tw debug log needs seek`
+- `/tw debug telemetry needs`
+- `/tw debug log respawntrace`
+- `/tw debug log xpevents`
 
-`/tw debugrespawntrace` logs the stored and normalized health/needs projection,
+`/tw debug log respawntrace` logs the stored and normalized health/needs projection,
 the immediate live entity health and death-component state, first damage within
 the trace window, and delayed 250 ms and 1 second probes. It covers Soul
 Collector capture and release, free and paid companion restoration, and bonded
@@ -64,13 +65,16 @@ health, and death-component state, even when the respawn trace is disabled.
 
 Every newly inserted companion projection clears stale fall distance and
 velocity and receives brief spawn-time fall protection. This gameplay guard is
-active even when `/tw debugrespawntrace` is disabled. A cancelled invalid fall
+active even when `/tw debug log respawntrace` is disabled. A cancelled invalid fall
 can appear under `[tw-respawn-trace]` or `[tw-spawn-protection]`, depending on
 active trace evidence.
 
 Death and Lost restoration is a gameplay flow. Roster-backed companions can
 use role-configured exact item costs, while legacy item-linked paths remain
-free. There is no debug-ready revival mutation or persistence repair command.
+free. `/tw debug persistence reviveready <profile UUID>` is the exception for
+a generic `DEAD_REVIVABLE` profile. It changes only that profile's current
+death snapshot through the normal persistence operation. It does not revive,
+summon, or change bonded profiles.
 
 For coops, test direct live capture, direct captured-item intake through the
 supported managed-coop interaction, and resident release independently.
@@ -79,7 +83,7 @@ Command status comes from the canonical lifecycle projection. A relocation
 timeout only drops the pending retry; it cannot manufacture `LOST`, and none of
 the debug toggles changes that rule.
 
-`/tw debugdb status`, `health`, and `integrity` print the same bounded
+`/tw debug persistence debugdb status`, `health`, and `integrity` print the same bounded
 replacement-persistence summary. `detail` adds bounded feature, outbox,
 operation-phase, incident, quarantine, and circuit counts. `export` writes a
 bounded redacted support ZIP under Tamework's universe data directory without

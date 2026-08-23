@@ -24,6 +24,7 @@ This document explains where Tamework config assets live and how each family res
 - `TwCapturePolicyConfig`: `<ModRoot>/Server/Tamework/CapturePolicies/*.json`
 - `TwPopulationGroupConfig`: `<ModRoot>/Server/Tamework/PopulationGroups/*.json`
 - `TwManagedActivityConfig`: `<ModRoot>/Server/Tamework/ManagedActivities/*.json`
+- `TwBondedCompanionRosterConfig`: `<ModRoot>/Server/Tamework/BondedCompanions/Rosters/*.json`
 
 ## Resolution patterns
 ### Single active global config
@@ -106,6 +107,9 @@ Behavior summary:
   policy, placement rings, paid `Command.Revive` cost/cooldown policy,
   `Command.Summon` duration/storage/cooldown policy, and other companion
   command behavior.
+- `TwBondedCompanionRosterConfig` defines bonded roster-family limits, session
+  duration, summon cooldown, revive cooldown, revive price, and action gates.
+  `ReviveCooldownSeconds: 0` disables the bonded revive cooldown.
 - Legacy config fields for settings-owned values are still decoded for older packs, but new examples and `/tw config` hide them so server owners use `/tw settings`.
 
 Persistence machinery does not have feature-specific asset families.

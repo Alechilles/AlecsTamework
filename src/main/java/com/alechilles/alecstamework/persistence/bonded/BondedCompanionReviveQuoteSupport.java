@@ -19,13 +19,15 @@ final class BondedCompanionReviveQuoteSupport {
      */
     BondedCompanionReviveQuote profileQuote(
             BondedCompanionRecord.Profile profile,
-            BondedCompanionPolicy policy
+            BondedCompanionPolicy policy,
+            long cooldownRemainingSeconds
     ) {
         BondedCompanionPolicy.RevivePrice price = policy.revivePriceFor(profile.roleId());
         List<BondedCompanionReviveQuote.CostLine> costs = price == null
                 ? List.of() : unavailable(price);
         return new BondedCompanionReviveQuote(
-                profile.profileId(), true, costs, 0L, policy.revision());
+                profile.profileId(), true, costs, cooldownRemainingSeconds,
+                policy.revision());
     }
 
     List<BondedCompanionReviveQuote.CostLine> costs(

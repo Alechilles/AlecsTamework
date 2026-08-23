@@ -51,6 +51,7 @@ public final class TwBondedCompanionRosterConfig implements
     int maximumActive;
     long sessionDurationSeconds;
     long summonCooldownSeconds;
+    long reviveCooldownSeconds;
     String summonAuraEffectId;
     String expiryWarningEffectId;
     RevivePriceDefinition revivePrice;
@@ -162,6 +163,9 @@ public final class TwBondedCompanionRosterConfig implements
         if (!explicitTopLevelKeys.contains("SummonCooldownSeconds")) {
             summonCooldownSeconds = parent.summonCooldownSeconds;
         }
+        if (!explicitTopLevelKeys.contains("ReviveCooldownSeconds")) {
+            reviveCooldownSeconds = parent.reviveCooldownSeconds;
+        }
         if (!explicitTopLevelKeys.contains("SummonAuraEffectId")) {
             summonAuraEffectId = parent.summonAuraEffectId;
         }
@@ -249,7 +253,8 @@ public final class TwBondedCompanionRosterConfig implements
         }
         if (maximumOwned < 0 || maximumActive < 0
                 || sessionDurationSeconds < 0L
-                || summonCooldownSeconds < 0L) {
+                || summonCooldownSeconds < 0L
+                || reviveCooldownSeconds < 0L) {
             throw new IllegalArgumentException(
                     "Bonded roster counts and timers cannot be negative: "
                             + configId
@@ -349,6 +354,11 @@ public final class TwBondedCompanionRosterConfig implements
 
     public long getSummonCooldownSeconds() {
         return summonCooldownSeconds;
+    }
+
+    /** Returns the delay between confirmed death and an eligible revive. */
+    public long getReviveCooldownSeconds() {
+        return reviveCooldownSeconds;
     }
 
     /** Optional visual effect applied after this roster successfully summons. */
