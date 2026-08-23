@@ -4,8 +4,6 @@ import com.hypixel.hytale.server.core.command.system.CommandOwner;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class TameworkCommandRootTest {
 
@@ -16,21 +14,26 @@ class TameworkCommandRootTest {
 
         assertEquals(TameworkCommandRoot.ROOT_PERMISSION, root.getPermission());
         assertEquals(
-                "tamework.command.tw.setowner",
-                root.getSubCommands().get("setowner").getPermission()
-        );
-        assertEquals(TameworkConfigPermission.NODE, root.getSubCommands().get("config").getPermission());
-        assertEquals(
-                "tamework.command.tw.reloadconfig",
-                root.getSubCommands().get("reloadconfig").getPermission()
+                "tamework.command.tw.debug.set.owner",
+                root.getSubCommands().get("debug").getSubCommands().get("set")
+                        .getSubCommands().get("owner").getPermission()
         );
         assertEquals(
-                "tamework.command.tw.activation",
-                root.getSubCommands().get("activation").getPermission()
+                TameworkConfigPermission.NODE,
+                root.getSubCommands().get("config").getSubCommands().get("open").getPermission()
         );
         assertEquals(
-                "tamework.command.tw.setlevel",
-                root.getSubCommands().get("setlevel").getPermission()
+                "tamework.command.tw.config.reload",
+                root.getSubCommands().get("config").getSubCommands().get("reload").getPermission()
+        );
+        assertEquals(
+                "tamework.command.tw.runtime.status",
+                root.getSubCommands().get("runtime").getSubCommands().get("status").getPermission()
+        );
+        assertEquals(
+                "tamework.command.tw.debug.set.level",
+                root.getSubCommands().get("debug").getSubCommands().get("set")
+                        .getSubCommands().get("level").getPermission()
         );
         assertEquals(
                 "tamework.command.tw.debug.set.needs",
@@ -38,15 +41,14 @@ class TameworkCommandRootTest {
                         .getSubCommands().get("needs").getPermission()
         );
         assertEquals(
-                "tamework.command.tw.spawntamed",
-                root.getSubCommands().get("spawntamed").getPermission()
+                "tamework.command.tw.npc.spawn.tamed",
+                root.getSubCommands().get("npc").getSubCommands().get("spawn")
+                        .getSubCommands().get("tamed").getPermission()
         );
-        var debugDb = root.getSubCommands().get("debugdb");
-        assertNotNull(debugDb, "replacement persistence diagnostics must remain registered");
-        assertEquals("tamework.command.tw.debugdb", debugDb.getPermission());
-        assertFalse(
-                root.getSubCommands().containsKey("persistencecircuit"),
-                "the unreleased persistence circuit command must not be restored"
+        assertEquals(
+                "tamework.command.tw.debug.persistence.debugdb",
+                root.getSubCommands().get("debug").getSubCommands().get("persistence")
+                        .getSubCommands().get("debugdb").getPermission()
         );
     }
 
