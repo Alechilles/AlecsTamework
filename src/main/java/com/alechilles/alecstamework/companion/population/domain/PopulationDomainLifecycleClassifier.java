@@ -15,9 +15,9 @@ public final class PopulationDomainLifecycleClassifier {
             throw new IllegalArgumentException("Lifecycle state is required");
         }
         return switch (state) {
-            case ACTIVE, UNLOADED, COOP, LOST, UNRESOLVED ->
+            case ACTIVE, UNLOADED, LOST, UNRESOLVED ->
                     new Classification(true, true);
-            case CAPTURED, ROSTER_STORED, PROVISIONED_DORMANT, DEAD_REVIVABLE ->
+            case CAPTURED, ROSTER_STORED, PROVISIONED_DORMANT, DEAD_REVIVABLE, COOP ->
                     new Classification(true, false);
             case RELEASED -> new Classification(false, false);
         };

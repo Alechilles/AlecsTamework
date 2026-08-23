@@ -18,7 +18,7 @@ class PopulationDomainLifecycleClassifierTest {
                 PopulationDomainLifecycleClassifier.classify(LifecycleState.UNLOADED)
         );
         assertEquals(
-                new PopulationDomainLifecycleClassifier.Classification(true, true),
+                new PopulationDomainLifecycleClassifier.Classification(true, false),
                 PopulationDomainLifecycleClassifier.classify(LifecycleState.COOP)
         );
         assertEquals(
