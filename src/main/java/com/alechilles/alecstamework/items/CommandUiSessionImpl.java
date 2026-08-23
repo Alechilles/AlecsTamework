@@ -1,8 +1,8 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.commandui.CommandUiActionHandle;
+import com.alechilles.alecstamework.api.commandui.CommandUiActionRequest;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
-import com.alechilles.alecstamework.api.commandui.CommandUiActionStatus;
 import com.alechilles.alecstamework.api.commandui.CommandUiChangeSet;
 import com.alechilles.alecstamework.api.commandui.CommandUiCloseReason;
 import com.alechilles.alecstamework.api.commandui.CommandUiEvent;
@@ -18,6 +18,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -51,6 +52,7 @@ final class CommandUiSessionImpl implements CommandUiSession {
     private final AtomicReference<State> state = new AtomicReference<>(State.OPEN);
     private final AtomicBoolean actionRebindRequired = new AtomicBoolean();
     private final AtomicBoolean closeEffectsStarted = new AtomicBoolean();
+    private final AtomicLong managedGeneration = new AtomicLong();
     private final CommandUiUpdateSink updateSink;
 
     CommandUiSessionImpl(
@@ -203,17 +205,32 @@ final class CommandUiSessionImpl implements CommandUiSession {
     public CompletionStage<CommandUiActionResult> invoke(
             @Nullable CommandUiActionHandle handle
     ) {
+        return invokeRequest(handle == null ? null
+                : CommandUiActionRequest.of(handle));
+    }
+
+    @Nonnull
+    @Override
+    public CompletionStage<CommandUiActionResult> invoke(
+            @Nullable CommandUiActionRequest request
+    ) {
+        return invokeRequest(request);
+    }
+
+    @Nonnull
+    private CompletionStage<CommandUiActionResult> invokeRequest(
+            @Nullable CommandUiActionRequest request
+    ) {
         if (!isOpen()) return CommandUiSession.closedResult();
         try {
             CompletionStage<CompletionStage<CommandUiActionResult>> queued =
                     dispatcher.dispatch(() -> actionGateway.invoke(
-                            sessionId, handle,
+                            sessionId, request,
                             currentSnapshot.get().actionGeneration(),
                             expectedRoute()));
             return flatten(queued).whenComplete((result, failure) -> {
                 if (failure == null && result != null
-                        && (result.status() == CommandUiActionStatus.APPLIED
-                        || result.status() == CommandUiActionStatus.ACCEPTED)) {
+                        && result.refreshSnapshot()) {
                     actionRebindRequired.set(true);
                     requestRefresh();
                 }
@@ -383,6 +400,64 @@ final class CommandUiSessionImpl implements CommandUiSession {
         return actionGateway.issue(sessionId, route, action,
                 currentSnapshot.get().actionGeneration(), authority, executor,
                 confirmationRequired);
+    }
+
+    /** Issues a main-snapshot action with bounded text input. */
+    @Nonnull
+    CommandUiActionHandle issueRequest(
+            @Nonnull CommandUiActionGateway.Route route,
+            @Nonnull CommandUiAction action,
+            @Nullable CommandUiActionGateway.AuthorityCheck authority,
+            @Nonnull CommandUiActionGateway.RequestActionExecutor executor,
+            @Nonnull CommandUiActionGateway.InputPolicy inputPolicy,
+            int maximumInputLength,
+            boolean confirmationRequired
+    ) {
+        requireRoute(route);
+        if (!isOpen()) {
+            throw new IllegalStateException(
+                    "Cannot issue an action for a closed session.");
+        }
+        return actionGateway.issueRequest(sessionId, route, action,
+                currentSnapshot.get().actionGeneration(), authority, executor,
+                inputPolicy, maximumInputLength, confirmationRequired);
+    }
+
+    /** Starts a managed flow and invalidates handles from its prior view. */
+    long beginManagedFlow() {
+        if (!isOpen()) {
+            throw new IllegalStateException(
+                    "Cannot start a flow for a closed session.");
+        }
+        long generation = actionGateway.beginManagedFlow(sessionId);
+        managedGeneration.set(generation);
+        return generation;
+    }
+
+    /** Issues an action for the current independent managed-flow view. */
+    @Nonnull
+    CommandUiActionHandle issueManaged(
+            @Nonnull CommandUiActionGateway.Route route,
+            @Nonnull CommandUiAction action,
+            @Nullable CommandUiActionGateway.AuthorityCheck authority,
+            @Nonnull CommandUiActionGateway.RequestActionExecutor executor,
+            @Nonnull CommandUiActionGateway.InputPolicy inputPolicy,
+            int maximumInputLength,
+            boolean confirmationRequired
+    ) {
+        requireRoute(route);
+        if (!isOpen()) {
+            throw new IllegalStateException(
+                    "Cannot issue an action for a closed session.");
+        }
+        long generation = managedGeneration.get();
+        if (generation <= 0L) {
+            throw new IllegalStateException(
+                    "A managed flow must start before it issues actions.");
+        }
+        return actionGateway.issueManaged(sessionId, route, action,
+                generation, authority, executor, inputPolicy,
+                maximumInputLength, confirmationRequired);
     }
 
     @Nonnull

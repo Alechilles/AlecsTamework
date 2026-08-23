@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.commandui.CommandUiActionHandle;
+import com.alechilles.alecstamework.api.commandui.CommandUiActionRequest;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionStatus;
 import com.alechilles.alecstamework.api.commandui.CommandUiChangeSet;
@@ -31,6 +32,153 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Behavior tests for session lifecycle, dispatch, and opaque action authority. */
 class CommandUiSessionTask2Test {
+    @Test
+    void actionInputIsValidatedBeforeAuthorityAndExecution() {
+        UUID sessionId = UUID.randomUUID();
+        CommandUiSessionImpl session = session(sessionId,
+                CommandUiSessionImpl.Mode.GENERIC,
+                new CommandUiActionGateway(), 1L);
+        AtomicInteger authorityChecks = new AtomicInteger();
+        AtomicInteger executions = new AtomicInteger();
+        var handleOnly = session.issueRequest(
+                CommandUiActionGateway.Route.GENERIC,
+                new CommandUiAction("SELECT_COMMAND"),
+                ignored -> {
+                    authorityChecks.incrementAndGet();
+                    return true;
+                },
+                (ignored, input) -> {
+                    executions.incrementAndGet();
+                    return CompletableFuture.completedFuture(
+                            CommandUiActionResult.applied());
+                },
+                CommandUiActionGateway.InputPolicy.NONE, 0, false);
+
+        CommandUiActionResult injected = session.invoke(
+                new CommandUiActionRequest(handleOnly, "injected"))
+                .toCompletableFuture().join();
+
+        assertEquals(CommandUiActionStatus.DENIED, injected.status());
+        assertEquals(0, authorityChecks.get());
+        assertEquals(0, executions.get());
+
+        AtomicReference<String> acceptedInput = new AtomicReference<>();
+        var atLimit = session.issueRequest(
+                CommandUiActionGateway.Route.GENERIC,
+                new CommandUiAction("SET_FILTER_TEXT"), ignored -> true,
+                (ignored, input) -> {
+                    acceptedInput.set(input);
+                    return CompletableFuture.completedFuture(
+                            CommandUiActionResult.applied());
+                }, CommandUiActionGateway.InputPolicy.REQUIRED_TEXT,
+                4, false);
+        assertEquals(CommandUiActionStatus.APPLIED,
+                session.invoke(new CommandUiActionRequest(atLimit, " abcd "))
+                        .toCompletableFuture().join().status());
+        assertEquals("abcd", acceptedInput.get());
+
+        var optionalBlank = session.issueRequest(
+                CommandUiActionGateway.Route.GENERIC,
+                new CommandUiAction("SET_FILTER_TEXT"), ignored -> true,
+                (ignored, input) -> {
+                    acceptedInput.set(input);
+                    return CompletableFuture.completedFuture(
+                            CommandUiActionResult.applied());
+                }, CommandUiActionGateway.InputPolicy.OPTIONAL_TEXT,
+                4, false);
+        assertEquals(CommandUiActionStatus.APPLIED,
+                session.invoke(new CommandUiActionRequest(
+                                optionalBlank, "   "))
+                        .toCompletableFuture().join().status());
+        assertEquals("", acceptedInput.get());
+
+        var tooLong = session.issueRequest(
+                CommandUiActionGateway.Route.GENERIC,
+                new CommandUiAction("SET_FILTER_TEXT"), ignored -> true,
+                (ignored, input) -> {
+                    executions.incrementAndGet();
+                    return CompletableFuture.completedFuture(
+                            CommandUiActionResult.applied());
+                }, CommandUiActionGateway.InputPolicy.REQUIRED_TEXT,
+                4, false);
+        assertEquals(CommandUiActionStatus.DENIED,
+                session.invoke(new CommandUiActionRequest(tooLong, "abcde"))
+                        .toCompletableFuture().join().status());
+        assertEquals(0, executions.get());
+        session.close();
+    }
+
+    @Test
+    void managedHandlesUseAnIndependentGenerationAndCloseWithTheSession() {
+        UUID sessionId = UUID.randomUUID();
+        CommandUiActionGateway gateway = new CommandUiActionGateway();
+        CommandUiSessionImpl session = session(sessionId,
+                CommandUiSessionImpl.Mode.GENERIC, gateway, 1L);
+        session.beginManagedFlow();
+        var survivesMainRefresh = session.issueManaged(
+                CommandUiActionGateway.Route.GENERIC,
+                new CommandUiAction("CREATE_GROUP"), ignored -> true,
+                (ignored, input) -> CompletableFuture.completedFuture(
+                        CommandUiActionResult.accepted()),
+                CommandUiActionGateway.InputPolicy.REQUIRED_TEXT, 24, false);
+        var expiresWithFlow = session.issueManaged(
+                CommandUiActionGateway.Route.GENERIC,
+                new CommandUiAction("RENAME_GROUP"), ignored -> true,
+                (ignored, input) -> CompletableFuture.completedFuture(
+                        CommandUiActionResult.accepted()),
+                CommandUiActionGateway.InputPolicy.REQUIRED_TEXT, 24, false);
+
+        session.publishInternal(snapshot(sessionId, 2L, 2L),
+                CommandUiChangeSet.empty());
+
+        assertEquals(CommandUiActionStatus.ACCEPTED,
+                session.invoke(new CommandUiActionRequest(
+                                survivesMainRefresh, "Barn"))
+                        .toCompletableFuture().join().status());
+        session.beginManagedFlow();
+        assertEquals(CommandUiActionStatus.STALE,
+                session.invoke(new CommandUiActionRequest(
+                                expiresWithFlow, "Stable"))
+                        .toCompletableFuture().join().status());
+
+        var expiresWithSession = session.issueManaged(
+                CommandUiActionGateway.Route.GENERIC,
+                new CommandUiAction("CREATE_GROUP"), ignored -> true,
+                (ignored, input) -> CompletableFuture.completedFuture(
+                        CommandUiActionResult.accepted()),
+                CommandUiActionGateway.InputPolicy.REQUIRED_TEXT, 24, false);
+        session.close();
+        assertEquals(0, gateway.activeHandleCount());
+        assertEquals(CommandUiActionStatus.STALE,
+                session.invoke(new CommandUiActionRequest(
+                                expiresWithSession, "Pasture"))
+                        .toCompletableFuture().join().status());
+    }
+
+    @Test
+    void presentedManagedFlowDoesNotRequestMainSnapshotRefresh() {
+        UUID sessionId = UUID.randomUUID();
+        AtomicInteger refreshes = new AtomicInteger();
+        CommandUiSessionImpl session = new CommandUiSessionImpl(
+                sessionId, snapshot(sessionId, 1L, 1L),
+                new CommandUiActionGateway(), CommandUiWorldDispatcher.direct(),
+                CommandUiSessionImpl.Mode.GENERIC,
+                refreshes::incrementAndGet, ignored -> { }, null);
+        var handle = session.issueGeneric(
+                new CommandUiAction("MANAGE_GROUPS"), () -> true,
+                () -> CompletableFuture.completedFuture(
+                        new CommandUiActionResult(
+                                CommandUiActionStatus.ACCEPTED,
+                                null, null, null, null, null, false)),
+                false);
+
+        assertEquals(CommandUiActionStatus.ACCEPTED,
+                session.invoke(handle).toCompletableFuture().join().status());
+        assertEquals(0, refreshes.get());
+        assertFalse(session.consumeActionRebindRequired());
+        session.close();
+    }
+
     @Test
     void genericAndBondedHandlesUseSeparateSessionRoutesAndRecheckAuthority() {
         UUID genericId = UUID.randomUUID();
