@@ -4,6 +4,9 @@
 
 ### Added
 
+- Added `TameworkCullNpc`, a reusable item interaction that lets a player cull
+  an eligible owned and tamed NPC without opening a command panel. Consumer
+  mods control the item, hold time, and other item behavior.
 - Added optional per-tool `Highlight Active` indicators for generic linked
   panels on Update 6. The controller sees group-colored indicators above loaded
   active companions. Ungrouped companions use neutral gold. The setting is

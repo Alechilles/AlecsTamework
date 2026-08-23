@@ -15,6 +15,7 @@ import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -199,6 +200,89 @@ class CommandGenericTargetAuthorityTest {
 
             assertFalse(allowsGenericTargetMutation(bonded, scope.store));
             assertTrue(allowsGenericTargetMutation(ordinary, scope.store));
+        }
+    }
+
+    @Test
+    void reusableCullEligibilityAllowsOwnedTamedGenericNpc()
+            throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            LiveTarget target = scope.liveOrdinaryTarget(true);
+            TameworkCullEligibility eligibility =
+                    new TameworkCullEligibility(new CommandLinkPolicyService());
+
+            assertTrue(eligibility.allows(target.player.getUuid(), true, true,
+                    target.reference, scope.store));
+        }
+    }
+
+    @Test
+    void reusableCullEligibilityRejectsWrongOwnerAndUntamedNpc()
+            throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            LiveTarget target = scope.liveOrdinaryTarget(true);
+            TameworkCullEligibility eligibility =
+                    new TameworkCullEligibility(new CommandLinkPolicyService());
+            TameworkOwnerComponent ownership = scope.store.getComponent(
+                    target.reference, scope.ownerType);
+            ownership.setOwnerId(UUID.fromString(
+                    "73000000-0000-0000-0000-000000000004"));
+            scope.store.put(target.reference, scope.ownerType, ownership);
+
+            assertFalse(eligibility.allows(target.player.getUuid(), true, true,
+                    target.reference, scope.store));
+            assertTrue(scope.store.getComponent(target.reference,
+                    scope.linksType).containsToolId("generic-tool"));
+
+            ownership.setOwnerId(target.owner);
+            scope.store.put(target.reference, scope.ownerType, ownership);
+            scope.store.put(target.reference, scope.tamedType,
+                    new TameworkTamedComponent(false));
+
+            assertFalse(eligibility.allows(target.player.getUuid(), true, true,
+                    target.reference, scope.store));
+            assertTrue(scope.store.getComponent(target.reference,
+                    scope.linksType).containsToolId("generic-tool"));
+        }
+    }
+
+    @Test
+    void reusableCullServiceRejectsBondedTargetBeforeLinkCleanup()
+            throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            LiveTarget target = scope.liveBondedTarget();
+            TameworkNpcCullService service = new TameworkNpcCullService(
+                    new TameworkCullEligibility(new CommandLinkPolicyService()),
+                    new CommandItemRegistry(),
+                    new CommandLinkMutationService(null,
+                            new CommandLinkPolicyService(), null, null));
+
+            assertEquals(TameworkNpcCullService.Outcome.DENIED,
+                    service.cull(target.player, target.reference, scope.store,
+                            true, true));
+            assertTrue(scope.store.getComponent(target.reference,
+                    scope.linksType).containsToolId("generic-tool"));
+        }
+    }
+
+    @Test
+    void reusableCullServiceRejectsMissingAndNonNpcTargets()
+            throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            LiveTarget target = scope.liveOrdinaryTarget(true);
+            TameworkNpcCullService service = new TameworkNpcCullService(
+                    new TameworkCullEligibility(new CommandLinkPolicyService()),
+                    new CommandItemRegistry(),
+                    new CommandLinkMutationService(null,
+                            new CommandLinkPolicyService(), null, null));
+
+            assertEquals(TameworkNpcCullService.Outcome.UNAVAILABLE,
+                    service.cull(target.player, null, scope.store, true, true));
+            assertEquals(TameworkNpcCullService.Outcome.UNAVAILABLE,
+                    service.cull(target.player, scope.store.createReference(),
+                            scope.store, true, true));
+            assertTrue(scope.store.getComponent(target.reference,
+                    scope.linksType).containsToolId("generic-tool"));
         }
     }
 
@@ -832,6 +916,8 @@ class CommandGenericTargetAuthorityTest {
                 new ComponentType<>();
         private final ComponentType<EntityStore, TameworkOwnerComponent>
                 ownerType = new ComponentType<>();
+        private final ComponentType<EntityStore, TameworkTamedComponent>
+                tamedType = new ComponentType<>();
         private final ComponentType<EntityStore, TameworkCommandLinksComponent>
                 linksType = new ComponentType<>();
         private final ComponentType<EntityStore, TameworkHookComponent>
@@ -871,6 +957,8 @@ class CommandGenericTargetAuthorityTest {
                     "projectionIdentityComponentType", scope.markerType);
             setField(tamework, Tamework.class,
                     "ownerComponentType", scope.ownerType);
+            setField(tamework, Tamework.class,
+                    "tamedComponentType", scope.tamedType);
             setField(tamework, Tamework.class,
                     "commandLinksComponentType", scope.linksType);
             setField(tamework, Tamework.class,
@@ -919,6 +1007,7 @@ class CommandGenericTargetAuthorityTest {
             TameworkOwnerComponent ownership = new TameworkOwnerComponent();
             ownership.setOwnerId(owner);
             store.put(reference, ownerType, ownership);
+            store.put(reference, tamedType, new TameworkTamedComponent(true));
             TameworkCommandLinksComponent links =
                     new TameworkCommandLinksComponent();
             links.setOwnerId(owner);

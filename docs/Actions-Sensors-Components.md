@@ -235,6 +235,7 @@ specific to each NPC.
 ## Item Interactions
 - `TameworkSpawn`
 - `TameworkNameNpc`
+- `TameworkCullNpc`
 - `TameworkCommand`
 
 ## `/tw` Commands
