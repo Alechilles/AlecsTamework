@@ -15,6 +15,7 @@ Parent: [Core Architecture](/mod/alecs-tamework/core-architecture) | [Developer 
 During setup, Tamework registers:
 - `TameworkSpawn`
 - `TameworkNameNpc`
+- `TameworkCullNpc`
 - `TameworkCommand`
 - `TameworkClearFeedTroughWater`
 

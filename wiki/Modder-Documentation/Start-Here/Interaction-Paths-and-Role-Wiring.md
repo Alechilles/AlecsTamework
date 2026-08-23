@@ -26,6 +26,20 @@ Use a vanilla instruction flow when:
 
 Tamework does not force one path everywhere. Use the optimized path for the common cases and bridge into custom logic only where the config model stops being efficient.
 
+### Direct culling item path
+Use `TameworkCullNpc` when an item should cull one NPC target without opening a
+command panel. It requires an owned and tamed target by default, clears generic
+command links, then uses normal death processing and drops. It never culls a
+bonded companion projection.
+
+```json
+{ "Type": "TameworkCullNpc" }
+```
+
+The item owns its range, cooldown, durability, prompt, and hold behavior. Put
+the cull interaction on the successful completion branch of a native
+`Charging` interaction when the item needs a hold confirmation.
+
 ## Recommended Wiring Flow
 1. Create or choose the NPC role and template.
 2. Add the interaction action node:

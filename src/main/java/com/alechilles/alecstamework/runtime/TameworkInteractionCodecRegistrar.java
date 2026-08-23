@@ -21,6 +21,8 @@ public final class TameworkInteractionCodecRegistrar {
                 TameworkCaptureChannelInteraction.CODEC);
         Interaction.CODEC.register("TameworkNameNpc", TameworkNameNpcInteraction.class,
                 TameworkNameNpcInteraction.CODEC);
+        Interaction.CODEC.register(TameworkCullNpcInteraction.TYPE_ID,
+                TameworkCullNpcInteraction.class, TameworkCullNpcInteraction.CODEC);
         Interaction.CODEC.register("TameworkCommand", TameworkCommandInteraction.class,
                 TameworkCommandInteraction.CODEC);
         Interaction.CODEC.register("TameworkCommandHotswap", TameworkCommandHotswapInteraction.class,

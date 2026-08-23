@@ -259,6 +259,33 @@ For replacement and empty-hand removal, use the exchange requirement and effect 
 }
 ```
 
+### `TameworkCullNpc`
+
+`TameworkCullNpc` is a terminal item interaction that kills one targeted NPC
+through Tamework's normal cull path. It applies fatal command damage, so the
+NPC's usual death effects and drops still occur.
+
+The interaction has no matching `Tw*Config` asset. Put it on a consumer mod's
+item and use that item's native interaction chain for range, cooldown,
+durability, animation, and optional hold confirmation.
+
+```json
+{
+  "Type": "TameworkCullNpc",
+  "RequireOwner": true,
+  "RequireTamed": true
+}
+```
+
+Both fields default to `true`. The interaction rejects missing or non-NPC
+targets, targets that do not meet the selected owner/tame policy, and bonded
+companion projections. It clears ordinary command links before the death path
+and removes the NPC from eligible generic command tools in the hotbar.
+
+For a butcher-style item, put this interaction on the successful completion
+branch of the item's native `Charging` interaction. Tamework supplies no
+standalone culling item or confirmation UI.
+
 ### `TameworkCaptureChannel`
 
 Runs one phase of a server-authoritative spawner capture channel. Use it as the first step of a native `Charging` interaction, with `Begin`, `Cancel`, and `Complete` phases.
