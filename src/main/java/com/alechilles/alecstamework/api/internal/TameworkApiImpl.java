@@ -342,7 +342,11 @@ public final class TameworkApiImpl
     @Override
     public EnumSet<TameworkApiCapability> getCapabilities() {
         synchronized (capabilities) {
-            return capabilities.clone();
+            EnumSet<TameworkApiCapability> current = capabilities.clone();
+            if (!commandUiProviderRegistry.available()) {
+                current.remove(TameworkApiCapability.COMMAND_UI_PROVIDERS);
+            }
+            return current;
         }
     }
 
@@ -366,6 +370,9 @@ public final class TameworkApiImpl
     public void close() {
         try {
             commandUiProviderRegistry.close();
+            synchronized (capabilities) {
+                capabilities.remove(TameworkApiCapability.COMMAND_UI_PROVIDERS);
+            }
         } finally {
             damagePolicy.close();
         }
