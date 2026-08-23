@@ -44,7 +44,7 @@ public final class TameworkShowHitboxesCommand extends AbstractPlayerCommand {
     private static final Map<UUID, TrackingSession> ACTIVE_TRACKING = new ConcurrentHashMap<>();
 
     public TameworkShowHitboxesCommand() {
-        super("showhitboxes", "Toggle live hitbox/detail-box tracking for the NPC in view.");
+        super("hitboxes", "Toggle live hitbox/detail-box tracking for the NPC in view.");
     }
 
     @Override

@@ -1,12 +1,15 @@
 package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.npc.actions.BreedingCooldownResetService;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingConfigResolver;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
+import com.alechilles.alecstamework.npc.progression.HappinessConfigResolver;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -26,6 +29,7 @@ import static com.hypixel.hytale.server.core.command.system.arguments.types.ArgT
  * Sets breeding readiness for NPCs selected with the standard NPC debug selectors.
  */
 public final class TameworkSetBreedingReadyCommand extends NPCMultiSelectCommandBase {
+    private static final double READY_HAPPINESS = 100.0;
     private final OptionalArg<String> modeArg = withOptionalArg(
             "mode", "Readiness mode: true, false, or toggle.", STRING
     ).suggest((sender, entered, parameters, suggestions) -> {
@@ -36,7 +40,7 @@ public final class TameworkSetBreedingReadyCommand extends NPCMultiSelectCommand
     private final BreedingCooldownResetService cooldownResetService = new BreedingCooldownResetService();
 
     public TameworkSetBreedingReadyCommand() {
-        super("ready", "Set breeding readiness for selected NPCs.");
+        super("breedingready", "Set breeding readiness for selected NPCs.");
     }
 
     @Override
@@ -55,8 +59,36 @@ public final class TameworkSetBreedingReadyCommand extends NPCMultiSelectCommand
             context.sendMessage(Message.raw("Breeding component is not available."));
             return;
         }
+        applyReadyHappiness(npcRef, store);
         MutationResult result = applyMutation(npcRef, npc, store, breedingType, mode);
         sendResult(context, npc, result);
+    }
+
+    private static void applyReadyHappiness(@Nonnull Ref<EntityStore> npcRef,
+                                            @Nonnull Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkHappinessComponent> happinessType =
+                TameworkHappinessComponent.getComponentType();
+        if (happinessType == null) {
+            return;
+        }
+        TameworkHappinessComponent happiness = store.getComponent(npcRef, happinessType);
+        TwHappinessConfig config = HappinessConfigResolver.resolveConfig(npcRef, store, happiness);
+        if (!HappinessConfigResolver.isRuntimeEnabled(config)) {
+            return;
+        }
+        double min = config.getValues().getMin();
+        double max = config.getValues().getMax();
+        double value = Math.max(Math.min(READY_HAPPINESS, Math.max(min, max)), Math.min(min, max));
+        long now = System.currentTimeMillis();
+        TameworkHappinessComponent next = happiness == null
+                ? new TameworkHappinessComponent(config.getId(), value, now)
+                : happiness;
+        next.setValue(value);
+        next.setLastUpdateMs(now);
+        if (next.getConfigId() == null || next.getConfigId().isBlank()) {
+            next.setConfigId(config.getId());
+        }
+        store.putComponent(npcRef, happinessType, next);
     }
 
     @Nonnull
@@ -80,10 +112,20 @@ public final class TameworkSetBreedingReadyCommand extends NPCMultiSelectCommand
         } else {
             breeding.setReady(false);
         }
+        breeding.setHappiness(resolveReadyHappiness(npcRef, store));
         breeding.setLastHappinessUpdateMs(System.currentTimeMillis());
         populateConfigId(npcRef, store, breeding);
         store.putComponent(npcRef, breedingType, breeding);
         return MutationResult.applied(readyBefore, breeding.isReady() && !breeding.isCooldownActive(now), breeding);
+    }
+
+    private static double resolveReadyHappiness(@Nonnull Ref<EntityStore> npcRef,
+                                                @Nonnull Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkHappinessComponent> happinessType =
+                TameworkHappinessComponent.getComponentType();
+        TameworkHappinessComponent happiness = happinessType == null
+                ? null : store.getComponent(npcRef, happinessType);
+        return happiness == null ? READY_HAPPINESS : happiness.getValue();
     }
 
     private static void populateConfigId(@Nonnull Ref<EntityStore> npcRef,

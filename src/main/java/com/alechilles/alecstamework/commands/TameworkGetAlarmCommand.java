@@ -24,7 +24,7 @@ public final class TameworkGetAlarmCommand extends AbstractWorldCommand {
     private static final String DEFAULT_ALARM_NAME = "Harvest_Ready";
 
     public TameworkGetAlarmCommand() {
-        super("getalarm", "Get alarm status of the NPC you are looking at.");
+        super("alarm", "Get alarm status of the NPC you are looking at.");
         setAllowsExtraArguments(true);
     }
 

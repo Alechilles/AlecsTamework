@@ -18,7 +18,7 @@ import javax.annotation.Nonnull;
  */
 public final class TameworkDebugPlayerInputCommand extends AbstractPlayerCommand {
     public TameworkDebugPlayerInputCommand() {
-        super("debugplayerinput", "Toggle player input diagnostics for mount-avatar experiments.");
+        super("input", "Toggle player input diagnostics for mount-avatar experiments.");
         setAllowsExtraArguments(true);
     }
 

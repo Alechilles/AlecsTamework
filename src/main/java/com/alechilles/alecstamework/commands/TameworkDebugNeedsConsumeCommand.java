@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
 public final class TameworkDebugNeedsConsumeCommand extends AbstractTameworkServerCommand {
 
     public TameworkDebugNeedsConsumeCommand() {
-        super("debugneedsconsume", "Toggle Tamework needs consume diagnostics logging.");
+        super("consume", "Toggle Tamework needs consume diagnostics logging.");
         setAllowsExtraArguments(true);
     }
 
@@ -33,15 +33,7 @@ public final class TameworkDebugNeedsConsumeCommand extends AbstractTameworkServ
     }
 
     private static String getFirstArg(CommandContext commandContext) {
-        String input = commandContext.getInputString();
-        if (input == null) {
-            return null;
-        }
-        String[] tokens = input.trim().split("\\s+");
-        if (tokens.length < 3) {
-            return null;
-        }
-        return tokens[2];
+        return TameworkCommandInput.firstArgument(commandContext.getInputString(), "consume");
     }
 
     private static Boolean parseBoolean(String raw) {

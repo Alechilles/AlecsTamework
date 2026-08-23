@@ -18,7 +18,7 @@ import javax.annotation.Nullable;
  */
 public final class TameworkSetLevelCommand extends AbstractPlayerCommand {
     public TameworkSetLevelCommand() {
-        super("setlevel", "Set level of the NPC you are looking at.");
+        super("level", "Set level of the NPC you are looking at.");
         setAllowsExtraArguments(true);
     }
 

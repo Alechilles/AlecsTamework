@@ -43,7 +43,7 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
     private static final String DIRECT_FOLLOW_ALARM = "Tamework_Baby_DirectFollow_Window";
 
     public TameworkGetFlockDebugCommand() {
-        super("getflockdebug", "Get flock direct-follow debug state for the NPC you are looking at.");
+        super("flock", "Get flock direct-follow debug state for the NPC you are looking at.");
     }
 
     @Override

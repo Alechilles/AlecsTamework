@@ -26,7 +26,7 @@ import javax.annotation.Nullable;
  */
 public final class TameworkSetTraitsCommand extends AbstractPlayerCommand {
     public TameworkSetTraitsCommand() {
-        super("settraits", "Replace traits on the NPC you are looking at.");
+        super("traits", "Replace traits on the NPC you are looking at.");
         setAllowsExtraArguments(true);
     }
 

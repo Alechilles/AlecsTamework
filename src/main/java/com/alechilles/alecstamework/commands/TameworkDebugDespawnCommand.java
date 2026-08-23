@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
 public final class TameworkDebugDespawnCommand extends AbstractTameworkServerCommand {
 
     public TameworkDebugDespawnCommand() {
-        super("debugdespawn", "Toggle Tamework companion despawn diagnostics logging (optional role filter).");
+        super("despawn", "Toggle Tamework companion despawn diagnostics logging (optional role filter).");
         setAllowsExtraArguments(true);
     }
 

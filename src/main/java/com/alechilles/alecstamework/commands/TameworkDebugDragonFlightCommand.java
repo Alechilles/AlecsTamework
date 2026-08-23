@@ -26,7 +26,7 @@ public final class TameworkDebugDragonFlightCommand extends AbstractPlayerComman
             new AvatarFlightMountLifecycleService();
 
     public TameworkDebugDragonFlightCommand() {
-        super("debugdragonflight", "Toggle transformed-player dragon flight testing.");
+        super("dragon-flight", "Toggle transformed-player dragon flight testing.");
         setAllowsExtraArguments(true);
     }
 

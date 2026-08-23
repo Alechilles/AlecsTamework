@@ -25,7 +25,7 @@ public final class TameworkFindNpcCommand extends AbstractWorldCommand {
     private static final String DEFAULT_MARKER_PARTICLE = "Hearts";
 
     public TameworkFindNpcCommand() {
-        super("findnpc", "Find an NPC by UUID and print its current world state.");
+        super("find", "Find an NPC by UUID and print its current world state.");
         setAllowsExtraArguments(true);
     }
 

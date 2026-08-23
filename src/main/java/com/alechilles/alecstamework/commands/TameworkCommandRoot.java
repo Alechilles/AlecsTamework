@@ -55,58 +55,17 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
         super("tw", "Tamework commands.");
         requirePermission(ROOT_PERMISSION);
         setPermissionGroups(TameworkConfigPermission.adminPermissionGroups());
-        addSubCommand(new TameworkDebugCommand());
-        addSubCommand(new TameworkSetOwnerCommand());
-        addSubCommand(new TameworkGetOwnerCommand());
-        addSubCommand(new TameworkGetHappinessCommand());
-        addSubCommand(new TameworkGetLifeStageCommand());
-        addSubCommand(new TameworkSetHappinessCommand());
-        addSubCommand(new TameworkSetLevelCommand());
-        addSubCommand(new TameworkGetTraitsCommand());
-        addSubCommand(new TameworkSetTraitsCommand());
-        addSubCommand(new TameworkAddTraitCommand());
-        addSubCommand(new TameworkGetTamedCommand());
-        addSubCommand(new TameworkSetTamedCommand());
-        addSubCommand(new TameworkFindNpcCommand());
-        addSubCommand(new TameworkNpcSpawnTamedCommand());
-        addSubCommand(new TameworkNpcCleanCommand());
-        addSubCommand(new TameworkGetAlarmCommand());
-        addSubCommand(new TameworkGetFlockDebugCommand());
-        addSubCommand(new TameworkApiCommandCollection());
-        addSubCommand(new TameworkConfigCommand());
-        addSubCommand(new TameworkSettingsCommand());
-        addSubCommand(new TameworkNewsCommand());
-        addSubCommand(new TameworkReloadConfigCommand());
-        addSubCommand(new TameworkActivationStatusCommand());
-        addSubCommand(new TameworkDebugHookCommand());
-        addSubCommand(new TameworkDebugSpawnerCommand());
-        addSubCommand(new TameworkDebugSpawnerLocationCommand());
-        addSubCommand(new TameworkDebugPromptCommand());
-        addSubCommand(new TameworkDebugRideCommand());
-        addSubCommand(new TameworkDebugPlayerModelCommand());
-        addSubCommand(new TameworkDebugPlayerInputCommand());
-        addSubCommand(new TameworkDebugDragonFlightCommand());
-        addSubCommand(new TameworkDebugDespawnCommand());
-        addSubCommand(new TameworkDebugLagCommand());
-        addSubCommand(new TameworkDebugTargetHudCommand());
-        addSubCommand(new TameworkDebugCoopCommand());
-        addSubCommand(new TameworkDebugNeedsConsumeCommand());
-        addSubCommand(new TameworkDebugNeedsDamageCommand());
-        addSubCommand(new TameworkDebugNeedsSeekCommand());
-        addSubCommand(new TameworkDebugNeedsTelemetryCommand());
-        addSubCommand(new TameworkDebugHarvestCommand());
-        addSubCommand(new TameworkDebugRespawnTraceCommand());
-        addSubCommand(new TameworkDebugFlyingCompanionCommand());
-        addSubCommand(new TameworkDebugXpEventsCommand());
-        addSubCommand(new TameworkShowHitboxesCommand());
-        addSubCommand(new TameworkShowSpawnBeaconsCommand(spawnBeaconVisualizationService));
-        addSubCommand(new TameworkShowSpawnMarkersCommand());
-        addSubCommand(new TameworkDeleteSpawnMarkerCommand());
-        addSubCommand(new TameworkDebugDbCommand(
+        addSubCommand(new TameworkDebugCommand(
                 persistenceDiagnostics,
                 persistenceExporter,
-                bondedDiagnostics
+                bondedDiagnostics,
+                spawnBeaconVisualizationService
         ));
-        addSubCommand(new TameworkDebugCrashTelemetryCommand());
+        addSubCommand(new TameworkNpcCommand());
+        addSubCommand(new TameworkApiCommandCollection());
+        addSubCommand(new TameworkConfigCommandGroup());
+        addSubCommand(new TameworkSettingsCommand());
+        addSubCommand(new TameworkNewsCommand());
+        addSubCommand(new TameworkRuntimeCommand());
     }
 }

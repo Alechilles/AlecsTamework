@@ -43,7 +43,7 @@ public final class TameworkNpcSpawnTamedCommand extends AbstractPlayerCommand {
     );
 
     public TameworkNpcSpawnTamedCommand() {
-        super("spawntamed", "Spawn owned and tamed NPCs from a role id.");
+        super("tamed", "Spawn owned and tamed NPCs from a role id.");
     }
 
     @Override

@@ -23,7 +23,7 @@ import javax.annotation.Nullable;
  */
 public final class TameworkNpcCleanCommand extends AbstractWorldCommand {
     public TameworkNpcCleanCommand() {
-        super("npcclean", "Remove all unowned NPCs matching a specific role id.");
+        super("clean", "Remove all unowned NPCs matching a specific role id.");
         setAllowsExtraArguments(true);
     }
 
