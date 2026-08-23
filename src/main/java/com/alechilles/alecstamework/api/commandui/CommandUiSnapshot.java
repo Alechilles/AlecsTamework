@@ -1,0 +1,411 @@
+package com.alechilles.alecstamework.api.commandui;
+
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+/**
+ * Full immutable, detached presentation state for one command UI session.
+ *
+ * <p>Presentation revision and action generation are intentionally separate.
+ * A countdown or indicator refresh can therefore publish a new snapshot
+ * without invalidating action handles that remain authoritative.</p>
+ */
+public final class CommandUiSnapshot {
+    private final UUID sessionId;
+    private final long presentationRevision;
+    private final long actionGeneration;
+    @Nullable
+    private final CommandUiProviderId providerId;
+    @Nullable
+    private final String toolId;
+    @Nullable
+    private final String itemId;
+    @Nullable
+    private final String configId;
+    @Nullable
+    private final String rosterMode;
+    private final Set<String> enabledCapabilities;
+    @Nullable
+    private final String selectedCommand;
+    private final List<CommandUiCommandOption> commandOptions;
+    private final List<CommandUiCompanionRow> companionRows;
+    private final CommandUiPanelState panelState;
+    private final Map<String, CommandUiActionView> globalActions;
+    private final Map<String, CommandUiActionView> commandActions;
+    private final long serverTimeMillis;
+    private final Map<String, Long> deadlines;
+    @Nullable
+    private final String emptyStateKey;
+    @Nullable
+    private final String disabledReason;
+
+    /** Small snapshot constructor for pure presentation tests and adapters. */
+    public CommandUiSnapshot(
+            @Nonnull UUID sessionId,
+            long presentationRevision,
+            long actionGeneration,
+            @Nullable String selectedCommand,
+            @Nonnull List<CommandUiCommandOption> commandOptions,
+            @Nonnull List<CommandUiCompanionRow> companionRows,
+            @Nonnull CommandUiPanelState panelState
+    ) {
+        this(sessionId, presentationRevision, actionGeneration, (String) null, null, null,
+                null, null, Set.of(), selectedCommand, commandOptions,
+                companionRows, panelState, Map.of(), Map.of(), 0L, Map.of(),
+                null, null);
+    }
+
+    /** Full snapshot constructor used by Tamework assemblers. */
+    public CommandUiSnapshot(
+            @Nonnull UUID sessionId,
+            long presentationRevision,
+            long actionGeneration,
+            @Nullable String providerId,
+            @Nullable String toolId,
+            @Nullable String itemId,
+            @Nullable String configId,
+            @Nullable String rosterMode,
+            @Nullable Set<String> enabledCapabilities,
+            @Nullable String selectedCommand,
+            @Nullable List<CommandUiCommandOption> commandOptions,
+            @Nullable List<CommandUiCompanionRow> companionRows,
+            @Nullable CommandUiPanelState panelState,
+            @Nullable Map<String, CommandUiActionView> globalActions,
+            @Nullable Map<String, CommandUiActionView> commandActions,
+            long serverTimeMillis,
+            @Nullable Map<String, Long> deadlines,
+            @Nullable String emptyStateKey,
+            @Nullable String disabledReason
+    ) {
+        this(sessionId, presentationRevision, actionGeneration,
+                parseProviderId(providerId), toolId, itemId, configId, rosterMode,
+                enabledCapabilities, selectedCommand, commandOptions,
+                companionRows, panelState, globalActions, commandActions,
+                serverTimeMillis, deadlines, emptyStateKey, disabledReason);
+    }
+
+    /** Full constructor accepting the normalized public provider ID type. */
+    public CommandUiSnapshot(
+            @Nonnull UUID sessionId,
+            long presentationRevision,
+            long actionGeneration,
+            @Nullable CommandUiProviderId providerId,
+            @Nullable String toolId,
+            @Nullable String itemId,
+            @Nullable String configId,
+            @Nullable String rosterMode,
+            @Nullable Set<String> enabledCapabilities,
+            @Nullable String selectedCommand,
+            @Nullable List<CommandUiCommandOption> commandOptions,
+            @Nullable List<CommandUiCompanionRow> companionRows,
+            @Nullable CommandUiPanelState panelState,
+            @Nullable Map<String, CommandUiActionView> globalActions,
+            @Nullable Map<String, CommandUiActionView> commandActions,
+            long serverTimeMillis,
+            @Nullable Map<String, Long> deadlines,
+            @Nullable String emptyStateKey,
+            @Nullable String disabledReason
+    ) {
+        this.sessionId = Objects.requireNonNull(sessionId, "sessionId");
+        if (presentationRevision < 0L) {
+            throw new IllegalArgumentException("Presentation revision cannot be negative.");
+        }
+        if (actionGeneration < 0L) {
+            throw new IllegalArgumentException("Action generation cannot be negative.");
+        }
+        this.presentationRevision = presentationRevision;
+        this.actionGeneration = actionGeneration;
+        this.providerId = providerId;
+        this.toolId = normalize(toolId);
+        this.itemId = normalize(itemId);
+        this.configId = normalize(configId);
+        this.rosterMode = normalize(rosterMode);
+        this.enabledCapabilities = copyStrings(enabledCapabilities);
+        this.selectedCommand = normalize(selectedCommand);
+        this.commandOptions = List.copyOf(commandOptions == null
+                ? List.of() : commandOptions);
+        this.companionRows = List.copyOf(companionRows == null
+                ? List.of() : companionRows);
+        this.panelState = panelState == null
+                ? new CommandUiPanelState(null) : panelState;
+        this.globalActions = copyActions(globalActions);
+        this.commandActions = copyActions(commandActions);
+        this.serverTimeMillis = serverTimeMillis;
+        this.deadlines = copyDeadlines(deadlines);
+        this.emptyStateKey = normalize(emptyStateKey);
+        this.disabledReason = normalize(disabledReason);
+    }
+
+    /** Convenience constructor for a snapshot with no action-generation change. */
+    public CommandUiSnapshot(
+            @Nonnull UUID sessionId,
+            long presentationRevision,
+            @Nullable String selectedCommand,
+            @Nullable List<CommandUiCommandOption> commandOptions,
+            @Nullable List<CommandUiCompanionRow> companionRows,
+            @Nullable CommandUiPanelState panelState
+    ) {
+        this(sessionId, presentationRevision, 0L, selectedCommand,
+                commandOptions == null ? List.of() : commandOptions,
+                companionRows == null ? List.of() : companionRows,
+                panelState == null ? new CommandUiPanelState(null) : panelState);
+    }
+
+    @Nonnull
+    public UUID sessionId() {
+        return sessionId;
+    }
+
+    @Nonnull
+    public UUID id() {
+        return sessionId;
+    }
+
+    public long presentationRevision() {
+        return presentationRevision;
+    }
+
+    /** Short alias used by page hosts. */
+    public long revision() {
+        return presentationRevision;
+    }
+
+    public long actionGeneration() {
+        return actionGeneration;
+    }
+
+    @Nullable
+    public CommandUiProviderId providerId() {
+        return providerId;
+    }
+
+    @Nullable
+    public String providerIdValue() {
+        return providerId == null ? null : providerId.value();
+    }
+
+    @Nullable
+    public String toolId() {
+        return toolId;
+    }
+
+    @Nullable
+    public String itemId() {
+        return itemId;
+    }
+
+    @Nullable
+    public String configId() {
+        return configId;
+    }
+
+    @Nullable
+    public String rosterMode() {
+        return rosterMode;
+    }
+
+    @Nonnull
+    public Set<String> enabledCapabilities() {
+        return enabledCapabilities;
+    }
+
+    /** Alias for capability-aware providers. */
+    @Nonnull
+    public Set<String> capabilities() {
+        return enabledCapabilities;
+    }
+
+    @Nullable
+    public String selectedCommand() {
+        return selectedCommand;
+    }
+
+    @Nullable
+    public String currentCommand() {
+        return selectedCommand;
+    }
+
+    @Nonnull
+    public List<CommandUiCommandOption> commandOptions() {
+        return commandOptions;
+    }
+
+    @Nonnull
+    public List<CommandUiCompanionRow> companionRows() {
+        return companionRows;
+    }
+
+    /** Alias for card-oriented providers. */
+    @Nonnull
+    public List<CommandUiCompanionRow> rows() {
+        return companionRows;
+    }
+
+    @Nonnull
+    public CommandUiPanelState panelState() {
+        return panelState;
+    }
+
+    @Nonnull
+    public CommandUiPanelState panel() {
+        return panelState;
+    }
+
+    @Nonnull
+    public CommandUiPanelState panelPresentation() {
+        return panelState;
+    }
+
+    @Nonnull
+    public Map<String, CommandUiActionView> globalActions() {
+        return globalActions;
+    }
+
+    @Nonnull
+    public Map<String, CommandUiActionView> commandActions() {
+        return commandActions;
+    }
+
+    @Nonnull
+    public Map<String, CommandUiActionView> actions() {
+        LinkedHashMap<String, CommandUiActionView> merged = new LinkedHashMap<>();
+        merged.putAll(globalActions);
+        merged.putAll(commandActions);
+        merged.putAll(panelState.actions());
+        companionRows.forEach(row -> row.actions().forEach(
+                (key, value) -> merged.put(row.rowId() + ":" + key, value)));
+        return Map.copyOf(merged);
+    }
+
+    public long serverTimeMillis() {
+        return serverTimeMillis;
+    }
+
+    public long serverTime() {
+        return serverTimeMillis;
+    }
+
+    @Nonnull
+    public Map<String, Long> deadlines() {
+        return deadlines;
+    }
+
+    @Nullable
+    public String emptyStateKey() {
+        return emptyStateKey;
+    }
+
+    @Nullable
+    public String disabledReason() {
+        return disabledReason;
+    }
+
+    /** Returns the row for a stable presentation ID, or null when absent. */
+    @Nullable
+    public CommandUiCompanionRow companionRow(@Nullable UUID rowId) {
+        if (rowId == null) return null;
+        for (CommandUiCompanionRow row : companionRows) {
+            if (rowId.equals(row.rowId())) return row;
+        }
+        return null;
+    }
+
+    /** Returns a detached copy with a different presentation revision. */
+    @Nonnull
+    public CommandUiSnapshot withPresentationRevision(long revision) {
+        return copyWithRevision(revision, actionGeneration);
+    }
+
+    /** Returns a detached copy with a different authority generation. */
+    @Nonnull
+    public CommandUiSnapshot withActionGeneration(long generation) {
+        return copyWithRevision(presentationRevision, generation);
+    }
+
+    private CommandUiSnapshot copyWithRevision(long revision, long generation) {
+        return new CommandUiSnapshot(sessionId, revision, generation, providerId,
+                toolId, itemId, configId, rosterMode, enabledCapabilities,
+                selectedCommand, commandOptions, companionRows, panelState,
+                globalActions, commandActions, serverTimeMillis, deadlines,
+                emptyStateKey, disabledReason);
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) return true;
+        if (!(other instanceof CommandUiSnapshot that)) return false;
+        return presentationRevision == that.presentationRevision
+                && actionGeneration == that.actionGeneration
+                && serverTimeMillis == that.serverTimeMillis
+                && sessionId.equals(that.sessionId)
+                && Objects.equals(providerId, that.providerId)
+                && Objects.equals(toolId, that.toolId)
+                && Objects.equals(itemId, that.itemId)
+                && Objects.equals(configId, that.configId)
+                && Objects.equals(rosterMode, that.rosterMode)
+                && enabledCapabilities.equals(that.enabledCapabilities)
+                && Objects.equals(selectedCommand, that.selectedCommand)
+                && commandOptions.equals(that.commandOptions)
+                && companionRows.equals(that.companionRows)
+                && panelState.equals(that.panelState)
+                && globalActions.equals(that.globalActions)
+                && commandActions.equals(that.commandActions)
+                && deadlines.equals(that.deadlines)
+                && Objects.equals(emptyStateKey, that.emptyStateKey)
+                && Objects.equals(disabledReason, that.disabledReason);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(sessionId, presentationRevision, actionGeneration,
+                providerId, toolId, itemId, configId, rosterMode,
+                enabledCapabilities, selectedCommand, commandOptions,
+                companionRows, panelState, globalActions, commandActions,
+                serverTimeMillis, deadlines, emptyStateKey, disabledReason);
+    }
+
+    @Nullable
+    private static CommandUiProviderId parseProviderId(@Nullable String value) {
+        return CommandUiProviderId.tryParse(value).orElse(null);
+    }
+
+    @Nonnull
+    private static Set<String> copyStrings(@Nullable Set<String> source) {
+        if (source == null || source.isEmpty()) return Set.of();
+        return source.stream().filter(Objects::nonNull).map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    @Nonnull
+    private static Map<String, CommandUiActionView> copyActions(
+            @Nullable Map<String, CommandUiActionView> source) {
+        if (source == null || source.isEmpty()) return Map.of();
+        LinkedHashMap<String, CommandUiActionView> copy = new LinkedHashMap<>();
+        source.forEach((key, value) -> {
+            if (key != null && value != null) copy.put(key, value);
+        });
+        return Map.copyOf(copy);
+    }
+
+    @Nonnull
+    private static Map<String, Long> copyDeadlines(@Nullable Map<String, Long> source) {
+        if (source == null || source.isEmpty()) return Map.of();
+        LinkedHashMap<String, Long> copy = new LinkedHashMap<>();
+        source.forEach((key, value) -> {
+            if (key != null && value != null) copy.put(key, value);
+        });
+        return Map.copyOf(copy);
+    }
+
+    @Nullable
+    private static String normalize(@Nullable String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+}

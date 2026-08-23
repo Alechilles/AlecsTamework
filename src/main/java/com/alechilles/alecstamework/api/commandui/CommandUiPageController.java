@@ -8,11 +8,9 @@ import javax.annotation.Nonnull;
 /**
  * Public per-session controller returned by a {@link CommandUiProvider}.
  *
- * <p>Task 2 supplies the immutable session, snapshot, update, and event
- * contracts. The object parameters in this first API stage keep the
- * registration facade source-compatible while those records are completed.
- * {@code T} is the provider event payload. The event codec is part of this
- * contract so a host can decode untrusted page events before dispatch.</p>
+ * <p>{@code T} is the provider event payload. The event codec is part of this
+ * contract so a host can decode untrusted page events before dispatch. The
+ * session, snapshot, and update values are immutable Tamework contracts.</p>
  *
  * @param <T> provider-owned event payload type
  */
@@ -30,8 +28,8 @@ public interface CommandUiPageController<T> extends AutoCloseable {
     /** Builds the initial provider page state. */
     default void buildInitial(
             CommandUiOpenContext context,
-            Object session,
-            Object snapshot,
+            CommandUiSession session,
+            CommandUiSnapshot snapshot,
             @Nonnull UICommandBuilder commandBuilder,
             @Nonnull UIEventBuilder eventBuilder
     ) {
@@ -39,21 +37,25 @@ public interface CommandUiPageController<T> extends AutoCloseable {
 
     /** Applies a provider-local or Tamework partial update. */
     default void update(
-            Object update,
+            CommandUiUpdate update,
             @Nonnull UICommandBuilder commandBuilder,
             @Nonnull UIEventBuilder eventBuilder
     ) {
     }
 
     /** Handles an untrusted page event after Tamework has received it. */
-    default void handleEvent(T event, Object session, Object snapshot) {
+    default void handleEvent(
+            T event,
+            CommandUiSession session,
+            CommandUiSnapshot snapshot
+    ) {
     }
 
     /** Handles an event and emits any immediate page update. */
     default void handleEvent(
             T event,
-            Object session,
-            Object snapshot,
+            CommandUiSession session,
+            CommandUiSnapshot snapshot,
             @Nonnull UICommandBuilder commandBuilder,
             @Nonnull UIEventBuilder eventBuilder
     ) {

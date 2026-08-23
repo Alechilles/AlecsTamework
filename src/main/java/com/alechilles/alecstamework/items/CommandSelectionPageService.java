@@ -2,6 +2,9 @@ package com.alechilles.alecstamework.items;
 
 import static com.alechilles.alecstamework.items.CommandSelectionCallbackGuards.*;
 
+import com.alechilles.alecstamework.api.commandui.CommandUiAction;
+import com.alechilles.alecstamework.api.commandui.CommandUiActionHandle;
+import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.compat.HytaleApiLevel;
@@ -24,6 +27,8 @@ import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -661,6 +666,108 @@ final class CommandSelectionPageService {
             return 0;
         }
         return config.getCommandList().length;
+    }
+
+    /**
+     * Binds an existing generic command callback to the session-owned opaque
+     * action gateway. The callback record remains the only generic mutation
+     * route; the provider supplies no target or route authority.
+     */
+    CommandUiActionHandle bindGenericUiAction(
+            CommandUiSessionImpl session,
+            CommandUiAction action,
+            Actions callbacks,
+            BooleanSupplier authority,
+            boolean confirmationRequired
+    ) {
+        if (session == null || action == null || callbacks == null) {
+            throw new IllegalArgumentException("Generic command UI action inputs are required.");
+        }
+        return session.issueGeneric(action, authority,
+                () -> applyGenericUiAction(action, callbacks), confirmationRequired);
+    }
+
+    private CompletionStage<CommandUiActionResult> applyGenericUiAction(
+            CommandUiAction action,
+            Actions callbacks
+    ) {
+        UUID target = action.targetId();
+        try {
+            switch (action.builtInKind()) {
+                case UNLINK -> {
+                    if (target == null || callbacks.unlink() == null) {
+                        return completedUiAction(CommandUiActionResult.notFound("target is unavailable"));
+                    }
+                    callbacks.unlink().accept(target);
+                }
+                case RELEASE -> {
+                    if (target == null || callbacks.release() == null) {
+                        return completedUiAction(CommandUiActionResult.notFound("target is unavailable"));
+                    }
+                    callbacks.release().accept(target);
+                }
+                case CULL -> {
+                    if (target == null || callbacks.cull() == null) {
+                        return completedUiAction(CommandUiActionResult.notFound("target is unavailable"));
+                    }
+                    callbacks.cull().accept(target);
+                }
+                case RESPAWN -> {
+                    if (target == null || callbacks.respawn() == null) {
+                        return completedUiAction(CommandUiActionResult.notFound("target is unavailable"));
+                    }
+                    callbacks.respawn().accept(target);
+                }
+                case LOCATE -> {
+                    if (target == null || callbacks.locate() == null) {
+                        return completedUiAction(CommandUiActionResult.notFound("target is unavailable"));
+                    }
+                    callbacks.locate().accept(target);
+                }
+                case RECALL -> {
+                    if (target == null || callbacks.recall() == null) {
+                        return completedUiAction(CommandUiActionResult.notFound("target is unavailable"));
+                    }
+                    callbacks.recall().accept(target);
+                }
+                case SET_HOME -> {
+                    if (target == null || callbacks.setHome() == null) {
+                        return completedUiAction(CommandUiActionResult.notFound("target is unavailable"));
+                    }
+                    callbacks.setHome().accept(target);
+                }
+                case RETURN_HOME -> {
+                    if (target == null || callbacks.returnHome() == null) {
+                        return completedUiAction(CommandUiActionResult.notFound("target is unavailable"));
+                    }
+                    callbacks.returnHome().accept(target);
+                }
+                case MANAGE_GROUPS -> {
+                    if (callbacks.manageGroups() == null) {
+                        return completedUiAction(CommandUiActionResult.unavailable("group actions are unavailable"));
+                    }
+                    callbacks.manageGroups().run();
+                }
+                case SELECT_COMMAND -> {
+                    if (action.value() == null || callbacks.selectCommand() == null) {
+                        return completedUiAction(CommandUiActionResult.notFound("command is unavailable"));
+                    }
+                    callbacks.selectCommand().accept(action.value());
+                }
+                default -> {
+                    return completedUiAction(CommandUiActionResult.unavailable(
+                            "generic action route is unavailable"));
+                }
+            }
+            return completedUiAction(CommandUiActionResult.applied());
+        } catch (RuntimeException | LinkageError failure) {
+            return completedUiAction(CommandUiActionResult.failed("generic action failed"));
+        }
+    }
+
+    private static CompletionStage<CommandUiActionResult> completedUiAction(
+            CommandUiActionResult result) {
+        return CompletableFuture.completedFuture(result);
     }
 
     record Actions(Consumer<UUID> unlink,

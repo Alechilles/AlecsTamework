@@ -14,7 +14,9 @@ import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import java.lang.reflect.Proxy;
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -150,8 +152,12 @@ class CommandUiProviderRegistryTest {
 
         assertSame(EventPayload.CODEC, controller.eventCodec());
         assertSame(EventPayload.CODEC, controller.codec());
-        controller.buildInitial(new CommandUiOpenContext(), "session", "snapshot", commands, events);
-        controller.handleEvent(payload, "session", "snapshot");
+        CommandUiSession session = noOp(CommandUiSession.class);
+        CommandUiSnapshot snapshot = new CommandUiSnapshot(
+                UUID.randomUUID(), 1L, 1L, null, List.of(), List.of(),
+                new CommandUiPanelState("linked"));
+        controller.buildInitial(new CommandUiOpenContext(), session, snapshot, commands, events);
+        controller.handleEvent(payload, session, snapshot);
 
         assertSame(commands, controller.initialCommands);
         assertSame(events, controller.initialEvents);
@@ -176,8 +182,8 @@ class CommandUiProviderRegistryTest {
         @Override
         public void buildInitial(
                 CommandUiOpenContext context,
-                Object session,
-                Object snapshot,
+                CommandUiSession session,
+                CommandUiSnapshot snapshot,
                 UICommandBuilder commandBuilder,
                 UIEventBuilder eventBuilder
         ) {
@@ -186,7 +192,11 @@ class CommandUiProviderRegistryTest {
         }
 
         @Override
-        public void handleEvent(EventPayload event, Object session, Object snapshot) {
+        public void handleEvent(
+                EventPayload event,
+                CommandUiSession session,
+                CommandUiSnapshot snapshot
+        ) {
             handledEvent = event;
         }
     }
