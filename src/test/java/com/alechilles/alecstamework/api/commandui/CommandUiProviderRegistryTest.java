@@ -113,6 +113,31 @@ class CommandUiProviderRegistryTest {
     }
 
     @Test
+    void exactSubscriptionEndsAfterItsProviderGenerationIsRemoved()
+            throws Exception {
+        CommandUiProviderRegistry registry = new CommandUiProviderRegistry();
+        var first = registry.register(
+                "example:menu", ignored -> null).registration();
+        CopyOnWriteArrayList<String> removed = new CopyOnWriteArrayList<>();
+        var subscription = registry.subscribeExactUnregister(
+                first.providerId(), first.generation(),
+                (providerId, generation) -> removed.add(
+                        providerId.value() + "@" + generation));
+
+        var unrelated = registry.register(
+                "example:other", ignored -> null).registration();
+        unrelated.close();
+        first.close();
+        var replacement = registry.register(
+                "example:menu", ignored -> null).registration();
+        replacement.close();
+
+        assertTrue(subscription.active());
+        assertEquals(List.of("example:menu@" + first.generation()), removed);
+        subscription.handle().close();
+    }
+
+    @Test
     void rejectsInvalidAndReservedIdsWithoutMutatingRegistry() {
         CommandUiProviderRegistry registry = new CommandUiProviderRegistry();
         CommandUiProvider provider = ignored -> null;

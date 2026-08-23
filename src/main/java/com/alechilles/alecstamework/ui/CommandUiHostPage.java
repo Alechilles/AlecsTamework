@@ -45,7 +45,8 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
     private final UpdateEmitter updateEmitter;
     private final boolean customProvider;
     private final AtomicBoolean open = new AtomicBoolean(true);
-    private final AutoCloseable unregisterSubscription;
+    private final SubscriptionSlot unregisterSubscription =
+            new SubscriptionSlot();
     private final CopyOnWriteArrayList<AutoCloseable> ownedResources =
             new CopyOnWriteArrayList<>();
 
@@ -82,7 +83,7 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
         this.customProvider = providerId != null && providerGeneration > 0L;
         CommandUiProviderRegistry.ExactSubscription providerSubscription =
                 subscribeProviderRemoval(providerRegistry);
-        this.unregisterSubscription = providerSubscription.handle();
+        this.unregisterSubscription.set(providerSubscription.handle());
         if (!providerSubscription.active()) {
             terminateHere(CommandUiCloseReason.PROVIDER_UNREGISTERED);
         }
@@ -142,15 +143,23 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
         UUID playerUuid = context.playerUuid();
         if (playerUuid == null) return false;
         try {
-            return worldDispatcher.dispatch(playerUuid, (ref, store) -> {
-                if (!open.get()) return;
-                try {
-                    UICommandBuilder commands = new UICommandBuilder();
-                    UIEventBuilder events = new UIEventBuilder();
-                    controller.update(update, commands, events);
-                    updateEmitter.send(commands, events, false);
-                } catch (RuntimeException | LinkageError failure) {
-                    fail("update callback", failure, false);
+            return worldDispatcher.dispatch(playerUuid, new WorldOperation() {
+                @Override
+                public void run(Ref<EntityStore> ref, Store<EntityStore> store) {
+                    if (!open.get()) return;
+                    try {
+                        UICommandBuilder commands = new UICommandBuilder();
+                        UIEventBuilder events = new UIEventBuilder();
+                        controller.update(update, commands, events);
+                        updateEmitter.send(commands, events, false);
+                    } catch (RuntimeException | LinkageError failure) {
+                        fail("update callback", failure, false);
+                    }
+                }
+
+                @Override
+                public void unavailable() {
+                    // A stale executor cannot update a player page.
                 }
             });
         } catch (RuntimeException | LinkageError failure) {
@@ -169,8 +178,16 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
         Objects.requireNonNull(events, "events");
         if (!open.get() || context.playerUuid() == null) return false;
         try {
-            return worldDispatcher.dispatch(context.playerUuid(), (ref, store) -> {
-                if (open.get()) updateEmitter.send(commands, events, false);
+            return worldDispatcher.dispatch(context.playerUuid(), new WorldOperation() {
+                @Override
+                public void run(Ref<EntityStore> ref, Store<EntityStore> store) {
+                    if (open.get()) updateEmitter.send(commands, events, false);
+                }
+
+                @Override
+                public void unavailable() {
+                    // A stale executor cannot update a player page.
+                }
             });
         } catch (RuntimeException | LinkageError failure) {
             fail("partial update", failure, false);
@@ -269,11 +286,7 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
         for (AutoCloseable resource : ownedResources) {
             if (ownedResources.remove(resource)) closeQuietly(resource);
         }
-        try {
-            unregisterSubscription.close();
-        } catch (Exception ignored) {
-            // Lifecycle cleanup continues for the controller and session.
-        }
+        unregisterSubscription.close();
         try {
             controller.close();
         } catch (RuntimeException | LinkageError ignored) {
@@ -287,6 +300,34 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
             resource.close();
         } catch (Exception ignored) {
             // Page cleanup continues for all other resources.
+        }
+    }
+
+    private static final class SubscriptionSlot implements AutoCloseable {
+        private AutoCloseable handle;
+        private boolean closed;
+
+        private void set(AutoCloseable handle) {
+            AutoCloseable required = Objects.requireNonNull(handle, "handle");
+            synchronized (this) {
+                if (!closed) {
+                    this.handle = required;
+                    return;
+                }
+            }
+            closeQuietly(required);
+        }
+
+        @Override
+        public void close() {
+            AutoCloseable current;
+            synchronized (this) {
+                if (closed) return;
+                closed = true;
+                current = handle;
+                handle = null;
+            }
+            if (current != null) closeQuietly(current);
         }
     }
 

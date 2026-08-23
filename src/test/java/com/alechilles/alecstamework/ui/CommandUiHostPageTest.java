@@ -90,6 +90,34 @@ class CommandUiHostPageTest {
     }
 
     @Test
+    void lostWorldSuppressesQueuedSnapshotUpdate() {
+        TestSession session = new TestSession(snapshot(1L));
+        TestController controller = new TestController();
+        RecordingEmitter emitter = new RecordingEmitter();
+        CommandUiHostPage<TestEvent> host = host(
+                session, controller, new UnavailableDispatcher(),
+                ignored -> { }, emitter);
+
+        assertTrue(host.applyUpdate(CommandUiUpdate.initial(snapshot(2L))));
+
+        assertEquals(null, controller.updatedSnapshot);
+        assertTrue(emitter.clearValues.isEmpty());
+    }
+
+    @Test
+    void lostWorldSuppressesQueuedPartialUpdate() {
+        RecordingEmitter emitter = new RecordingEmitter();
+        CommandUiHostPage<TestEvent> host = host(
+                new TestSession(snapshot(1L)), new TestController(),
+                new UnavailableDispatcher(), ignored -> { }, emitter);
+
+        assertTrue(host.submitPartialUpdate(
+                new UICommandBuilder(), new UIEventBuilder(), false));
+
+        assertTrue(emitter.clearValues.isEmpty());
+    }
+
+    @Test
     void failedInitialBuildClosesProviderStateBeforeDeferredFallback() {
         TestSession session = new TestSession(snapshot(1L));
         TestController controller = new TestController();
@@ -317,6 +345,16 @@ class CommandUiHostPageTest {
             List<CommandUiHostPage.WorldOperation> pending = List.copyOf(queued);
             queued.clear();
             pending.forEach(operation -> operation.run(null, null));
+        }
+    }
+
+    private static final class UnavailableDispatcher
+            implements CommandUiHostPage.WorldDispatcher {
+        @Override
+        public boolean dispatch(UUID playerUuid,
+                                CommandUiHostPage.WorldOperation operation) {
+            operation.unavailable();
+            return true;
         }
     }
 

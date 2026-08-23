@@ -130,9 +130,10 @@ public final class CommandUiProviderRegistry implements CommandUiApi, AutoClosea
                 || current.generation != generation) {
             return new ExactSubscription(false, () -> { });
         }
-        unregisterListeners.add(required);
-        return new ExactSubscription(true,
-                () -> unregisterListeners.remove(required));
+        ExactUnregisterListener exact = new ExactUnregisterListener(
+                providerId, generation, required);
+        unregisterListeners.add(exact);
+        return new ExactSubscription(true, exact);
     }
 
     @Override
@@ -200,6 +201,40 @@ public final class CommandUiProviderRegistry implements CommandUiApi, AutoClosea
         void unregistered(CommandUiProviderId providerId, long generation);
     }
 
+    private final class ExactUnregisterListener
+            implements UnregisterListener, AutoCloseable {
+        private final CommandUiProviderId providerId;
+        private final long generation;
+        private final UnregisterListener delegate;
+        private final AtomicBoolean closed = new AtomicBoolean();
+
+        private ExactUnregisterListener(
+                CommandUiProviderId providerId,
+                long generation,
+                UnregisterListener delegate
+        ) {
+            this.providerId = providerId;
+            this.generation = generation;
+            this.delegate = delegate;
+        }
+
+        @Override
+        public void unregistered(CommandUiProviderId removedProviderId,
+                                 long removedGeneration) {
+            if (!providerId.equals(removedProviderId)
+                    || generation != removedGeneration
+                    || !closed.compareAndSet(false, true)) return;
+            unregisterListeners.remove(this);
+            delegate.unregistered(removedProviderId, removedGeneration);
+        }
+
+        @Override
+        public void close() {
+            if (!closed.compareAndSet(false, true)) return;
+            unregisterListeners.remove(this);
+        }
+    }
+
     private final class Entry implements CommandUiProviderRegistration {
         private final CommandUiProviderId providerId;
         private final CommandUiProvider provider;
@@ -236,11 +271,13 @@ public final class CommandUiProviderRegistry implements CommandUiApi, AutoClosea
 
         @Override
         public void close() {
-            if (!closed.compareAndSet(false, true)) {
-                return;
-            }
-            if (providers.remove(providerId, this)) {
-                notifyUnregister(providerId, generation);
+            synchronized (CommandUiProviderRegistry.this) {
+                if (!closed.compareAndSet(false, true)) {
+                    return;
+                }
+                if (providers.remove(providerId, this)) {
+                    notifyUnregister(providerId, generation);
+                }
             }
         }
     }
