@@ -143,35 +143,53 @@ final class BondedCompanionPanelActionRouter {
      */
     CompletionStage<CommandUiActionResult> routeForUi(
             UUID ownerUuid,
-            Ref<EntityStore> eventPlayerRef,
-            Store<EntityStore> eventStore,
-            TwCommandItemConfig config,
-            CommandPanelFeaturePresentation feature,
+            String rosterId,
+            String profileId,
             BondedCompanionPanelActionService.Action action,
-            CommandSelectionPageService.BondedLifecycleAuthority lifecycleAuthority
+            CurrentUiContextResolver contextResolver
     ) {
-        if (ownerUuid == null || config == null
-                || !config.usesBondedCompanionRoster()) {
+        if (ownerUuid == null || rosterId == null || profileId == null
+                || action == null || contextResolver == null) {
             return completed(CommandUiActionResult.unavailable(
                     "bonded action route is unavailable"));
         }
-        if (feature == null || feature.bonded() == null) {
+        CurrentUiContext currentContext;
+        try {
+            currentContext = contextResolver.resolve(ownerUuid, rosterId, profileId);
+        } catch (RuntimeException | LinkageError failure) {
+            return completed(CommandUiActionResult.unavailable(
+                    "current bonded world is unavailable"));
+        }
+        if (currentContext == null || currentContext.config() == null
+                || !currentContext.config().usesBondedCompanionRoster()) {
+            return completed(CommandUiActionResult.unavailable(
+                    "bonded action route is unavailable"));
+        }
+        if (currentContext.feature() == null
+                || currentContext.feature().bonded() == null) {
             return completed(CommandUiActionResult.notFound(
                     "bonded companion is unavailable"));
         }
-        Player player = players.resolve(ownerUuid, eventPlayerRef, eventStore);
-        if (player == null || lifecycleAuthority == null
-                || !lifecycleAuthority.allows(player)) {
+        var presentation = currentContext.feature().bonded();
+        if (!rosterId.equals(presentation.rosterId())
+                || !profileId.equals(presentation.profileId())) {
+            return completed(CommandUiActionResult.conflict(
+                    "bonded presentation is stale"));
+        }
+        Player player = players.resolve(ownerUuid, currentContext.playerRef(),
+                currentContext.store());
+        if (player == null || currentContext.lifecycleAuthority() == null
+                || !currentContext.lifecycleAuthority().allows(player)) {
             return completed(CommandUiActionResult.denied(
                     "current bonded authority denied the action"));
         }
         String world = player.getWorld() == null
                 ? null : player.getWorld().getName();
-        var presentation = feature.bonded();
-        BondedCompanionActionContext context;
+        BondedCompanionActionContext actionContext;
         try {
-            context = action == BondedCompanionPanelActionService.Action.ABANDON
-                    ? null : contexts.create(player, eventStore, presentation.roleId(),
+            actionContext = action == BondedCompanionPanelActionService.Action.ABANDON
+                    ? null : contexts.create(player, currentContext.store(),
+                            presentation.roleId(),
                             action == BondedCompanionPanelActionService.Action.SUMMON);
         } catch (RuntimeException | LinkageError failure) {
             return completed(CommandUiActionResult.failed(
@@ -179,7 +197,7 @@ final class BondedCompanionPanelActionRouter {
         }
         CompletionStage<BondedCompanionPanelActionService.Outcome> outcome;
         try {
-            outcome = actions.performAsync(action, ownerUuid, world, context,
+            outcome = actions.performAsync(action, ownerUuid, world, actionContext,
                     presentation);
         } catch (RuntimeException | LinkageError failure) {
             return completed(CommandUiActionResult.failed(
@@ -246,6 +264,23 @@ final class BondedCompanionPanelActionRouter {
     interface CurrentPlayerResolver {
         Player resolve(UUID ownerUuid, Ref<EntityStore> playerRef,
                        Store<EntityStore> store);
+    }
+
+    /** Resolves current-world ECS context when a deferred UI action runs. */
+    @FunctionalInterface
+    interface CurrentUiContextResolver {
+        CurrentUiContext resolve(UUID ownerUuid, String rosterId,
+                                 String profileId);
+    }
+
+    /** Current invocation values; never retained by an action binding. */
+    record CurrentUiContext(
+            Ref<EntityStore> playerRef,
+            Store<EntityStore> store,
+            TwCommandItemConfig config,
+            CommandPanelFeaturePresentation feature,
+            CommandSelectionPageService.BondedLifecycleAuthority lifecycleAuthority
+    ) {
     }
 
     private void showWarning(

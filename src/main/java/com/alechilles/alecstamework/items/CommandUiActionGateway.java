@@ -24,7 +24,6 @@ import javax.annotation.Nullable;
  */
 final class CommandUiActionGateway {
     static final Duration CONFIRMATION_LIFETIME = Duration.ofSeconds(5L);
-    private static final int MAX_ACTIVE_HANDLES_PER_SESSION = 256;
 
     enum Route {
         GENERIC,
@@ -93,7 +92,6 @@ final class CommandUiActionGateway {
                 0L
         );
         bindings.put(handle.token(), binding);
-        trimSession(sessionId);
         return handle;
     }
 
@@ -123,24 +121,6 @@ final class CommandUiActionGateway {
         return issue(sessionId, Route.BONDED, action, generation,
                 authority == null ? null : ignored -> authority.getAsBoolean(),
                 ignored -> complete(executor), confirmationRequired);
-    }
-
-    /** Convenience synchronous executor adapter. */
-    @Nonnull
-    CommandUiActionHandle issueGeneric(
-            @Nonnull UUID sessionId,
-            @Nonnull CommandUiAction action,
-            long generation,
-            @Nullable BooleanSupplier authority,
-            @Nonnull Runnable executor,
-            boolean confirmationRequired
-    ) {
-        return issueGeneric(sessionId, action, generation, authority,
-                () -> {
-                    executor.run();
-                    return CompletableFuture.completedFuture(
-                            CommandUiActionResult.applied());
-                }, confirmationRequired);
     }
 
     /** Invokes a handle after session, generation, expiry, and authority checks. */
@@ -282,35 +262,7 @@ final class CommandUiActionGateway {
                 sessionId, route, action, generation, providerGeneration,
                 authority, executor, confirmationRequired,
                 confirmationToken, expiresAtNanos));
-        trimSession(sessionId);
         return handle;
-    }
-
-    /** Keeps the registry proportional to the current page rather than its lifetime. */
-    private void trimSession(UUID sessionId) {
-        while (countSessionHandles(sessionId) > MAX_ACTIVE_HANDLES_PER_SESSION) {
-            String oldestToken = null;
-            long oldestIssuedAt = Long.MAX_VALUE;
-            for (var entry : bindings.entrySet()) {
-                Binding binding = entry.getValue();
-                if (sessionId.equals(binding.sessionId)
-                        && binding.issuedAtNanos < oldestIssuedAt) {
-                    oldestToken = entry.getKey();
-                    oldestIssuedAt = binding.issuedAtNanos;
-                }
-            }
-            if (oldestToken == null || bindings.remove(oldestToken) == null) {
-                return;
-            }
-        }
-    }
-
-    private int countSessionHandles(UUID sessionId) {
-        int count = 0;
-        for (Binding binding : bindings.values()) {
-            if (sessionId.equals(binding.sessionId)) count++;
-        }
-        return count;
     }
 
     private void retireOlderGeneration(UUID sessionId, long generation) {
@@ -350,7 +302,6 @@ final class CommandUiActionGateway {
             boolean requiresConfirmation,
             boolean confirmationToken,
             long expiresAtNanos,
-            long issuedAtNanos,
             AtomicBoolean consumed
     ) {
         private Binding(
@@ -368,7 +319,6 @@ final class CommandUiActionGateway {
             this(sessionId, route, action, generation, providerGeneration,
                     authority, executor,
                     requiresConfirmation, confirmationToken, expiresAtNanos,
-                    System.nanoTime(),
                     new AtomicBoolean());
         }
     }

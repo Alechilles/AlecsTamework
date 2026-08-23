@@ -174,23 +174,36 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                             List.of(), new CommandUiPanelState("generic")),
                     gateway, CommandUiWorldDispatcher.direct(),
                     CommandUiSessionImpl.Mode.GENERIC);
-            var routeProbe = service.bindBondedUiAction(
-                    bonded, new CommandUiAction("DISMISS", CARD), OWNER, actor,
-                    store, bondedConfig(), bondedDismissFeature(), ignored -> true,
-                    false);
+            AtomicInteger resolverCalls = new AtomicInteger();
+            AtomicReference<BondedCompanionPanelActionRouter.CurrentUiContext>
+                    currentContext = new AtomicReference<>();
+            var contextResolver =
+                    (BondedCompanionPanelActionRouter.CurrentUiContextResolver)
+                    (owner, roster, profile) -> {
+                        resolverCalls.incrementAndGet();
+                        return currentContext.get();
+                    };
+            var routeProbe = service.bindBondedUiAction(bonded,
+                    new CommandSelectionPageService.BondedUiActionBinding(
+                            new CommandUiAction("DISMISS", CARD), OWNER,
+                            "hydragon:dragons", "profile-7", contextResolver, false));
             assertEquals(CommandUiActionStatus.DENIED,
                     generic.invoke(routeProbe).toCompletableFuture().join().status());
 
-            var handle = service.bindBondedUiAction(
-                    bonded, new CommandUiAction("DISMISS", CARD), OWNER, actor,
-                    store, bondedConfig(), bondedDismissFeature(), ignored -> true,
-                    false);
+            var handle = service.bindBondedUiAction(bonded,
+                    new CommandSelectionPageService.BondedUiActionBinding(
+                            new CommandUiAction("DISMISS", CARD), OWNER,
+                            "hydragon:dragons", "profile-7", contextResolver, false));
+            currentContext.set(new BondedCompanionPanelActionRouter.CurrentUiContext(
+                    actor, store, bondedConfig(), bondedDismissFeature(),
+                    ignored -> true));
             CommandUiActionResult applied = bonded.invoke(handle)
                     .toCompletableFuture().join();
             assertEquals(CommandUiActionStatus.APPLIED, applied.status());
             assertNotNull(captured.get());
             assertEquals(OWNER, captured.get().ownerUuid());
             assertEquals("profile-7", captured.get().profileId());
+            assertEquals(1, resolverCalls.get());
 
             bonded.close();
         }

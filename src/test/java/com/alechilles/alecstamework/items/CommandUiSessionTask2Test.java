@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.api.commandui.CommandUiActionHandle;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionStatus;
 import com.alechilles.alecstamework.api.commandui.CommandUiChangeSet;
@@ -8,6 +9,7 @@ import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -174,29 +176,89 @@ class CommandUiSessionTask2Test {
     }
 
     @Test
-    void genericBinderReportsMissingTargetAndAuthorityDenial() {
+    void sessionFactoryBindsProviderGenerationAcrossReplacement() {
+        CommandUiActionGateway gateway = new CommandUiActionGateway();
+        CommandSelectionPageService service =
+                new CommandSelectionPageService(null, null, null, null, null);
+        CommandUiSessionFactory factory = new CommandUiSessionFactory(gateway, service);
+        UUID sessionId = UUID.randomUUID();
+        var binding = new CommandSelectionPageService.GenericUiActionBinding(
+                new CommandUiAction("MANAGE_GROUPS"),
+                () -> true,
+                () -> CompletableFuture.completedFuture(
+                        CommandUiActionResult.applied()),
+                false);
+
+        CommandUiSessionFactory.CreatedSession original = factory.createGeneric(
+                sessionId, snapshot(sessionId, 1L, 1L), 11L,
+                CommandUiWorldDispatcher.direct(), () -> { }, ignored -> { },
+                null, List.of(binding));
+        var originalHandle = original.handles().get(0);
+        CommandUiSessionFactory.CreatedSession replacement = factory.createGeneric(
+                sessionId, snapshot(sessionId, 2L, 1L), 12L,
+                CommandUiWorldDispatcher.direct(), () -> { }, ignored -> { },
+                null, List.of(binding));
+
+        assertEquals(CommandUiActionStatus.STALE,
+                original.session().invoke(originalHandle)
+                        .toCompletableFuture().join().status());
+        assertEquals(CommandUiActionStatus.APPLIED,
+                replacement.session().invoke(replacement.handles().get(0))
+                        .toCompletableFuture().join().status());
+        replacement.session().close();
+    }
+
+    @Test
+    void factoryDoesNotIssueBondedHandleWithoutProductionRoute() {
+        CommandUiActionGateway gateway = new CommandUiActionGateway();
+        CommandUiSessionFactory factory = new CommandUiSessionFactory(gateway,
+                new CommandSelectionPageService(null, null, null, null, null));
+        UUID sessionId = UUID.randomUUID();
+        var unsupported = new CommandSelectionPageService.BondedUiActionBinding(
+                new CommandUiAction("ASSIGN_GROUP"), UUID.randomUUID(),
+                "test:roster", "profile-1", (owner, roster, profile) -> null,
+                false);
+
+        CommandUiSessionFactory.CreatedSession created = factory.createBonded(
+                sessionId, snapshot(sessionId, 1L, 1L), 1L,
+                CommandUiWorldDispatcher.direct(), () -> { }, ignored -> { },
+                null, List.of(unsupported));
+
+        assertTrue(created.handles().isEmpty());
+        created.session().close();
+    }
+
+    @Test
+    void genericBinderRequiresOutcomeBearingOperation() {
         CommandSelectionPageService service =
                 new CommandSelectionPageService(null, null, null, null, null);
         CommandUiActionGateway gateway = new CommandUiActionGateway();
         UUID sessionId = UUID.randomUUID();
         CommandUiSessionImpl session = session(sessionId,
                 CommandUiSessionImpl.Mode.GENERIC, gateway, 1L);
-        CommandSelectionPageService.Actions callbacks = new CommandSelectionPageService.Actions(
-                ignored -> { }, ignored -> { }, ignored -> { }, ignored -> { },
-                ignored -> { }, ignored -> { }, ignored -> { }, ignored -> { },
-                () -> { }, () -> { }, ignored -> { });
-
         var missing = service.bindGenericUiAction(session,
-                new CommandUiAction("UNLINK", UUID.randomUUID()), callbacks,
-                () -> true, ignored -> false, false);
+                new CommandSelectionPageService.GenericUiActionBinding(
+                        new CommandUiAction("UNLINK", UUID.randomUUID()),
+                        () -> true,
+                        () -> CompletableFuture.completedFuture(
+                                CommandUiActionResult.notFound("target is unavailable")),
+                        false));
         assertEquals(CommandUiActionStatus.NOT_FOUND,
                 session.invoke(missing).toCompletableFuture().join().status());
 
+        AtomicBoolean operationCalled = new AtomicBoolean();
         var denied = service.bindGenericUiAction(session,
-                new CommandUiAction("UNLINK", UUID.randomUUID()), callbacks,
-                () -> false, ignored -> true, false);
+                new CommandSelectionPageService.GenericUiActionBinding(
+                        new CommandUiAction("UNLINK", UUID.randomUUID()),
+                        () -> false,
+                        () -> {
+                            operationCalled.set(true);
+                            return CompletableFuture.completedFuture(
+                                    CommandUiActionResult.applied());
+                        }, false));
         assertEquals(CommandUiActionStatus.DENIED,
                 session.invoke(denied).toCompletableFuture().join().status());
+        assertFalse(operationCalled.get());
         session.close();
     }
 
@@ -225,7 +287,7 @@ class CommandUiSessionTask2Test {
     }
 
     @Test
-    void sameGenerationHandleStorageRemainsBounded() {
+    void sameGenerationHandlesRemainValidUntilConsumed() {
         UUID sessionId = UUID.randomUUID();
         CommandUiActionGateway gateway = new CommandUiActionGateway();
         CommandUiSessionImpl session = session(sessionId,
@@ -233,19 +295,24 @@ class CommandUiSessionTask2Test {
         var first = session.issueGeneric(new CommandUiAction("MANAGE_GROUPS"),
                 () -> true, () -> CompletableFuture.completedFuture(
                         CommandUiActionResult.applied()), false);
+        List<CommandUiActionHandle> handles = new ArrayList<>();
+        handles.add(first);
 
         for (int index = 0; index < 400; index++) {
-            session.issueGeneric(new CommandUiAction(
+            handles.add(session.issueGeneric(new CommandUiAction(
                             "MANAGE_GROUPS", UUID.nameUUIDFromBytes(
                                     ("target-" + index).getBytes(
                                             StandardCharsets.UTF_8))),
                     () -> true, () -> CompletableFuture.completedFuture(
-                            CommandUiActionResult.applied()), false);
+                            CommandUiActionResult.applied()), false));
         }
 
-        assertTrue(gateway.activeHandleCount() <= 256);
-        assertEquals(CommandUiActionStatus.STALE,
-                session.invoke(first).toCompletableFuture().join().status());
+        assertEquals(handles.size(), gateway.activeHandleCount());
+        for (CommandUiActionHandle handle : handles) {
+            assertEquals(CommandUiActionStatus.APPLIED,
+                    session.invoke(handle).toCompletableFuture().join().status());
+        }
+        assertEquals(0, gateway.activeHandleCount());
         session.close();
     }
 

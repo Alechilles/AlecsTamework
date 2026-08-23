@@ -26,11 +26,11 @@ import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.Map;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
 /**
  * Builds and opens the command selection page from focused panel services and bound actions.
@@ -668,161 +668,77 @@ final class CommandSelectionPageService {
         return config.getCommandList().length;
     }
 
-    /**
-     * Binds an existing generic command callback to the session-owned opaque
-     * action gateway. The callback record remains the only generic mutation
-     * route; the provider supplies no target or route authority.
-     */
+    /** Binds one generic action only when its caller supplies a real outcome. */
     CommandUiActionHandle bindGenericUiAction(
             CommandUiSessionImpl session,
-            CommandUiAction action,
-            Actions callbacks,
-            BooleanSupplier authority,
-            boolean confirmationRequired
+            GenericUiActionBinding binding
     ) {
-        return bindGenericUiAction(session, action, callbacks, authority,
-                ignored -> true, confirmationRequired);
+        Objects.requireNonNull(session, "session");
+        Objects.requireNonNull(binding, "binding");
+        return session.issueGeneric(binding.action(), binding.authority(),
+                binding.operation(), binding.confirmationRequired());
     }
 
-    /** Binds a generic action with a world-thread target prevalidation fence. */
-    CommandUiActionHandle bindGenericUiAction(
-            CommandUiSessionImpl session,
-            CommandUiAction action,
-            Actions callbacks,
-            BooleanSupplier authority,
-            Predicate<CommandUiAction> targetAvailable,
-            boolean confirmationRequired
-    ) {
-        if (session == null || action == null || callbacks == null) {
-            throw new IllegalArgumentException("Generic command UI action inputs are required.");
-        }
-        return session.issueGeneric(action, authority,
-                () -> applyGenericUiAction(action, callbacks, targetAvailable),
-                confirmationRequired);
-    }
-
-    /** Binds a bonded action to the existing router and durable outcome service. */
+    /** Binds one bonded action to stable IDs and a current-world resolver. */
+    @Nullable
     CommandUiActionHandle bindBondedUiAction(
             CommandUiSessionImpl session,
-            CommandUiAction action,
-            UUID ownerUuid,
-            Ref<EntityStore> eventPlayerRef,
-            Store<EntityStore> eventStore,
-            TwCommandItemConfig config,
-            CommandPanelFeaturePresentation feature,
-            BondedLifecycleAuthority lifecycleAuthority,
-            boolean confirmationRequired
+            BondedUiActionBinding binding
     ) {
-        if (session == null || action == null || ownerUuid == null
-                || config == null || feature == null) {
-            throw new IllegalArgumentException("Bonded command UI action inputs are required.");
-        }
+        Objects.requireNonNull(session, "session");
+        Objects.requireNonNull(binding, "binding");
         BondedCompanionPanelActionService.Action bondedAction = switch (
-                action.builtInKind()) {
+                binding.action().builtInKind()) {
             case SUMMON -> BondedCompanionPanelActionService.Action.SUMMON;
             case DISMISS -> BondedCompanionPanelActionService.Action.STORE;
             case REVIVE -> BondedCompanionPanelActionService.Action.REVIVE;
             case ABANDON -> BondedCompanionPanelActionService.Action.ABANDON;
             default -> null;
         };
-        return session.issueBonded(action, () -> true, () -> {
-            if (bondedActions == null || bondedAction == null) {
-                return completedUiAction(CommandUiActionResult.unavailable(
-                        "bonded action route is unavailable"));
-            }
-            return bondedActions.routeForUi(ownerUuid, eventPlayerRef,
-                    eventStore, config, feature, bondedAction,
-                    lifecycleAuthority);
-        }, confirmationRequired);
+        if (bondedActions == null || bondedAction == null) return null;
+        // The bonded gateway binding carries profile/roster identity. Do not
+        // retain a replaceable current-NPC UUID from a rendered row.
+        CommandUiAction boundAction = new CommandUiAction(
+                binding.action().kind(), null, binding.action().value(),
+                binding.action().confirmationRequired());
+        return session.issueBonded(boundAction, () -> true, () ->
+                bondedActions.routeForUi(binding.ownerUuid(), binding.rosterId(),
+                        binding.profileId(), bondedAction, binding.contextResolver()),
+                binding.confirmationRequired());
     }
 
-    private CompletionStage<CommandUiActionResult> applyGenericUiAction(
+    record GenericUiActionBinding(
             CommandUiAction action,
-            Actions callbacks,
-            Predicate<CommandUiAction> targetAvailable
+            BooleanSupplier authority,
+            java.util.function.Supplier<CompletionStage<CommandUiActionResult>> operation,
+            boolean confirmationRequired
     ) {
-        UUID target = action.targetId();
-        try {
-            if (target != null && (targetAvailable == null
-                    || !targetAvailable.test(action))) {
-                return completedUiAction(CommandUiActionResult.notFound(
-                        "target is unavailable"));
-            }
-            switch (action.builtInKind()) {
-                case UNLINK -> {
-                    if (target == null || callbacks.unlink() == null) {
-                        return completedUiAction(CommandUiActionResult.notFound("target is unavailable"));
-                    }
-                    callbacks.unlink().accept(target);
-                }
-                case RELEASE -> {
-                    if (target == null || callbacks.release() == null) {
-                        return completedUiAction(CommandUiActionResult.notFound("target is unavailable"));
-                    }
-                    callbacks.release().accept(target);
-                }
-                case CULL -> {
-                    if (target == null || callbacks.cull() == null) {
-                        return completedUiAction(CommandUiActionResult.notFound("target is unavailable"));
-                    }
-                    callbacks.cull().accept(target);
-                }
-                case RESPAWN -> {
-                    if (target == null || callbacks.respawn() == null) {
-                        return completedUiAction(CommandUiActionResult.notFound("target is unavailable"));
-                    }
-                    callbacks.respawn().accept(target);
-                }
-                case LOCATE -> {
-                    if (target == null || callbacks.locate() == null) {
-                        return completedUiAction(CommandUiActionResult.notFound("target is unavailable"));
-                    }
-                    callbacks.locate().accept(target);
-                }
-                case RECALL -> {
-                    if (target == null || callbacks.recall() == null) {
-                        return completedUiAction(CommandUiActionResult.notFound("target is unavailable"));
-                    }
-                    callbacks.recall().accept(target);
-                }
-                case SET_HOME -> {
-                    if (target == null || callbacks.setHome() == null) {
-                        return completedUiAction(CommandUiActionResult.notFound("target is unavailable"));
-                    }
-                    callbacks.setHome().accept(target);
-                }
-                case RETURN_HOME -> {
-                    if (target == null || callbacks.returnHome() == null) {
-                        return completedUiAction(CommandUiActionResult.notFound("target is unavailable"));
-                    }
-                    callbacks.returnHome().accept(target);
-                }
-                case MANAGE_GROUPS -> {
-                    if (callbacks.manageGroups() == null) {
-                        return completedUiAction(CommandUiActionResult.unavailable("group actions are unavailable"));
-                    }
-                    callbacks.manageGroups().run();
-                }
-                case SELECT_COMMAND -> {
-                    if (action.value() == null || callbacks.selectCommand() == null) {
-                        return completedUiAction(CommandUiActionResult.notFound("command is unavailable"));
-                    }
-                    callbacks.selectCommand().accept(action.value());
-                }
-                default -> {
-                    return completedUiAction(CommandUiActionResult.unavailable(
-                            "generic action route is unavailable"));
-                }
-            }
-            return completedUiAction(CommandUiActionResult.applied());
-        } catch (RuntimeException | LinkageError failure) {
-            return completedUiAction(CommandUiActionResult.failed("generic action failed"));
+        GenericUiActionBinding {
+            Objects.requireNonNull(action, "action");
+            Objects.requireNonNull(authority, "authority");
+            Objects.requireNonNull(operation, "operation");
         }
     }
 
-    private static CompletionStage<CommandUiActionResult> completedUiAction(
-            CommandUiActionResult result) {
-        return CompletableFuture.completedFuture(result);
+    record BondedUiActionBinding(
+            CommandUiAction action,
+            UUID ownerUuid,
+            String rosterId,
+            String profileId,
+            BondedCompanionPanelActionRouter.CurrentUiContextResolver contextResolver,
+            boolean confirmationRequired
+    ) {
+        BondedUiActionBinding {
+            Objects.requireNonNull(action, "action");
+            Objects.requireNonNull(ownerUuid, "ownerUuid");
+            if (rosterId == null || rosterId.isBlank()) {
+                throw new IllegalArgumentException("rosterId is required");
+            }
+            if (profileId == null || profileId.isBlank()) {
+                throw new IllegalArgumentException("profileId is required");
+            }
+            Objects.requireNonNull(contextResolver, "contextResolver");
+        }
     }
 
     record Actions(Consumer<UUID> unlink,
