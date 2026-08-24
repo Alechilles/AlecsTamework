@@ -7,6 +7,8 @@ import com.alechilles.alecstamework.debug.CompanionXpEventDebugLogService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService.AwardResult;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
+import com.alechilles.alecstamework.output.CompanionOutputService;
+import com.alechilles.alecstamework.output.CompanionOutputService.FinalizedOutput;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -23,9 +25,7 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import com.hypixel.hytale.server.npc.util.InventoryHelper;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -62,9 +62,11 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
                     + " dropList=" + valueOrNull(this.dropList));
             return true;
         }
-        List<ItemStack> drops = CompanionHarvestBonusService.shouldDuplicateDrops(ref, store, role)
-                ? duplicateDrops(baseDrops)
-                : baseDrops;
+        FinalizedOutput output = CompanionOutputService.finalizeDrops(
+                baseDrops,
+                CompanionHarvestBonusService.shouldDuplicateDrops(ref, store, role)
+        );
+        List<ItemStack> drops = output.itemStacks();
         UUID operationId = UUID.randomUUID();
         String activityContext = resolveActivityContext(
                 role,
@@ -95,7 +97,7 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
                     activityContext,
                     ActivityRuntime.resolveOwnerId(ref, store),
                     ActivityRuntime.resolveCompanionId(ref, store),
-                    quantities(drops),
+                    output.itemQuantities(),
                     result
             );
         } else if (dropped) {
@@ -105,7 +107,7 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
                     activityContext,
                     ActivityRuntime.resolveOwnerId(ref, store),
                     ActivityRuntime.resolveCompanionId(ref, store),
-                    quantities(drops),
+                    output.itemQuantities(),
                     null
             );
         } else if (!dropped) {
@@ -137,19 +139,6 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
                 null
         )
                 .getStringParam(role, null, paramName);
-    }
-
-    private Map<String, Integer> quantities(List<ItemStack> drops) {
-        LinkedHashMap<String, Integer> quantities = new LinkedHashMap<>();
-        for (ItemStack drop : drops) {
-            if (drop == null || drop.isEmpty()
-                    || drop.getItemId() == null || drop.getItemId().isBlank()
-                    || drop.getQuantity() <= 0) {
-                continue;
-            }
-            quantities.merge(drop.getItemId(), drop.getQuantity(), Integer::sum);
-        }
-        return Map.copyOf(quantities);
     }
 
     /** Bridges the Update 6 callback while retaining the Update 5 Role overload above. */
@@ -188,42 +177,6 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
             drops.add(randomItem);
         }
         return drops;
-    }
-
-    private List<ItemStack> duplicateDrops(List<ItemStack> drops) {
-        if (drops == null || drops.isEmpty()) {
-            return List.of();
-        }
-        ArrayList<ItemStack> out = new ArrayList<>(drops.size() * 2);
-        for (ItemStack stack : drops) {
-            if (stack == null || stack.isEmpty()) {
-                continue;
-            }
-            out.add(stack);
-            ItemStack duplicate = cloneStack(stack);
-            if (duplicate != null && !duplicate.isEmpty()) {
-                out.add(duplicate);
-            }
-        }
-        return out;
-    }
-
-    private ItemStack cloneStack(ItemStack stack) {
-        String itemId = stack.getItemId();
-        if (itemId == null || itemId.isBlank()) {
-            return null;
-        }
-        int quantity = stack.getQuantity();
-        if (quantity <= 0) {
-            return null;
-        }
-        return new ItemStack(
-                itemId,
-                quantity,
-                stack.getDurability(),
-                stack.getMaxDurability(),
-                stack.getMetadata()
-        );
     }
 
     private void logHarvestDropAward(@Nonnull Ref<EntityStore> ref,

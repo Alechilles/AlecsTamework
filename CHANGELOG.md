@@ -9,6 +9,12 @@
   V2 event. Profiles that omit the mapping keep the normal cull death drops
   and publish no cull activity.
 
+### Changed
+
+- Companion harvests, passive animal products, filled containers, and cull
+  rewards now share one finalized-output boundary before Activity V2 reports
+  their produced item quantities.
+
 ## 3.2.2 - Flightmaster's Talisman Preview Hotfix - 2026-08-24
 
 ### Fixed

@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.output.CompanionOutputService;
+import com.alechilles.alecstamework.output.CompanionOutputService.FinalizedOutput;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -34,15 +36,19 @@ final class CullRewardService {
             return Outcome.unavailable();
         }
         Roll roll = roll(dropList, ThreadLocalRandom.current());
+        List<ItemStack> stacks = new ArrayList<>();
         for (Reward reward : roll.rewards()) {
-            ItemStack stack = new ItemStack(
+            stacks.add(new ItemStack(
                     reward.itemId(),
                     reward.quantity(),
                     reward.metadata()
-            );
+            ));
+        }
+        FinalizedOutput output = CompanionOutputService.finalizeDrops(stacks, false);
+        for (ItemStack stack : output.itemStacks()) {
             ItemUtils.dropItem(npcRef, stack, store);
         }
-        return new Outcome(true, roll.itemQuantities());
+        return new Outcome(true, output.itemQuantities());
     }
 
     static Roll roll(ItemDropList dropList, Random random) {

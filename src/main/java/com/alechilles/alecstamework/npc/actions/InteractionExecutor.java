@@ -15,6 +15,7 @@ import com.alechilles.alecstamework.items.CommandAutoLinkService;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService.AwardResult;
+import com.alechilles.alecstamework.output.CompanionOutputService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -348,7 +349,8 @@ final class InteractionExecutor {
                 harvestContext,
                 ownerId,
                 companionId,
-                outcome.itemQuantities,
+                CompanionOutputService.finalizeQuantities(
+                        outcome.itemQuantities).itemQuantities(),
                 award
         );
     }
