@@ -137,6 +137,9 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                               @Nullable Ref<EntityStore> playerRef,
                               @Nonnull Store<EntityStore> store,
                               long nowMs) {
+        if (!CommandHudClientReadiness.canRender(player)) {
+            return;
+        }
         CommandTargetHudStateStore.HudState previous = hudStateStore.stateForStore(store, playerUuid);
         if (!activationTracker.shouldInspectPlayer(store, playerUuid, nowMs)) {
             return;
