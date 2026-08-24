@@ -35,10 +35,14 @@ class CommandUiValueTest {
 
     @Test
     void valueRejectsNullAndNonFiniteNumbers() {
+        List<CommandUiValue> nullList = new ArrayList<>();
+        nullList.add(null);
+        Map<String, CommandUiValue> nullObject = new LinkedHashMap<>();
+        nullObject.put("missing", null);
+
         assertThrows(NullPointerException.class, () -> CommandUiValue.of((String) null));
-        assertThrows(NullPointerException.class, () -> CommandUiValue.list(List.of((CommandUiValue) null)));
-        assertThrows(NullPointerException.class, () -> CommandUiValue.object(
-                Map.of("missing", (CommandUiValue) null)));
+        assertThrows(NullPointerException.class, () -> CommandUiValue.list(nullList));
+        assertThrows(NullPointerException.class, () -> CommandUiValue.object(nullObject));
         assertThrows(IllegalArgumentException.class, () -> CommandUiValue.of(Double.NaN));
         assertThrows(IllegalArgumentException.class, () -> CommandUiValue.of(Double.POSITIVE_INFINITY));
     }

@@ -108,12 +108,6 @@ public final class CommandUiValue {
         return type;
     }
 
-    /** Alias for callers that use the term kind. */
-    @Nonnull
-    public Type kind() {
-        return type;
-    }
-
     @Nonnull
     public String stringValue() {
         return cast(Type.STRING, String.class);

@@ -98,11 +98,6 @@ public final class CommandUiContribution {
     }
 
     @Nonnull
-    public CommandUiContributorId id() {
-        return contributorId;
-    }
-
-    @Nonnull
     public Map<String, CommandUiValue> pageData() {
         return pageData;
     }
@@ -164,12 +159,6 @@ public final class CommandUiContribution {
 
     @Nonnull
     public String diagnosticReason() {
-        return diagnosticReason;
-    }
-
-    /** Alias for callers that use the shorter reason wording. */
-    @Nonnull
-    public String reason() {
         return diagnosticReason;
     }
 

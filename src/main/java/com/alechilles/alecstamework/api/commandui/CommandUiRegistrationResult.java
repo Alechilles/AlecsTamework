@@ -26,27 +26,46 @@ public final class CommandUiRegistrationResult {
     private final String id;
     private final String message;
 
-    public CommandUiRegistrationResult(
+    private CommandUiRegistrationResult(
             @Nonnull Status status,
             @Nullable CommandUiRegistration registration,
             @Nullable String id,
             @Nullable String message
     ) {
         this.status = Objects.requireNonNull(status, "status");
-        this.registration = registration;
-        this.id = normalize(id);
+        if (status == Status.REGISTERED) {
+            CommandUiRegistration liveRegistration = Objects.requireNonNull(
+                    registration,
+                    "registered results require a registration"
+            );
+            String registrationId = normalize(liveRegistration.id());
+            if (registrationId == null) {
+                throw new IllegalArgumentException(
+                        "Registered command UI handles require a nonblank ID."
+                );
+            }
+            this.registration = liveRegistration;
+            this.id = registrationId;
+        } else {
+            if (registration != null) {
+                throw new IllegalArgumentException(
+                        "Non-success command UI results cannot carry a registration."
+                );
+            }
+            this.registration = null;
+            this.id = normalize(id);
+        }
         this.message = message == null ? "" : message.trim();
     }
 
     @Nonnull
     public static CommandUiRegistrationResult registered(
-            @Nonnull String id,
             @Nonnull CommandUiRegistration registration
     ) {
         return new CommandUiRegistrationResult(
                 Status.REGISTERED,
                 Objects.requireNonNull(registration, "registration"),
-                Objects.requireNonNull(id, "id"),
+                null,
                 "registered"
         );
     }
@@ -90,12 +109,6 @@ public final class CommandUiRegistrationResult {
         return registration;
     }
 
-    /** Alias for code that treats the handle as a close handle. */
-    @Nullable
-    public CommandUiRegistration handle() {
-        return registration;
-    }
-
     @Nullable
     public String id() {
         return id;
@@ -108,10 +121,6 @@ public final class CommandUiRegistrationResult {
 
     public boolean registered() {
         return status == Status.REGISTERED && registration != null;
-    }
-
-    public boolean accepted() {
-        return registered();
     }
 
     @Nullable

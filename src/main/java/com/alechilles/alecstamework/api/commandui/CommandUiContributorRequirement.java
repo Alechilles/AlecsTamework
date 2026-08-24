@@ -12,9 +12,4 @@ public record CommandUiContributorRequirement(
         id = Objects.requireNonNull(id, "id");
     }
 
-    /** Alias for code that calls the field a contributor ID. */
-    @Nonnull
-    public CommandUiContributorId contributorId() {
-        return id;
-    }
 }

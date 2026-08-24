@@ -36,12 +36,6 @@ public record CommandUiRendererId(@Nonnull String value) {
         }
     }
 
-    /** Alias for callers that use an optional parser. */
-    @Nonnull
-    public static Optional<CommandUiRendererId> parse(@Nullable String rawValue) {
-        return tryParse(rawValue);
-    }
-
     /** Returns the namespace portion before the separator. */
     @Nonnull
     public String namespace() {
@@ -57,17 +51,6 @@ public record CommandUiRendererId(@Nonnull String value) {
     /** Returns whether this identifier belongs to Tamework's reserved namespace. */
     public boolean reserved() {
         return value.startsWith(RESERVED_NAMESPACE);
-    }
-
-    /** Alias for code that uses explicit reserved-ID wording. */
-    public boolean isReserved() {
-        return reserved();
-    }
-
-    /** Alias for callers that use an ID-shaped accessor. */
-    @Nonnull
-    public String id() {
-        return value;
     }
 
     @Nonnull

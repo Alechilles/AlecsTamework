@@ -67,6 +67,22 @@ class TwCommandItemConfigCommandUiTest {
     }
 
     @Test
+    void reservedRendererIdIsRejected() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> decode("{\"UiRendererId\":\"tamework:internal\"}")
+        );
+    }
+
+    @Test
+    void reservedContributorIdIsRejected() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> decode("{\"UiContributors\":[{\"Id\":\"tamework:internal\"}]}")
+        );
+    }
+
+    @Test
     void duplicateContributorIdsAreRejected() {
         assertThrows(
                 IllegalArgumentException.class,

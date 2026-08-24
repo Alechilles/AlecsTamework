@@ -247,7 +247,9 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             asset -> asset.uiRendererId
         )
         .documentation("Optional namespaced command-menu renderer. Blank or omitted selects the standard Tamework menu. "
-                + "Renderer IDs are normalized to lowercase. Inheritance: omitted value inherits.")
+                + "Renderer IDs are normalized to lowercase. Inheritance: an omitted child value inherits from its "
+                + "parent; an explicit child value replaces it. If no effective renderer is present, the standard "
+                + "Tamework menu is selected.")
         .add()
         .<UiContributorSettings[]>append(
             new KeyedCodec<>("UiContributors", UI_CONTRIBUTOR_ARRAY_CODEC),
@@ -527,7 +529,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             return null;
         }
         CommandUiRendererId id = CommandUiRendererId.of(value);
-        if (id.isReserved()) {
+        if (id.reserved()) {
             throw new IllegalArgumentException("The tamework: renderer namespace is reserved.");
         }
         return id.value();
@@ -546,7 +548,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
                 throw new IllegalArgumentException("UiContributors cannot contain null entries.");
             }
             CommandUiContributorId id = CommandUiContributorId.of(settings.id);
-            if (id.isReserved()) {
+            if (id.reserved()) {
                 throw new IllegalArgumentException("The tamework: contributor namespace is reserved.");
             }
             if (!seen.add(id)) {

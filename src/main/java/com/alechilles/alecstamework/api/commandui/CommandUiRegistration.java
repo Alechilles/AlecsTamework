@@ -14,11 +14,6 @@ public interface CommandUiRegistration extends AutoCloseable {
     /** Returns whether this exact generation remains live. */
     boolean active();
 
-    /** Alias for callers that use the close-state wording. */
-    default boolean isActive() {
-        return active();
-    }
-
     /** Removes this generation. The operation is idempotent. */
     @Override
     void close();
