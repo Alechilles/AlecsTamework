@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.2.2 - Flightmaster's Talisman Preview Hotfix - 2026-08-24
+
+### Fixed
+
+- Fixed the Flightmaster's Talisman crafting preview. It now uses the
+  front-facing icon orientation and a smaller scale.
+
 ## 3.2.1 - Runtime Performance and Active Companion Indicators - 2026-08-22
 
 ### Added
