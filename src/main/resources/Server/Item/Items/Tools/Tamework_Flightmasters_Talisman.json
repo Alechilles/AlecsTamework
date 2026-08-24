@@ -51,15 +51,15 @@
   "Texture": "Items/Tamework/FlightmasterTalisman/Flightmaster_Talisman_Texture.png",
   "Icon": "Icons/ItemsGenerated/Tamework_Flightmasters_Talisman.png",
   "IconProperties": {
-    "Scale": 0.82,
+    "Scale": 0.5,
     "Translation": [
       2,
       1
     ],
     "Rotation": [
-      18,
-      205,
-      330
+      0,
+      0,
+      0
     ]
   },
   "MaxStack": 1,
