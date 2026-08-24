@@ -246,7 +246,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             (asset, value) -> asset.uiRendererId = normalizeUiRendererId(value),
             asset -> asset.uiRendererId
         )
-        .documentation("Optional namespaced command-menu renderer. Blank or omitted selects the standard Tamework menu. "
+        .documentation("Optional namespaced command-menu renderer. Blank selects the standard Tamework menu. "
                 + "Renderer IDs are normalized to lowercase. Inheritance: an omitted child value inherits from its "
                 + "parent; an explicit child value replaces it. If no effective renderer is present, the standard "
                 + "Tamework menu is selected.")
