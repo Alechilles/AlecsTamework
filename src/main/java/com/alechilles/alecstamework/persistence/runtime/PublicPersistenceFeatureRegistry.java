@@ -1,5 +1,4 @@
 package com.alechilles.alecstamework.persistence.runtime;
-
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseDefinition;
 import com.alechilles.alecstamework.companion.capture.CaptureAttemptCooldownIndex;
@@ -32,7 +31,6 @@ import com.alechilles.alecstamework.persistence.facade
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 /** The complete static descriptor set for replacement public persistence behavior. */
 public final class PublicPersistenceFeatureRegistry {
     public static final PersistenceFeatureId IDENTITY =
@@ -498,5 +496,4 @@ public final class PublicPersistenceFeatureRegistry {
                 )
         );
     }
-
 }
