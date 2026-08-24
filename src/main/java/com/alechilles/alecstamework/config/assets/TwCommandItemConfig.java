@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.config.assets;
 
-import com.alechilles.alecstamework.api.commandui.CommandUiProviderId;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorRequirement;
+import com.alechilles.alecstamework.api.commandui.CommandUiRendererId;
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
 import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.assetstore.AssetStore;
@@ -13,8 +15,11 @@ import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
 import com.hypixel.hytale.codec.lookup.StringCodecMapCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
+import java.util.ArrayList;
 import org.joml.Vector3d;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
@@ -146,6 +151,8 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
 
     static final CommandEntry[] EMPTY_COMMAND_LIST = new CommandEntry[0];
     static final CommandStep[] EMPTY_STEPS = new CommandStep[0];
+    private static final CommandUiContributorRequirement[] EMPTY_UI_CONTRIBUTORS =
+            new CommandUiContributorRequirement[0];
 
     public static final StringCodecMapCodec<
             AllowedRoles,
@@ -166,6 +173,25 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             TwCommandItemCodecs.COMMAND_ENTRY_CODEC;
     public static final ArrayCodec<CommandEntry> COMMAND_ENTRY_ARRAY_CODEC =
             TwCommandItemCodecs.COMMAND_ENTRY_ARRAY_CODEC;
+    public static final BuilderCodec<UiContributorSettings> UI_CONTRIBUTOR_CODEC =
+            BuilderCodec.builder(UiContributorSettings.class, UiContributorSettings::new)
+                    .<String>append(
+                            new KeyedCodec<>("Id", Codec.STRING),
+                            (settings, value) -> settings.id = value,
+                            settings -> settings.id
+                    )
+                    .documentation("Namespaced contributor ID selected for this command UI.")
+                    .add()
+                    .<Boolean>append(
+                            new KeyedCodec<>("Required", Codec.BOOLEAN),
+                            (settings, value) -> settings.required = value != null && value,
+                            settings -> settings.required
+                    )
+                    .documentation("When true, contributor failure falls back to the standard Tamework UI.")
+                    .add()
+                    .build();
+    public static final ArrayCodec<UiContributorSettings> UI_CONTRIBUTOR_ARRAY_CODEC =
+            new ArrayCodec<>(UI_CONTRIBUTOR_CODEC, UiContributorSettings[]::new);
 
     public static final AssetBuilderCodec<String, TwCommandItemConfig> CODEC =
         AssetBuilderCodec.builder(
@@ -216,12 +242,20 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
                 + "Required when RosterStorage is OwnerCommandFamily. Inheritance: omitted value inherits.")
         .add()
         .<String>append(
-            new KeyedCodec<>("UiProviderId", Codec.STRING),
-            (asset, value) -> asset.uiProviderId = normalizeUiProviderId(value),
-            asset -> asset.uiProviderId
+            new KeyedCodec<>("UiRendererId", Codec.STRING),
+            (asset, value) -> asset.uiRendererId = normalizeUiRendererId(value),
+            asset -> asset.uiRendererId
         )
-        .documentation("Optional namespaced command-menu provider. Blank or omitted selects the standard Tamework menu. "
-                + "Provider IDs are normalized to lowercase. Inheritance: omitted value inherits.")
+        .documentation("Optional namespaced command-menu renderer. Blank or omitted selects the standard Tamework menu. "
+                + "Renderer IDs are normalized to lowercase. Inheritance: omitted value inherits.")
+        .add()
+        .<UiContributorSettings[]>append(
+            new KeyedCodec<>("UiContributors", UI_CONTRIBUTOR_ARRAY_CODEC),
+            (asset, value) -> asset.uiContributors = normalizeUiContributors(value),
+            asset -> toUiContributorSettings(asset.uiContributors)
+        )
+        .documentation("Ordered contributor requirements. An explicit list replaces the inherited list; an explicit "
+                + "empty list clears inherited contributors.")
         .add()
         .<RosterStorage>append(
             new KeyedCodec<>(
@@ -338,7 +372,8 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     private double radius = -1.0;
     private MembershipMode membershipMode = MembershipMode.LinkedOnly;
     private String commandFamilyId;
-    private String uiProviderId;
+    private String uiRendererId;
+    private CommandUiContributorRequirement[] uiContributors = EMPTY_UI_CONTRIBUTORS;
     private RosterStorage rosterStorage = RosterStorage.ItemMetadata;
     private String bondedRosterId;
     private Boolean projectRosterToItemMetadata;
@@ -422,7 +457,10 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         if (!explicitTopLevelKeys.contains("Radius")) radius = parent.radius;
         if (!explicitTopLevelKeys.contains("MembershipMode")) membershipMode = parent.membershipMode;
         if (!explicitTopLevelKeys.contains("CommandFamilyId")) commandFamilyId = parent.commandFamilyId;
-        if (!explicitTopLevelKeys.contains("UiProviderId")) uiProviderId = parent.uiProviderId;
+        if (!explicitTopLevelKeys.contains("UiRendererId")) uiRendererId = parent.uiRendererId;
+        if (!explicitTopLevelKeys.contains("UiContributors")) {
+            uiContributors = parent.uiContributors.clone();
+        }
         if (!explicitTopLevelKeys.contains("RosterStorage")) rosterStorage = parent.rosterStorage;
         if (!explicitTopLevelKeys.contains("BondedRosterId")) bondedRosterId = parent.bondedRosterId;
         if (!explicitTopLevelKeys.contains("ProjectRosterToItemMetadata")) {
@@ -484,11 +522,56 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     }
 
     @Nullable
-    private static String normalizeUiProviderId(@Nullable String value) {
+    private static String normalizeUiRendererId(@Nullable String value) {
         if (value == null || value.isBlank()) {
             return null;
         }
-        return CommandUiProviderId.of(value).value();
+        CommandUiRendererId id = CommandUiRendererId.of(value);
+        if (id.isReserved()) {
+            throw new IllegalArgumentException("The tamework: renderer namespace is reserved.");
+        }
+        return id.value();
+    }
+
+    private static CommandUiContributorRequirement[] normalizeUiContributors(
+            @Nullable UiContributorSettings[] value
+    ) {
+        if (value == null || value.length == 0) {
+            return EMPTY_UI_CONTRIBUTORS;
+        }
+        List<CommandUiContributorRequirement> requirements = new ArrayList<>(value.length);
+        Set<CommandUiContributorId> seen = new HashSet<>();
+        for (UiContributorSettings settings : value) {
+            if (settings == null) {
+                throw new IllegalArgumentException("UiContributors cannot contain null entries.");
+            }
+            CommandUiContributorId id = CommandUiContributorId.of(settings.id);
+            if (id.isReserved()) {
+                throw new IllegalArgumentException("The tamework: contributor namespace is reserved.");
+            }
+            if (!seen.add(id)) {
+                throw new IllegalArgumentException("UiContributors contains duplicate ID: " + id.value());
+            }
+            requirements.add(new CommandUiContributorRequirement(id, settings.required));
+        }
+        return requirements.toArray(CommandUiContributorRequirement[]::new);
+    }
+
+    private static UiContributorSettings[] toUiContributorSettings(
+            @Nullable CommandUiContributorRequirement[] requirements
+    ) {
+        if (requirements == null || requirements.length == 0) {
+            return new UiContributorSettings[0];
+        }
+        UiContributorSettings[] settings = new UiContributorSettings[requirements.length];
+        for (int index = 0; index < requirements.length; index++) {
+            CommandUiContributorRequirement requirement = requirements[index];
+            UiContributorSettings setting = new UiContributorSettings();
+            setting.id = requirement.id().value();
+            setting.required = requirement.required();
+            settings[index] = setting;
+        }
+        return settings;
     }
 
     public boolean isEnabled() {
@@ -512,10 +595,26 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         return commandFamilyId;
     }
 
-    /** Returns the normalized custom menu provider ID, or null for the standard menu. */
+    /** Returns the normalized custom menu renderer ID, or null for the standard menu. */
+    @Nullable
+    public String getUiRendererId() {
+        return uiRendererId;
+    }
+
+    /** Returns the ordered immutable contributor requirements for this command UI. */
+    @Nonnull
+    public List<CommandUiContributorRequirement> getUiContributors() {
+        return List.of(uiContributors);
+    }
+
+    /**
+     * Transitional source compatibility for runtime code that still reads the
+     * removed provider field. New code must use {@link #getUiRendererId()}.
+     */
+    @Deprecated
     @Nullable
     public String getUiProviderId() {
-        return uiProviderId;
+        return null;
     }
 
     public RosterStorage getRosterStorage() {
@@ -684,6 +783,20 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public String getMessage() {
             return message;
+        }
+    }
+
+    /** Codec-only representation of one contributor requirement. */
+    public static final class UiContributorSettings {
+        private String id;
+        private boolean required;
+
+        public String getId() {
+            return id;
+        }
+
+        public boolean isRequired() {
+            return required;
         }
     }
 

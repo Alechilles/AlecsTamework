@@ -19,6 +19,51 @@ public interface CommandUiApi {
     boolean available();
 
     /**
+     * Registers one custom renderer under a normalized namespaced identifier.
+     *
+     * <p>Implementations that do not expose the renderer registry return an
+     * unavailable result. This default keeps replacement API adapters
+     * fail-closed while they are being upgraded.</p>
+     */
+    @Nonnull
+    default CommandUiRegistrationResult registerRenderer(
+            @Nullable String rendererId,
+            @Nullable CommandUiRendererProvider provider
+    ) {
+        return CommandUiRegistrationResult.unavailable(rendererId);
+    }
+
+    /** Convenience overload for callers that already parsed an identifier. */
+    @Nonnull
+    default CommandUiRegistrationResult registerRenderer(
+            @Nullable CommandUiRendererId rendererId,
+            @Nullable CommandUiRendererProvider provider
+    ) {
+        return registerRenderer(rendererId == null ? null : rendererId.value(), provider);
+    }
+
+    /**
+     * Registers one session contributor under a normalized namespaced
+     * identifier.
+     */
+    @Nonnull
+    default CommandUiRegistrationResult registerContributor(
+            @Nullable String contributorId,
+            @Nullable CommandUiContributorProvider provider
+    ) {
+        return CommandUiRegistrationResult.unavailable(contributorId);
+    }
+
+    /** Convenience overload for callers that already parsed an identifier. */
+    @Nonnull
+    default CommandUiRegistrationResult registerContributor(
+            @Nullable CommandUiContributorId contributorId,
+            @Nullable CommandUiContributorProvider provider
+    ) {
+        return registerContributor(contributorId == null ? null : contributorId.value(), provider);
+    }
+
+    /**
      * Registers one provider under a normalized namespaced identifier.
      *
      * <p>A successful result owns an idempotent registration handle. A later
