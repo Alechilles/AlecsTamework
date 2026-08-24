@@ -5,6 +5,7 @@ public final class ActivityIds {
     public static final String FEED = "tamework:feed";
     public static final String HARVEST = "tamework:harvest";
     public static final String BREED_SUCCESS = "tamework:breed_success";
+    public static final String CULL_SUCCESS = "tamework:cull_success";
     public static final String TAME_SUCCESS = "tamework:tame_success";
     public static final String NEED_SATISFIED = "tamework:need_satisfied";
     public static final String REVIVE_SUCCESS = "tamework:revive_success";

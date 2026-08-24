@@ -173,6 +173,29 @@ public final class TwManagedActivityConfig
                             "Namespaced activity emitted after a committed autonomous food or water need change."
                     )
                     .add()
+                    .<String>append(
+                            new KeyedCodec<>("CullSuccess", Codec.STRING),
+                            (settings, value) -> settings.cullSuccess = value,
+                            settings -> settings.cullSuccess
+                    )
+                    .documentation(
+                            "Optional namespaced activity emitted after an authorized cull succeeds."
+                    )
+                    .add()
+                    .<Map<String, String>>append(
+                            new KeyedCodec<>(
+                                    "CullDropLists",
+                                    MapCodec.STRING_HASH_MAP_CODEC
+                            ),
+                            (settings, value) -> settings.cullDropLists =
+                                    value == null ? Map.of() : value,
+                            settings -> settings.cullDropLists
+                    )
+                    .documentation(
+                            "Optional map of population-group IDs to domestic item drop-list IDs. "
+                                    + "An explicit child map replaces the parent map."
+                    )
+                    .add()
                     .build();
 
     public static final AssetBuilderCodec<String, TwManagedActivityConfig>
@@ -425,6 +448,12 @@ public final class TwManagedActivityConfig
         if (!nested.contains("NeedSatisfied")) {
             activities.needSatisfied = parent.activities.needSatisfied;
         }
+        if (!nested.contains("CullSuccess")) {
+            activities.cullSuccess = parent.activities.cullSuccess;
+        }
+        if (!nested.contains("CullDropLists")) {
+            activities.cullDropLists = parent.activities.cullDropLists;
+        }
     }
 
     /** Validates fields that do not require the population-group registry. */
@@ -538,6 +567,32 @@ public final class TwManagedActivityConfig
                 "PendingOutputItems",
                 configId
         );
+        validateCullSettings(settings, configId);
+    }
+
+    private static void validateCullSettings(
+            ActivitySettings settings,
+            String configId
+    ) {
+        boolean hasActivity = settings.cullSuccess != null
+                && !settings.cullSuccess.isBlank();
+        boolean hasDrops = settings.cullDropLists != null
+                && !settings.cullDropLists.isEmpty();
+        if (!hasActivity && !hasDrops) {
+            return;
+        }
+        requireNamespaced(settings.cullSuccess, "CullSuccess", configId);
+        if (!hasDrops) {
+            throw new IllegalArgumentException(
+                    "CullDropLists are required when CullSuccess is configured in "
+                            + configId
+            );
+        }
+        for (Map.Entry<String, String> entry
+                : settings.cullDropLists.entrySet()) {
+            requireNamespaced(entry.getKey(), "CullDropLists key", configId);
+            requireText(entry.getValue(), "CullDropLists value");
+        }
     }
 
     private static void validateMapping(
@@ -683,6 +738,8 @@ public final class TwManagedActivityConfig
         private String breedingSuccess;
         private String tameSuccess;
         private String needSatisfied;
+        private String cullSuccess;
+        private Map<String, String> cullDropLists = Map.of();
 
         private ActivitySettings() {
         }
@@ -713,6 +770,17 @@ public final class TwManagedActivityConfig
 
         public String getNeedSatisfied() {
             return needSatisfied;
+        }
+
+        @Nullable
+        public String getCullSuccess() {
+            return cullSuccess;
+        }
+
+        public Map<String, String> getCullDropLists() {
+            return cullDropLists == null
+                    ? Map.of()
+                    : Map.copyOf(cullDropLists);
         }
     }
 }

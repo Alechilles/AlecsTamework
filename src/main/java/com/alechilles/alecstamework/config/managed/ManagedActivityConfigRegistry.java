@@ -361,6 +361,14 @@ public final class ManagedActivityConfigRegistry {
 
         TwManagedActivityConfig.ActivitySettings settings =
                 config.getActivities();
+        for (String groupId : settings.getCullDropLists().keySet()) {
+            if (!families.containsKey(normalize(groupId))) {
+                throw new IllegalArgumentException(
+                        "managed-profile-cull-group-not-declared:"
+                                + config.getProfileId() + ':' + groupId
+                );
+            }
+        }
         ManagedActivityProfile.ActivityMapping activities =
                 new ManagedActivityProfile.ActivityMapping(
                         normalize(settings.getFeed()),
@@ -368,7 +376,9 @@ public final class ManagedActivityConfigRegistry {
                         settings.getPendingOutputItems(),
                         normalize(settings.getBreedingSuccess()),
                         normalize(settings.getTameSuccess()),
-                        normalize(settings.getNeedSatisfied())
+                        normalize(settings.getNeedSatisfied()),
+                        settings.getCullSuccess(),
+                        settings.getCullDropLists()
                 );
         return new ManagedActivityProfile(
                 normalize(config.getProfileId()),

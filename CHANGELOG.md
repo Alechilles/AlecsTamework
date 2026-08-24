@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Managed activity profiles can map authorized `TameworkCullNpc` item
+  interactions to a domestic drop list and a `tamework:cull_success` Activity
+  V2 event. Profiles that omit the mapping keep the normal cull death drops
+  and publish no cull activity.
+
 ## 3.2.1 - Runtime Performance and Active Companion Indicators - 2026-08-22
 
 ### Added

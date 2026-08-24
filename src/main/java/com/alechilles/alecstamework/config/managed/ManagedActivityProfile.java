@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Immutable, validated content profile for one generic managed-activity
@@ -128,7 +129,9 @@ public record ManagedActivityProfile(
             @Nonnull Map<String, String> pendingOutputItems,
             @Nonnull String breedingSuccess,
             @Nonnull String tameSuccess,
-            @Nonnull String needSatisfied
+            @Nonnull String needSatisfied,
+            @Nullable String cullSuccess,
+            @Nonnull Map<String, String> cullDropLists
     ) {
         public ActivityMapping {
             feed = requireText(feed, "activities.feed");
@@ -152,6 +155,11 @@ public record ManagedActivityProfile(
                     needSatisfied,
                     "activities.needSatisfied"
             );
+            cullSuccess = normalizeOptional(cullSuccess);
+            cullDropLists = immutableStringMap(
+                    cullDropLists,
+                    "activities.cullDropLists"
+            );
         }
 
         private static Map<String, String> immutableStringMap(
@@ -169,6 +177,11 @@ public record ManagedActivityProfile(
                 );
             }
             return Map.copyOf(copy);
+        }
+
+        @Nullable
+        private static String normalizeOptional(@Nullable String value) {
+            return value == null || value.isBlank() ? null : value.trim();
         }
     }
 }

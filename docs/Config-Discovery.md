@@ -50,7 +50,10 @@ Resolved by role id + `Priority`:
 - `TwManagedActivityConfig` compiles provider-neutral activity profiles. A
   profile resolves an exact role through its population-group-backed family,
   exposes named capacity domains and activity mappings, and reports explicit
-  readiness by profile id. Duplicate roles inside one profile are rejected.
+  readiness by profile id. Optional `CullSuccess` and `CullDropLists` fields
+  map authorized `TameworkCullNpc` item interactions to one activity and one
+  domestic drop table per family. Duplicate roles inside one profile are
+  rejected.
 
 ### Dynamic attachment family
 - `TwDynamicAttachmentsConfig` is indexed by role id and evaluates ordered conditional rules.
@@ -95,7 +98,8 @@ Behavior summary:
 - `TwManagedActivityConfig` treats `Domains`, `Families`, and capability or
   mapping arrays as replacement sections when authored. An explicit
   `Activities` object inherits only its omitted nested fields. This prevents a
-  child from silently combining two family or domain lists.
+  child from silently combining two family or domain lists. An explicit
+  `CullDropLists` map replaces the parent map.
 
 ## Global vs companion policy scope
 - `TwGlobalConfig` contains global defaults and shared infrastructure knobs.

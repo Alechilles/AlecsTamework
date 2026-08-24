@@ -25,7 +25,9 @@ public final class TameworkCullNpcInteraction extends SimpleInteraction {
             TameworkCullNpcInteraction::new,
             SimpleInteraction.CODEC
     )
-            .documentation("Culls an authorized NPC target with normal death processing.")
+            .documentation(
+                    "Culls an authorized NPC target and applies managed domestic rewards when configured."
+            )
             .<Boolean>appendInherited(
                     new KeyedCodec<>("RequireOwner", Codec.BOOLEAN),
                     (interaction, value) -> interaction.requireOwner = value == null || value,

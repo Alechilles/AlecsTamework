@@ -41,7 +41,7 @@ class ManagedActivityPublisherTest {
             "20000000-0000-0000-0000-000000000002");
 
     @Test
-    void publishesMappedFeedHarvestAndBreedingPayloadsAfterCommittedOutcomes() throws Exception {
+    void publishesMappedFeedHarvestBreedingAndCullPayloadsAfterCommittedOutcomes() throws Exception {
         ManagedActivityConfigRegistry managed = managedRegistry();
         List<ActivityView> published = new ArrayList<>();
         ManagedActivityPublisher publisher = new ManagedActivityPublisher(
@@ -52,6 +52,7 @@ class ManagedActivityPublisherTest {
         UUID harvestOperation = UUID.randomUUID();
         UUID litterId = UUID.randomUUID();
         UUID offspring = UUID.randomUUID();
+        UUID cullOperation = UUID.randomUUID();
 
         publisher.publishFeed(
                 feedOperation,
@@ -81,8 +82,15 @@ class ManagedActivityPublisherTest {
                 SECOND_COMPANION,
                 List.of(offspring)
         );
+        publisher.publishCull(
+                cullOperation,
+                "RoleA",
+                OWNER,
+                COMPANION,
+                Map.of("Food_Beef_Raw", 3, "Ingredient_Hide_Medium", 1)
+        );
 
-        assertEquals(3, published.size());
+        assertEquals(4, published.size());
         ManagedActivityView feed = assertInstanceOf(
                 ManagedActivityView.class, published.get(0));
         assertEquals(ActivityIds.FEED, feed.header().actionId());
@@ -139,6 +147,23 @@ class ManagedActivityPublisherTest {
                 breeding.participants()
         );
         assertEquals(List.of(offspring), breeding.offspringIds());
+
+        ManagedActivityView cull = assertInstanceOf(
+                ManagedActivityView.class, published.get(3));
+        assertEquals(ActivityIds.CULL_SUCCESS, cull.header().actionId());
+        assertEquals(cullOperation, cull.header().operationId());
+        assertEquals("runeteria:cull_success", cull.mappedActivityId());
+        assertEquals(Map.of(
+                "Food_Beef_Raw", 3,
+                "Ingredient_Hide_Medium", 1
+        ), cull.itemQuantities());
+        assertEquals(List.of(new ActivityParticipantView(
+                COMPANION,
+                OWNER,
+                "runeteria:husbandry",
+                "RoleA"
+        )), cull.participants());
+        assertEquals("RH_Slaughter_Cow", publisher.resolveCullDropList("RoleA"));
     }
 
     @Test
@@ -261,7 +286,9 @@ class ManagedActivityPublisherTest {
                     "PendingOutputItems":{"Food_Egg":"runeteria:egg"},
                     "BreedingSuccess":"runeteria:breed",
                     "TameSuccess":"runeteria:tame_success",
-                    "NeedSatisfied":"runeteria:feed"
+                    "NeedSatisfied":"runeteria:feed",
+                    "CullSuccess":"runeteria:cull_success",
+                    "CullDropLists":{"runeteria:family":"RH_Slaughter_Cow"}
                   }
                 }
                 """);

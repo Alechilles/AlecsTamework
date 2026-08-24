@@ -61,6 +61,12 @@ AutoCloseable handle = api.events().subscribe(NpcProfileChangedEvent.class, even
 It does not retain or replay activities. Consumers must close their
 subscription during shutdown.
 
+Managed activity profiles can publish `tamework:cull_success` as a
+`ManagedActivityView`. The payload contains one owner/companion participant,
+the resolved family group, the profile's mapped activity ID, and the domestic
+item quantities. A profile that omits cull configuration publishes no cull
+activity and keeps normal death drops.
+
 `RevivalActivityView` includes the persistent companion profile identity and,
 when Tamework can resolve the active managed role, `roleId` and immutable
 `groupIds`. The role is nullable and the group set can be empty for older or

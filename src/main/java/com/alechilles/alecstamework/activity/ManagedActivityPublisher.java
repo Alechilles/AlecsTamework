@@ -145,6 +145,50 @@ public final class ManagedActivityPublisher {
         );
     }
 
+    /** Publishes one authorized cull after death processing is committed. */
+    public void publishCull(
+            @Nonnull UUID operationId,
+            @Nullable String roleId,
+            @Nullable UUID ownerId,
+            @Nullable UUID companionId,
+            @Nullable Map<String, Integer> itemQuantities
+    ) {
+        if (ownerId == null || companionId == null) {
+            return;
+        }
+        ManagedActivityConfigRegistry.RoleResolution resolution =
+                resolveRole(roleId, companionId);
+        if (resolution == null) {
+            return;
+        }
+        publish(
+                operationId,
+                ActivityIds.CULL_SUCCESS,
+                resolution.profile(),
+                groupIds(resolution),
+                List.of(participant(resolution, ownerId, companionId)),
+                resolution.profile().activities().cullSuccess(),
+                itemQuantities,
+                List.of(),
+                null,
+                null
+        );
+    }
+
+    /** Resolves the configured domestic drop list for one managed role. */
+    @Nullable
+    public String resolveCullDropList(@Nullable String roleId) {
+        ManagedActivityConfigRegistry.RoleResolution resolution =
+                resolveRole(roleId);
+        if (resolution == null || resolution.family() == null) {
+            return null;
+        }
+        String dropList = resolution.profile().activities().cullDropLists()
+                .get(resolution.family().groupId());
+        return dropList == null || dropList.isBlank()
+                ? null : dropList.trim();
+    }
+
     /** Publishes one committed autonomous food or water need change. */
     public void publishNeedSatisfied(
             @Nonnull UUID operationId,
@@ -244,6 +288,16 @@ public final class ManagedActivityPublisher {
         }
         return managedActivities.resolveRole(roleId.trim())
                 .orElse(null);
+    }
+
+    @Nullable
+    private ManagedActivityConfigRegistry.RoleResolution resolveRole(
+            @Nullable String roleId
+    ) {
+        if (roleId == null || roleId.isBlank()) {
+            return null;
+        }
+        return managedActivities.resolveRole(roleId.trim()).orElse(null);
     }
 
     @Nonnull

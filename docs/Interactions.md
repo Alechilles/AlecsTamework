@@ -262,8 +262,10 @@ For replacement and empty-hand removal, use the exchange requirement and effect 
 ### `TameworkCullNpc`
 
 `TameworkCullNpc` is a terminal item interaction that kills one targeted NPC
-through Tamework's normal cull path. It applies fatal command damage, so the
-NPC's usual death effects and drops still occur.
+through Tamework's cull path. It applies fatal command damage. The NPC's usual
+death effects and drops occur unless its managed activity profile maps the
+role's family through `Activities.CullDropLists`. A resolved domestic table is
+rolled once and replaces the normal death drops.
 
 The interaction has no matching `Tw*Config` asset. Put it on a consumer mod's
 item and use that item's native interaction chain for range, cooldown,
@@ -280,7 +282,9 @@ durability, animation, and optional hold confirmation.
 Both fields default to `true`. The interaction rejects missing or non-NPC
 targets, targets that do not meet the selected owner/tame policy, and bonded
 companion projections. It clears ordinary command links before the death path
-and removes the NPC from eligible generic command tools in the hotbar.
+and removes the NPC from eligible generic command tools in the hotbar. After a
+successful managed cull, Activity V2 emits `tamework:cull_success` with the
+owner, companion, family, mapped activity ID, and rolled item quantities.
 
 For a butcher-style item, put this interaction in a named interaction asset,
 then reference that asset on the successful completion branch of the item's

@@ -2,18 +2,21 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.TameworkApi;
+import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.asset.type.gameplay.DeathConfig;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
@@ -101,7 +104,7 @@ public final class TameworkNpcCullService {
                 new CommandLinkMutationService(null, policy, null, null)
         );
         Outcome outcome = service.cull(
-                player, target, store, requireOwner, requireTamed
+                player, target, store, requireOwner, requireTamed, true
         );
         return outcome == Outcome.CULLED || outcome == Outcome.QUEUED;
     }
@@ -111,6 +114,15 @@ public final class TameworkNpcCullService {
                  @Nullable Store<EntityStore> store,
                  boolean requireOwner,
                  boolean requireTamed) {
+        return cull(player, target, store, requireOwner, requireTamed, false);
+    }
+
+    private Outcome cull(@Nullable Player player,
+                         @Nullable Ref<EntityStore> target,
+                         @Nullable Store<EntityStore> store,
+                         boolean requireOwner,
+                         boolean requireTamed,
+                         boolean managedRewards) {
         if (player == null || target == null || !target.isValid() || store == null) {
             return Outcome.UNAVAILABLE;
         }
@@ -131,10 +143,12 @@ public final class TameworkNpcCullService {
         if (rosterRemoval.isReady()) {
             return queueCullAfterRosterRemoval(
                     player, npc.getUuid(), requireOwner, requireTamed,
-                    rosterRemoval
+                    managedRewards, rosterRemoval
             );
         }
-        return applyCull(player, target, store);
+        return applyCull(
+                player, player.getUuid(), target, store, managedRewards
+        );
     }
 
     private CommandRosterCullUnlinkService.Preparation prepareRosterRemoval(
@@ -162,6 +176,7 @@ public final class TameworkNpcCullService {
             @Nullable UUID targetUuid,
             boolean requireOwner,
             boolean requireTamed,
+            boolean managedRewards,
             CommandRosterCullUnlinkService.Preparation rosterRemoval
     ) {
         World world = player.getWorld();
@@ -181,7 +196,7 @@ public final class TameworkNpcCullService {
                 LeaseBoundWorldDispatcher.execute(world, () ->
                         applyDeferredCull(
                                 world, ownerUuid, targetUuid,
-                                requireOwner, requireTamed
+                                requireOwner, requireTamed, managedRewards
                         ));
             }
         });
@@ -193,7 +208,8 @@ public final class TameworkNpcCullService {
             UUID ownerUuid,
             UUID targetUuid,
             boolean requireOwner,
-            boolean requireTamed
+            boolean requireTamed,
+            boolean managedRewards
     ) {
         if (world.getEntityStore() == null) {
             return;
@@ -208,28 +224,66 @@ public final class TameworkNpcCullService {
         WorldPlayerResolver.ResolvedPlayer resolved =
                 WorldPlayerResolver.resolve(world, ownerUuid);
         Player player = resolved == null ? null : resolved.player();
-        applyCull(player, target, store);
+        applyCull(player, ownerUuid, target, store, managedRewards);
     }
 
     private Outcome applyCull(
             @Nullable Player player,
+            @Nullable UUID ownerUuid,
             Ref<EntityStore> target,
-            Store<EntityStore> store
+            Store<EntityStore> store,
+            boolean managedRewards
     ) {
+        ComponentType<EntityStore, DeathComponent> deathType =
+                resolveDeathComponentType();
+        if (deathType != null
+                && store.getComponent(target, deathType) != null) {
+            return Outcome.UNAVAILABLE;
+        }
         DamageCause cause = DamageCause.COMMAND != null
                 ? DamageCause.COMMAND : DamageCause.PHYSICAL;
         if (cause == null) {
             return Outcome.UNAVAILABLE;
         }
-        unlinkCommandTarget(target, store);
         NPCEntity npc = store.getComponent(target, NPCEntity.getComponentType());
+        String roleId = managedRewards
+                ? CompanionRoleIdResolver.resolveRoleId(target, store) : null;
+        CullRewardService.Outcome rewards = managedRewards
+                ? CullRewardService.apply(
+                ActivityRuntime.resolveCullDropList(roleId), target, store)
+                : CullRewardService.Outcome.unavailable();
+        unlinkCommandTarget(target, store);
         removeCommandToolRecords(player, npc == null ? null : npc.getUuid());
         DeathComponent.tryAddComponent(
                 store,
                 target,
                 new Damage(Damage.NULL_SOURCE, cause, CULL_DAMAGE_AMOUNT)
         );
+        DeathComponent death = deathType == null ? null
+                : store.getComponent(target, deathType);
+        if (rewards.domesticDropsApplied() && death != null) {
+            death.setItemsLossMode(DeathConfig.ItemsLossMode.NONE);
+        }
+        if (managedRewards) {
+            ActivityRuntime.publishCull(
+                    UUID.randomUUID(),
+                    roleId,
+                    ownerUuid,
+                    npc == null ? null : npc.getUuid(),
+                    rewards.itemQuantities()
+            );
+        }
         return Outcome.CULLED;
+    }
+
+    @Nullable
+    private static ComponentType<EntityStore, DeathComponent>
+            resolveDeathComponentType() {
+        try {
+            return DeathComponent.getComponentType();
+        } catch (NullPointerException unavailableComponentRegistry) {
+            return null;
+        }
     }
 
     /**

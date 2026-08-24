@@ -202,6 +202,33 @@ public final class ActivityRuntime {
         }
     }
 
+    /** Resolves the configured domestic cull drop list for one managed role. */
+    @Nullable
+    public static String resolveCullDropList(@Nullable String roleId) {
+        ManagedActivityPublisher publisher = CURRENT.get().publisher;
+        return publisher == null ? null : publisher.resolveCullDropList(roleId);
+    }
+
+    /** Publishes one authorized cull after death processing is committed. */
+    public static void publishCull(
+            @Nonnull UUID operationId,
+            @Nullable String roleId,
+            @Nullable UUID ownerId,
+            @Nullable UUID companionId,
+            @Nullable Map<String, Integer> itemQuantities
+    ) {
+        ManagedActivityPublisher publisher = CURRENT.get().publisher;
+        if (publisher != null) {
+            publisher.publishCull(
+                    operationId,
+                    roleId,
+                    ownerId,
+                    companionId,
+                    itemQuantities
+            );
+        }
+    }
+
     /** Publishes one committed autonomous need change. */
     public static void publishNeedSatisfied(
             @Nonnull UUID operationId,
