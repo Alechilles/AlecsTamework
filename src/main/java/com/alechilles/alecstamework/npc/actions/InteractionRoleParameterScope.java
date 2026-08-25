@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.npc.compat.NpcBuilderAccess;
 import com.hypixel.hytale.server.npc.asset.builder.Builder;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderParameters;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
+import com.hypixel.hytale.server.npc.util.expression.Scope;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import javax.annotation.Nullable;
 
@@ -18,6 +19,12 @@ final class InteractionRoleParameterScope {
             return null;
         }
         try {
+            Scope globalScope = support.getGlobalScope();
+            if (globalScope != null) {
+                return globalScope instanceof StdScope
+                        ? StdScope.copyOf((StdScope) globalScope)
+                        : new StdScope(globalScope);
+            }
             Builder<?> roleBuilder = NpcBuilderAccess.getRoleRoot(support);
             BuilderParameters parameters = roleBuilder != null ? roleBuilder.getBuilderParameters() : null;
             return parameters != null ? parameters.createScope() : null;
