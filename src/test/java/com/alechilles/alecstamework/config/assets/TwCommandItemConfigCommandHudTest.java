@@ -4,36 +4,35 @@ import com.alechilles.alecstamework.api.commandhud.CommandHudContributorId;
 import com.alechilles.alecstamework.api.commandhud.CommandHudContributorRequirement;
 import com.hypixel.hytale.codec.ExtraInfo;
 import java.util.List;
-import java.util.Set;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Tests independent command target and hotswap HUD configuration behavior. */
 class TwCommandItemConfigCommandHudTest {
     @Test
-    void targetAndHotswapSelectionsInheritIndependently() {
-        TwCommandItemConfig parent = decode(
+    void targetAndHotswapSelectionsDecodeIndependently() {
+        TwCommandItemConfig config = decode(
                 "{\"TargetHudRendererId\":\"Runeteria:Target\","
                         + "\"TargetHudContributors\":[{\"Id\":\"Runeteria:TargetBadge\",\"Required\":true}],"
                         + "\"HotswapHudRendererId\":\"Runeteria:Hotswap\","
-                        + "\"HotswapHudContributors\":[{\"Id\":\"Runeteria:Badge\",\"Required\":false}]}"
+                        + "\"HotswapHudContributors\":[{\"Id\":\"Runeteria:HotswapBadge\",\"Required\":false}]}"
         );
-        TwCommandItemConfig child = decode("{\"TargetHudContributors\":[]}");
 
-        child.inheritMissingTopLevelFrom(parent, Set.of("TargetHudContributors"));
-
-        assertEquals("runeteria:target", child.getTargetHudRendererId());
-        assertTrue(child.getTargetHudContributors().isEmpty());
-        assertEquals("runeteria:hotswap", child.getHotswapHudRendererId());
+        assertEquals("runeteria:target", config.getTargetHudRendererId());
         assertEquals(
                 List.of(new CommandHudContributorRequirement(
-                        CommandHudContributorId.of("runeteria:badge"), false)),
-                child.getHotswapHudContributors()
+                        CommandHudContributorId.of("runeteria:targetbadge"), true)),
+                config.getTargetHudContributors()
+        );
+        assertEquals("runeteria:hotswap", config.getHotswapHudRendererId());
+        assertEquals(
+                List.of(new CommandHudContributorRequirement(
+                        CommandHudContributorId.of("runeteria:hotswapbadge"), false)),
+                config.getHotswapHudContributors()
         );
     }
 
@@ -79,13 +78,13 @@ class TwCommandItemConfigCommandHudTest {
                 IllegalArgumentException.class,
                 () -> decode("{\"TargetHudContributors\":["
                         + "{\"Id\":\"runeteria:badge\"},"
-                        + "{\"Id\":\"Runeteria:Badge\"}]}" )
+                        + "{\"Id\":\"Runeteria:Badge\"}]}")
         );
         assertThrows(
                 IllegalArgumentException.class,
                 () -> decode("{\"HotswapHudContributors\":["
                         + "{\"Id\":\"runeteria:badge\"},"
-                        + "{\"Id\":\"Runeteria:Badge\"}]}" )
+                        + "{\"Id\":\"Runeteria:Badge\"}]}")
         );
     }
 

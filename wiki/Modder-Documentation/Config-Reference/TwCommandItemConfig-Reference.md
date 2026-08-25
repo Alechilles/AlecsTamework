@@ -23,6 +23,9 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 - Explicit object sections inherit missing nested keys from the parent.
 - Explicit arrays and maps replace the parent value.
 - `ItemIds` and `CommandList` are explicit arrays and replace the parent list.
+- `TargetHudContributors` and `HotswapHudContributors` are explicit arrays and
+  replace the parent list, including when the child sets an empty array.
+- HUD renderer and contributor fields inherit independently from the parent.
 - `TwCommandItemConfig` is one of the item families refreshed by `/tw reloadconfig`.
 
 ## Top-Level Structure
@@ -35,6 +38,10 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
   "RosterStorage": "ItemMetadata",
   "UiRendererId": null,
   "UiContributors": [],
+  "TargetHudRendererId": null,
+  "TargetHudContributors": [],
+  "HotswapHudRendererId": null,
+  "HotswapHudContributors": [],
   "CommandFamilyId": null,
   "BondedRosterId": null,
   "ProjectRosterToItemMetadata": true,
@@ -70,6 +77,23 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
   entry has `Id` and `Required`. This explicit array replaces the parent list;
   an omitted array inherits it. A missing, incompatible, or failed required
   contributor causes standard-menu fallback. An optional contributor does not.
+- `TargetHudRendererId`: optional namespaced renderer for the target HUD. IDs
+  are normalized to lowercase. A blank or `null` value selects the standard
+  Tamework target HUD. The `tamework:` namespace is reserved. When omitted,
+  this field inherits from the parent.
+- `TargetHudContributors`: ordered target-HUD contributor requirements. Each
+  entry has `Id` and `Required`; IDs are normalized to lowercase, and the
+  `tamework:` namespace and duplicate IDs are rejected. When omitted, the list
+  inherits from the parent. An explicit list replaces it, including `[]`.
+- `HotswapHudRendererId`: optional namespaced renderer for the equipped-item
+  hotswap HUD. IDs are normalized to lowercase. A blank or `null` value selects
+  the standard Tamework hotswap HUD. The `tamework:` namespace is reserved.
+  When omitted, this field inherits from the parent independently of target HUD
+  selection.
+- `HotswapHudContributors`: ordered hotswap-HUD contributor requirements. Each
+  entry has `Id` and `Required`; IDs are normalized to lowercase, and the
+  `tamework:` namespace and duplicate IDs are rejected. When omitted, the list
+  inherits from the parent. An explicit list replaces it, including `[]`.
 - `BondedRosterId`: stable namespaced roster referenced by
   `BondedCompanions`; it must exist in the accepted bonded roster generation.
 - `ProjectRosterToItemMetadata`: optionally writes a disposable item cache for
@@ -218,6 +242,11 @@ Fields:
   `UiContributors` adds isolated presentation, server actions, and custom
   flows that the renderer declares it can display. Tamework still owns
   snapshots, action authority, current-world dispatch, and fallback.
+- `TargetHudRendererId` and `TargetHudContributors` apply only to target HUD
+  composition. `HotswapHudRendererId` and `HotswapHudContributors` apply only
+  to equipped-item hotswap HUD composition. Each surface defaults to the
+  standard HUD when no renderer is selected, and each surface can be configured
+  without changing the other.
 - Shared relocation retry behavior and unlink-confirm policy come from [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference).
 - `RequireOwner` can be left unset to inherit global linking-owner policy.
 - `OwnerCommandFamily` requires `RequireOwner: true` and a non-blank

@@ -1,11 +1,7 @@
 package com.alechilles.alecstamework.config.assets;
 
-import com.alechilles.alecstamework.api.commandhud.CommandHudContributorId;
 import com.alechilles.alecstamework.api.commandhud.CommandHudContributorRequirement;
-import com.alechilles.alecstamework.api.commandhud.CommandHudRendererId;
-import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorRequirement;
-import com.alechilles.alecstamework.api.commandui.CommandUiRendererId;
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
 import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.assetstore.AssetStore;
@@ -18,10 +14,8 @@ import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
 import com.hypixel.hytale.codec.lookup.StringCodecMapCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
-import java.util.ArrayList;
 import org.joml.Vector3d;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -154,11 +148,6 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
 
     static final CommandEntry[] EMPTY_COMMAND_LIST = new CommandEntry[0];
     static final CommandStep[] EMPTY_STEPS = new CommandStep[0];
-    private static final CommandUiContributorRequirement[] EMPTY_UI_CONTRIBUTORS =
-            new CommandUiContributorRequirement[0];
-    private static final CommandHudContributorRequirement[] EMPTY_HUD_CONTRIBUTORS =
-            new CommandHudContributorRequirement[0];
-
     public static final StringCodecMapCodec<
             AllowedRoles,
             BuilderCodec<? extends AllowedRoles>> ALLOWED_ROLES_CODEC =
@@ -179,24 +168,13 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     public static final ArrayCodec<CommandEntry> COMMAND_ENTRY_ARRAY_CODEC =
             TwCommandItemCodecs.COMMAND_ENTRY_ARRAY_CODEC;
     public static final BuilderCodec<UiContributorSettings> UI_CONTRIBUTOR_CODEC =
-            BuilderCodec.builder(UiContributorSettings.class, UiContributorSettings::new)
-                    .<String>append(
-                            new KeyedCodec<>("Id", Codec.STRING),
-                            (settings, value) -> settings.id = value,
-                            settings -> settings.id
-                    )
-                    .documentation("Namespaced contributor ID selected for this command UI.")
-                    .add()
-                    .<Boolean>append(
-                            new KeyedCodec<>("Required", Codec.BOOLEAN),
-                            (settings, value) -> settings.required = value != null && value,
-                            settings -> settings.required
-                    )
-                    .documentation("When true, contributor failure falls back to the standard Tamework UI.")
-                    .add()
-                    .build();
+            TwCommandPresentationSelection.UI_CONTRIBUTOR_CODEC;
     public static final ArrayCodec<UiContributorSettings> UI_CONTRIBUTOR_ARRAY_CODEC =
-            new ArrayCodec<>(UI_CONTRIBUTOR_CODEC, UiContributorSettings[]::new);
+            TwCommandPresentationSelection.UI_CONTRIBUTOR_ARRAY_CODEC;
+    public static final BuilderCodec<UiContributorSettings> HUD_CONTRIBUTOR_CODEC =
+            TwCommandPresentationSelection.HUD_CONTRIBUTOR_CODEC;
+    public static final ArrayCodec<UiContributorSettings> HUD_CONTRIBUTOR_ARRAY_CODEC =
+            TwCommandPresentationSelection.HUD_CONTRIBUTOR_ARRAY_CODEC;
 
     public static final AssetBuilderCodec<String, TwCommandItemConfig> CODEC =
         AssetBuilderCodec.builder(
@@ -248,8 +226,8 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         .add()
         .<String>append(
             new KeyedCodec<>("UiRendererId", Codec.STRING),
-            (asset, value) -> asset.uiRendererId = normalizeUiRendererId(value),
-            asset -> asset.uiRendererId
+            (asset, value) -> asset.presentationSelection.setUiRendererId(value),
+            asset -> asset.presentationSelection.uiRendererId()
         )
         .documentation("Optional namespaced command-menu renderer. Blank selects the standard Tamework menu. "
                 + "Renderer IDs are normalized to lowercase. Inheritance: an omitted child value inherits from its "
@@ -258,42 +236,42 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         .add()
         .<UiContributorSettings[]>append(
             new KeyedCodec<>("UiContributors", UI_CONTRIBUTOR_ARRAY_CODEC),
-            (asset, value) -> asset.uiContributors = normalizeUiContributors(value),
-            asset -> toUiContributorSettings(asset.uiContributors)
+            (asset, value) -> asset.presentationSelection.setUiContributors(value),
+            asset -> asset.presentationSelection.uiContributorSettings()
         )
         .documentation("Ordered contributor requirements. An explicit list replaces the inherited list; an explicit "
                 + "empty list clears inherited contributors.")
         .add()
         .<String>append(
             new KeyedCodec<>("TargetHudRendererId", Codec.STRING),
-            (asset, value) -> asset.targetHudRendererId = normalizeHudRendererId(value),
-            asset -> asset.targetHudRendererId
+            (asset, value) -> asset.presentationSelection.setTargetHudRendererId(value),
+            asset -> asset.presentationSelection.targetHudRendererId()
         )
         .documentation("Optional namespaced renderer for the target HUD. Blank selects the standard HUD. "
                 + "Renderer IDs are normalized to lowercase. Inheritance: an omitted value inherits from the "
                 + "parent; an explicit value replaces it.")
         .add()
         .<UiContributorSettings[]>append(
-            new KeyedCodec<>("TargetHudContributors", UI_CONTRIBUTOR_ARRAY_CODEC),
-            (asset, value) -> asset.targetHudContributors = normalizeHudContributors(value, "TargetHudContributors"),
-            asset -> toHudContributorSettings(asset.targetHudContributors)
+            new KeyedCodec<>("TargetHudContributors", HUD_CONTRIBUTOR_ARRAY_CODEC),
+            (asset, value) -> asset.presentationSelection.setTargetHudContributors(value),
+            asset -> asset.presentationSelection.targetHudContributorSettings()
         )
         .documentation("Ordered target HUD contributor requirements. An omitted list inherits from the parent; an "
                 + "explicit list replaces it, including an explicit empty list.")
         .add()
         .<String>append(
             new KeyedCodec<>("HotswapHudRendererId", Codec.STRING),
-            (asset, value) -> asset.hotswapHudRendererId = normalizeHudRendererId(value),
-            asset -> asset.hotswapHudRendererId
+            (asset, value) -> asset.presentationSelection.setHotswapHudRendererId(value),
+            asset -> asset.presentationSelection.hotswapHudRendererId()
         )
         .documentation("Optional namespaced renderer for the hotswap HUD. Blank selects the standard HUD. "
                 + "Renderer IDs are normalized to lowercase. Inheritance: an omitted value inherits from the "
                 + "parent; an explicit value replaces it.")
         .add()
         .<UiContributorSettings[]>append(
-            new KeyedCodec<>("HotswapHudContributors", UI_CONTRIBUTOR_ARRAY_CODEC),
-            (asset, value) -> asset.hotswapHudContributors = normalizeHudContributors(value, "HotswapHudContributors"),
-            asset -> toHudContributorSettings(asset.hotswapHudContributors)
+            new KeyedCodec<>("HotswapHudContributors", HUD_CONTRIBUTOR_ARRAY_CODEC),
+            (asset, value) -> asset.presentationSelection.setHotswapHudContributors(value),
+            asset -> asset.presentationSelection.hotswapHudContributorSettings()
         )
         .documentation("Ordered hotswap HUD contributor requirements. An omitted list inherits from the parent; an "
                 + "explicit list replaces it, including an explicit empty list.")
@@ -413,12 +391,8 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     private double radius = -1.0;
     private MembershipMode membershipMode = MembershipMode.LinkedOnly;
     private String commandFamilyId;
-    private String uiRendererId;
-    private CommandUiContributorRequirement[] uiContributors = EMPTY_UI_CONTRIBUTORS;
-    private String targetHudRendererId;
-    private CommandHudContributorRequirement[] targetHudContributors = EMPTY_HUD_CONTRIBUTORS;
-    private String hotswapHudRendererId;
-    private CommandHudContributorRequirement[] hotswapHudContributors = EMPTY_HUD_CONTRIBUTORS;
+    private final TwCommandPresentationSelection presentationSelection =
+            new TwCommandPresentationSelection();
     private RosterStorage rosterStorage = RosterStorage.ItemMetadata;
     private String bondedRosterId;
     private Boolean projectRosterToItemMetadata;
@@ -502,22 +476,10 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         if (!explicitTopLevelKeys.contains("Radius")) radius = parent.radius;
         if (!explicitTopLevelKeys.contains("MembershipMode")) membershipMode = parent.membershipMode;
         if (!explicitTopLevelKeys.contains("CommandFamilyId")) commandFamilyId = parent.commandFamilyId;
-        if (!explicitTopLevelKeys.contains("UiRendererId")) uiRendererId = parent.uiRendererId;
-        if (!explicitTopLevelKeys.contains("UiContributors")) {
-            uiContributors = parent.uiContributors.clone();
-        }
-        if (!explicitTopLevelKeys.contains("TargetHudRendererId")) {
-            targetHudRendererId = parent.targetHudRendererId;
-        }
-        if (!explicitTopLevelKeys.contains("TargetHudContributors")) {
-            targetHudContributors = parent.targetHudContributors.clone();
-        }
-        if (!explicitTopLevelKeys.contains("HotswapHudRendererId")) {
-            hotswapHudRendererId = parent.hotswapHudRendererId;
-        }
-        if (!explicitTopLevelKeys.contains("HotswapHudContributors")) {
-            hotswapHudContributors = parent.hotswapHudContributors.clone();
-        }
+        presentationSelection.inheritMissingTopLevelFrom(
+                parent.presentationSelection,
+                explicitTopLevelKeys
+        );
         if (!explicitTopLevelKeys.contains("RosterStorage")) rosterStorage = parent.rosterStorage;
         if (!explicitTopLevelKeys.contains("BondedRosterId")) bondedRosterId = parent.bondedRosterId;
         if (!explicitTopLevelKeys.contains("ProjectRosterToItemMetadata")) {
@@ -578,106 +540,6 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    @Nullable
-    private static String normalizeUiRendererId(@Nullable String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        CommandUiRendererId id = CommandUiRendererId.of(value);
-        if (id.reserved()) {
-            throw new IllegalArgumentException("The tamework: renderer namespace is reserved.");
-        }
-        return id.value();
-    }
-
-    @Nullable
-    private static String normalizeHudRendererId(@Nullable String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        return CommandHudRendererId.of(value).value();
-    }
-
-    private static CommandUiContributorRequirement[] normalizeUiContributors(
-            @Nullable UiContributorSettings[] value
-    ) {
-        if (value == null || value.length == 0) {
-            return EMPTY_UI_CONTRIBUTORS;
-        }
-        List<CommandUiContributorRequirement> requirements = new ArrayList<>(value.length);
-        Set<CommandUiContributorId> seen = new HashSet<>();
-        for (UiContributorSettings settings : value) {
-            if (settings == null) {
-                throw new IllegalArgumentException("UiContributors cannot contain null entries.");
-            }
-            CommandUiContributorId id = CommandUiContributorId.of(settings.id);
-            if (id.reserved()) {
-                throw new IllegalArgumentException("The tamework: contributor namespace is reserved.");
-            }
-            if (!seen.add(id)) {
-                throw new IllegalArgumentException("UiContributors contains duplicate ID: " + id.value());
-            }
-            requirements.add(new CommandUiContributorRequirement(id, settings.required));
-        }
-        return requirements.toArray(CommandUiContributorRequirement[]::new);
-    }
-
-    private static CommandHudContributorRequirement[] normalizeHudContributors(
-            @Nullable UiContributorSettings[] value,
-            @Nonnull String fieldName
-    ) {
-        if (value == null || value.length == 0) {
-            return EMPTY_HUD_CONTRIBUTORS;
-        }
-        List<CommandHudContributorRequirement> requirements = new ArrayList<>(value.length);
-        Set<CommandHudContributorId> seen = new HashSet<>();
-        for (UiContributorSettings settings : value) {
-            if (settings == null) {
-                throw new IllegalArgumentException(fieldName + " cannot contain null entries.");
-            }
-            CommandHudContributorId id = CommandHudContributorId.of(settings.id);
-            if (!seen.add(id)) {
-                throw new IllegalArgumentException(fieldName + " contains duplicate ID: " + id.value());
-            }
-            requirements.add(new CommandHudContributorRequirement(id, settings.required));
-        }
-        return requirements.toArray(CommandHudContributorRequirement[]::new);
-    }
-
-    private static UiContributorSettings[] toUiContributorSettings(
-            @Nullable CommandUiContributorRequirement[] requirements
-    ) {
-        if (requirements == null || requirements.length == 0) {
-            return new UiContributorSettings[0];
-        }
-        UiContributorSettings[] settings = new UiContributorSettings[requirements.length];
-        for (int index = 0; index < requirements.length; index++) {
-            CommandUiContributorRequirement requirement = requirements[index];
-            UiContributorSettings setting = new UiContributorSettings();
-            setting.id = requirement.id().value();
-            setting.required = requirement.required();
-            settings[index] = setting;
-        }
-        return settings;
-    }
-
-    private static UiContributorSettings[] toHudContributorSettings(
-            @Nullable CommandHudContributorRequirement[] requirements
-    ) {
-        if (requirements == null || requirements.length == 0) {
-            return new UiContributorSettings[0];
-        }
-        UiContributorSettings[] settings = new UiContributorSettings[requirements.length];
-        for (int index = 0; index < requirements.length; index++) {
-            CommandHudContributorRequirement requirement = requirements[index];
-            UiContributorSettings setting = new UiContributorSettings();
-            setting.id = requirement.id().value();
-            setting.required = requirement.required();
-            settings[index] = setting;
-        }
-        return settings;
-    }
-
     public boolean isEnabled() {
         return enabled;
     }
@@ -702,37 +564,37 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     /** Returns the normalized custom menu renderer ID, or null for the standard menu. */
     @Nullable
     public String getUiRendererId() {
-        return uiRendererId;
+        return presentationSelection.uiRendererId();
     }
 
     /** Returns the ordered immutable contributor requirements for this command UI. */
     @Nonnull
     public List<CommandUiContributorRequirement> getUiContributors() {
-        return List.of(uiContributors);
+        return presentationSelection.uiContributors();
     }
 
     /** Returns the normalized custom target HUD renderer ID, or null for the standard HUD. */
     @Nullable
     public String getTargetHudRendererId() {
-        return targetHudRendererId;
+        return presentationSelection.targetHudRendererId();
     }
 
     /** Returns the ordered immutable target HUD contributor requirements. */
     @Nonnull
     public List<CommandHudContributorRequirement> getTargetHudContributors() {
-        return List.of(targetHudContributors);
+        return presentationSelection.targetHudContributors();
     }
 
     /** Returns the normalized custom hotswap HUD renderer ID, or null for the standard HUD. */
     @Nullable
     public String getHotswapHudRendererId() {
-        return hotswapHudRendererId;
+        return presentationSelection.hotswapHudRendererId();
     }
 
     /** Returns the ordered immutable hotswap HUD contributor requirements. */
     @Nonnull
     public List<CommandHudContributorRequirement> getHotswapHudContributors() {
-        return List.of(hotswapHudContributors);
+        return presentationSelection.hotswapHudContributors();
     }
 
     public RosterStorage getRosterStorage() {
@@ -906,8 +768,8 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
 
     /** Codec-only representation of one contributor requirement. */
     public static final class UiContributorSettings {
-        private String id;
-        private boolean required;
+        String id;
+        boolean required;
 
         public String getId() {
             return id;
