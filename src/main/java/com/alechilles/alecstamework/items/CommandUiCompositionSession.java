@@ -6,13 +6,12 @@ import com.alechilles.alecstamework.api.commandui.CommandUiContributorCreateCont
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorDirtySink;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorProvider;
+import com.alechilles.alecstamework.api.commandui.CommandUiDirtyScope;
 import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
 import com.alechilles.alecstamework.api.commandui.CommandUiSessionContributor;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
-import com.alechilles.alecstamework.api.commandui.CommandUiValue;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -51,7 +50,13 @@ final class CommandUiCompositionSession implements AutoCloseable {
         this.refreshRequest = Objects.requireNonNull(refreshRequest,
                 "refreshRequest");
         this.states = createStates(bindings);
-        this.currentSnapshot = composeLocked(true);
+        try {
+            this.currentSnapshot = composeLocked(true, true);
+        } catch (RuntimeException | LinkageError failure) {
+            open = false;
+            closeStates(states);
+            throw failure;
+        }
     }
 
     /** Creates a session and composes every contributor once. */
@@ -82,7 +87,7 @@ final class CommandUiCompositionSession implements AutoCloseable {
             if (!open) return currentSnapshot;
             this.baseSnapshot = baseSnapshot;
             states.forEach(State::markAll);
-            currentSnapshot = composeLocked(true);
+            currentSnapshot = composeLocked(true, false);
             return currentSnapshot;
         }
     }
@@ -91,7 +96,7 @@ final class CommandUiCompositionSession implements AutoCloseable {
     boolean refresh() {
         synchronized (lock) {
             if (!open || !hasDirty()) return false;
-            currentSnapshot = composeLocked(false);
+            currentSnapshot = composeLocked(false, false);
             return true;
         }
     }
@@ -104,9 +109,7 @@ final class CommandUiCompositionSession implements AutoCloseable {
             open = false;
             closing = List.copyOf(states);
         }
-        for (int index = closing.size() - 1; index >= 0; index--) {
-            closeQuietly(closing.get(index).contributor);
-        }
+        closeStates(closing);
     }
 
     private List<State> createStates(@Nonnull List<Binding> bindings) {
@@ -139,26 +142,41 @@ final class CommandUiCompositionSession implements AutoCloseable {
         return false;
     }
 
-    private CommandUiSnapshot composeLocked(boolean initial) {
+    private CommandUiSnapshot composeLocked(boolean initial,
+                                            boolean abortRequired) {
         Map<CommandUiContributorId, CommandUiContribution> contributions =
                 new LinkedHashMap<>();
         for (State state : states) {
             if (!initial && !state.dirty()) {
-                if (state.lastContribution != null) {
-                    contributions.put(state.binding.id(), state.lastContribution);
+                if (state.lastPublishedContribution != null) {
+                    contributions.put(state.binding.id(),
+                            state.lastPublishedContribution);
                 }
                 continue;
             }
+            CommandUiDirtyScope scope = initial
+                    ? CommandUiDirtyScope.full() : state.dirtyScope;
             state.clearDirty();
             if (!state.binding.active().getAsBoolean()) {
-                if (state.lastContribution != null) {
-                    contributions.put(state.binding.id(), state.lastContribution);
+                if (initial && abortRequired && state.binding.required()) {
+                    throw new InitialCompositionFailure(state.binding.id(),
+                            "contributor registration generation is no longer active");
+                }
+                if (state.lastPublishedContribution != null) {
+                    contributions.put(state.binding.id(),
+                            state.lastPublishedContribution);
                 }
                 continue;
             }
-            CommandUiContribution next = compose(state);
-            state.lastContribution = next;
-            contributions.put(state.binding.id(), next);
+            CommandUiContribution next = compose(state, scope, initial,
+                    abortRequired);
+            if (next != null) {
+                state.lastPublishedContribution = next;
+                if (state.lastComposeValid) {
+                    state.lastValidContribution = next;
+                }
+                contributions.put(state.binding.id(), next);
+            }
         }
         CommandUiSnapshot next = baseSnapshot.withContributions(contributions);
         if (!initial) {
@@ -175,23 +193,50 @@ final class CommandUiCompositionSession implements AutoCloseable {
         return next;
     }
 
-    @Nonnull
-    private CommandUiContribution compose(@Nonnull State state) {
+    @Nullable
+    private CommandUiContribution compose(
+            @Nonnull State state,
+            @Nonnull CommandUiDirtyScope scope,
+            boolean initial,
+            boolean abortRequired
+    ) {
+        state.failure = null;
+        state.lastComposeValid = false;
         if (state.contributor == null) {
-            return failedContribution(state);
+            state.failure = "contributor factory returned null";
+            return compositionFailure(state, initial, abortRequired);
         }
         try {
             CommandUiContribution contribution = state.contributor.compose(
-                    baseSnapshot, state.lastContribution);
+                    baseSnapshot, state.lastValidContribution, scope);
             if (contribution == null
                     || !state.binding.id().equals(contribution.contributorId())) {
-                return failedContribution(state);
+                state.failure = contribution == null
+                        ? "contributor returned null"
+                        : "contributor returned a different contributor ID";
+                return compositionFailure(state, initial, abortRequired);
             }
+            state.lastComposeValid = true;
             return contribution;
         } catch (RuntimeException | LinkageError failure) {
             state.failure = failure.getClass().getSimpleName();
-            return failedContribution(state);
+            return compositionFailure(state, initial, abortRequired);
         }
+    }
+
+    @Nullable
+    private CommandUiContribution compositionFailure(
+            @Nonnull State state,
+            boolean initial,
+            boolean abortRequired
+    ) {
+        if (initial && abortRequired && state.binding.required()) {
+            throw new InitialCompositionFailure(state.binding.id(),
+                    state.failure == null ? "required contributor failed"
+                            : state.failure);
+        }
+        if (initial && !state.binding.required()) return null;
+        return failedContribution(state);
     }
 
     @Nonnull
@@ -204,10 +249,13 @@ final class CommandUiCompositionSession implements AutoCloseable {
                 state.failure == null ? "contributor failed" : state.failure);
     }
 
-    private void mark(@Nonnull State state, @Nonnull Runnable mutation) {
+    private void mark(
+            @Nonnull State state,
+            @Nonnull CommandUiDirtyScope scope
+    ) {
         synchronized (lock) {
             if (!open || !state.binding.active().getAsBoolean()) return;
-            mutation.run();
+            state.dirtyScope = state.dirtyScope.mergedWith(scope);
         }
         try {
             refreshRequest.run();
@@ -216,11 +264,19 @@ final class CommandUiCompositionSession implements AutoCloseable {
         }
     }
 
+    private void closeStates(@Nonnull List<State> closing) {
+        for (int index = closing.size() - 1; index >= 0; index--) {
+            State state = closing.get(index);
+            closeQuietly(state.contributor);
+            state.contributor = null;
+        }
+    }
+
     private static void closeQuietly(@Nullable AutoCloseable resource) {
         if (resource == null) return;
         try {
             resource.close();
-        } catch (Exception ignored) {
+        } catch (Exception | LinkageError ignored) {
             // Continue closing all contributors in reverse order.
         }
     }
@@ -252,35 +308,41 @@ final class CommandUiCompositionSession implements AutoCloseable {
         }
     }
 
+    /** Signals that a required contributor could not compose the initial page. */
+    static final class InitialCompositionFailure extends RuntimeException {
+        InitialCompositionFailure(
+                @Nonnull CommandUiContributorId contributorId,
+                @Nonnull String reason
+        ) {
+            super("Required contributor " + contributorId.value()
+                    + " failed during initial composition: " + reason);
+        }
+    }
+
     private final class State {
         private final Binding binding;
-        private final Set<String> paths = new LinkedHashSet<>();
-        private final Set<UUID> rows = new LinkedHashSet<>();
         private CommandUiSessionContributor contributor;
         private CommandUiContributorDirtySink sink;
-        private CommandUiContribution lastContribution;
+        private CommandUiContribution lastValidContribution;
+        private CommandUiContribution lastPublishedContribution;
         private String failure;
-        private boolean allDirty;
-        private boolean pageDirty;
+        private CommandUiDirtyScope dirtyScope = CommandUiDirtyScope.empty();
+        private boolean lastComposeValid;
 
         private State(Binding binding) {
             this.binding = binding;
         }
 
         private boolean dirty() {
-            return allDirty || pageDirty || !paths.isEmpty() || !rows.isEmpty();
+            return !dirtyScope.equals(CommandUiDirtyScope.empty());
         }
 
         private void markAll() {
-            allDirty = true;
-            pageDirty = true;
+            dirtyScope = dirtyScope.mergedWith(CommandUiDirtyScope.full());
         }
 
         private void clearDirty() {
-            allDirty = false;
-            pageDirty = false;
-            paths.clear();
-            rows.clear();
+            dirtyScope = CommandUiDirtyScope.empty();
         }
     }
 
@@ -293,30 +355,24 @@ final class CommandUiCompositionSession implements AutoCloseable {
 
         @Override
         public void markAllDirty() {
-            mark(state, state::markAll);
+            mark(state, CommandUiDirtyScope.full());
         }
 
         @Override
         public void markPageDirty() {
-            mark(state, () -> state.pageDirty = true);
+            mark(state, CommandUiDirtyScope.pageScope());
         }
 
         @Override
         public void markPathsDirty(@Nonnull Set<String> paths) {
-            Objects.requireNonNull(paths, "paths");
-            mark(state, () -> paths.forEach(path -> {
-                if (path != null && !path.isBlank()) {
-                    state.paths.add(path.trim());
-                }
-            }));
+            mark(state, CommandUiDirtyScope.paths(
+                    Objects.requireNonNull(paths, "paths")));
         }
 
         @Override
         public void markRowsDirty(@Nonnull Set<UUID> rowIds) {
-            Objects.requireNonNull(rowIds, "rowIds");
-            mark(state, () -> rowIds.forEach(row -> {
-                if (row != null) state.rows.add(row);
-            }));
+            mark(state, CommandUiDirtyScope.rows(
+                    Objects.requireNonNull(rowIds, "rowIds")));
         }
     }
 }

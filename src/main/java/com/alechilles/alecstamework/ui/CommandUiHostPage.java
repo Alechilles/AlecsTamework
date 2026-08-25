@@ -49,6 +49,7 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
     private final UpdateEmitter updateEmitter;
     private final boolean customProvider;
     private final AtomicBoolean open = new AtomicBoolean(true);
+    private final AtomicBoolean resourcesClosed = new AtomicBoolean();
     private final SubscriptionSlot unregisterSubscription =
             new SubscriptionSlot();
     private final CopyOnWriteArrayList<AutoCloseable> ownedResources =
@@ -91,7 +92,7 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
                 subscribeProviderRemoval(providerRegistry);
         this.unregisterSubscription.set(providerSubscription.handle());
         if (!providerSubscription.active()) {
-            terminateHere(CommandUiCloseReason.PROVIDER_UNREGISTERED);
+            terminate(CommandUiCloseReason.PROVIDER_UNREGISTERED, customProvider);
         }
     }
 
@@ -134,7 +135,7 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
                 subscribeRendererRemoval(rendererRegistry);
         this.unregisterSubscription.set(rendererSubscription.handle());
         if (!rendererSubscription.active()) {
-            terminateHere(CommandUiCloseReason.PROVIDER_UNREGISTERED);
+            terminate(CommandUiCloseReason.PROVIDER_UNREGISTERED, customProvider);
         }
     }
 
@@ -202,7 +203,7 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
                         controller.update(update, commands, events);
                         updateEmitter.send(commands, events, false);
                     } catch (RuntimeException | LinkageError failure) {
-                        fail("update callback", failure, false);
+                        fail("update callback", failure, customProvider);
                     }
                 }
 
@@ -212,7 +213,7 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
                 }
             });
         } catch (RuntimeException | LinkageError failure) {
-            fail("update dispatch", failure, false);
+            fail("update dispatch", failure, customProvider);
             return false;
         }
     }
@@ -285,7 +286,8 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
                 (removedId, removedGeneration) -> {
             if (providerId.equals(removedId)
                     && providerGeneration == removedGeneration) {
-                terminate(CommandUiCloseReason.PROVIDER_UNREGISTERED);
+                terminate(CommandUiCloseReason.PROVIDER_UNREGISTERED,
+                        customProvider);
             }
         });
     }
@@ -301,7 +303,8 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
                 (removedId, removedGeneration) -> {
                     if (rendererId.equals(removedId)
                             && providerGeneration == removedGeneration) {
-                        terminate(CommandUiCloseReason.PROVIDER_UNREGISTERED);
+                        terminate(CommandUiCloseReason.PROVIDER_UNREGISTERED,
+                                customProvider);
                     }
                 });
     }
@@ -327,6 +330,10 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
     }
 
     private void terminate(CommandUiCloseReason reason) {
+        terminate(reason, false);
+    }
+
+    private void terminate(CommandUiCloseReason reason, boolean openFallback) {
         if (!open.compareAndSet(true, false)) return;
         UUID playerUuid = context.playerUuid();
         if (playerUuid == null) {
@@ -335,7 +342,27 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
         }
         try {
             if (worldDispatcher.dispatch(playerUuid,
-                    (ref, store) -> closeResources(reason))) return;
+                    new WorldOperation() {
+                        @Override
+                        public void run(Ref<EntityStore> ref,
+                                        Store<EntityStore> store) {
+                            closeResources(reason);
+                            if (openFallback) {
+                                try {
+                                    fallbackOpener.open(new CurrentWorld(ref, store));
+                                } catch (RuntimeException | LinkageError fallbackFailure) {
+                                    LOGGER.log(Level.SEVERE,
+                                            "Command UI standard fallback failed.",
+                                            fallbackFailure);
+                                }
+                            }
+                        }
+
+                        @Override
+                        public void unavailable() {
+                            closeResources(reason);
+                        }
+                    })) return;
         } catch (RuntimeException | LinkageError ignored) {
             // Authority still must be invalidated if dispatch is unavailable.
         }
@@ -348,6 +375,7 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
     }
 
     private void closeResources(CommandUiCloseReason reason) {
+        if (!resourcesClosed.compareAndSet(false, true)) return;
         for (AutoCloseable resource : ownedResources) {
             if (ownedResources.remove(resource)) closeQuietly(resource);
         }
@@ -363,7 +391,7 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
     private static void closeQuietly(AutoCloseable resource) {
         try {
             resource.close();
-        } catch (Exception ignored) {
+        } catch (Exception | LinkageError ignored) {
             // Page cleanup continues for all other resources.
         }
     }

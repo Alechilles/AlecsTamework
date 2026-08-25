@@ -116,7 +116,8 @@ class CommandUiRendererContributorRegistryTest {
             @Override
             public CommandUiContribution compose(
                     CommandUiSnapshot base,
-                    CommandUiContribution previous
+                    CommandUiContribution previous,
+                    CommandUiDirtyScope scope
             ) {
                 return new CommandUiContribution(
                         CommandUiContributorId.of("example:test"));

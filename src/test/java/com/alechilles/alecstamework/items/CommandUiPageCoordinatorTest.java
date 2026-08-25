@@ -4,9 +4,15 @@ import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
 import com.alechilles.alecstamework.api.commandui.CommandUiPageController;
 import com.alechilles.alecstamework.api.commandui.CommandUiPanelState;
 import com.alechilles.alecstamework.api.commandui.CommandUiProviderId;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorRequirement;
+import com.alechilles.alecstamework.api.commandui.CommandUiDirtyScope;
+import com.alechilles.alecstamework.api.commandui.CommandUiRendererId;
 import com.alechilles.alecstamework.api.commandui.CommandUiSession;
+import com.alechilles.alecstamework.api.commandui.CommandUiSessionContributor;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
 import com.alechilles.alecstamework.api.internal.CommandUiProviderRegistry;
+import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 import com.alechilles.alecstamework.ui.CommandUiHostPage;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
@@ -18,6 +24,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -103,6 +110,67 @@ class CommandUiPageCoordinatorTest {
         assertEquals(1, controller.closeCount);
     }
 
+    @Test
+    void requiredInitialContributorFailureReturnsStandardController() {
+        CommandUiRegistry registry = new CommandUiRegistry();
+        RecordingController custom = new RecordingController();
+        RecordingController standard = new RecordingController();
+        registry.registerRenderer("runeteria:ui", ignored -> custom);
+        registry.registerContributor("runeteria:required", context -> {
+            throw new IllegalStateException("factory");
+        });
+        CommandUiPageCoordinator coordinator = new CommandUiPageCoordinator(
+                registry, new CommandSelectionPageService(
+                        null, null, null, null, null));
+        PlayerRef playerRef = new PlayerRef(
+                null, UUID.randomUUID(), "CoordinatorTester", "en-US", null, null);
+        CommandUiOpenContext context = new CommandUiOpenContext(
+                playerRef.getUuid(), "en-US", "tool-1", "config-1",
+                CommandUiRendererId.of("runeteria:ui"), "generic");
+
+        CommandUiPageCoordinator.Created created = coordinator.create(
+                playerRef, context, snapshot(), () -> standard,
+                List.of(new CommandUiContributorRequirement(
+                        CommandUiContributorId.of("runeteria:required"), true)),
+                List.of(), List.of(), (current, handles) -> current,
+                directDispatcher(), ignored -> { });
+
+        created.host().build(null, new UICommandBuilder(),
+                new UIEventBuilder(), null);
+        assertFalse(created.custom());
+        assertEquals(1, custom.closeCount);
+        assertSame(standard.initialSnapshot, created.session().snapshot());
+        created.session().close();
+    }
+
+    @Test
+    void finalizerFailureClosesCompositionAndRendererBeforeHostOwnership() {
+        CommandUiRegistry registry = new CommandUiRegistry();
+        RecordingController renderer = new RecordingController();
+        RecordingContributor contributor = new RecordingContributor();
+        registry.registerRenderer("runeteria:ui", ignored -> renderer);
+        registry.registerContributor("runeteria:data", ignored -> contributor);
+        CommandUiPageCoordinator coordinator = new CommandUiPageCoordinator(
+                registry, new CommandSelectionPageService(
+                        null, null, null, null, null));
+        PlayerRef playerRef = new PlayerRef(
+                null, UUID.randomUUID(), "CoordinatorTester", "en-US", null, null);
+        CommandUiOpenContext context = new CommandUiOpenContext(
+                playerRef.getUuid(), "en-US", "tool-1", "config-1",
+                CommandUiRendererId.of("runeteria:ui"), "generic");
+
+        assertThrows(IllegalStateException.class, () -> coordinator.create(
+                playerRef, context, snapshot(), RecordingController::new,
+                List.of(new CommandUiContributorRequirement(
+                        CommandUiContributorId.of("runeteria:data"), true)),
+                List.of(), List.of(), (current, handles) -> {
+                    throw new IllegalStateException("finalizer");
+                }, directDispatcher(), ignored -> { }));
+
+        assertEquals(1, contributor.closeCount);
+        assertEquals(1, renderer.closeCount);
+    }
+
     private static CommandUiHostPage.WorldDispatcher directDispatcher() {
         return (playerUuid, operation) -> {
             operation.run(null, null);
@@ -133,6 +201,26 @@ class CommandUiPageCoordinatorTest {
                                  UICommandBuilder commands,
                                  UIEventBuilder events) {
             initialSnapshot = snapshot;
+        }
+
+        @Override
+        public void close() {
+            closeCount++;
+        }
+    }
+
+    private static final class RecordingContributor
+            implements CommandUiSessionContributor {
+        private int closeCount;
+
+        @Override
+        public com.alechilles.alecstamework.api.commandui.CommandUiContribution compose(
+                CommandUiSnapshot base,
+                com.alechilles.alecstamework.api.commandui.CommandUiContribution previous,
+                CommandUiDirtyScope scope
+        ) {
+            return new com.alechilles.alecstamework.api.commandui.CommandUiContribution(
+                    CommandUiContributorId.of("runeteria:data"));
         }
 
         @Override

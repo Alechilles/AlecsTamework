@@ -8,10 +8,12 @@ import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
 import com.alechilles.alecstamework.api.commandui.CommandUiPageController;
 import com.alechilles.alecstamework.api.commandui.CommandUiPanelState;
 import com.alechilles.alecstamework.api.commandui.CommandUiProviderId;
+import com.alechilles.alecstamework.api.commandui.CommandUiRendererId;
 import com.alechilles.alecstamework.api.commandui.CommandUiSession;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
 import com.alechilles.alecstamework.api.commandui.CommandUiUpdate;
 import com.alechilles.alecstamework.api.internal.CommandUiProviderRegistry;
+import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
@@ -223,6 +225,86 @@ class CommandUiHostPageTest {
     }
 
     @Test
+    void rendererUpdateFailureClosesAndOpensStandardFallback() {
+        CommandUiRegistry registry = new CommandUiRegistry();
+        var registration = registry.registerRenderer(
+                "example:menu", ignored -> new TestController()).registration();
+        TestSession session = new TestSession(snapshot(1L));
+        TestController controller = new TestController();
+        controller.failUpdate = true;
+        AtomicInteger fallbackOpenCount = new AtomicInteger();
+        CommandUiHostPage<TestEvent> host = rendererHostForRegistration(
+                registry, registration.generation(), session, controller,
+                fallbackOpenCount);
+
+        assertTrue(host.applyUpdate(CommandUiUpdate.initial(snapshot(2L))));
+
+        assertEquals(CommandUiCloseReason.FAILURE, session.closeReason);
+        assertEquals(1, controller.closeCount);
+        assertEquals(1, fallbackOpenCount.get());
+        registration.close();
+        assertEquals(1, fallbackOpenCount.get());
+    }
+
+    @Test
+    void rendererUpdateDispatchFailureClosesAndOpensStandardFallback() {
+        CommandUiRegistry registry = new CommandUiRegistry();
+        var registration = registry.registerRenderer(
+                "example:menu", ignored -> new TestController()).registration();
+        TestSession session = new TestSession(snapshot(1L));
+        TestController controller = new TestController();
+        AtomicInteger fallbackOpenCount = new AtomicInteger();
+        AtomicInteger dispatchCount = new AtomicInteger();
+        CommandUiHostPage<TestEvent> host = rendererHostForRegistration(
+                registry, registration.generation(), session, controller,
+                (playerUuid, operation) -> {
+                    if (dispatchCount.getAndIncrement() == 0) {
+                        throw new IllegalStateException("world unavailable");
+                    }
+                    operation.run(null, null);
+                    return true;
+                }, fallbackOpenCount);
+
+        assertFalse(host.applyUpdate(CommandUiUpdate.initial(snapshot(2L))));
+
+        assertEquals(CommandUiCloseReason.FAILURE, session.closeReason);
+        assertEquals(1, controller.closeCount);
+        assertEquals(1, fallbackOpenCount.get());
+        registration.close();
+    }
+
+    @Test
+    void rendererRemovalOpensStandardFallbackOnlyForExactGeneration() {
+        CommandUiRegistry registry = new CommandUiRegistry();
+        var first = registry.registerRenderer(
+                "example:menu", ignored -> new TestController()).registration();
+        AtomicInteger fallbackOpenCount = new AtomicInteger();
+        TestSession firstSession = new TestSession(snapshot(1L));
+        CommandUiHostPage<TestEvent> firstHost = rendererHostForRegistration(
+                registry, first.generation(), firstSession, new TestController(),
+                fallbackOpenCount);
+
+        first.close();
+        var replacement = registry.registerRenderer(
+                "example:menu", ignored -> new TestController()).registration();
+        TestSession replacementSession = new TestSession(snapshot(1L));
+        CommandUiHostPage<TestEvent> replacementHost = rendererHostForRegistration(
+                registry, replacement.generation(), replacementSession,
+                new TestController(), fallbackOpenCount);
+        first.close();
+
+        assertFalse(firstHost.isOpen());
+        assertEquals(CommandUiCloseReason.PROVIDER_UNREGISTERED,
+                firstSession.closeReason);
+        assertTrue(replacementHost.isOpen());
+        assertEquals(1, fallbackOpenCount.get());
+
+        replacement.close();
+        assertFalse(replacementHost.isOpen());
+        assertEquals(2, fallbackOpenCount.get());
+    }
+
+    @Test
     void dismissalClosesTheControllerAndInvalidatesTheSession() {
         TestSession session = new TestSession(snapshot(1L));
         TestController controller = new TestController();
@@ -315,6 +397,43 @@ class CommandUiHostPageTest {
                 new RecordingEmitter());
     }
 
+    private static CommandUiHostPage<TestEvent> rendererHostForRegistration(
+            CommandUiRegistry registry,
+            long rendererGeneration,
+            TestSession session,
+            TestController controller,
+            AtomicInteger fallbackOpenCount
+    ) {
+        return rendererHostForRegistration(registry, rendererGeneration, session,
+                controller, directDispatcher(), fallbackOpenCount);
+    }
+
+    private static CommandUiHostPage<TestEvent> rendererHostForRegistration(
+            CommandUiRegistry registry,
+            long rendererGeneration,
+            TestSession session,
+            TestController controller,
+            CommandUiHostPage.WorldDispatcher dispatcher,
+            AtomicInteger fallbackOpenCount
+    ) {
+        PlayerRef playerRef = new PlayerRef(
+                null, UUID.randomUUID(), "HostTester", "en-US", null, null);
+        return new CommandUiHostPage<>(
+                playerRef,
+                new CommandUiOpenContext(playerRef.getUuid(), "en-US",
+                        "tool-1", "config-1",
+                        CommandUiRendererId.of("example:menu"), "generic"),
+                session,
+                controller,
+                CommandUiRendererId.of("example:menu"),
+                rendererGeneration,
+                registry,
+                dispatcher,
+                ignored -> fallbackOpenCount.incrementAndGet(),
+                new RecordingEmitter(),
+                true);
+    }
+
     private static CommandUiSnapshot snapshot(long revision) {
         return new CommandUiSnapshot(
                 UUID.nameUUIDFromBytes("host-session".getBytes()),
@@ -376,6 +495,7 @@ class CommandUiHostPageTest {
         private CommandUiSnapshot updatedSnapshot;
         private boolean failBuild;
         private boolean failEvent;
+        private boolean failUpdate;
         private int eventCount;
         private int closeCount;
 
@@ -399,6 +519,7 @@ class CommandUiHostPageTest {
         public void update(CommandUiUpdate update,
                            UICommandBuilder commands,
                            UIEventBuilder events) {
+            if (failUpdate) throw new IllegalStateException("update failed");
             updatedSnapshot = update.snapshot();
         }
 

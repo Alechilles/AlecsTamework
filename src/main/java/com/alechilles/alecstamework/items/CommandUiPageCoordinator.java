@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.commandui.CommandUiActionHandle;
+import com.alechilles.alecstamework.api.commandui.CommandUiCloseReason;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorRequirement;
 import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
 import com.alechilles.alecstamework.api.commandui.CommandUiPageController;
@@ -172,62 +173,104 @@ final class CommandUiPageCoordinator {
         };
         CommandUiCompositionSession composition = null;
         if (resolved.custom() && !resolved.contributors().isEmpty()) {
-            composition = CommandUiCompositionSession.create(
-                    baseSnapshot, context, resolved.contributors(),
-                    (snapshot, changes) -> {
-                        CommandUiSessionImpl current = sessionRef.get();
-                        if (current == null || !current.isOpen()) return;
-                        CommandUiSnapshot previous = current.snapshot();
-                        if (!current.publishInternal(snapshot, changes)) return;
-                        CommandUiHostPage<?> page = host.get();
-                        if (page != null) {
-                            page.applyUpdate(new com.alechilles.alecstamework.api.commandui.CommandUiUpdate(
-                                    current.snapshot(), previous, changes));
-                        }
-                    }, compositionRefreshRequest);
-            compositionRef.set(composition);
+            try {
+                composition = CommandUiCompositionSession.create(
+                        baseSnapshot, context, resolved.contributors(),
+                        (snapshot, changes) -> {
+                            CommandUiSessionImpl current = sessionRef.get();
+                            if (current == null || !current.isOpen()) return;
+                            CommandUiSnapshot previous = current.snapshot();
+                            if (!current.publishInternal(snapshot, changes)) return;
+                            CommandUiHostPage<?> page = host.get();
+                            if (page != null) {
+                                page.applyUpdate(new com.alechilles.alecstamework.api.commandui.CommandUiUpdate(
+                                        current.snapshot(), previous, changes));
+                            }
+                        }, compositionRefreshRequest);
+                compositionRef.set(composition);
+            } catch (RuntimeException | LinkageError failure) {
+                pendingCompositionRefresh.set(false);
+                closeQuietly(composition);
+                closeQuietly(resolved.controller());
+                resolved = resolveStandard(context, standardFactory);
+            }
         }
         CommandUiSnapshot composedBase = composition == null
                 ? baseSnapshot : composition.snapshot();
-        CommandUiSessionFactory.CreatedSession createdSession = sessions.createMixed(
-                composedBase.sessionId(), composedBase,
-                resolved.rendererGeneration(),
-                sessionDispatcher(playerRef.getUuid(), worldDispatcher),
-                Objects.requireNonNull(refreshRequest, "refreshRequest"), reason -> {
-                    CommandUiHostPage<?> current = host.get();
-                    if (current != null) current.closeSession(reason);
-                },
-                (commands, events, clear) -> {
-                    CommandUiHostPage<?> current = host.get();
-                    return current != null && current.submitPartialUpdate(
-                            commands, events, clear);
-                },
-                List.copyOf(genericActions), List.copyOf(bondedActions));
-        sessionRef.set(createdSession.session());
-        if (pendingCompositionRefresh.getAndSet(false)) {
-            compositionRefreshRequest.run();
+        CommandUiSessionFactory.CreatedSession createdSession = null;
+        CommandUiHostPage<?> page = null;
+        try {
+            createdSession = sessions.createMixed(
+                    composedBase.sessionId(), composedBase,
+                    resolved.rendererGeneration(),
+                    sessionDispatcher(playerRef.getUuid(), worldDispatcher),
+                    Objects.requireNonNull(refreshRequest, "refreshRequest"), reason -> {
+                        CommandUiHostPage<?> current = host.get();
+                        if (current != null) current.closeSession(reason);
+                    },
+                    (commands, events, clear) -> {
+                        CommandUiHostPage<?> current = host.get();
+                        return current != null && current.submitPartialUpdate(
+                                commands, events, clear);
+                    },
+                    List.copyOf(genericActions), List.copyOf(bondedActions));
+            sessionRef.set(createdSession.session());
+            if (pendingCompositionRefresh.getAndSet(false)) {
+                compositionRefreshRequest.run();
+            }
+            CommandUiSnapshot finalSnapshot = Objects.requireNonNull(
+                    snapshotFinalizer.finish(composedBase, createdSession.handles()),
+                    "final snapshot");
+            if (composition != null) {
+                finalSnapshot = finalSnapshot.withContributions(
+                        composition.snapshot().contributions());
+            }
+            if (finalSnapshot != baseSnapshot) {
+                createdSession.session().publishInternal(
+                        finalSnapshot,
+                        com.alechilles.alecstamework.api.commandui.CommandUiChangeSet.full());
+            }
+            page = createHost(
+                    playerRef, context, createdSession.session(), resolved,
+                    worldDispatcher, fallbackOpener);
+            host.set(page);
+            if (composition != null && !page.own(composition)) {
+                composition = null;
+            }
+            return new Created(page, createdSession.session(),
+                    createdSession.handles(), resolved.custom(),
+                    resolved.providerGeneration(), resolved.rendererGeneration(),
+                    composition);
+        } catch (RuntimeException | LinkageError failure) {
+            if (page == null) {
+                if (createdSession != null) {
+                    createdSession.session().close(CommandUiCloseReason.FAILURE);
+                }
+                closeQuietly(composition);
+                closeQuietly(resolved.controller());
+            }
+            throw failure;
         }
-        CommandUiSnapshot finalSnapshot = Objects.requireNonNull(
-                snapshotFinalizer.finish(composedBase, createdSession.handles()),
-                "final snapshot");
-        if (composition != null) {
-            finalSnapshot = finalSnapshot.withContributions(
-                    composition.snapshot().contributions());
+    }
+
+    @Nonnull
+    private CommandUiControllerResolver.Resolved resolveStandard(
+            @Nonnull CommandUiOpenContext context,
+            @Nonnull Supplier<CommandUiPageController<?>> standardFactory
+    ) {
+        return registry != null
+                ? controllers.resolve((CommandUiRendererId) null, List.of(),
+                        context, standardFactory)
+                : controllers.resolve((String) null, context, standardFactory);
+    }
+
+    private static void closeQuietly(@javax.annotation.Nullable AutoCloseable resource) {
+        if (resource == null) return;
+        try {
+            resource.close();
+        } catch (Exception | LinkageError ignored) {
+            // Cleanup must continue for the remaining resources.
         }
-        if (finalSnapshot != baseSnapshot) {
-            createdSession.session().publishInternal(
-                    finalSnapshot,
-                    com.alechilles.alecstamework.api.commandui.CommandUiChangeSet.full());
-        }
-        CommandUiHostPage<?> page = createHost(
-                playerRef, context, createdSession.session(), resolved,
-                worldDispatcher, fallbackOpener);
-        host.set(page);
-        if (composition != null) page.own(composition);
-        return new Created(page, createdSession.session(),
-                createdSession.handles(), resolved.custom(),
-                resolved.providerGeneration(), resolved.rendererGeneration(),
-                composition);
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
