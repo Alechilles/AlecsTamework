@@ -10,6 +10,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -115,11 +116,17 @@ class CommandHudSnapshotTest {
                 false, Set.of(), false, Map.of(contributorId, paths));
 
         assertTrue(targetChanges.contributorFullRefresh(contributorId));
+        assertTrue(targetChanges.changed(CommandTargetHudChangeSet.Section.CONTRIBUTIONS));
         assertTrue(targetChanges.scopeFor(contributorId).fullRefresh());
         assertTrue(targetChanges.pathsFor(contributorId).isEmpty());
         assertTrue(hotswapChanges.contributorFullRefresh(contributorId));
         assertTrue(hotswapChanges.scopeFor(contributorId).fullRefresh());
         assertTrue(hotswapChanges.pathsFor(contributorId).isEmpty());
+
+        CommandTargetHudChangeSet normalPaths = CommandTargetHudChangeSet.contributorPaths(
+                contributorId, Set.of("badge"));
+        assertFalse(normalPaths.fullRefresh());
+        assertTrue(normalPaths.changed(CommandTargetHudChangeSet.Section.CONTRIBUTIONS));
     }
 
     @Test

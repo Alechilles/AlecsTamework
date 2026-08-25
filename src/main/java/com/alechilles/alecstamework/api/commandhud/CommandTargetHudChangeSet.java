@@ -51,9 +51,13 @@ public final class CommandTargetHudChangeSet {
             @Nullable Map<CommandHudContributorId, Set<String>> contributorPaths
     ) {
         this.fullRefresh = fullRefresh;
-        this.changedSections = fullRefresh
+        Set<Section> sections = fullRefresh
                 ? Section.all() : copySections(changedSections);
         ContributorPathCopy copied = copyContributorPaths(contributorPaths);
+        if (!copied.paths().isEmpty() || !copied.fullRefreshes().isEmpty()) {
+            sections = withContributions(sections);
+        }
+        this.changedSections = sections;
         this.contributorPaths = copied.paths();
         this.fullRefreshContributors = copied.fullRefreshes();
     }
@@ -132,6 +136,15 @@ public final class CommandTargetHudChangeSet {
     private static Set<Section> copySections(@Nullable Set<Section> source) {
         if (source == null || source.isEmpty()) return Set.of();
         return Collections.unmodifiableSet(EnumSet.copyOf(source));
+    }
+
+    @Nonnull
+    private static Set<Section> withContributions(@Nonnull Set<Section> sections) {
+        if (sections.contains(Section.CONTRIBUTIONS)) return sections;
+        EnumSet<Section> copy = sections.isEmpty()
+                ? EnumSet.noneOf(Section.class) : EnumSet.copyOf(sections);
+        copy.add(Section.CONTRIBUTIONS);
+        return Collections.unmodifiableSet(copy);
     }
 
     @Nonnull
