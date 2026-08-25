@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.commandui.CommandUiApi;
-import com.alechilles.alecstamework.api.internal.CommandUiProviderRegistry;
+import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 
 import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
@@ -525,7 +525,7 @@ public final class CommandItemFeatureHandler {
     /** Connects command menu opening to the live public provider registry. */
     public void configureCommandUi(@Nullable CommandUiApi commandUi) {
         selectionPageService.configureCommandUi(
-                commandUi instanceof CommandUiProviderRegistry registry
+                commandUi instanceof CommandUiRegistry registry
                         ? registry : null);
     }
     private boolean openSelectionMenu(Player player,

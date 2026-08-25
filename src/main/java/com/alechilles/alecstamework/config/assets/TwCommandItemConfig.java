@@ -609,16 +609,6 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         return List.of(uiContributors);
     }
 
-    /**
-     * Transitional source compatibility for runtime code that still reads the
-     * removed provider field. New code must use {@link #getUiRendererId()}.
-     */
-    @Deprecated
-    @Nullable
-    public String getUiProviderId() {
-        return null;
-    }
-
     public RosterStorage getRosterStorage() {
         return rosterStorage;
     }

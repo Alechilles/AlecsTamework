@@ -4,9 +4,12 @@ import com.alechilles.alecstamework.api.commandui.CommandUiCloseReason;
 import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
 import com.alechilles.alecstamework.api.commandui.CommandUiPageController;
 import com.alechilles.alecstamework.api.commandui.CommandUiProviderId;
+import com.alechilles.alecstamework.api.commandui.CommandUiRendererId;
 import com.alechilles.alecstamework.api.commandui.CommandUiSession;
 import com.alechilles.alecstamework.api.commandui.CommandUiUpdate;
+import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 import com.alechilles.alecstamework.api.internal.CommandUiProviderRegistry;
+import com.alechilles.alecstamework.api.internal.CommandUiRendererRegistry;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
@@ -39,6 +42,7 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
     private final CommandUiSession session;
     private final CommandUiPageController<T> controller;
     private final CommandUiProviderId providerId;
+    private final CommandUiRendererId rendererId;
     private final long providerGeneration;
     private final WorldDispatcher worldDispatcher;
     private final FallbackOpener fallbackOpener;
@@ -73,6 +77,8 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
         this.session = Objects.requireNonNull(session, "session");
         this.controller = controller;
         this.providerId = providerId;
+        this.rendererId = providerId == null
+                ? null : CommandUiRendererId.tryParse(providerId.value()).orElse(null);
         this.providerGeneration = providerGeneration;
         this.worldDispatcher = Objects.requireNonNull(
                 worldDispatcher, "worldDispatcher");
@@ -85,6 +91,49 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
                 subscribeProviderRemoval(providerRegistry);
         this.unregisterSubscription.set(providerSubscription.handle());
         if (!providerSubscription.active()) {
+            terminateHere(CommandUiCloseReason.PROVIDER_UNREGISTERED);
+        }
+    }
+
+    /** Creates a host bound to one exact renderer registration generation. */
+    public CommandUiHostPage(
+            @Nonnull PlayerRef playerRef,
+            @Nonnull CommandUiOpenContext context,
+            @Nonnull CommandUiSession session,
+            @Nonnull CommandUiPageController<T> controller,
+            @Nullable CommandUiRendererId rendererId,
+            long rendererGeneration,
+            @Nullable CommandUiRegistry rendererRegistry,
+            @Nonnull WorldDispatcher worldDispatcher,
+            @Nonnull FallbackOpener fallbackOpener,
+            @Nullable UpdateEmitter updateEmitter,
+            boolean rendererMode
+    ) {
+        super(Objects.requireNonNull(playerRef, "playerRef"),
+                CustomPageLifetime.CanDismiss,
+                Objects.requireNonNull(controller, "controller").eventCodec());
+        if (rendererGeneration < 0L) {
+            throw new IllegalArgumentException(
+                    "Renderer generation cannot be negative.");
+        }
+        this.context = Objects.requireNonNull(context, "context");
+        this.session = Objects.requireNonNull(session, "session");
+        this.controller = controller;
+        this.providerId = rendererId == null
+                ? null : CommandUiProviderId.tryParse(rendererId.value()).orElse(null);
+        this.rendererId = rendererId;
+        this.providerGeneration = rendererGeneration;
+        this.worldDispatcher = Objects.requireNonNull(
+                worldDispatcher, "worldDispatcher");
+        this.fallbackOpener = Objects.requireNonNull(
+                fallbackOpener, "fallbackOpener");
+        this.updateEmitter = updateEmitter == null
+                ? this::sendHostUpdate : updateEmitter;
+        this.customProvider = rendererId != null && rendererGeneration > 0L;
+        CommandUiRendererRegistry.ExactSubscription rendererSubscription =
+                subscribeRendererRemoval(rendererRegistry);
+        this.unregisterSubscription.set(rendererSubscription.handle());
+        if (!rendererSubscription.active()) {
             terminateHere(CommandUiCloseReason.PROVIDER_UNREGISTERED);
         }
     }
@@ -239,6 +288,22 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
                 terminate(CommandUiCloseReason.PROVIDER_UNREGISTERED);
             }
         });
+    }
+
+    private CommandUiRendererRegistry.ExactSubscription subscribeRendererRemoval(
+            @Nullable CommandUiRegistry registry) {
+        if (registry == null || rendererId == null || providerGeneration <= 0L) {
+            return new CommandUiRendererRegistry.ExactSubscription(
+                    true, () -> { });
+        }
+        return registry.rendererRegistry().subscribeExactUnregister(
+                rendererId, providerGeneration,
+                (removedId, removedGeneration) -> {
+                    if (rendererId.equals(removedId)
+                            && providerGeneration == removedGeneration) {
+                        terminate(CommandUiCloseReason.PROVIDER_UNREGISTERED);
+                    }
+                });
     }
 
     private void fail(String phase, Throwable failure, boolean openFallback) {

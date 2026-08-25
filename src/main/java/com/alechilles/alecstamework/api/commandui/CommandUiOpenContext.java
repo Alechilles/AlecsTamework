@@ -19,13 +19,13 @@ public final class CommandUiOpenContext {
     @Nullable
     private final String configId;
     @Nullable
-    private final CommandUiProviderId providerId;
+    private final CommandUiRendererId rendererId;
     @Nullable
     private final String rosterMode;
 
     /** Creates an empty context for adapters that do not need presentation values. */
     public CommandUiOpenContext() {
-        this(null, null, null, null, (CommandUiProviderId) null, null);
+        this(null, null, null, null, (CommandUiRendererId) null, null);
     }
 
     public CommandUiOpenContext(
@@ -36,11 +36,26 @@ public final class CommandUiOpenContext {
             @Nullable CommandUiProviderId providerId,
             @Nullable String rosterMode
     ) {
+        this(playerUuid, language, toolId, configId,
+                providerId == null ? null
+                        : CommandUiRendererId.tryParse(providerId.value()).orElse(null),
+                rosterMode);
+    }
+
+    /** Creates detached context with the selected renderer identifier. */
+    public CommandUiOpenContext(
+            @Nullable UUID playerUuid,
+            @Nullable String language,
+            @Nullable String toolId,
+            @Nullable String configId,
+            @Nullable CommandUiRendererId rendererId,
+            @Nullable String rosterMode
+    ) {
         this.playerUuid = playerUuid;
         this.language = normalize(language);
         this.toolId = normalize(toolId);
         this.configId = normalize(configId);
-        this.providerId = providerId;
+        this.rendererId = rendererId;
         this.rosterMode = normalize(rosterMode);
     }
 
@@ -60,7 +75,7 @@ public final class CommandUiOpenContext {
                 configId,
                 providerId == null || providerId.isBlank()
                         ? null
-                        : CommandUiProviderId.of(providerId),
+                        : CommandUiRendererId.of(providerId),
                 rosterMode
         );
     }
@@ -91,8 +106,17 @@ public final class CommandUiOpenContext {
     }
 
     @Nullable
+    public CommandUiRendererId rendererId() {
+        return rendererId;
+    }
+
+    /** @deprecated Use {@link #rendererId()} for active command UI selection. */
+    @Deprecated
+    @Nullable
     public CommandUiProviderId providerId() {
-        return providerId;
+        return rendererId == null
+                ? null
+                : CommandUiProviderId.tryParse(rendererId.value()).orElse(null);
     }
 
     @Nullable
