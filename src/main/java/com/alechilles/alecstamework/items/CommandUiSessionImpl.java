@@ -39,6 +39,7 @@ final class CommandUiSessionImpl implements CommandUiSession {
     }
 
     private enum State { OPEN, CLOSING, CLOSED }
+    private enum ManagedFlowOwner { NONE, BUILT_IN, CONTRIBUTOR }
 
     private final UUID sessionId;
     private final long providerGeneration;
@@ -53,6 +54,10 @@ final class CommandUiSessionImpl implements CommandUiSession {
     private final AtomicBoolean actionRebindRequired = new AtomicBoolean();
     private final AtomicBoolean closeEffectsStarted = new AtomicBoolean();
     private final AtomicLong managedGeneration = new AtomicLong();
+    private final AtomicReference<ManagedFlowOwner> managedFlowOwner =
+            new AtomicReference<>(ManagedFlowOwner.NONE);
+    @Nullable
+    private volatile CommandUiContributorFlowManager contributorFlowManager;
     private final CommandUiUpdateSink updateSink;
 
     CommandUiSessionImpl(
@@ -227,7 +232,7 @@ final class CommandUiSessionImpl implements CommandUiSession {
                     dispatcher.dispatch(() -> actionGateway.invoke(
                             sessionId, request,
                             currentSnapshot.get().actionGeneration(),
-                            expectedRoute()));
+                            expectedRoute(), contributorFlowManager));
             return flatten(queued).whenComplete((result, failure) -> {
                 if (failure == null && result != null
                         && result.refreshSnapshot()) {
@@ -375,6 +380,8 @@ final class CommandUiSessionImpl implements CommandUiSession {
 
     private void finishClose(CommandUiCloseReason reason) {
         if (!closeEffectsStarted.compareAndSet(false, true)) return;
+        CommandUiContributorFlowManager flowManager = contributorFlowManager;
+        if (flowManager != null) flowManager.close();
         actionGateway.closeSession(sessionId);
         try {
             closeCallback.accept(reason);
@@ -429,9 +436,52 @@ final class CommandUiSessionImpl implements CommandUiSession {
             throw new IllegalStateException(
                     "Cannot start a flow for a closed session.");
         }
+        CommandUiContributorFlowManager flowManager = contributorFlowManager;
+        if (flowManager != null) flowManager.replacedByBuiltIn();
+        managedFlowOwner.set(ManagedFlowOwner.BUILT_IN);
         long generation = actionGateway.beginManagedFlow(sessionId);
         managedGeneration.set(generation);
         return generation;
+    }
+
+    /** Starts or advances the installed contributor-owned flow. */
+    long beginContributorFlow(
+            @Nonnull CommandUiContributorFlowManager manager
+    ) {
+        if (!isOpen() || contributorFlowManager != manager) {
+            throw new IllegalStateException(
+                    "Contributor flow manager is not active for this session.");
+        }
+        managedFlowOwner.set(ManagedFlowOwner.CONTRIBUTOR);
+        long generation = actionGateway.beginManagedFlow(sessionId);
+        managedGeneration.set(generation);
+        return generation;
+    }
+
+    /** Retires all handles for the current managed flow without refreshing main state. */
+    void closeManagedFlow() {
+        managedFlowOwner.set(ManagedFlowOwner.NONE);
+        managedGeneration.set(0L);
+        actionGateway.closeManagedFlow(sessionId);
+    }
+
+    /** Closes a flow only while the installed contributor still owns it. */
+    void closeContributorFlow(
+            @Nonnull CommandUiContributorFlowManager manager
+    ) {
+        if (contributorFlowManager != manager
+                || !managedFlowOwner.compareAndSet(
+                        ManagedFlowOwner.CONTRIBUTOR,
+                        ManagedFlowOwner.NONE)) {
+            return;
+        }
+        managedGeneration.set(0L);
+        actionGateway.closeManagedFlow(sessionId);
+    }
+
+    boolean contributorFlowActive() {
+        CommandUiContributorFlowManager manager = contributorFlowManager;
+        return manager != null && manager.hasActiveFlow();
     }
 
     /** Issues an action for the current independent managed-flow view. */
@@ -458,6 +508,22 @@ final class CommandUiSessionImpl implements CommandUiSession {
         return actionGateway.issueManaged(sessionId, route, action,
                 generation, authority, executor, inputPolicy,
                 maximumInputLength, confirmationRequired);
+    }
+
+    /** Issues a contributor action through the current managed-flow generation. */
+    @Nullable
+    CommandUiActionHandle issueManagedContributor(
+            @Nonnull CommandUiContributorActionBinding binding,
+            @Nonnull CommandUiActionGateway.ContributorIdentity identity,
+            @Nonnull CommandUiActionGateway.RendererGenerationCheck rendererGenerationCheck,
+            @Nonnull CommandUiActionGateway.ContributorGenerationCheck generationCheck
+    ) {
+        if (!isOpen()) {
+            throw new IllegalStateException(
+                    "Cannot issue an action for a closed session.");
+        }
+        return actionGateway.issueManagedContributor(sessionId, binding, identity,
+                rendererGenerationCheck, generationCheck, null);
     }
 
     @Nonnull
@@ -518,6 +584,28 @@ final class CommandUiSessionImpl implements CommandUiSession {
     ) {
         return isOpen() && actionGateway.refreshContributor(handle, binding,
                 rendererGenerationCheck, generationCheck);
+    }
+
+    boolean refreshManagedContributor(
+            @Nonnull CommandUiActionHandle handle,
+            @Nonnull CommandUiContributorActionBinding binding,
+            @Nonnull CommandUiActionGateway.RendererGenerationCheck rendererGenerationCheck,
+            @Nonnull CommandUiActionGateway.ContributorGenerationCheck generationCheck
+    ) {
+        return isOpen() && actionGateway.refreshManagedContributor(handle, binding,
+                rendererGenerationCheck, generationCheck);
+    }
+
+    /** Installs the session-owned custom-flow lifecycle processor once. */
+    void installContributorFlowManager(
+            @Nonnull CommandUiContributorFlowManager manager
+    ) {
+        Objects.requireNonNull(manager, "manager");
+        if (contributorFlowManager != null && contributorFlowManager != manager) {
+            throw new IllegalStateException(
+                    "A contributor flow manager is already installed.");
+        }
+        contributorFlowManager = manager;
     }
 
     private void requireRoute(CommandUiActionGateway.Route route) {

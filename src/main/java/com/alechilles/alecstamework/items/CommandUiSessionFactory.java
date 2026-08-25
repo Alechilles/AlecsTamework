@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.commandui.CommandUiActionHandle;
+import com.alechilles.alecstamework.api.commandui.CommandUiActionView;
 import com.alechilles.alecstamework.api.commandui.CommandUiCloseReason;
 import com.alechilles.alecstamework.api.commandui.CommandUiCompanionRow;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorAction;
@@ -13,6 +14,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -130,6 +132,9 @@ final class CommandUiSessionFactory {
         ContributorBindingState state = new ContributorBindingState(
                 created.session(), playerUuid, configId, contributorRegistry,
                 contributorBindings, rendererGenerationCheck);
+        created.session().installContributorFlowManager(
+                new CommandUiContributorFlowManager(
+                        created.session(), state, contributorRegistry));
         return new CreatedSession(created.session(), created.handles(), state);
     }
 
@@ -243,6 +248,61 @@ final class CommandUiSessionFactory {
                     snapshot.withActionGeneration(generation), handles);
         }
 
+        /**
+         * Binds the exact current FLOW definitions to managed-flow handles.
+         * Caller-supplied flow handles are never consulted.
+         */
+        @Nonnull
+        synchronized ManagedFlowActions bindManagedFlowActions(
+                @Nonnull CommandUiContributorId contributorId,
+                long contributorGeneration,
+                @Nonnull Set<String> effectiveIds,
+                @Nonnull Map<String, CommandUiActionHandle> existing
+        ) {
+            Map<String, CommandUiActionHandle> issued = new LinkedHashMap<>();
+            Map<String, CommandUiActionView> views = new LinkedHashMap<>();
+            for (CommandUiContributorActionBinding binding : bindings) {
+                if (binding.scope() != CommandUiContributorAction.Scope.FLOW
+                        || !contributorId.equals(binding.contributorId())
+                        || contributorGeneration != binding.contributorGeneration()
+                        || !effectiveIds.contains(binding.effectiveId())) {
+                    continue;
+                }
+                CommandUiActionHandle handle = existing.get(binding.effectiveId());
+                if (handle == null || !session.refreshManagedContributor(
+                        handle, binding, rendererGenerationCheck::getAsBoolean,
+                        generationCheck(binding))) {
+                    handle = session.issueManagedContributor(binding,
+                            new CommandUiActionGateway.ContributorIdentity(
+                                    playerUuid, configId, null, null, null),
+                            rendererGenerationCheck::getAsBoolean,
+                            generationCheck(binding));
+                }
+                CommandUiActionView view = binding.view(handle);
+                if (view == null) continue;
+                if (handle != null) {
+                    issued.put(binding.effectiveId(), handle);
+                }
+                views.put(binding.effectiveId(), view);
+            }
+            if (!views.keySet().equals(effectiveIds)) {
+                throw new IllegalArgumentException(
+                        "Custom flow requested an unknown or hidden action.");
+            }
+            return new ManagedFlowActions(issued, views);
+        }
+
+        /** Returns whether the exact contributor generation is in this state. */
+        synchronized boolean hasContributor(
+                @Nonnull CommandUiContributorId contributorId,
+                long contributorGeneration
+        ) {
+            return bindings.stream().anyMatch(binding ->
+                    contributorId.equals(binding.contributorId())
+                            && contributorGeneration
+                            == binding.contributorGeneration());
+        }
+
         private List<CommandUiActionCatalog.ContributorActionHandle> issue(
                 @Nonnull CommandUiSnapshot snapshot,
                 @Nonnull List<CommandUiContributorActionBinding> source,
@@ -255,7 +315,8 @@ final class CommandUiSessionFactory {
                 boolean rowVisible = binding.scope()
                         != CommandUiContributorAction.Scope.ROW || row != null;
                 CommandUiActionHandle handle = null;
-                if (rowVisible) {
+                if (rowVisible && binding.scope()
+                        != CommandUiContributorAction.Scope.FLOW) {
                     CommandUiActionGateway.ContributorIdentity identity =
                             new CommandUiActionGateway.ContributorIdentity(
                                     playerUuid, configId,
@@ -312,6 +373,16 @@ final class CommandUiSessionFactory {
             static BindingKey of(CommandUiContributorActionBinding binding) {
                 return new BindingKey(binding.contributorId(), binding.scope(),
                         binding.rowId(), binding.effectiveId());
+            }
+        }
+
+        record ManagedFlowActions(
+                @Nonnull Map<String, CommandUiActionHandle> handles,
+                @Nonnull Map<String, CommandUiActionView> views
+        ) {
+            ManagedFlowActions {
+                handles = Map.copyOf(handles);
+                views = Map.copyOf(views);
             }
         }
     }

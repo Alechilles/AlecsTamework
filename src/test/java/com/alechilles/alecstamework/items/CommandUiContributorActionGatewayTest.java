@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /** Production behavior contract for contributor-owned command UI actions. */
 class CommandUiContributorActionGatewayTest {
@@ -401,6 +402,44 @@ class CommandUiContributorActionGatewayTest {
                 gateway.invoke(sessionId, CommandUiActionRequest.of(handle),
                         1L, null).toCompletableFuture().join().status());
         assertEquals(2, calls.get());
+    }
+
+    @Test
+    void managedContributorHandlesUseOnlyTheManagedGeneration() {
+        CommandUiActionGateway gateway = new CommandUiActionGateway();
+        UUID sessionId = UUID.randomUUID();
+        gateway.openSession(sessionId, 1L);
+        long managedGeneration = gateway.beginManagedFlow(sessionId);
+        CommandUiContributorId contributorId = CommandUiContributorId.of(
+                "runeteria:actions");
+        CommandUiContributorActionBinding binding = binding(
+                contributorId, 1L, CommandUiContributorAction.Scope.FLOW, null,
+                CommandUiContributorAction.InputPolicy.NONE,
+                context -> CompletableFuture.completedFuture(
+                        CommandUiActionResult.applied()));
+
+        CommandUiActionHandle handle = gateway.issueManagedContributor(
+                sessionId, binding, identity(), () -> true, () -> true, null);
+
+        assertEquals(CommandUiActionStatus.APPLIED,
+                gateway.invoke(sessionId, CommandUiActionRequest.of(handle),
+                        managedGeneration + 100L, null)
+                        .toCompletableFuture().join().status());
+
+        CommandUiActionHandle stale = gateway.issueManagedContributor(
+                sessionId, binding, identity(), () -> true, () -> true, null);
+        gateway.beginManagedFlow(sessionId);
+        assertEquals(CommandUiActionStatus.STALE,
+                gateway.invoke(sessionId, CommandUiActionRequest.of(stale),
+                        managedGeneration, null)
+                        .toCompletableFuture().join().status());
+
+        gateway.closeManagedFlow(sessionId);
+        assertThrows(IllegalStateException.class,
+                () -> gateway.issueManagedContributor(
+                        sessionId, binding, identity(), () -> true,
+                        () -> true, null));
+        gateway.closeSession(sessionId);
     }
 
     @Test

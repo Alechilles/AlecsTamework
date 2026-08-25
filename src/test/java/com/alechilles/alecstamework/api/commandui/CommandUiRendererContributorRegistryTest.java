@@ -98,6 +98,22 @@ class CommandUiRendererContributorRegistryTest {
     }
 
     @Test
+    void contributorRemovalListenerRunsOutsideTheRegistryMonitor() {
+        CommandUiContributorRegistry registry =
+                new CommandUiContributorRegistry();
+        java.util.concurrent.atomic.AtomicBoolean monitorHeld =
+                new java.util.concurrent.atomic.AtomicBoolean(true);
+        registry.subscribeUnregister((id, generation) ->
+                monitorHeld.set(Thread.holdsLock(registry)));
+        CommandUiRegistrationResult registered = registry.register(
+                "example:data", ignored -> emptyContributor());
+
+        registered.registration().close();
+
+        assertFalse(monitorHeld.get());
+    }
+
+    @Test
     void unavailableFacadeFailsClosedForBothRegistrationSurfaces() {
         CommandUiApi unavailable = CommandUiApi.unavailable();
 

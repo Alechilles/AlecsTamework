@@ -126,13 +126,17 @@ public final class CommandUiContributorRegistry implements AutoCloseable {
     }
 
     @Override
-    public synchronized void close() {
-        if (!closed.compareAndSet(false, true)) return;
-        for (Entry entry : contributors.values()) {
-            entry.closed.set(true);
+    public void close() {
+        java.util.List<Entry> removed;
+        synchronized (this) {
+            if (!closed.compareAndSet(false, true)) return;
+            removed = java.util.List.copyOf(contributors.values());
+            for (Entry entry : removed) entry.closed.set(true);
+            contributors.clear();
+        }
+        for (Entry entry : removed) {
             notifyUnregister(entry.id, entry.generation);
         }
-        contributors.clear();
         listeners.clear();
     }
 
@@ -227,12 +231,12 @@ public final class CommandUiContributorRegistry implements AutoCloseable {
 
         @Override
         public void close() {
+            boolean removed;
             synchronized (CommandUiContributorRegistry.this) {
                 if (!closed.compareAndSet(false, true)) return;
-                if (contributors.remove(id, this)) {
-                    notifyUnregister(id, generation);
-                }
+                removed = contributors.remove(id, this);
             }
+            if (removed) notifyUnregister(id, generation);
         }
     }
 }
