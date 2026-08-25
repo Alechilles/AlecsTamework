@@ -93,6 +93,13 @@ class ReplacementTameworkApiFactoryTest {
                                  new SimpleClaimsTamedDamagePolicy()
                          )) {
                 assertTrue(api.getByProfileId(profileId().toString()).isPresent());
+                assertTrue(api.getCapabilities().containsAll(List.of(
+                        TameworkApiCapability.COMMAND_UI_RENDERERS,
+                        TameworkApiCapability.COMMAND_UI_CONTRIBUTORS,
+                        TameworkApiCapability.COMMAND_UI_CUSTOM_ACTIONS,
+                        TameworkApiCapability.COMMAND_UI_CUSTOM_FLOWS
+                )));
+                assertTrue(api.commandUi().available());
                 assertEquals(
                         "HEALTHY",
                         api.diagnostics().getPersistenceDiagnostics()

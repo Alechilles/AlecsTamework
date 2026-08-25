@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.api;
 
+import com.alechilles.alecstamework.api.commandui.CommandUiRegistrationResult;
 import org.junit.jupiter.api.Test;
 
 import java.util.EnumSet;
@@ -16,7 +17,10 @@ class TameworkApiV09ContractTest {
         TameworkApi legacy = new LegacyApiImplementation();
 
         assertFalse(legacy.commandUi().available());
-        assertTrue(legacy.commandUi().find("example:menu").isEmpty());
+        assertEquals(
+                CommandUiRegistrationResult.Status.UNAVAILABLE,
+                legacy.commandUi().registerRenderer("example:menu", null).status()
+        );
 
         assertEquals(
                 CompanionProvisioningResult.Status.UNAVAILABLE,

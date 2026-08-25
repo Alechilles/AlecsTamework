@@ -1,64 +1,122 @@
 package com.alechilles.alecstamework.api.commandui;
 
-import java.util.Optional;
-import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/**
- * Capability-gated registration surface for command-item menu providers.
- *
- * <p>The facade is unavailable on API implementations that do not host the
- * command UI provider lifecycle. Callers can therefore probe the capability
- * without checking a concrete Tamework implementation.</p>
- */
+/** Capability-gated registration surface for command-item UI renderers and contributors. */
 public interface CommandUiApi {
     /**
-     * Returns whether provider registration is active for this API instance.
+     * Returns whether renderer and contributor registration is active for this API instance.
      */
     boolean available();
 
     /**
-     * Registers one provider under a normalized namespaced identifier.
+     * Registers one custom renderer under a normalized namespaced identifier.
      *
-     * <p>A successful result owns an idempotent registration handle. A later
-     * registration with the same identifier returns {@code CONFLICT} and does
-     * not replace the live provider.</p>
+     * <p>Implementations that do not expose the renderer registry return an
+     * unavailable result. This default keeps replacement API adapters
+     * fail-closed while they are being upgraded.</p>
      */
     @Nonnull
-    CommandUiProviderRegistrationResult register(
-            @Nullable String providerId,
-            @Nullable CommandUiProvider provider
-    );
-
-    /** Convenience overload for callers that already parsed an identifier. */
-    @Nonnull
-    default CommandUiProviderRegistrationResult register(
-            @Nullable CommandUiProviderId providerId,
-            @Nullable CommandUiProvider provider
+    default CommandUiRegistrationResult registerRenderer(
+            @Nullable String rendererId,
+            @Nullable CommandUiRendererProvider provider
     ) {
-        return register(providerId == null ? null : providerId.value(), provider);
+        return CommandUiRegistrationResult.unavailable(rendererId);
     }
 
     /**
-     * Finds the currently registered provider for one identifier.
+     * Registers one renderer with immutable presentation capabilities.
      *
-     * <p>Malformed or absent identifiers resolve to an empty result. Lookup
-     * does not expose a provider after its registration has closed.</p>
+     * <p>The default delegates to the source-compatible overload. Older API
+     * implementations therefore continue to register their provider while
+     * newer implementations can retain the descriptor with its generation.</p>
      */
     @Nonnull
-    Optional<CommandUiProvider> find(@Nullable String providerId);
+    default CommandUiRegistrationResult registerRenderer(
+            @Nullable String rendererId,
+            @Nullable CommandUiRendererDescriptor descriptor,
+            @Nullable CommandUiRendererProvider provider
+    ) {
+        return registerRenderer(rendererId, provider);
+    }
 
     /** Convenience overload for callers that already parsed an identifier. */
     @Nonnull
-    default Optional<CommandUiProvider> find(@Nullable CommandUiProviderId providerId) {
-        return find(providerId == null ? null : providerId.value());
+    default CommandUiRegistrationResult registerRenderer(
+            @Nullable CommandUiRendererId rendererId,
+            @Nullable CommandUiRendererProvider provider
+    ) {
+        return registerRenderer(rendererId == null ? null : rendererId.value(), provider);
     }
 
-    /** Lists the normalized identifiers that are live at the time of the call. */
+    /** Convenience overload for a parsed renderer ID and descriptor. */
     @Nonnull
-    default Set<CommandUiProviderId> listProviderIds() {
-        return Set.of();
+    default CommandUiRegistrationResult registerRenderer(
+            @Nullable CommandUiRendererId rendererId,
+            @Nullable CommandUiRendererDescriptor descriptor,
+            @Nullable CommandUiRendererProvider provider
+    ) {
+        return registerRenderer(rendererId == null ? null : rendererId.value(),
+                descriptor, provider);
+    }
+
+    /**
+     * Registers one session contributor under a normalized namespaced
+     * identifier.
+     */
+    @Nonnull
+    default CommandUiRegistrationResult registerContributor(
+            @Nullable String contributorId,
+            @Nullable CommandUiContributorProvider provider
+    ) {
+        return CommandUiRegistrationResult.unavailable(contributorId);
+    }
+
+    /**
+     * Registers one contributor with immutable presentation capabilities.
+     *
+     * <p>The default delegates to the source-compatible overload so older API
+     * implementations remain source and behavior compatible.</p>
+     */
+    @Nonnull
+    default CommandUiRegistrationResult registerContributor(
+            @Nullable String contributorId,
+            @Nullable CommandUiContributorDescriptor descriptor,
+            @Nullable CommandUiContributorProvider provider
+    ) {
+        return registerContributor(contributorId, provider);
+    }
+
+    /** Convenience overload for callers that already parsed an identifier. */
+    @Nonnull
+    default CommandUiRegistrationResult registerContributor(
+            @Nullable CommandUiContributorId contributorId,
+            @Nullable CommandUiContributorProvider provider
+    ) {
+        return registerContributor(contributorId == null ? null : contributorId.value(), provider);
+    }
+
+    /** Convenience overload for a parsed contributor ID and descriptor. */
+    @Nonnull
+    default CommandUiRegistrationResult registerContributor(
+            @Nullable CommandUiContributorId contributorId,
+            @Nullable CommandUiContributorDescriptor descriptor,
+            @Nullable CommandUiContributorProvider provider
+    ) {
+        return registerContributor(contributorId == null ? null : contributorId.value(),
+                descriptor, provider);
+    }
+
+    /**
+     * Returns a value-only diagnostics snapshot.
+     *
+     * <p>The default is an empty, fail-closed snapshot so older and degraded
+     * API implementations remain source compatible.</p>
+     */
+    @Nonnull
+    default CommandUiDiagnostics diagnostics() {
+        return CommandUiDiagnostics.empty();
     }
 
     /** Returns the stable fail-closed adapter for legacy and degraded APIs. */
@@ -73,19 +131,6 @@ public interface CommandUiApi {
             @Override
             public boolean available() {
                 return false;
-            }
-
-            @Override
-            public CommandUiProviderRegistrationResult register(
-                    String providerId,
-                    CommandUiProvider provider
-            ) {
-                return CommandUiProviderRegistrationResult.unavailable(providerId);
-            }
-
-            @Override
-            public Optional<CommandUiProvider> find(String providerId) {
-                return Optional.empty();
             }
         };
 

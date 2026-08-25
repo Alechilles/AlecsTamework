@@ -8,80 +8,113 @@ draft: false
 
 Parent: [API Recipes](/mod/alecs-tamework/api-recipes) | [Public API](/mod/alecs-tamework/public-api)
 
-Goal: let a Java plugin render a custom command-item menu while Tamework keeps
+Goal: let one Java plugin render a custom command menu and let one or more
+plugins add namespaced presentation, actions, and flows. Tamework keeps
 gameplay authority.
 
-## 1. Register during plugin setup
-
-Keep the registration handle as plugin state.
+## 1. Check the contract
 
 ```java
-private CommandUiProviderRegistration commandUiRegistration;
+EnumSet<TameworkApiCapability> required = EnumSet.of(
+        TameworkApiCapability.COMMAND_UI_RENDERERS,
+        TameworkApiCapability.COMMAND_UI_CONTRIBUTORS,
+        TameworkApiCapability.COMMAND_UI_CUSTOM_ACTIONS,
+        TameworkApiCapability.COMMAND_UI_CUSTOM_FLOWS);
+
+if (!api.getCapabilities().containsAll(required)
+        || !api.commandUi().available()) {
+    return;
+}
+```
+
+Check only the capabilities that your plugin needs. A data-only contributor
+does not need the action or flow capability.
+
+## 2. Register the renderer and contributor
+
+Keep every successful registration as plugin state.
+
+```java
+private CommandUiRegistration rendererRegistration;
+private CommandUiRegistration contributorRegistration;
 
 void registerCommandUi(TameworkApi api) {
-    EnumSet<TameworkApiCapability> required = EnumSet.of(
-            TameworkApiCapability.COMMAND_UI_PROVIDERS,
-            TameworkApiCapability.COMMAND_UI_MANAGED_FLOWS);
-    if (!api.getCapabilities().containsAll(required)) {
-        return;
-    }
+    CommandUiRegistrationResult renderer = api.commandUi().registerRenderer(
+            "runeteria:husbandry_ui",
+            new CommandUiRendererDescriptor(
+                    Set.of("runeteria:husbandry"),
+                    Set.of("runeteria:husbandry/checklist")),
+            HusbandryCommandUiController::new);
+    if (!renderer.registered()) return;
+    rendererRegistration = renderer.registration();
 
-    CommandUiProviderRegistrationResult result = api.commandUi().register(
-            "runeteria:husbandry",
-            HusbandryCommandPage::new
-    );
-    if (result.registered()) {
-        commandUiRegistration = result.registration();
+    CommandUiRegistrationResult contributor =
+            api.commandUi().registerContributor(
+                    "runeteria:husbandry",
+                    new CommandUiContributorDescriptor(
+                            Set.of("runeteria:husbandry/page"),
+                            Set.of("runeteria:husbandry/row"),
+                            Set.of(CommandUiContributorAction.Scope.PAGE,
+                                    CommandUiContributorAction.Scope.ROW,
+                                    CommandUiContributorAction.Scope.FLOW),
+                            Set.of("runeteria:husbandry/checklist")),
+                    HusbandryPresentationContributor::new);
+    if (contributor.registered()) {
+        contributorRegistration = contributor.registration();
+    } else {
+        rendererRegistration.close();
+        rendererRegistration = null;
     }
 }
 
 void unregisterCommandUi() {
-    if (commandUiRegistration != null) {
-        commandUiRegistration.close();
-        commandUiRegistration = null;
-    }
+    if (contributorRegistration != null) contributorRegistration.close();
+    if (rendererRegistration != null) rendererRegistration.close();
+    contributorRegistration = null;
+    rendererRegistration = null;
 }
 ```
 
-Do not cache `commandUi().available()` as permanent server state. Check the
-capability when the plugin registers.
+If Rune_UI owns the layout and Rune_Husbandry owns the data, each plugin keeps
+only its own registration. The command config composes them at page-open time.
 
-## 2. Select the provider in the command config
+## 3. Select the composition in the command config
 
 ```json
 {
-  "Parent": "Runeteria_Husbandry_Command_Base",
-  "UiProviderId": "runeteria:husbandry"
+  "Parent": "RH_Command_Livestock",
+  "UiRendererId": "runeteria:husbandry_ui",
+  "UiContributors": [
+    {
+      "Id": "runeteria:husbandry",
+      "Required": true
+    }
+  ]
 }
 ```
 
-The ID must match the registered ID after lowercase normalization.
+Use `Required: true` when the custom page is not useful without that
+contribution. Its absence causes standard-menu fallback. Use `false` for a
+badge, indicator, or other feature that the renderer can omit.
 
-## 3. Build one controller per open menu
+## 4. Build one controller per open menu
 
-This shortened example shows the important boundary. Your plugin owns the UI
-asset and selectors. Tamework owns the session and actions.
+The controller owns only rendering and event decoding:
 
 ```java
-final class HusbandryCommandPage
-        implements CommandUiPageController<HusbandryCommandPage.EventPayload> {
+final class HusbandryCommandUiController
+        implements CommandUiPageController<HusbandryUiEvent> {
     private static final String UI_PATH =
-            "Common/UI/Custom/RuneteriaHusbandryCommand.ui";
-
-    private final CommandUiOpenContext context;
-
-    HusbandryCommandPage(CommandUiOpenContext context) {
-        this.context = context;
-    }
+            "Rune_UI/HusbandryCommand.ui";
 
     @Override
-    public BuilderCodec<EventPayload> eventCodec() {
-        return EventPayload.CODEC;
+    public BuilderCodec<HusbandryUiEvent> eventCodec() {
+        return HusbandryUiEvent.CODEC;
     }
 
     @Override
     public void buildInitial(
-            CommandUiOpenContext ignored,
+            CommandUiOpenContext context,
             CommandUiSession session,
             CommandUiSnapshot snapshot,
             UICommandBuilder commands,
@@ -105,134 +138,156 @@ final class HusbandryCommandPage
             removeCard(rowId, commands);
         }
         for (UUID rowId : update.changeSet().changedCompanionIds()) {
-            CommandUiCompanionRow row = update.snapshot().companionRow(rowId);
-            if (row != null) {
-                renderCardIndicators(row, commands, events);
-            }
+            CommandUiCompanionRow row =
+                    update.snapshot().companionRow(rowId);
+            if (row != null) renderCardIndicators(row, commands);
         }
     }
 
     @Override
     public void handleEvent(
-            EventPayload event,
+            HusbandryUiEvent event,
             CommandUiSession session,
             CommandUiSnapshot snapshot
     ) {
-        CommandUiActionHandle handle =
-                new CommandUiActionHandle(event.actionToken);
         CommandUiActionRequest request = new CommandUiActionRequest(
-                handle, event.inputProvided ? event.textInput : null);
-        session.invoke(request).thenAccept(result -> {
-            UICommandBuilder commands = new UICommandBuilder();
-            UIEventBuilder events = new UIEventBuilder();
-            renderResult(result, commands, events);
-            session.updateSink().submit(commands, events, false);
-        });
-    }
-
-    static final class EventPayload {
-        static final BuilderCodec<EventPayload> CODEC = BuilderCodec.builder(
-                EventPayload.class, EventPayload::new)
-                .<String>append(
-                        new KeyedCodec<>("ActionToken", Codec.STRING),
-                        (event, value) -> event.actionToken = value,
-                        event -> event.actionToken)
-                .add()
-                .<String>append(
-                        new KeyedCodec<>("TextInput", Codec.STRING),
-                        (event, value) -> event.textInput = value,
-                        event -> event.textInput)
-                .add()
-                .<Boolean>append(
-                        new KeyedCodec<>("InputProvided", Codec.BOOLEAN),
-                        (event, value) -> event.inputProvided = value,
-                        event -> event.inputProvided)
-                .add()
-                .build();
-
-        String actionToken;
-        String textInput = "";
-        boolean inputProvided;
+                new CommandUiActionHandle(event.actionToken()),
+                event.inputProvided() ? event.input() : null);
+        session.invoke(request).thenAccept(this::renderActionResult);
     }
 }
 ```
 
-When you bind a button, put only `action.handle().token()` in its
-`ActionToken` event value. Disabled actions have no usable handle.
+Put the UI file at `Common/UI/Custom/Rune_UI/HusbandryCommand.ui`. The string
+passed to `append` starts below `Common/UI/Custom`; it must not repeat that
+prefix.
 
-Set `InputProvided` only for actions that accept text. Tamework rejects all
-text, including an empty string, on a handle-only action.
+Bind only `action.handle().token()` into the client event. Disabled actions
+have no usable handle. Set input only for an action that declares optional or
+required input.
 
-## 4. Render small changes
+## 5. Add namespaced presentation and actions
 
-`CommandUiUpdate.snapshot()` is always complete. Use its change set to avoid a
-full page rebuild.
-
-For example, a health or active-state change can update one card indicator:
+Create one contributor for each open session:
 
 ```java
-private void renderCardIndicators(
-        CommandUiCompanionRow row,
-        UICommandBuilder commands,
-        UIEventBuilder events
+final class HusbandryPresentationContributor
+        implements CommandUiSessionContributor {
+    private final CommandUiContributorId id;
+    private final CommandUiContributorDirtySink dirty;
+
+    HusbandryPresentationContributor(
+            CommandUiContributorCreateContext context) {
+        id = context.contributorId();
+        dirty = context.dirtySink();
+    }
+
+    @Override
+    public CommandUiContribution compose(
+            CommandUiSnapshot base,
+            CommandUiContribution previous,
+            CommandUiDirtyScope scope
+    ) {
+        Map<UUID, Map<String, CommandUiValue>> rows = new LinkedHashMap<>();
+        Map<UUID, Map<String, CommandUiContributorAction>> actions =
+                new LinkedHashMap<>();
+        for (CommandUiCompanionRow row : base.companionRows()) {
+            rows.put(row.rowId(), Map.of(
+                    "ready", CommandUiValue.of(isReady(row))));
+            actions.put(row.rowId(), Map.of(
+                    "toggle_ready", toggleReadyAction()));
+        }
+        return CommandUiContribution.withActions(
+                id,
+                Map.of("mode", CommandUiValue.of("husbandry")),
+                rows,
+                Map.of(), Map.of(), actions, Map.of());
+    }
+
+    private CommandUiContributorAction toggleReadyAction() {
+        return new CommandUiContributorAction(
+                "toggle_ready", "READY", "Toggle ready",
+                CommandUiContributorAction.InputPolicy.NONE,
+                false,
+                context -> {
+                    changeServerState(context.rowId());
+                    dirty.markRowsDirty(Set.of(context.rowId()));
+                    return CompletableFuture.completedFuture(
+                            CommandUiActionResult.applied());
+                });
+    }
+}
+```
+
+The renderer reads this value from
+`snapshot.contribution(CommandUiContributorId.of("runeteria:husbandry"))`.
+The row UUID keeps a card indicator stable across updates. The action handler
+runs behind Tamework's session, registration-generation, and world-thread
+checks.
+
+## 6. Open a custom flow
+
+A page or row action can return a contributor-owned flow:
+
+```java
+return CompletableFuture.completedFuture(CommandUiActionResult.openFlow(
+        new CommandUiCustomFlowView(
+                UUID.randomUUID(),
+                "runeteria:husbandry/checklist",
+                contributorId,
+                contributorGeneration,
+                1L,
+                1L,
+                Map.of("step", CommandUiValue.of("overview")),
+                Map.of(
+                        contributorId.value() + "/next",
+                        new CommandUiActionView(
+                                "NEXT", "Continue", true,
+                                null, false, null)))));
+```
+
+Define flow-scoped actions in the contribution. Tamework binds only the action
+IDs requested by the flow view. Later flow actions can return `REPLACE`,
+`UPDATE`, or `CLOSE`. Keep the flow instance ID stable until close. Increment
+the revision when the step or data changes, and increment the action generation
+when the action surface changes.
+
+Built-in group and talent actions still return their built-in detached flow
+types. A renderer can support built-in and contributor flows in the same page.
+
+## 7. Render focused changes
+
+`CommandUiUpdate.snapshot()` is always complete. Use the change set and each
+contributor's dirty scope to avoid a full rebuild. For one indicator:
+
+```java
+private void renderReadyIndicator(
+        UUID rowId,
+        boolean ready,
+        UICommandBuilder commands
 ) {
-    String root = "#Companion_" + row.rowId();
-    commands.set(root + " #Health.Text",
-            row.currentHealth() + " / " + row.maxHealth());
-    commands.set(root + " #Active.Visible", row.active());
+    String root = "#Companion_" + rowId;
+    commands.set(root + " #Ready.Visible", ready);
 }
 ```
 
-Do not clear or rebuild the full list for this update. The host sends the
-builder with `clear=false`.
+The host submits the builder with `clear=false`, so untouched elements stay in
+place.
 
-## 5. Route confirmation actions
+## 8. Handle failures and confirmations
 
-If an invocation returns `CONFIRMATION_REQUIRED`, show a provider-owned
-confirmation overlay with the returned presentation. Bind the returned
-confirmation handle to the confirm button. Do not reuse the first handle.
-If the player cancels, discard the confirmation handle. The initiating action
-stays available, so the player can start a new confirmation flow. Confirmation
-handles expire after five seconds.
+If an invocation returns `CONFIRMATION_REQUIRED`, show a confirmation control
+and bind the new confirmation handle. Do not reuse the first handle.
 
-Treat `APPLIED` as a confirmed state change. Treat `ACCEPTED` as a successful
-dispatch whose callback did not report whether it changed state. In both
-cases, use the next Tamework snapshot as the source of visible state.
+Treat `STALE`, `DENIED`, `UNAVAILABLE`, `CONFLICT`, and `FAILED` as
+server-authoritative failures. Request a fresh snapshot when the result asks
+for it. Release controller and contributor listeners in `close()`.
 
-## 6. Render managed flows
-
-Inspect `result.flowView()` after invocation. Keep this navigation local to the
-provider page:
-
-```java
-CommandUiFlowView flow = result.flowView();
-if (flow instanceof CommandUiGroupFlowView groups) {
-    renderGroups(groups, commands, events);
-} else if (flow instanceof CommandUiTalentFlowView talents) {
-    renderTalents(talents, commands, events);
-}
-```
-
-Use only the handles in the returned flow. Create and rename actions accept a
-group-name value. Recolor accepts `#RRGGBB`. Purchase, selection, and ordinary
-navigation actions accept no text. Reset and delete use the same confirmation
-rule as main command actions.
-
-Each managed mutation returns a fresh flow and retires the older managed
-handles. Back navigation can show the retained main command snapshot. Main
-snapshot refreshes do not invalidate the current managed flow.
-
-## Notes
-
-- Do not retain a `Player`, ECS reference, store, item stack, or mutable
-  snapshot in the controller.
-- Do not infer gameplay authority from visible text or metadata.
-- Call `session.requestRefresh()` when provider-local flow needs a fresh
-  Tamework snapshot.
-- Release provider-local listeners in `close()`.
-- A controller failure falls back to the standard Tamework menu.
+Use `api.commandUi().diagnostics()` for safe registration, session, status,
+timing, and fallback details. Diagnostics contain no action tokens, input, or
+private contribution values.
 
 ## Related Pages
 
-- [Command UI Provider API Reference](/mod/alecs-tamework/command-ui-provider-api-reference)
+- [Command UI Renderer and Contributor API Reference](/mod/alecs-tamework/command-ui-provider-api-reference)
 - [API Bootstrap and Capability Checks](/mod/alecs-tamework/api-bootstrap-and-capability-checks-recipe)

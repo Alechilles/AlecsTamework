@@ -76,6 +76,13 @@ Resolved by bound item ids:
 - `TwNameItemConfig` (`ItemId`)
 - `TwCommandItemConfig` (`ItemIds`)
 
+The effective `TwCommandItemConfig` also resolves its command UI composition.
+`UiRendererId` selects one registered Java renderer. `UiContributors` replaces
+the parent list when it is explicitly authored; otherwise it inherits the
+parent list. Each entry has a namespaced `Id` and a `Required` flag. A missing
+required contribution falls back to the standard menu. A missing optional
+contribution does not stop the selected renderer.
+
 ### Name-pool family
 - `TwNamesConfig` resolves by asset id (for example from `TwNameItemConfig.Naming.RandomNamesId`).
 

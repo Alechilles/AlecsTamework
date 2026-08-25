@@ -5,12 +5,15 @@ import static com.alechilles.alecstamework.items.CommandSelectionCallbackGuards.
 import com.alechilles.alecstamework.api.commandui.CommandUiActionHandle;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
 import com.alechilles.alecstamework.api.commandui.CommandUiCommandOption;
+import com.alechilles.alecstamework.api.commandui.CommandUiContribution;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorRequirement;
 import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
 import com.alechilles.alecstamework.api.commandui.CommandUiPanelState;
-import com.alechilles.alecstamework.api.commandui.CommandUiProviderId;
+import com.alechilles.alecstamework.api.commandui.CommandUiRendererId;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
 import com.alechilles.alecstamework.api.commandui.CommandUiUpdate;
-import com.alechilles.alecstamework.api.internal.CommandUiProviderRegistry;
+import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.compat.HytaleApiLevel;
@@ -232,9 +235,81 @@ final class CommandSelectionPageService {
     }
 
     /** Enables the shared host with Tamework's live provider registry. */
-    void configureCommandUi(@Nullable CommandUiProviderRegistry registry) {
+    void configureCommandUi(@Nullable CommandUiRegistry registry) {
         commandUiCoordinator = registry == null
                 ? null : new CommandUiPageCoordinator(registry, this);
+    }
+
+    /** Exercises registry resolution, composition, handle dispatch, and flow ownership. */
+    CommandItemFeatureHandler.CommandUiSelfTestResult runCommandUiSelfTest(
+            PlayerRef playerRef,
+            CommandUiOpenContext context,
+            CommandUiContributorId contributorId
+    ) {
+        CommandUiPageCoordinator coordinator = commandUiCoordinator;
+        if (coordinator == null || playerRef == null || context == null
+                || contributorId == null) {
+            return new CommandItemFeatureHandler.CommandUiSelfTestResult(
+                    false, false, false,
+                    CommandUiActionResult.failed(
+                            "command UI runtime is unavailable"));
+        }
+        CommandUiPageCoordinator.Created created = null;
+        try {
+            CommandUiSnapshot base = new CommandUiSnapshot(
+                    UUID.randomUUID(), 1L, 1L,
+                    context.rendererId() == null
+                            ? null : context.rendererId().value(),
+                    List.of(), List.of(), new CommandUiPanelState("self-test"));
+            created = coordinator.create(
+                    playerRef, context, base,
+                    () -> new com.alechilles.alecstamework.api.commandui
+                            .CommandUiPageController<
+                            com.alechilles.alecstamework.ui
+                                    .CommandSelectionEventData>() {
+                        @Override
+                        public com.hypixel.hytale.codec.builder.BuilderCodec<
+                                com.alechilles.alecstamework.ui
+                                        .CommandSelectionEventData> eventCodec() {
+                            return com.alechilles.alecstamework.ui
+                                    .CommandSelectionEventData.CODEC;
+                        }
+                    },
+                    List.of(new CommandUiContributorRequirement(
+                            contributorId, true)),
+                    List.of(), List.of(), (snapshot, handles) -> snapshot,
+                    (ignoredPlayer, operation) -> {
+                        operation.run(null, null);
+                        return true;
+                    }, ignoredWorld -> { });
+            CommandUiContribution contribution = created.session().snapshot()
+                    .contribution(contributorId);
+            boolean ready = contribution != null
+                    && contribution.pageValue("ready") != null;
+            com.alechilles.alecstamework.api.commandui.CommandUiActionView action =
+                    contribution == null ? null
+                            : contribution.pageActions().values().stream()
+                            .findFirst().orElse(null);
+            boolean bound = action != null && action.handle() != null;
+            CommandUiActionResult result = bound
+                    ? created.session().invoke(action.handle())
+                    .toCompletableFuture().join()
+                    : CommandUiActionResult.failed(
+                            "command UI contributor action was not bound");
+            return new CommandItemFeatureHandler.CommandUiSelfTestResult(
+                    created.custom(), ready, bound, result);
+        } catch (RuntimeException | LinkageError failure) {
+            return new CommandItemFeatureHandler.CommandUiSelfTestResult(
+                    false, false, false,
+                    CommandUiActionResult.failed(
+                            "command UI runtime probe failed"));
+        } finally {
+            if (created != null) {
+                created.session().close(
+                        com.alechilles.alecstamework.api.commandui
+                                .CommandUiCloseReason.DISMISSED);
+            }
+        }
     }
 
     /**
@@ -310,18 +385,18 @@ final class CommandSelectionPageService {
         UUID sessionId = UUID.randomUUID();
         String selected = working == null ? null : working.getFromMetadataOrNull(
                 TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING);
-        CommandUiProviderId configuredProvider = forceStandard ? null
-                : CommandUiProviderId.tryParse(config.getUiProviderId()).orElse(null);
+        CommandUiRendererId configuredRenderer = forceStandard ? null
+                : CommandUiRendererId.tryParse(config.getUiRendererId()).orElse(null);
         String rosterMode = config.usesBondedCompanionRoster()
                 ? "bonded" : "generic";
         CommandUiOpenContext openContext = new CommandUiOpenContext(
                 uiPlayerRef.getUuid(), uiPlayerRef.getLanguage(), toolId,
-                config.getId(), configuredProvider, rosterMode);
+                config.getId(), configuredRenderer, rosterMode);
         PageContext pageContext = pageContext(
                 player, uiPlayerRef, config, working, toolId, actions,
                 genericAuthority, bondedAuthority);
         InitialUiState initial = initialSnapshot(
-                sessionId, configuredProvider, player, config, working,
+                sessionId, configuredRenderer, player, config, working,
                 toolId, selected, rosterMode, pageContext.snapshot());
         CommandUiSnapshot snapshot = initial.snapshot();
         CommandUiActionCatalog actionCatalog = commandActions(
@@ -337,7 +412,8 @@ final class CommandSelectionPageService {
                         pageContext, buildNpcCallbacks(pageContext),
                         buildFeatureCallbacks(pageContext),
                         buildPanelCallbacks(pageContext))),
-                actionCatalog.genericBindings(), actionCatalog.bondedBindings(),
+                config.getUiContributors(), actionCatalog.genericBindings(),
+                actionCatalog.bondedBindings(),
                 actionCatalog::attach,
                 refreshRequest,
                 commandUiWorldDispatcher,
@@ -345,7 +421,10 @@ final class CommandSelectionPageService {
                         currentWorld, config, toolId, actions,
                         genericAuthority, bondedAuthority));
         createdRef.set(created);
-        if (!created.host().isOpen()) {
+        if (!created.host().takePageOwnership()) {
+            if (!created.host().claimFallbackForOpener()) {
+                return true;
+            }
             return open(player, store, config, working, toolId, actions,
                     genericAuthority, bondedAuthority, true);
         }
@@ -362,10 +441,18 @@ final class CommandSelectionPageService {
             if (created.host().own(automaticRefresh)) automaticRefresh.start();
         }
         boolean opened = openPage(player, playerRef, store, created.host());
+        boolean pageOwned = created.host().finishPageOpening(opened);
         if (!opened) {
             created.host().closeSession(
                     com.alechilles.alecstamework.api.commandui
                             .CommandUiCloseReason.FAILURE);
+        }
+        if (pageOwned) {
+            created.pageOpened();
+        }
+        if (!pageOwned && created.host().claimFallbackForOpener()) {
+            return open(player, store, config, working, toolId, actions,
+                    genericAuthority, bondedAuthority, true);
         }
         return opened;
     }
@@ -406,10 +493,13 @@ final class CommandSelectionPageService {
             PageContext context = pageContext(player, currentRef, config, working,
                     toolId, actions, genericAuthority, bondedAuthority);
             CommandUiSnapshot fresh = initialSnapshot(
-                    previous.sessionId(), previous.providerId(), player, config,
+                    previous.sessionId(), previous.rendererId(), player, config,
                     working, toolId, selected, previous.rosterMode(),
                     context.snapshot()).snapshot()
                     .withPresentationRevision(previous.presentationRevision() + 1L);
+            if (created.composition() != null) {
+                fresh = created.composition().rebase(fresh);
+            }
             CommandUiActionCatalog catalog = commandActions(context, fresh);
             CommandUiSnapshot next;
             if (created.session().consumeActionRebindRequired()
@@ -424,6 +514,11 @@ final class CommandSelectionPageService {
                 next = catalog.attach(fresh, handles);
             } else {
                 next = CommandUiActionCatalog.retainActions(fresh, previous);
+            }
+            if (created.composition() != null) {
+                next = next.withContributions(
+                        created.composition().snapshot().contributions());
+                next = created.reconcileContributorActions(next, previous);
             }
             var changes = CommandUiSnapshotDiffer.diff(previous, next);
             created.session().publishInternal(next, changes);
@@ -455,7 +550,7 @@ final class CommandSelectionPageService {
 
     private InitialUiState initialSnapshot(
             UUID sessionId,
-            @Nullable CommandUiProviderId providerId,
+            @Nullable CommandUiRendererId rendererId,
             Player player,
             TwCommandItemConfig config,
             @Nullable ItemStack working,
@@ -492,7 +587,7 @@ final class CommandSelectionPageService {
                                 : player.getPlayerRef().getLanguage());
         CommandUiSnapshot snapshot = CommandUiSnapshotAssembler.assemble(
                 sessionId, 1L, 1L,
-                providerId == null ? null : providerId.value(),
+                rendererId == null ? null : rendererId.value(),
                 toolId, working == null ? null : working.getItemId(),
                 config.getId(), rosterMode,
                 Set.of("commands", "companions", "panel", "partial-updates"),
@@ -528,13 +623,14 @@ final class CommandSelectionPageService {
         Map<String, String> groups = CommandUiSnapshotAssembler.groups(working);
         return new CommandUiSnapshot(
                 base.sessionId(), base.presentationRevision(),
-                base.actionGeneration(), base.providerId(), base.toolId(),
+                base.actionGeneration(), base.rendererId(), base.toolId(),
                 base.itemId(), base.configId(), base.rosterMode(),
                 base.enabledCapabilities(), base.selectedCommand(),
                 base.commandOptions(), base.companionRows(), base.panelState(),
                 base.globalActions(), base.commandActions(), assigned, choices,
                 groups, base.serverTimeMillis(), base.deadlines(),
-                base.emptyStateKey(), base.disabledReason());
+                base.emptyStateKey(), base.disabledReason(),
+                base.contributions());
     }
 
     private CommandUiActionCatalog commandActions(

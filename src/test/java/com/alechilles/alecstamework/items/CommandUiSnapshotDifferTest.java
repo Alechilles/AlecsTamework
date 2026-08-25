@@ -3,10 +3,13 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.api.commandui.CommandUiChangeSet;
 import com.alechilles.alecstamework.api.commandui.CommandUiCommandOption;
 import com.alechilles.alecstamework.api.commandui.CommandUiCompanionRow;
+import com.alechilles.alecstamework.api.commandui.CommandUiContribution;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
 import com.alechilles.alecstamework.api.commandui.CommandUiPanelState;
-import com.alechilles.alecstamework.api.commandui.CommandUiProviderId;
+import com.alechilles.alecstamework.api.commandui.CommandUiRendererId;
 import com.alechilles.alecstamework.api.commandui.CommandUiSection;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
+import com.alechilles.alecstamework.api.commandui.CommandUiValue;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.ui.BondedCompanionPanelPresentation;
 import com.alechilles.alecstamework.ui.BondedCompanionStatusPresentation;
@@ -14,10 +17,12 @@ import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -67,6 +72,41 @@ class CommandUiSnapshotDifferTest {
                 previous, groups);
         assertEquals(java.util.Set.of(CommandUiSection.GROUPS),
                 groupChanges.changedSections());
+    }
+
+    @Test
+    void changedContributorRowProducesTargetedHint() {
+        UUID sessionId = UUID.randomUUID();
+        UUID rowId = UUID.randomUUID();
+        CommandUiContributorId contributorId = CommandUiContributorId.of(
+                "runeteria:test");
+        CommandUiSnapshot before = snapshotWithContribution(sessionId,
+                contributorId, rowId, false);
+        CommandUiSnapshot after = snapshotWithContribution(sessionId,
+                contributorId, rowId, true);
+
+        CommandUiChangeSet changes = CommandUiSnapshotDiffer.diff(before, after);
+
+        assertEquals(Set.of(rowId), changes.changedContributorRowIds()
+                .get(contributorId));
+        assertTrue(changes.changedContributorPaths().get(contributorId)
+                .contains("rows." + rowId + ".ready"));
+        assertTrue(!changes.fullRefresh());
+    }
+
+    @Test
+    void equivalentContributorValuesDoNotProduceAChangeHint() {
+        UUID sessionId = UUID.randomUUID();
+        UUID rowId = UUID.randomUUID();
+        CommandUiContributorId contributorId = CommandUiContributorId.of(
+                "runeteria:test");
+
+        CommandUiChangeSet changes = CommandUiSnapshotDiffer.diff(
+                snapshotWithContribution(sessionId, contributorId, rowId, true),
+                snapshotWithContribution(sessionId, contributorId, rowId, true));
+
+        assertFalse(changes.changedContributorIds().contains(contributorId));
+        assertTrue(changes.changedContributorPaths().isEmpty());
     }
 
     @Test
@@ -121,11 +161,29 @@ class CommandUiSnapshotDifferTest {
             Map<String, String> groups
     ) {
         return new CommandUiSnapshot(
-                sessionId, 1L, 1L, (CommandUiProviderId) null,
+                sessionId, 1L, 1L, (CommandUiRendererId) null,
                 "tool", "item", "config", "generic", java.util.Set.of(),
                 null, List.of(), List.of(), new CommandUiPanelState("linked"),
                 Map.of(), Map.of(), assignments, choices, groups,
                 0L, Map.of(), null, null);
+    }
+
+    private static CommandUiSnapshot snapshotWithContribution(
+            UUID sessionId,
+            CommandUiContributorId contributorId,
+            UUID rowId,
+            boolean value
+    ) {
+        return new CommandUiSnapshot(
+                sessionId, 1L, 1L, (CommandUiRendererId) null,
+                "tool", "item", "config", "generic", Set.of(), null,
+                List.of(), List.of(new CommandUiCompanionRow(rowId, "companion")),
+                new CommandUiPanelState("linked"), Map.of(), Map.of(),
+                Map.of(), Map.of(), Map.of(), 0L, Map.of(), null, null,
+                Map.of(contributorId, new CommandUiContribution(
+                        contributorId,
+                        Map.of("ready", CommandUiValue.of(value)),
+                        Map.of(rowId, Map.of("ready", CommandUiValue.of(value))))));
     }
 
     private static LinkedNpcEntry entry(UUID npcUuid) {

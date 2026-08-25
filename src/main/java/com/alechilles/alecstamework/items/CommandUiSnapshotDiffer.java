@@ -2,8 +2,11 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.commandui.CommandUiChangeSet;
 import com.alechilles.alecstamework.api.commandui.CommandUiCompanionRow;
+import com.alechilles.alecstamework.api.commandui.CommandUiContribution;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
 import com.alechilles.alecstamework.api.commandui.CommandUiSection;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
+import com.alechilles.alecstamework.api.commandui.CommandUiValue;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -85,7 +88,11 @@ final class CommandUiSnapshotDiffer {
             sections.add(CommandUiSection.ROSTER_STRUCTURE);
         }
 
-        return new CommandUiChangeSet(false, sections, changed, removed);
+        ContributorChanges contributorChanges = contributorChanges(
+                previous.contributions(), current.contributions());
+        return new CommandUiChangeSet(false, sections, changed, removed,
+                contributorChanges.ids(), contributorChanges.paths(),
+                contributorChanges.rows(), contributorChanges.removedRows());
     }
 
     /** Alias for code that names the operation {@code between}. */
@@ -118,5 +125,164 @@ final class CommandUiSnapshotDiffer {
                     current.companionRows().get(index).rowId())) return false;
         }
         return true;
+    }
+
+    @Nonnull
+    private static ContributorChanges contributorChanges(
+            @Nonnull Map<CommandUiContributorId, CommandUiContribution> previous,
+            @Nonnull Map<CommandUiContributorId, CommandUiContribution> current
+    ) {
+        Set<CommandUiContributorId> ids = new HashSet<>();
+        Map<CommandUiContributorId, Set<String>> paths = new HashMap<>();
+        Map<CommandUiContributorId, Set<UUID>> rows = new HashMap<>();
+        Map<CommandUiContributorId, Set<UUID>> removedRows = new HashMap<>();
+        Set<CommandUiContributorId> all = new HashSet<>();
+        all.addAll(previous.keySet());
+        all.addAll(current.keySet());
+        for (CommandUiContributorId id : all) {
+            CommandUiContribution before = previous.get(id);
+            CommandUiContribution after = current.get(id);
+            if (sameContribution(before, after)) continue;
+            ids.add(id);
+            if (before == null) {
+                addAllPaths(paths, id, after);
+                addAllRows(rows, id, after);
+                continue;
+            }
+            if (after == null) {
+                addAllRows(removedRows, id, before);
+                paths.computeIfAbsent(id, ignored -> new HashSet<>()).add("*");
+                continue;
+            }
+            compareContribution(id, before, after, paths, rows, removedRows);
+        }
+        return new ContributorChanges(ids, paths, rows, removedRows);
+    }
+
+    private static boolean sameContribution(
+            @Nullable CommandUiContribution before,
+            @Nullable CommandUiContribution after
+    ) {
+        if (before == after) return true;
+        if (before == null || after == null) return false;
+        return before.contributorId().equals(after.contributorId())
+                && before.pageData().equals(after.pageData())
+                && before.rowData().equals(after.rowData())
+                && before.pageActions().equals(after.pageActions())
+                && before.commandActions().equals(after.commandActions())
+                && before.rowActions().equals(after.rowActions())
+                && before.flowActions().equals(after.flowActions())
+                && before.status() == after.status()
+                && before.diagnosticReason().equals(after.diagnosticReason());
+    }
+
+    private static void compareContribution(
+            CommandUiContributorId id,
+            CommandUiContribution before,
+            CommandUiContribution after,
+            Map<CommandUiContributorId, Set<String>> paths,
+            Map<CommandUiContributorId, Set<UUID>> rows,
+            Map<CommandUiContributorId, Set<UUID>> removedRows
+    ) {
+        compareValues(id, "page", before.pageData(), after.pageData(), paths);
+        Map<UUID, Map<String, CommandUiValue>> beforeRows = before.rowData();
+        Map<UUID, Map<String, CommandUiValue>> afterRows = after.rowData();
+        Set<UUID> allRows = new HashSet<>();
+        allRows.addAll(beforeRows.keySet());
+        allRows.addAll(afterRows.keySet());
+        for (UUID rowId : allRows) {
+            Map<String, CommandUiValue> oldData = beforeRows.get(rowId);
+            Map<String, CommandUiValue> newData = afterRows.get(rowId);
+            if (oldData == null) {
+                rows.computeIfAbsent(id, ignored -> new HashSet<>()).add(rowId);
+                addMapPaths(paths, id, "rows." + rowId, newData);
+            } else if (newData == null) {
+                removedRows.computeIfAbsent(id, ignored -> new HashSet<>()).add(rowId);
+                paths.computeIfAbsent(id, ignored -> new HashSet<>())
+                        .add("rows." + rowId);
+            } else {
+                int beforeCount = paths.getOrDefault(id, Set.of()).size();
+                compareValues(id, "rows." + rowId, oldData, newData, paths);
+                if (paths.getOrDefault(id, Set.of()).size() != beforeCount) {
+                    rows.computeIfAbsent(id, ignored -> new HashSet<>()).add(rowId);
+                }
+            }
+        }
+        if (before.status() != after.status()
+                || !Objects.equals(before.diagnosticReason(), after.diagnosticReason())
+                || !Objects.equals(before.pageActions(), after.pageActions())
+                || !Objects.equals(before.commandActions(), after.commandActions())
+                || !Objects.equals(before.rowActions(), after.rowActions())
+                || !Objects.equals(before.flowActions(), after.flowActions())) {
+            paths.computeIfAbsent(id, ignored -> new HashSet<>()).add("metadata");
+        }
+    }
+
+    private static void compareValues(
+            CommandUiContributorId id,
+            String prefix,
+            Map<String, CommandUiValue> before,
+            Map<String, CommandUiValue> after,
+            Map<CommandUiContributorId, Set<String>> paths
+    ) {
+        Set<String> keys = new HashSet<>();
+        keys.addAll(before.keySet());
+        keys.addAll(after.keySet());
+        for (String key : keys) {
+            CommandUiValue oldValue = before.get(key);
+            CommandUiValue newValue = after.get(key);
+            if (!Objects.equals(oldValue, newValue)) {
+                paths.computeIfAbsent(id, ignored -> new HashSet<>())
+                        .add(prefix + "." + key);
+            }
+        }
+    }
+
+    private static void addMapPaths(
+            Map<CommandUiContributorId, Set<String>> paths,
+            CommandUiContributorId id,
+            String prefix,
+            Map<String, CommandUiValue> values
+    ) {
+        if (values == null || values.isEmpty()) {
+            paths.computeIfAbsent(id, ignored -> new HashSet<>()).add(prefix);
+            return;
+        }
+        for (String key : values.keySet()) {
+            paths.computeIfAbsent(id, ignored -> new HashSet<>())
+                    .add(prefix + "." + key);
+        }
+    }
+
+    private static void addAllPaths(
+            Map<CommandUiContributorId, Set<String>> paths,
+            CommandUiContributorId id,
+            CommandUiContribution contribution
+    ) {
+        if (contribution == null) return;
+        compareValues(id, "page", Map.of(), contribution.pageData(), paths);
+        for (Map.Entry<UUID, Map<String, CommandUiValue>> entry
+                : contribution.rowData().entrySet()) {
+            addMapPaths(paths, id, "rows." + entry.getKey(), entry.getValue());
+        }
+        paths.computeIfAbsent(id, ignored -> new HashSet<>()).add("metadata");
+    }
+
+    private static void addAllRows(
+            Map<CommandUiContributorId, Set<UUID>> rows,
+            CommandUiContributorId id,
+            CommandUiContribution contribution
+    ) {
+        if (contribution == null || contribution.rowData().isEmpty()) return;
+        rows.computeIfAbsent(id, ignored -> new HashSet<>())
+                .addAll(contribution.rowData().keySet());
+    }
+
+    private record ContributorChanges(
+            Set<CommandUiContributorId> ids,
+            Map<CommandUiContributorId, Set<String>> paths,
+            Map<CommandUiContributorId, Set<UUID>> rows,
+            Map<CommandUiContributorId, Set<UUID>> removedRows
+    ) {
     }
 }

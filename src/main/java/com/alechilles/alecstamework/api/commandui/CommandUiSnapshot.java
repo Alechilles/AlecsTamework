@@ -21,7 +21,7 @@ public final class CommandUiSnapshot {
     private final long presentationRevision;
     private final long actionGeneration;
     @Nullable
-    private final CommandUiProviderId providerId;
+    private final CommandUiRendererId rendererId;
     @Nullable
     private final String toolId;
     @Nullable
@@ -47,6 +47,7 @@ public final class CommandUiSnapshot {
     private final String emptyStateKey;
     @Nullable
     private final String disabledReason;
+    private final Map<CommandUiContributorId, CommandUiContribution> contributions;
 
     /** Small snapshot constructor for pure presentation tests and adapters. */
     public CommandUiSnapshot(
@@ -59,7 +60,7 @@ public final class CommandUiSnapshot {
             @Nonnull CommandUiPanelState panelState
     ) {
         this(sessionId, presentationRevision, actionGeneration,
-                (CommandUiProviderId) null, null, null,
+                (CommandUiRendererId) null, null, null,
                 null, null, Set.of(), selectedCommand, commandOptions,
                 companionRows, panelState, Map.of(), Map.of(), Map.of(), Map.of(),
                 Map.of(), 0L, Map.of(), null, null);
@@ -70,7 +71,7 @@ public final class CommandUiSnapshot {
             @Nonnull UUID sessionId,
             long presentationRevision,
             long actionGeneration,
-            @Nullable String providerId,
+            @Nullable String rendererId,
             @Nullable String toolId,
             @Nullable String itemId,
             @Nullable String configId,
@@ -88,11 +89,11 @@ public final class CommandUiSnapshot {
             @Nullable String disabledReason
     ) {
         this(sessionId, presentationRevision, actionGeneration,
-                parseProviderId(providerId), toolId, itemId, configId, rosterMode,
+                parseRendererId(rendererId), toolId, itemId, configId, rosterMode,
                 enabledCapabilities, selectedCommand, commandOptions,
                 companionRows, panelState, globalActions, commandActions,
                 Map.of(), Map.of(), Map.of(), serverTimeMillis, deadlines,
-                emptyStateKey, disabledReason);
+                emptyStateKey, disabledReason, Map.of());
     }
 
     /** Full constructor retaining the compact pre-assignment form. */
@@ -100,7 +101,7 @@ public final class CommandUiSnapshot {
             @Nonnull UUID sessionId,
             long presentationRevision,
             long actionGeneration,
-            @Nullable CommandUiProviderId providerId,
+            @Nullable CommandUiRendererId rendererId,
             @Nullable String toolId,
             @Nullable String itemId,
             @Nullable String configId,
@@ -117,19 +118,21 @@ public final class CommandUiSnapshot {
             @Nullable String emptyStateKey,
             @Nullable String disabledReason
     ) {
-        this(sessionId, presentationRevision, actionGeneration, providerId,
+        this(sessionId, presentationRevision, actionGeneration,
+                rendererId,
                 toolId, itemId, configId, rosterMode, enabledCapabilities,
                 selectedCommand, commandOptions, companionRows, panelState,
                 globalActions, commandActions, Map.of(), Map.of(), Map.of(),
-                serverTimeMillis, deadlines, emptyStateKey, disabledReason);
+                serverTimeMillis, deadlines, emptyStateKey, disabledReason,
+                Map.of());
     }
 
-    /** Full constructor accepting the normalized public provider ID type. */
+    /** Full snapshot constructor retaining the compact assignment form. */
     public CommandUiSnapshot(
             @Nonnull UUID sessionId,
             long presentationRevision,
             long actionGeneration,
-            @Nullable CommandUiProviderId providerId,
+            @Nullable CommandUiRendererId rendererId,
             @Nullable String toolId,
             @Nullable String itemId,
             @Nullable String configId,
@@ -149,6 +152,40 @@ public final class CommandUiSnapshot {
             @Nullable String emptyStateKey,
             @Nullable String disabledReason
     ) {
+        this(sessionId, presentationRevision, actionGeneration,
+                rendererId, toolId, itemId, configId, rosterMode,
+                enabledCapabilities, selectedCommand, commandOptions,
+                companionRows, panelState, globalActions, commandActions,
+                hotswapAssignments, hotswapChoices, groups, serverTimeMillis,
+                deadlines, emptyStateKey, disabledReason, Map.of());
+    }
+
+    /** Full constructor accepting the normalized public renderer ID type. */
+    public CommandUiSnapshot(
+            @Nonnull UUID sessionId,
+            long presentationRevision,
+            long actionGeneration,
+            @Nullable CommandUiRendererId rendererId,
+            @Nullable String toolId,
+            @Nullable String itemId,
+            @Nullable String configId,
+            @Nullable String rosterMode,
+            @Nullable Set<String> enabledCapabilities,
+            @Nullable String selectedCommand,
+            @Nullable List<CommandUiCommandOption> commandOptions,
+            @Nullable List<CommandUiCompanionRow> companionRows,
+            @Nullable CommandUiPanelState panelState,
+            @Nullable Map<String, CommandUiActionView> globalActions,
+            @Nullable Map<String, CommandUiActionView> commandActions,
+            @Nullable Map<String, String> hotswapAssignments,
+            @Nullable Map<String, List<CommandUiCommandOption>> hotswapChoices,
+            @Nullable Map<String, String> groups,
+            long serverTimeMillis,
+            @Nullable Map<String, Long> deadlines,
+            @Nullable String emptyStateKey,
+            @Nullable String disabledReason,
+            @Nullable Map<CommandUiContributorId, CommandUiContribution> contributions
+    ) {
         this.sessionId = Objects.requireNonNull(sessionId, "sessionId");
         if (presentationRevision < 0L) {
             throw new IllegalArgumentException("Presentation revision cannot be negative.");
@@ -158,7 +195,7 @@ public final class CommandUiSnapshot {
         }
         this.presentationRevision = presentationRevision;
         this.actionGeneration = actionGeneration;
-        this.providerId = providerId;
+        this.rendererId = rendererId;
         this.toolId = normalize(toolId);
         this.itemId = normalize(itemId);
         this.configId = normalize(configId);
@@ -180,6 +217,7 @@ public final class CommandUiSnapshot {
         this.deadlines = copyDeadlines(deadlines);
         this.emptyStateKey = normalize(emptyStateKey);
         this.disabledReason = normalize(disabledReason);
+        this.contributions = copyContributions(contributions);
     }
 
     /** Convenience constructor for a snapshot with no action-generation change. */
@@ -211,8 +249,8 @@ public final class CommandUiSnapshot {
     }
 
     @Nullable
-    public CommandUiProviderId providerId() {
-        return providerId;
+    public CommandUiRendererId rendererId() {
+        return rendererId;
     }
 
     @Nullable
@@ -303,11 +341,11 @@ public final class CommandUiSnapshot {
     }
 
     /**
-     * Returns display-ready empty-state text for custom providers.
+     * Returns display-ready empty-state text for custom renderers.
      *
-     * <p>The legacy {@link #emptyStateKey()} name remains for source
-     * compatibility. Runtime assemblers resolve configured keys before they
-     * cross the public command UI boundary.</p>
+     * <p>The legacy {@link #emptyStateKey()} name remains for compatibility.
+     * Runtime assemblers resolve configured keys before they cross the public
+     * command UI boundary.</p>
      */
     @Nullable
     public String emptyStateText() {
@@ -317,6 +355,35 @@ public final class CommandUiSnapshot {
     @Nullable
     public String disabledReason() {
         return disabledReason;
+    }
+
+    /** Returns immutable contributor namespaces keyed by contributor ID. */
+    @Nonnull
+    public Map<CommandUiContributorId, CommandUiContribution> contributions() {
+        return contributions;
+    }
+
+    /** Returns one contributor namespace, or null when it is absent. */
+    @Nullable
+    public CommandUiContribution contribution(@Nullable CommandUiContributorId id) {
+        return id == null ? null : contributions.get(id);
+    }
+
+    /** Returns a detached copy with the immutable contributor map replaced. */
+    @Nonnull
+    public CommandUiSnapshot withContributions(
+            @Nullable Map<CommandUiContributorId, CommandUiContribution> values
+    ) {
+        Map<CommandUiContributorId, CommandUiContribution> requested =
+                values == null ? Map.of() : values;
+        if (contributions.equals(requested)) return this;
+        return new CommandUiSnapshot(
+                sessionId, presentationRevision, actionGeneration, rendererId,
+                toolId, itemId, configId, rosterMode, enabledCapabilities,
+                selectedCommand, commandOptions, companionRows, panelState,
+                globalActions, commandActions, hotswapAssignments,
+                hotswapChoices, groups, serverTimeMillis, deadlines,
+                emptyStateKey, disabledReason, requested);
     }
 
     /** Returns the row for a stable presentation ID, or null when absent. */
@@ -345,21 +412,21 @@ public final class CommandUiSnapshot {
     @Nonnull
     public CommandUiSnapshot withEmptyStateText(@Nullable String text) {
         return new CommandUiSnapshot(
-                sessionId, presentationRevision, actionGeneration, providerId,
+                sessionId, presentationRevision, actionGeneration, rendererId,
                 toolId, itemId, configId, rosterMode, enabledCapabilities,
                 selectedCommand, commandOptions, companionRows, panelState,
                 globalActions, commandActions, hotswapAssignments,
                 hotswapChoices, groups, serverTimeMillis, deadlines, text,
-                disabledReason);
+                disabledReason, contributions);
     }
 
     private CommandUiSnapshot copyWithRevision(long revision, long generation) {
-        return new CommandUiSnapshot(sessionId, revision, generation, providerId,
+        return new CommandUiSnapshot(sessionId, revision, generation, rendererId,
                 toolId, itemId, configId, rosterMode, enabledCapabilities,
                 selectedCommand, commandOptions, companionRows, panelState,
                 globalActions, commandActions, hotswapAssignments,
                 hotswapChoices, groups, serverTimeMillis, deadlines,
-                emptyStateKey, disabledReason);
+                emptyStateKey, disabledReason, contributions);
     }
 
     @Override
@@ -370,7 +437,7 @@ public final class CommandUiSnapshot {
                 && actionGeneration == that.actionGeneration
                 && serverTimeMillis == that.serverTimeMillis
                 && sessionId.equals(that.sessionId)
-                && Objects.equals(providerId, that.providerId)
+                && Objects.equals(rendererId, that.rendererId)
                 && Objects.equals(toolId, that.toolId)
                 && Objects.equals(itemId, that.itemId)
                 && Objects.equals(configId, that.configId)
@@ -387,22 +454,23 @@ public final class CommandUiSnapshot {
                 && groups.equals(that.groups)
                 && deadlines.equals(that.deadlines)
                 && Objects.equals(emptyStateKey, that.emptyStateKey)
-                && Objects.equals(disabledReason, that.disabledReason);
+                && Objects.equals(disabledReason, that.disabledReason)
+                && Objects.equals(contributions, that.contributions);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(sessionId, presentationRevision, actionGeneration,
-                providerId, toolId, itemId, configId, rosterMode,
+                rendererId, toolId, itemId, configId, rosterMode,
                 enabledCapabilities, selectedCommand, commandOptions,
                 companionRows, panelState, globalActions, commandActions,
                 hotswapAssignments, hotswapChoices, groups, serverTimeMillis,
-                deadlines, emptyStateKey, disabledReason);
+                deadlines, emptyStateKey, disabledReason, contributions);
     }
 
     @Nullable
-    private static CommandUiProviderId parseProviderId(@Nullable String value) {
-        return CommandUiProviderId.tryParse(value).orElse(null);
+    private static CommandUiRendererId parseRendererId(@Nullable String value) {
+        return CommandUiRendererId.tryParse(value).orElse(null);
     }
 
     @Nonnull
@@ -455,6 +523,19 @@ public final class CommandUiSnapshot {
     private static Map<String, Long> copyDeadlines(@Nullable Map<String, Long> source) {
         if (source == null || source.isEmpty()) return Map.of();
         LinkedHashMap<String, Long> copy = new LinkedHashMap<>();
+        source.forEach((key, value) -> {
+            if (key != null && value != null) copy.put(key, value);
+        });
+        return Map.copyOf(copy);
+    }
+
+    @Nonnull
+    private static Map<CommandUiContributorId, CommandUiContribution> copyContributions(
+            @Nullable Map<CommandUiContributorId, CommandUiContribution> source
+    ) {
+        if (source == null || source.isEmpty()) return Map.of();
+        LinkedHashMap<CommandUiContributorId, CommandUiContribution> copy =
+                new LinkedHashMap<>();
         source.forEach((key, value) -> {
             if (key != null && value != null) copy.put(key, value);
         });

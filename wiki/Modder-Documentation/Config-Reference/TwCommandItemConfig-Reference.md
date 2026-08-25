@@ -33,7 +33,8 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
   "Radius": -1,
   "MembershipMode": "LinkedOnly",
   "RosterStorage": "ItemMetadata",
-  "UiProviderId": null,
+  "UiRendererId": null,
+  "UiContributors": [],
   "CommandFamilyId": null,
   "BondedRosterId": null,
   "ProjectRosterToItemMetadata": true,
@@ -62,9 +63,13 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
   `BondedCompanions` for the separate bonded profile-and-lease authority.
 - `CommandFamilyId`: stable namespaced family shared by equivalent access
   items; required for `OwnerCommandFamily`.
-- `UiProviderId`: optional namespaced Java command-menu provider ID. Omit it or
+- `UiRendererId`: optional namespaced Java command-menu renderer ID. Omit it or
   use `null` for the standard Tamework menu. The effective ID must have a live
-  registration through `TameworkApi.commandUi()` when the menu opens.
+  renderer registration through `TameworkApi.commandUi()` when the menu opens.
+- `UiContributors`: ordered list of namespaced contributor requirements. Each
+  entry has `Id` and `Required`. This explicit array replaces the parent list;
+  an omitted array inherits it. A missing, incompatible, or failed required
+  contributor causes standard-menu fallback. An optional contributor does not.
 - `BondedRosterId`: stable namespaced roster referenced by
   `BondedCompanions`; it must exist in the accepted bonded roster generation.
 - `ProjectRosterToItemMetadata`: optionally writes a disposable item cache for
@@ -209,8 +214,10 @@ Fields:
 - The item interaction is `TameworkCommand`.
 - Left-click typically runs the current command; right-click commonly uses `CommandId: OpenSelectionMenu` to open the radial.
 - The linked panel uses this config’s command list and recipient rules but also depends on runtime services, linked companion records, and effective companion policy from [TwCompanionConfig Reference](/mod/alecs-tamework/twcompanionconfig-reference).
-- `UiProviderId` changes only the menu controller and layout. Tamework still
-  owns snapshots, action authority, current-world dispatch, and fallback.
+- `UiRendererId` changes only the menu controller and layout.
+  `UiContributors` adds isolated presentation, server actions, and custom
+  flows that the renderer declares it can display. Tamework still owns
+  snapshots, action authority, current-world dispatch, and fallback.
 - Shared relocation retry behavior and unlink-confirm policy come from [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference).
 - `RequireOwner` can be left unset to inherit global linking-owner policy.
 - `OwnerCommandFamily` requires `RequireOwner: true` and a non-blank

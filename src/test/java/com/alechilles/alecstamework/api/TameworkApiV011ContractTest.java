@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.api;
 
+import com.alechilles.alecstamework.api.commandui.CommandUiRegistrationResult;
 import com.alechilles.alecstamework.api.internal.BondedOnlyTameworkApi;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
 import com.alechilles.alecstamework.api.internal.TameworkApiImpl;
@@ -36,6 +37,7 @@ class TameworkApiV011ContractTest {
         TameworkApi legacy = new LegacyApiImplementation();
 
         assertNewCapabilitiesAbsent(legacy);
+        assertCommandUiUnavailable(legacy);
         assertActivityFeedUnavailable(legacy);
         assertAdmissionDefaultsUnavailable(legacy.policies());
     }
@@ -44,6 +46,7 @@ class TameworkApiV011ContractTest {
     void productionAndDegradedFacadesHoldBackNewCapabilitiesUntilReady() throws Exception {
         try (TameworkApiImpl base = newBaseApi()) {
             assertNewCapabilitiesAbsent(base);
+            assertCommandUiCapabilities(base);
             assertActivityFeedUnavailable(base);
             assertAdmissionDefaultsUnavailable(base.policies());
         }
@@ -51,6 +54,7 @@ class TameworkApiV011ContractTest {
         TameworkApi degraded = new BondedOnlyTameworkApi(
                 BondedCompanionApi.unavailable());
         assertNewCapabilitiesAbsent(degraded);
+        assertCommandUiUnavailable(degraded);
         assertActivityFeedUnavailable(degraded);
     }
 
@@ -173,6 +177,28 @@ class TameworkApiV011ContractTest {
     private static void assertNewCapabilitiesAbsent(TameworkApi api) {
         assertTrue(api.getCapabilities().stream()
                 .noneMatch(NEW_CAPABILITIES::contains));
+    }
+
+    private static void assertCommandUiCapabilities(TameworkApi api) {
+        assertTrue(api.getCapabilities().containsAll(EnumSet.of(
+                TameworkApiCapability.COMMAND_UI_RENDERERS,
+                TameworkApiCapability.COMMAND_UI_CONTRIBUTORS,
+                TameworkApiCapability.COMMAND_UI_CUSTOM_ACTIONS,
+                TameworkApiCapability.COMMAND_UI_CUSTOM_FLOWS
+        )));
+        assertTrue(api.commandUi().available());
+    }
+
+    private static void assertCommandUiUnavailable(TameworkApi api) {
+        assertFalse(api.commandUi().available());
+        assertEquals(
+                CommandUiRegistrationResult.Status.UNAVAILABLE,
+                api.commandUi().registerRenderer("example:menu", null).status()
+        );
+        assertEquals(
+                CommandUiRegistrationResult.Status.UNAVAILABLE,
+                api.commandUi().registerContributor("example:contributor", null).status()
+        );
     }
 
     private static void assertActivityFeedUnavailable(TameworkApi api) {

@@ -6,13 +6,13 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import javax.annotation.Nonnull;
 
 /**
- * Public per-session controller returned by a {@link CommandUiProvider}.
+ * Public per-session controller returned by a {@link CommandUiRendererProvider}.
  *
  * <p>{@code T} is the provider event payload. The event codec is part of this
  * contract so a host can decode untrusted page events before dispatch. The
  * session, snapshot, and update values are immutable Tamework contracts.</p>
  *
- * @param <T> provider-owned event payload type
+ * @param <T> renderer-owned event payload type
  */
 public interface CommandUiPageController<T> extends AutoCloseable {
     /** Returns the codec used by the host to decode provider page events. */
@@ -25,7 +25,7 @@ public interface CommandUiPageController<T> extends AutoCloseable {
         return eventCodec();
     }
 
-    /** Builds the initial provider page state. */
+    /** Builds the initial renderer page state. */
     default void buildInitial(
             CommandUiOpenContext context,
             CommandUiSession session,
@@ -35,7 +35,7 @@ public interface CommandUiPageController<T> extends AutoCloseable {
     ) {
     }
 
-    /** Applies a provider-local or Tamework partial update. */
+    /** Applies a renderer-local or Tamework partial update. */
     default void update(
             CommandUiUpdate update,
             @Nonnull UICommandBuilder commandBuilder,
@@ -62,7 +62,7 @@ public interface CommandUiPageController<T> extends AutoCloseable {
         handleEvent(event, session, snapshot);
     }
 
-    /** Releases provider-local state when the page closes. */
+    /** Releases renderer-local state when the page closes. */
     @Override
     default void close() {
     }

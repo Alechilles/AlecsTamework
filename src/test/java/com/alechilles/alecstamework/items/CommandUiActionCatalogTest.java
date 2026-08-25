@@ -9,6 +9,10 @@ import com.alechilles.alecstamework.api.commandui.CommandUiCommandOption;
 import com.alechilles.alecstamework.api.commandui.CommandUiPanelState;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
 import com.alechilles.alecstamework.api.commandui.CommandUiCompanionRow;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorAction;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorActionHandler;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
+import com.alechilles.alecstamework.api.commandui.CommandUiContribution;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -24,6 +28,66 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Observable action exposure for provider snapshots. */
 class CommandUiActionCatalogTest {
+    @Test
+    void contributorHandlesAreAttachedToDetachedContributionViews() {
+        UUID sessionId = UUID.randomUUID();
+        CommandUiContributorId contributorId = CommandUiContributorId.of(
+                "runeteria:contributor");
+        CommandUiContributorActionHandler handler = context ->
+                CompletableFuture.completedFuture(CommandUiActionResult.applied());
+        CommandUiContributorAction action = new CommandUiContributorAction(
+                "toggle", "TOGGLE", "Toggle", CommandUiContributorAction.InputPolicy.NONE,
+                false, handler);
+        CommandUiActionCatalog catalog = new CommandUiActionCatalog();
+        CommandUiActionCatalog.ContributorActionComposition composed =
+                catalog.bindContributorActions(contributorId, 7L,
+                        CommandUiContribution.withActions(contributorId,
+                                Map.of(), Map.of(), Map.of(), Map.of("toggle", action),
+                                Map.of(), Map.of()));
+        CommandUiSnapshot base = new CommandUiSnapshot(
+                sessionId, 1L, 1L, null, List.of(), List.of(),
+                new CommandUiPanelState("linked"))
+                .withContributions(Map.of(contributorId, composed.contribution()));
+        CommandUiActionHandle handle = new CommandUiActionHandle("opaque");
+
+        CommandUiSnapshot attached = CommandUiActionCatalog.attachContributorActions(
+                base, List.of(new CommandUiActionCatalog.ContributorActionHandle(
+                        composed.bindings().getFirst(), handle)));
+
+        assertEquals(handle, attached.contribution(contributorId)
+                .commandActions().get("runeteria:contributor/toggle").handle());
+    }
+
+    @Test
+    void contributorRegistrationGenerationChangeRequiresFreshHandles() {
+        UUID sessionId = UUID.randomUUID();
+        CommandUiContributorId contributorId = CommandUiContributorId.of(
+                "runeteria:contributor");
+        CommandUiContributorAction action = new CommandUiContributorAction(
+                "toggle", "TOGGLE", "Toggle",
+                CommandUiContributorAction.InputPolicy.NONE, false,
+                context -> CompletableFuture.completedFuture(
+                        CommandUiActionResult.applied()));
+        CommandUiActionCatalog oldCatalog = new CommandUiActionCatalog();
+        CommandUiActionCatalog.ContributorActionComposition oldComposition =
+                oldCatalog.bindContributorActions(contributorId, 7L,
+                        CommandUiContribution.withActions(contributorId,
+                                Map.of(), Map.of(), Map.of(), Map.of("toggle", action),
+                                Map.of(), Map.of()));
+        CommandUiActionCatalog newCatalog = new CommandUiActionCatalog();
+        CommandUiActionCatalog.ContributorActionComposition newComposition =
+                newCatalog.bindContributorActions(contributorId, 8L,
+                        CommandUiContribution.withActions(contributorId,
+                                Map.of(), Map.of(), Map.of(), Map.of("toggle", action),
+                                Map.of(), Map.of()));
+
+        assertFalse(CommandUiActionCatalog.contributorActionsMatch(
+                List.of(new CommandUiActionCatalog.ContributorActionHandle(
+                        oldComposition.bindings().getFirst(),
+                        new CommandUiActionHandle("old"))),
+                newComposition.bindings()));
+    }
+
     @Test
     void panelTextActionUsesItsBoundedRequestExecutor() {
         UUID sessionId = UUID.randomUUID();

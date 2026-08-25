@@ -4,7 +4,7 @@ import java.util.UUID;
 import javax.annotation.Nullable;
 
 /**
- * Detached context supplied while a provider creates one page controller.
+ * Detached context supplied while a renderer creates one page controller.
  *
  * <p>Only stable identity and presentation values belong here. The context
  * intentionally has no live Hytale object or gameplay authority.</p>
@@ -19,38 +19,39 @@ public final class CommandUiOpenContext {
     @Nullable
     private final String configId;
     @Nullable
-    private final CommandUiProviderId providerId;
+    private final CommandUiRendererId rendererId;
     @Nullable
     private final String rosterMode;
 
     /** Creates an empty context for adapters that do not need presentation values. */
     public CommandUiOpenContext() {
-        this(null, null, null, null, (CommandUiProviderId) null, null);
+        this(null, null, null, null, (CommandUiRendererId) null, null);
     }
 
+    /** Creates detached context with the selected renderer identifier. */
     public CommandUiOpenContext(
             @Nullable UUID playerUuid,
             @Nullable String language,
             @Nullable String toolId,
             @Nullable String configId,
-            @Nullable CommandUiProviderId providerId,
+            @Nullable CommandUiRendererId rendererId,
             @Nullable String rosterMode
     ) {
         this.playerUuid = playerUuid;
         this.language = normalize(language);
         this.toolId = normalize(toolId);
         this.configId = normalize(configId);
-        this.providerId = providerId;
+        this.rendererId = rendererId;
         this.rosterMode = normalize(rosterMode);
     }
 
-    /** Convenience constructor for provider-facing string IDs. */
+    /** Convenience constructor for renderer-facing string IDs. */
     public CommandUiOpenContext(
             @Nullable UUID playerUuid,
             @Nullable String language,
             @Nullable String toolId,
             @Nullable String configId,
-            @Nullable String providerId,
+            @Nullable String rendererId,
             @Nullable String rosterMode
     ) {
         this(
@@ -58,9 +59,9 @@ public final class CommandUiOpenContext {
                 language,
                 toolId,
                 configId,
-                providerId == null || providerId.isBlank()
+                rendererId == null || rendererId.isBlank()
                         ? null
-                        : CommandUiProviderId.of(providerId),
+                        : CommandUiRendererId.of(rendererId),
                 rosterMode
         );
     }
@@ -91,8 +92,8 @@ public final class CommandUiOpenContext {
     }
 
     @Nullable
-    public CommandUiProviderId providerId() {
-        return providerId;
+    public CommandUiRendererId rendererId() {
+        return rendererId;
     }
 
     @Nullable

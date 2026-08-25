@@ -1,9 +1,15 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorRequirement;
+import com.alechilles.alecstamework.api.commandui.CommandUiContribution;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
 import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
 import com.alechilles.alecstamework.api.commandui.CommandUiPageController;
-import com.alechilles.alecstamework.api.commandui.CommandUiProviderId;
-import com.alechilles.alecstamework.api.internal.CommandUiProviderRegistry;
+import com.alechilles.alecstamework.api.commandui.CommandUiRendererId;
+import com.alechilles.alecstamework.api.internal.CommandUiContributorRegistry;
+import com.alechilles.alecstamework.api.internal.CommandUiRendererRegistry;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
@@ -11,62 +17,69 @@ import javax.annotation.Nullable;
 
 /** Selects a custom controller before the host fixes its event codec. */
 final class CommandUiControllerResolver {
-    private final CommandUiProviderRegistry registry;
+    private final CommandUiCompositionResolver compositionResolver;
 
-    CommandUiControllerResolver(@Nonnull CommandUiProviderRegistry registry) {
-        this.registry = Objects.requireNonNull(registry, "registry");
+    CommandUiControllerResolver(
+            @Nonnull CommandUiRendererRegistry renderers,
+            @Nonnull CommandUiContributorRegistry contributors
+    ) {
+        this.compositionResolver = new CommandUiCompositionResolver(
+                renderers, contributors);
     }
 
     @Nonnull
     Resolved resolve(
-            @Nullable String configuredProviderId,
+            @Nullable CommandUiRendererId rendererId,
+            @Nonnull List<CommandUiContributorRequirement> requirements,
             @Nonnull CommandUiOpenContext context,
             @Nonnull Supplier<CommandUiPageController<?>> standardFactory
     ) {
+        Objects.requireNonNull(requirements, "requirements");
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(standardFactory, "standardFactory");
-        var provider = registry.resolve(configuredProviderId);
-        if (provider.isEmpty()) return standard(standardFactory);
-
-        CommandUiPageController<?> controller = null;
-        try {
-            var resolved = provider.orElseThrow();
-            controller = resolved.provider().create(context);
-            if (controller == null || controller.eventCodec() == null) {
-                close(controller);
-                return standard(standardFactory);
-            }
-            return new Resolved(controller, resolved.providerId(),
-                    resolved.generation(), true);
-        } catch (RuntimeException | LinkageError failure) {
-            close(controller);
-            return standard(standardFactory);
-        }
+        return fromComposition(compositionResolver.resolve(rendererId,
+                requirements, context, standardFactory));
     }
 
-    private static Resolved standard(
-            Supplier<CommandUiPageController<?>> standardFactory) {
-        CommandUiPageController<?> controller = Objects.requireNonNull(
-                standardFactory.get(), "standard controller");
-        Objects.requireNonNull(controller.eventCodec(),
-                "standard controller event codec");
-        return new Resolved(controller, null, 0L, false);
+    @Nonnull
+    private static Resolved fromComposition(
+            @Nonnull CommandUiCompositionResolver.Resolved resolved
+    ) {
+        if (!resolved.custom()) return standardResolved(resolved.controller());
+        return new Resolved(resolved.controller(), resolved.rendererId(),
+                resolved.rendererGeneration(),
+                true, resolved.contributors(),
+                resolved.contributorStatuses());
     }
 
-    private static void close(@Nullable CommandUiPageController<?> controller) {
-        if (controller == null) return;
-        try {
-            controller.close();
-        } catch (RuntimeException | LinkageError ignored) {
-            // Startup fallback must remain available.
-        }
+    @Nonnull
+    private static Resolved standardResolved(
+            @Nonnull CommandUiPageController<?> controller
+    ) {
+        return new Resolved(controller, null, 0L, false, List.of(), Map.of());
     }
 
     record Resolved(
             @Nonnull CommandUiPageController<?> controller,
-            @Nullable CommandUiProviderId providerId,
-            long providerGeneration,
-            boolean custom
+            @Nullable CommandUiRendererId rendererId,
+            long rendererGeneration,
+            boolean custom,
+            @Nonnull List<CommandUiCompositionSession.Binding> contributors,
+            @Nonnull Map<CommandUiContributorId, CommandUiContribution.Status>
+                    contributorStatuses
     ) {
+        Resolved {
+            Objects.requireNonNull(controller, "controller");
+            contributors = List.copyOf(Objects.requireNonNull(
+                    contributors, "contributors"));
+            contributorStatuses = java.util.Collections.unmodifiableMap(
+                    new java.util.LinkedHashMap<>(Objects.requireNonNull(
+                            contributorStatuses, "contributorStatuses")));
+        }
+
+        @Nonnull
+        List<CommandUiCompositionSession.Binding> bindings() {
+            return contributors;
+        }
     }
 }

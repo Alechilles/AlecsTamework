@@ -133,7 +133,7 @@ public final class TameworkApiImpl
     private final DiagnosticsApi diagnosticsApi;
     private final InteractionExtensionApi interactionExtensionApi;
     private final TraitEffectApi traitEffectApi;
-    private final CommandUiProviderRegistry commandUiProviderRegistry;
+    private final CommandUiRegistry commandUiRegistry;
     private final BreedingCooldownResetService breedingCooldownResetService =
             new BreedingCooldownResetService();
     private final CommandLinksApi commandLinksApi = new CommandLinksApi() {
@@ -276,8 +276,10 @@ public final class TameworkApiImpl
             TameworkApiCapability.COMPANION_XP_EVENTS,
             TameworkApiCapability.CONFIG_READ,
             TameworkApiCapability.DIAGNOSTICS,
-            TameworkApiCapability.COMMAND_UI_PROVIDERS,
-            TameworkApiCapability.COMMAND_UI_MANAGED_FLOWS
+            TameworkApiCapability.COMMAND_UI_RENDERERS,
+            TameworkApiCapability.COMMAND_UI_CONTRIBUTORS,
+            TameworkApiCapability.COMMAND_UI_CUSTOM_ACTIONS,
+            TameworkApiCapability.COMMAND_UI_CUSTOM_FLOWS
     );
     private final Gson gson = new Gson();
     @Nullable
@@ -302,7 +304,7 @@ public final class TameworkApiImpl
                 interactionExtensionApi,
                 traitEffectApi,
                 damagePolicy,
-                new CommandUiProviderRegistry()
+                new CommandUiRegistry()
         );
     }
 
@@ -314,7 +316,7 @@ public final class TameworkApiImpl
                            @Nonnull InteractionExtensionApi interactionExtensionApi,
                            @Nonnull TraitEffectApi traitEffectApi,
                            @Nonnull SimpleClaimsTamedDamagePolicy damagePolicy,
-                           @Nonnull CommandUiProviderRegistry commandUiProviderRegistry) {
+                           @Nonnull CommandUiRegistry commandUiRegistry) {
         this.profilesApi = Objects.requireNonNull(profilesApi, "profilesApi");
         this.profileDataApi = Objects.requireNonNull(
                 profileDataApi, "profileDataApi"
@@ -330,9 +332,9 @@ public final class TameworkApiImpl
         this.damagePolicy = Objects.requireNonNull(damagePolicy);
         this.interactionExtensionApi = Objects.requireNonNull(interactionExtensionApi);
         this.traitEffectApi = Objects.requireNonNull(traitEffectApi);
-        this.commandUiProviderRegistry = Objects.requireNonNull(
-                commandUiProviderRegistry,
-                "commandUiProviderRegistry"
+        this.commandUiRegistry = Objects.requireNonNull(
+                commandUiRegistry,
+                "commandUiRegistry"
         );
     }
 
@@ -345,9 +347,11 @@ public final class TameworkApiImpl
     public EnumSet<TameworkApiCapability> getCapabilities() {
         synchronized (capabilities) {
             EnumSet<TameworkApiCapability> current = capabilities.clone();
-            if (!commandUiProviderRegistry.available()) {
-                current.remove(TameworkApiCapability.COMMAND_UI_PROVIDERS);
-                current.remove(TameworkApiCapability.COMMAND_UI_MANAGED_FLOWS);
+            if (!commandUiRegistry.available()) {
+                current.remove(TameworkApiCapability.COMMAND_UI_RENDERERS);
+                current.remove(TameworkApiCapability.COMMAND_UI_CONTRIBUTORS);
+                current.remove(TameworkApiCapability.COMMAND_UI_CUSTOM_ACTIONS);
+                current.remove(TameworkApiCapability.COMMAND_UI_CUSTOM_FLOWS);
             }
             return current;
         }
@@ -372,10 +376,12 @@ public final class TameworkApiImpl
     @Override
     public void close() {
         try {
-            commandUiProviderRegistry.close();
+            commandUiRegistry.close();
             synchronized (capabilities) {
-                capabilities.remove(TameworkApiCapability.COMMAND_UI_PROVIDERS);
-                capabilities.remove(TameworkApiCapability.COMMAND_UI_MANAGED_FLOWS);
+                capabilities.remove(TameworkApiCapability.COMMAND_UI_RENDERERS);
+                capabilities.remove(TameworkApiCapability.COMMAND_UI_CONTRIBUTORS);
+                capabilities.remove(TameworkApiCapability.COMMAND_UI_CUSTOM_ACTIONS);
+                capabilities.remove(TameworkApiCapability.COMMAND_UI_CUSTOM_FLOWS);
             }
         } finally {
             damagePolicy.close();
@@ -394,7 +400,7 @@ public final class TameworkApiImpl
 
     @Override
     public CommandUiApi commandUi() {
-        return commandUiProviderRegistry;
+        return commandUiRegistry;
     }
 
     @Override
