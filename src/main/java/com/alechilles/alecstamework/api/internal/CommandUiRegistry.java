@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.api.internal;
 import com.alechilles.alecstamework.api.commandui.CommandUiApi;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorProvider;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorDescriptor;
+import com.alechilles.alecstamework.api.commandui.CommandUiDiagnostics;
 import com.alechilles.alecstamework.api.commandui.CommandUiProvider;
 import com.alechilles.alecstamework.api.commandui.CommandUiRegistrationResult;
 import com.alechilles.alecstamework.api.commandui.CommandUiRendererProvider;
@@ -10,6 +11,9 @@ import com.alechilles.alecstamework.api.commandui.CommandUiRendererDescriptor;
 import com.alechilles.alecstamework.api.commandui.CommandUiRegistration;
 import com.alechilles.alecstamework.api.commandui.CommandUiRendererId;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
+import com.alechilles.alecstamework.items.CommandUiDiagnosticsService;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.Objects;
@@ -20,6 +24,8 @@ import javax.annotation.Nullable;
 public final class CommandUiRegistry implements CommandUiApi, AutoCloseable {
     private final CommandUiRendererRegistry renderers;
     private final CommandUiContributorRegistry contributors;
+    private final CommandUiDiagnosticsService diagnostics =
+            new CommandUiDiagnosticsService();
     @Nullable
     private final CommandUiProviderRegistry legacyProviders;
 
@@ -134,6 +140,40 @@ public final class CommandUiRegistry implements CommandUiApi, AutoCloseable {
         return contributors.listIds();
     }
 
+    /** Returns a detached snapshot of live registrations and session state. */
+    @Override
+    @Nonnull
+    public CommandUiDiagnostics diagnostics() {
+        CommandUiDiagnostics runtime = diagnostics.snapshot();
+        List<CommandUiDiagnostics.RendererRegistration> rendererValues =
+                renderers.listIds().stream()
+                        .map(id -> renderers.resolve(id.value()).orElse(null))
+                        .filter(Objects::nonNull)
+                        .map(value -> new CommandUiDiagnostics.RendererRegistration(
+                                value.id().value(), value.generation()))
+                        .sorted(Comparator.comparing(
+                                CommandUiDiagnostics.RendererRegistration::rendererId))
+                        .toList();
+        List<CommandUiDiagnostics.ContributorRegistration> contributorValues =
+                contributors.listIds().stream()
+                        .map(id -> contributors.resolve(id.value()).orElse(null))
+                        .filter(Objects::nonNull)
+                        .map(value -> new CommandUiDiagnostics.ContributorRegistration(
+                                value.id().value(), value.generation()))
+                        .sorted(Comparator.comparing(
+                                CommandUiDiagnostics.ContributorRegistration::contributorId))
+                        .toList();
+        return new CommandUiDiagnostics(rendererValues, contributorValues,
+                runtime.sessions(), runtime.latestFailureReason(),
+                runtime.slowCompositionCount(), runtime.slowWarningCount());
+    }
+
+    /** Returns the shared internal diagnostics service for page composition. */
+    @Nonnull
+    public CommandUiDiagnosticsService diagnosticsService() {
+        return diagnostics;
+    }
+
     /**
      * Deprecated provider registration is retained only for old source users.
      * Active command-item selection uses renderer registration above.
@@ -170,5 +210,6 @@ public final class CommandUiRegistry implements CommandUiApi, AutoCloseable {
         renderers.close();
         contributors.close();
         if (legacyProviders != null) legacyProviders.close();
+        diagnostics.close();
     }
 }

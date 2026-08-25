@@ -159,6 +159,17 @@ public interface CommandUiApi {
         return Set.of();
     }
 
+    /**
+     * Returns a value-only diagnostics snapshot.
+     *
+     * <p>The default is an empty, fail-closed snapshot so older and degraded
+     * API implementations remain source compatible.</p>
+     */
+    @Nonnull
+    default CommandUiDiagnostics diagnostics() {
+        return CommandUiDiagnostics.empty();
+    }
+
     /** Returns the stable fail-closed adapter for legacy and degraded APIs. */
     @Nonnull
     static CommandUiApi unavailable() {

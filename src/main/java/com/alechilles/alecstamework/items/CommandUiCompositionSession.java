@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.commandui.CommandUiChangeSet;
 import com.alechilles.alecstamework.api.commandui.CommandUiContribution;
+import com.alechilles.alecstamework.api.commandui.CommandUiDiagnostics;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorCreateContext;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorDirtySink;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
@@ -35,10 +36,14 @@ final class CommandUiCompositionSession implements AutoCloseable {
     private final BiConsumer<CommandUiSnapshot, CommandUiChangeSet> publisher;
     private final Runnable refreshRequest;
     private final RequiredFailureHandler requiredFailureHandler;
+    @Nullable
+    private final CommandUiDiagnosticsService diagnosticsService;
+    private final long rendererGeneration;
     private final List<State> states;
     private final Map<CommandUiContributorId, CommandUiContribution>
             compatibilityContributions;
     private boolean open = true;
+    private boolean diagnosticsSessionOpen;
     private CommandUiSnapshot baseSnapshot;
     private CommandUiSnapshot currentSnapshot;
     private RequiredFailure requiredFailure;
@@ -53,6 +58,22 @@ final class CommandUiCompositionSession implements AutoCloseable {
             @Nonnull Runnable refreshRequest,
             @Nonnull RequiredFailureHandler requiredFailureHandler
     ) {
+        this(baseSnapshot, openContext, bindings, compatibilityStatuses,
+                publisher, refreshRequest, requiredFailureHandler, null, 0L);
+    }
+
+    private CommandUiCompositionSession(
+            @Nonnull CommandUiSnapshot baseSnapshot,
+            @Nonnull CommandUiOpenContext openContext,
+            @Nonnull List<Binding> bindings,
+            @Nonnull Map<CommandUiContributorId, CommandUiContribution.Status>
+                    compatibilityStatuses,
+            @Nonnull BiConsumer<CommandUiSnapshot, CommandUiChangeSet> publisher,
+            @Nonnull Runnable refreshRequest,
+            @Nonnull RequiredFailureHandler requiredFailureHandler,
+            @Nullable CommandUiDiagnosticsService diagnosticsService,
+            long rendererGeneration
+    ) {
         this.baseSnapshot = baseOnly(baseSnapshot);
         this.openContext = Objects.requireNonNull(openContext, "openContext");
         this.publisher = Objects.requireNonNull(publisher, "publisher");
@@ -60,14 +81,22 @@ final class CommandUiCompositionSession implements AutoCloseable {
                 "refreshRequest");
         this.requiredFailureHandler = Objects.requireNonNull(
                 requiredFailureHandler, "requiredFailureHandler");
+        this.diagnosticsService = diagnosticsService;
+        if (rendererGeneration < 0L) {
+            throw new IllegalArgumentException(
+                    "Renderer generation cannot be negative.");
+        }
+        this.rendererGeneration = rendererGeneration;
         this.states = createStates(bindings);
         this.compatibilityContributions = compatibilityContributions(
                 compatibilityStatuses);
         try {
+            openDiagnostics();
             this.currentSnapshot = composeLocked(true, true, false);
             installSubscriptions();
         } catch (RuntimeException | LinkageError failure) {
             open = false;
+            closeDiagnostics("initial_composition_failed");
             closeStates(states);
             throw failure;
         }
@@ -135,6 +164,42 @@ final class CommandUiCompositionSession implements AutoCloseable {
                 requiredFailureHandler);
     }
 
+    /** Creates a session with process-local diagnostics instrumentation. */
+    @Nonnull
+    static CommandUiCompositionSession create(
+            @Nonnull CommandUiSnapshot baseSnapshot,
+            @Nonnull CommandUiOpenContext openContext,
+            @Nonnull List<Binding> bindings,
+            @Nonnull BiConsumer<CommandUiSnapshot, CommandUiChangeSet> publisher,
+            @Nonnull Runnable refreshRequest,
+            @Nonnull CommandUiDiagnosticsService diagnosticsService,
+            long rendererGeneration
+    ) {
+        return new CommandUiCompositionSession(baseSnapshot, openContext,
+                bindings, Map.of(), publisher, refreshRequest,
+                (contributorId, reason) -> { }, diagnosticsService,
+                rendererGeneration);
+    }
+
+    /** Creates a status-aware instrumented session. */
+    @Nonnull
+    static CommandUiCompositionSession create(
+            @Nonnull CommandUiSnapshot baseSnapshot,
+            @Nonnull CommandUiOpenContext openContext,
+            @Nonnull List<Binding> bindings,
+            @Nonnull Map<CommandUiContributorId, CommandUiContribution.Status>
+                    compatibilityStatuses,
+            @Nonnull BiConsumer<CommandUiSnapshot, CommandUiChangeSet> publisher,
+            @Nonnull Runnable refreshRequest,
+            @Nonnull RequiredFailureHandler requiredFailureHandler,
+            @Nonnull CommandUiDiagnosticsService diagnosticsService,
+            long rendererGeneration
+    ) {
+        return new CommandUiCompositionSession(baseSnapshot, openContext,
+                bindings, compatibilityStatuses, publisher, refreshRequest,
+                requiredFailureHandler, diagnosticsService, rendererGeneration);
+    }
+
     @Nonnull
     CommandUiSnapshot snapshot() {
         synchronized (lock) {
@@ -190,6 +255,7 @@ final class CommandUiCompositionSession implements AutoCloseable {
         }
         if (failure != null) {
             closeStates(closing);
+            closeDiagnostics("required_composition_failed");
             notifyRequiredFailure(failure.failure);
         }
         return result;
@@ -212,6 +278,7 @@ final class CommandUiCompositionSession implements AutoCloseable {
         }
         if (failure != null) {
             closeStates(closing);
+            closeDiagnostics("required_composition_failed");
             notifyRequiredFailure(failure.failure);
             return false;
         }
@@ -226,6 +293,7 @@ final class CommandUiCompositionSession implements AutoCloseable {
             open = false;
             closing = List.copyOf(states);
         }
+        closeDiagnostics(null);
         closeStates(closing);
     }
 
@@ -271,6 +339,27 @@ final class CommandUiCompositionSession implements AutoCloseable {
     ) {
         return Objects.requireNonNull(snapshot, "baseSnapshot")
                 .withContributions(Map.of());
+    }
+
+    private void openDiagnostics() {
+        if (diagnosticsService == null) return;
+        List<CommandUiDiagnostics.ContributorRegistration> selected =
+                states.stream().map(state ->
+                        new CommandUiDiagnostics.ContributorRegistration(
+                                state.binding.id().value(),
+                                state.binding.generation())).toList();
+        diagnosticsService.openSession(baseSnapshot.sessionId(),
+                baseSnapshot.rendererId() == null
+                        ? null : baseSnapshot.rendererId().value(),
+                rendererGeneration, baseSnapshot.itemId(),
+                baseSnapshot.configId(), selected);
+        diagnosticsSessionOpen = true;
+    }
+
+    private void closeDiagnostics(@Nullable String reason) {
+        if (!diagnosticsSessionOpen || diagnosticsService == null) return;
+        diagnosticsSessionOpen = false;
+        diagnosticsService.closeSession(baseSnapshot.sessionId(), reason);
     }
 
     private void installSubscriptions() {
@@ -364,11 +453,14 @@ final class CommandUiCompositionSession implements AutoCloseable {
         state.failure = null;
         state.lastComposeValid = false;
         state.actionBindings = List.of();
-        if (state.contributor == null) {
-            state.failure = "contributor factory returned null";
-            return compositionFailure(state, initial, abortRequired);
-        }
+        long startedAtNanos = diagnosticsService == null
+                ? 0L : diagnosticsService.compositionStarted();
+        CommandUiContribution result = null;
         try {
+            if (state.contributor == null) {
+                state.failure = "contributor factory returned null";
+                return compositionFailure(state, initial, abortRequired);
+            }
             CommandUiContribution contribution = state.contributor.compose(
                     baseSnapshot, state.lastValidContribution, scope);
             if (contribution == null
@@ -378,6 +470,12 @@ final class CommandUiCompositionSession implements AutoCloseable {
                         : "contributor returned a different contributor ID";
                 return compositionFailure(state, initial, abortRequired);
             }
+            CommandUiValueBounds.Validation bounds =
+                    CommandUiValueBounds.validateContribution(contribution);
+            if (!bounds.valid()) {
+                state.failure = bounds.message();
+                return compositionFailure(state, initial, abortRequired);
+            }
             CommandUiActionCatalog.ContributorActionComposition composed =
                     new CommandUiActionCatalog().bindContributorActions(
                             state.binding.id(), state.binding.generation(),
@@ -385,10 +483,22 @@ final class CommandUiCompositionSession implements AutoCloseable {
             state.lastValidContribution = contribution;
             state.actionBindings = composed.bindings();
             state.lastComposeValid = true;
-            return composed.contribution();
+            result = composed.contribution();
+            return result;
         } catch (RuntimeException | LinkageError failure) {
             state.failure = failure.getClass().getSimpleName();
             return compositionFailure(state, initial, abortRequired);
+        } finally {
+            if (diagnosticsService != null) {
+                String status = result == null
+                        ? (state.binding.required()
+                        ? "REQUIRED_FAILED" : "OPTIONAL_FAILED")
+                        : result.status().name();
+                diagnosticsService.compositionFinished(
+                        baseSnapshot.sessionId(), state.binding.id().value(),
+                        state.binding.generation(), startedAtNanos, status,
+                        state.failure);
+            }
         }
     }
 
@@ -459,8 +569,13 @@ final class CommandUiCompositionSession implements AutoCloseable {
         closeQuietly(contributor);
         if (failure != null) {
             closeStates(closing);
+            closeDiagnostics("required_contributor_removed");
             notifyRequiredFailure(failure);
             return;
+        }
+        if (diagnosticsService != null) {
+            diagnosticsService.contributorRemoved(baseSnapshot.sessionId(),
+                    state.binding.id().value(), state.binding.generation());
         }
         requestRefresh();
     }

@@ -182,7 +182,8 @@ final class CommandUiPageCoordinator {
             }
         };
         CommandUiCompositionSession composition = null;
-        if (resolved.custom() && (!resolved.contributors().isEmpty()
+        if (resolved.custom() && (registry != null
+                || !resolved.contributors().isEmpty()
                 || !resolved.contributorStatuses().isEmpty())) {
             try {
                 composition = CommandUiCompositionSession.create(
@@ -214,7 +215,9 @@ final class CommandUiPageCoordinator {
                                 current.closeSessionWithFallback(
                                         CommandUiCloseReason.FAILURE);
                             }
-                        });
+                        }, Objects.requireNonNull(registry, "registry")
+                                .diagnosticsService(),
+                        resolved.rendererGeneration());
                 compositionRef.set(composition);
             } catch (RuntimeException | LinkageError failure) {
                 pendingCompositionRefresh.set(false);

@@ -78,6 +78,30 @@ class CommandUiRendererContributorRegistryTest {
     }
 
     @Test
+    void diagnosticsReportOnlyLiveRegistrationGenerations() {
+        CommandUiRegistry registry = new CommandUiRegistry();
+        CommandUiRegistrationResult renderer = registry.registerRenderer(
+                "example:menu", ignored -> null);
+        CommandUiRegistrationResult contributor = registry.registerContributor(
+                "example:data", ignored -> emptyContributor());
+
+        CommandUiDiagnostics active = registry.diagnostics();
+
+        assertEquals(List.of(new CommandUiDiagnostics.RendererRegistration(
+                        "example:menu", renderer.registration().generation())),
+                active.registeredRenderers());
+        assertEquals(List.of(new CommandUiDiagnostics.ContributorRegistration(
+                        "example:data", contributor.registration().generation())),
+                active.registeredContributors());
+
+        renderer.registration().close();
+        contributor.registration().close();
+
+        assertTrue(registry.diagnostics().registeredRenderers().isEmpty());
+        assertTrue(registry.diagnostics().registeredContributors().isEmpty());
+    }
+
+    @Test
     void contributorRemovalListenerIsGenerationSpecific() throws Exception {
         CommandUiRegistry registry = new CommandUiRegistry(
                 new CommandUiRendererRegistry(), new CommandUiContributorRegistry());
