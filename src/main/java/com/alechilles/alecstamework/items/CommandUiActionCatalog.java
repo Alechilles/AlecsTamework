@@ -282,6 +282,86 @@ final class CommandUiActionCatalog {
                 base.disabledReason());
     }
 
+    /** Attaches contributor-owned opaque handles to an already detached snapshot. */
+    @Nonnull
+    static CommandUiSnapshot attachContributorActions(
+            @Nonnull CommandUiSnapshot base,
+            @Nonnull List<ContributorActionHandle> handles
+    ) {
+        Objects.requireNonNull(base, "base");
+        Objects.requireNonNull(handles, "handles");
+        Map<ContributorActionKey, CommandUiActionView> attached =
+                new LinkedHashMap<>();
+        for (ContributorActionHandle entry : handles) {
+            Objects.requireNonNull(entry, "contributor handle");
+            CommandUiActionView view = entry.binding().view(entry.handle());
+            if (view == null) continue;
+            CommandUiContributorActionBinding binding = entry.binding();
+            attached.put(new ContributorActionKey(binding.contributorId(),
+                    binding.scope(), binding.rowId(), binding.effectiveId()), view);
+        }
+        if (attached.isEmpty()) return base;
+
+        Map<CommandUiContributorId, CommandUiContribution> contributions =
+                new LinkedHashMap<>();
+        for (Map.Entry<CommandUiContributorId, CommandUiContribution> entry
+                : base.contributions().entrySet()) {
+            CommandUiContribution contribution = entry.getValue();
+            Map<String, CommandUiActionView> page =
+                    new LinkedHashMap<>(contribution.pageActions());
+            Map<String, CommandUiActionView> command =
+                    new LinkedHashMap<>(contribution.commandActions());
+            Map<UUID, Map<String, CommandUiActionView>> rows = new LinkedHashMap<>();
+            contribution.rowActions().forEach((rowId, values) ->
+                    rows.put(rowId, new LinkedHashMap<>(values)));
+            Map<String, CommandUiActionView> flow =
+                    new LinkedHashMap<>(contribution.flowActions());
+            for (Map.Entry<ContributorActionKey, CommandUiActionView> update
+                    : attached.entrySet()) {
+                ContributorActionKey key = update.getKey();
+                if (!entry.getKey().equals(key.contributorId())) continue;
+                switch (key.scope()) {
+                    case PAGE -> page.put(key.effectiveId(), update.getValue());
+                    case COMMAND -> command.put(key.effectiveId(), update.getValue());
+                    case ROW -> rows.computeIfAbsent(key.rowId(),
+                            ignored -> new LinkedHashMap<>())
+                            .put(key.effectiveId(), update.getValue());
+                    case FLOW -> flow.put(key.effectiveId(), update.getValue());
+                }
+            }
+            contributions.put(entry.getKey(), new CommandUiContribution(
+                    contribution.contributorId(), contribution.pageData(),
+                    contribution.rowData(), page, command, rows, flow,
+                    contribution.status(), contribution.diagnosticReason()));
+        }
+        return base.withContributions(contributions);
+    }
+
+    /** Returns whether contributor action definitions retain the same surface. */
+    static boolean contributorActionsMatch(
+            @Nonnull List<ContributorActionHandle> previous,
+            @Nonnull List<CommandUiContributorActionBinding> current
+    ) {
+        Objects.requireNonNull(previous, "previous");
+        Objects.requireNonNull(current, "current");
+        Map<ContributorActionKey, ContributorActionShape> oldShapes =
+                new LinkedHashMap<>();
+        for (ContributorActionHandle entry : previous) {
+            CommandUiContributorActionBinding binding = entry.binding();
+            oldShapes.put(new ContributorActionKey(binding.contributorId(),
+                    binding.scope(), binding.rowId(), binding.effectiveId()),
+                    ContributorActionShape.of(binding));
+        }
+        Map<ContributorActionKey, ContributorActionShape> newShapes =
+                new LinkedHashMap<>();
+        for (CommandUiContributorActionBinding binding : current) {
+            newShapes.put(new ContributorActionKey(binding.contributorId(),
+                    binding.scope(), binding.rowId(), binding.effectiveId()),
+                    ContributorActionShape.of(binding));
+        }
+        return oldShapes.equals(newShapes);
+    }
+
     /** Returns whether the published action surface still matches this catalog. */
     boolean matchesActions(CommandUiSnapshot snapshot) {
         Objects.requireNonNull(snapshot, "snapshot");
@@ -444,6 +524,47 @@ final class CommandUiActionCatalog {
             @Nonnull CommandUiContribution contribution,
             @Nonnull List<CommandUiContributorActionBinding> bindings
     ) { }
+
+    /** One contributor binding and its opaque renderer-facing handle. */
+    record ContributorActionHandle(
+            @Nonnull CommandUiContributorActionBinding binding,
+            @Nullable CommandUiActionHandle handle
+    ) {
+        ContributorActionHandle {
+            Objects.requireNonNull(binding, "binding");
+        }
+    }
+
+    private record ContributorActionKey(
+            @Nonnull CommandUiContributorId contributorId,
+            @Nonnull CommandUiContributorAction.Scope scope,
+            @Nullable UUID rowId,
+            @Nonnull String effectiveId
+    ) { }
+
+    private record ContributorActionShape(
+            long contributorGeneration,
+            @Nonnull String kind,
+            @Nonnull String label,
+            @Nullable String iconAssetId,
+            boolean visible,
+            boolean enabled,
+            @Nullable String disabledReason,
+            @Nonnull CommandUiContributorAction.InputPolicy inputPolicy,
+            boolean confirmationRequired,
+            @Nonnull Map<String, String> metadata
+    ) {
+        static ContributorActionShape of(
+                @Nonnull CommandUiContributorActionBinding binding
+        ) {
+            CommandUiContributorAction action = binding.action();
+            return new ContributorActionShape(binding.contributorGeneration(),
+                    action.kind(), action.label(), action.iconAssetId(),
+                    action.visible(), action.enabled(), action.disabledReason(),
+                    action.inputPolicy(), action.confirmationRequired(),
+                    action.metadata());
+        }
+    }
 
     private record ActionKey(Scope scope, String key, UUID rowId) { }
 

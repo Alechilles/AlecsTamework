@@ -2,10 +2,17 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.commandui.CommandUiActionHandle;
 import com.alechilles.alecstamework.api.commandui.CommandUiCloseReason;
+import com.alechilles.alecstamework.api.commandui.CommandUiCompanionRow;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorAction;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
+import com.alechilles.alecstamework.api.internal.CommandUiContributorRegistry;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 import javax.annotation.Nonnull;
@@ -97,12 +104,189 @@ final class CommandUiSessionFactory {
         return new CreatedSession(session, List.copyOf(handles));
     }
 
+    /** Creates a mixed session and binds the selected contributor actions. */
+    @Nonnull
+    CreatedSession createMixed(
+            @Nonnull UUID sessionId,
+            @Nonnull CommandUiSnapshot snapshot,
+            long providerGeneration,
+            @Nonnull CommandUiWorldDispatcher dispatcher,
+            @Nullable Runnable refresh,
+            @Nullable Consumer<CommandUiCloseReason> close,
+            @Nullable CommandUiSessionImpl.PartialUpdateSubmitter submitter,
+            @Nonnull List<CommandSelectionPageService.GenericUiActionBinding> genericActions,
+            @Nonnull List<CommandSelectionPageService.BondedUiActionBinding> bondedActions,
+            @Nonnull UUID playerUuid,
+            @Nullable String configId,
+            @Nonnull List<CommandUiContributorActionBinding> contributorBindings,
+            @Nonnull CommandUiContributorRegistry contributorRegistry
+    ) {
+        CreatedSession created = createMixed(sessionId, snapshot,
+                providerGeneration, dispatcher, refresh, close, submitter,
+                genericActions, bondedActions);
+        if (contributorBindings.isEmpty()) return created;
+        ContributorBindingState state = new ContributorBindingState(
+                created.session(), playerUuid, configId, contributorRegistry,
+                contributorBindings);
+        return new CreatedSession(created.session(), created.handles(), state);
+    }
+
     record CreatedSession(
             @Nonnull CommandUiSessionImpl session,
-            @Nonnull List<CommandUiActionHandle> handles
+            @Nonnull List<CommandUiActionHandle> handles,
+            @Nullable ContributorBindingState contributorState
     ) {
+        CreatedSession(
+                @Nonnull CommandUiSessionImpl session,
+                @Nonnull List<CommandUiActionHandle> handles
+        ) {
+            this(session, handles, null);
+        }
+
         CreatedSession {
             handles = List.copyOf(handles);
+        }
+    }
+
+    /** Owns contributor handles and preserves them across presentation refreshes. */
+    static final class ContributorBindingState {
+        private final CommandUiSessionImpl session;
+        private final UUID playerUuid;
+        private final String configId;
+        private final CommandUiContributorRegistry registry;
+        private List<CommandUiActionCatalog.ContributorActionHandle> handles;
+        private List<CommandUiContributorActionBinding> bindings;
+        private long actionGeneration;
+
+        private ContributorBindingState(
+                @Nonnull CommandUiSessionImpl session,
+                @Nonnull UUID playerUuid,
+                @Nullable String configId,
+                @Nonnull CommandUiContributorRegistry registry,
+                @Nonnull List<CommandUiContributorActionBinding> bindings
+        ) {
+            this.session = session;
+            this.playerUuid = playerUuid;
+            this.configId = configId;
+            this.registry = registry;
+            this.bindings = List.copyOf(bindings);
+            this.actionGeneration = session.snapshot().actionGeneration();
+            this.handles = issue(session.snapshot(), this.bindings,
+                    actionGeneration);
+        }
+
+        @Nonnull
+        synchronized CommandUiSnapshot attachInitial(
+                @Nonnull CommandUiSnapshot snapshot
+        ) {
+            return CommandUiActionCatalog.attachContributorActions(snapshot,
+                    handles);
+        }
+
+        @Nonnull
+        synchronized CommandUiSnapshot reconcile(
+                @Nonnull CommandUiSnapshot snapshot,
+                @Nonnull CommandUiSnapshot previous,
+                @Nonnull List<CommandUiContributorActionBinding> currentBindings
+        ) {
+            List<CommandUiContributorActionBinding> current =
+                    List.copyOf(currentBindings);
+            boolean sameSurface = CommandUiActionCatalog.contributorActionsMatch(
+                    handles, current)
+                    && renderableMatches(previous, snapshot, current);
+            if (sameSurface
+                    && snapshot.actionGeneration() == actionGeneration) {
+                Map<BindingKey, CommandUiActionHandle> existing = new LinkedHashMap<>();
+                for (CommandUiActionCatalog.ContributorActionHandle entry : handles) {
+                    existing.put(BindingKey.of(entry.binding()), entry.handle());
+                }
+                handles = current.stream().map(binding ->
+                        new CommandUiActionCatalog.ContributorActionHandle(
+                                binding, existing.get(BindingKey.of(binding))))
+                        .toList();
+                bindings = current;
+                return CommandUiActionCatalog.attachContributorActions(snapshot,
+                        handles);
+            }
+            long generation = snapshot.actionGeneration();
+            if (!sameSurface && generation <= actionGeneration) {
+                generation = Math.max(previous.actionGeneration(),
+                        actionGeneration) + 1L;
+            } else {
+                generation = Math.max(generation, actionGeneration);
+            }
+            handles = issue(snapshot, current, generation);
+            bindings = current;
+            actionGeneration = generation;
+            return CommandUiActionCatalog.attachContributorActions(
+                    snapshot.withActionGeneration(generation), handles);
+        }
+
+        private List<CommandUiActionCatalog.ContributorActionHandle> issue(
+                @Nonnull CommandUiSnapshot snapshot,
+                @Nonnull List<CommandUiContributorActionBinding> source,
+                long actionGeneration
+        ) {
+            List<CommandUiActionCatalog.ContributorActionHandle> issued =
+                    new ArrayList<>(source.size());
+            for (CommandUiContributorActionBinding binding : source) {
+                CommandUiCompanionRow row = snapshot.companionRow(binding.rowId());
+                boolean rowVisible = binding.scope()
+                        != CommandUiContributorAction.Scope.ROW || row != null;
+                CommandUiActionHandle handle = null;
+                if (rowVisible) {
+                    CommandUiActionGateway.ContributorIdentity identity =
+                            new CommandUiActionGateway.ContributorIdentity(
+                                    playerUuid, configId,
+                                    binding.rowId(),
+                                    row == null ? null : row.companionUuid(),
+                                    row == null ? null : row.profileId());
+                    handle = session.issueContributor(binding, actionGeneration,
+                            identity, () -> registry.isActive(
+                                    binding.contributorId(),
+                                    binding.contributorGeneration()));
+                }
+                issued.add(new CommandUiActionCatalog.ContributorActionHandle(
+                        binding, handle));
+            }
+            return List.copyOf(issued);
+        }
+
+        private static boolean renderableMatches(
+                @Nonnull CommandUiSnapshot oldSnapshot,
+                @Nonnull CommandUiSnapshot newSnapshot,
+                @Nonnull List<CommandUiContributorActionBinding> newBindings
+        ) {
+            for (CommandUiContributorActionBinding binding : newBindings) {
+                if (binding.scope() != CommandUiContributorAction.Scope.ROW) {
+                    continue;
+                }
+                CommandUiCompanionRow oldRow = oldSnapshot.companionRow(
+                        binding.rowId());
+                CommandUiCompanionRow newRow = newSnapshot.companionRow(
+                        binding.rowId());
+                if (oldRow == null || newRow == null) {
+                    if (oldRow != newRow) return false;
+                    continue;
+                }
+                if (!java.util.Objects.equals(oldRow.companionUuid(),
+                        newRow.companionUuid())
+                        || !java.util.Objects.equals(oldRow.profileId(),
+                        newRow.profileId())) return false;
+            }
+            return true;
+        }
+
+        private record BindingKey(
+                CommandUiContributorId contributorId,
+                CommandUiContributorAction.Scope scope,
+                UUID rowId,
+                String effectiveId
+        ) {
+            static BindingKey of(CommandUiContributorActionBinding binding) {
+                return new BindingKey(binding.contributorId(), binding.scope(),
+                        binding.rowId(), binding.effectiveId());
+            }
         }
     }
 }

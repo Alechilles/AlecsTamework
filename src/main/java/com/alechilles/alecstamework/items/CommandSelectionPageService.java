@@ -444,6 +444,7 @@ final class CommandSelectionPageService {
             if (created.composition() != null) {
                 next = next.withContributions(
                         created.composition().snapshot().contributions());
+                next = created.reconcileContributorActions(next, previous);
             }
             var changes = CommandUiSnapshotDiffer.diff(previous, next);
             created.session().publishInternal(next, changes);

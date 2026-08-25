@@ -146,6 +146,8 @@ final class CommandUiPageCoordinator {
                 new java.util.concurrent.atomic.AtomicBoolean();
         AtomicReference<CommandUiHostPage<?>> host = new AtomicReference<>();
         AtomicReference<CommandUiSessionImpl> sessionRef = new AtomicReference<>();
+        AtomicReference<CommandUiSessionFactory.ContributorBindingState>
+                contributorStateRef = new AtomicReference<>();
         Runnable compositionRefreshRequest = () -> {
             if (!pageShown.get()) {
                 pendingCompositionRefresh.set(true);
@@ -186,7 +188,14 @@ final class CommandUiPageCoordinator {
                             CommandUiSessionImpl current = sessionRef.get();
                             if (current == null || !current.isOpen()) return;
                             CommandUiSnapshot previous = current.snapshot();
-                            if (!current.publishInternal(snapshot, changes)) return;
+                            CommandUiSnapshot next = snapshot;
+                            CommandUiSessionFactory.ContributorBindingState state =
+                                    contributorStateRef.get();
+                            if (state != null) {
+                                next = state.reconcile(snapshot, previous,
+                                        compositionRef.get().actionBindings());
+                            }
+                            if (!current.publishInternal(next, changes)) return;
                             CommandUiHostPage<?> page = host.get();
                             if (page != null) {
                                 page.applyUpdate(new com.alechilles.alecstamework.api.commandui.CommandUiUpdate(
@@ -206,27 +215,51 @@ final class CommandUiPageCoordinator {
         CommandUiSessionFactory.CreatedSession createdSession = null;
         CommandUiHostPage<?> page = null;
         try {
-            createdSession = sessions.createMixed(
-                    composedBase.sessionId(), composedBase,
-                    resolved.rendererGeneration(),
-                    sessionDispatcher(playerRef.getUuid(), worldDispatcher),
-                    Objects.requireNonNull(refreshRequest, "refreshRequest"), reason -> {
-                        CommandUiHostPage<?> current = host.get();
-                        if (current != null) current.closeSession(reason);
-                    },
-                    (commands, events, clear) -> {
-                        CommandUiHostPage<?> current = host.get();
-                        return current != null && current.submitPartialUpdate(
-                                commands, events, clear);
-                    },
-                    List.copyOf(genericActions), List.copyOf(bondedActions));
+            if (registry != null && composition != null) {
+                createdSession = sessions.createMixed(
+                        composedBase.sessionId(), composedBase,
+                        resolved.rendererGeneration(),
+                        sessionDispatcher(playerRef.getUuid(), worldDispatcher),
+                        Objects.requireNonNull(refreshRequest, "refreshRequest"), reason -> {
+                            CommandUiHostPage<?> current = host.get();
+                            if (current != null) current.closeSession(reason);
+                        },
+                        (commands, events, clear) -> {
+                            CommandUiHostPage<?> current = host.get();
+                            return current != null && current.submitPartialUpdate(
+                                    commands, events, clear);
+                        },
+                        List.copyOf(genericActions), List.copyOf(bondedActions),
+                        playerRef.getUuid(), context.configId(),
+                        composition.actionBindings(), registry.contributorRegistry());
+            } else {
+                createdSession = sessions.createMixed(
+                        composedBase.sessionId(), composedBase,
+                        resolved.rendererGeneration(),
+                        sessionDispatcher(playerRef.getUuid(), worldDispatcher),
+                        Objects.requireNonNull(refreshRequest, "refreshRequest"), reason -> {
+                            CommandUiHostPage<?> current = host.get();
+                            if (current != null) current.closeSession(reason);
+                        },
+                        (commands, events, clear) -> {
+                            CommandUiHostPage<?> current = host.get();
+                            return current != null && current.submitPartialUpdate(
+                                    commands, events, clear);
+                        },
+                        List.copyOf(genericActions), List.copyOf(bondedActions));
+            }
             sessionRef.set(createdSession.session());
+            contributorStateRef.set(createdSession.contributorState());
             CommandUiSnapshot finalSnapshot = Objects.requireNonNull(
                     snapshotFinalizer.finish(composedBase, createdSession.handles()),
                     "final snapshot");
             if (composition != null) {
                 finalSnapshot = finalSnapshot.withContributions(
                         composition.snapshot().contributions());
+            }
+            if (createdSession.contributorState() != null) {
+                finalSnapshot = createdSession.contributorState().attachInitial(
+                        finalSnapshot);
             }
             if (finalSnapshot != baseSnapshot) {
                 createdSession.session().publishInternal(
@@ -240,6 +273,15 @@ final class CommandUiPageCoordinator {
             if (composition != null && !page.own(composition)) {
                 composition = null;
             }
+            CommandUiCompositionSession ownedComposition = composition;
+            CommandUiSessionFactory.ContributorBindingState contributorState =
+                    createdSession.contributorState();
+            ContributorActionReconciler contributorReconciler =
+                    (next, previous) -> contributorState == null
+                            || ownedComposition == null
+                            ? next
+                            : contributorState.reconcile(next, previous,
+                                    ownedComposition.actionBindings());
             Runnable onPageOpened = () -> {
                 if (!pageShown.compareAndSet(false, true)) return;
                 if (pendingCompositionRefresh.getAndSet(false)) {
@@ -249,7 +291,7 @@ final class CommandUiPageCoordinator {
             return new Created(page, createdSession.session(),
                     createdSession.handles(), resolved.custom(),
                     resolved.providerGeneration(), resolved.rendererGeneration(),
-                    composition, onPageOpened);
+                    composition, onPageOpened, contributorReconciler);
         } catch (RuntimeException | LinkageError failure) {
             if (page == null) {
                 if (createdSession != null) {
@@ -353,6 +395,12 @@ final class CommandUiPageCoordinator {
                                  List<CommandUiActionHandle> handles);
     }
 
+    @FunctionalInterface
+    interface ContributorActionReconciler {
+        CommandUiSnapshot reconcile(CommandUiSnapshot next,
+                                    CommandUiSnapshot previous);
+    }
+
     record Created(
             CommandUiHostPage<?> host,
             CommandUiSessionImpl session,
@@ -361,15 +409,25 @@ final class CommandUiPageCoordinator {
             long providerGeneration,
             long rendererGeneration,
             @javax.annotation.Nullable CommandUiCompositionSession composition,
-            @Nonnull Runnable onPageOpened
+            @Nonnull Runnable onPageOpened,
+            @Nonnull ContributorActionReconciler contributorActionReconciler
     ) {
         Created {
             handles = List.copyOf(handles);
             onPageOpened = Objects.requireNonNull(onPageOpened, "onPageOpened");
+            contributorActionReconciler = Objects.requireNonNull(
+                    contributorActionReconciler, "contributorActionReconciler");
         }
 
         void pageOpened() {
             onPageOpened.run();
+        }
+
+        CommandUiSnapshot reconcileContributorActions(
+                CommandUiSnapshot next,
+                CommandUiSnapshot previous
+        ) {
+            return contributorActionReconciler.reconcile(next, previous);
         }
     }
 }

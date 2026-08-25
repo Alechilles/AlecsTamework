@@ -492,6 +492,22 @@ final class CommandUiSessionImpl implements CommandUiSession {
                 confirmationRequired);
     }
 
+    /** Issues one contributor action without exposing its server handler. */
+    @Nullable
+    CommandUiActionHandle issueContributor(
+            @Nonnull CommandUiContributorActionBinding binding,
+            long actionGeneration,
+            @Nonnull CommandUiActionGateway.ContributorIdentity identity,
+            @Nonnull CommandUiActionGateway.ContributorGenerationCheck generationCheck
+    ) {
+        if (!isOpen()) {
+            throw new IllegalStateException(
+                    "Cannot issue an action for a closed session.");
+        }
+        return actionGateway.issueContributor(sessionId, binding,
+                actionGeneration, identity, generationCheck, null);
+    }
+
     private void requireRoute(CommandUiActionGateway.Route route) {
         if (mode == Mode.MIXED) return;
         boolean generic = mode == Mode.GENERIC;
