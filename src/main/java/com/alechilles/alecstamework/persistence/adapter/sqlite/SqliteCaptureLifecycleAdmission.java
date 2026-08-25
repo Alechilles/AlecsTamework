@@ -182,7 +182,7 @@ final class SqliteCaptureLifecycleAdmission {
                 ? requested.resultingOwnerId()
                 : requested.tameAndLinkEvidence().finalLifecycle().ownerId();
         String targetWorld = requested.capturedItem()
-                ? requested.targetWorldKey()
+                ? targetOwner == null ? null : requested.targetWorldKey()
                 : requested.tameAndLinkEvidence().finalLifecycle().ownerWorldKey();
         PopulationAdmissionOperation operation = operation(
                 source, targetOwner

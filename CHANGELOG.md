@@ -23,6 +23,11 @@
   rewards now share one finalized-output boundary before Activity V2 reports
   their produced item quantities.
 
+### Fixed
+
+- Owner-clearing capture items can capture managed companions without failing
+  lifecycle admission.
+
 ## 3.2.2 - Flightmaster's Talisman Preview Hotfix - 2026-08-24
 
 ### Fixed

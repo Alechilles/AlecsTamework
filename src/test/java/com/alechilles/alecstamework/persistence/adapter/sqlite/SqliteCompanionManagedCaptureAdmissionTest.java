@@ -47,6 +47,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Managed ordinary-capture admission, convergence, and replay regressions. */
@@ -179,6 +180,31 @@ class SqliteCompanionManagedCaptureAdmissionTest {
         assertEquals(1, admissionCalls.get());
         assertEquals(1, liveCalls.get());
     }
+
+    @Test
+    void managedCaptureClearingOwnerPublishesAndClearsOwnership()
+            throws Exception {
+        admissionMode = AdmissionMode.MANAGED;
+        seedCommittedDomainSource();
+
+        OperationWorkflowResult result = submit(
+                25,
+                captureRequest(null),
+                (capture, operation) -> LiveOperationResult.confirmed(
+                        "managed_owner_clear_capture_confirmed"
+                ).completed()
+        );
+
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLISHED,
+                result.status(),
+                () -> String.valueOf(result.failure())
+        );
+        CompanionLifecycle lifecycle = lifecycle();
+        assertEquals(LifecycleState.CAPTURED, lifecycle.state());
+        assertNull(lifecycle.ownerId());
+        assertNull(lifecycle.ownerWorldKey());
+    }
     @Test
     void concurrentIdenticalFirstCapturesCallProviderAndLiveOnce()
             throws Exception {
@@ -301,6 +327,10 @@ class SqliteCompanionManagedCaptureAdmissionTest {
                 .get(10, TimeUnit.SECONDS);
     }
     private CompanionCaptureRequest captureRequest() {
+        return captureRequest(OWNER);
+    }
+
+    private CompanionCaptureRequest captureRequest(OwnerId resultingOwner) {
         CompanionSnapshot snapshot = new CompanionSnapshot(
                 SnapshotId.parse("50000000-0000-0000-0000-000000000001"),
                 PROFILE,
@@ -315,7 +345,7 @@ class SqliteCompanionManagedCaptureAdmissionTest {
         return new CompanionCaptureRequest(
                 PROFILE,
                 LifecycleRevision.INITIAL,
-                OWNER,
+                resultingOwner,
                 ALIAS,
                 "world",
                 snapshot,
@@ -457,15 +487,15 @@ class SqliteCompanionManagedCaptureAdmissionTest {
     private PopulationDomainAdmissionOperation.Payload managedPayload(
             LifecycleAdmissionRequest request
     ) {
-        OwnerId targetOwner = new OwnerId(
-                request.managedRequest().request().newOwnerUuid()
-        );
+        UUID targetOwnerUuid = request.managedRequest().request().newOwnerUuid();
+        OwnerId targetOwner = targetOwnerUuid == null
+                ? null : new OwnerId(targetOwnerUuid);
         return new PopulationDomainAdmissionOperation.Payload(
                 request.reservationId(),
                 PROFILE,
                 targetOwner,
                 request.source().revision(),
-                "world",
+                targetOwner == null ? null : "world",
                 request.sourceOwner(),
                 request.sourceWorld(),
                 request.sourceState(),
