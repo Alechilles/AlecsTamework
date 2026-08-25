@@ -360,24 +360,39 @@ class CommandUiContributorActionGatewayTest {
     }
 
     @Test
-    void targetedSuccessfulResultKeepsTheDirectActionReusable() {
+    void targetedSuccessKeepsHandleAfterSynchronousBindingRefresh() {
         CommandUiActionGateway gateway = new CommandUiActionGateway();
         UUID sessionId = UUID.randomUUID();
         gateway.openSession(sessionId, 1L);
         AtomicInteger calls = new AtomicInteger();
+        AtomicReference<CommandUiActionHandle> handleRef =
+                new AtomicReference<>();
+        AtomicReference<CommandUiContributorActionBinding> replacementRef =
+                new AtomicReference<>();
         CommandUiActionResult targeted = new CommandUiActionResult(
                 CommandUiActionStatus.APPLIED, "updated", null, null,
                 Map.of(), null, false);
-        CommandUiContributorActionBinding binding = binding(
-                CommandUiContributorId.of("runeteria:actions"), 1L,
+        CommandUiContributorId contributorId = CommandUiContributorId.of(
+                "runeteria:actions");
+        CommandUiContributorActionBinding binding = binding("targeted",
+                contributorId, 1L,
+                CommandUiContributorAction.Scope.PAGE, null,
+                CommandUiContributorAction.InputPolicy.NONE, context -> {
+                    calls.incrementAndGet();
+                    assertTrue(gateway.refreshContributor(handleRef.get(),
+                            replacementRef.get(), () -> true, () -> true));
+                    return CompletableFuture.completedFuture(targeted);
+                }, false);
+        replacementRef.set(binding("targeted", contributorId, 1L,
                 CommandUiContributorAction.Scope.PAGE, null,
                 CommandUiContributorAction.InputPolicy.NONE, context -> {
                     calls.incrementAndGet();
                     return CompletableFuture.completedFuture(targeted);
-                });
+                }, false));
         CommandUiActionHandle handle = gateway.issueContributor(
                 sessionId, binding, 1L, identity(), () -> true,
                 context -> true);
+        handleRef.set(handle);
 
         assertEquals(CommandUiActionStatus.APPLIED,
                 gateway.invoke(sessionId, CommandUiActionRequest.of(handle),
@@ -386,6 +401,92 @@ class CommandUiContributorActionGatewayTest {
                 gateway.invoke(sessionId, CommandUiActionRequest.of(handle),
                         1L, null).toCompletableFuture().join().status());
         assertEquals(2, calls.get());
+    }
+
+    @Test
+    void snapshotRefreshConsumesHandleAfterSynchronousBindingRefresh() {
+        CommandUiActionGateway gateway = new CommandUiActionGateway();
+        UUID sessionId = UUID.randomUUID();
+        gateway.openSession(sessionId, 1L);
+        AtomicReference<CommandUiActionHandle> handleRef =
+                new AtomicReference<>();
+        AtomicReference<CommandUiContributorActionBinding> replacementRef =
+                new AtomicReference<>();
+        CommandUiActionResult refreshing = new CommandUiActionResult(
+                CommandUiActionStatus.APPLIED, "updated", null, null,
+                Map.of(), null, true);
+        CommandUiContributorId contributorId = CommandUiContributorId.of(
+                "runeteria:actions");
+        CommandUiContributorActionBinding binding = binding("refreshing",
+                contributorId, 1L,
+                CommandUiContributorAction.Scope.PAGE, null,
+                CommandUiContributorAction.InputPolicy.NONE, context -> {
+                    assertTrue(gateway.refreshContributor(handleRef.get(),
+                            replacementRef.get(), () -> true, () -> true));
+                    return CompletableFuture.completedFuture(refreshing);
+                }, false);
+        replacementRef.set(binding("refreshing", contributorId, 1L,
+                CommandUiContributorAction.Scope.PAGE, null,
+                CommandUiContributorAction.InputPolicy.NONE, context ->
+                        CompletableFuture.completedFuture(refreshing), false));
+        CommandUiActionHandle handle = gateway.issueContributor(
+                sessionId, binding, 1L, identity(), () -> true,
+                context -> true);
+        handleRef.set(handle);
+
+        assertEquals(CommandUiActionStatus.APPLIED,
+                gateway.invoke(sessionId, CommandUiActionRequest.of(handle),
+                        1L, null).toCompletableFuture().join().status());
+        assertEquals(CommandUiActionStatus.STALE,
+                gateway.invoke(sessionId, CommandUiActionRequest.of(handle),
+                        1L, null).toCompletableFuture().join().status());
+    }
+
+    @Test
+    void confirmationConsumesFamilyAfterSynchronousBindingRefresh() {
+        CommandUiActionGateway gateway = new CommandUiActionGateway();
+        UUID sessionId = UUID.randomUUID();
+        gateway.openSession(sessionId, 1L);
+        AtomicReference<CommandUiActionHandle> initiatingRef =
+                new AtomicReference<>();
+        AtomicReference<CommandUiContributorActionBinding> replacementRef =
+                new AtomicReference<>();
+        CommandUiContributorId contributorId = CommandUiContributorId.of(
+                "runeteria:actions");
+        CommandUiContributorActionBinding binding = binding("confirmed",
+                CommandUiContributorId.of("runeteria:actions"), 1L,
+                CommandUiContributorAction.Scope.PAGE, null,
+                CommandUiContributorAction.InputPolicy.NONE, context -> {
+                    assertTrue(gateway.refreshContributor(initiatingRef.get(),
+                            replacementRef.get(), () -> true, () -> true));
+                    return CompletableFuture.completedFuture(
+                            CommandUiActionResult.applied());
+                }, true);
+        replacementRef.set(binding("confirmed", contributorId, 1L,
+                CommandUiContributorAction.Scope.PAGE, null,
+                CommandUiContributorAction.InputPolicy.NONE, context ->
+                        CompletableFuture.completedFuture(
+                                CommandUiActionResult.applied()), true));
+        CommandUiActionHandle initiating = gateway.issueContributor(
+                sessionId, binding, 1L, identity(), () -> true,
+                context -> true);
+        initiatingRef.set(initiating);
+        CommandUiActionResult prompt = gateway.invoke(sessionId,
+                CommandUiActionRequest.of(initiating), 1L, null)
+                .toCompletableFuture().join();
+
+        assertEquals(CommandUiActionStatus.APPLIED,
+                gateway.invoke(sessionId, CommandUiActionRequest.of(
+                                prompt.confirmationHandle()),
+                        1L, null).toCompletableFuture().join().status());
+        assertEquals(CommandUiActionStatus.STALE,
+                gateway.invoke(sessionId, CommandUiActionRequest.of(
+                                prompt.confirmationHandle()),
+                        1L, null).toCompletableFuture().join().status());
+        assertEquals(CommandUiActionStatus.STALE,
+                gateway.invoke(sessionId,
+                        CommandUiActionRequest.of(initiating), 1L, null)
+                        .toCompletableFuture().join().status());
     }
 
     @Test
@@ -457,9 +558,23 @@ class CommandUiContributorActionGatewayTest {
             com.alechilles.alecstamework.api.commandui.CommandUiContributorActionHandler handler,
             boolean confirmation
     ) {
+        return binding("action-" + UUID.randomUUID(), contributorId,
+                generation, scope, rowId, inputPolicy, handler, confirmation);
+    }
+
+    private static CommandUiContributorActionBinding binding(
+            String actionId,
+            CommandUiContributorId contributorId,
+            long generation,
+            CommandUiContributorAction.Scope scope,
+            UUID rowId,
+            CommandUiContributorAction.InputPolicy inputPolicy,
+            com.alechilles.alecstamework.api.commandui.CommandUiContributorActionHandler handler,
+            boolean confirmation
+    ) {
         return new CommandUiContributorActionBinding(contributorId, generation,
                 new CommandUiContributorAction(
-                        "action-" + UUID.randomUUID(), "TEST", "Test action",
+                        actionId, "TEST", "Test action",
                         null, true, true, null, inputPolicy, confirmation,
                         Map.of(), handler), scope, rowId);
     }
