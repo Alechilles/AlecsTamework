@@ -83,6 +83,15 @@ parent list. Each entry has a namespaced `Id` and a `Required` flag. A missing
 required contribution falls back to the standard menu. A missing optional
 contribution does not stop the selected renderer.
 
+Target and equipped-item hotswap HUDs have independent selections:
+`TargetHudRendererId` and `HotswapHudRendererId` select their renderer, while
+`TargetHudContributors` and `HotswapHudContributors` select ordered contributor
+requirements. Each renderer ID is normalized to lowercase; a blank value uses
+the standard HUD. Omitted fields inherit independently from the parent. An
+explicit contributor list replaces the parent list, including an explicit empty
+list. These fields are part of the command-item codec, so the config editor
+discovers them from the codec schema.
+
 ### Name-pool family
 - `TwNamesConfig` resolves by asset id (for example from `TwNameItemConfig.Naming.RandomNamesId`).
 

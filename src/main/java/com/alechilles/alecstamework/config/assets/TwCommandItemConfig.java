@@ -1,5 +1,8 @@
 package com.alechilles.alecstamework.config.assets;
 
+import com.alechilles.alecstamework.api.commandhud.CommandHudContributorId;
+import com.alechilles.alecstamework.api.commandhud.CommandHudContributorRequirement;
+import com.alechilles.alecstamework.api.commandhud.CommandHudRendererId;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorRequirement;
 import com.alechilles.alecstamework.api.commandui.CommandUiRendererId;
@@ -153,6 +156,8 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     static final CommandStep[] EMPTY_STEPS = new CommandStep[0];
     private static final CommandUiContributorRequirement[] EMPTY_UI_CONTRIBUTORS =
             new CommandUiContributorRequirement[0];
+    private static final CommandHudContributorRequirement[] EMPTY_HUD_CONTRIBUTORS =
+            new CommandHudContributorRequirement[0];
 
     public static final StringCodecMapCodec<
             AllowedRoles,
@@ -258,6 +263,40 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         )
         .documentation("Ordered contributor requirements. An explicit list replaces the inherited list; an explicit "
                 + "empty list clears inherited contributors.")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("TargetHudRendererId", Codec.STRING),
+            (asset, value) -> asset.targetHudRendererId = normalizeHudRendererId(value),
+            asset -> asset.targetHudRendererId
+        )
+        .documentation("Optional namespaced renderer for the target HUD. Blank selects the standard HUD. "
+                + "Renderer IDs are normalized to lowercase. Inheritance: an omitted value inherits from the "
+                + "parent; an explicit value replaces it.")
+        .add()
+        .<UiContributorSettings[]>append(
+            new KeyedCodec<>("TargetHudContributors", UI_CONTRIBUTOR_ARRAY_CODEC),
+            (asset, value) -> asset.targetHudContributors = normalizeHudContributors(value, "TargetHudContributors"),
+            asset -> toHudContributorSettings(asset.targetHudContributors)
+        )
+        .documentation("Ordered target HUD contributor requirements. An omitted list inherits from the parent; an "
+                + "explicit list replaces it, including an explicit empty list.")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("HotswapHudRendererId", Codec.STRING),
+            (asset, value) -> asset.hotswapHudRendererId = normalizeHudRendererId(value),
+            asset -> asset.hotswapHudRendererId
+        )
+        .documentation("Optional namespaced renderer for the hotswap HUD. Blank selects the standard HUD. "
+                + "Renderer IDs are normalized to lowercase. Inheritance: an omitted value inherits from the "
+                + "parent; an explicit value replaces it.")
+        .add()
+        .<UiContributorSettings[]>append(
+            new KeyedCodec<>("HotswapHudContributors", UI_CONTRIBUTOR_ARRAY_CODEC),
+            (asset, value) -> asset.hotswapHudContributors = normalizeHudContributors(value, "HotswapHudContributors"),
+            asset -> toHudContributorSettings(asset.hotswapHudContributors)
+        )
+        .documentation("Ordered hotswap HUD contributor requirements. An omitted list inherits from the parent; an "
+                + "explicit list replaces it, including an explicit empty list.")
         .add()
         .<RosterStorage>append(
             new KeyedCodec<>(
@@ -376,6 +415,10 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     private String commandFamilyId;
     private String uiRendererId;
     private CommandUiContributorRequirement[] uiContributors = EMPTY_UI_CONTRIBUTORS;
+    private String targetHudRendererId;
+    private CommandHudContributorRequirement[] targetHudContributors = EMPTY_HUD_CONTRIBUTORS;
+    private String hotswapHudRendererId;
+    private CommandHudContributorRequirement[] hotswapHudContributors = EMPTY_HUD_CONTRIBUTORS;
     private RosterStorage rosterStorage = RosterStorage.ItemMetadata;
     private String bondedRosterId;
     private Boolean projectRosterToItemMetadata;
@@ -463,6 +506,18 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         if (!explicitTopLevelKeys.contains("UiContributors")) {
             uiContributors = parent.uiContributors.clone();
         }
+        if (!explicitTopLevelKeys.contains("TargetHudRendererId")) {
+            targetHudRendererId = parent.targetHudRendererId;
+        }
+        if (!explicitTopLevelKeys.contains("TargetHudContributors")) {
+            targetHudContributors = parent.targetHudContributors.clone();
+        }
+        if (!explicitTopLevelKeys.contains("HotswapHudRendererId")) {
+            hotswapHudRendererId = parent.hotswapHudRendererId;
+        }
+        if (!explicitTopLevelKeys.contains("HotswapHudContributors")) {
+            hotswapHudContributors = parent.hotswapHudContributors.clone();
+        }
         if (!explicitTopLevelKeys.contains("RosterStorage")) rosterStorage = parent.rosterStorage;
         if (!explicitTopLevelKeys.contains("BondedRosterId")) bondedRosterId = parent.bondedRosterId;
         if (!explicitTopLevelKeys.contains("ProjectRosterToItemMetadata")) {
@@ -535,6 +590,14 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         return id.value();
     }
 
+    @Nullable
+    private static String normalizeHudRendererId(@Nullable String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return CommandHudRendererId.of(value).value();
+    }
+
     private static CommandUiContributorRequirement[] normalizeUiContributors(
             @Nullable UiContributorSettings[] value
     ) {
@@ -559,6 +622,28 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         return requirements.toArray(CommandUiContributorRequirement[]::new);
     }
 
+    private static CommandHudContributorRequirement[] normalizeHudContributors(
+            @Nullable UiContributorSettings[] value,
+            @Nonnull String fieldName
+    ) {
+        if (value == null || value.length == 0) {
+            return EMPTY_HUD_CONTRIBUTORS;
+        }
+        List<CommandHudContributorRequirement> requirements = new ArrayList<>(value.length);
+        Set<CommandHudContributorId> seen = new HashSet<>();
+        for (UiContributorSettings settings : value) {
+            if (settings == null) {
+                throw new IllegalArgumentException(fieldName + " cannot contain null entries.");
+            }
+            CommandHudContributorId id = CommandHudContributorId.of(settings.id);
+            if (!seen.add(id)) {
+                throw new IllegalArgumentException(fieldName + " contains duplicate ID: " + id.value());
+            }
+            requirements.add(new CommandHudContributorRequirement(id, settings.required));
+        }
+        return requirements.toArray(CommandHudContributorRequirement[]::new);
+    }
+
     private static UiContributorSettings[] toUiContributorSettings(
             @Nullable CommandUiContributorRequirement[] requirements
     ) {
@@ -568,6 +653,23 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         UiContributorSettings[] settings = new UiContributorSettings[requirements.length];
         for (int index = 0; index < requirements.length; index++) {
             CommandUiContributorRequirement requirement = requirements[index];
+            UiContributorSettings setting = new UiContributorSettings();
+            setting.id = requirement.id().value();
+            setting.required = requirement.required();
+            settings[index] = setting;
+        }
+        return settings;
+    }
+
+    private static UiContributorSettings[] toHudContributorSettings(
+            @Nullable CommandHudContributorRequirement[] requirements
+    ) {
+        if (requirements == null || requirements.length == 0) {
+            return new UiContributorSettings[0];
+        }
+        UiContributorSettings[] settings = new UiContributorSettings[requirements.length];
+        for (int index = 0; index < requirements.length; index++) {
+            CommandHudContributorRequirement requirement = requirements[index];
             UiContributorSettings setting = new UiContributorSettings();
             setting.id = requirement.id().value();
             setting.required = requirement.required();
@@ -607,6 +709,30 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     @Nonnull
     public List<CommandUiContributorRequirement> getUiContributors() {
         return List.of(uiContributors);
+    }
+
+    /** Returns the normalized custom target HUD renderer ID, or null for the standard HUD. */
+    @Nullable
+    public String getTargetHudRendererId() {
+        return targetHudRendererId;
+    }
+
+    /** Returns the ordered immutable target HUD contributor requirements. */
+    @Nonnull
+    public List<CommandHudContributorRequirement> getTargetHudContributors() {
+        return List.of(targetHudContributors);
+    }
+
+    /** Returns the normalized custom hotswap HUD renderer ID, or null for the standard HUD. */
+    @Nullable
+    public String getHotswapHudRendererId() {
+        return hotswapHudRendererId;
+    }
+
+    /** Returns the ordered immutable hotswap HUD contributor requirements. */
+    @Nonnull
+    public List<CommandHudContributorRequirement> getHotswapHudContributors() {
+        return List.of(hotswapHudContributors);
     }
 
     public RosterStorage getRosterStorage() {
