@@ -221,6 +221,7 @@ tamework.ui.linkedPanel.card.button.cull=Cull
 tamework.ui.linkedPanel.card.button.link=Link
 tamework.ui.linkedPanel.card.button.locate=Locate
 tamework.ui.linkedPanel.card.button.release=Release
+tamework.ui.linkedPanel.card.button.abandon=Abandon
 tamework.ui.linkedPanel.card.confirmRemove=CONFIRM REMOVE
 tamework.ui.linkedPanel.card.group.setTooltip=Set Group
 tamework.ui.linkedPanel.card.inactive=INACTIVE

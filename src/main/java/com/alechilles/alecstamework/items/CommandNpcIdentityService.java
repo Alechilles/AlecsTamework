@@ -54,6 +54,10 @@ final class CommandNpcIdentityService {
             return lifecycleState == LifecycleState.COOP;
         }
 
+        boolean released() {
+            return lifecycleState == LifecycleState.RELEASED;
+        }
+
         boolean suppressesLiveAction() {
             return lifecycleState != LifecycleState.ACTIVE
                     && lifecycleState != LifecycleState.UNLOADED;
@@ -216,7 +220,9 @@ final class CommandNpcIdentityService {
             original.add(record);
             IdentityResolution resolution = resolve(record);
             resolutions.add(resolution);
-            canonical.add(canonicalRecord(record, resolution));
+            if (!resolution.durableState().released()) {
+                canonical.add(canonicalRecord(record, resolution));
+            }
         }
         boolean unsafe = resolutions.stream().anyMatch(result ->
                 result.status() == ResolutionStatus.CONFLICT

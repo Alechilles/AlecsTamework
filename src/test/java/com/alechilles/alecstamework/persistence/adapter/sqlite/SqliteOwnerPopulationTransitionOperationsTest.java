@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
+import com.alechilles.alecstamework.companion.identity.CompanionToolLink;
+import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
@@ -45,6 +47,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Shared-operation, exact-source, and serialized capacity admission tests. */
@@ -53,6 +56,8 @@ class SqliteOwnerPopulationTransitionOperationsTest {
             ProfileId.parse("20000000-0000-0000-0000-000000000001");
     private static final ProfileId PROFILE_B =
             ProfileId.parse("20000000-0000-0000-0000-000000000002");
+    private static final ProfileId PROFILE_C =
+            ProfileId.parse("20000000-0000-0000-0000-000000000003");
     private static final OwnerId OWNER =
             OwnerId.parse("30000000-0000-0000-0000-000000000001");
 
@@ -351,6 +356,101 @@ class SqliteOwnerPopulationTransitionOperationsTest {
         );
     }
 
+    @Test
+    void terminalOwnerClearReleasesLifecycleLinksAndDomainCapacity()
+            throws Exception {
+        createOwnedProfile();
+        OperationId domainOperation = operationId(50);
+        PopulationDomainAdmissionOperation domain =
+                adapter.populationDomainAdmissionOperations();
+        var prepared = domain.prepare(
+                domainOperation,
+                new IdempotencyKey("population-domain:owned-profile"),
+                new PopulationDomainAdmissionOperation.Payload(
+                        java.util.UUID.fromString(
+                                "50000000-0000-0000-0000-000000000050"
+                        ),
+                        PROFILE_C,
+                        OWNER,
+                        LifecycleRevision.INITIAL,
+                        "world-a",
+                        OWNER,
+                        "world-a",
+                        LifecycleState.ACTIVE,
+                        LifecycleState.ACTIVE,
+                        "runeteria:livestock",
+                        "runeteria:rune_professions",
+                        1,
+                        "test-generation",
+                        1,
+                        1,
+                        Long.MAX_VALUE,
+                        1,
+                        List.of(new PopulationDomainAdmissionOperation.DomainInput(
+                                "runeteria:husbandry/owned",
+                                PopulationDomainScope.GLOBAL,
+                                null,
+                                1,
+                                0,
+                                1,
+                                16,
+                                0,
+                                1
+                        )),
+                        List.of(),
+                        -3_500
+                )
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        assertInstanceOf(
+                com.alechilles.alecstamework.persistence.kernel
+                        .PersistenceTransactionResult.Committed.class,
+                prepared
+        );
+        domain.claim(domainOperation).toCompletableFuture()
+                .get(10, TimeUnit.SECONDS);
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLISHED,
+                domain.commit(domainOperation, false).toCompletableFuture()
+                        .get(10, TimeUnit.SECONDS).result().status()
+        );
+
+        OwnerPopulationTransitionRequest release =
+                new OwnerPopulationTransitionRequest(
+                        PROFILE_C,
+                        LifecycleRevision.INITIAL,
+                        OWNER,
+                        "world-a",
+                        null,
+                        null,
+                        0,
+                        0,
+                        -3_000
+                );
+        OperationWorkflowResult result = adapter.ownerPopulationOperations()
+                .submit(
+                        operationId(51),
+                        new IdempotencyKey("population:permanent-release"),
+                        release
+                ).completion().toCompletableFuture()
+                .get(10, TimeUnit.SECONDS);
+
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLISHED,
+                result.status(),
+                () -> String.valueOf(result.failure())
+        );
+        var profile = adapter.profileIndex().find(PROFILE_C).orElseThrow();
+        assertEquals(LifecycleState.RELEASED, profile.lifecycleState());
+        assertNull(profile.ownerId());
+        assertTrue(profile.toolIds().isEmpty());
+        try (var connection = connections.openReadConnection()) {
+            var transaction = new SqlitePersistenceTransactionContext(connection);
+            assertTrue(transaction.populationDomains()
+                    .profileEvidence(PROFILE_C, null).committed().isEmpty());
+            assertTrue(transaction.toolLinks().findByProfile(PROFILE_C).isEmpty());
+        }
+    }
+
     private PopulationDomainAdmissionOperation.Payload managedPayload(
             OperationId operationId
     ) {
@@ -426,6 +526,61 @@ class SqliteOwnerPopulationTransitionOperationsTest {
                 operationId(operationNumber),
                 new IdempotencyKey("profile:" + operationNumber),
                 create
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
+    }
+
+    private void createOwnedProfile() throws Exception {
+        long now = -4_000L;
+        NpcAlias alias = new NpcAlias(
+                java.util.UUID.fromString(
+                        "60000000-0000-0000-0000-000000000003"
+                )
+        );
+        CompanionIdentity identity = new CompanionIdentity(
+                PROFILE_C,
+                "Owned Companion",
+                "Tamed_Cow",
+                null,
+                null,
+                "world-a",
+                now,
+                now,
+                now,
+                0
+        );
+        CompanionProfileMutation.AdoptLive adoption =
+                new CompanionProfileMutation.AdoptLive(
+                        identity,
+                        alias,
+                        OWNER,
+                        "world-a",
+                        List.of(
+                                new CompanionToolLink(
+                                        PROFILE_C,
+                                        java.util.UUID.fromString(
+                                                "70000000-0000-0000-0000-000000000001"
+                                        ),
+                                        "COMMAND_ITEM",
+                                        now,
+                                        now
+                                ),
+                                new CompanionToolLink(
+                                        PROFILE_C,
+                                        java.util.UUID.fromString(
+                                                "70000000-0000-0000-0000-000000000002"
+                                        ),
+                                        "COMMAND_ITEM",
+                                        now,
+                                        now
+                                )
+                        ),
+                        now
+                );
+        OperationWorkflowResult result = adapter.profileOperations().submit(
+                operationId(3),
+                new IdempotencyKey("profile:owned"),
+                adoption
         ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
         assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
     }

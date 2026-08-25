@@ -131,6 +131,25 @@ class CommandNpcIdentityServiceTest {
         assertFalse(resolution.durableState().inCoop());
     }
 
+    @Test
+    void canonicalizationRemovesReleasedProfilesFromCommandTools() {
+        UUID profileUuid = UUID.randomUUID();
+        UUID currentUuid = UUID.randomUUID();
+        CommandNpcIdentityService service = service(
+                projection(profileUuid, currentUuid, LifecycleState.RELEASED),
+                this::absent
+        );
+
+        CommandNpcIdentityService.CanonicalizationResult result =
+                service.canonicalize(List.of(record(
+                        currentUuid, profileUuid.toString()
+                )));
+
+        assertTrue(result.records().isEmpty());
+        assertFalse(result.hasConflicts());
+        assertFalse(result.hasFailures());
+    }
+
     private CommandNpcIdentityService service(
             CompanionProfileProjectionState projection,
             CommandNpcIdentityService.LiveNpcProbe probe

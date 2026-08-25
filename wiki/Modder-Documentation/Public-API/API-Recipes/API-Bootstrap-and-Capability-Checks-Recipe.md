@@ -53,6 +53,8 @@ The readiness-gated persistence capabilities are:
 | Capability | API or contract |
 | --- | --- |
 | `POPULATION_GROUPS` | `populationGroups()` |
+| `DURABLE_POPULATION_GROUP_COUNTS` | durable owned counts from `populationGroups()` |
+| `LOADED_POPULATION_GROUP_COUNTS` | process-local loaded counts from `populationGroups()` |
 | `COMMAND_FAMILY_ROSTERS` | `commandFamilyRosters()` |
 | `COMMAND_TIMED_SUMMONING` | `commandTimedSummoning()` |
 | `COMPANION_PROVISIONING` | `companionProvisioning()` |

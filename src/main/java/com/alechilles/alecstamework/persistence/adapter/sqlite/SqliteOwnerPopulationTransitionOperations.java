@@ -3,13 +3,18 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChangeCodec;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationAdmissionPlan;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationAdmissionPlanner;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionDefinition;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionEventCodec;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionOutcome;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionRequest;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainConvergencePlan;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainConvergencePlanner;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainPort;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChange;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
@@ -257,11 +262,12 @@ public final class SqliteOwnerPopulationTransitionOperations {
                         transaction,
                         request.profileId()
                 );
+        boolean terminalRelease = request.targetOwnerId() == null;
         CompanionLifecycle committed = new CompanionLifecycle(
                 source.profileId(),
                 request.targetOwnerId(),
-                source.state(),
-                source.location(),
+                terminalRelease ? LifecycleState.RELEASED : source.state(),
+                terminalRelease ? LifecycleLocation.none() : source.location(),
                 source.revision().next(),
                 null,
                 request.requestedAtMs(),
@@ -269,6 +275,9 @@ public final class SqliteOwnerPopulationTransitionOperations {
                 source.quarantineIncidentId(),
                 request.targetOwnerWorldKey()
         );
+        if (terminalRelease) {
+            releaseDurableClaims(transaction, operation, source);
+        }
         requireApplied(
                 transaction.lifecycles().transition(new LifecycleTransition(
                         source.revision(),
@@ -283,6 +292,46 @@ public final class SqliteOwnerPopulationTransitionOperations {
                         request.profileId()
                 );
         return events(operation, request, source, committed, before, after);
+    }
+
+    private void releaseDurableClaims(
+            SqlitePersistenceTransactionContext transaction,
+            OperationEnvelope operation,
+            CompanionLifecycle source
+    ) {
+        PopulationDomainPort.ProfileEvidence evidence = transaction
+                .populationDomains().profileEvidence(
+                        source.profileId(), operation.operationId()
+                );
+        if (!evidence.currentOperationPending().isEmpty()
+                || !evidence.foreignPending().isEmpty()) {
+            throw new IllegalStateException(
+                    "owner_population_domain_claim_pending"
+            );
+        }
+        if (!evidence.committed().isEmpty()) {
+            PopulationDomainConvergencePlan plan =
+                    PopulationDomainConvergencePlanner.plan(
+                            source.profileId(),
+                            source.revision(),
+                            source.ownerId(),
+                            source.ownerWorldKey(),
+                            source.state(),
+                            null,
+                            null,
+                            LifecycleState.RELEASED,
+                            evidence.committed()
+                    );
+            if (!transaction.populationDomains().convergeExact(plan)) {
+                throw new IllegalStateException(
+                        "owner_population_domain_release_failed"
+                );
+            }
+        }
+        requireApplied(
+                transaction.toolLinks().replace(source.profileId(), List.of()),
+                "owner_population_tool_links"
+        );
     }
 
     private List<ProjectionEventDraft> events(

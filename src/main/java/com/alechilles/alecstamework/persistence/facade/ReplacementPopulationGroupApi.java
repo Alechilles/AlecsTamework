@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.api.PopulationGroupReconciliationView;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupBucket;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupCounts;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupLifecycleClassifier;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupPolicy;
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigDefinition;
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigIndex;
@@ -75,24 +76,58 @@ public final class ReplacementPopulationGroupApi
         if (liveIndex == null) {
             return OptionalLong.empty();
         }
-        PopulationGroupConfigIndex snapshot = configs.snapshot();
-        LinkedHashSet<String> roleIds = new LinkedHashSet<>();
-        for (String groupId : groupIds) {
-            if (groupId == null || groupId.isBlank()) {
-                return OptionalLong.empty();
-            }
-            Optional<PopulationGroupConfigDefinition> definition =
-                    snapshot.getDefinition(groupId.trim());
-            if (definition.isEmpty()) {
-                return OptionalLong.empty();
-            }
-            roleIds.addAll(definition.orElseThrow().roleIds());
+        Optional<Set<String>> roles = resolveRoleIds(groupIds);
+        return roles.isEmpty() ? OptionalLong.empty() : OptionalLong.of(
+                liveIndex.countOwnedRoles(ownerUuid, roles.orElseThrow())
+        );
+    }
+
+    @Override
+    @Nonnull
+    public OptionalLong getDurableOwnedCount(
+            @Nonnull UUID ownerUuid,
+            @Nonnull Set<String> groupIds
+    ) {
+        Objects.requireNonNull(ownerUuid, "ownerUuid");
+        Objects.requireNonNull(groupIds, "groupIds");
+        if (!projectionReadable()) {
+            return OptionalLong.empty();
         }
-        return OptionalLong.of(liveIndex.countOwnedRoles(ownerUuid, roleIds));
+        Optional<Set<String>> roles = resolveRoleIds(groupIds);
+        if (roles.isEmpty()) {
+            return OptionalLong.empty();
+        }
+        Set<String> roleIds = roles.orElseThrow();
+        long count = queries.projectedProfileSnapshot().values().stream()
+                .filter(profile -> profile.ownerId() != null
+                        && ownerUuid.equals(profile.ownerId().value()))
+                .filter(profile -> profile.roleId() != null
+                        && roleIds.contains(profile.roleId()))
+                .filter(profile -> PopulationGroupLifecycleClassifier
+                        .consumesOwned(profile.lifecycleState()))
+                .count();
+        return OptionalLong.of(count);
     }
 
     public boolean supportsLoadedOwnedCounts() {
         return liveIndex != null;
+    }
+
+    private Optional<Set<String>> resolveRoleIds(Set<String> groupIds) {
+        PopulationGroupConfigIndex snapshot = configs.snapshot();
+        LinkedHashSet<String> roleIds = new LinkedHashSet<>();
+        for (String groupId : groupIds) {
+            if (groupId == null || groupId.isBlank()) {
+                return Optional.empty();
+            }
+            Optional<PopulationGroupConfigDefinition> definition =
+                    snapshot.getDefinition(groupId.trim());
+            if (definition.isEmpty()) {
+                return Optional.empty();
+            }
+            roleIds.addAll(definition.orElseThrow().roleIds());
+        }
+        return Optional.of(Set.copyOf(roleIds));
     }
 
     @Override

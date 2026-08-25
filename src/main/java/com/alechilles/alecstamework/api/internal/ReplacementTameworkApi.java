@@ -291,6 +291,9 @@ public final class ReplacementTameworkApi
         if (readReady(PublicPersistenceFeatureRegistry.POPULATION_GROUPS)
                 && dependencies.populationGroups() != null) {
             capabilities.add(TameworkApiCapability.POPULATION_GROUPS);
+            capabilities.add(
+                    TameworkApiCapability.DURABLE_POPULATION_GROUP_COUNTS
+            );
             if (populationGroups instanceof ReplacementPopulationGroupApi groups
                     && groups.supportsLoadedOwnedCounts()) {
                 capabilities.add(

@@ -221,6 +221,7 @@ tamework.ui.linkedPanel.card.button.cull=Schlachten
 tamework.ui.linkedPanel.card.button.link=Verknüpfen
 tamework.ui.linkedPanel.card.button.locate=Lokalisieren
 tamework.ui.linkedPanel.card.button.release=Freilassen
+tamework.ui.linkedPanel.card.button.abandon=Aufgeben
 tamework.ui.linkedPanel.card.confirmRemove=ENTFERNEN BESTÄTIGEN
 tamework.ui.linkedPanel.card.group.setTooltip=Gruppe festlegen
 tamework.ui.linkedPanel.card.inactive=INAKTIV

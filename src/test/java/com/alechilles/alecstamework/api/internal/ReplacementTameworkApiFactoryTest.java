@@ -13,6 +13,7 @@ import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TameworkApiCapability;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
+import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
@@ -22,24 +23,30 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.damage.SimpleClaimsTamedDamagePolicy;
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegistry;
+import com.alechilles.alecstamework.config.assets.TwPopulationGroupConfig;
 import com.alechilles.alecstamework.persistence.facade.ReplacementCompanionProvisioningApi;
 import com.alechilles.alecstamework.persistence.facade.ReplacementPaidCommandRevivalApi;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceRuntimeConfiguration;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceWorldReconciliation;
+import com.hypixel.hytale.codec.ExtraInfo;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -377,6 +384,79 @@ class ReplacementTameworkApiFactoryTest {
         );
     }
 
+    @Test
+    void durableGroupCountIncludesOwnedDormantProfiles() throws Exception {
+        TameworkEventBus events = new TameworkEventBus(null);
+        OwnerId owner = OwnerId.parse(
+                "30000000-0000-0000-0000-000000000099"
+        );
+        try (PersistenceBootstrap persistence = new PersistenceBootstrap(
+                configuration(events)
+        )) {
+            assertTrue(persistence.start().toCompletableFuture().join().complete());
+            for (int index = 0; index < 4; index++) {
+                LifecycleState state = List.of(
+                        LifecycleState.ACTIVE,
+                        LifecycleState.UNLOADED,
+                        LifecycleState.DEAD_REVIVABLE,
+                        LifecycleState.LOST
+                ).get(index);
+                var created = persistence.facades().operations().mutateProfile(
+                        OperationId.create(),
+                        new IdempotencyKey("durable-count-profile-" + index),
+                        ownedProfile(index, owner, state, "Tamed_Cow")
+                );
+                assertTrue(created.accepted());
+                assertEquals(
+                        OperationWorkflowResult.Status.PUBLISHED,
+                        created.completion().toCompletableFuture()
+                                .get(5, TimeUnit.SECONDS).status()
+                );
+            }
+            var other = persistence.facades().operations().mutateProfile(
+                    OperationId.create(),
+                    new IdempotencyKey("durable-count-other-role"),
+                    ownedProfile(9, owner, LifecycleState.ACTIVE, "Tamed_Horse")
+            );
+            assertTrue(other.accepted());
+            assertEquals(
+                    OperationWorkflowResult.Status.PUBLISHED,
+                    other.completion().toCompletableFuture()
+                            .get(5, TimeUnit.SECONDS).status()
+            );
+
+            ReplacementFeatureApiDependencies dependencies = restoredDependencies();
+            assertTrue(dependencies.populationGroups().replace(
+                    List.of(livestockGroup()), 1L
+            ).applied());
+            try (ReplacementTameworkApiFactory.Composition composition =
+                         ReplacementTameworkApiFactory.compose(
+                                 persistence,
+                                 Duration.ofSeconds(5),
+                                 () -> -50L,
+                                 events,
+                                 null,
+                                 new InteractionExtensionRegistry(null),
+                                 new TraitEffectRegistry(null, null),
+                                 new SimpleClaimsTamedDamagePolicy(),
+                                 dependencies
+                         )) {
+                TameworkApi api = composition.api();
+                assertTrue(api.getCapabilities().stream()
+                        .map(Enum::name)
+                        .anyMatch("DURABLE_POPULATION_GROUP_COUNTS"::equals));
+                assertEquals(
+                        OptionalLong.of(4L),
+                        api.populationGroups().getDurableOwnedCount(
+                                owner.value(), Set.of("runeteria:livestock")
+                        )
+                );
+            }
+        } finally {
+            events.close();
+        }
+    }
+
     private ReplacementFeatureApiDependencies admissionDependencies(
             AdmissionProviderRegistry providers
     ) {
@@ -425,6 +505,65 @@ class ReplacementTameworkApiFactoryTest {
         return new CompanionProfileMutation.Create(
                 identity, lifecycle, List.of(), -200L
         );
+    }
+
+    private CompanionProfileMutation.Create ownedProfile(
+            int index,
+            OwnerId owner,
+            LifecycleState state,
+            String roleId
+    ) {
+        ProfileId profileId = ProfileId.parse(String.format(
+                "20000000-0000-0000-0000-%012d", 100 + index
+        ));
+        String metadata = "{\"source\":\"durable-count-test\"}";
+        CompanionIdentity identity = new CompanionIdentity(
+                profileId,
+                "Companion " + index,
+                roleId,
+                metadata,
+                Sha256Hash.ofUtf8(metadata),
+                "world",
+                -200L,
+                -200L,
+                -200L,
+                0L
+        );
+        LifecycleLocation location = state == LifecycleState.ACTIVE
+                ? LifecycleLocation.liveEntity(profileId.toString(), "world")
+                : LifecycleLocation.none();
+        CompanionLifecycle lifecycle = new CompanionLifecycle(
+                profileId,
+                owner,
+                state,
+                location,
+                LifecycleRevision.INITIAL,
+                null,
+                -200L,
+                ReconciliationGeneration.INITIAL,
+                null,
+                "world"
+        );
+        return new CompanionProfileMutation.Create(
+                identity, lifecycle, List.of(), -200L
+        );
+    }
+
+    private TwPopulationGroupConfig livestockGroup() {
+        TwPopulationGroupConfig config = TwPopulationGroupConfig.CODEC.decode(
+                BsonDocument.parse("""
+                        {"GroupId":"runeteria:livestock","RoleIds":["Tamed_Cow"]}
+                        """),
+                new ExtraInfo()
+        );
+        try {
+            var id = TwPopulationGroupConfig.class.getDeclaredField("id");
+            id.setAccessible(true);
+            id.set(config, "Runeteria_Livestock");
+        } catch (ReflectiveOperationException failure) {
+            throw new IllegalStateException(failure);
+        }
+        return config;
     }
 
     private ProfileId profileId() {

@@ -37,6 +37,22 @@ public interface PopulationGroupApi {
         return OptionalLong.empty();
     }
 
+    /**
+     * Counts durable owned profiles whose roles belong to the supplied groups.
+     *
+     * <p>The count includes unloaded, dead, and lost profiles. Released profiles
+     * do not consume owned capacity.</p>
+     */
+    @Nonnull
+    default OptionalLong getDurableOwnedCount(
+            @Nonnull UUID ownerUuid,
+            @Nonnull Set<String> groupIds
+    ) {
+        if (ownerUuid == null) throw new NullPointerException("ownerUuid");
+        if (groupIds == null) throw new NullPointerException("groupIds");
+        return OptionalLong.empty();
+    }
+
     @Nonnull
     PopulationGroupReconciliationView getReconciliationStatus();
 

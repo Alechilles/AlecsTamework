@@ -25,6 +25,8 @@ public enum TameworkApiCapability {
     POPULATION_GROUPS,
     /** Process-local loaded-owner counts filtered by population groups. */
     LOADED_POPULATION_GROUP_COUNTS,
+    /** Durable owned-profile counts filtered by population groups. */
+    DURABLE_POPULATION_GROUP_COUNTS,
     COMPANION_PROVISIONING,
     /** Durable command-roster leases, active-cap storage, expiry, and resummon cooldowns. */
     COMMAND_TIMED_SUMMONING,

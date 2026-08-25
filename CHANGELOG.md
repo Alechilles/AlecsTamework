@@ -4,6 +4,11 @@
 
 ### Added
 
+- Added a durable population-group owned count for integrations that must
+  include unloaded, dead, and lost companions in capacity checks.
+- Generic command panels can permanently abandon owned companions. This
+  releases their durable owner capacity and tool links, including when the
+  companion is unloaded, dead, or lost.
 - Managed activity profiles can map authorized `TameworkCullNpc` item
   interactions to a domestic drop list and a `tamework:cull_success` Activity
   V2 event. Profiles that omit the mapping keep the normal cull death drops
@@ -11,6 +16,9 @@
 
 ### Changed
 
+- Clearing a companion owner through the owner-population transition now
+  commits the terminal `RELEASED` lifecycle and clears its durable capacity
+  claims and command-tool links in the same transaction.
 - Companion harvests, passive animal products, filled containers, and cull
   rewards now share one finalized-output boundary before Activity V2 reports
   their produced item quantities.

@@ -338,7 +338,10 @@ public final class CommandItemFeatureHandler {
                 linkPolicyService,
                 stepExecutionService,
                 feedbackService,
-                npcNameResolver
+                npcNameResolver,
+                persistence,
+                inventoryRepairService,
+                CommandUiCurrentWorldDispatcher.production()
         );
         this.ownerCullService = new CommandOwnerCullService(
                 linkPolicyService,

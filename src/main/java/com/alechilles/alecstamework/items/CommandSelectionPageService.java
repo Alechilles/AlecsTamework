@@ -766,6 +766,10 @@ final class CommandSelectionPageService {
         if (linked) addGenericRow(catalog, rowId, "UNLINK", "Unlink",
                 npcId, null, npc.unlink(), context.genericAuthority(),
                 context.requireUnlinkConfirm());
+        if (linked && !entry.captured() && !entry.inCoop()) {
+            addGenericRow(catalog, rowId, "ABANDON", "Abandon permanently",
+                    npcId, null, npc.release(), context.genericAuthority(), true);
+        }
         if (releasable) {
             addGenericRow(catalog, rowId, "RELEASE", "Release", npcId, null,
                     npc.release(), context.genericAuthority(), true);
