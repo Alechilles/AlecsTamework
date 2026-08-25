@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.persistence.diagnostics
 import com.alechilles.alecstamework.persistence.diagnostics
         .BondedCompanionDiagnosticContributor;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceOperations;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceQueries;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractCommandCollection;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -18,20 +19,20 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
     public static final String ROOT_PERMISSION = "tamework.command.tw";
 
     public TameworkCommandRoot() {
-        this(null, null, null, new SpawnBeaconVisualizationService(), null);
+        this(null, null, null, new SpawnBeaconVisualizationService(), null, null);
     }
 
     public TameworkCommandRoot(
             @Nullable PersistenceDiagnosticsReader persistenceDiagnostics
     ) {
-        this(persistenceDiagnostics, null, null, new SpawnBeaconVisualizationService(), null);
+        this(persistenceDiagnostics, null, null, new SpawnBeaconVisualizationService(), null, null);
     }
 
     public TameworkCommandRoot(
             @Nullable PersistenceDiagnosticsReader persistenceDiagnostics,
             @Nullable PersistenceDiagnosticExporter persistenceExporter
     ) {
-        this(persistenceDiagnostics, persistenceExporter, null, new SpawnBeaconVisualizationService(), null);
+        this(persistenceDiagnostics, persistenceExporter, null, new SpawnBeaconVisualizationService(), null, null);
     }
 
     public TameworkCommandRoot(
@@ -44,6 +45,7 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
                 persistenceExporter,
                 bondedDiagnostics,
                 new SpawnBeaconVisualizationService(),
+                null,
                 null
         );
     }
@@ -59,6 +61,7 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
                 persistenceExporter,
                 bondedDiagnostics,
                 spawnBeaconVisualizationService,
+                null,
                 null
         );
     }
@@ -70,6 +73,24 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
             @Nonnull SpawnBeaconVisualizationService spawnBeaconVisualizationService,
             @Nullable PublicPersistenceOperations persistenceOperations
     ) {
+        this(
+                persistenceDiagnostics,
+                persistenceExporter,
+                bondedDiagnostics,
+                spawnBeaconVisualizationService,
+                null,
+                persistenceOperations
+        );
+    }
+
+    public TameworkCommandRoot(
+            @Nullable PersistenceDiagnosticsReader persistenceDiagnostics,
+            @Nullable PersistenceDiagnosticExporter persistenceExporter,
+            @Nullable BondedCompanionDiagnosticContributor bondedDiagnostics,
+            @Nonnull SpawnBeaconVisualizationService spawnBeaconVisualizationService,
+            @Nullable PublicPersistenceQueries persistenceQueries,
+            @Nullable PublicPersistenceOperations persistenceOperations
+    ) {
         super("tw", "Tamework commands.");
         requirePermission(ROOT_PERMISSION);
         setPermissionGroups(TameworkConfigPermission.adminPermissionGroups());
@@ -78,6 +99,7 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
                 persistenceExporter,
                 bondedDiagnostics,
                 spawnBeaconVisualizationService,
+                persistenceQueries,
                 persistenceOperations
         ));
         addSubCommand(new TameworkNpcCommand());

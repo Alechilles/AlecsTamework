@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.persistence.diagnostics.BondedCompanionDiagn
 import com.alechilles.alecstamework.persistence.diagnostics.PersistenceDiagnosticExporter;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceDiagnosticsReader;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceOperations;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceQueries;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractCommandCollection;
 import javax.annotation.Nullable;
 
@@ -13,12 +14,15 @@ public final class TameworkDebugPersistenceCommand extends AbstractCommandCollec
             PersistenceDiagnosticsReader persistenceDiagnostics,
             PersistenceDiagnosticExporter persistenceExporter,
             BondedCompanionDiagnosticContributor bondedDiagnostics,
+            @Nullable PublicPersistenceQueries persistenceQueries,
             @Nullable PublicPersistenceOperations persistenceOperations
     ) {
         super("persistence", "Tamework persistence diagnostics.");
         addSubCommand(new TameworkDebugDbCommand(
                 persistenceDiagnostics, persistenceExporter, bondedDiagnostics
         ));
-        addSubCommand(new TameworkDebugReviveReadyCommand(persistenceOperations));
+        addSubCommand(new TameworkDebugReviveReadyCommand(
+                persistenceQueries, persistenceOperations
+        ));
     }
 }

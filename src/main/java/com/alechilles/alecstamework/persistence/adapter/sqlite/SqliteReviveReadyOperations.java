@@ -54,7 +54,10 @@ public final class SqliteReviveReadyOperations {
                 request,
                 FEATURE_SCOPE,
                 null,
-                List.of(OperationScope.profile(request.profileId())),
+                List.of(
+                        OperationScope.profile(request.profileId()),
+                        OperationScope.owner(request.ownerId())
+                ),
                 request.requestedAtMs()
         );
         return coordinator.execute(
@@ -80,6 +83,16 @@ public final class SqliteReviveReadyOperations {
                 .orElseThrow(() -> new IllegalStateException(
                         "revive_ready_profile_not_found"
                 ));
+        if (!request.ownerId().equals(lifecycle.ownerId())) {
+            throw new IllegalStateException("revive_ready_owner_mismatch");
+        }
+        boolean linked = !transaction.toolLinks()
+                .findByProfile(profileId).isEmpty()
+                || transaction.commandRosters()
+                .findByProfile(profileId).isPresent();
+        if (!linked) {
+            throw new IllegalStateException("revive_ready_profile_unlinked");
+        }
         if (lifecycle.state() != LifecycleState.DEAD_REVIVABLE
                 || lifecycle.activeOperationId() != null) {
             throw new IllegalStateException("revive_ready_profile_not_dead");

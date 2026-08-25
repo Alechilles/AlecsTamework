@@ -4,8 +4,10 @@
 
 ### Added
 
-- Added `/tw debug persistence reviveready <profile UUID>` for server staff to
-  make one generic dead companion ready for its normal revival flow.
+- Added `/tw debug persistence reviveready` for server staff to submit
+  revive-ready updates for all dead generic linked companions owned by the
+  caller. The command asks the caller to retry if linked roster data is still
+  updating.
 - Added optional bonded roster `ReviveCooldownSeconds`. It defaults to `0`, so
   existing bonded companions can still revive immediately unless a roster sets
   a positive cooldown.
