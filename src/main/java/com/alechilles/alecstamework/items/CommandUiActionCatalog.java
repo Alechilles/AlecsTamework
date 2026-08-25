@@ -1,9 +1,12 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.commandui.CommandUiActionHandle;
+import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionView;
 import com.alechilles.alecstamework.api.commandui.CommandUiCommandOption;
 import com.alechilles.alecstamework.api.commandui.CommandUiCompanionRow;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorAction;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
 import com.alechilles.alecstamework.api.commandui.CommandUiPanelState;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
 import java.util.ArrayList;
@@ -12,11 +15,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /** Collects visible Tamework actions and attaches their opaque handles. */
 final class CommandUiActionCatalog {
     private final List<Entry> generic = new ArrayList<>();
     private final List<Entry> bonded = new ArrayList<>();
+    private final List<ContributorEntry> contributors = new ArrayList<>();
 
     void addCommand(
             String commandId,
@@ -69,6 +75,54 @@ final class CommandUiActionCatalog {
             CommandSelectionPageService.BondedUiActionBinding binding
     ) {
         bonded.add(new Entry(Scope.ROW, key, rowId, label, null, binding));
+    }
+
+    /** Adds one page-scoped contributor action when its effective ID is free. */
+    CommandUiActionResult addContributorPage(
+            @Nonnull CommandUiContributorId contributorId,
+            long contributorGeneration,
+            @Nonnull CommandUiContributorAction action
+    ) {
+        return addContributor(CommandUiContributorAction.Scope.PAGE,
+                null, contributorId, contributorGeneration, action);
+    }
+
+    /** Adds one command-scoped contributor action when its effective ID is free. */
+    CommandUiActionResult addContributorCommand(
+            @Nonnull CommandUiContributorId contributorId,
+            long contributorGeneration,
+            @Nonnull CommandUiContributorAction action
+    ) {
+        return addContributor(CommandUiContributorAction.Scope.COMMAND,
+                null, contributorId, contributorGeneration, action);
+    }
+
+    /** Adds one row-scoped contributor action when its effective ID is free. */
+    CommandUiActionResult addContributorRow(
+            @Nonnull UUID rowId,
+            @Nonnull CommandUiContributorId contributorId,
+            long contributorGeneration,
+            @Nonnull CommandUiContributorAction action
+    ) {
+        return addContributor(CommandUiContributorAction.Scope.ROW,
+                Objects.requireNonNull(rowId, "rowId"), contributorId,
+                contributorGeneration, action);
+    }
+
+    /** Adds one flow-scoped contributor action when its effective ID is free. */
+    CommandUiActionResult addContributorFlow(
+            @Nonnull CommandUiContributorId contributorId,
+            long contributorGeneration,
+            @Nonnull CommandUiContributorAction action
+    ) {
+        return addContributor(CommandUiContributorAction.Scope.FLOW,
+                null, contributorId, contributorGeneration, action);
+    }
+
+    /** Returns server-owned contributor bindings in deterministic add order. */
+    @Nonnull
+    List<CommandUiContributorActionBinding> contributorBindings() {
+        return contributors.stream().map(ContributorEntry::binding).toList();
     }
 
     List<CommandSelectionPageService.GenericUiActionBinding> genericBindings() {
@@ -266,6 +320,42 @@ final class CommandUiActionCatalog {
     }
 
     private enum Scope { COMMAND, GLOBAL, PANEL, HOTSWAP, ROW }
+
+    private CommandUiActionResult addContributor(
+            @Nonnull CommandUiContributorAction.Scope scope,
+            @Nullable UUID rowId,
+            @Nonnull CommandUiContributorId contributorId,
+            long contributorGeneration,
+            @Nonnull CommandUiContributorAction action
+    ) {
+        Objects.requireNonNull(scope, "scope");
+        Objects.requireNonNull(contributorId, "contributorId");
+        Objects.requireNonNull(action, "action");
+        CommandUiContributorActionBinding binding =
+                new CommandUiContributorActionBinding(contributorId,
+                        contributorGeneration, action, scope, rowId);
+        ContributorKey key = new ContributorKey(scope, binding.effectiveId(),
+                scope == CommandUiContributorAction.Scope.ROW ? rowId : null);
+        for (ContributorEntry entry : contributors) {
+            if (entry.key().equals(key)) {
+                return CommandUiActionResult.conflict(
+                        "contributor action ID is already bound in this scope");
+            }
+        }
+        contributors.add(new ContributorEntry(key, binding));
+        return CommandUiActionResult.applied();
+    }
+
+    private record ContributorKey(
+            @Nonnull CommandUiContributorAction.Scope scope,
+            @Nonnull String effectiveId,
+            @Nullable UUID rowId
+    ) { }
+
+    private record ContributorEntry(
+            @Nonnull ContributorKey key,
+            @Nonnull CommandUiContributorActionBinding binding
+    ) { }
 
     private record ActionKey(Scope scope, String key, UUID rowId) { }
 
