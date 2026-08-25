@@ -44,6 +44,50 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** End-to-end construction of a provider host and its authoritative session. */
 class CommandUiPageCoordinatorTest {
     @Test
+    void requiredContributorUnregisterClosesCustomPageWithOneFallback() {
+        CommandUiRegistry registry = new CommandUiRegistry();
+        CommandUiContributorId contributorId = CommandUiContributorId.of(
+                "runeteria:required");
+        registry.registerRenderer("runeteria:ui",
+                ignored -> new RecordingController());
+        var registration = registry.registerContributor(
+                contributorId.value(), ignored ->
+                        (base, previous, scope) ->
+                                new CommandUiContribution(contributorId))
+                .registration();
+        CommandUiPageCoordinator coordinator = new CommandUiPageCoordinator(
+                registry, new CommandSelectionPageService(
+                        null, null, null, null, null));
+        PlayerRef playerRef = new PlayerRef(
+                null, UUID.randomUUID(), "CoordinatorTester", "en-US", null,
+                null);
+        CommandUiOpenContext context = new CommandUiOpenContext(
+                playerRef.getUuid(), "en-US", "tool-1", "config-1",
+                CommandUiRendererId.of("runeteria:ui"), "generic");
+        AtomicInteger fallbacks = new AtomicInteger();
+
+        CommandUiPageCoordinator.Created created = coordinator.create(
+                playerRef, context, snapshot(), RecordingController::new,
+                List.of(new CommandUiContributorRequirement(
+                        contributorId, true)), List.of(), List.of(),
+                (current, handles) -> current, directDispatcher(),
+                ignored -> fallbacks.incrementAndGet());
+        created.host().build(null, new UICommandBuilder(),
+                new UIEventBuilder(), null);
+        assertTrue(created.host().takePageOwnership());
+        assertTrue(created.host().finishPageOpening(true));
+        created.pageOpened();
+
+        registration.close();
+
+        assertFalse(created.host().isOpen());
+        assertFalse(created.session().isOpen());
+        assertEquals(1, fallbacks.get());
+        registration.close();
+        assertEquals(1, fallbacks.get());
+    }
+
+    @Test
     void productionCompositionPublishesAndInvokesContributorActionHandle() {
         CommandUiRegistry registry = new CommandUiRegistry();
         RecordingController custom = new RecordingController();

@@ -10,7 +10,9 @@ import com.alechilles.alecstamework.api.commandui.CommandUiDirtyScope;
 import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
 import com.alechilles.alecstamework.api.commandui.CommandUiSessionContributor;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
+import com.alechilles.alecstamework.api.internal.CommandUiContributorRegistry;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,12 +34,14 @@ final class CommandUiCompositionSession implements AutoCloseable {
     private final CommandUiOpenContext openContext;
     private final BiConsumer<CommandUiSnapshot, CommandUiChangeSet> publisher;
     private final Runnable refreshRequest;
+    private final RequiredFailureHandler requiredFailureHandler;
     private final List<State> states;
     private final Map<CommandUiContributorId, CommandUiContribution>
             compatibilityContributions;
     private boolean open = true;
     private CommandUiSnapshot baseSnapshot;
     private CommandUiSnapshot currentSnapshot;
+    private RequiredFailure requiredFailure;
 
     private CommandUiCompositionSession(
             @Nonnull CommandUiSnapshot baseSnapshot,
@@ -46,18 +50,22 @@ final class CommandUiCompositionSession implements AutoCloseable {
             @Nonnull Map<CommandUiContributorId, CommandUiContribution.Status>
                     compatibilityStatuses,
             @Nonnull BiConsumer<CommandUiSnapshot, CommandUiChangeSet> publisher,
-            @Nonnull Runnable refreshRequest
+            @Nonnull Runnable refreshRequest,
+            @Nonnull RequiredFailureHandler requiredFailureHandler
     ) {
-        this.baseSnapshot = Objects.requireNonNull(baseSnapshot, "baseSnapshot");
+        this.baseSnapshot = baseOnly(baseSnapshot);
         this.openContext = Objects.requireNonNull(openContext, "openContext");
         this.publisher = Objects.requireNonNull(publisher, "publisher");
         this.refreshRequest = Objects.requireNonNull(refreshRequest,
                 "refreshRequest");
+        this.requiredFailureHandler = Objects.requireNonNull(
+                requiredFailureHandler, "requiredFailureHandler");
         this.states = createStates(bindings);
         this.compatibilityContributions = compatibilityContributions(
                 compatibilityStatuses);
         try {
-            this.currentSnapshot = composeLocked(true, true);
+            this.currentSnapshot = composeLocked(true, true, false);
+            installSubscriptions();
         } catch (RuntimeException | LinkageError failure) {
             open = false;
             closeStates(states);
@@ -75,7 +83,23 @@ final class CommandUiCompositionSession implements AutoCloseable {
             @Nonnull Runnable refreshRequest
     ) {
         return new CommandUiCompositionSession(baseSnapshot, openContext,
-                bindings, Map.of(), publisher, refreshRequest);
+                bindings, Map.of(), publisher, refreshRequest,
+                (contributorId, reason) -> { });
+    }
+
+    /** Creates a session with a callback for required contributor failure. */
+    @Nonnull
+    static CommandUiCompositionSession create(
+            @Nonnull CommandUiSnapshot baseSnapshot,
+            @Nonnull CommandUiOpenContext openContext,
+            @Nonnull List<Binding> bindings,
+            @Nonnull BiConsumer<CommandUiSnapshot, CommandUiChangeSet> publisher,
+            @Nonnull Runnable refreshRequest,
+            @Nonnull RequiredFailureHandler requiredFailureHandler
+    ) {
+        return new CommandUiCompositionSession(baseSnapshot, openContext,
+                bindings, Map.of(), publisher, refreshRequest,
+                requiredFailureHandler);
     }
 
     /** Creates a session with statuses produced by compatibility resolution. */
@@ -90,7 +114,25 @@ final class CommandUiCompositionSession implements AutoCloseable {
             @Nonnull Runnable refreshRequest
     ) {
         return new CommandUiCompositionSession(baseSnapshot, openContext,
-                bindings, compatibilityStatuses, publisher, refreshRequest);
+                bindings, compatibilityStatuses, publisher, refreshRequest,
+                (contributorId, reason) -> { });
+    }
+
+    /** Creates a status-aware session with a required-failure callback. */
+    @Nonnull
+    static CommandUiCompositionSession create(
+            @Nonnull CommandUiSnapshot baseSnapshot,
+            @Nonnull CommandUiOpenContext openContext,
+            @Nonnull List<Binding> bindings,
+            @Nonnull Map<CommandUiContributorId, CommandUiContribution.Status>
+                    compatibilityStatuses,
+            @Nonnull BiConsumer<CommandUiSnapshot, CommandUiChangeSet> publisher,
+            @Nonnull Runnable refreshRequest,
+            @Nonnull RequiredFailureHandler requiredFailureHandler
+    ) {
+        return new CommandUiCompositionSession(baseSnapshot, openContext,
+                bindings, compatibilityStatuses, publisher, refreshRequest,
+                requiredFailureHandler);
     }
 
     @Nonnull
@@ -110,26 +152,70 @@ final class CommandUiCompositionSession implements AutoCloseable {
         }
     }
 
+    boolean isOpen() {
+        synchronized (lock) {
+            return open;
+        }
+    }
+
+    /** Returns the first required failure that ended this session, if any. */
+    @Nullable
+    RequiredFailure requiredFailure() {
+        synchronized (lock) {
+            return requiredFailure;
+        }
+    }
+
     /** Replaces the Tamework base and composes all contributors without publishing. */
     @Nonnull
     CommandUiSnapshot rebase(@Nonnull CommandUiSnapshot baseSnapshot) {
         Objects.requireNonNull(baseSnapshot, "baseSnapshot");
+        RequiredCompositionFailure failure = null;
+        List<State> closing = List.of();
+        CommandUiSnapshot result;
         synchronized (lock) {
             if (!open) return currentSnapshot;
-            this.baseSnapshot = baseSnapshot;
+            this.baseSnapshot = baseOnly(baseSnapshot);
             states.forEach(State::markAll);
-            currentSnapshot = composeLocked(true, false);
-            return currentSnapshot;
+            try {
+                currentSnapshot = composeLocked(false, false, false);
+                result = currentSnapshot;
+            } catch (RequiredCompositionFailure required) {
+                open = false;
+                requiredFailure = required.failure;
+                closing = List.copyOf(states);
+                result = currentSnapshot;
+                failure = required;
+            }
         }
+        if (failure != null) {
+            closeStates(closing);
+            notifyRequiredFailure(failure.failure);
+        }
+        return result;
     }
 
     /** Composes dirty contributors and publishes one immutable transition. */
     boolean refresh() {
+        RequiredCompositionFailure failure = null;
+        List<State> closing = List.of();
         synchronized (lock) {
             if (!open || !hasDirty()) return false;
-            currentSnapshot = composeLocked(false, false);
-            return true;
+            try {
+                currentSnapshot = composeLocked(false, false, true);
+            } catch (RequiredCompositionFailure required) {
+                open = false;
+                requiredFailure = required.failure;
+                closing = List.copyOf(states);
+                failure = required;
+            }
         }
+        if (failure != null) {
+            closeStates(closing);
+            notifyRequiredFailure(failure.failure);
+            return false;
+        }
+        return true;
     }
 
     @Override
@@ -146,40 +232,82 @@ final class CommandUiCompositionSession implements AutoCloseable {
     private List<State> createStates(@Nonnull List<Binding> bindings) {
         Objects.requireNonNull(bindings, "bindings");
         List<State> created = new ArrayList<>(bindings.size());
-        for (Binding binding : bindings) {
-            Objects.requireNonNull(binding, "binding");
-            State state = new State(binding);
-            state.sink = new DirtySink(state);
-            try {
-                state.contributor = binding.provider().create(
-                        new CommandUiContributorCreateContext(
-                                openContext, binding.id(), binding.generation(),
-                                state.sink));
-                if (state.contributor == null) {
-                    state.failure = "contributor factory returned null";
+        Set<CommandUiContributorId> ids = new HashSet<>();
+        try {
+            for (Binding binding : bindings) {
+                Objects.requireNonNull(binding, "binding");
+                if (!ids.add(binding.id())) {
+                    throw new IllegalArgumentException(
+                            "Command UI contributor IDs must be unique.");
                 }
-            } catch (RuntimeException | LinkageError failure) {
-                state.failure = failure.getClass().getSimpleName();
+                State state = new State(binding);
+                state.sink = new DirtySink(state);
+                try {
+                    state.contributor = binding.provider().create(
+                            new CommandUiContributorCreateContext(
+                                    openContext, binding.id(),
+                                    binding.generation(), state.sink));
+                    if (state.contributor == null) {
+                        state.failure = "contributor factory returned null";
+                    }
+                } catch (RuntimeException | LinkageError failure) {
+                    state.failure = failure.getClass().getSimpleName();
+                }
+                state.markAll();
+                created.add(state);
             }
-            state.markAll();
-            created.add(state);
+        } catch (RuntimeException | LinkageError failure) {
+            for (int index = created.size() - 1; index >= 0; index--) {
+                closeQuietly(created.get(index).contributor);
+            }
+            throw failure;
         }
         return List.copyOf(created);
     }
 
+    @Nonnull
+    private static CommandUiSnapshot baseOnly(
+            @Nonnull CommandUiSnapshot snapshot
+    ) {
+        return Objects.requireNonNull(snapshot, "baseSnapshot")
+                .withContributions(Map.of());
+    }
+
+    private void installSubscriptions() {
+        for (State state : states) {
+            CommandUiContributorRegistry registry = state.binding.registry();
+            if (registry == null || state.binding.generation() <= 0L) continue;
+            CommandUiContributorRegistry.ExactSubscription subscription =
+                    registry.subscribeExactUnregister(state.binding.id(),
+                            state.binding.generation(),
+                            (removedId, removedGeneration) ->
+                                    registrationEnded(state, removedId,
+                                            removedGeneration));
+            state.unregisterSubscription = subscription.handle();
+            if (!subscription.active() || !state.binding.active().getAsBoolean()) {
+                registrationEnded(state, state.binding.id(),
+                        state.binding.generation());
+            }
+        }
+    }
+
     private boolean hasDirty() {
         for (State state : states) {
-            if (state.dirty()) return true;
+            if (state.dirty() || state.registrationLost || !isActive(state)) {
+                return true;
+            }
         }
         return false;
     }
 
     private CommandUiSnapshot composeLocked(boolean initial,
-                                            boolean abortRequired) {
+                                            boolean abortRequired,
+                                            boolean publish) {
         Map<CommandUiContributorId, CommandUiContribution> contributions =
                 new LinkedHashMap<>(compatibilityContributions);
         for (State state : states) {
-            if (!initial && !state.dirty()) {
+            contributions.remove(state.binding.id());
+            if (!initial && !state.dirty() && isActive(state)) {
                 if (state.lastPublishedContribution != null) {
                     contributions.put(state.binding.id(),
                             state.lastPublishedContribution);
@@ -189,15 +317,19 @@ final class CommandUiCompositionSession implements AutoCloseable {
             CommandUiDirtyScope scope = initial
                     ? CommandUiDirtyScope.full() : state.dirtyScope;
             state.clearDirty();
-            if (!state.binding.active().getAsBoolean()) {
+            if (!isActive(state)) {
                 if (initial && abortRequired && state.binding.required()) {
                     throw new InitialCompositionFailure(state.binding.id(),
                             "contributor registration generation is no longer active");
                 }
-                if (state.lastPublishedContribution != null) {
-                    contributions.put(state.binding.id(),
-                            state.lastPublishedContribution);
+                if (state.binding.required()) {
+                    throw new RequiredCompositionFailure(
+                            new RequiredFailure(state.binding.id(),
+                                    "contributor registration generation is no longer active"));
                 }
+                state.lastValidContribution = null;
+                state.lastPublishedContribution = null;
+                state.actionBindings = List.of();
                 continue;
             }
             CommandUiContribution next = compose(state, scope, initial,
@@ -208,7 +340,7 @@ final class CommandUiCompositionSession implements AutoCloseable {
             }
         }
         CommandUiSnapshot next = baseSnapshot.withContributions(contributions);
-        if (!initial) {
+        if (!initial && publish) {
             CommandUiChangeSet changes = CommandUiSnapshotDiffer.diff(
                     currentSnapshot, next);
             if (!changes.equals(CommandUiChangeSet.empty())) {
@@ -272,6 +404,12 @@ final class CommandUiCompositionSession implements AutoCloseable {
                             : state.failure);
         }
         if (initial && !state.binding.required()) return null;
+        if (state.binding.required()) {
+            throw new RequiredCompositionFailure(new RequiredFailure(
+                    state.binding.id(),
+                    state.failure == null ? "required contributor failed"
+                            : state.failure));
+        }
         return failedContribution(state);
     }
 
@@ -280,19 +418,54 @@ final class CommandUiCompositionSession implements AutoCloseable {
         CommandUiContribution.Status status = state.binding.required()
                 ? CommandUiContribution.Status.REQUIRED_FAILED
                 : CommandUiContribution.Status.OPTIONAL_FAILED;
+        if (state.lastValidContribution != null) {
+            return state.lastValidContribution.withoutActions(status,
+                    state.failure == null ? "contributor failed" : state.failure);
+        }
         return new CommandUiContribution(state.binding.id(), Map.of(), Map.of(),
                 Map.of(), Map.of(), Map.of(), Map.of(), status,
                 state.failure == null ? "contributor failed" : state.failure);
     }
 
-    private void mark(
+    private void registrationEnded(
             @Nonnull State state,
-            @Nonnull CommandUiDirtyScope scope
+            @Nonnull CommandUiContributorId removedId,
+            long removedGeneration
     ) {
+        if (!state.binding.id().equals(removedId)
+                || state.binding.generation() != removedGeneration) return;
+        AutoCloseable contributor = null;
+        RequiredFailure failure = null;
+        List<State> closing = List.of();
         synchronized (lock) {
-            if (!open || !state.binding.active().getAsBoolean()) return;
-            state.dirtyScope = state.dirtyScope.mergedWith(scope);
+            if (!open || state.registrationLost) return;
+            state.registrationLost = true;
+            state.clearDirty();
+            state.actionBindings = List.of();
+            contributor = state.contributor;
+            state.contributor = null;
+            if (state.binding.required()) {
+                open = false;
+                failure = new RequiredFailure(state.binding.id(),
+                        "contributor registration was removed");
+                requiredFailure = failure;
+                closing = List.copyOf(states);
+            } else {
+                state.lastValidContribution = null;
+                state.lastPublishedContribution = null;
+                state.markAll();
+            }
         }
+        closeQuietly(contributor);
+        if (failure != null) {
+            closeStates(closing);
+            notifyRequiredFailure(failure);
+            return;
+        }
+        requestRefresh();
+    }
+
+    private void requestRefresh() {
         try {
             refreshRequest.run();
         } catch (RuntimeException | LinkageError ignored) {
@@ -300,9 +473,41 @@ final class CommandUiCompositionSession implements AutoCloseable {
         }
     }
 
+    private boolean isActive(@Nonnull State state) {
+        if (state.registrationLost) return false;
+        try {
+            return state.binding.active().getAsBoolean();
+        } catch (RuntimeException | LinkageError failure) {
+            state.failure = failure.getClass().getSimpleName();
+            return false;
+        }
+    }
+
+    private void notifyRequiredFailure(@Nonnull RequiredFailure failure) {
+        try {
+            requiredFailureHandler.failed(failure.contributorId(),
+                    failure.reason());
+        } catch (RuntimeException | LinkageError ignored) {
+            // Failure reporting cannot keep contributor cleanup from completing.
+        }
+    }
+
+    private void mark(
+            @Nonnull State state,
+            @Nonnull CommandUiDirtyScope scope
+    ) {
+        synchronized (lock) {
+            if (!open || !isActive(state)) return;
+            state.dirtyScope = state.dirtyScope.mergedWith(scope);
+        }
+        requestRefresh();
+    }
+
     private void closeStates(@Nonnull List<State> closing) {
         for (int index = closing.size() - 1; index >= 0; index--) {
             State state = closing.get(index);
+            closeQuietly(state.unregisterSubscription);
+            state.unregisterSubscription = null;
             closeQuietly(state.contributor);
             state.contributor = null;
             state.actionBindings = List.of();
@@ -356,7 +561,8 @@ final class CommandUiCompositionSession implements AutoCloseable {
             long generation,
             @Nonnull CommandUiContributorProvider provider,
             boolean required,
-            @Nonnull BooleanSupplier active
+            @Nonnull BooleanSupplier active,
+            @Nullable CommandUiContributorRegistry registry
     ) {
         Binding {
             Objects.requireNonNull(id, "id");
@@ -371,9 +577,56 @@ final class CommandUiCompositionSession implements AutoCloseable {
         Binding(
                 @Nonnull CommandUiContributorId id,
                 long generation,
+                @Nonnull CommandUiContributorProvider provider,
+                boolean required,
+                @Nonnull BooleanSupplier active
+        ) {
+            this(id, generation, provider, required, active, null);
+        }
+
+        Binding(
+                @Nonnull CommandUiContributorId id,
+                long generation,
                 @Nonnull CommandUiContributorProvider provider
         ) {
-            this(id, generation, provider, false, () -> true);
+            this(id, generation, provider, false, () -> true, null);
+        }
+
+        Binding(
+                @Nonnull CommandUiContributorId id,
+                long generation,
+                @Nonnull CommandUiContributorProvider provider,
+                boolean required,
+                @Nonnull CommandUiContributorRegistry registry
+        ) {
+            this(id, generation, provider, required,
+                    () -> registry.isActive(id, generation), registry);
+        }
+    }
+
+    @FunctionalInterface
+    interface RequiredFailureHandler {
+        void failed(CommandUiContributorId contributorId, String reason);
+    }
+
+    record RequiredFailure(
+            @Nonnull CommandUiContributorId contributorId,
+            @Nonnull String reason
+    ) {
+        RequiredFailure {
+            Objects.requireNonNull(contributorId, "contributorId");
+            Objects.requireNonNull(reason, "reason");
+        }
+    }
+
+    private static final class RequiredCompositionFailure
+            extends RuntimeException {
+        private final RequiredFailure failure;
+
+        private RequiredCompositionFailure(RequiredFailure failure) {
+            super("Required contributor " + failure.contributorId().value()
+                    + " failed during refresh: " + failure.reason());
+            this.failure = failure;
         }
     }
 
@@ -397,6 +650,8 @@ final class CommandUiCompositionSession implements AutoCloseable {
         private String failure;
         private CommandUiDirtyScope dirtyScope = CommandUiDirtyScope.empty();
         private boolean lastComposeValid;
+        private boolean registrationLost;
+        private AutoCloseable unregisterSubscription;
         private List<CommandUiContributorActionBinding> actionBindings = List.of();
 
         private State(Binding binding) {

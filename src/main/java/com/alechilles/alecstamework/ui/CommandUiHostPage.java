@@ -263,6 +263,17 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
         terminate(Objects.requireNonNull(reason, "reason"));
     }
 
+    /**
+     * Closes this custom host and claims its one standard-page fallback.
+     *
+     * <p>The opener retains ownership when the page has not been accepted.
+     * Once the host owns the page, the fallback is dispatched from the
+     * current player world.</p>
+     */
+    public void closeSessionWithFallback(@Nonnull CommandUiCloseReason reason) {
+        terminate(Objects.requireNonNull(reason, "reason"), true);
+    }
+
     /** Begins opening this host before the page manager receives it. */
     public boolean takePageOwnership() {
         if (!customProvider) return open.get();

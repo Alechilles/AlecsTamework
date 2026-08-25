@@ -303,6 +303,23 @@ class CommandUiHostPageTest {
     }
 
     @Test
+    void requiredContributorFailureUsesHostFallbackOwnershipExactlyOnce() {
+        AtomicInteger fallbackOpenCount = new AtomicInteger();
+        CommandUiHostPage<TestEvent> host = host(
+                new TestSession(snapshot(1L)), new TestController(),
+                directDispatcher(), ignored -> fallbackOpenCount.incrementAndGet(),
+                new RecordingEmitter());
+
+        assertTrue(host.takePageOwnership());
+        assertTrue(host.finishPageOpening(true));
+        host.closeSessionWithFallback(CommandUiCloseReason.FAILURE);
+        host.closeSessionWithFallback(CommandUiCloseReason.FAILURE);
+
+        assertEquals(1, fallbackOpenCount.get());
+        assertFalse(host.isOpen());
+    }
+
+    @Test
     void rendererGenerationEndingBeforeHostConstructionOpensFallbackOnce() {
         CommandUiRegistry registry = new CommandUiRegistry();
         var registration = registry.registerRenderer(

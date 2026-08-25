@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Standard fallback and ordered composition resolution behavior. */
@@ -66,6 +67,7 @@ class CommandUiCompositionResolverTest {
         assertEquals(List.of(CommandUiContributorId.of("runeteria:husbandry")),
                 resolved.contributors().stream()
                         .map(CommandUiCompositionSession.Binding::id).toList());
+        assertSame(contributors, resolved.contributors().getFirst().registry());
         assertTrue(resolved.contributorStatuses().isEmpty());
     }
 

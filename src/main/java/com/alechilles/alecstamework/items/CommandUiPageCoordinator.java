@@ -144,6 +144,8 @@ final class CommandUiPageCoordinator {
                 new java.util.concurrent.atomic.AtomicBoolean();
         java.util.concurrent.atomic.AtomicBoolean pageShown =
                 new java.util.concurrent.atomic.AtomicBoolean();
+        java.util.concurrent.atomic.AtomicBoolean requiredFailurePending =
+                new java.util.concurrent.atomic.AtomicBoolean();
         AtomicReference<CommandUiHostPage<?>> host = new AtomicReference<>();
         AtomicReference<CommandUiSessionImpl> sessionRef = new AtomicReference<>();
         AtomicReference<CommandUiSessionFactory.ContributorBindingState>
@@ -203,7 +205,16 @@ final class CommandUiPageCoordinator {
                                 page.applyUpdate(new com.alechilles.alecstamework.api.commandui.CommandUiUpdate(
                                         current.snapshot(), previous, changes));
                             }
-                        }, compositionRefreshRequest);
+                        }, compositionRefreshRequest, (contributorId, reason) -> {
+                            requiredFailurePending.set(true);
+                            CommandUiHostPage<?> current = host.get();
+                            if (current != null
+                                    && requiredFailurePending.compareAndSet(
+                                    true, false)) {
+                                current.closeSessionWithFallback(
+                                        CommandUiCloseReason.FAILURE);
+                            }
+                        });
                 compositionRef.set(composition);
             } catch (RuntimeException | LinkageError failure) {
                 pendingCompositionRefresh.set(false);
@@ -280,6 +291,11 @@ final class CommandUiPageCoordinator {
                     playerRef, context, createdSession.session(), resolved,
                     worldDispatcher, fallbackOpener);
             host.set(page);
+            if ((requiredFailurePending.getAndSet(false)
+                    || composition != null && !composition.isOpen())
+                    && page.isOpen()) {
+                page.closeSessionWithFallback(CommandUiCloseReason.FAILURE);
+            }
             if (composition != null && !page.own(composition)) {
                 composition = null;
             }

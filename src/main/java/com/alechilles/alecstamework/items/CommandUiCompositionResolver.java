@@ -84,8 +84,7 @@ final class CommandUiCompositionResolver {
             }
             bindings.add(new CommandUiCompositionSession.Binding(
                     value.id(), value.generation(), value.provider(),
-                    requirement.required(),
-                    () -> contributors.isActive(value.id(), value.generation())));
+                    requirement.required(), contributors));
         }
 
         CommandUiPageController<?> controller = null;

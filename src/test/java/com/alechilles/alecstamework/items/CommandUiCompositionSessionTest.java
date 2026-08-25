@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.api.commandui.CommandUiContribution;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorAction;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorActionHandler;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorCreateContext;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorDirtySink;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorProvider;
 import com.alechilles.alecstamework.api.commandui.CommandUiDirtyScope;
@@ -15,6 +16,8 @@ import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
 import com.alechilles.alecstamework.api.commandui.CommandUiSessionContributor;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
 import com.alechilles.alecstamework.api.commandui.CommandUiValue;
+import com.alechilles.alecstamework.api.internal.CommandUiContributorRegistry;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,6 +36,241 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Session-scoped contributor composition and dirty-sink behavior. */
 class CommandUiCompositionSessionTest {
+    @Test
+    void composesInConfiguredOrderWithoutSharingContributorNamespaces() {
+        CommandUiContributorId firstId = CommandUiContributorId.of(
+                "example:first");
+        CommandUiContributorId secondId = CommandUiContributorId.of(
+                "example:second");
+        List<String> order = new ArrayList<>();
+        AtomicReference<CommandUiContribution> secondPrevious =
+                new AtomicReference<>();
+        AtomicReference<Boolean> secondSawFirst = new AtomicReference<>();
+
+        CommandUiCompositionSession session = CommandUiCompositionSession.create(
+                baseSnapshot().withContributions(Map.of(firstId,
+                        new CommandUiContribution(firstId))),
+                new CommandUiOpenContext(), List.of(
+                        new CommandUiCompositionSession.Binding(firstId, 1L,
+                                ignored -> orderedContributor(firstId, order,
+                                        "first")),
+                        new CommandUiCompositionSession.Binding(secondId, 1L,
+                                ignored -> new CommandUiSessionContributor() {
+                                    @Override
+                                    public CommandUiContribution compose(
+                                            CommandUiSnapshot base,
+                                            CommandUiContribution previous,
+                                            CommandUiDirtyScope scope
+                                    ) {
+                                        order.add("second");
+                                        secondPrevious.set(previous);
+                                        secondSawFirst.set(base.contribution(firstId)
+                                                != null);
+                                        return new CommandUiContribution(secondId,
+                                                Map.of("source", CommandUiValue.of(
+                                                        "second")), Map.of());
+                                    }
+                                })),
+                (snapshot, changes) -> { }, () -> { });
+
+        assertEquals(List.of("first", "second"), order);
+        assertNull(secondPrevious.get());
+        assertEquals(Boolean.FALSE, secondSawFirst.get());
+        assertEquals(Set.of(firstId, secondId),
+                session.snapshot().contributions().keySet());
+        assertEquals("first", session.snapshot().contribution(firstId)
+                .pageValue("source").stringValue());
+        assertEquals("second", session.snapshot().contribution(secondId)
+                .pageValue("source").stringValue());
+        session.close();
+    }
+
+    @Test
+    void optionalRefreshFailureRetainsPresentationAndInvalidatesActionsUntilRecovery() {
+        CommandUiContributorId id = CommandUiContributorId.of("example:optional");
+        AtomicInteger calls = new AtomicInteger();
+        AtomicReference<CommandUiContributorDirtySink> sink =
+                new AtomicReference<>();
+        List<CommandUiSnapshot> published = new ArrayList<>();
+        CommandUiContributorAction action = action("toggle");
+        CommandUiCompositionSession session = CommandUiCompositionSession.create(
+                baseSnapshot(), new CommandUiOpenContext(), List.of(
+                        new CommandUiCompositionSession.Binding(id, 1L,
+                                context -> {
+                                    sink.set(context.dirtySink());
+                                    return new CommandUiSessionContributor() {
+                                        @Override
+                                        public CommandUiContribution compose(
+                                                CommandUiSnapshot base,
+                                                CommandUiContribution previous,
+                                                CommandUiDirtyScope scope
+                                        ) {
+                                            int call = calls.incrementAndGet();
+                                            if (call == 2) {
+                                                throw new IllegalStateException(
+                                                        "transient");
+                                            }
+                                            return CommandUiContribution.withActions(
+                                                    id,
+                                                    Map.of("state", CommandUiValue.of(
+                                                            call == 1 ? "initial"
+                                                                    : "recovered")),
+                                                    Map.of(), Map.of(),
+                                                    Map.of("toggle", action),
+                                                    Map.of(), Map.of());
+                                        }
+                                    };
+                                })),
+                (snapshot, changes) -> published.add(snapshot), () -> { });
+
+        assertEquals(1, session.actionBindings().size());
+        sink.get().markPageDirty();
+        assertTrue(session.refresh());
+
+        CommandUiContribution failed = session.snapshot().contribution(id);
+        assertNotNull(failed);
+        assertEquals("initial", failed.pageValue("state").stringValue());
+        assertEquals(CommandUiContribution.Status.OPTIONAL_FAILED,
+                failed.status());
+        assertTrue(failed.commandActions().isEmpty());
+        assertTrue(session.actionBindings().isEmpty());
+
+        sink.get().markPageDirty();
+        assertTrue(session.refresh());
+
+        CommandUiContribution recovered = session.snapshot().contribution(id);
+        assertNotNull(recovered);
+        assertEquals("recovered", recovered.pageValue("state").stringValue());
+        assertEquals(CommandUiContribution.Status.READY, recovered.status());
+        assertEquals(1, session.actionBindings().size());
+        assertEquals(2, published.size());
+        session.close();
+    }
+
+    @Test
+    void optionalUnregisterRemovesItsNamespaceAndStaleCloseCannotAffectReplacement() {
+        CommandUiContributorId id = CommandUiContributorId.of("example:optional");
+        CommandUiContributorRegistry registry = new CommandUiContributorRegistry();
+        CommandUiContributorProvider provider = ignored -> new CommandUiSessionContributor() {
+            @Override
+            public CommandUiContribution compose(
+                    CommandUiSnapshot base,
+                    CommandUiContribution previous,
+                    CommandUiDirtyScope scope
+            ) {
+                return new CommandUiContribution(id,
+                        Map.of("state", CommandUiValue.of("ready")), Map.of());
+            }
+        };
+        var firstRegistration = registry.register(id.value(), provider).registration();
+        CommandUiCompositionSession first = CommandUiCompositionSession.create(
+                baseSnapshot(), new CommandUiOpenContext(), List.of(
+                        new CommandUiCompositionSession.Binding(id,
+                                firstRegistration.generation(), provider, false,
+                                registry)),
+                (snapshot, changes) -> { }, () -> { });
+
+        firstRegistration.close();
+        assertTrue(first.refresh());
+        assertNull(first.snapshot().contribution(id));
+        assertTrue(first.actionBindings().isEmpty());
+
+        var replacementRegistration = registry.register(id.value(), provider)
+                .registration();
+        CommandUiCompositionSession replacement = CommandUiCompositionSession.create(
+                baseSnapshot(), new CommandUiOpenContext(), List.of(
+                        new CommandUiCompositionSession.Binding(id,
+                                replacementRegistration.generation(), provider,
+                                false, registry)),
+                (snapshot, changes) -> { }, () -> { });
+        firstRegistration.close();
+        assertTrue(replacement.isOpen());
+        assertNotNull(replacement.snapshot().contribution(id));
+
+        replacementRegistration.close();
+        first.close();
+        replacement.close();
+        registry.close();
+    }
+
+    @Test
+    void requiredRefreshFailureClosesTheSessionAndReportsExactlyOnce() {
+        CommandUiContributorId id = CommandUiContributorId.of("example:required");
+        AtomicReference<CommandUiContributorDirtySink> sink =
+                new AtomicReference<>();
+        AtomicInteger calls = new AtomicInteger();
+        AtomicInteger failures = new AtomicInteger();
+        AtomicReference<CommandUiCompositionSession.RequiredFailure> detail =
+                new AtomicReference<>();
+        CommandUiCompositionSession session = CommandUiCompositionSession.create(
+                baseSnapshot(), new CommandUiOpenContext(), List.of(
+                        new CommandUiCompositionSession.Binding(id, 1L,
+                                context -> {
+                                    sink.set(context.dirtySink());
+                                    return new CommandUiSessionContributor() {
+                                        @Override
+                                        public CommandUiContribution compose(
+                                                CommandUiSnapshot base,
+                                                CommandUiContribution previous,
+                                                CommandUiDirtyScope scope
+                                        ) {
+                                            if (calls.getAndIncrement() > 0) {
+                                                throw new IllegalStateException(
+                                                        "required failure");
+                                            }
+                                            return new CommandUiContribution(id);
+                                        }
+                                    };
+                                }, true, () -> true)),
+                (snapshot, changes) -> { }, () -> { },
+                (failedId, reason) -> {
+                    failures.incrementAndGet();
+                    detail.set(new CommandUiCompositionSession.RequiredFailure(
+                            failedId, reason));
+                });
+
+        sink.get().markPageDirty();
+        assertFalse(session.refresh());
+        assertFalse(session.isOpen());
+        assertEquals(1, failures.get());
+        assertEquals(id, detail.get().contributorId());
+        assertEquals(detail.get(), session.requiredFailure());
+        session.close();
+        assertEquals(1, failures.get());
+    }
+
+    @Test
+    void requiredUnregisterClosesTheSessionAndReportsExactlyOnce() {
+        CommandUiContributorId id = CommandUiContributorId.of("example:required");
+        CommandUiContributorRegistry registry = new CommandUiContributorRegistry();
+        CommandUiContributorProvider provider = ignored -> new CommandUiSessionContributor() {
+            @Override
+            public CommandUiContribution compose(
+                    CommandUiSnapshot base,
+                    CommandUiContribution previous,
+                    CommandUiDirtyScope scope
+            ) {
+                return new CommandUiContribution(id);
+            }
+        };
+        var registration = registry.register(id.value(), provider).registration();
+        AtomicInteger failures = new AtomicInteger();
+        CommandUiCompositionSession session = CommandUiCompositionSession.create(
+                baseSnapshot(), new CommandUiOpenContext(), List.of(
+                        new CommandUiCompositionSession.Binding(id,
+                                registration.generation(), provider, true,
+                                registry)),
+                (snapshot, changes) -> { }, () -> { },
+                (failedId, reason) -> failures.incrementAndGet());
+
+        registration.close();
+        assertFalse(session.isOpen());
+        assertEquals(1, failures.get());
+        session.close();
+        assertEquals(1, failures.get());
+        registry.close();
+    }
+
     @Test
     void publishesCompatibilityStatusWithoutCreatingAContributor() {
         CommandUiContributorId contributorId = CommandUiContributorId.of(
@@ -247,6 +485,35 @@ class CommandUiCompositionSessionTest {
                 closed.add(id.name());
             }
         };
+    }
+
+    private static CommandUiSessionContributor orderedContributor(
+            CommandUiContributorId id,
+            List<String> order,
+            String value
+    ) {
+        return new CommandUiSessionContributor() {
+            @Override
+            public CommandUiContribution compose(
+                    CommandUiSnapshot base,
+                    CommandUiContribution previous,
+                    CommandUiDirtyScope scope
+            ) {
+                order.add(id.name());
+                return new CommandUiContribution(id,
+                        Map.of("source", CommandUiValue.of(value)), Map.of());
+            }
+        };
+    }
+
+    private static CommandUiContributorAction action(String localId) {
+        CommandUiContributorActionHandler handler = context ->
+                java.util.concurrent.CompletableFuture.completedFuture(
+                        CommandUiActionResult.applied());
+        return new CommandUiContributorAction(
+                localId, localId.toUpperCase(), localId, null, true, true, null,
+                CommandUiContributorAction.InputPolicy.NONE, false, Map.of(),
+                handler);
     }
 
     @Test

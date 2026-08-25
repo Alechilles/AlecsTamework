@@ -107,8 +107,10 @@ public final class CommandUiContributorRegistry implements AutoCloseable {
     ) {
         UnregisterListener required = java.util.Objects.requireNonNull(
                 listener, "listener");
-        if (closed.get()) return () -> { };
-        listeners.add(required);
+        synchronized (this) {
+            if (closed.get()) return () -> { };
+            listeners.add(required);
+        }
         return () -> listeners.remove(required);
     }
 

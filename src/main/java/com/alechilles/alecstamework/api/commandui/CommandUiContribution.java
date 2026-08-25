@@ -238,6 +238,42 @@ public final class CommandUiContribution {
         return diagnosticReason;
     }
 
+    /**
+     * Returns a detached copy with a different framework status.
+     *
+     * <p>All presentation data and server action definitions remain intact.
+     * Tamework uses this form when it needs to report a status without
+     * changing the contributor's valid presentation.</p>
+     */
+    @Nonnull
+    public CommandUiContribution withStatus(
+            @Nonnull Status status,
+            @Nullable String diagnosticReason
+    ) {
+        return new CommandUiContribution(
+                contributorId, pageData, rowData, pageActions, commandActions,
+                rowActions, flowActions, pageActionDefinitions,
+                commandActionDefinitions, rowActionDefinitions,
+                flowActionDefinitions, status, diagnosticReason);
+    }
+
+    /**
+     * Returns a detached copy with every executable action removed.
+     *
+     * <p>The page and row presentation remains available while the action
+     * authority is unavailable.</p>
+     */
+    @Nonnull
+    public CommandUiContribution withoutActions(
+            @Nonnull Status status,
+            @Nullable String diagnosticReason
+    ) {
+        return new CommandUiContribution(
+                contributorId, pageData, rowData, Map.of(), Map.of(), Map.of(),
+                Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), status,
+                diagnosticReason);
+    }
+
     private static Map<String, CommandUiValue> copyPageData(
             @Nullable Map<String, CommandUiValue> source
     ) {
