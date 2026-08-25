@@ -323,7 +323,7 @@ final class CommandUiActionGateway {
         Objects.requireNonNull(generationCheck, "generationCheck");
         AtomicBoolean refreshed = new AtomicBoolean();
         contributorBindings.computeIfPresent(handle.token(), (token, current) -> {
-            if (current.confirmationToken || current.consumed.get()
+            if (current.confirmationToken
                     || !sameContributorIdentity(current.actionBinding, binding)) {
                 return current;
             }
@@ -602,8 +602,12 @@ final class CommandUiActionGateway {
                         "action returned no result"));
             }
             if (successful(result)) {
-                contributorBindings.remove(token, binding);
-                retireContributorConfirmationFamily(token, binding);
+                if (binding.confirmationToken || result.refreshSnapshot()) {
+                    contributorBindings.remove(token);
+                    retireContributorConfirmationFamily(token, binding);
+                } else {
+                    binding.consumed.set(false);
+                }
             } else {
                 restoreContributorAfterFailure(token, binding);
             }

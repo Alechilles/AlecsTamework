@@ -360,6 +360,35 @@ class CommandUiContributorActionGatewayTest {
     }
 
     @Test
+    void targetedSuccessfulResultKeepsTheDirectActionReusable() {
+        CommandUiActionGateway gateway = new CommandUiActionGateway();
+        UUID sessionId = UUID.randomUUID();
+        gateway.openSession(sessionId, 1L);
+        AtomicInteger calls = new AtomicInteger();
+        CommandUiActionResult targeted = new CommandUiActionResult(
+                CommandUiActionStatus.APPLIED, "updated", null, null,
+                Map.of(), null, false);
+        CommandUiContributorActionBinding binding = binding(
+                CommandUiContributorId.of("runeteria:actions"), 1L,
+                CommandUiContributorAction.Scope.PAGE, null,
+                CommandUiContributorAction.InputPolicy.NONE, context -> {
+                    calls.incrementAndGet();
+                    return CompletableFuture.completedFuture(targeted);
+                });
+        CommandUiActionHandle handle = gateway.issueContributor(
+                sessionId, binding, 1L, identity(), () -> true,
+                context -> true);
+
+        assertEquals(CommandUiActionStatus.APPLIED,
+                gateway.invoke(sessionId, CommandUiActionRequest.of(handle),
+                        1L, null).toCompletableFuture().join().status());
+        assertEquals(CommandUiActionStatus.APPLIED,
+                gateway.invoke(sessionId, CommandUiActionRequest.of(handle),
+                        1L, null).toCompletableFuture().join().status());
+        assertEquals(2, calls.get());
+    }
+
+    @Test
     void handlerExceptionNullStageAndIncompleteStageFailWithoutClosingSession() {
         CommandUiActionGateway gateway = new CommandUiActionGateway();
         UUID sessionId = UUID.randomUUID();
