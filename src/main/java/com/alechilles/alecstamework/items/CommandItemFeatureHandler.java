@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.commandui.CommandUiApi;
+import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
+import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
 import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 
 import com.alechilles.alecstamework.api.BondedCompanionApi;
@@ -528,6 +531,26 @@ public final class CommandItemFeatureHandler {
                 commandUi instanceof CommandUiRegistry registry
                         ? registry : null);
     }
+
+    /** Runs the live command UI chain without opening a page for the player. */
+    public CommandUiSelfTestResult runCommandUiSelfTest(
+            PlayerRef playerRef,
+            CommandUiOpenContext context,
+            CommandUiContributorId contributorId
+    ) {
+        return selectionPageService.runCommandUiSelfTest(
+                playerRef, context, contributorId);
+    }
+
+    /** Detached result from the internal live command UI probe. */
+    public record CommandUiSelfTestResult(
+            boolean customRenderer,
+            boolean contributionReady,
+            boolean actionBound,
+            CommandUiActionResult actionResult
+    ) {
+    }
+
     private boolean openSelectionMenu(Player player,
                                       Store<EntityStore> store,
                                       TwCommandItemConfig config,

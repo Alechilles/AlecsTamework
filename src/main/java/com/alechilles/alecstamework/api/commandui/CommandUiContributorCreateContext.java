@@ -49,7 +49,7 @@ public final class CommandUiContributorCreateContext {
                 openContext.toolId(),
                 null,
                 openContext.configId(),
-                parseRendererId(openContext.providerId()),
+                openContext.rendererId(),
                 contributorId,
                 registrationGeneration,
                 dirtySink,
@@ -178,12 +178,4 @@ public final class CommandUiContributorCreateContext {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    @Nullable
-    private static CommandUiRendererId parseRendererId(
-            @Nullable CommandUiProviderId providerId
-    ) {
-        return providerId == null
-                ? null
-                : CommandUiRendererId.tryParse(providerId.value()).orElse(null);
-    }
 }

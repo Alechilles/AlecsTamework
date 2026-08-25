@@ -4,7 +4,7 @@ import com.alechilles.alecstamework.api.commandui.CommandUiActionView;
 import com.alechilles.alecstamework.api.commandui.CommandUiCommandOption;
 import com.alechilles.alecstamework.api.commandui.CommandUiCompanionRow;
 import com.alechilles.alecstamework.api.commandui.CommandUiPanelState;
-import com.alechilles.alecstamework.api.commandui.CommandUiProviderId;
+import com.alechilles.alecstamework.api.commandui.CommandUiRendererId;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
@@ -53,7 +53,7 @@ final class CommandUiSnapshotAssembler {
             @Nonnull UUID sessionId,
             long presentationRevision,
             long actionGeneration,
-            @Nullable String providerId,
+            @Nullable String rendererId,
             @Nullable String toolId,
             @Nullable String itemId,
             @Nullable String configId,
@@ -72,7 +72,7 @@ final class CommandUiSnapshotAssembler {
             @Nullable String disabledReason
     ) {
         return assemble(sessionId, presentationRevision, actionGeneration,
-                providerId, toolId, itemId, configId, rosterMode, capabilities,
+                rendererId, toolId, itemId, configId, rosterMode, capabilities,
                 selectedCommand, commandOptions, entries, features, Map.of(),
                 panelState, globalActions, commandActions, serverTimeMillis,
                 deadlines, emptyStateKey, disabledReason);
@@ -84,7 +84,7 @@ final class CommandUiSnapshotAssembler {
             @Nonnull UUID sessionId,
             long presentationRevision,
             long actionGeneration,
-            @Nullable String providerId,
+            @Nullable String rendererId,
             @Nullable String toolId,
             @Nullable String itemId,
             @Nullable String configId,
@@ -117,7 +117,7 @@ final class CommandUiSnapshotAssembler {
                 ? new CommandUiPanelState(null) : panelState;
         return new CommandUiSnapshot(
                 sessionId, presentationRevision, actionGeneration,
-                CommandUiProviderId.tryParse(providerId).orElse(null),
+                CommandUiRendererId.tryParse(rendererId).orElse(null),
                 toolId, itemId, configId, rosterMode, capabilities,
                 selectedCommand, commandOptions, rows, panel, globalActions,
                 commandActions, serverTimeMillis, deadlines, emptyStateKey,
@@ -130,7 +130,7 @@ final class CommandUiSnapshotAssembler {
             @Nonnull UUID sessionId,
             long presentationRevision,
             long actionGeneration,
-            @Nullable String providerId,
+            @Nullable String rendererId,
             @Nullable String toolId,
             @Nullable String itemId,
             @Nullable String configId,
@@ -164,7 +164,7 @@ final class CommandUiSnapshotAssembler {
         }
         return new CommandUiSnapshot(
                 sessionId, presentationRevision, actionGeneration,
-                CommandUiProviderId.tryParse(providerId).orElse(null),
+                CommandUiRendererId.tryParse(rendererId).orElse(null),
                 toolId, itemId, configId, rosterMode, capabilities,
                 selectedCommand, commandOptions, rows,
                 panelState == null ? new CommandUiPanelState(null) : panelState,
@@ -178,7 +178,7 @@ final class CommandUiSnapshotAssembler {
             @Nonnull UUID sessionId,
             long presentationRevision,
             long actionGeneration,
-            @Nullable String providerId,
+            @Nullable String rendererId,
             @Nullable String toolId,
             @Nullable String itemId,
             @Nullable String configId,
@@ -197,7 +197,7 @@ final class CommandUiSnapshotAssembler {
         CommandPanelEntrySourceService.CommandPanelSnapshot source =
                 panelSnapshot.snapshot();
         return assemble(sessionId, presentationRevision, actionGeneration,
-                providerId, toolId, itemId, configId, rosterMode, capabilities,
+                rendererId, toolId, itemId, configId, rosterMode, capabilities,
                 selectedCommand, commandOptions, source.entries(),
                 source.featurePresentations(), panelState, globalActions,
                 commandActions, serverTimeMillis, deadlines,

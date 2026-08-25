@@ -3,6 +3,27 @@ package com.alechilles.alecstamework.selftest;
 import com.alechilles.alecstamework.api.ClaimAccessDecisionView;
 import com.alechilles.alecstamework.api.CommandLinkView;
 import com.alechilles.alecstamework.api.CommandItemConfigView;
+import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
+import com.alechilles.alecstamework.api.commandui.CommandUiApi;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorAction;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorCreateContext;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorDescriptor;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
+import com.alechilles.alecstamework.api.commandui.CommandUiContribution;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorProvider;
+import com.alechilles.alecstamework.api.commandui.CommandUiCustomFlowView;
+import com.alechilles.alecstamework.api.commandui.CommandUiDiagnostics;
+import com.alechilles.alecstamework.api.commandui.CommandUiDirtyScope;
+import com.alechilles.alecstamework.api.commandui.CommandUiFlowOperation;
+import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
+import com.alechilles.alecstamework.api.commandui.CommandUiPageController;
+import com.alechilles.alecstamework.api.commandui.CommandUiRegistrationResult;
+import com.alechilles.alecstamework.api.commandui.CommandUiRendererDescriptor;
+import com.alechilles.alecstamework.api.commandui.CommandUiRendererProvider;
+import com.alechilles.alecstamework.api.commandui.CommandUiSessionContributor;
+import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
+import com.alechilles.alecstamework.api.commandui.CommandUiValue;
+import com.alechilles.alecstamework.ui.CommandSelectionEventData;
 import com.alechilles.alecstamework.api.DamagePolicyDecisionView;
 import com.alechilles.alecstamework.api.DiagnosticsApi;
 import com.alechilles.alecstamework.api.InteractionEffectSpec;
@@ -38,6 +59,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -59,6 +81,7 @@ public final class ApiSelfTestRunner {
         INTERACTION_EXTENSIONS,
         TRAIT_EFFECTS,
         POLICIES,
+        COMMAND_UI,
         DIAGNOSTICS,
         HYDRAGON_INTEGRATIONS,
         ALL;
@@ -95,6 +118,9 @@ public final class ApiSelfTestRunner {
         }
         if (suite == Suite.ALL || suite == Suite.POLICIES) {
             suites.add(runPolicies(context));
+        }
+        if (suite == Suite.ALL || suite == Suite.COMMAND_UI) {
+            suites.add(runCommandUi(context));
         }
         if (suite == Suite.ALL || suite == Suite.DIAGNOSTICS) {
             suites.add(runDiagnostics(context));
@@ -797,6 +823,171 @@ public final class ApiSelfTestRunner {
                 "limit=" + population.limit() + ", current=" + population.currentCount()
         ));
         return new ApiSelfTestSuiteResult("policies", assertions);
+    }
+
+    @Nonnull
+    private ApiSelfTestSuiteResult runCommandUi(@Nonnull ApiSelfTestContext context) {
+        ArrayList<ApiSelfTestAssertion> assertions = new ArrayList<>();
+        TameworkApi api = context.api();
+        EnumSet<TameworkApiCapability> required = EnumSet.of(
+                TameworkApiCapability.COMMAND_UI_RENDERERS,
+                TameworkApiCapability.COMMAND_UI_CONTRIBUTORS,
+                TameworkApiCapability.COMMAND_UI_CUSTOM_ACTIONS,
+                TameworkApiCapability.COMMAND_UI_CUSTOM_FLOWS
+        );
+        EnumSet<TameworkApiCapability> capabilities = api.getCapabilities();
+        assertions.add(check(
+                "command UI capabilities advertised",
+                capabilities.containsAll(required),
+                "capabilities=" + capabilities
+        ));
+        CommandUiApi commandUi = api.commandUi();
+        assertions.add(check(
+                "command UI registration available",
+                commandUi.available(),
+                "available=" + commandUi.available()
+        ));
+        if (!commandUi.available() || !capabilities.containsAll(required)) {
+            return new ApiSelfTestSuiteResult("command-ui", assertions);
+        }
+
+        UUID playerUuid = context.player().getUuid();
+        if (playerUuid == null) playerUuid = UUID.randomUUID();
+        String suffix = playerUuid.toString().replace("-", "");
+        String rendererId = "selftest:" + suffix + "/renderer";
+        String contributorIdValue = "selftest:" + suffix + "/contributor";
+        String flowType = "selftest:" + suffix + "/flow";
+        CommandUiContributorId contributorId = CommandUiContributorId.of(
+                contributorIdValue);
+        CommandUiOpenContext openContext = new CommandUiOpenContext(
+                playerUuid, "en-US", "self-test", null,
+                rendererId, "generic");
+        CommandUiRendererProvider rendererProvider = ignored ->
+                new CommandUiPageController<CommandSelectionEventData>() {
+                    @Override
+                    public com.hypixel.hytale.codec.builder.BuilderCodec<
+                            CommandSelectionEventData> eventCodec() {
+                        return CommandSelectionEventData.CODEC;
+                    }
+                };
+        CommandUiRegistrationResult rendererRegistration =
+                commandUi.registerRenderer(
+                        rendererId,
+                        new CommandUiRendererDescriptor(
+                                Set.of(contributorIdValue), Set.of(flowType)),
+                        rendererProvider);
+        CommandUiRegistrationResult contributorRegistration = null;
+        try {
+            assertions.add(check(
+                    "renderer registration succeeds",
+                    rendererRegistration.status()
+                            == CommandUiRegistrationResult.Status.REGISTERED,
+                    rendererRegistration.status().name()
+            ));
+            CommandUiContributorDescriptor contributorDescriptor =
+                    new CommandUiContributorDescriptor(
+                            Set.of("selftest"), Set.of(),
+                            Set.of(CommandUiContributorAction.Scope.PAGE,
+                                    CommandUiContributorAction.Scope.FLOW),
+                            Set.of(flowType));
+            CommandUiContributorProvider contributorProvider =
+                    createContext -> new CommandUiSessionContributor() {
+                        @Override
+                        public CommandUiContribution compose(
+                                CommandUiSnapshot base,
+                                CommandUiContribution previous,
+                                CommandUiDirtyScope scope
+                        ) {
+                            CommandUiContributorAction action =
+                                    new CommandUiContributorAction(
+                                            "check", "self-test", "Check",
+                                            CommandUiContributorAction.InputPolicy.NONE,
+                                            false,
+                                            ignoredContext -> CompletableFuture
+                                                    .completedFuture(
+                                                            CommandUiActionResult.openFlow(
+                                                                    new CommandUiCustomFlowView(
+                                                                            UUID.randomUUID(),
+                                                                            flowType,
+                                                                            createContext.contributorId(),
+                                                                            createContext.registrationGeneration(),
+                                                                            1L, 1L,
+                                                                            Map.of("ready", CommandUiValue.of(true)),
+                                                                            Map.of()))));
+                            return CommandUiContribution.withActions(
+                                    contributorId,
+                                    Map.of("ready", CommandUiValue.of(true)),
+                                    Map.of(), Map.of("check", action),
+                                    Map.of(), Map.of(), Map.of());
+                        }
+                    };
+            contributorRegistration = commandUi.registerContributor(
+                    contributorIdValue,
+                    contributorDescriptor,
+                    contributorProvider);
+            assertions.add(check(
+                    "contributor registration succeeds",
+                    contributorRegistration.status()
+                            == CommandUiRegistrationResult.Status.REGISTERED,
+                    contributorRegistration.status().name()
+            ));
+            if (!contributorRegistration.registered()) {
+                return new ApiSelfTestSuiteResult("command-ui", assertions);
+            }
+            long contributorGeneration = contributorRegistration.registration()
+                    .generation();
+            var runtime = context.plugin().getCommandItemFeatureHandler()
+                    .runCommandUiSelfTest(context.player().getPlayerRef(),
+                            openContext, contributorId);
+            assertions.add(check(
+                    "registered renderer creates the runtime session",
+                    runtime.customRenderer(),
+                    "customRenderer=" + runtime.customRenderer()
+            ));
+            assertions.add(check(
+                    "registered contributor composes detached data",
+                    runtime.contributionReady(),
+                    "contributionReady=" + runtime.contributionReady()
+            ));
+            assertions.add(check(
+                    "registered contributor action receives an opaque handle",
+                    runtime.actionBound(),
+                    "actionBound=" + runtime.actionBound()
+            ));
+            CommandUiActionResult actionResult = runtime.actionResult();
+            assertions.add(check(
+                    "opaque action dispatch opens its managed custom flow",
+                    actionResult != null
+                            && actionResult.flowOperation()
+                            == CommandUiFlowOperation.OPEN
+                            && actionResult.flowView()
+                            instanceof CommandUiCustomFlowView flow
+                            && flow.ownerContributorId().equals(contributorId)
+                            && flow.ownerGeneration()
+                            == contributorGeneration,
+                    actionResult == null ? "action missing"
+                            : "operation=" + actionResult.flowOperation()
+            ));
+        } finally {
+            if (contributorRegistration != null
+                    && contributorRegistration.registration() != null) {
+                contributorRegistration.registration().close();
+            }
+            if (rendererRegistration.registration() != null) {
+                rendererRegistration.registration().close();
+            }
+        }
+        CommandUiDiagnostics diagnostics = commandUi.diagnostics();
+        assertions.add(check(
+                "command UI registrations clean up",
+                diagnostics.renderers().stream().noneMatch(
+                        value -> rendererId.equals(value.rendererId()))
+                        && diagnostics.contributors().stream().noneMatch(
+                        value -> contributorIdValue.equals(value.contributorId())),
+                "rendererCount=" + diagnostics.renderers().size()
+                        + ", contributorCount=" + diagnostics.contributors().size()
+        ));
+        return new ApiSelfTestSuiteResult("command-ui", assertions);
     }
 
     @Nonnull

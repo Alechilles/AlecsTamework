@@ -50,9 +50,13 @@ public enum TameworkApiCapability {
     EXTERNAL_ADMISSION_PROVIDERS,
     /** Validated managed-content profiles and readiness state. */
     REQUIRED_CONTENT_PROFILES,
-    /** External command-menu providers can register with the live runtime. */
-    COMMAND_UI_PROVIDERS,
-    /** Command UI providers can use bounded input and detached managed flows. */
-    COMMAND_UI_MANAGED_FLOWS
+    /** External command UI renderers can register with the live runtime. */
+    COMMAND_UI_RENDERERS,
+    /** External command UI contributors can register with the live runtime. */
+    COMMAND_UI_CONTRIBUTORS,
+    /** Command UI sessions can issue Tamework-defined action handles. */
+    COMMAND_UI_CUSTOM_ACTIONS,
+    /** Command UI sessions can host Tamework-managed custom flows. */
+    COMMAND_UI_CUSTOM_FLOWS
 }
 

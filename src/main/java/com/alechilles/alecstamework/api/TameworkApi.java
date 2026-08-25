@@ -72,10 +72,9 @@ public interface TameworkApi {
     }
 
     /**
-     * Returns the optional command-menu provider registration facade.
+     * Returns the optional command UI renderer and contributor registration facade.
      *
-     * <p>This default keeps source and binary compatibility with API
-     * implementations compiled before command UI providers existed.</p>
+     * <p>The default keeps adapters that do not host command UI fail-closed.</p>
      */
     default CommandUiApi commandUi() {
         return CommandUiApi.unavailable();

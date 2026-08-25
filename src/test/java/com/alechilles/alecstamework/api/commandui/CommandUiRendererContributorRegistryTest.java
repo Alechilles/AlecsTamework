@@ -3,7 +3,6 @@ package com.alechilles.alecstamework.api.commandui;
 import com.alechilles.alecstamework.api.internal.CommandUiContributorRegistry;
 import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 import com.alechilles.alecstamework.api.internal.CommandUiRendererRegistry;
-import java.util.Optional;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -148,7 +147,6 @@ class CommandUiRendererContributorRegistryTest {
         assertEquals(CommandUiRegistrationResult.Status.UNAVAILABLE,
                 unavailable.registerContributor("example:data", ignored -> null)
                         .status());
-        assertEquals(Optional.empty(), unavailable.find("example:menu"));
     }
 
     private static CommandUiSessionContributor emptyContributor() {

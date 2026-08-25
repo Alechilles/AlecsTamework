@@ -4,7 +4,7 @@ import java.util.UUID;
 import javax.annotation.Nullable;
 
 /**
- * Detached context supplied while a provider creates one page controller.
+ * Detached context supplied while a renderer creates one page controller.
  *
  * <p>Only stable identity and presentation values belong here. The context
  * intentionally has no live Hytale object or gameplay authority.</p>
@@ -28,20 +28,6 @@ public final class CommandUiOpenContext {
         this(null, null, null, null, (CommandUiRendererId) null, null);
     }
 
-    public CommandUiOpenContext(
-            @Nullable UUID playerUuid,
-            @Nullable String language,
-            @Nullable String toolId,
-            @Nullable String configId,
-            @Nullable CommandUiProviderId providerId,
-            @Nullable String rosterMode
-    ) {
-        this(playerUuid, language, toolId, configId,
-                providerId == null ? null
-                        : CommandUiRendererId.tryParse(providerId.value()).orElse(null),
-                rosterMode);
-    }
-
     /** Creates detached context with the selected renderer identifier. */
     public CommandUiOpenContext(
             @Nullable UUID playerUuid,
@@ -59,13 +45,13 @@ public final class CommandUiOpenContext {
         this.rosterMode = normalize(rosterMode);
     }
 
-    /** Convenience constructor for provider-facing string IDs. */
+    /** Convenience constructor for renderer-facing string IDs. */
     public CommandUiOpenContext(
             @Nullable UUID playerUuid,
             @Nullable String language,
             @Nullable String toolId,
             @Nullable String configId,
-            @Nullable String providerId,
+            @Nullable String rendererId,
             @Nullable String rosterMode
     ) {
         this(
@@ -73,9 +59,9 @@ public final class CommandUiOpenContext {
                 language,
                 toolId,
                 configId,
-                providerId == null || providerId.isBlank()
+                rendererId == null || rendererId.isBlank()
                         ? null
-                        : CommandUiRendererId.of(providerId),
+                        : CommandUiRendererId.of(rendererId),
                 rosterMode
         );
     }
@@ -108,15 +94,6 @@ public final class CommandUiOpenContext {
     @Nullable
     public CommandUiRendererId rendererId() {
         return rendererId;
-    }
-
-    /** @deprecated Use {@link #rendererId()} for active command UI selection. */
-    @Deprecated
-    @Nullable
-    public CommandUiProviderId providerId() {
-        return rendererId == null
-                ? null
-                : CommandUiProviderId.tryParse(rendererId.value()).orElse(null);
     }
 
     @Nullable

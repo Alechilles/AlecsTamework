@@ -9,7 +9,6 @@ import com.alechilles.alecstamework.api.commandui.CommandUiPageController;
 import com.alechilles.alecstamework.api.commandui.CommandUiRendererDescriptor;
 import com.alechilles.alecstamework.api.commandui.CommandUiRendererId;
 import com.alechilles.alecstamework.api.internal.CommandUiContributorRegistry;
-import com.alechilles.alecstamework.api.internal.CommandUiProviderRegistry;
 import com.alechilles.alecstamework.api.internal.CommandUiRendererRegistry;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import java.util.List;
@@ -22,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Provider selection behavior before the host fixes its event codec. */
+/** Renderer selection behavior before the host fixes its event codec. */
 class CommandUiControllerResolverTest {
     @Test
     void forwardsOptionalCompatibilityStatusToSessionCreation() {
@@ -51,41 +50,48 @@ class CommandUiControllerResolverTest {
     }
 
     @Test
-    void registeredProviderWinsWithItsExactGeneration() {
-        CommandUiProviderRegistry registry = new CommandUiProviderRegistry();
+    void registeredRendererWinsWithItsExactGeneration() {
+        CommandUiRendererRegistry registry = new CommandUiRendererRegistry();
         TestController custom = new TestController();
         var registration = registry.register(
-                "runeteria:husbandry", ignored -> custom).registration();
+                "runeteria:husbandry", CommandUiRendererDescriptor.unrestricted(),
+                ignored -> custom).registration();
         TestController standard = new TestController();
 
         CommandUiControllerResolver.Resolved resolved =
-                new CommandUiControllerResolver(registry).resolve(
-                        "  RUNETERIA:HUSBANDRY  ", new CommandUiOpenContext(),
+                new CommandUiControllerResolver(registry,
+                        new CommandUiContributorRegistry()).resolve(
+                        CommandUiRendererId.of("runeteria:husbandry"), List.of(),
+                        new CommandUiOpenContext(),
                         () -> standard);
 
         assertSame(custom, resolved.controller());
         assertTrue(resolved.custom());
-        assertEquals("runeteria:husbandry", resolved.providerId().value());
-        assertEquals(registration.generation(), resolved.providerGeneration());
+        assertEquals("runeteria:husbandry", resolved.rendererId().value());
+        assertEquals(registration.generation(), resolved.rendererGeneration());
     }
 
     @Test
-    void missingOrFailedProviderUsesAFreshStandardController() {
-        CommandUiProviderRegistry registry = new CommandUiProviderRegistry();
-        registry.register("example:broken", ignored -> {
+    void missingOrFailedRendererUsesAFreshStandardController() {
+        CommandUiRendererRegistry registry = new CommandUiRendererRegistry();
+        registry.register("example:broken",
+                CommandUiRendererDescriptor.unrestricted(), ignored -> {
             throw new IllegalStateException("startup failed");
         });
         AtomicInteger standardCreations = new AtomicInteger();
         TestController standard = new TestController();
-        CommandUiControllerResolver resolver = new CommandUiControllerResolver(registry);
+        CommandUiControllerResolver resolver = new CommandUiControllerResolver(
+                registry, new CommandUiContributorRegistry());
 
         CommandUiControllerResolver.Resolved missing = resolver.resolve(
-                "example:missing", new CommandUiOpenContext(), () -> {
+                CommandUiRendererId.of("example:missing"), List.of(),
+                new CommandUiOpenContext(), () -> {
                     standardCreations.incrementAndGet();
                     return standard;
                 });
         CommandUiControllerResolver.Resolved failed = resolver.resolve(
-                "example:broken", new CommandUiOpenContext(), () -> {
+                CommandUiRendererId.of("example:broken"), List.of(),
+                new CommandUiOpenContext(), () -> {
                     standardCreations.incrementAndGet();
                     return standard;
                 });

@@ -4,7 +4,6 @@ import com.alechilles.alecstamework.api.commandui.CommandUiApi;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorProvider;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorDescriptor;
 import com.alechilles.alecstamework.api.commandui.CommandUiDiagnostics;
-import com.alechilles.alecstamework.api.commandui.CommandUiProvider;
 import com.alechilles.alecstamework.api.commandui.CommandUiRegistrationResult;
 import com.alechilles.alecstamework.api.commandui.CommandUiRendererProvider;
 import com.alechilles.alecstamework.api.commandui.CommandUiRendererDescriptor;
@@ -26,8 +25,6 @@ public final class CommandUiRegistry implements CommandUiApi, AutoCloseable {
     private final CommandUiContributorRegistry contributors;
     private final CommandUiDiagnosticsService diagnostics =
             new CommandUiDiagnosticsService();
-    @Nullable
-    private final CommandUiProviderRegistry legacyProviders;
 
     public CommandUiRegistry() {
         this(new CommandUiRendererRegistry(), new CommandUiContributorRegistry());
@@ -37,23 +34,13 @@ public final class CommandUiRegistry implements CommandUiApi, AutoCloseable {
             @Nonnull CommandUiRendererRegistry renderers,
             @Nonnull CommandUiContributorRegistry contributors
     ) {
-        this(renderers, contributors, new CommandUiProviderRegistry());
-    }
-
-    private CommandUiRegistry(
-            CommandUiRendererRegistry renderers,
-            CommandUiContributorRegistry contributors,
-            @Nullable CommandUiProviderRegistry legacyProviders
-    ) {
         this.renderers = Objects.requireNonNull(renderers, "renderers");
         this.contributors = Objects.requireNonNull(contributors, "contributors");
-        this.legacyProviders = legacyProviders;
     }
 
     @Override
     public boolean available() {
-        return renderers.available() && contributors.available()
-                && (legacyProviders == null || legacyProviders.available());
+        return renderers.available() && contributors.available();
     }
 
     @Override
@@ -174,42 +161,10 @@ public final class CommandUiRegistry implements CommandUiApi, AutoCloseable {
         return diagnostics;
     }
 
-    /**
-     * Deprecated provider registration is retained only for old source users.
-     * Active command-item selection uses renderer registration above.
-     */
-    @Override
-    @Nonnull
-    @Deprecated
-    public com.alechilles.alecstamework.api.commandui.CommandUiProviderRegistrationResult register(
-            @Nullable String providerId,
-            @Nullable CommandUiProvider provider
-    ) {
-        return legacyProviders == null
-                ? com.alechilles.alecstamework.api.commandui.CommandUiProviderRegistrationResult
-                .unavailable(providerId)
-                : legacyProviders.register(providerId, provider);
-    }
-
-    @Override
-    @Nonnull
-    @Deprecated
-    public Optional<CommandUiProvider> find(@Nullable String providerId) {
-        return legacyProviders == null
-                ? Optional.empty() : legacyProviders.find(providerId);
-    }
-
-    @Override
-    @Nonnull
-    public Set<com.alechilles.alecstamework.api.commandui.CommandUiProviderId> listProviderIds() {
-        return legacyProviders == null ? Set.of() : legacyProviders.listProviderIds();
-    }
-
     @Override
     public synchronized void close() {
         renderers.close();
         contributors.close();
-        if (legacyProviders != null) legacyProviders.close();
         diagnostics.close();
     }
 }

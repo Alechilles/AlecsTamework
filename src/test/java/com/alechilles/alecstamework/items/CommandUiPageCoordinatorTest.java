@@ -10,7 +10,6 @@ import com.alechilles.alecstamework.api.commandui.CommandUiActionStatus;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorAction;
 import com.alechilles.alecstamework.api.commandui.CommandUiUpdate;
 import com.alechilles.alecstamework.api.commandui.CommandUiValue;
-import com.alechilles.alecstamework.api.commandui.CommandUiProviderId;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorRequirement;
 import com.alechilles.alecstamework.api.commandui.CommandUiDirtyScope;
@@ -18,7 +17,6 @@ import com.alechilles.alecstamework.api.commandui.CommandUiRendererId;
 import com.alechilles.alecstamework.api.commandui.CommandUiSession;
 import com.alechilles.alecstamework.api.commandui.CommandUiSessionContributor;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
-import com.alechilles.alecstamework.api.internal.CommandUiProviderRegistry;
 import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 import com.alechilles.alecstamework.ui.CommandUiHostPage;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
@@ -41,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** End-to-end construction of a provider host and its authoritative session. */
+/** End-to-end construction of a renderer host and its authoritative session. */
 class CommandUiPageCoordinatorTest {
     @Test
     void requiredContributorUnregisterClosesCustomPageWithOneFallback() {
@@ -364,10 +362,10 @@ class CommandUiPageCoordinatorTest {
     }
 
     @Test
-    void selectedProviderBuildsAgainstTheFinalSessionSnapshot() {
-        CommandUiProviderRegistry registry = new CommandUiProviderRegistry();
+    void selectedRendererBuildsAgainstTheFinalSessionSnapshot() {
+        CommandUiRegistry registry = new CommandUiRegistry();
         RecordingController custom = new RecordingController();
-        long generation = registry.register(
+        long generation = registry.registerRenderer(
                 "runeteria:husbandry", ignored -> custom)
                 .registration().generation();
         CommandSelectionPageService actionService =
@@ -379,7 +377,7 @@ class CommandUiPageCoordinatorTest {
         CommandUiSnapshot base = snapshot();
         CommandUiOpenContext context = new CommandUiOpenContext(
                 playerRef.getUuid(), "en-US", "tool-1", "config-1",
-                CommandUiProviderId.of("runeteria:husbandry"), "generic");
+                CommandUiRendererId.of("runeteria:husbandry"), "generic");
 
         CommandUiPageCoordinator.Created created = coordinator.create(
                 playerRef, context, base, RecordingController::new,
@@ -389,7 +387,7 @@ class CommandUiPageCoordinatorTest {
                 new UIEventBuilder(), null);
 
         assertTrue(created.custom());
-        assertEquals(generation, created.providerGeneration());
+        assertEquals(generation, created.rendererGeneration());
         assertSame(base, custom.initialSnapshot);
         assertSame(base, created.session().snapshot());
         created.session().close();
@@ -451,10 +449,10 @@ class CommandUiPageCoordinatorTest {
     }
 
     @Test
-    void providerSessionCloseAlsoClosesHostAndController() {
-        CommandUiProviderRegistry registry = new CommandUiProviderRegistry();
+    void rendererSessionCloseAlsoClosesHostAndController() {
+        CommandUiRegistry registry = new CommandUiRegistry();
         RecordingController controller = new RecordingController();
-        registry.register("runeteria:husbandry", ignored -> controller);
+        registry.registerRenderer("runeteria:husbandry", ignored -> controller);
         CommandUiPageCoordinator coordinator = new CommandUiPageCoordinator(
                 registry, new CommandSelectionPageService(
                         null, null, null, null, null));
@@ -462,7 +460,7 @@ class CommandUiPageCoordinatorTest {
                 null, UUID.randomUUID(), "CoordinatorTester", "en-US", null, null);
         CommandUiOpenContext context = new CommandUiOpenContext(
                 playerRef.getUuid(), "en-US", "tool-1", "config-1",
-                CommandUiProviderId.of("runeteria:husbandry"), "generic");
+                CommandUiRendererId.of("runeteria:husbandry"), "generic");
         CommandUiPageCoordinator.Created created = coordinator.create(
                 playerRef, context, snapshot(), RecordingController::new,
                 List.of(), List.of(), (current, handles) -> current,
@@ -475,10 +473,10 @@ class CommandUiPageCoordinatorTest {
     }
 
     @Test
-    void providerSessionCloseCleansHostWhenWorldDispatchIsRejected() {
-        CommandUiProviderRegistry registry = new CommandUiProviderRegistry();
+    void rendererSessionCloseCleansHostWhenWorldDispatchIsRejected() {
+        CommandUiRegistry registry = new CommandUiRegistry();
         RecordingController controller = new RecordingController();
-        registry.register("runeteria:husbandry", ignored -> controller);
+        registry.registerRenderer("runeteria:husbandry", ignored -> controller);
         CommandUiPageCoordinator coordinator = new CommandUiPageCoordinator(
                 registry, new CommandSelectionPageService(
                         null, null, null, null, null));
@@ -486,7 +484,7 @@ class CommandUiPageCoordinatorTest {
                 null, UUID.randomUUID(), "CoordinatorTester", "en-US", null, null);
         CommandUiOpenContext context = new CommandUiOpenContext(
                 playerRef.getUuid(), "en-US", "tool-1", "config-1",
-                CommandUiProviderId.of("runeteria:husbandry"), "generic");
+                CommandUiRendererId.of("runeteria:husbandry"), "generic");
         CommandUiPageCoordinator.Created created = coordinator.create(
                 playerRef, context, snapshot(), RecordingController::new,
                 List.of(), List.of(), (current, handles) -> current,

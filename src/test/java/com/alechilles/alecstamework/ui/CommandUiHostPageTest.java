@@ -7,12 +7,10 @@ import com.alechilles.alecstamework.api.commandui.CommandUiCloseReason;
 import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
 import com.alechilles.alecstamework.api.commandui.CommandUiPageController;
 import com.alechilles.alecstamework.api.commandui.CommandUiPanelState;
-import com.alechilles.alecstamework.api.commandui.CommandUiProviderId;
 import com.alechilles.alecstamework.api.commandui.CommandUiRendererId;
 import com.alechilles.alecstamework.api.commandui.CommandUiSession;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
 import com.alechilles.alecstamework.api.commandui.CommandUiUpdate;
-import com.alechilles.alecstamework.api.internal.CommandUiProviderRegistry;
 import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
@@ -76,7 +74,7 @@ class CommandUiHostPageTest {
     }
 
     @Test
-    void providerPartialSubmissionCanNeverClearTheWholePage() {
+    void rendererPartialSubmissionCanNeverClearTheWholePage() {
         TestSession session = new TestSession(snapshot(1L));
         RecordingEmitter emitter = new RecordingEmitter();
         CommandUiHostPage<TestEvent> host = host(
@@ -120,7 +118,7 @@ class CommandUiHostPageTest {
     }
 
     @Test
-    void failedInitialBuildClosesProviderStateBeforeDeferredFallback() {
+    void failedInitialBuildClosesRendererStateBeforeDeferredFallback() {
         TestSession session = new TestSession(snapshot(1L));
         TestController controller = new TestController();
         controller.failBuild = true;
@@ -153,7 +151,7 @@ class CommandUiHostPageTest {
         CommandUiHostPage<TestEvent> host = new CommandUiHostPage<>(
                 playerRef, new CommandUiOpenContext(playerRef.getUuid(),
                 "en-US", "tool-1", "config-1",
-                (CommandUiProviderId) null, "generic"), session, controller,
+                (CommandUiRendererId) null, "generic"), session, controller,
                 null, 0L, null, directDispatcher(),
                 ignored -> fallbackOpenCount.incrementAndGet(),
                 new RecordingEmitter());
@@ -181,49 +179,6 @@ class CommandUiHostPageTest {
         assertEquals(1, controller.eventCount);
         assertEquals(1, controller.closeCount);
         assertFalse(host.applyUpdate(CommandUiUpdate.initial(snapshot(2L))));
-    }
-
-    @Test
-    void unregisterClosesOnlyHostsForTheRemovedProviderGeneration() {
-        CommandUiProviderRegistry registry = new CommandUiProviderRegistry();
-        var firstRegistration = registry.register(
-                "example:menu", ignored -> null).registration();
-        TestSession firstSession = new TestSession(snapshot(1L));
-        CommandUiHostPage<TestEvent> firstHost = hostForRegistration(
-                registry, firstRegistration.generation(), firstSession);
-
-        firstRegistration.close();
-        var replacementRegistration = registry.register(
-                "example:menu", ignored -> null).registration();
-        TestSession replacementSession = new TestSession(snapshot(1L));
-        CommandUiHostPage<TestEvent> replacementHost = hostForRegistration(
-                registry, replacementRegistration.generation(), replacementSession);
-        firstRegistration.close();
-
-        assertEquals(CommandUiCloseReason.PROVIDER_UNREGISTERED,
-                firstSession.closeReason);
-        assertFalse(firstHost.isOpen());
-        assertTrue(replacementHost.isOpen());
-        replacementRegistration.close();
-        assertEquals(CommandUiCloseReason.PROVIDER_UNREGISTERED,
-                replacementSession.closeReason);
-    }
-
-    @Test
-    void hostClosesWhenProviderGenerationEndedBeforeSubscription() {
-        CommandUiProviderRegistry registry = new CommandUiProviderRegistry();
-        var registration = registry.register(
-                "example:menu", ignored -> null).registration();
-        long generation = registration.generation();
-        registration.close();
-        TestSession session = new TestSession(snapshot(1L));
-
-        CommandUiHostPage<TestEvent> host = hostForRegistration(
-                registry, generation, session);
-
-        assertFalse(host.isOpen());
-        assertEquals(CommandUiCloseReason.PROVIDER_UNREGISTERED,
-                session.closeReason);
     }
 
     @Test
@@ -489,37 +444,15 @@ class CommandUiHostPageTest {
                 playerRef,
                 new CommandUiOpenContext(playerRef.getUuid(), "en-US",
                         "tool-1", "config-1",
-                        CommandUiProviderId.of("example:menu"), "generic"),
+                        CommandUiRendererId.of("example:menu"), "generic"),
                 session,
                 controller,
-                CommandUiProviderId.of("example:menu"),
+                CommandUiRendererId.of("example:menu"),
                 7L,
                 null,
                 dispatcher,
                 fallback,
                 emitter);
-    }
-
-    private static CommandUiHostPage<TestEvent> hostForRegistration(
-            CommandUiProviderRegistry registry,
-            long providerGeneration,
-            TestSession session
-    ) {
-        PlayerRef playerRef = new PlayerRef(
-                null, UUID.randomUUID(), "HostTester", "en-US", null, null);
-        return new CommandUiHostPage<>(
-                playerRef,
-                new CommandUiOpenContext(playerRef.getUuid(), "en-US",
-                        "tool-1", "config-1",
-                        CommandUiProviderId.of("example:menu"), "generic"),
-                session,
-                new TestController(),
-                CommandUiProviderId.of("example:menu"),
-                providerGeneration,
-                registry,
-                directDispatcher(),
-                ignored -> { },
-                new RecordingEmitter());
     }
 
     private static CommandUiHostPage<TestEvent> rendererHostForRegistration(
@@ -568,8 +501,7 @@ class CommandUiHostPageTest {
                 registry,
                 dispatcher,
                 fallbackOpener,
-                new RecordingEmitter(),
-                true);
+                new RecordingEmitter());
     }
 
     private static CommandUiSnapshot snapshot(long revision) {

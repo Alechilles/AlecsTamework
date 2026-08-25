@@ -5,6 +5,8 @@ import static com.alechilles.alecstamework.items.CommandSelectionCallbackGuards.
 import com.alechilles.alecstamework.api.commandui.CommandUiActionHandle;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
 import com.alechilles.alecstamework.api.commandui.CommandUiCommandOption;
+import com.alechilles.alecstamework.api.commandui.CommandUiContribution;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorRequirement;
 import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
 import com.alechilles.alecstamework.api.commandui.CommandUiPanelState;
@@ -236,6 +238,78 @@ final class CommandSelectionPageService {
     void configureCommandUi(@Nullable CommandUiRegistry registry) {
         commandUiCoordinator = registry == null
                 ? null : new CommandUiPageCoordinator(registry, this);
+    }
+
+    /** Exercises registry resolution, composition, handle dispatch, and flow ownership. */
+    CommandItemFeatureHandler.CommandUiSelfTestResult runCommandUiSelfTest(
+            PlayerRef playerRef,
+            CommandUiOpenContext context,
+            CommandUiContributorId contributorId
+    ) {
+        CommandUiPageCoordinator coordinator = commandUiCoordinator;
+        if (coordinator == null || playerRef == null || context == null
+                || contributorId == null) {
+            return new CommandItemFeatureHandler.CommandUiSelfTestResult(
+                    false, false, false,
+                    CommandUiActionResult.failed(
+                            "command UI runtime is unavailable"));
+        }
+        CommandUiPageCoordinator.Created created = null;
+        try {
+            CommandUiSnapshot base = new CommandUiSnapshot(
+                    UUID.randomUUID(), 1L, 1L,
+                    context.rendererId() == null
+                            ? null : context.rendererId().value(),
+                    List.of(), List.of(), new CommandUiPanelState("self-test"));
+            created = coordinator.create(
+                    playerRef, context, base,
+                    () -> new com.alechilles.alecstamework.api.commandui
+                            .CommandUiPageController<
+                            com.alechilles.alecstamework.ui
+                                    .CommandSelectionEventData>() {
+                        @Override
+                        public com.hypixel.hytale.codec.builder.BuilderCodec<
+                                com.alechilles.alecstamework.ui
+                                        .CommandSelectionEventData> eventCodec() {
+                            return com.alechilles.alecstamework.ui
+                                    .CommandSelectionEventData.CODEC;
+                        }
+                    },
+                    List.of(new CommandUiContributorRequirement(
+                            contributorId, true)),
+                    List.of(), List.of(), (snapshot, handles) -> snapshot,
+                    (ignoredPlayer, operation) -> {
+                        operation.run(null, null);
+                        return true;
+                    }, ignoredWorld -> { });
+            CommandUiContribution contribution = created.session().snapshot()
+                    .contribution(contributorId);
+            boolean ready = contribution != null
+                    && contribution.pageValue("ready") != null;
+            com.alechilles.alecstamework.api.commandui.CommandUiActionView action =
+                    contribution == null ? null
+                            : contribution.pageActions().values().stream()
+                            .findFirst().orElse(null);
+            boolean bound = action != null && action.handle() != null;
+            CommandUiActionResult result = bound
+                    ? created.session().invoke(action.handle())
+                    .toCompletableFuture().join()
+                    : CommandUiActionResult.failed(
+                            "command UI contributor action was not bound");
+            return new CommandItemFeatureHandler.CommandUiSelfTestResult(
+                    created.custom(), ready, bound, result);
+        } catch (RuntimeException | LinkageError failure) {
+            return new CommandItemFeatureHandler.CommandUiSelfTestResult(
+                    false, false, false,
+                    CommandUiActionResult.failed(
+                            "command UI runtime probe failed"));
+        } finally {
+            if (created != null) {
+                created.session().close(
+                        com.alechilles.alecstamework.api.commandui
+                                .CommandUiCloseReason.DISMISSED);
+            }
+        }
     }
 
     /**

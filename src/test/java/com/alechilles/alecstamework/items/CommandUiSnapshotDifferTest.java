@@ -6,7 +6,7 @@ import com.alechilles.alecstamework.api.commandui.CommandUiCompanionRow;
 import com.alechilles.alecstamework.api.commandui.CommandUiContribution;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
 import com.alechilles.alecstamework.api.commandui.CommandUiPanelState;
-import com.alechilles.alecstamework.api.commandui.CommandUiProviderId;
+import com.alechilles.alecstamework.api.commandui.CommandUiRendererId;
 import com.alechilles.alecstamework.api.commandui.CommandUiSection;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
 import com.alechilles.alecstamework.api.commandui.CommandUiValue;
@@ -161,7 +161,7 @@ class CommandUiSnapshotDifferTest {
             Map<String, String> groups
     ) {
         return new CommandUiSnapshot(
-                sessionId, 1L, 1L, (CommandUiProviderId) null,
+                sessionId, 1L, 1L, (CommandUiRendererId) null,
                 "tool", "item", "config", "generic", java.util.Set.of(),
                 null, List.of(), List.of(), new CommandUiPanelState("linked"),
                 Map.of(), Map.of(), assignments, choices, groups,
@@ -175,7 +175,7 @@ class CommandUiSnapshotDifferTest {
             boolean value
     ) {
         return new CommandUiSnapshot(
-                sessionId, 1L, 1L, (CommandUiProviderId) null,
+                sessionId, 1L, 1L, (CommandUiRendererId) null,
                 "tool", "item", "config", "generic", Set.of(), null,
                 List.of(), List.of(new CommandUiCompanionRow(rowId, "companion")),
                 new CommandUiPanelState("linked"), Map.of(), Map.of(),

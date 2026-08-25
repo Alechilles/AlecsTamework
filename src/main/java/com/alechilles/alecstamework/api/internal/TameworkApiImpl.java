@@ -276,8 +276,10 @@ public final class TameworkApiImpl
             TameworkApiCapability.COMPANION_XP_EVENTS,
             TameworkApiCapability.CONFIG_READ,
             TameworkApiCapability.DIAGNOSTICS,
-            TameworkApiCapability.COMMAND_UI_PROVIDERS,
-            TameworkApiCapability.COMMAND_UI_MANAGED_FLOWS
+            TameworkApiCapability.COMMAND_UI_RENDERERS,
+            TameworkApiCapability.COMMAND_UI_CONTRIBUTORS,
+            TameworkApiCapability.COMMAND_UI_CUSTOM_ACTIONS,
+            TameworkApiCapability.COMMAND_UI_CUSTOM_FLOWS
     );
     private final Gson gson = new Gson();
     @Nullable
@@ -346,8 +348,10 @@ public final class TameworkApiImpl
         synchronized (capabilities) {
             EnumSet<TameworkApiCapability> current = capabilities.clone();
             if (!commandUiRegistry.available()) {
-                current.remove(TameworkApiCapability.COMMAND_UI_PROVIDERS);
-                current.remove(TameworkApiCapability.COMMAND_UI_MANAGED_FLOWS);
+                current.remove(TameworkApiCapability.COMMAND_UI_RENDERERS);
+                current.remove(TameworkApiCapability.COMMAND_UI_CONTRIBUTORS);
+                current.remove(TameworkApiCapability.COMMAND_UI_CUSTOM_ACTIONS);
+                current.remove(TameworkApiCapability.COMMAND_UI_CUSTOM_FLOWS);
             }
             return current;
         }
@@ -374,8 +378,10 @@ public final class TameworkApiImpl
         try {
             commandUiRegistry.close();
             synchronized (capabilities) {
-                capabilities.remove(TameworkApiCapability.COMMAND_UI_PROVIDERS);
-                capabilities.remove(TameworkApiCapability.COMMAND_UI_MANAGED_FLOWS);
+                capabilities.remove(TameworkApiCapability.COMMAND_UI_RENDERERS);
+                capabilities.remove(TameworkApiCapability.COMMAND_UI_CONTRIBUTORS);
+                capabilities.remove(TameworkApiCapability.COMMAND_UI_CUSTOM_ACTIONS);
+                capabilities.remove(TameworkApiCapability.COMMAND_UI_CUSTOM_FLOWS);
             }
         } finally {
             damagePolicy.close();

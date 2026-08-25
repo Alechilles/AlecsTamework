@@ -3,12 +3,10 @@ package com.alechilles.alecstamework.ui;
 import com.alechilles.alecstamework.api.commandui.CommandUiCloseReason;
 import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
 import com.alechilles.alecstamework.api.commandui.CommandUiPageController;
-import com.alechilles.alecstamework.api.commandui.CommandUiProviderId;
 import com.alechilles.alecstamework.api.commandui.CommandUiRendererId;
 import com.alechilles.alecstamework.api.commandui.CommandUiSession;
 import com.alechilles.alecstamework.api.commandui.CommandUiUpdate;
 import com.alechilles.alecstamework.api.internal.CommandUiRegistry;
-import com.alechilles.alecstamework.api.internal.CommandUiProviderRegistry;
 import com.alechilles.alecstamework.api.internal.CommandUiRendererRegistry;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -31,7 +29,7 @@ import javax.annotation.Nullable;
  * Tamework-owned page shell for one standard or plugin command UI controller.
  *
  * <p>The controller receives detached snapshots and guarded builders. The host
- * owns page lifetime, world dispatch, provider-generation removal, and
+ * owns page lifetime, world dispatch, renderer-generation removal, and
  * failure isolation.</p>
  */
 public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
@@ -41,13 +39,12 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
     private final CommandUiOpenContext context;
     private final CommandUiSession session;
     private final CommandUiPageController<T> controller;
-    private final CommandUiProviderId providerId;
     private final CommandUiRendererId rendererId;
-    private final long providerGeneration;
+    private final long rendererGeneration;
     private final WorldDispatcher worldDispatcher;
     private final FallbackOpener fallbackOpener;
     private final UpdateEmitter updateEmitter;
-    private final boolean customProvider;
+    private final boolean customRenderer;
     private final AtomicBoolean open = new AtomicBoolean(true);
     private final AtomicBoolean resourcesClosed = new AtomicBoolean();
     private final Object lifecycleLock = new Object();
@@ -56,47 +53,6 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
             new SubscriptionSlot();
     private final CopyOnWriteArrayList<AutoCloseable> ownedResources =
             new CopyOnWriteArrayList<>();
-
-    public CommandUiHostPage(
-            @Nonnull PlayerRef playerRef,
-            @Nonnull CommandUiOpenContext context,
-            @Nonnull CommandUiSession session,
-            @Nonnull CommandUiPageController<T> controller,
-            @Nullable CommandUiProviderId providerId,
-            long providerGeneration,
-            @Nullable CommandUiProviderRegistry providerRegistry,
-            @Nonnull WorldDispatcher worldDispatcher,
-            @Nonnull FallbackOpener fallbackOpener,
-            @Nullable UpdateEmitter updateEmitter
-    ) {
-        super(Objects.requireNonNull(playerRef, "playerRef"),
-                CustomPageLifetime.CanDismiss,
-                Objects.requireNonNull(controller, "controller").eventCodec());
-        if (providerGeneration < 0L) {
-            throw new IllegalArgumentException(
-                    "Provider generation cannot be negative.");
-        }
-        this.context = Objects.requireNonNull(context, "context");
-        this.session = Objects.requireNonNull(session, "session");
-        this.controller = controller;
-        this.providerId = providerId;
-        this.rendererId = providerId == null
-                ? null : CommandUiRendererId.tryParse(providerId.value()).orElse(null);
-        this.providerGeneration = providerGeneration;
-        this.worldDispatcher = Objects.requireNonNull(
-                worldDispatcher, "worldDispatcher");
-        this.fallbackOpener = Objects.requireNonNull(
-                fallbackOpener, "fallbackOpener");
-        this.updateEmitter = updateEmitter == null
-                ? this::sendHostUpdate : updateEmitter;
-        this.customProvider = providerId != null && providerGeneration > 0L;
-        CommandUiProviderRegistry.ExactSubscription providerSubscription =
-                subscribeProviderRemoval(providerRegistry);
-        this.unregisterSubscription.set(providerSubscription.handle());
-        if (!providerSubscription.active()) {
-            terminate(CommandUiCloseReason.PROVIDER_UNREGISTERED, customProvider);
-        }
-    }
 
     /** Creates a host bound to one exact renderer registration generation. */
     public CommandUiHostPage(
@@ -109,8 +65,7 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
             @Nullable CommandUiRegistry rendererRegistry,
             @Nonnull WorldDispatcher worldDispatcher,
             @Nonnull FallbackOpener fallbackOpener,
-            @Nullable UpdateEmitter updateEmitter,
-            boolean rendererMode
+            @Nullable UpdateEmitter updateEmitter
     ) {
         super(Objects.requireNonNull(playerRef, "playerRef"),
                 CustomPageLifetime.CanDismiss,
@@ -122,24 +77,22 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
         this.context = Objects.requireNonNull(context, "context");
         this.session = Objects.requireNonNull(session, "session");
         this.controller = controller;
-        this.providerId = rendererId == null
-                ? null : CommandUiProviderId.tryParse(rendererId.value()).orElse(null);
         this.rendererId = rendererId;
-        this.providerGeneration = rendererGeneration;
+        this.rendererGeneration = rendererGeneration;
         this.worldDispatcher = Objects.requireNonNull(
                 worldDispatcher, "worldDispatcher");
         this.fallbackOpener = Objects.requireNonNull(
                 fallbackOpener, "fallbackOpener");
         this.updateEmitter = updateEmitter == null
                 ? this::sendHostUpdate : updateEmitter;
-        this.customProvider = rendererId != null && rendererGeneration > 0L;
+        this.customRenderer = rendererId != null && rendererGeneration > 0L;
         CommandUiRendererRegistry.ExactSubscription rendererSubscription =
                 subscribeRendererRemoval(rendererRegistry);
         this.unregisterSubscription.set(rendererSubscription.handle());
         if (!rendererSubscription.active()) {
             // The page owner handles fallback when construction returns a
             // closed host before the page can be shown.
-            terminate(CommandUiCloseReason.PROVIDER_UNREGISTERED, false);
+            terminate(CommandUiCloseReason.PROVIDER_UNREGISTERED, customRenderer);
         }
     }
 
@@ -161,7 +114,7 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
                         ref, store, commandBuilder, eventBuilder);
             }
         } catch (RuntimeException | LinkageError failure) {
-            fail("initial build", failure, customProvider);
+            fail("initial build", failure, customRenderer);
         }
     }
 
@@ -207,7 +160,7 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
                         controller.update(update, commands, events);
                         updateEmitter.send(commands, events, false);
                     } catch (RuntimeException | LinkageError failure) {
-                        fail("update callback", failure, customProvider);
+                        fail("update callback", failure, customRenderer);
                     }
                 }
 
@@ -217,12 +170,12 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
                 }
             });
         } catch (RuntimeException | LinkageError failure) {
-            fail("update dispatch", failure, customProvider);
+            fail("update dispatch", failure, customRenderer);
             return false;
         }
     }
 
-    /** Accepts a provider-local update while forcing partial page semantics. */
+    /** Accepts a renderer-local update while forcing partial page semantics. */
     public boolean submitPartialUpdate(
             @Nonnull UICommandBuilder commands,
             @Nonnull UIEventBuilder events,
@@ -276,7 +229,7 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
 
     /** Begins opening this host before the page manager receives it. */
     public boolean takePageOwnership() {
-        if (!customProvider) return open.get();
+        if (!customRenderer) return open.get();
         synchronized (lifecycleLock) {
             if (!open.get() || fallbackOwnership != FallbackOwnership.PRE_SHOW) {
                 return false;
@@ -288,7 +241,7 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
 
     /** Commits page ownership only after the page manager accepts the page. */
     public boolean finishPageOpening(boolean opened) {
-        if (!customProvider) return opened && open.get();
+        if (!customRenderer) return opened && open.get();
         synchronized (lifecycleLock) {
             if (fallbackOwnership != FallbackOwnership.OPENING) return false;
             if (!opened) {
@@ -336,35 +289,19 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
         return false;
     }
 
-    private CommandUiProviderRegistry.ExactSubscription subscribeProviderRemoval(
-            @Nullable CommandUiProviderRegistry registry) {
-        if (registry == null || providerId == null || providerGeneration <= 0L) {
-            return new CommandUiProviderRegistry.ExactSubscription(
-                    true, () -> { });
-        }
-        return registry.subscribeExactUnregister(providerId, providerGeneration,
-                (removedId, removedGeneration) -> {
-            if (providerId.equals(removedId)
-                    && providerGeneration == removedGeneration) {
-                terminate(CommandUiCloseReason.PROVIDER_UNREGISTERED,
-                        customProvider);
-            }
-        });
-    }
-
     private CommandUiRendererRegistry.ExactSubscription subscribeRendererRemoval(
             @Nullable CommandUiRegistry registry) {
-        if (registry == null || rendererId == null || providerGeneration <= 0L) {
+        if (registry == null || rendererId == null || rendererGeneration <= 0L) {
             return new CommandUiRendererRegistry.ExactSubscription(
                     true, () -> { });
         }
         return registry.rendererRegistry().subscribeExactUnregister(
-                rendererId, providerGeneration,
+                rendererId, rendererGeneration,
                 (removedId, removedGeneration) -> {
                     if (rendererId.equals(removedId)
-                            && providerGeneration == removedGeneration) {
+                            && rendererGeneration == removedGeneration) {
                         terminate(CommandUiCloseReason.PROVIDER_UNREGISTERED,
-                                customProvider);
+                                customRenderer);
                     }
                 });
     }
@@ -374,7 +311,7 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
         if (!termination.claimed()) return;
         boolean hostFallback = termination.hostFallback();
         LOGGER.log(Level.SEVERE,
-                "Command UI provider session failed during " + phase + ".",
+                "Command UI renderer session failed during " + phase + ".",
                 failure);
         closeResources(CommandUiCloseReason.FAILURE);
         if (!hostFallback || context.playerUuid() == null) return;
@@ -439,13 +376,13 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
                 return new TerminationClaim(false, false);
             }
             boolean hostFallback = claimHostFallback(openFallback);
-            if (customProvider && !hostFallback) markPreShowFallbackRequired();
+            if (customRenderer && !hostFallback) markPreShowFallbackRequired();
             return new TerminationClaim(true, hostFallback);
         }
     }
 
     private boolean claimHostFallback(boolean requested) {
-        if (!requested || !customProvider
+        if (!requested || !customRenderer
                 || fallbackOwnership != FallbackOwnership.PAGE) {
             return false;
         }
@@ -476,7 +413,7 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
         try {
             controller.close();
         } catch (RuntimeException | LinkageError ignored) {
-            // Provider cleanup cannot keep action authority alive.
+            // Renderer cleanup cannot keep action authority alive.
         }
         session.close(reason);
     }

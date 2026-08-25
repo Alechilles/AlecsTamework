@@ -60,7 +60,7 @@ public final class CommandUiSnapshot {
             @Nonnull CommandUiPanelState panelState
     ) {
         this(sessionId, presentationRevision, actionGeneration,
-                (CommandUiProviderId) null, null, null,
+                (CommandUiRendererId) null, null, null,
                 null, null, Set.of(), selectedCommand, commandOptions,
                 companionRows, panelState, Map.of(), Map.of(), Map.of(), Map.of(),
                 Map.of(), 0L, Map.of(), null, null);
@@ -71,7 +71,7 @@ public final class CommandUiSnapshot {
             @Nonnull UUID sessionId,
             long presentationRevision,
             long actionGeneration,
-            @Nullable String providerId,
+            @Nullable String rendererId,
             @Nullable String toolId,
             @Nullable String itemId,
             @Nullable String configId,
@@ -89,7 +89,7 @@ public final class CommandUiSnapshot {
             @Nullable String disabledReason
     ) {
         this(sessionId, presentationRevision, actionGeneration,
-                parseRendererId(providerId), toolId, itemId, configId, rosterMode,
+                parseRendererId(rendererId), toolId, itemId, configId, rosterMode,
                 enabledCapabilities, selectedCommand, commandOptions,
                 companionRows, panelState, globalActions, commandActions,
                 Map.of(), Map.of(), Map.of(), serverTimeMillis, deadlines,
@@ -101,7 +101,7 @@ public final class CommandUiSnapshot {
             @Nonnull UUID sessionId,
             long presentationRevision,
             long actionGeneration,
-            @Nullable CommandUiProviderId providerId,
+            @Nullable CommandUiRendererId rendererId,
             @Nullable String toolId,
             @Nullable String itemId,
             @Nullable String configId,
@@ -119,7 +119,7 @@ public final class CommandUiSnapshot {
             @Nullable String disabledReason
     ) {
         this(sessionId, presentationRevision, actionGeneration,
-                toRendererId(providerId),
+                rendererId,
                 toolId, itemId, configId, rosterMode, enabledCapabilities,
                 selectedCommand, commandOptions, companionRows, panelState,
                 globalActions, commandActions, Map.of(), Map.of(), Map.of(),
@@ -127,13 +127,12 @@ public final class CommandUiSnapshot {
                 Map.of());
     }
 
-    /** @deprecated Use the renderer-typed constructor for active code. */
-    @Deprecated
+    /** Full snapshot constructor retaining the compact assignment form. */
     public CommandUiSnapshot(
             @Nonnull UUID sessionId,
             long presentationRevision,
             long actionGeneration,
-            @Nullable CommandUiProviderId providerId,
+            @Nullable CommandUiRendererId rendererId,
             @Nullable String toolId,
             @Nullable String itemId,
             @Nullable String configId,
@@ -154,49 +153,14 @@ public final class CommandUiSnapshot {
             @Nullable String disabledReason
     ) {
         this(sessionId, presentationRevision, actionGeneration,
-                toRendererId(providerId), toolId, itemId, configId, rosterMode,
+                rendererId, toolId, itemId, configId, rosterMode,
                 enabledCapabilities, selectedCommand, commandOptions,
                 companionRows, panelState, globalActions, commandActions,
                 hotswapAssignments, hotswapChoices, groups, serverTimeMillis,
                 deadlines, emptyStateKey, disabledReason, Map.of());
     }
 
-    /** @deprecated Use the renderer-typed constructor for active code. */
-    @Deprecated
-    public CommandUiSnapshot(
-            @Nonnull UUID sessionId,
-            long presentationRevision,
-            long actionGeneration,
-            @Nullable CommandUiProviderId providerId,
-            @Nullable String toolId,
-            @Nullable String itemId,
-            @Nullable String configId,
-            @Nullable String rosterMode,
-            @Nullable Set<String> enabledCapabilities,
-            @Nullable String selectedCommand,
-            @Nullable List<CommandUiCommandOption> commandOptions,
-            @Nullable List<CommandUiCompanionRow> companionRows,
-            @Nullable CommandUiPanelState panelState,
-            @Nullable Map<String, CommandUiActionView> globalActions,
-            @Nullable Map<String, CommandUiActionView> commandActions,
-            @Nullable Map<String, String> hotswapAssignments,
-            @Nullable Map<String, List<CommandUiCommandOption>> hotswapChoices,
-            @Nullable Map<String, String> groups,
-            long serverTimeMillis,
-            @Nullable Map<String, Long> deadlines,
-            @Nullable String emptyStateKey,
-            @Nullable String disabledReason,
-            @Nullable Map<CommandUiContributorId, CommandUiContribution> contributions
-    ) {
-        this(sessionId, presentationRevision, actionGeneration,
-                toRendererId(providerId), toolId, itemId, configId, rosterMode,
-                enabledCapabilities, selectedCommand, commandOptions,
-                companionRows, panelState, globalActions, commandActions,
-                hotswapAssignments, hotswapChoices, groups, serverTimeMillis,
-                deadlines, emptyStateKey, disabledReason, contributions);
-    }
-
-    /** Full constructor accepting the normalized public provider ID type. */
+    /** Full constructor accepting the normalized public renderer ID type. */
     public CommandUiSnapshot(
             @Nonnull UUID sessionId,
             long presentationRevision,
@@ -289,15 +253,6 @@ public final class CommandUiSnapshot {
         return rendererId;
     }
 
-    /** @deprecated Use {@link #rendererId()} for active command UI selection. */
-    @Deprecated
-    @Nullable
-    public CommandUiProviderId providerId() {
-        return rendererId == null
-                ? null
-                : CommandUiProviderId.tryParse(rendererId.value()).orElse(null);
-    }
-
     @Nullable
     public String toolId() {
         return toolId;
@@ -386,11 +341,11 @@ public final class CommandUiSnapshot {
     }
 
     /**
-     * Returns display-ready empty-state text for custom providers.
+     * Returns display-ready empty-state text for custom renderers.
      *
-     * <p>The legacy {@link #emptyStateKey()} name remains for source
-     * compatibility. Runtime assemblers resolve configured keys before they
-     * cross the public command UI boundary.</p>
+     * <p>The legacy {@link #emptyStateKey()} name remains for compatibility.
+     * Runtime assemblers resolve configured keys before they cross the public
+     * command UI boundary.</p>
      */
     @Nullable
     public String emptyStateText() {
@@ -419,13 +374,16 @@ public final class CommandUiSnapshot {
     public CommandUiSnapshot withContributions(
             @Nullable Map<CommandUiContributorId, CommandUiContribution> values
     ) {
+        Map<CommandUiContributorId, CommandUiContribution> requested =
+                values == null ? Map.of() : values;
+        if (contributions.equals(requested)) return this;
         return new CommandUiSnapshot(
                 sessionId, presentationRevision, actionGeneration, rendererId,
                 toolId, itemId, configId, rosterMode, enabledCapabilities,
                 selectedCommand, commandOptions, companionRows, panelState,
                 globalActions, commandActions, hotswapAssignments,
                 hotswapChoices, groups, serverTimeMillis, deadlines,
-                emptyStateKey, disabledReason, values);
+                emptyStateKey, disabledReason, requested);
     }
 
     /** Returns the row for a stable presentation ID, or null when absent. */
@@ -513,15 +471,6 @@ public final class CommandUiSnapshot {
     @Nullable
     private static CommandUiRendererId parseRendererId(@Nullable String value) {
         return CommandUiRendererId.tryParse(value).orElse(null);
-    }
-
-    @Nullable
-    private static CommandUiRendererId toRendererId(
-            @Nullable CommandUiProviderId providerId
-    ) {
-        return providerId == null
-                ? null
-                : CommandUiRendererId.tryParse(providerId.value()).orElse(null);
     }
 
     @Nonnull

@@ -273,7 +273,7 @@ final class CommandUiActionCatalog {
                 panel.values());
         return new CommandUiSnapshot(
                 base.sessionId(), base.presentationRevision(),
-                base.actionGeneration(), base.providerId(), base.toolId(),
+                base.actionGeneration(), base.rendererId(), base.toolId(),
                 base.itemId(), base.configId(), base.rosterMode(),
                 base.enabledCapabilities(), base.selectedCommand(), commands,
                 rows, attachedPanel, globalActions, commandActions,
@@ -460,7 +460,7 @@ final class CommandUiActionCatalog {
                 previous.panelState().actions(), panel.values());
         return new CommandUiSnapshot(
                 fresh.sessionId(), fresh.presentationRevision(),
-                previous.actionGeneration(), fresh.providerId(), fresh.toolId(),
+                previous.actionGeneration(), fresh.rendererId(), fresh.toolId(),
                 fresh.itemId(), fresh.configId(), fresh.rosterMode(),
                 fresh.enabledCapabilities(), fresh.selectedCommand(), commands,
                 rows, retainedPanel, previous.globalActions(),
