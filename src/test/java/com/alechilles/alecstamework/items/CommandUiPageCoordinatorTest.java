@@ -163,6 +163,70 @@ class CommandUiPageCoordinatorTest {
     }
 
     @Test
+    void stableContributorHandleExecutesTheLatestComposedHandler() {
+        CommandUiRegistry registry = new CommandUiRegistry();
+        RecordingController custom = new RecordingController();
+        CommandUiContributorId contributorId = CommandUiContributorId.of(
+                "runeteria:actions");
+        AtomicInteger revisions = new AtomicInteger();
+        AtomicInteger executedRevision = new AtomicInteger();
+        AtomicReference<com.alechilles.alecstamework.api.commandui.CommandUiContributorDirtySink>
+                sink = new AtomicReference<>();
+        registry.registerRenderer("runeteria:ui", ignored -> custom);
+        registry.registerContributor("runeteria:actions", context -> {
+            sink.set(context.dirtySink());
+            return (base, previous, scope) -> {
+                int revision = revisions.incrementAndGet();
+                CommandUiContributorAction action =
+                        new CommandUiContributorAction(
+                                "ping", "PING", "Ping",
+                                CommandUiContributorAction.InputPolicy.NONE,
+                                false, actionContext -> {
+                            executedRevision.set(revision);
+                            return java.util.concurrent.CompletableFuture
+                                    .completedFuture(
+                                            CommandUiActionResult.applied());
+                        });
+                return CommandUiContribution.withActions(contributorId,
+                        Map.of("revision", CommandUiValue.of(revision)),
+                        Map.of(), Map.of(), Map.of("ping", action),
+                        Map.of(), Map.of());
+            };
+        });
+        CommandUiPageCoordinator coordinator = new CommandUiPageCoordinator(
+                registry, new CommandSelectionPageService(
+                        null, null, null, null, null));
+        PlayerRef playerRef = new PlayerRef(
+                null, UUID.randomUUID(), "CoordinatorTester", "en-US", null, null);
+        CommandUiOpenContext context = new CommandUiOpenContext(
+                playerRef.getUuid(), "en-US", "tool-1", "config-1",
+                CommandUiRendererId.of("runeteria:ui"), "generic");
+        CommandUiPageCoordinator.Created created = coordinator.create(
+                playerRef, context, snapshot(), RecordingController::new,
+                List.of(new CommandUiContributorRequirement(
+                        contributorId, false)), List.of(), List.of(),
+                (current, handles) -> current, directDispatcher(), ignored -> { });
+        created.host().build(null, new UICommandBuilder(),
+                new UIEventBuilder(), null);
+        assertTrue(created.host().takePageOwnership());
+        assertTrue(created.host().finishPageOpening(true));
+        created.pageOpened();
+        String token = created.session().snapshot().contribution(contributorId)
+                .commandActions().get("runeteria:actions/ping").handle().token();
+
+        sink.get().markPageDirty();
+
+        assertEquals(token, created.session().snapshot()
+                .contribution(contributorId).commandActions()
+                .get("runeteria:actions/ping").handle().token());
+        assertEquals(CommandUiActionStatus.APPLIED,
+                created.session().invoke(new CommandUiActionHandle(token))
+                        .toCompletableFuture().join().status());
+        assertEquals(2, executedRevision.get());
+        created.session().close();
+    }
+
+    @Test
     void contributorActionResultRequestsTheExistingSessionRefresh() {
         CommandUiRegistry registry = new CommandUiRegistry();
         RecordingController custom = new RecordingController();

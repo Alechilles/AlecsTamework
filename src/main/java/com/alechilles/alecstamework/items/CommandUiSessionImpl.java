@@ -498,6 +498,7 @@ final class CommandUiSessionImpl implements CommandUiSession {
             @Nonnull CommandUiContributorActionBinding binding,
             long actionGeneration,
             @Nonnull CommandUiActionGateway.ContributorIdentity identity,
+            @Nonnull CommandUiActionGateway.RendererGenerationCheck rendererGenerationCheck,
             @Nonnull CommandUiActionGateway.ContributorGenerationCheck generationCheck
     ) {
         if (!isOpen()) {
@@ -505,7 +506,18 @@ final class CommandUiSessionImpl implements CommandUiSession {
                     "Cannot issue an action for a closed session.");
         }
         return actionGateway.issueContributor(sessionId, binding,
-                actionGeneration, identity, generationCheck, null);
+                actionGeneration, identity, rendererGenerationCheck,
+                generationCheck, null);
+    }
+
+    boolean refreshContributor(
+            @Nonnull CommandUiActionHandle handle,
+            @Nonnull CommandUiContributorActionBinding binding,
+            @Nonnull CommandUiActionGateway.RendererGenerationCheck rendererGenerationCheck,
+            @Nonnull CommandUiActionGateway.ContributorGenerationCheck generationCheck
+    ) {
+        return isOpen() && actionGateway.refreshContributor(handle, binding,
+                rendererGenerationCheck, generationCheck);
     }
 
     private void requireRoute(CommandUiActionGateway.Route route) {

@@ -126,6 +126,33 @@ class CommandUiContributorActionGatewayTest {
     }
 
     @Test
+    void inactiveRendererGenerationNeverCallsTheHandler() {
+        UUID sessionId = UUID.randomUUID();
+        AtomicBoolean rendererActive = new AtomicBoolean(true);
+        AtomicInteger calls = new AtomicInteger();
+        CommandUiActionGateway gateway = new CommandUiActionGateway();
+        gateway.openSession(sessionId, 9L);
+        CommandUiContributorActionBinding binding = binding(
+                CommandUiContributorId.of("runeteria:actions"), 3L,
+                CommandUiContributorAction.Scope.PAGE, null,
+                CommandUiContributorAction.InputPolicy.NONE, context -> {
+                    calls.incrementAndGet();
+                    return CompletableFuture.completedFuture(
+                            CommandUiActionResult.applied());
+                });
+        CommandUiActionHandle handle = gateway.issueContributor(
+                sessionId, binding, 7L, identity(), rendererActive::get,
+                () -> true, context -> true);
+
+        rendererActive.set(false);
+
+        assertEquals(CommandUiActionStatus.STALE,
+                gateway.invoke(sessionId, CommandUiActionRequest.of(handle),
+                        7L, null).toCompletableFuture().join().status());
+        assertEquals(0, calls.get());
+    }
+
+    @Test
     void invisibleOrDisabledContributorActionsDoNotReceiveHandles() {
         CommandUiContributorId contributorId = CommandUiContributorId.of(
                 "runeteria:actions");
@@ -228,8 +255,7 @@ class CommandUiContributorActionGatewayTest {
                 CommandUiActionRequest.of(initial), 4L, null)
                 .toCompletableFuture().join();
         assertEquals(CommandUiActionStatus.CONFIRMATION_REQUIRED, retry.status());
-        now.set(now.get() + CommandUiActionGateway.CONFIRMATION_LIFETIME.toNanos()
-                + 1L);
+        now.set(now.get() + CommandUiActionGateway.CONFIRMATION_LIFETIME.toNanos());
         assertEquals(CommandUiActionStatus.STALE,
                 gateway.invoke(sessionId, CommandUiActionRequest.of(
                                 retry.confirmationHandle()), 4L, null)
@@ -267,6 +293,70 @@ class CommandUiContributorActionGatewayTest {
                 gateway.invoke(sessionId, CommandUiActionRequest.of(initial), 4L,
                                 null)
                         .toCompletableFuture().join().status());
+    }
+
+    @Test
+    void deniedResultsKeepActionsAndConfirmationFamiliesUsable() {
+        CommandUiActionGateway gateway = new CommandUiActionGateway();
+        UUID sessionId = UUID.randomUUID();
+        gateway.openSession(sessionId, 1L);
+        AtomicBoolean authority = new AtomicBoolean(false);
+        AtomicInteger directCalls = new AtomicInteger();
+        CommandUiContributorId contributorId = CommandUiContributorId.of(
+                "runeteria:actions");
+        CommandUiContributorActionBinding direct = binding(contributorId, 1L,
+                CommandUiContributorAction.Scope.PAGE, null,
+                CommandUiContributorAction.InputPolicy.NONE, context ->
+                        CompletableFuture.completedFuture(
+                                directCalls.incrementAndGet() == 1
+                                        ? CommandUiActionResult.denied("retry")
+                                        : CommandUiActionResult.applied()));
+        CommandUiActionHandle directHandle = gateway.issueContributor(
+                sessionId, direct, 1L, identity(), () -> true,
+                context -> authority.get());
+
+        assertEquals(CommandUiActionStatus.DENIED,
+                gateway.invoke(sessionId, CommandUiActionRequest.of(directHandle),
+                        1L, null).toCompletableFuture().join().status());
+        assertEquals(0, directCalls.get());
+        authority.set(true);
+        assertEquals(CommandUiActionStatus.DENIED,
+                gateway.invoke(sessionId, CommandUiActionRequest.of(directHandle),
+                        1L, null).toCompletableFuture().join().status());
+        assertEquals(CommandUiActionStatus.APPLIED,
+                gateway.invoke(sessionId, CommandUiActionRequest.of(directHandle),
+                        1L, null).toCompletableFuture().join().status());
+
+        AtomicInteger confirmationCalls = new AtomicInteger();
+        CommandUiContributorActionBinding confirmed = binding(contributorId, 1L,
+                CommandUiContributorAction.Scope.PAGE, null,
+                CommandUiContributorAction.InputPolicy.NONE, context -> {
+                    confirmationCalls.incrementAndGet();
+                    return CompletableFuture.completedFuture(
+                            CommandUiActionResult.denied("retry"));
+                }, true);
+        CommandUiActionHandle initiating = gateway.issueContributor(
+                sessionId, confirmed, 1L, identity(), () -> true,
+                context -> true);
+        CommandUiActionResult first = gateway.invoke(sessionId,
+                CommandUiActionRequest.of(initiating), 1L, null)
+                .toCompletableFuture().join();
+        CommandUiActionResult sibling = gateway.invoke(sessionId,
+                CommandUiActionRequest.of(initiating), 1L, null)
+                .toCompletableFuture().join();
+
+        assertEquals(CommandUiActionStatus.DENIED,
+                gateway.invoke(sessionId, CommandUiActionRequest.of(
+                                first.confirmationHandle()), 1L, null)
+                        .toCompletableFuture().join().status());
+        assertEquals(CommandUiActionStatus.DENIED,
+                gateway.invoke(sessionId, CommandUiActionRequest.of(
+                                sibling.confirmationHandle()), 1L, null)
+                        .toCompletableFuture().join().status());
+        assertEquals(CommandUiActionStatus.CONFIRMATION_REQUIRED,
+                gateway.invoke(sessionId, CommandUiActionRequest.of(initiating),
+                        1L, null).toCompletableFuture().join().status());
+        assertEquals(2, confirmationCalls.get());
     }
 
     @Test

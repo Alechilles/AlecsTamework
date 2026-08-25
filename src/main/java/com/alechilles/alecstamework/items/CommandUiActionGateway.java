@@ -75,6 +75,11 @@ final class CommandUiActionGateway {
     }
 
     @FunctionalInterface
+    interface RendererGenerationCheck {
+        boolean active();
+    }
+
+    @FunctionalInterface
     interface ContributorAuthorityCheck {
         boolean allows(@Nonnull CommandUiContributorActionContext context);
     }
@@ -262,9 +267,25 @@ final class CommandUiActionGateway {
             @Nonnull ContributorGenerationCheck generationCheck,
             @Nullable ContributorAuthorityCheck authority
     ) {
+        return issueContributor(sessionId, binding, actionGeneration, identity,
+                () -> true, generationCheck, authority);
+    }
+
+    @Nullable
+    CommandUiActionHandle issueContributor(
+            @Nonnull UUID sessionId,
+            @Nonnull CommandUiContributorActionBinding binding,
+            long actionGeneration,
+            @Nonnull ContributorIdentity identity,
+            @Nonnull RendererGenerationCheck rendererGenerationCheck,
+            @Nonnull ContributorGenerationCheck generationCheck,
+            @Nullable ContributorAuthorityCheck authority
+    ) {
         Objects.requireNonNull(sessionId, "sessionId");
         Objects.requireNonNull(binding, "binding");
         Objects.requireNonNull(identity, "identity");
+        Objects.requireNonNull(rendererGenerationCheck,
+                "rendererGenerationCheck");
         Objects.requireNonNull(generationCheck, "generationCheck");
         if (actionGeneration < 0L) {
             throw new IllegalArgumentException(
@@ -281,11 +302,36 @@ final class CommandUiActionGateway {
                 UUID.randomUUID().toString());
         contributorBindings.put(handle.token(), new ContributorBinding(
                 sessionId, binding, actionGeneration, session.providerGeneration,
-                identity, generationCheck,
+                identity, rendererGenerationCheck, generationCheck,
                 authority == null ? ignored -> true : authority,
                 binding.action().confirmationRequired(), false, 0L, null, null,
                 new AtomicBoolean(), new AtomicBoolean()));
         return handle;
+    }
+
+    /** Replaces the server handler behind one still-valid opaque handle. */
+    boolean refreshContributor(
+            @Nonnull CommandUiActionHandle handle,
+            @Nonnull CommandUiContributorActionBinding binding,
+            @Nonnull RendererGenerationCheck rendererGenerationCheck,
+            @Nonnull ContributorGenerationCheck generationCheck
+    ) {
+        Objects.requireNonNull(handle, "handle");
+        Objects.requireNonNull(binding, "binding");
+        Objects.requireNonNull(rendererGenerationCheck,
+                "rendererGenerationCheck");
+        Objects.requireNonNull(generationCheck, "generationCheck");
+        AtomicBoolean refreshed = new AtomicBoolean();
+        contributorBindings.computeIfPresent(handle.token(), (token, current) -> {
+            if (current.confirmationToken || current.consumed.get()
+                    || !sameContributorIdentity(current.actionBinding, binding)) {
+                return current;
+            }
+            refreshed.set(true);
+            return current.withActionBinding(binding, rendererGenerationCheck,
+                    generationCheck);
+        });
+        return refreshed.get();
     }
 
     /** Invokes a handle after session, generation, expiry, and authority checks. */
@@ -422,8 +468,13 @@ final class CommandUiActionGateway {
             return completed(CommandUiActionResult.stale(
                     "command UI provider generation is stale"));
         }
+        if (!isRendererActive(binding)) {
+            contributorBindings.remove(handle.token(), binding);
+            return completed(CommandUiActionResult.stale(
+                    "command UI renderer generation is stale"));
+        }
         if (binding.confirmationToken
-                && binding.expiresAtNanos < nanoTime.getAsLong()) {
+                && binding.expiresAtNanos <= nanoTime.getAsLong()) {
             contributorBindings.remove(handle.token(), binding);
             return completed(CommandUiActionResult.stale(
                     "confirmation handle expired"));
@@ -439,15 +490,15 @@ final class CommandUiActionGateway {
         if (!input.valid) {
             return completed(CommandUiActionResult.denied(input.message));
         }
-        if (!isContributorActive(binding)) {
+        if (!isRendererActive(binding) || !isContributorActive(binding)) {
             contributorBindings.remove(handle.token(), binding);
             return completed(CommandUiActionResult.stale(
-                    "command UI contributor generation is stale"));
+                    "command UI renderer or contributor generation is stale"));
         }
         CommandUiContributorActionContext context = binding.context(
                 input.value, binding.confirmationToken);
         if (!allows(binding, context)) {
-            contributorBindings.remove(handle.token(), binding);
+            rejectContributorWithoutExecution(handle.token(), binding);
             return completed(CommandUiActionResult.denied(
                     "current contributor authority denied the action"));
         }
@@ -473,15 +524,15 @@ final class CommandUiActionGateway {
 
         // This is deliberately adjacent to handler invocation. A registration
         // can disappear after the first validation and before this point.
-        if (!isContributorActive(binding)) {
+        if (!isRendererActive(binding) || !isContributorActive(binding)) {
             contributorBindings.remove(handle.token(), binding);
             return completed(CommandUiActionResult.stale(
-                    "command UI contributor generation is stale"));
+                    "command UI renderer or contributor generation is stale"));
         }
         CommandUiContributorActionContext executionContext = binding.context(
                 input.value, binding.confirmationToken);
         if (!allows(binding, executionContext)) {
-            contributorBindings.remove(handle.token(), binding);
+            restoreContributorAfterFailure(handle.token(), binding);
             return completed(CommandUiActionResult.denied(
                     "current contributor authority denied the action"));
         }
@@ -500,7 +551,8 @@ final class CommandUiActionGateway {
         contributorBindings.put(confirmation.token(), new ContributorBinding(
                 binding.sessionId, binding.actionBinding, binding.actionGeneration,
                 binding.providerGeneration, binding.identity,
-                binding.generationCheck, binding.authority, false,
+                binding.rendererGenerationCheck, binding.generationCheck,
+                binding.authority, false,
                 true, nowNanos + CONFIRMATION_LIFETIME.toNanos(), initiatingToken,
                 input,
                 binding.confirmationFamilyConsumed, new AtomicBoolean()));
@@ -513,18 +565,17 @@ final class CommandUiActionGateway {
             @Nonnull ContributorBinding binding,
             @Nonnull CommandUiContributorActionContext context
     ) {
-        retireContributorConfirmationFamily(token, binding);
         try {
             CompletionStage<CommandUiActionResult> stage =
                     binding.actionBinding.handler().handle(context);
             if (stage == null) {
-                contributorBindings.remove(token, binding);
+                restoreContributorAfterFailure(token, binding);
                 return completed(CommandUiActionResult.failed(
                         "action returned no result"));
             }
             CompletableFuture<CommandUiActionResult> future = stage.toCompletableFuture();
             if (!future.isDone()) {
-                contributorBindings.remove(token, binding);
+                restoreContributorAfterFailure(token, binding);
                 return completed(CommandUiActionResult.failed(
                         "contributor action must complete on the world thread"));
             }
@@ -534,15 +585,30 @@ final class CommandUiActionGateway {
             } catch (RuntimeException failure) {
                 result = null;
             }
-            contributorBindings.remove(token, binding);
-            return result == null
-                    ? completed(CommandUiActionResult.failed(
-                            "action returned no result"))
-                    : completed(result);
+            if (result == null) {
+                restoreContributorAfterFailure(token, binding);
+                return completed(CommandUiActionResult.failed(
+                        "action returned no result"));
+            }
+            if (successful(result)) {
+                contributorBindings.remove(token, binding);
+                retireContributorConfirmationFamily(token, binding);
+            } else {
+                restoreContributorAfterFailure(token, binding);
+            }
+            return completed(result);
         } catch (RuntimeException | LinkageError failure) {
-            contributorBindings.remove(token, binding);
+            restoreContributorAfterFailure(token, binding);
             return completed(CommandUiActionResult.failed(
                     "action execution failed"));
+        }
+    }
+
+    private boolean isRendererActive(@Nonnull ContributorBinding binding) {
+        try {
+            return binding.rendererGenerationCheck.active();
+        } catch (RuntimeException | LinkageError ignored) {
+            return false;
         }
     }
 
@@ -696,6 +762,48 @@ final class CommandUiActionGateway {
                 && initiatingToken.equals(entry.getValue().initiatingToken));
     }
 
+    private void restoreContributorAfterFailure(
+            String token,
+            ContributorBinding binding
+    ) {
+        if (binding.confirmationToken) {
+            contributorBindings.remove(token, binding);
+            binding.confirmationFamilyConsumed.set(false);
+        } else {
+            binding.consumed.set(false);
+        }
+    }
+
+    private void rejectContributorWithoutExecution(
+            String token,
+            ContributorBinding binding
+    ) {
+        if (binding.confirmationToken) {
+            contributorBindings.remove(token, binding);
+        }
+    }
+
+    private static boolean successful(CommandUiActionResult result) {
+        return result.status()
+                == com.alechilles.alecstamework.api.commandui
+                .CommandUiActionStatus.APPLIED
+                || result.status()
+                == com.alechilles.alecstamework.api.commandui
+                .CommandUiActionStatus.ACCEPTED;
+    }
+
+    private static boolean sameContributorIdentity(
+            CommandUiContributorActionBinding first,
+            CommandUiContributorActionBinding second
+    ) {
+        return first.contributorId().equals(second.contributorId())
+                && first.contributorGeneration()
+                == second.contributorGeneration()
+                && first.scope() == second.scope()
+                && Objects.equals(first.rowId(), second.rowId())
+                && first.effectiveId().equals(second.effectiveId());
+    }
+
     private void retireOlderGeneration(UUID sessionId, long generation) {
         bindings.entrySet().removeIf(entry ->
                 sessionId.equals(entry.getValue().sessionId)
@@ -818,6 +926,7 @@ final class CommandUiActionGateway {
             long actionGeneration,
             long providerGeneration,
             @Nonnull ContributorIdentity identity,
+            @Nonnull RendererGenerationCheck rendererGenerationCheck,
             @Nonnull ContributorGenerationCheck generationCheck,
             @Nonnull ContributorAuthorityCheck authority,
             boolean requiresConfirmation,
@@ -840,6 +949,8 @@ final class CommandUiActionGateway {
                         "Provider generation cannot be negative.");
             }
             Objects.requireNonNull(identity, "identity");
+            Objects.requireNonNull(rendererGenerationCheck,
+                    "rendererGenerationCheck");
             Objects.requireNonNull(generationCheck, "generationCheck");
             Objects.requireNonNull(authority, "authority");
             Objects.requireNonNull(confirmationFamilyConsumed,
@@ -860,6 +971,19 @@ final class CommandUiActionGateway {
                     row ? identity.companionId() : null,
                     row ? identity.profileId() : null,
                     input, confirmed);
+        }
+
+        ContributorBinding withActionBinding(
+                CommandUiContributorActionBinding replacement,
+                RendererGenerationCheck replacementRendererCheck,
+                ContributorGenerationCheck replacementContributorCheck
+        ) {
+            return new ContributorBinding(sessionId, replacement,
+                    actionGeneration, providerGeneration, identity,
+                    replacementRendererCheck, replacementContributorCheck,
+                    authority, requiresConfirmation, confirmationToken,
+                    expiresAtNanos, initiatingToken, confirmationInput,
+                    confirmationFamilyConsumed, consumed);
         }
     }
 

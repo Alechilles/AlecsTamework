@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -119,7 +120,8 @@ final class CommandUiSessionFactory {
             @Nonnull UUID playerUuid,
             @Nullable String configId,
             @Nonnull List<CommandUiContributorActionBinding> contributorBindings,
-            @Nonnull CommandUiContributorRegistry contributorRegistry
+            @Nonnull CommandUiContributorRegistry contributorRegistry,
+            @Nonnull BooleanSupplier rendererGenerationCheck
     ) {
         CreatedSession created = createMixed(sessionId, snapshot,
                 providerGeneration, dispatcher, refresh, close, submitter,
@@ -127,7 +129,7 @@ final class CommandUiSessionFactory {
         if (contributorBindings.isEmpty()) return created;
         ContributorBindingState state = new ContributorBindingState(
                 created.session(), playerUuid, configId, contributorRegistry,
-                contributorBindings);
+                contributorBindings, rendererGenerationCheck);
         return new CreatedSession(created.session(), created.handles(), state);
     }
 
@@ -154,6 +156,7 @@ final class CommandUiSessionFactory {
         private final UUID playerUuid;
         private final String configId;
         private final CommandUiContributorRegistry registry;
+        private final BooleanSupplier rendererGenerationCheck;
         private List<CommandUiActionCatalog.ContributorActionHandle> handles;
         private List<CommandUiContributorActionBinding> bindings;
         private long actionGeneration;
@@ -163,12 +166,15 @@ final class CommandUiSessionFactory {
                 @Nonnull UUID playerUuid,
                 @Nullable String configId,
                 @Nonnull CommandUiContributorRegistry registry,
-                @Nonnull List<CommandUiContributorActionBinding> bindings
+                @Nonnull List<CommandUiContributorActionBinding> bindings,
+                @Nonnull BooleanSupplier rendererGenerationCheck
         ) {
             this.session = session;
             this.playerUuid = playerUuid;
             this.configId = configId;
             this.registry = registry;
+            this.rendererGenerationCheck = java.util.Objects.requireNonNull(
+                    rendererGenerationCheck, "rendererGenerationCheck");
             this.bindings = List.copyOf(bindings);
             this.actionGeneration = session.snapshot().actionGeneration();
             this.handles = issue(session.snapshot(), this.bindings,
@@ -194,22 +200,37 @@ final class CommandUiSessionFactory {
             boolean sameSurface = CommandUiActionCatalog.contributorActionsMatch(
                     handles, current)
                     && renderableMatches(previous, snapshot, current);
+            boolean reusable = true;
             if (sameSurface
                     && snapshot.actionGeneration() == actionGeneration) {
                 Map<BindingKey, CommandUiActionHandle> existing = new LinkedHashMap<>();
                 for (CommandUiActionCatalog.ContributorActionHandle entry : handles) {
                     existing.put(BindingKey.of(entry.binding()), entry.handle());
                 }
-                handles = current.stream().map(binding ->
-                        new CommandUiActionCatalog.ContributorActionHandle(
-                                binding, existing.get(BindingKey.of(binding))))
-                        .toList();
-                bindings = current;
-                return CommandUiActionCatalog.attachContributorActions(snapshot,
-                        handles);
+                List<CommandUiActionCatalog.ContributorActionHandle> refreshed =
+                        new ArrayList<>(current.size());
+                for (CommandUiContributorActionBinding binding : current) {
+                    CommandUiActionHandle handle = existing.get(
+                            BindingKey.of(binding));
+                    if (handle != null && !session.refreshContributor(handle,
+                            binding, rendererGenerationCheck::getAsBoolean,
+                            generationCheck(binding))) {
+                        reusable = false;
+                        break;
+                    }
+                    refreshed.add(
+                            new CommandUiActionCatalog.ContributorActionHandle(
+                                    binding, handle));
+                }
+                if (reusable) {
+                    handles = List.copyOf(refreshed);
+                    bindings = current;
+                    return CommandUiActionCatalog.attachContributorActions(
+                            snapshot, handles);
+                }
             }
             long generation = snapshot.actionGeneration();
-            if (!sameSurface && generation <= actionGeneration) {
+            if ((!sameSurface || !reusable) && generation <= actionGeneration) {
                 generation = Math.max(previous.actionGeneration(),
                         actionGeneration) + 1L;
             } else {
@@ -242,14 +263,19 @@ final class CommandUiSessionFactory {
                                     row == null ? null : row.companionUuid(),
                                     row == null ? null : row.profileId());
                     handle = session.issueContributor(binding, actionGeneration,
-                            identity, () -> registry.isActive(
-                                    binding.contributorId(),
-                                    binding.contributorGeneration()));
+                            identity, rendererGenerationCheck::getAsBoolean,
+                            generationCheck(binding));
                 }
                 issued.add(new CommandUiActionCatalog.ContributorActionHandle(
                         binding, handle));
             }
             return List.copyOf(issued);
+        }
+
+        private CommandUiActionGateway.ContributorGenerationCheck
+        generationCheck(CommandUiContributorActionBinding binding) {
+            return () -> registry.isActive(binding.contributorId(),
+                    binding.contributorGeneration());
         }
 
         private static boolean renderableMatches(

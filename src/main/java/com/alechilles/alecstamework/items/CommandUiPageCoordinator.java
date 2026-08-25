@@ -212,6 +212,8 @@ final class CommandUiPageCoordinator {
         }
         CommandUiSnapshot composedBase = composition == null
                 ? baseSnapshot : composition.snapshot();
+        CommandUiRendererId selectedRendererId = resolved.rendererId();
+        long selectedRendererGeneration = resolved.rendererGeneration();
         CommandUiSessionFactory.CreatedSession createdSession = null;
         CommandUiHostPage<?> page = null;
         try {
@@ -231,7 +233,13 @@ final class CommandUiPageCoordinator {
                         },
                         List.copyOf(genericActions), List.copyOf(bondedActions),
                         playerRef.getUuid(), context.configId(),
-                        composition.actionBindings(), registry.contributorRegistry());
+                        composition.actionBindings(), registry.contributorRegistry(),
+                        () -> selectedRendererId != null
+                                && registry.rendererRegistry()
+                                .resolve(selectedRendererId.value())
+                                .map(current -> current.generation()
+                                        == selectedRendererGeneration)
+                                .orElse(false));
             } else {
                 createdSession = sessions.createMixed(
                         composedBase.sessionId(), composedBase,
