@@ -189,10 +189,8 @@ public final class PublicPersistenceFeatureRegistry {
                                 OperationScopeType.OWNER
                         ),
                         OwnerPopulationReconciliationDefinition.INSTANCE,
-                        Set.of(
-                                OperationScopeType.PROFILE,
-                                OperationScopeType.OWNER
-                        )
+                        Set.of(OperationScopeType.PROFILE,
+                                OperationScopeType.OWNER)
                 ),
                 Set.of(IDENTITY, LIFECYCLE),
                 Set.of(
@@ -228,10 +226,7 @@ public final class PublicPersistenceFeatureRegistry {
                 List.of(PopulationGroupAssignmentDefinition.INSTANCE),
                 PublicPersistenceFeatureDescriptorFactory.scopes(
                         PopulationGroupAssignmentDefinition.INSTANCE,
-                        Set.of(
-                                OperationScopeType.PROFILE,
-                                OperationScopeType.OWNER
-                        )
+                        Set.of(OperationScopeType.PROFILE, OperationScopeType.OWNER)
                 ),
                 Set.of(IDENTITY, LIFECYCLE, OWNER_POPULATION),
                 Set.of(POPULATION_GROUP_INDEX),
