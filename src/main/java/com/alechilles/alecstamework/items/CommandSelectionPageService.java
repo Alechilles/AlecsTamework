@@ -347,7 +347,10 @@ final class CommandSelectionPageService {
                         currentWorld, config, toolId, actions,
                         genericAuthority, bondedAuthority));
         createdRef.set(created);
-        if (!created.host().isOpen()) {
+        if (!created.host().takePageOwnership()) {
+            if (!created.host().claimFallbackForOpener()) {
+                return true;
+            }
             return open(player, store, config, working, toolId, actions,
                     genericAuthority, bondedAuthority, true);
         }

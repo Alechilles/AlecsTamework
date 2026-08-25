@@ -130,6 +130,7 @@ class CommandUiHostPageTest {
                 session, controller, dispatcher,
                 ignored -> fallbackOpenCount.incrementAndGet(),
                 new RecordingEmitter());
+        assertTrue(host.takePageOwnership());
 
         host.build(null, new UICommandBuilder(), new UIEventBuilder(), null);
 
@@ -225,23 +226,47 @@ class CommandUiHostPageTest {
     }
 
     @Test
-    void rendererGenerationEndingBeforeHostOwnershipOpensFallbackOnce() {
+    void rendererRemovalAfterActiveSubscriptionBeforePageOwnershipOpensFallbackOnce() {
         CommandUiRegistry registry = new CommandUiRegistry();
         var registration = registry.registerRenderer(
                 "example:menu", ignored -> new TestController()).registration();
-        long generation = registry.resolveRenderer("example:menu")
-                .orElseThrow().generation();
+        long generation = registration.generation();
+        AtomicInteger fallbackOpenCount = new AtomicInteger();
+        CommandUiHostPage.FallbackOpener fallbackOpener =
+                ignored -> fallbackOpenCount.incrementAndGet();
+        QueuedDispatcher dispatcher = new QueuedDispatcher();
+        TestSession session = new TestSession(snapshot(1L));
+
+        CommandUiHostPage<TestEvent> host = rendererHostForRegistration(
+                registry, generation, session, new TestController(),
+                dispatcher, fallbackOpenCount);
+        registration.close();
+        if (!host.takePageOwnership() && host.claimFallbackForOpener()) {
+            // This is the opener's pre-show closed-host fallback branch.
+            fallbackOpener.open(new CommandUiHostPage.CurrentWorld(null, null));
+        }
+        dispatcher.runAll();
+
+        assertEquals(1, fallbackOpenCount.get());
+    }
+
+    @Test
+    void rendererGenerationEndingBeforeHostConstructionOpensFallbackOnce() {
+        CommandUiRegistry registry = new CommandUiRegistry();
+        var registration = registry.registerRenderer(
+                "example:menu", ignored -> new TestController()).registration();
+        long generation = registration.generation();
         registration.close();
         AtomicInteger fallbackOpenCount = new AtomicInteger();
+        CommandUiHostPage.FallbackOpener fallbackOpener =
+                ignored -> fallbackOpenCount.incrementAndGet();
         TestSession session = new TestSession(snapshot(1L));
 
         CommandUiHostPage<TestEvent> host = rendererHostForRegistration(
                 registry, generation, session, new TestController(),
                 fallbackOpenCount);
-        if (!host.isOpen()) {
-            // CommandSelectionPageService owns fallback when host construction
-            // returns a closed page before it can show the page.
-            fallbackOpenCount.incrementAndGet();
+        if (!host.takePageOwnership() && host.claimFallbackForOpener()) {
+            fallbackOpener.open(new CommandUiHostPage.CurrentWorld(null, null));
         }
 
         assertEquals(1, fallbackOpenCount.get());
@@ -259,6 +284,7 @@ class CommandUiHostPageTest {
         CommandUiHostPage<TestEvent> host = rendererHostForRegistration(
                 registry, registration.generation(), session, controller,
                 fallbackOpenCount);
+        assertTrue(host.takePageOwnership());
 
         assertTrue(host.applyUpdate(CommandUiUpdate.initial(snapshot(2L))));
 
@@ -287,6 +313,7 @@ class CommandUiHostPageTest {
                     operation.run(null, null);
                     return true;
                 }, fallbackOpenCount);
+        assertTrue(host.takePageOwnership());
 
         assertFalse(host.applyUpdate(CommandUiUpdate.initial(snapshot(2L))));
 
@@ -306,6 +333,7 @@ class CommandUiHostPageTest {
         CommandUiHostPage<TestEvent> firstHost = rendererHostForRegistration(
                 registry, first.generation(), firstSession, new TestController(),
                 fallbackOpenCount);
+        assertTrue(firstHost.takePageOwnership());
 
         first.close();
         var replacement = registry.registerRenderer(
@@ -314,6 +342,7 @@ class CommandUiHostPageTest {
         CommandUiHostPage<TestEvent> replacementHost = rendererHostForRegistration(
                 registry, replacement.generation(), replacementSession,
                 new TestController(), fallbackOpenCount);
+        assertTrue(replacementHost.takePageOwnership());
         first.close();
 
         assertFalse(firstHost.isOpen());

@@ -50,6 +50,8 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
     private final boolean customProvider;
     private final AtomicBoolean open = new AtomicBoolean(true);
     private final AtomicBoolean resourcesClosed = new AtomicBoolean();
+    private final Object lifecycleLock = new Object();
+    private FallbackOwnership fallbackOwnership = FallbackOwnership.PRE_SHOW;
     private final SubscriptionSlot unregisterSubscription =
             new SubscriptionSlot();
     private final CopyOnWriteArrayList<AutoCloseable> ownedResources =
@@ -261,6 +263,29 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
         terminate(Objects.requireNonNull(reason, "reason"));
     }
 
+    /** Transfers fallback ownership to the page after construction succeeds. */
+    public boolean takePageOwnership() {
+        if (!customProvider) return open.get();
+        synchronized (lifecycleLock) {
+            if (!open.get() || fallbackOwnership != FallbackOwnership.PRE_SHOW) {
+                return false;
+            }
+            fallbackOwnership = FallbackOwnership.PAGE;
+            return true;
+        }
+    }
+
+    /** Claims a pre-show fallback for the opener when the host already ended. */
+    public boolean claimFallbackForOpener() {
+        synchronized (lifecycleLock) {
+            if (fallbackOwnership != FallbackOwnership.PRE_SHOW_FALLBACK) {
+                return false;
+            }
+            fallbackOwnership = FallbackOwnership.OPENER_FALLBACK;
+            return true;
+        }
+    }
+
     public boolean isOpen() {
         return open.get();
     }
@@ -312,12 +337,14 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
     }
 
     private void fail(String phase, Throwable failure, boolean openFallback) {
-        if (!open.compareAndSet(true, false)) return;
+        TerminationClaim termination = claimTermination(openFallback);
+        if (!termination.claimed()) return;
+        boolean hostFallback = termination.hostFallback();
         LOGGER.log(Level.SEVERE,
                 "Command UI provider session failed during " + phase + ".",
                 failure);
         closeResources(CommandUiCloseReason.FAILURE);
-        if (!openFallback || context.playerUuid() == null) return;
+        if (!hostFallback || context.playerUuid() == null) return;
         try {
             boolean accepted = worldDispatcher.dispatch(
                     context.playerUuid(), (ref, store) ->
@@ -336,7 +363,9 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
     }
 
     private void terminate(CommandUiCloseReason reason, boolean openFallback) {
-        if (!open.compareAndSet(true, false)) return;
+        TerminationClaim termination = claimTermination(openFallback);
+        if (!termination.claimed()) return;
+        boolean hostFallback = termination.hostFallback();
         UUID playerUuid = context.playerUuid();
         if (playerUuid == null) {
             closeResources(reason);
@@ -349,7 +378,7 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
                         public void run(Ref<EntityStore> ref,
                                         Store<EntityStore> store) {
                             closeResources(reason);
-                            if (openFallback) {
+                            if (hostFallback) {
                                 try {
                                     fallbackOpener.open(new CurrentWorld(ref, store));
                                 } catch (RuntimeException | LinkageError fallbackFailure) {
@@ -371,8 +400,36 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
         closeResources(reason);
     }
 
+    private TerminationClaim claimTermination(boolean openFallback) {
+        synchronized (lifecycleLock) {
+            if (!open.compareAndSet(true, false)) {
+                return new TerminationClaim(false, false);
+            }
+            boolean hostFallback = claimHostFallback(openFallback);
+            if (customProvider && !hostFallback) markPreShowFallbackRequired();
+            return new TerminationClaim(true, hostFallback);
+        }
+    }
+
+    private boolean claimHostFallback(boolean requested) {
+        if (!requested || !customProvider
+                || fallbackOwnership != FallbackOwnership.PAGE) {
+            return false;
+        }
+        fallbackOwnership = FallbackOwnership.HOST_FALLBACK;
+        return true;
+    }
+
+    private void markPreShowFallbackRequired() {
+        if (fallbackOwnership == FallbackOwnership.PRE_SHOW) {
+            fallbackOwnership = FallbackOwnership.PRE_SHOW_FALLBACK;
+        }
+    }
+
     private void terminateHere(CommandUiCloseReason reason) {
-        if (!open.compareAndSet(true, false)) return;
+        synchronized (lifecycleLock) {
+            if (!open.compareAndSet(true, false)) return;
+        }
         closeResources(reason);
     }
 
@@ -424,6 +481,17 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
             }
             if (current != null) closeQuietly(current);
         }
+    }
+
+    private record TerminationClaim(boolean claimed, boolean hostFallback) {
+    }
+
+    private enum FallbackOwnership {
+        PRE_SHOW,
+        PAGE,
+        PRE_SHOW_FALLBACK,
+        OPENER_FALLBACK,
+        HOST_FALLBACK
     }
 
     private void sendHostUpdate(
