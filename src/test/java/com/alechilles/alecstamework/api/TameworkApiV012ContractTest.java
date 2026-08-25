@@ -43,13 +43,21 @@ class TameworkApiV012ContractTest {
     @Test
     void fullRuntimeAdvertisesCommandHudCapabilitiesUntilClosed() {
         TameworkEventBus events = new TameworkEventBus(null);
-        try (TameworkApiImpl api = newBaseApi(events)) {
+        TameworkApiImpl api = newBaseApi(events);
+        try {
             assertEquals("0.12.0", api.getApiVersion());
             assertTrue(api.getCapabilities().containsAll(EnumSet.of(
                     TameworkApiCapability.COMMAND_HUD_RENDERERS,
                     TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS)));
             assertTrue(api.commandHud().available());
+            api.close();
+            assertFalse(api.getCapabilities().contains(
+                    TameworkApiCapability.COMMAND_HUD_RENDERERS));
+            assertFalse(api.getCapabilities().contains(
+                    TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS));
+            assertFalse(api.commandHud().available());
         } finally {
+            api.close();
             events.close();
         }
     }

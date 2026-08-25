@@ -72,7 +72,8 @@ public final class CommandHudRendererDescriptor {
         Objects.requireNonNull(contributorId, "contributorId");
         Objects.requireNonNull(contributor, "contributor");
         if (unrestricted) return true;
-        if (!supportsContributor(contributorId)) return false;
+        if (supportedContributorNamespaces.contains(contributorId.value())) return true;
+        if (!supportedContributorNamespaces.contains(contributorId.namespace())) return false;
         if (contributor.isUnrestricted()) return true;
         for (String namespace : contributor.dataNamespaces()) {
             if (!supportsDataNamespace(namespace)) return false;
