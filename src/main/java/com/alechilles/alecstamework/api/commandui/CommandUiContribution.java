@@ -174,31 +174,31 @@ public final class CommandUiContribution {
         return key == null ? null : rowData(rowId).get(key);
     }
 
-    /** Returns detached page-level actions keyed by contributor-local ID. */
+    /** Returns detached page actions keyed by effective public action ID. */
     @Nonnull
     public Map<String, CommandUiActionView> pageActions() {
         return pageActions;
     }
 
-    /** Returns detached command-level actions keyed by contributor-local ID. */
+    /** Returns detached command actions keyed by effective public action ID. */
     @Nonnull
     public Map<String, CommandUiActionView> commandActions() {
         return commandActions;
     }
 
-    /** Returns detached row-level actions keyed by row and contributor-local ID. */
+    /** Returns detached row actions keyed by row and effective public action ID. */
     @Nonnull
     public Map<UUID, Map<String, CommandUiActionView>> rowActions() {
         return rowActions;
     }
 
-    /** Returns detached actions for one companion row. */
+    /** Returns detached row actions keyed by effective public action ID. */
     @Nonnull
     public Map<String, CommandUiActionView> rowActions(@Nonnull UUID rowId) {
         return rowActions.getOrDefault(Objects.requireNonNull(rowId, "rowId"), Map.of());
     }
 
-    /** Returns detached flow-level actions keyed by contributor-local ID. */
+    /** Returns detached flow actions keyed by effective public action ID. */
     @Nonnull
     public Map<String, CommandUiActionView> flowActions() {
         return flowActions;
