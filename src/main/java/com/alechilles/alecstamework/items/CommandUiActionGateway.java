@@ -331,6 +331,17 @@ final class CommandUiActionGateway {
             return current.withActionBinding(binding, rendererGenerationCheck,
                     generationCheck);
         });
+        if (refreshed.get()) {
+            contributorBindings.replaceAll((token, current) ->
+                    current.confirmationToken
+                            && handle.token().equals(current.initiatingToken)
+                            && !current.consumed.get()
+                            && sameContributorIdentity(
+                            current.actionBinding, binding)
+                            ? current.withActionBinding(binding,
+                            rendererGenerationCheck, generationCheck)
+                            : current);
+        }
         return refreshed.get();
     }
 

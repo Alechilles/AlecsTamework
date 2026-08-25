@@ -163,7 +163,7 @@ class CommandUiPageCoordinatorTest {
     }
 
     @Test
-    void stableContributorHandleExecutesTheLatestComposedHandler() {
+    void stableContributorHandleAndConfirmationUseTheLatestComposedHandler() {
         CommandUiRegistry registry = new CommandUiRegistry();
         RecordingController custom = new RecordingController();
         CommandUiContributorId contributorId = CommandUiContributorId.of(
@@ -181,7 +181,7 @@ class CommandUiPageCoordinatorTest {
                         new CommandUiContributorAction(
                                 "ping", "PING", "Ping",
                                 CommandUiContributorAction.InputPolicy.NONE,
-                                false, actionContext -> {
+                                true, actionContext -> {
                             executedRevision.set(revision);
                             return java.util.concurrent.CompletableFuture
                                     .completedFuture(
@@ -213,6 +213,11 @@ class CommandUiPageCoordinatorTest {
         created.pageOpened();
         String token = created.session().snapshot().contribution(contributorId)
                 .commandActions().get("runeteria:actions/ping").handle().token();
+        CommandUiActionResult confirmation = created.session().invoke(
+                        new CommandUiActionHandle(token))
+                .toCompletableFuture().join();
+        assertEquals(CommandUiActionStatus.CONFIRMATION_REQUIRED,
+                confirmation.status());
 
         sink.get().markPageDirty();
 
@@ -220,7 +225,7 @@ class CommandUiPageCoordinatorTest {
                 .contribution(contributorId).commandActions()
                 .get("runeteria:actions/ping").handle().token());
         assertEquals(CommandUiActionStatus.APPLIED,
-                created.session().invoke(new CommandUiActionHandle(token))
+                created.session().invoke(confirmation.confirmationHandle())
                         .toCompletableFuture().join().status());
         assertEquals(2, executedRevision.get());
         created.session().close();
