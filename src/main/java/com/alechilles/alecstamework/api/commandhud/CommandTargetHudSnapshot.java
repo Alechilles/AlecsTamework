@@ -196,14 +196,30 @@ public final class CommandTargetHudSnapshot {
             @Nullable Integer maxHealth,
             @Nullable Integer currentHappiness,
             @Nullable Integer maxHappiness,
+            @Nullable Integer targetHappinessPercent,
             @Nullable Integer currentHunger,
             @Nullable Integer maxHunger,
             @Nullable Integer currentThirst,
             @Nullable Integer maxThirst
     ) {
+        /** Creates vitals without a known happiness target. */
+        public Vitals(
+                @Nullable Integer currentHealth,
+                @Nullable Integer maxHealth,
+                @Nullable Integer currentHappiness,
+                @Nullable Integer maxHappiness,
+                @Nullable Integer currentHunger,
+                @Nullable Integer maxHunger,
+                @Nullable Integer currentThirst,
+                @Nullable Integer maxThirst
+        ) {
+            this(currentHealth, maxHealth, currentHappiness, maxHappiness, null,
+                    currentHunger, maxHunger, currentThirst, maxThirst);
+        }
+
         /** Returns an absent-value set of vitals. */
         public static Vitals empty() {
-            return new Vitals(null, null, null, null, null, null, null, null);
+            return new Vitals(null, null, null, null, null, null, null, null, null);
         }
 
         public Integer health() {
@@ -212,6 +228,10 @@ public final class CommandTargetHudSnapshot {
 
         public Integer happiness() {
             return currentHappiness;
+        }
+
+        public Integer happinessTargetPercent() {
+            return targetHappinessPercent;
         }
 
         public Integer hunger() {
@@ -336,14 +356,35 @@ public final class CommandTargetHudSnapshot {
             @Nullable Integer level,
             @Nullable Long experience,
             @Nullable Long experienceToNextLevel,
-            @Nullable Integer availableTalentPoints
+            @Nullable Integer availableTalentPoints,
+            @Nullable Integer maxLevel,
+            @Nullable Boolean atMaxLevel
     ) {
+        /** Creates progression without maximum-level metadata. */
+        public Progression(
+                @Nullable Integer level,
+                @Nullable Long experience,
+                @Nullable Long experienceToNextLevel,
+                @Nullable Integer availableTalentPoints
+        ) {
+            this(level, experience, experienceToNextLevel, availableTalentPoints,
+                    null, null);
+        }
+
         public static Progression empty() {
-            return new Progression(null, null, null, null);
+            return new Progression(null, null, null, null, null, null);
         }
 
         public Integer talentPoints() {
             return availableTalentPoints;
+        }
+
+        public Integer maximumLevel() {
+            return maxLevel;
+        }
+
+        public Boolean maximumLevelState() {
+            return atMaxLevel;
         }
     }
 
@@ -351,12 +392,30 @@ public final class CommandTargetHudSnapshot {
     public record Trait(
             @Nonnull String id,
             @Nonnull String label,
-            @Nullable String iconPath
+            @Nullable String iconPath,
+            @Nonnull String iconText,
+            @Nonnull String tooltipText,
+            double fillRatio,
+            boolean counterClockwise,
+            boolean belowDefault
     ) {
+        /** Creates a trait with standard fallback presentation values. */
+        public Trait(
+                @Nonnull String id,
+                @Nonnull String label,
+                @Nullable String iconPath
+        ) {
+            this(id, label, iconPath, "?", null, 0.0, false, false);
+        }
+
         public Trait {
             id = normalize(id);
             label = normalize(label);
-            iconPath = normalize(iconPath);
+            iconPath = normalizeNullable(iconPath);
+            iconText = iconText == null || iconText.isBlank() ? "?" : iconText.trim();
+            tooltipText = tooltipText == null || tooltipText.isBlank()
+                    ? label : tooltipText.trim();
+            fillRatio = clampRatio(fillRatio);
         }
     }
 
@@ -369,6 +428,16 @@ public final class CommandTargetHudSnapshot {
     @Nonnull
     private static String normalize(@Nullable String value) {
         return value == null || value.isBlank() ? "" : value.trim();
+    }
+
+    @Nullable
+    private static String normalizeNullable(@Nullable String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private static double clampRatio(double value) {
+        if (!Double.isFinite(value)) return 0.0;
+        return Math.max(0.0, Math.min(1.0, value));
     }
 
     @Override

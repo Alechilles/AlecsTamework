@@ -55,7 +55,14 @@ public final class CommandHotswapHudView {
         LinkedHashMap<CommandHudContributorId, CommandHudContribution> copy =
                 new LinkedHashMap<>();
         source.forEach((key, value) -> {
-            if (key != null) copy.put(key, Objects.requireNonNull(value, "contribution"));
+            if (key == null) return;
+            CommandHudContribution contribution =
+                    Objects.requireNonNull(value, "contribution");
+            if (!key.equals(contribution.contributorId())) {
+                throw new IllegalArgumentException(
+                        "Contribution map key must match the contribution ID.");
+            }
+            copy.put(key, contribution);
         });
         return Map.copyOf(copy);
     }

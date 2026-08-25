@@ -34,6 +34,7 @@ public final class CommandTargetHudChangeSet {
     private final boolean fullRefresh;
     private final Set<Section> changedSections;
     private final Map<CommandHudContributorId, Set<String>> contributorPaths;
+    private final Set<CommandHudContributorId> fullRefreshContributors;
 
     /** Creates a change set with no contributor path hints. */
     public CommandTargetHudChangeSet(
@@ -52,7 +53,9 @@ public final class CommandTargetHudChangeSet {
         this.fullRefresh = fullRefresh;
         this.changedSections = fullRefresh
                 ? Section.all() : copySections(changedSections);
-        this.contributorPaths = copyContributorPaths(contributorPaths);
+        ContributorPathCopy copied = copyContributorPaths(contributorPaths);
+        this.contributorPaths = copied.paths();
+        this.fullRefreshContributors = copied.fullRefreshes();
     }
 
     /** Creates a full target refresh hint. */
@@ -97,9 +100,28 @@ public final class CommandTargetHudChangeSet {
         return contributorPaths;
     }
 
+    /** Returns contributors whose local scope requires a complete refresh. */
+    @Nonnull
+    public Set<CommandHudContributorId> fullRefreshContributors() {
+        return fullRefreshContributors;
+    }
+
+    /** Returns whether this contributor must be recomposed completely. */
+    public boolean contributorFullRefresh(@Nonnull CommandHudContributorId contributorId) {
+        return fullRefresh || fullRefreshContributors.contains(contributorId);
+    }
+
     @Nonnull
     public Set<String> pathsFor(@Nonnull CommandHudContributorId contributorId) {
         return contributorPaths.getOrDefault(contributorId, Set.of());
+    }
+
+    /** Returns the bounded scope for one contributor, including overflow state. */
+    @Nonnull
+    public CommandHudDirtyScope scopeFor(@Nonnull CommandHudContributorId contributorId) {
+        return contributorFullRefresh(contributorId)
+                ? CommandHudDirtyScope.full()
+                : CommandHudDirtyScope.paths(pathsFor(contributorId));
     }
 
     public boolean changed(@Nonnull Section section) {
@@ -113,24 +135,46 @@ public final class CommandTargetHudChangeSet {
     }
 
     @Nonnull
-    private static Map<CommandHudContributorId, Set<String>> copyContributorPaths(
+    private static ContributorPathCopy copyContributorPaths(
             @Nullable Map<CommandHudContributorId, Set<String>> source
     ) {
-        if (source == null || source.isEmpty()) return Map.of();
+        if (source == null || source.isEmpty()) {
+            return new ContributorPathCopy(Map.of(), Set.of());
+        }
         LinkedHashMap<CommandHudContributorId, Set<String>> copy = new LinkedHashMap<>();
+        LinkedHashSet<CommandHudContributorId> fullRefreshes = new LinkedHashSet<>();
         source.forEach((id, paths) -> {
             if (id == null) return;
-            LinkedHashSet<String> normalized = new LinkedHashSet<>();
-            if (paths != null) {
-                for (String path : paths) {
-                    String value = CommandHudDirtyScope.normalizePath(path);
-                    if (value != null) normalized.add(value);
-                    if (normalized.size() >= CommandHudDirtyScope.MAX_PATHS) break;
-                }
-            }
-            copy.put(id, normalized.isEmpty()
-                    ? Set.of() : Collections.unmodifiableSet(normalized));
+            PathCopy pathCopy = copyPaths(paths);
+            copy.put(id, pathCopy.paths());
+            if (pathCopy.fullRefresh()) fullRefreshes.add(id);
         });
-        return Map.copyOf(copy);
+        return new ContributorPathCopy(Map.copyOf(copy), Set.copyOf(fullRefreshes));
+    }
+
+    @Nonnull
+    private static PathCopy copyPaths(@Nullable Set<String> source) {
+        if (source == null || source.isEmpty()) return new PathCopy(Set.of(), false);
+        LinkedHashSet<String> normalized = new LinkedHashSet<>();
+        for (String path : source) {
+            String value = CommandHudDirtyScope.normalizePath(path);
+            if (value == null) continue;
+            normalized.add(value);
+            if (normalized.size() > CommandHudDirtyScope.MAX_PATHS) {
+                return new PathCopy(Set.of(), true);
+            }
+        }
+        Set<String> immutable = normalized.isEmpty()
+                ? Set.of() : Collections.unmodifiableSet(normalized);
+        return new PathCopy(immutable, false);
+    }
+
+    private record PathCopy(@Nonnull Set<String> paths, boolean fullRefresh) {
+    }
+
+    private record ContributorPathCopy(
+            @Nonnull Map<CommandHudContributorId, Set<String>> paths,
+            @Nonnull Set<CommandHudContributorId> fullRefreshes
+    ) {
     }
 }
