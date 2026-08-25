@@ -21,6 +21,7 @@ public final class CommandUiContributorCreateContext {
     private final CommandUiRendererId rendererId;
     @Nonnull
     private final CommandUiContributorId contributorId;
+    private final long registrationGeneration;
     @Nonnull
     private final CommandUiContributorDirtySink dirtySink;
     @Nonnull
@@ -32,6 +33,16 @@ public final class CommandUiContributorCreateContext {
             @Nonnull CommandUiContributorId contributorId,
             @Nonnull CommandUiContributorDirtySink dirtySink
     ) {
+        this(openContext, contributorId, 0L, dirtySink);
+    }
+
+    /** Creates a context for one exact contributor registration generation. */
+    public CommandUiContributorCreateContext(
+            @Nonnull CommandUiOpenContext openContext,
+            @Nonnull CommandUiContributorId contributorId,
+            long registrationGeneration,
+            @Nonnull CommandUiContributorDirtySink dirtySink
+    ) {
         this(
                 Objects.requireNonNull(openContext, "openContext").playerUuid(),
                 openContext.language(),
@@ -40,6 +51,7 @@ public final class CommandUiContributorCreateContext {
                 openContext.configId(),
                 parseRendererId(openContext.providerId()),
                 contributorId,
+                registrationGeneration,
                 dirtySink,
                 openContext
         );
@@ -64,6 +76,7 @@ public final class CommandUiContributorCreateContext {
                 configId,
                 rendererId,
                 contributorId,
+                0L,
                 dirtySink,
                 new CommandUiOpenContext(
                         playerUuid,
@@ -84,6 +97,7 @@ public final class CommandUiContributorCreateContext {
             @Nullable String configId,
             @Nullable CommandUiRendererId rendererId,
             @Nonnull CommandUiContributorId contributorId,
+            long registrationGeneration,
             @Nonnull CommandUiContributorDirtySink dirtySink,
             @Nonnull CommandUiOpenContext openContext
     ) {
@@ -94,6 +108,11 @@ public final class CommandUiContributorCreateContext {
         this.configId = normalize(configId);
         this.rendererId = rendererId;
         this.contributorId = Objects.requireNonNull(contributorId, "contributorId");
+        if (registrationGeneration < 0L) {
+            throw new IllegalArgumentException(
+                    "Registration generation cannot be negative.");
+        }
+        this.registrationGeneration = registrationGeneration;
         this.dirtySink = Objects.requireNonNull(dirtySink, "dirtySink");
         this.openContext = Objects.requireNonNull(openContext, "openContext");
     }
@@ -136,6 +155,11 @@ public final class CommandUiContributorCreateContext {
     @Nonnull
     public CommandUiContributorId contributorId() {
         return contributorId;
+    }
+
+    /** Returns the exact registration generation, or zero for a detached context. */
+    public long registrationGeneration() {
+        return registrationGeneration;
     }
 
     @Nonnull

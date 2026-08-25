@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.commandui.CommandUiRegistration;
 import com.alechilles.alecstamework.api.commandui.CommandUiRegistrationResult;
+import com.alechilles.alecstamework.api.commandui.CommandUiRendererDescriptor;
 import com.alechilles.alecstamework.api.commandui.CommandUiRendererId;
 import com.alechilles.alecstamework.api.commandui.CommandUiRendererProvider;
 import java.util.ArrayList;
@@ -32,6 +33,16 @@ public final class CommandUiRendererRegistry implements AutoCloseable {
             @Nullable String rawId,
             @Nullable CommandUiRendererProvider provider
     ) {
+        return register(rawId, CommandUiRendererDescriptor.unrestricted(), provider);
+    }
+
+    /** Registers a renderer and retains its immutable generation descriptor. */
+    @Nonnull
+    public synchronized CommandUiRegistrationResult register(
+            @Nullable String rawId,
+            @Nullable CommandUiRendererDescriptor descriptor,
+            @Nullable CommandUiRendererProvider provider
+    ) {
         if (closed.get()) {
             return CommandUiRegistrationResult.unavailable(rawId);
         }
@@ -49,7 +60,12 @@ public final class CommandUiRendererRegistry implements AutoCloseable {
             return CommandUiRegistrationResult.invalid(rawId,
                     "Command UI renderer provider is required.");
         }
-        Entry entry = new Entry(id, provider, nextGeneration.incrementAndGet());
+        if (descriptor == null) {
+            return CommandUiRegistrationResult.invalid(rawId,
+                    "Command UI renderer descriptor is required.");
+        }
+        Entry entry = new Entry(id, provider, descriptor,
+                nextGeneration.incrementAndGet());
         if (renderers.putIfAbsent(id, entry) != null) {
             return CommandUiRegistrationResult.conflict(id.value());
         }
@@ -79,7 +95,7 @@ public final class CommandUiRendererRegistry implements AutoCloseable {
         return entry == null || !entry.active()
                 ? Optional.empty()
                 : Optional.of(new ResolvedRenderer(
-                        entry.id, entry.provider, entry.generation));
+                        entry.id, entry.provider, entry.generation, entry.descriptor));
     }
 
     @Nonnull
@@ -123,13 +139,17 @@ public final class CommandUiRendererRegistry implements AutoCloseable {
     }
 
     @Override
-    public synchronized void close() {
-        if (!closed.compareAndSet(false, true)) return;
-        for (Entry entry : renderers.values()) {
-            entry.closed.set(true);
+    public void close() {
+        List<Entry> removed;
+        synchronized (this) {
+            if (!closed.compareAndSet(false, true)) return;
+            removed = List.copyOf(renderers.values());
+            for (Entry entry : removed) entry.closed.set(true);
+            renderers.clear();
+        }
+        for (Entry entry : removed) {
             notifyUnregister(entry.id, entry.generation);
         }
-        renderers.clear();
         listeners.clear();
     }
 
@@ -147,8 +167,24 @@ public final class CommandUiRendererRegistry implements AutoCloseable {
     public record ResolvedRenderer(
             @Nonnull CommandUiRendererId id,
             @Nonnull CommandUiRendererProvider provider,
-            long generation
+            long generation,
+            @Nonnull CommandUiRendererDescriptor descriptor
     ) {
+        public ResolvedRenderer {
+            java.util.Objects.requireNonNull(id, "id");
+            java.util.Objects.requireNonNull(provider, "provider");
+            java.util.Objects.requireNonNull(descriptor, "descriptor");
+        }
+
+        /** Compatibility constructor for internal callers from the old API. */
+        public ResolvedRenderer(
+                @Nonnull CommandUiRendererId id,
+                @Nonnull CommandUiRendererProvider provider,
+                long generation
+        ) {
+            this(id, provider, generation,
+                    CommandUiRendererDescriptor.unrestricted());
+        }
     }
 
     /** Atomic result for an exact-generation lifecycle subscription. */
@@ -198,14 +234,17 @@ public final class CommandUiRendererRegistry implements AutoCloseable {
     private final class Entry implements CommandUiRegistration {
         private final CommandUiRendererId id;
         private final CommandUiRendererProvider provider;
+        private final CommandUiRendererDescriptor descriptor;
         private final long generation;
         private final AtomicBoolean closed = new AtomicBoolean();
 
         private Entry(CommandUiRendererId id,
                        CommandUiRendererProvider provider,
+                       CommandUiRendererDescriptor descriptor,
                        long generation) {
             this.id = id;
             this.provider = provider;
+            this.descriptor = descriptor;
             this.generation = generation;
         }
 
@@ -228,11 +267,13 @@ public final class CommandUiRendererRegistry implements AutoCloseable {
 
         @Override
         public void close() {
+            boolean removed;
             synchronized (CommandUiRendererRegistry.this) {
                 if (!closed.compareAndSet(false, true)) return;
-                if (renderers.remove(id, this)) {
-                    notifyUnregister(id, generation);
-                }
+                removed = renderers.remove(id, this);
+            }
+            if (removed) {
+                notifyUnregister(id, generation);
             }
         }
     }

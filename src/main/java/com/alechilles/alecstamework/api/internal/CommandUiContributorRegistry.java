@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorDescriptor;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorProvider;
 import com.alechilles.alecstamework.api.commandui.CommandUiRegistration;
 import com.alechilles.alecstamework.api.commandui.CommandUiRegistrationResult;
@@ -28,6 +29,16 @@ public final class CommandUiContributorRegistry implements AutoCloseable {
             @Nullable String rawId,
             @Nullable CommandUiContributorProvider provider
     ) {
+        return register(rawId, CommandUiContributorDescriptor.unrestricted(), provider);
+    }
+
+    /** Registers a contributor and retains its immutable generation descriptor. */
+    @Nonnull
+    public synchronized CommandUiRegistrationResult register(
+            @Nullable String rawId,
+            @Nullable CommandUiContributorDescriptor descriptor,
+            @Nullable CommandUiContributorProvider provider
+    ) {
         if (closed.get()) return CommandUiRegistrationResult.unavailable(rawId);
         Optional<CommandUiContributorId> parsed = CommandUiContributorId.tryParse(rawId);
         if (parsed.isEmpty()) {
@@ -43,7 +54,12 @@ public final class CommandUiContributorRegistry implements AutoCloseable {
             return CommandUiRegistrationResult.invalid(rawId,
                     "Command UI contributor provider is required.");
         }
-        Entry entry = new Entry(id, provider, nextGeneration.incrementAndGet());
+        if (descriptor == null) {
+            return CommandUiRegistrationResult.invalid(rawId,
+                    "Command UI contributor descriptor is required.");
+        }
+        Entry entry = new Entry(id, provider, descriptor,
+                nextGeneration.incrementAndGet());
         if (contributors.putIfAbsent(id, entry) != null) {
             return CommandUiRegistrationResult.conflict(id.value());
         }
@@ -71,7 +87,7 @@ public final class CommandUiContributorRegistry implements AutoCloseable {
         return entry == null || !entry.active()
                 ? Optional.empty()
                 : Optional.of(new ResolvedContributor(
-                        entry.id, entry.provider, entry.generation));
+                        entry.id, entry.provider, entry.generation, entry.descriptor));
     }
 
     @Nonnull
@@ -153,8 +169,24 @@ public final class CommandUiContributorRegistry implements AutoCloseable {
     public record ResolvedContributor(
             @Nonnull CommandUiContributorId id,
             @Nonnull CommandUiContributorProvider provider,
-            long generation
+            long generation,
+            @Nonnull CommandUiContributorDescriptor descriptor
     ) {
+        public ResolvedContributor {
+            java.util.Objects.requireNonNull(id, "id");
+            java.util.Objects.requireNonNull(provider, "provider");
+            java.util.Objects.requireNonNull(descriptor, "descriptor");
+        }
+
+        /** Compatibility constructor for internal callers from the old API. */
+        public ResolvedContributor(
+                @Nonnull CommandUiContributorId id,
+                @Nonnull CommandUiContributorProvider provider,
+                long generation
+        ) {
+            this(id, provider, generation,
+                    CommandUiContributorDescriptor.unrestricted());
+        }
     }
 
     public record ExactSubscription(boolean active, @Nonnull AutoCloseable handle) {
@@ -201,14 +233,17 @@ public final class CommandUiContributorRegistry implements AutoCloseable {
     private final class Entry implements CommandUiRegistration {
         private final CommandUiContributorId id;
         private final CommandUiContributorProvider provider;
+        private final CommandUiContributorDescriptor descriptor;
         private final long generation;
         private final AtomicBoolean closed = new AtomicBoolean();
 
         private Entry(CommandUiContributorId id,
-                       CommandUiContributorProvider provider,
-                       long generation) {
+                      CommandUiContributorProvider provider,
+                      CommandUiContributorDescriptor descriptor,
+                      long generation) {
             this.id = id;
             this.provider = provider;
+            this.descriptor = descriptor;
             this.generation = generation;
         }
 

@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
+import com.alechilles.alecstamework.api.commandui.CommandUiContribution;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorProvider;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorRequirement;
 import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
@@ -10,7 +11,9 @@ import com.alechilles.alecstamework.api.commandui.CommandUiRendererProvider;
 import com.alechilles.alecstamework.api.internal.CommandUiContributorRegistry;
 import com.alechilles.alecstamework.api.internal.CommandUiRendererRegistry;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -51,44 +54,55 @@ final class CommandUiCompositionResolver {
                 renderers.resolve(rendererId.value());
         if (renderer.isEmpty()) return standard(standardFactory);
 
+        CommandUiRendererRegistry.ResolvedRenderer resolved = renderer.orElseThrow();
+        List<CommandUiCompositionSession.Binding> bindings = new ArrayList<>();
+        Map<CommandUiContributorId, CommandUiContribution.Status> statuses =
+                new LinkedHashMap<>();
+        for (CommandUiContributorRequirement requirement : requirements) {
+            if (requirement == null || requirement.id() == null) {
+                continue;
+            }
+            Optional<CommandUiContributorRegistry.ResolvedContributor>
+                    contributor = contributors.resolve(requirement.id().value());
+            if (contributor.isEmpty()) {
+                if (requirement.required()) {
+                    return standard(standardFactory);
+                }
+                statuses.put(requirement.id(),
+                        CommandUiContribution.Status.OPTIONAL_UNAVAILABLE);
+                continue;
+            }
+            CommandUiContributorRegistry.ResolvedContributor value =
+                    contributor.orElseThrow();
+            if (!resolved.descriptor().supports(value.id(), value.descriptor())) {
+                if (requirement.required()) {
+                    return standard(standardFactory);
+                }
+                statuses.put(value.id(),
+                        CommandUiContribution.Status.UNSUPPORTED_BY_RENDERER);
+                continue;
+            }
+            bindings.add(new CommandUiCompositionSession.Binding(
+                    value.id(), value.generation(), value.provider(),
+                    requirement.required(),
+                    () -> contributors.isActive(value.id(), value.generation())));
+        }
+
         CommandUiPageController<?> controller = null;
         try {
-            CommandUiRendererRegistry.ResolvedRenderer resolved =
-                    renderer.orElseThrow();
             CommandUiRendererProvider provider = resolved.provider();
             controller = provider.create(context);
             if (controller == null || controller.eventCodec() == null) {
                 close(controller);
                 return standard(standardFactory);
             }
-            List<CommandUiCompositionSession.Binding> bindings =
-                    new ArrayList<>();
-            for (CommandUiContributorRequirement requirement : requirements) {
-                if (requirement == null || requirement.id() == null) {
-                    continue;
-                }
-                Optional<CommandUiContributorRegistry.ResolvedContributor>
-                        contributor = contributors.resolve(requirement.id().value());
-                if (contributor.isEmpty()) {
-                    if (requirement.required()) {
-                        close(controller);
-                        return standard(standardFactory);
-                    }
-                    continue;
-                }
-                CommandUiContributorRegistry.ResolvedContributor value =
-                        contributor.orElseThrow();
-                bindings.add(new CommandUiCompositionSession.Binding(
-                        value.id(), value.generation(), value.provider(),
-                        requirement.required(),
-                        () -> contributors.isActive(value.id(), value.generation())));
-            }
             return new Resolved(
                     controller,
                     resolved.id(),
                     resolved.generation(),
                     true,
-                    List.copyOf(bindings));
+                    List.copyOf(bindings),
+                    statuses);
         } catch (RuntimeException | LinkageError failure) {
             close(controller);
             return standard(standardFactory);
@@ -133,7 +147,9 @@ final class CommandUiCompositionResolver {
             @Nullable CommandUiRendererId rendererId,
             long rendererGeneration,
             boolean custom,
-            @Nonnull List<CommandUiCompositionSession.Binding> contributors
+            @Nonnull List<CommandUiCompositionSession.Binding> contributors,
+            @Nonnull Map<CommandUiContributorId,
+                    CommandUiContribution.Status> statuses
     ) {
         Resolved {
             Objects.requireNonNull(controller, "controller");
@@ -143,17 +159,38 @@ final class CommandUiCompositionResolver {
             }
             contributors = List.copyOf(Objects.requireNonNull(
                     contributors, "contributors"));
+            statuses = java.util.Collections.unmodifiableMap(
+                    new LinkedHashMap<>(Objects.requireNonNull(
+                            statuses, "statuses")));
             if (!custom && (rendererId != null || rendererGeneration != 0L
-                    || !contributors.isEmpty())) {
+                    || !contributors.isEmpty() || !statuses.isEmpty())) {
                 throw new IllegalArgumentException(
                         "Standard resolution cannot carry custom state.");
             }
+        }
+
+        Resolved(
+                @Nonnull CommandUiPageController<?> controller,
+                @Nullable CommandUiRendererId rendererId,
+                long rendererGeneration,
+                boolean custom,
+                @Nonnull List<CommandUiCompositionSession.Binding> contributors
+        ) {
+            this(controller, rendererId, rendererGeneration, custom,
+                    contributors, Map.of());
         }
 
         /** Alias for callers that describe the ordered list as bindings. */
         @Nonnull
         List<CommandUiCompositionSession.Binding> bindings() {
             return contributors;
+        }
+
+        /** Returns optional contributor compatibility statuses recorded at open. */
+        @Nonnull
+        Map<CommandUiContributorId, CommandUiContribution.Status>
+                contributorStatuses() {
+            return statuses;
         }
     }
 }

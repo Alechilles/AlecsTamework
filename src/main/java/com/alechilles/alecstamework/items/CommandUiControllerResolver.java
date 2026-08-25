@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorRequirement;
+import com.alechilles.alecstamework.api.commandui.CommandUiContribution;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
 import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
 import com.alechilles.alecstamework.api.commandui.CommandUiPageController;
 import com.alechilles.alecstamework.api.commandui.CommandUiProviderId;
@@ -9,6 +11,7 @@ import com.alechilles.alecstamework.api.internal.CommandUiContributorRegistry;
 import com.alechilles.alecstamework.api.internal.CommandUiProviderRegistry;
 import com.alechilles.alecstamework.api.internal.CommandUiRendererRegistry;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
@@ -89,7 +92,7 @@ final class CommandUiControllerResolver {
             }
             return new Resolved(controller, resolved.providerId(),
                     toRendererId(resolved.providerId()), resolved.generation(),
-                    resolved.generation(), true, List.of());
+                    resolved.generation(), true, List.of(), Map.of());
         } catch (RuntimeException | LinkageError failure) {
             close(controller);
             return standard(standardFactory);
@@ -106,7 +109,8 @@ final class CommandUiControllerResolver {
                 ? null : CommandUiProviderId.tryParse(rendererId.value()).orElse(null);
         return new Resolved(resolved.controller(), providerId, rendererId,
                 resolved.rendererGeneration(), resolved.rendererGeneration(),
-                true, resolved.contributors());
+                true, resolved.contributors(),
+                resolved.contributorStatuses());
     }
 
     @Nonnull
@@ -124,7 +128,8 @@ final class CommandUiControllerResolver {
     private static Resolved standardResolved(
             @Nonnull CommandUiPageController<?> controller
     ) {
-        return new Resolved(controller, null, null, 0L, 0L, false, List.of());
+        return new Resolved(controller, null, null, 0L, 0L, false, List.of(),
+                Map.of());
     }
 
     @Nullable
@@ -150,12 +155,17 @@ final class CommandUiControllerResolver {
             long providerGeneration,
             long rendererGeneration,
             boolean custom,
-            @Nonnull List<CommandUiCompositionSession.Binding> contributors
+            @Nonnull List<CommandUiCompositionSession.Binding> contributors,
+            @Nonnull Map<CommandUiContributorId, CommandUiContribution.Status>
+                    contributorStatuses
     ) {
         Resolved {
             Objects.requireNonNull(controller, "controller");
             contributors = List.copyOf(Objects.requireNonNull(
                     contributors, "contributors"));
+            contributorStatuses = java.util.Collections.unmodifiableMap(
+                    new java.util.LinkedHashMap<>(Objects.requireNonNull(
+                            contributorStatuses, "contributorStatuses")));
         }
 
         @Nonnull

@@ -33,6 +33,8 @@ final class CommandUiCompositionSession implements AutoCloseable {
     private final BiConsumer<CommandUiSnapshot, CommandUiChangeSet> publisher;
     private final Runnable refreshRequest;
     private final List<State> states;
+    private final Map<CommandUiContributorId, CommandUiContribution>
+            compatibilityContributions;
     private boolean open = true;
     private CommandUiSnapshot baseSnapshot;
     private CommandUiSnapshot currentSnapshot;
@@ -41,6 +43,8 @@ final class CommandUiCompositionSession implements AutoCloseable {
             @Nonnull CommandUiSnapshot baseSnapshot,
             @Nonnull CommandUiOpenContext openContext,
             @Nonnull List<Binding> bindings,
+            @Nonnull Map<CommandUiContributorId, CommandUiContribution.Status>
+                    compatibilityStatuses,
             @Nonnull BiConsumer<CommandUiSnapshot, CommandUiChangeSet> publisher,
             @Nonnull Runnable refreshRequest
     ) {
@@ -50,6 +54,8 @@ final class CommandUiCompositionSession implements AutoCloseable {
         this.refreshRequest = Objects.requireNonNull(refreshRequest,
                 "refreshRequest");
         this.states = createStates(bindings);
+        this.compatibilityContributions = compatibilityContributions(
+                compatibilityStatuses);
         try {
             this.currentSnapshot = composeLocked(true, true);
         } catch (RuntimeException | LinkageError failure) {
@@ -69,7 +75,22 @@ final class CommandUiCompositionSession implements AutoCloseable {
             @Nonnull Runnable refreshRequest
     ) {
         return new CommandUiCompositionSession(baseSnapshot, openContext,
-                bindings, publisher, refreshRequest);
+                bindings, Map.of(), publisher, refreshRequest);
+    }
+
+    /** Creates a session with statuses produced by compatibility resolution. */
+    @Nonnull
+    static CommandUiCompositionSession create(
+            @Nonnull CommandUiSnapshot baseSnapshot,
+            @Nonnull CommandUiOpenContext openContext,
+            @Nonnull List<Binding> bindings,
+            @Nonnull Map<CommandUiContributorId, CommandUiContribution.Status>
+                    compatibilityStatuses,
+            @Nonnull BiConsumer<CommandUiSnapshot, CommandUiChangeSet> publisher,
+            @Nonnull Runnable refreshRequest
+    ) {
+        return new CommandUiCompositionSession(baseSnapshot, openContext,
+                bindings, compatibilityStatuses, publisher, refreshRequest);
     }
 
     @Nonnull
@@ -132,7 +153,8 @@ final class CommandUiCompositionSession implements AutoCloseable {
             try {
                 state.contributor = binding.provider().create(
                         new CommandUiContributorCreateContext(
-                                openContext, binding.id(), state.sink));
+                                openContext, binding.id(), binding.generation(),
+                                state.sink));
                 if (state.contributor == null) {
                     state.failure = "contributor factory returned null";
                 }
@@ -155,7 +177,7 @@ final class CommandUiCompositionSession implements AutoCloseable {
     private CommandUiSnapshot composeLocked(boolean initial,
                                             boolean abortRequired) {
         Map<CommandUiContributorId, CommandUiContribution> contributions =
-                new LinkedHashMap<>();
+                new LinkedHashMap<>(compatibilityContributions);
         for (State state : states) {
             if (!initial && !state.dirty()) {
                 if (state.lastPublishedContribution != null) {
@@ -294,6 +316,38 @@ final class CommandUiCompositionSession implements AutoCloseable {
         } catch (Exception | LinkageError ignored) {
             // Continue closing all contributors in reverse order.
         }
+    }
+
+    @Nonnull
+    private static Map<CommandUiContributorId, CommandUiContribution>
+            compatibilityContributions(
+            @Nonnull Map<CommandUiContributorId, CommandUiContribution.Status>
+                    statuses
+    ) {
+        Objects.requireNonNull(statuses, "compatibilityStatuses");
+        if (statuses.isEmpty()) return Map.of();
+        Map<CommandUiContributorId, CommandUiContribution> contributions =
+                new LinkedHashMap<>();
+        statuses.forEach((id, status) -> contributions.put(
+                Objects.requireNonNull(id, "contributorId"),
+                new CommandUiContribution(id, Map.of(), Map.of(), Map.of(),
+                        Map.of(), Map.of(), Map.of(),
+                        Objects.requireNonNull(status, "status"),
+                        compatibilityReason(status))));
+        return java.util.Collections.unmodifiableMap(contributions);
+    }
+
+    @Nonnull
+    private static String compatibilityReason(
+            @Nonnull CommandUiContribution.Status status
+    ) {
+        return switch (status) {
+            case UNSUPPORTED_BY_RENDERER ->
+                    "The selected renderer does not support this contributor.";
+            case OPTIONAL_UNAVAILABLE ->
+                    "The optional contributor is not registered.";
+            default -> "The contributor is unavailable.";
+        };
     }
 
     /** One exact contributor generation selected for this session. */

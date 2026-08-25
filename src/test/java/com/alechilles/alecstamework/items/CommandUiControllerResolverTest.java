@@ -1,9 +1,19 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.api.commandui.CommandUiContribution;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorDescriptor;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorRequirement;
 import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
 import com.alechilles.alecstamework.api.commandui.CommandUiPageController;
+import com.alechilles.alecstamework.api.commandui.CommandUiRendererDescriptor;
+import com.alechilles.alecstamework.api.commandui.CommandUiRendererId;
+import com.alechilles.alecstamework.api.internal.CommandUiContributorRegistry;
 import com.alechilles.alecstamework.api.internal.CommandUiProviderRegistry;
+import com.alechilles.alecstamework.api.internal.CommandUiRendererRegistry;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
@@ -14,6 +24,32 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Provider selection behavior before the host fixes its event codec. */
 class CommandUiControllerResolverTest {
+    @Test
+    void forwardsOptionalCompatibilityStatusToSessionCreation() {
+        CommandUiRendererRegistry renderers = new CommandUiRendererRegistry();
+        CommandUiContributorRegistry contributors =
+                new CommandUiContributorRegistry();
+        CommandUiContributorId contributorId = CommandUiContributorId.of(
+                "other:unsupported");
+        renderers.register("runeteria:ui",
+                new CommandUiRendererDescriptor(Set.of("runeteria"), Set.of()),
+                ignored -> new TestController());
+        contributors.register(contributorId.value(),
+                new CommandUiContributorDescriptor(),
+                ignored -> null);
+
+        CommandUiControllerResolver.Resolved resolved =
+                new CommandUiControllerResolver(renderers, contributors).resolve(
+                        CommandUiRendererId.of("runeteria:ui"),
+                        List.of(new CommandUiContributorRequirement(
+                                contributorId, false)),
+                        new CommandUiOpenContext(), TestController::new);
+
+        assertTrue(resolved.custom());
+        assertEquals(CommandUiContribution.Status.UNSUPPORTED_BY_RENDERER,
+                resolved.contributorStatuses().get(contributorId));
+    }
+
     @Test
     void registeredProviderWinsWithItsExactGeneration() {
         CommandUiProviderRegistry registry = new CommandUiProviderRegistry();

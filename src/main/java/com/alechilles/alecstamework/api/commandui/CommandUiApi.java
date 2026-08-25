@@ -33,6 +33,22 @@ public interface CommandUiApi {
         return CommandUiRegistrationResult.unavailable(rendererId);
     }
 
+    /**
+     * Registers one renderer with immutable presentation capabilities.
+     *
+     * <p>The default delegates to the source-compatible overload. Older API
+     * implementations therefore continue to register their provider while
+     * newer implementations can retain the descriptor with its generation.</p>
+     */
+    @Nonnull
+    default CommandUiRegistrationResult registerRenderer(
+            @Nullable String rendererId,
+            @Nullable CommandUiRendererDescriptor descriptor,
+            @Nullable CommandUiRendererProvider provider
+    ) {
+        return registerRenderer(rendererId, provider);
+    }
+
     /** Convenience overload for callers that already parsed an identifier. */
     @Nonnull
     default CommandUiRegistrationResult registerRenderer(
@@ -40,6 +56,17 @@ public interface CommandUiApi {
             @Nullable CommandUiRendererProvider provider
     ) {
         return registerRenderer(rendererId == null ? null : rendererId.value(), provider);
+    }
+
+    /** Convenience overload for a parsed renderer ID and descriptor. */
+    @Nonnull
+    default CommandUiRegistrationResult registerRenderer(
+            @Nullable CommandUiRendererId rendererId,
+            @Nullable CommandUiRendererDescriptor descriptor,
+            @Nullable CommandUiRendererProvider provider
+    ) {
+        return registerRenderer(rendererId == null ? null : rendererId.value(),
+                descriptor, provider);
     }
 
     /**
@@ -54,6 +81,21 @@ public interface CommandUiApi {
         return CommandUiRegistrationResult.unavailable(contributorId);
     }
 
+    /**
+     * Registers one contributor with immutable presentation capabilities.
+     *
+     * <p>The default delegates to the source-compatible overload so older API
+     * implementations remain source and behavior compatible.</p>
+     */
+    @Nonnull
+    default CommandUiRegistrationResult registerContributor(
+            @Nullable String contributorId,
+            @Nullable CommandUiContributorDescriptor descriptor,
+            @Nullable CommandUiContributorProvider provider
+    ) {
+        return registerContributor(contributorId, provider);
+    }
+
     /** Convenience overload for callers that already parsed an identifier. */
     @Nonnull
     default CommandUiRegistrationResult registerContributor(
@@ -61,6 +103,17 @@ public interface CommandUiApi {
             @Nullable CommandUiContributorProvider provider
     ) {
         return registerContributor(contributorId == null ? null : contributorId.value(), provider);
+    }
+
+    /** Convenience overload for a parsed contributor ID and descriptor. */
+    @Nonnull
+    default CommandUiRegistrationResult registerContributor(
+            @Nullable CommandUiContributorId contributorId,
+            @Nullable CommandUiContributorDescriptor descriptor,
+            @Nullable CommandUiContributorProvider provider
+    ) {
+        return registerContributor(contributorId == null ? null : contributorId.value(),
+                descriptor, provider);
     }
 
     /**

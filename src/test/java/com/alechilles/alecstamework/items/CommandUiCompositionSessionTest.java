@@ -34,6 +34,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Session-scoped contributor composition and dirty-sink behavior. */
 class CommandUiCompositionSessionTest {
     @Test
+    void publishesCompatibilityStatusWithoutCreatingAContributor() {
+        CommandUiContributorId contributorId = CommandUiContributorId.of(
+                "runeteria:unsupported");
+
+        CommandUiCompositionSession session = CommandUiCompositionSession.create(
+                baseSnapshot(), new CommandUiOpenContext(), List.of(),
+                Map.of(contributorId,
+                        CommandUiContribution.Status.UNSUPPORTED_BY_RENDERER),
+                (snapshot, changes) -> { }, () -> { });
+
+        CommandUiContribution contribution = session.snapshot()
+                .contribution(contributorId);
+        assertNotNull(contribution);
+        assertEquals(CommandUiContribution.Status.UNSUPPORTED_BY_RENDERER,
+                contribution.status());
+        assertTrue(contribution.pageData().isEmpty());
+        assertTrue(contribution.pageActions().isEmpty());
+        session.close();
+    }
+
+    @Test
     void rejectsContributorSuppliedDetachedActionHandles() {
         CommandUiContributorId contributorId = CommandUiContributorId.of(
                 "runeteria:test");
@@ -73,12 +94,15 @@ class CommandUiCompositionSessionTest {
                 "toggle", "TOGGLE_READY", "Toggle ready", null,
                 true, true, null, CommandUiContributorAction.InputPolicy.NONE,
                 false, Map.of(), handler);
+        AtomicReference<CommandUiContributorCreateContext> created =
+                new AtomicReference<>();
 
         CommandUiCompositionSession session = CommandUiCompositionSession.create(
                 baseSnapshot(), new CommandUiOpenContext(),
                 List.of(new CommandUiCompositionSession.Binding(
-                        contributorId, 42L, context ->
-                        new CommandUiSessionContributor() {
+                        contributorId, 42L, context -> {
+                            created.set(context);
+                            return new CommandUiSessionContributor() {
                             @Override
                             public CommandUiContribution compose(
                                     CommandUiSnapshot base,
@@ -90,6 +114,7 @@ class CommandUiCompositionSessionTest {
                                         Map.of(), Map.of("toggle", action),
                                         Map.of(), Map.of());
                             }
+                            };
                         })),
                 (snapshot, changes) -> { }, () -> { });
 
@@ -107,6 +132,7 @@ class CommandUiCompositionSessionTest {
         assertSame(handler, binding.handler());
         assertEquals(contributorId, binding.contributorId());
         assertEquals(42L, binding.contributorGeneration());
+        assertEquals(42L, created.get().registrationGeneration());
         session.close();
     }
 

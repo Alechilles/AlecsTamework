@@ -2,9 +2,11 @@ package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.commandui.CommandUiApi;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorProvider;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorDescriptor;
 import com.alechilles.alecstamework.api.commandui.CommandUiProvider;
 import com.alechilles.alecstamework.api.commandui.CommandUiRegistrationResult;
 import com.alechilles.alecstamework.api.commandui.CommandUiRendererProvider;
+import com.alechilles.alecstamework.api.commandui.CommandUiRendererDescriptor;
 import com.alechilles.alecstamework.api.commandui.CommandUiRegistration;
 import com.alechilles.alecstamework.api.commandui.CommandUiRendererId;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
@@ -54,7 +56,18 @@ public final class CommandUiRegistry implements CommandUiApi, AutoCloseable {
             @Nullable String rendererId,
             @Nullable CommandUiRendererProvider provider
     ) {
-        return renderers.register(rendererId, provider);
+        return registerRenderer(rendererId,
+                CommandUiRendererDescriptor.unrestricted(), provider);
+    }
+
+    @Override
+    @Nonnull
+    public CommandUiRegistrationResult registerRenderer(
+            @Nullable String rendererId,
+            @Nullable CommandUiRendererDescriptor descriptor,
+            @Nullable CommandUiRendererProvider provider
+    ) {
+        return renderers.register(rendererId, descriptor, provider);
     }
 
     @Override
@@ -63,7 +76,18 @@ public final class CommandUiRegistry implements CommandUiApi, AutoCloseable {
             @Nullable String contributorId,
             @Nullable CommandUiContributorProvider provider
     ) {
-        return contributors.register(contributorId, provider);
+        return registerContributor(contributorId,
+                CommandUiContributorDescriptor.unrestricted(), provider);
+    }
+
+    @Override
+    @Nonnull
+    public CommandUiRegistrationResult registerContributor(
+            @Nullable String contributorId,
+            @Nullable CommandUiContributorDescriptor descriptor,
+            @Nullable CommandUiContributorProvider provider
+    ) {
+        return contributors.register(contributorId, descriptor, provider);
     }
 
     /** Typed renderer lookup used by the Tamework runtime. */

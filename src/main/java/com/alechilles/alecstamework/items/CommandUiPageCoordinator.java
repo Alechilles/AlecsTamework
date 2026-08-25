@@ -180,10 +180,12 @@ final class CommandUiPageCoordinator {
             }
         };
         CommandUiCompositionSession composition = null;
-        if (resolved.custom() && !resolved.contributors().isEmpty()) {
+        if (resolved.custom() && (!resolved.contributors().isEmpty()
+                || !resolved.contributorStatuses().isEmpty())) {
             try {
                 composition = CommandUiCompositionSession.create(
                         baseSnapshot, context, resolved.contributors(),
+                        resolved.contributorStatuses(),
                         (snapshot, changes) -> {
                             CommandUiSessionImpl current = sessionRef.get();
                             if (current == null || !current.isOpen()) return;
