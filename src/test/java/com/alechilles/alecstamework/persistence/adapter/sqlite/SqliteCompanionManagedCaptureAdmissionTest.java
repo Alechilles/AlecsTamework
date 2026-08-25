@@ -205,6 +205,31 @@ class SqliteCompanionManagedCaptureAdmissionTest {
         assertNull(lifecycle.ownerId());
         assertNull(lifecycle.ownerWorldKey());
     }
+
+    @Test
+    void managedCaptureClearingOwnerPublishesWithoutDomainClaims()
+            throws Exception {
+        admissionMode = AdmissionMode.MANAGED;
+
+        OperationWorkflowResult result = submit(
+                26,
+                captureRequest(null),
+                (capture, operation) -> LiveOperationResult.confirmed(
+                        "managed_owner_clear_without_claims_confirmed"
+                ).completed()
+        );
+
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLISHED,
+                result.status(),
+                () -> String.valueOf(result.failure())
+        );
+        CompanionLifecycle lifecycle = lifecycle();
+        assertEquals(LifecycleState.CAPTURED, lifecycle.state());
+        assertNull(lifecycle.ownerId());
+        assertNull(lifecycle.ownerWorldKey());
+    }
+
     @Test
     void concurrentIdenticalFirstCapturesCallProviderAndLiveOnce()
             throws Exception {

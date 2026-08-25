@@ -83,10 +83,13 @@ public final class PopulationDomainConvergencePlanner {
                 == targetClassification.owned()
                 && sourceClassification.deployable()
                 == targetClassification.deployable();
+        boolean clearsOwnerWithoutRows = sourceOwner != null
+                && targetOwner == null;
         if (committedRows.isEmpty()
                 && sourceOwner != null
                 && (sourceClassification.owned() || sourceClassification.deployable())
-                && (!sameOwnerBucket || !sameConsumption)) {
+                && (!sameOwnerBucket || !sameConsumption)
+                && !clearsOwnerWithoutRows) {
             throw new IllegalStateException(
                     "population_domain_source_rows_missing"
             );
