@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes;
 import com.alechilles.alecstamework.api.BondedCompanionProfileView;
 import com.alechilles.alecstamework.api.BondedCompanionResult;
+import com.alechilles.alecstamework.api.BondedCompanionResultCode;
 import com.alechilles.alecstamework.api.BondedCompanionTalentActionRequest;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
@@ -89,6 +90,48 @@ final class BondedCompanionTalentPageService {
         }
     }
 
+    @Nullable
+    ManagedTarget managedTarget(
+            @Nullable Player player,
+            @Nullable BondedCompanionPanelPresentation presentation
+    ) {
+        State state = player == null || presentation == null ? null
+                : State.from(player.getUuid(), presentation);
+        return state == null ? null : new ManagedTarget(state);
+    }
+
+    @Nullable
+    ManagedSnapshot managedSnapshot(
+            @Nullable Player player,
+            @Nonnull ManagedTarget target
+    ) {
+        if (player == null) return null;
+        State state = target.state;
+        return new ManagedSnapshot(
+                pageData(resolveLanguage(player), state),
+                state.profileId, state.level, availablePoints(state),
+                state.revision);
+    }
+
+    @Nonnull
+    ManagedMutation purchaseManaged(
+            @Nullable Player player,
+            @Nonnull ManagedTarget target,
+            @Nullable String talentId
+    ) {
+        return updateManaged(player, target,
+                BondedCompanionTalentActionRequest.Action.PURCHASE, talentId);
+    }
+
+    @Nonnull
+    ManagedMutation resetManaged(
+            @Nullable Player player,
+            @Nonnull ManagedTarget target
+    ) {
+        return updateManaged(player, target,
+                BondedCompanionTalentActionRequest.Action.RESET, null);
+    }
+
     @Nonnull
     private String update(
             @Nonnull Player player,
@@ -96,9 +139,29 @@ final class BondedCompanionTalentPageService {
             @Nonnull BondedCompanionTalentActionRequest.Action action,
             @Nullable String talentId
     ) {
+        ManagedMutation outcome = updateManaged(
+                player, new ManagedTarget(state), action, talentId);
+        if (outcome.applied()) {
+            feedback.showSuccess(player, outcome.message());
+        } else {
+            feedback.showWarning(player, outcome.message());
+        }
+        return outcome.message();
+    }
+
+    @Nonnull
+    private ManagedMutation updateManaged(
+            @Nullable Player player,
+            @Nonnull ManagedTarget target,
+            @Nonnull BondedCompanionTalentActionRequest.Action action,
+            @Nullable String talentId
+    ) {
+        State state = target.state;
         BondedCompanionApi current = api.get();
         if (current == null || !current.availability().available()) {
-            return warning(player, "Bonded companion data is unavailable right now.");
+            return new ManagedMutation(false, false,
+                    BondedCompanionResultCode.UNAVAILABLE,
+                    "Bonded companion data is unavailable right now.");
         }
         String idempotency = "talents:" + state.profileId + ":"
                 + state.revision + ":" + action + ":"
@@ -115,24 +178,24 @@ final class BondedCompanionTalentPageService {
         BondedCompanionResult<BondedCompanionProfileView> result = future == null
                 ? null : future.getNow(null);
         if (result == null) {
-            return warning(player, "Talent changes are still being saved. Try again shortly.");
+            return new ManagedMutation(false, true,
+                    BondedCompanionResultCode.UNAVAILABLE,
+                    "Talent changes are still being saved. Try again shortly.");
         }
         if (!result.successful() || result.value() == null) {
-            return warning(player, action == BondedCompanionTalentActionRequest.Action.PURCHASE
+            String fallback = action
+                    == BondedCompanionTalentActionRequest.Action.PURCHASE
                     ? "That talent can no longer be unlocked."
-                    : "No talent points could be refunded.");
+                    : "No talent points could be refunded.";
+            return new ManagedMutation(false, false, result.code(),
+                    result.reason() == null ? fallback : result.reason());
         }
         state.apply(result.value());
-        applyLiveProjection(player, state);
+        if (player != null) applyLiveProjection(player, state);
         String message = action == BondedCompanionTalentActionRequest.Action.PURCHASE
                 ? "Talent unlocked." : "Talent points refunded.";
-        feedback.showSuccess(player, message);
-        return message;
-    }
-
-    private String warning(@Nonnull Player player, @Nonnull String message) {
-        feedback.showWarning(player, message);
-        return message;
+        return new ManagedMutation(true, false,
+                BondedCompanionResultCode.SUCCESS, message);
     }
 
     private void applyLiveProjection(@Nonnull Player player, @Nonnull State state) {
@@ -358,6 +421,31 @@ final class BondedCompanionTalentPageService {
     private static String text(Map<String, String> attributes, String key) {
         String value = attributes.get(key);
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    static final class ManagedTarget {
+        private final State state;
+
+        private ManagedTarget(State state) {
+            this.state = state;
+        }
+    }
+
+    record ManagedSnapshot(
+            @Nonnull TameworkCompanionTalentsPage.PageData pageData,
+            @Nonnull String profileId,
+            int level,
+            int availablePoints,
+            long revision
+    ) {
+    }
+
+    record ManagedMutation(
+            boolean applied,
+            boolean pending,
+            @Nonnull BondedCompanionResultCode code,
+            @Nonnull String message
+    ) {
     }
 
     private static final class State {

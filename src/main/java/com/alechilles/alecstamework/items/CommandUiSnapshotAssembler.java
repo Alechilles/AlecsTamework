@@ -7,9 +7,11 @@ import com.alechilles.alecstamework.api.commandui.CommandUiPanelState;
 import com.alechilles.alecstamework.api.commandui.CommandUiProviderId;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.ui.BondedCompanionPanelPresentation;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
 import java.util.ArrayList;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -22,6 +24,21 @@ import javax.annotation.Nullable;
 /** Builds detached public snapshots from existing command-panel read models. */
 final class CommandUiSnapshotAssembler {
     CommandUiSnapshotAssembler() {
+    }
+
+    /** Returns every stored group, including groups with no assigned row. */
+    @Nonnull
+    static Map<String, String> groups(@Nullable ItemStack stack) {
+        Map<String, String> result = new java.util.LinkedHashMap<>();
+        for (CommandGroupService.GroupRecord group
+                : new CommandGroupService().readGroups(stack)) {
+            if (group == null || group.groupId == null
+                    || group.groupId.isBlank()) continue;
+            result.putIfAbsent(group.groupId,
+                    group.name == null || group.name.isBlank()
+                            ? group.groupId : group.name);
+        }
+        return Map.copyOf(result);
     }
 
     /**
@@ -253,17 +270,29 @@ final class CommandUiSnapshotAssembler {
             @Nullable String selectedCommand,
             @Nullable Map<String, CommandUiActionView> actions
     ) {
+        return commandOptions(config, selectedCommand, actions, null);
+    }
+
+    /** Builds display-ready command choices for one player language. */
+    @Nonnull
+    static List<CommandUiCommandOption> commandOptions(
+            @Nullable TwCommandItemConfig config,
+            @Nullable String selectedCommand,
+            @Nullable Map<String, CommandUiActionView> actions,
+            @Nullable String language
+    ) {
         if (config == null || config.getCommandList() == null) return List.of();
         List<CommandUiCommandOption> options = new ArrayList<>();
         for (TwCommandItemConfig.CommandEntry command : config.getCommandList()) {
             if (command == null || command.getId() == null
                     || command.getId().isBlank()) continue;
             String id = command.getId().trim();
+            String configuredLabel = command.getDisplayName();
             options.add(new CommandUiCommandOption(
                     id,
-                    command.getDisplayName() == null || command.getDisplayName().isBlank()
-                            ? id : command.getDisplayName(),
-                    null,
+                    LocalizedText.resolveConfigValue(
+                            language, configuredLabel, id),
+                    configuredLabel,
                     command.getIcon(),
                     command.isShowInRadial(),
                     id.equals(selectedCommand),

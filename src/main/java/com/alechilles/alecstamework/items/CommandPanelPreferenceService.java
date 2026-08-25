@@ -16,7 +16,7 @@ final class CommandPanelPreferenceService {
     private static final double MIN_NEARBY_RADIUS = 8.0;
     private static final double MAX_NEARBY_RADIUS = 96.0;
     private static final double NEARBY_RADIUS_STEP = 4.0;
-    private static final int MAX_FILTER_TEXT_LENGTH = 40;
+    static final int MAX_FILTER_TEXT_LENGTH = 40;
 
     enum PanelMode {
         LinkedMode,

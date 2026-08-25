@@ -37,7 +37,10 @@
 - Added an experimental command UI provider API for Java plugins. Command-item
   configs can select a fully custom menu layout with `UiProviderId`. Providers
   receive immutable snapshots, row and section change hints, guarded partial
-  updates, and opaque handles for Tamework-defined actions.
+  updates, and opaque handles for Tamework-defined actions. The API also
+  supplies bounded filter input and complete managed group and generic or
+  bonded talent flows, including confirmations and fresh detached state after
+  mutations.
 - Added optional per-tool `Highlight Active` indicators for generic linked
   panels on Update 6. The controller sees group-colored indicators above loaded
   active companions. Ungrouped companions use neutral gold. The setting is

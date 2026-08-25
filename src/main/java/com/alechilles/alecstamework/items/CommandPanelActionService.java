@@ -315,14 +315,21 @@ final class CommandPanelActionService {
     }
 
     void applySetSelectedFilterText(Player player, String toolId, String value) {
-        boolean updated = toolInventoryService.mutateToolStack(
-                player,
-                toolId,
-                stack -> panelPreferenceService.applySelectedFilterText(stack, value)
-        );
+        boolean updated = trySetSelectedFilterText(player, toolId, value);
         if (!updated && player != null) {
             feedbackService.showWarningKey(player, "tamework.ui.notifications.command.panel.filterUpdateFailed");
         }
+    }
+
+    boolean trySetSelectedFilterText(
+            Player player,
+            String toolId,
+            String value
+    ) {
+        return toolInventoryService.mutateToolStack(
+                player, toolId,
+                stack -> panelPreferenceService.applySelectedFilterText(
+                        stack, value));
     }
 
     void applyClearFilters(Player player, String toolId) {

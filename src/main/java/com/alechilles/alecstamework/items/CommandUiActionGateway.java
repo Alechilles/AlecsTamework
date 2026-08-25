@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.commandui.CommandUiActionHandle;
+import com.alechilles.alecstamework.api.commandui.CommandUiActionRequest;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
 import java.time.Duration;
 import java.util.UUID;
@@ -9,6 +10,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
@@ -30,10 +32,30 @@ final class CommandUiActionGateway {
         BONDED
     }
 
+    enum InputPolicy {
+        NONE,
+        OPTIONAL_TEXT,
+        REQUIRED_TEXT
+    }
+
+    private enum Scope {
+        MAIN,
+        MANAGED
+    }
+
     @FunctionalInterface
     interface ActionExecutor {
         @Nonnull
         CompletionStage<CommandUiActionResult> execute(@Nonnull CommandUiAction action);
+    }
+
+    @FunctionalInterface
+    interface RequestActionExecutor {
+        @Nonnull
+        CompletionStage<CommandUiActionResult> execute(
+                @Nonnull CommandUiAction action,
+                @Nullable String textInput
+        );
     }
 
     @FunctionalInterface
@@ -42,7 +64,8 @@ final class CommandUiActionGateway {
     }
 
     private final ConcurrentMap<String, Binding> bindings = new ConcurrentHashMap<>();
-    private final ConcurrentMap<UUID, Long> activeSessions = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, SessionBinding> activeSessions =
+            new ConcurrentHashMap<>();
 
     CommandUiActionGateway() {
     }
@@ -57,7 +80,7 @@ final class CommandUiActionGateway {
         if (providerGeneration < 0L) {
             throw new IllegalArgumentException("Provider generation cannot be negative.");
         }
-        activeSessions.put(sessionId, providerGeneration);
+        activeSessions.put(sessionId, new SessionBinding(providerGeneration));
     }
 
     /** Issues a handle for one route and current authority generation. */
@@ -71,22 +94,86 @@ final class CommandUiActionGateway {
             @Nonnull ActionExecutor executor,
             boolean confirmationRequired
     ) {
+        return issueRequest(sessionId, route, action, Scope.MAIN, generation,
+                authority, (boundAction, ignored) -> executor.execute(boundAction),
+                InputPolicy.NONE, 0, confirmationRequired);
+    }
+
+    /** Issues a main-snapshot handle with a server-owned input policy. */
+    @Nonnull
+    CommandUiActionHandle issueRequest(
+            @Nonnull UUID sessionId,
+            @Nonnull Route route,
+            @Nonnull CommandUiAction action,
+            long generation,
+            @Nullable AuthorityCheck authority,
+            @Nonnull RequestActionExecutor executor,
+            @Nonnull InputPolicy inputPolicy,
+            int maximumInputLength,
+            boolean confirmationRequired
+    ) {
+        return issueRequest(sessionId, route, action, Scope.MAIN, generation,
+                authority, executor, inputPolicy, maximumInputLength,
+                confirmationRequired);
+    }
+
+    /** Issues a managed-flow handle with an independent generation. */
+    @Nonnull
+    CommandUiActionHandle issueManaged(
+            @Nonnull UUID sessionId,
+            @Nonnull Route route,
+            @Nonnull CommandUiAction action,
+            long generation,
+            @Nullable AuthorityCheck authority,
+            @Nonnull RequestActionExecutor executor,
+            @Nonnull InputPolicy inputPolicy,
+            int maximumInputLength,
+            boolean confirmationRequired
+    ) {
+        SessionBinding session = activeSessions.get(sessionId);
+        if (session == null || generation <= 0L
+                || session.managedGeneration.get() != generation) {
+            throw new IllegalStateException(
+                    "Managed flow generation is not active.");
+        }
+        return issueRequest(sessionId, route, action, Scope.MANAGED, generation,
+                authority, executor, inputPolicy, maximumInputLength,
+                confirmationRequired);
+    }
+
+    @Nonnull
+    private CommandUiActionHandle issueRequest(
+            @Nonnull UUID sessionId,
+            @Nonnull Route route,
+            @Nonnull CommandUiAction action,
+            @Nonnull Scope scope,
+            long generation,
+            @Nullable AuthorityCheck authority,
+            @Nonnull RequestActionExecutor executor,
+            @Nonnull InputPolicy inputPolicy,
+            int maximumInputLength,
+            boolean confirmationRequired
+    ) {
         if (generation < 0L) {
             throw new IllegalArgumentException("Action generation cannot be negative.");
         }
-        activeSessions.putIfAbsent(sessionId, 0L);
-        long providerGeneration = activeSessions.get(sessionId);
-        retireOlderGeneration(sessionId, generation);
+        validateInputPolicy(inputPolicy, maximumInputLength);
+        activeSessions.putIfAbsent(sessionId, new SessionBinding(0L));
+        long providerGeneration = activeSessions.get(sessionId).providerGeneration;
+        if (scope == Scope.MAIN) retireOlderGeneration(sessionId, generation);
         CommandUiActionHandle handle = new CommandUiActionHandle(
                 UUID.randomUUID().toString());
         Binding binding = new Binding(
                 sessionId,
                 route,
                 action,
+                scope,
                 generation,
                 providerGeneration,
                 authority == null ? ignored -> true : authority,
                 executor,
+                inputPolicy,
+                maximumInputLength,
                 confirmationRequired || action.confirmationRequired(),
                 false,
                 0L,
@@ -128,15 +215,16 @@ final class CommandUiActionGateway {
     @Nonnull
     CompletionStage<CommandUiActionResult> invoke(
             @Nonnull UUID sessionId,
-            @Nullable CommandUiActionHandle handle,
+            @Nullable CommandUiActionRequest request,
             long currentGeneration,
             @Nullable Route expectedRoute
     ) {
-        Long providerGeneration = activeSessions.get(sessionId);
-        if (providerGeneration == null || handle == null) {
+        SessionBinding session = activeSessions.get(sessionId);
+        if (session == null || request == null) {
             return completed(CommandUiActionResult.stale(
                     "command UI action handle is not valid"));
         }
+        CommandUiActionHandle handle = request.handle();
         Binding binding = bindings.get(handle.token());
         if (binding == null) {
             return completed(CommandUiActionResult.stale(
@@ -151,12 +239,14 @@ final class CommandUiActionGateway {
             return completed(CommandUiActionResult.denied(
                     "command UI action route is not valid for this session"));
         }
-        if (binding.generation != currentGeneration) {
+        long activeGeneration = binding.scope == Scope.MAIN
+                ? currentGeneration : session.managedGeneration.get();
+        if (binding.generation != activeGeneration) {
             bindings.remove(handle.token(), binding);
             return completed(CommandUiActionResult.stale(
                     "command UI action generation is stale"));
         }
-        if (binding.providerGeneration != providerGeneration) {
+        if (binding.providerGeneration != session.providerGeneration) {
             bindings.remove(handle.token(), binding);
             return completed(CommandUiActionResult.stale(
                     "command UI provider generation is stale"));
@@ -165,6 +255,10 @@ final class CommandUiActionGateway {
             bindings.remove(handle.token(), binding);
             return completed(CommandUiActionResult.stale(
                     "confirmation handle expired"));
+        }
+        InputValidation input = validateInput(binding, request.textInput());
+        if (!input.valid) {
+            return completed(CommandUiActionResult.denied(input.message));
         }
         if (!allows(binding)) {
             bindings.remove(handle.token(), binding);
@@ -189,10 +283,14 @@ final class CommandUiActionGateway {
                     binding.sessionId,
                     binding.route,
                     binding.action,
+                    binding.scope,
                     binding.generation,
                     binding.providerGeneration,
                     binding.authority,
-                    binding.executor,
+                    (action, ignored) -> binding.executor.execute(
+                            action, input.value),
+                    InputPolicy.NONE,
+                    0,
                     false,
                     true,
                     System.nanoTime() + CONFIRMATION_LIFETIME.toNanos(),
@@ -205,7 +303,7 @@ final class CommandUiActionGateway {
         retireConfirmationFamily(handle.token(), binding);
         try {
             CompletionStage<CommandUiActionResult> stage = binding.executor.execute(
-                    binding.action);
+                    binding.action, input.value);
             if (stage == null) {
                 bindings.remove(handle.token(), binding);
                 return completed(CommandUiActionResult.failed(
@@ -226,7 +324,22 @@ final class CommandUiActionGateway {
         }
         bindings.entrySet().removeIf(entry ->
                 sessionId.equals(entry.getValue().sessionId)
+                        && entry.getValue().scope == Scope.MAIN
                         && entry.getValue().generation < generation);
+    }
+
+    /** Starts a managed flow and invalidates handles from its prior view. */
+    long beginManagedFlow(@Nonnull UUID sessionId) {
+        SessionBinding session = activeSessions.get(sessionId);
+        if (session == null) {
+            throw new IllegalStateException("Command UI session is not active.");
+        }
+        long generation = session.managedGeneration.incrementAndGet();
+        bindings.entrySet().removeIf(entry ->
+                sessionId.equals(entry.getValue().sessionId)
+                        && entry.getValue().scope == Scope.MANAGED
+                        && entry.getValue().generation < generation);
+        return generation;
     }
 
     /** Invalidates all handles for one session and rejects later invocations. */
@@ -258,10 +371,13 @@ final class CommandUiActionGateway {
             UUID sessionId,
             Route route,
             CommandUiAction action,
+            Scope scope,
             long generation,
             long providerGeneration,
             AuthorityCheck authority,
-            ActionExecutor executor,
+            RequestActionExecutor executor,
+            InputPolicy inputPolicy,
+            int maximumInputLength,
             boolean confirmationRequired,
             boolean confirmationToken,
             long expiresAtNanos,
@@ -271,8 +387,9 @@ final class CommandUiActionGateway {
         CommandUiActionHandle handle = new CommandUiActionHandle(
                 UUID.randomUUID().toString());
         bindings.put(handle.token(), new Binding(
-                sessionId, route, action, generation, providerGeneration,
-                authority, executor, confirmationRequired,
+                sessionId, route, action, scope, generation, providerGeneration,
+                authority, executor, inputPolicy, maximumInputLength,
+                confirmationRequired,
                 confirmationToken, expiresAtNanos, initiatingToken,
                 confirmationFamilyConsumed, new AtomicBoolean()));
         return handle;
@@ -289,6 +406,7 @@ final class CommandUiActionGateway {
     private void retireOlderGeneration(UUID sessionId, long generation) {
         bindings.entrySet().removeIf(entry ->
                 sessionId.equals(entry.getValue().sessionId)
+                        && entry.getValue().scope == Scope.MAIN
                         && entry.getValue().generation < generation);
     }
 
@@ -312,14 +430,56 @@ final class CommandUiActionGateway {
         return CompletableFuture.completedFuture(result);
     }
 
+    private static void validateInputPolicy(
+            @Nonnull InputPolicy inputPolicy,
+            int maximumInputLength
+    ) {
+        if (inputPolicy == InputPolicy.NONE && maximumInputLength != 0) {
+            throw new IllegalArgumentException(
+                    "Handle-only actions must use a zero input limit.");
+        }
+        if (inputPolicy != InputPolicy.NONE && maximumInputLength <= 0) {
+            throw new IllegalArgumentException(
+                    "Text actions must use a positive input limit.");
+        }
+    }
+
+    @Nonnull
+    private static InputValidation validateInput(
+            @Nonnull Binding binding,
+            @Nullable String supplied
+    ) {
+        if (binding.inputPolicy == InputPolicy.NONE) {
+            return supplied == null
+                    ? InputValidation.valid(null)
+                    : InputValidation.invalid(
+                            "command UI action does not accept text input");
+        }
+        String normalized = supplied == null ? null : supplied.trim();
+        if (binding.inputPolicy == InputPolicy.REQUIRED_TEXT
+                && (normalized == null || normalized.isEmpty())) {
+            return InputValidation.invalid(
+                    "command UI action requires text input");
+        }
+        if (normalized != null
+                && normalized.length() > binding.maximumInputLength) {
+            return InputValidation.invalid(
+                    "command UI action text input is too long");
+        }
+        return InputValidation.valid(normalized);
+    }
+
     private record Binding(
             UUID sessionId,
             Route route,
             CommandUiAction action,
+            Scope scope,
             long generation,
             long providerGeneration,
             AuthorityCheck authority,
-            ActionExecutor executor,
+            RequestActionExecutor executor,
+            InputPolicy inputPolicy,
+            int maximumInputLength,
             boolean requiresConfirmation,
             boolean confirmationToken,
             long expiresAtNanos,
@@ -331,19 +491,46 @@ final class CommandUiActionGateway {
                 UUID sessionId,
                 Route route,
                 CommandUiAction action,
+                Scope scope,
                 long generation,
                 long providerGeneration,
                 AuthorityCheck authority,
-                ActionExecutor executor,
+                RequestActionExecutor executor,
+                InputPolicy inputPolicy,
+                int maximumInputLength,
                 boolean requiresConfirmation,
                 boolean confirmationToken,
                 long expiresAtNanos,
                 @Nullable String initiatingToken
         ) {
-            this(sessionId, route, action, generation, providerGeneration,
-                    authority, executor,
+            this(sessionId, route, action, scope, generation,
+                    providerGeneration, authority, executor, inputPolicy,
+                    maximumInputLength,
                     requiresConfirmation, confirmationToken, expiresAtNanos,
                     initiatingToken, new AtomicBoolean(), new AtomicBoolean());
+        }
+    }
+
+    private record SessionBinding(
+            long providerGeneration,
+            AtomicLong managedGeneration
+    ) {
+        private SessionBinding(long providerGeneration) {
+            this(providerGeneration, new AtomicLong());
+        }
+    }
+
+    private record InputValidation(
+            boolean valid,
+            @Nullable String value,
+            String message
+    ) {
+        private static InputValidation valid(@Nullable String value) {
+            return new InputValidation(true, value, "");
+        }
+
+        private static InputValidation invalid(String message) {
+            return new InputValidation(false, null, message);
         }
     }
 }

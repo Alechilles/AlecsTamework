@@ -345,7 +345,8 @@ class TameworkApiImplTest {
                 TameworkApiCapability.CONFIG_READ,
                 TameworkApiCapability.DIAGNOSTICS,
                 TameworkApiCapability.PROFILE_DATA_TRANSACTIONS,
-                TameworkApiCapability.COMMAND_UI_PROVIDERS
+                TameworkApiCapability.COMMAND_UI_PROVIDERS,
+                TameworkApiCapability.COMMAND_UI_MANAGED_FLOWS
         );
     }
 

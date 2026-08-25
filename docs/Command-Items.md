@@ -234,6 +234,13 @@ controller can update one card indicator without rebuilding the page.
 Version 1 exposes only Tamework-defined actions. See the durable wiki pages
 for the public contract and registration recipe.
 
+Providers that require `COMMAND_UI_MANAGED_FLOWS` can also reproduce the group
+manager and generic or bonded talent pages. Tamework returns detached flow
+models and opaque actions for group create, rename, recolor, delete, active
+selection, talent purchase, and talent reset. Text values have server-owned
+limits. Providers cannot supply targets, action kinds, costs, or profile
+revisions.
+
 Linked panel supports:
 - Mode toggle: `LinkedMode` / `NearbyMode`
 - Nearby radius controls in nearby mode

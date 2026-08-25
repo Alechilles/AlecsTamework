@@ -15,6 +15,9 @@ public final class CommandUiActionResult {
     @Nullable
     private final CommandUiActionView confirmationView;
     private final Map<String, String> metadata;
+    @Nullable
+    private final CommandUiFlowView flowView;
+    private final boolean refreshSnapshot;
 
     public CommandUiActionResult(
             @Nonnull CommandUiActionStatus status,
@@ -23,11 +26,27 @@ public final class CommandUiActionResult {
             @Nullable CommandUiActionView confirmationView,
             @Nullable Map<String, String> metadata
     ) {
+        this(status, message, confirmationHandle, confirmationView, metadata,
+                null, defaultRefresh(status));
+    }
+
+    /** Full result constructor for managed command UI flows. */
+    public CommandUiActionResult(
+            @Nonnull CommandUiActionStatus status,
+            @Nullable String message,
+            @Nullable CommandUiActionHandle confirmationHandle,
+            @Nullable CommandUiActionView confirmationView,
+            @Nullable Map<String, String> metadata,
+            @Nullable CommandUiFlowView flowView,
+            boolean refreshSnapshot
+    ) {
         this.status = Objects.requireNonNull(status, "status");
         this.message = message == null ? "" : message.trim();
         this.confirmationHandle = confirmationHandle;
         this.confirmationView = confirmationView;
         this.metadata = copyMetadata(metadata);
+        this.flowView = flowView;
+        this.refreshSnapshot = refreshSnapshot;
     }
 
     public CommandUiActionResult(@Nonnull CommandUiActionStatus status) {
@@ -54,6 +73,27 @@ public final class CommandUiActionResult {
     @Nonnull
     public static CommandUiActionResult accepted() {
         return new CommandUiActionResult(CommandUiActionStatus.ACCEPTED);
+    }
+
+    /** Returns a detached managed flow without requesting a main snapshot refresh. */
+    @Nonnull
+    public static CommandUiActionResult presented(
+            @Nonnull CommandUiFlowView flowView
+    ) {
+        return new CommandUiActionResult(CommandUiActionStatus.ACCEPTED,
+                null, null, null, Map.of(),
+                Objects.requireNonNull(flowView, "flowView"), false);
+    }
+
+    /** Returns an updated managed flow and requests a main snapshot refresh. */
+    @Nonnull
+    public static CommandUiActionResult updated(
+            @Nullable String message,
+            @Nonnull CommandUiFlowView flowView
+    ) {
+        return new CommandUiActionResult(CommandUiActionStatus.APPLIED,
+                message, null, null, Map.of(),
+                Objects.requireNonNull(flowView, "flowView"), true);
     }
 
     @Nonnull
@@ -137,6 +177,17 @@ public final class CommandUiActionResult {
         return metadata;
     }
 
+    /** Returns a detached managed-flow replacement, when this action opened one. */
+    @Nullable
+    public CommandUiFlowView flowView() {
+        return flowView;
+    }
+
+    /** Returns whether the session should request a fresh main snapshot. */
+    public boolean refreshSnapshot() {
+        return refreshSnapshot;
+    }
+
     @Override
     public boolean equals(Object other) {
         if (this == other) return true;
@@ -145,13 +196,22 @@ public final class CommandUiActionResult {
                 && message.equals(that.message)
                 && Objects.equals(confirmationHandle, that.confirmationHandle)
                 && Objects.equals(confirmationView, that.confirmationView)
-                && metadata.equals(that.metadata);
+                && metadata.equals(that.metadata)
+                && Objects.equals(flowView, that.flowView)
+                && refreshSnapshot == that.refreshSnapshot;
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(status, message, confirmationHandle,
-                confirmationView, metadata);
+                confirmationView, metadata, flowView, refreshSnapshot);
+    }
+
+    private static boolean defaultRefresh(
+            @Nonnull CommandUiActionStatus status
+    ) {
+        return status == CommandUiActionStatus.APPLIED
+                || status == CommandUiActionStatus.ACCEPTED;
     }
 
     private static Map<String, String> copyMetadata(

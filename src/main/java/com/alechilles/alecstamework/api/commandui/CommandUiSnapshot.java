@@ -302,6 +302,18 @@ public final class CommandUiSnapshot {
         return emptyStateKey;
     }
 
+    /**
+     * Returns display-ready empty-state text for custom providers.
+     *
+     * <p>The legacy {@link #emptyStateKey()} name remains for source
+     * compatibility. Runtime assemblers resolve configured keys before they
+     * cross the public command UI boundary.</p>
+     */
+    @Nullable
+    public String emptyStateText() {
+        return emptyStateKey;
+    }
+
     @Nullable
     public String disabledReason() {
         return disabledReason;
@@ -327,6 +339,18 @@ public final class CommandUiSnapshot {
     @Nonnull
     public CommandUiSnapshot withActionGeneration(long generation) {
         return copyWithRevision(presentationRevision, generation);
+    }
+
+    /** Returns a copy with display-ready empty-state text. */
+    @Nonnull
+    public CommandUiSnapshot withEmptyStateText(@Nullable String text) {
+        return new CommandUiSnapshot(
+                sessionId, presentationRevision, actionGeneration, providerId,
+                toolId, itemId, configId, rosterMode, enabledCapabilities,
+                selectedCommand, commandOptions, companionRows, panelState,
+                globalActions, commandActions, hotswapAssignments,
+                hotswapChoices, groups, serverTimeMillis, deadlines, text,
+                disabledReason);
     }
 
     private CommandUiSnapshot copyWithRevision(long revision, long generation) {
