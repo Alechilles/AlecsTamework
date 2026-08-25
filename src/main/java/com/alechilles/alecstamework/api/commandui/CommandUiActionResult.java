@@ -17,6 +17,8 @@ public final class CommandUiActionResult {
     private final Map<String, String> metadata;
     @Nullable
     private final CommandUiFlowView flowView;
+    @Nullable
+    private final CommandUiFlowOperation flowOperation;
     private final boolean refreshSnapshot;
 
     public CommandUiActionResult(
@@ -27,7 +29,7 @@ public final class CommandUiActionResult {
             @Nullable Map<String, String> metadata
     ) {
         this(status, message, confirmationHandle, confirmationView, metadata,
-                null, defaultRefresh(status));
+                null, null, defaultRefresh(status));
     }
 
     /** Full result constructor for managed command UI flows. */
@@ -40,12 +42,44 @@ public final class CommandUiActionResult {
             @Nullable CommandUiFlowView flowView,
             boolean refreshSnapshot
     ) {
+        this(status, message, confirmationHandle, confirmationView, metadata,
+                flowView, defaultFlowOperation(status, flowView), refreshSnapshot);
+    }
+
+    /** Full result constructor with an explicit managed-flow operation. */
+    public CommandUiActionResult(
+            @Nonnull CommandUiActionStatus status,
+            @Nullable String message,
+            @Nullable CommandUiActionHandle confirmationHandle,
+            @Nullable CommandUiActionView confirmationView,
+            @Nullable Map<String, String> metadata,
+            @Nullable CommandUiFlowView flowView,
+            @Nullable CommandUiFlowOperation flowOperation,
+            boolean refreshSnapshot
+    ) {
         this.status = Objects.requireNonNull(status, "status");
         this.message = message == null ? "" : message.trim();
         this.confirmationHandle = confirmationHandle;
         this.confirmationView = confirmationView;
         this.metadata = copyMetadata(metadata);
         this.flowView = flowView;
+        if (flowOperation != null && !successfulFlowStatus(status)) {
+            throw new IllegalArgumentException(
+                    "A flow operation requires an applied or accepted result.");
+        }
+        if (flowOperation == null && flowView != null) {
+            throw new IllegalArgumentException(
+                    "A flow view requires a flow operation.");
+        }
+        if (flowOperation == CommandUiFlowOperation.CLOSE && flowView != null) {
+            throw new IllegalArgumentException("A closed flow cannot carry a flow view.");
+        }
+        if (flowOperation != null && flowOperation != CommandUiFlowOperation.CLOSE
+                && flowView == null) {
+            throw new IllegalArgumentException(
+                    "A non-close flow operation requires a flow view.");
+        }
+        this.flowOperation = flowOperation;
         this.refreshSnapshot = refreshSnapshot;
     }
 
@@ -80,9 +114,9 @@ public final class CommandUiActionResult {
     public static CommandUiActionResult presented(
             @Nonnull CommandUiFlowView flowView
     ) {
-        return new CommandUiActionResult(CommandUiActionStatus.ACCEPTED,
-                null, null, null, Map.of(),
-                Objects.requireNonNull(flowView, "flowView"), false);
+        return flowResult(CommandUiActionStatus.ACCEPTED, null,
+                Objects.requireNonNull(flowView, "flowView"),
+                CommandUiFlowOperation.OPEN, false);
     }
 
     /** Returns an updated managed flow and requests a main snapshot refresh. */
@@ -91,9 +125,47 @@ public final class CommandUiActionResult {
             @Nullable String message,
             @Nonnull CommandUiFlowView flowView
     ) {
+        return flowResult(CommandUiActionStatus.APPLIED, message,
+                Objects.requireNonNull(flowView, "flowView"),
+                CommandUiFlowOperation.UPDATE, true);
+    }
+
+    /** Opens a custom flow from the retained main snapshot. */
+    @Nonnull
+    public static CommandUiActionResult openFlow(
+            @Nonnull CommandUiCustomFlowView flowView
+    ) {
+        return flowResult(CommandUiActionStatus.ACCEPTED, null,
+                Objects.requireNonNull(flowView, "flowView"),
+                CommandUiFlowOperation.OPEN, false);
+    }
+
+    /** Replaces the current custom flow with a new revision. */
+    @Nonnull
+    public static CommandUiActionResult replaceFlow(
+            @Nonnull CommandUiCustomFlowView flowView
+    ) {
+        return flowResult(CommandUiActionStatus.APPLIED, null,
+                Objects.requireNonNull(flowView, "flowView"),
+                CommandUiFlowOperation.REPLACE, false);
+    }
+
+    /** Updates the current custom flow without replacing its instance. */
+    @Nonnull
+    public static CommandUiActionResult updateFlow(
+            @Nonnull CommandUiCustomFlowView flowView
+    ) {
+        return flowResult(CommandUiActionStatus.APPLIED, null,
+                Objects.requireNonNull(flowView, "flowView"),
+                CommandUiFlowOperation.UPDATE, false);
+    }
+
+    /** Closes the active custom flow and returns to the retained main page. */
+    @Nonnull
+    public static CommandUiActionResult closeFlow() {
         return new CommandUiActionResult(CommandUiActionStatus.APPLIED,
-                message, null, null, Map.of(),
-                Objects.requireNonNull(flowView, "flowView"), true);
+                null, null, null, Map.of(), null,
+                CommandUiFlowOperation.CLOSE, false);
     }
 
     @Nonnull
@@ -183,6 +255,12 @@ public final class CommandUiActionResult {
         return flowView;
     }
 
+    /** Returns the requested managed-flow operation, if one is present. */
+    @Nullable
+    public CommandUiFlowOperation flowOperation() {
+        return flowOperation;
+    }
+
     /** Returns whether the session should request a fresh main snapshot. */
     public boolean refreshSnapshot() {
         return refreshSnapshot;
@@ -198,13 +276,15 @@ public final class CommandUiActionResult {
                 && Objects.equals(confirmationView, that.confirmationView)
                 && metadata.equals(that.metadata)
                 && Objects.equals(flowView, that.flowView)
+                && flowOperation == that.flowOperation
                 && refreshSnapshot == that.refreshSnapshot;
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(status, message, confirmationHandle,
-                confirmationView, metadata, flowView, refreshSnapshot);
+                confirmationView, metadata, flowView, flowOperation,
+                refreshSnapshot);
     }
 
     private static boolean defaultRefresh(
@@ -212,6 +292,38 @@ public final class CommandUiActionResult {
     ) {
         return status == CommandUiActionStatus.APPLIED
                 || status == CommandUiActionStatus.ACCEPTED;
+    }
+
+    @Nullable
+    private static CommandUiFlowOperation defaultFlowOperation(
+            @Nonnull CommandUiActionStatus status,
+            @Nullable CommandUiFlowView flowView
+    ) {
+        if (flowView == null) return null;
+        return switch (status) {
+            case ACCEPTED -> CommandUiFlowOperation.OPEN;
+            case APPLIED -> CommandUiFlowOperation.UPDATE;
+            default -> null;
+        };
+    }
+
+    private static boolean successfulFlowStatus(
+            @Nonnull CommandUiActionStatus status
+    ) {
+        return status == CommandUiActionStatus.APPLIED
+                || status == CommandUiActionStatus.ACCEPTED;
+    }
+
+    @Nonnull
+    private static CommandUiActionResult flowResult(
+            @Nonnull CommandUiActionStatus status,
+            @Nullable String message,
+            @Nonnull CommandUiFlowView flowView,
+            @Nonnull CommandUiFlowOperation operation,
+            boolean refreshSnapshot
+    ) {
+        return new CommandUiActionResult(status, message, null, null, Map.of(),
+                flowView, operation, refreshSnapshot);
     }
 
     private static Map<String, String> copyMetadata(
