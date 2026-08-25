@@ -225,6 +225,29 @@ class CommandUiHostPageTest {
     }
 
     @Test
+    void rendererGenerationEndingBeforeHostOwnershipOpensFallbackOnce() {
+        CommandUiRegistry registry = new CommandUiRegistry();
+        var registration = registry.registerRenderer(
+                "example:menu", ignored -> new TestController()).registration();
+        long generation = registry.resolveRenderer("example:menu")
+                .orElseThrow().generation();
+        registration.close();
+        AtomicInteger fallbackOpenCount = new AtomicInteger();
+        TestSession session = new TestSession(snapshot(1L));
+
+        CommandUiHostPage<TestEvent> host = rendererHostForRegistration(
+                registry, generation, session, new TestController(),
+                fallbackOpenCount);
+        if (!host.isOpen()) {
+            // CommandSelectionPageService owns fallback when host construction
+            // returns a closed page before it can show the page.
+            fallbackOpenCount.incrementAndGet();
+        }
+
+        assertEquals(1, fallbackOpenCount.get());
+    }
+
+    @Test
     void rendererUpdateFailureClosesAndOpensStandardFallback() {
         CommandUiRegistry registry = new CommandUiRegistry();
         var registration = registry.registerRenderer(

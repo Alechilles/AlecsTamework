@@ -135,7 +135,9 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
                 subscribeRendererRemoval(rendererRegistry);
         this.unregisterSubscription.set(rendererSubscription.handle());
         if (!rendererSubscription.active()) {
-            terminate(CommandUiCloseReason.PROVIDER_UNREGISTERED, customProvider);
+            // The page owner handles fallback when construction returns a
+            // closed host before the page can be shown.
+            terminate(CommandUiCloseReason.PROVIDER_UNREGISTERED, false);
         }
     }
 
