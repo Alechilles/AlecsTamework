@@ -131,6 +131,7 @@ class CommandUiHostPageTest {
                 ignored -> fallbackOpenCount.incrementAndGet(),
                 new RecordingEmitter());
         assertTrue(host.takePageOwnership());
+        assertTrue(host.finishPageOpening(true));
 
         host.build(null, new UICommandBuilder(), new UIEventBuilder(), null);
 
@@ -251,6 +252,33 @@ class CommandUiHostPageTest {
     }
 
     @Test
+    void rendererRemovalDuringCustomOpenLeavesStandardPageLast() {
+        CommandUiRegistry registry = new CommandUiRegistry();
+        var registration = registry.registerRenderer(
+                "example:menu", ignored -> new TestController()).registration();
+        List<String> pageOrder = new ArrayList<>();
+        CommandUiHostPage.FallbackOpener fallbackOpener =
+                ignored -> pageOrder.add("standard");
+        TestSession session = new TestSession(snapshot(1L));
+        CommandUiHostPage<TestEvent> host = rendererHostForRegistration(
+                registry, registration.generation(), session, new TestController(),
+                directDispatcher(), fallbackOpener);
+
+        assertTrue(host.takePageOwnership());
+        pageOrder.add("custom-open-start");
+        registration.close();
+        pageOrder.add("custom-open-complete");
+        assertFalse(host.finishPageOpening(true));
+        if (host.claimFallbackForOpener()) {
+            fallbackOpener.open(new CommandUiHostPage.CurrentWorld(null, null));
+        }
+
+        assertEquals(List.of(
+                "custom-open-start", "custom-open-complete", "standard"),
+                pageOrder);
+    }
+
+    @Test
     void rendererGenerationEndingBeforeHostConstructionOpensFallbackOnce() {
         CommandUiRegistry registry = new CommandUiRegistry();
         var registration = registry.registerRenderer(
@@ -285,6 +313,7 @@ class CommandUiHostPageTest {
                 registry, registration.generation(), session, controller,
                 fallbackOpenCount);
         assertTrue(host.takePageOwnership());
+        assertTrue(host.finishPageOpening(true));
 
         assertTrue(host.applyUpdate(CommandUiUpdate.initial(snapshot(2L))));
 
@@ -314,6 +343,7 @@ class CommandUiHostPageTest {
                     return true;
                 }, fallbackOpenCount);
         assertTrue(host.takePageOwnership());
+        assertTrue(host.finishPageOpening(true));
 
         assertFalse(host.applyUpdate(CommandUiUpdate.initial(snapshot(2L))));
 
@@ -334,6 +364,7 @@ class CommandUiHostPageTest {
                 registry, first.generation(), firstSession, new TestController(),
                 fallbackOpenCount);
         assertTrue(firstHost.takePageOwnership());
+        assertTrue(firstHost.finishPageOpening(true));
 
         first.close();
         var replacement = registry.registerRenderer(
@@ -343,6 +374,7 @@ class CommandUiHostPageTest {
                 registry, replacement.generation(), replacementSession,
                 new TestController(), fallbackOpenCount);
         assertTrue(replacementHost.takePageOwnership());
+        assertTrue(replacementHost.finishPageOpening(true));
         first.close();
 
         assertFalse(firstHost.isOpen());
@@ -468,6 +500,19 @@ class CommandUiHostPageTest {
             CommandUiHostPage.WorldDispatcher dispatcher,
             AtomicInteger fallbackOpenCount
     ) {
+        return rendererHostForRegistration(registry, rendererGeneration, session,
+                controller, dispatcher,
+                ignored -> fallbackOpenCount.incrementAndGet());
+    }
+
+    private static CommandUiHostPage<TestEvent> rendererHostForRegistration(
+            CommandUiRegistry registry,
+            long rendererGeneration,
+            TestSession session,
+            TestController controller,
+            CommandUiHostPage.WorldDispatcher dispatcher,
+            CommandUiHostPage.FallbackOpener fallbackOpener
+    ) {
         PlayerRef playerRef = new PlayerRef(
                 null, UUID.randomUUID(), "HostTester", "en-US", null, null);
         return new CommandUiHostPage<>(
@@ -481,7 +526,7 @@ class CommandUiHostPageTest {
                 rendererGeneration,
                 registry,
                 dispatcher,
-                ignored -> fallbackOpenCount.incrementAndGet(),
+                fallbackOpener,
                 new RecordingEmitter(),
                 true);
     }

@@ -367,10 +367,15 @@ final class CommandSelectionPageService {
             if (created.host().own(automaticRefresh)) automaticRefresh.start();
         }
         boolean opened = openPage(player, playerRef, store, created.host());
+        boolean pageOwned = created.host().finishPageOpening(opened);
         if (!opened) {
             created.host().closeSession(
                     com.alechilles.alecstamework.api.commandui
                             .CommandUiCloseReason.FAILURE);
+        }
+        if (!pageOwned && created.host().claimFallbackForOpener()) {
+            return open(player, store, config, working, toolId, actions,
+                    genericAuthority, bondedAuthority, true);
         }
         return opened;
     }

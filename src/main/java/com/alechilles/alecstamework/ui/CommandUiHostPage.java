@@ -263,11 +263,25 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
         terminate(Objects.requireNonNull(reason, "reason"));
     }
 
-    /** Transfers fallback ownership to the page after construction succeeds. */
+    /** Begins opening this host before the page manager receives it. */
     public boolean takePageOwnership() {
         if (!customProvider) return open.get();
         synchronized (lifecycleLock) {
             if (!open.get() || fallbackOwnership != FallbackOwnership.PRE_SHOW) {
+                return false;
+            }
+            fallbackOwnership = FallbackOwnership.OPENING;
+            return true;
+        }
+    }
+
+    /** Commits page ownership only after the page manager accepts the page. */
+    public boolean finishPageOpening(boolean opened) {
+        if (!customProvider) return opened && open.get();
+        synchronized (lifecycleLock) {
+            if (fallbackOwnership != FallbackOwnership.OPENING) return false;
+            if (!opened || !open.get()) {
+                fallbackOwnership = FallbackOwnership.CLOSED;
                 return false;
             }
             fallbackOwnership = FallbackOwnership.PAGE;
@@ -421,7 +435,8 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
     }
 
     private void markPreShowFallbackRequired() {
-        if (fallbackOwnership == FallbackOwnership.PRE_SHOW) {
+        if (fallbackOwnership == FallbackOwnership.PRE_SHOW
+                || fallbackOwnership == FallbackOwnership.OPENING) {
             fallbackOwnership = FallbackOwnership.PRE_SHOW_FALLBACK;
         }
     }
@@ -488,10 +503,12 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
 
     private enum FallbackOwnership {
         PRE_SHOW,
+        OPENING,
         PAGE,
         PRE_SHOW_FALLBACK,
         OPENER_FALLBACK,
-        HOST_FALLBACK
+        HOST_FALLBACK,
+        CLOSED
     }
 
     private void sendHostUpdate(
