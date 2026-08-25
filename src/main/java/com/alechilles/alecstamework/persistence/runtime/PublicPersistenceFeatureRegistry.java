@@ -409,7 +409,10 @@ public final class PublicPersistenceFeatureRegistry {
                         CompanionRestorationDefinition.INSTANCE,
                         Set.of(OperationScopeType.PROFILE),
                         ReviveReadyDefinition.INSTANCE,
-                        Set.of(OperationScopeType.PROFILE)
+                        Set.of(
+                                OperationScopeType.PROFILE,
+                                OperationScopeType.OWNER
+                        )
                 ),
                 Set.of(IDENTITY, LIFECYCLE),
                 Set.of(
@@ -423,7 +426,8 @@ public final class PublicPersistenceFeatureRegistry {
                 PublicPersistenceFeatureDescriptorFactory.worldReadiness(),
                 Set.of(
                         OperationScopeType.OPERATION,
-                        OperationScopeType.PROFILE
+                        OperationScopeType.PROFILE,
+                        OperationScopeType.OWNER
                 )
         );
     }

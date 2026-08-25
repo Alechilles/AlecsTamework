@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.persistence.diagnostics.BondedCompanionDiagn
 import com.alechilles.alecstamework.persistence.diagnostics.PersistenceDiagnosticExporter;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceDiagnosticsReader;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceOperations;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceQueries;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractCommandCollection;
 import javax.annotation.Nullable;
 
@@ -16,6 +17,7 @@ public final class TameworkDebugCommand extends AbstractCommandCollection {
             PersistenceDiagnosticExporter persistenceExporter,
             BondedCompanionDiagnosticContributor bondedDiagnostics,
             SpawnBeaconVisualizationService spawnBeaconVisualizationService,
+            @Nullable PublicPersistenceQueries persistenceQueries,
             @Nullable PublicPersistenceOperations persistenceOperations
     ) {
         super("debug", "Tamework debug commands.");
@@ -28,6 +30,7 @@ public final class TameworkDebugCommand extends AbstractCommandCollection {
                 persistenceDiagnostics,
                 persistenceExporter,
                 bondedDiagnostics,
+                persistenceQueries,
                 persistenceOperations
         ));
         addSubCommand(new TameworkDebugAvatarCommand());

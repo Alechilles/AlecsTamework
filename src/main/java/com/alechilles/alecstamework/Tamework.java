@@ -1469,6 +1469,8 @@ public class Tamework extends JavaPlugin {
                     bondedCompanionComposition == null ? null : bondedCompanionComposition.diagnostics(),
                     spawnBeaconVisualizationService,
                     persistenceComposition == null
+                            ? null : persistenceComposition.facades().queries(),
+                    persistenceComposition == null
                             ? null : persistenceComposition.facades().operations()
             ));
         }

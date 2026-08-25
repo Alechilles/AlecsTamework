@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
+import com.alechilles.alecstamework.companion.identity.CompanionToolLink;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
@@ -16,6 +17,9 @@ import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopR
 import com.alechilles.alecstamework.items.persistence.DeathSnapshotV2Codec;
 import com.alechilles.alecstamework.items.persistence.DeathSnapshotV2Payload;
 import com.alechilles.alecstamework.items.persistence.TameworkSnapshotCodecs;
+import com.alechilles.alecstamework.persistence.control.PersistenceStartupAction;
+import com.alechilles.alecstamework.persistence.control.PersistenceStartupCoordinator;
+import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinitionRegistry;
@@ -23,10 +27,14 @@ import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
 import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceFeatureRegistry;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +50,8 @@ class SqliteReviveReadyOperationsTest {
             ProfileId.parse("10000000-0000-0000-0000-000000000001");
     private static final OwnerId OWNER =
             OwnerId.parse("20000000-0000-0000-0000-000000000001");
+    private static final UUID TOOL_ID =
+            UUID.fromString("25000000-0000-0000-0000-000000000001");
 
     @TempDir
     Path tempDir;
@@ -62,11 +72,13 @@ class SqliteReviveReadyOperationsTest {
         writer = new SqliteSingleWriter(connections);
         reads = new SqliteReadExecutor(connections);
         SqliteUnitOfWorkRunner units = new SqliteUnitOfWorkRunner(writer, reads);
+        PersistenceStartupCoordinator admission = readyAdmission();
         SqliteOperationEngine engine = new SqliteOperationEngine(
                 new OperationDefinitionRegistry(
                         List.of(ReviveReadyDefinition.INSTANCE)
                 ),
-                units
+                units,
+                admission
         );
         operations = new SqliteReviveReadyOperations(
                 new SqliteDatabaseOperationCoordinator(
@@ -99,7 +111,7 @@ class SqliteReviveReadyOperationsTest {
         OperationWorkflowResult result = operations.submit(
                 OperationId.parse("30000000-0000-0000-0000-000000000001"),
                 new IdempotencyKey("revive-ready-test"),
-                new ReviveReadyRequest(PROFILE, -300L)
+                new ReviveReadyRequest(PROFILE, OWNER, -300L)
         ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
 
         assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
@@ -117,6 +129,55 @@ class SqliteReviveReadyOperationsTest {
                         .fullStateJson(),
                 death.fullStateJson()
         );
+    }
+
+    private PersistenceStartupCoordinator readyAdmission() {
+        EnumMap<PersistenceStartupNode, PersistenceStartupAction> actions =
+                new EnumMap<>(PersistenceStartupNode.class);
+        for (PersistenceStartupNode node : PersistenceStartupNode.values()) {
+            actions.put(node, () -> CompletableFuture.completedFuture(
+                    PersistenceStartupAction.Result.COMPLETE
+            ));
+        }
+        PersistenceStartupCoordinator admission =
+                new PersistenceStartupCoordinator(
+                        PublicPersistenceFeatureRegistry.create(),
+                        Map.copyOf(actions)
+                );
+        admission.advance().toCompletableFuture().join();
+        return admission;
+    }
+
+    @Test
+    void rejectsOwnerThatNoLongerOwnsTheProfile() throws Exception {
+        OperationWorkflowResult result = operations.submit(
+                OperationId.parse("30000000-0000-0000-0000-000000000002"),
+                new IdempotencyKey("revive-ready-wrong-owner"),
+                new ReviveReadyRequest(
+                        PROFILE,
+                        OwnerId.parse("20000000-0000-0000-0000-000000000002"),
+                        -300L
+                )
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertNotEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
+        assertEquals(originalSnapshot.snapshotId(), currentDeathSnapshot().snapshotId());
+    }
+
+    @Test
+    void rejectsProfileThatIsNoLongerLinked() throws Exception {
+        try (var connection = connections.openWriterConnection()) {
+            new SqliteCompanionToolLinkStore(connection).replace(PROFILE, List.of());
+        }
+
+        OperationWorkflowResult result = operations.submit(
+                OperationId.parse("30000000-0000-0000-0000-000000000003"),
+                new IdempotencyKey("revive-ready-unlinked"),
+                new ReviveReadyRequest(PROFILE, OWNER, -300L)
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertNotEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
+        assertEquals(originalSnapshot.snapshotId(), currentDeathSnapshot().snapshotId());
     }
 
     private void seedDeadProfile() throws Exception {
@@ -167,6 +228,13 @@ class SqliteReviveReadyOperationsTest {
                     null
             ));
             transaction.snapshots().replaceCurrent(originalSnapshot);
+            transaction.toolLinks().link(new CompanionToolLink(
+                    PROFILE,
+                    TOOL_ID,
+                    "command",
+                    -500L,
+                    -500L
+            ));
             connection.commit();
         }
     }

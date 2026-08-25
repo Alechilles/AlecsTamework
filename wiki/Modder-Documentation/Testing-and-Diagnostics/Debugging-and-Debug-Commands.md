@@ -28,7 +28,7 @@ Use this page when an asset or integration loads but behaves incorrectly.
 - `/tw debug view hitboxes`
 - `/tw debug view spawnbeacons [radius|off]`
 - `/tw debug persistence debugdb [status|health|integrity|detail|export]`
-- `/tw debug persistence reviveready <profile UUID>`
+- `/tw debug persistence reviveready`
 
 `/tw debug view spawnbeacons` tracks loaded natural spawn beacons around the caller
 and reveals them to nearby Creative-mode players with the same configured model
@@ -71,10 +71,13 @@ active trace evidence.
 
 Death and Lost restoration is a gameplay flow. Roster-backed companions can
 use role-configured exact item costs, while legacy item-linked paths remain
-free. `/tw debug persistence reviveready <profile UUID>` is the exception for
-a generic `DEAD_REVIVABLE` profile. It changes only that profile's current
-death snapshot through the normal persistence operation. It does not revive,
-summon, or change bonded profiles.
+free. `/tw debug persistence reviveready` is the exception for generic
+`DEAD_REVIVABLE` profiles. It submits the normal persistence operation for
+every dead generic linked profile owned by the calling player. The result shows
+accepted, already-ready, and rejected counts. An accepted update completes
+through the normal persistence workflow. The command asks the caller to retry
+if linked roster data is still updating. It does not revive, summon, or change
+bonded profiles.
 
 For coops, test direct live capture, direct captured-item intake through the
 supported managed-coop interaction, and resident release independently.
