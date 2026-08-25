@@ -45,10 +45,10 @@ public interface CommandUiSession extends AutoCloseable {
                     CommandUiActionResult.denied(
                             "command UI action request is invalid"));
         }
-        if (request.textInput() != null) {
+        if (request.input() != null) {
             return CompletableFuture.completedFuture(
                     CommandUiActionResult.denied(
-                            "command UI action does not accept text input"));
+                            "command UI action does not accept input"));
         }
         return invoke(request.handle());
     }

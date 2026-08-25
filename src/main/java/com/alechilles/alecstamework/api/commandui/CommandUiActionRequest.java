@@ -8,8 +8,6 @@ import javax.annotation.Nullable;
 public final class CommandUiActionRequest {
     private final CommandUiActionHandle handle;
     @Nullable
-    private final String textInput;
-    @Nullable
     private final CommandUiValue input;
 
     /** Creates a request with an optional action-specific text value. */
@@ -18,18 +16,15 @@ public final class CommandUiActionRequest {
             @Nullable String textInput
     ) {
         this.handle = Objects.requireNonNull(handle, "handle");
-        this.textInput = textInput;
         this.input = textInput == null ? null : CommandUiValue.string(textInput);
     }
 
     private CommandUiActionRequest(
             @Nonnull CommandUiActionHandle handle,
-            @Nullable CommandUiValue input,
-            @Nullable String textInput
+            @Nullable CommandUiValue input
     ) {
         this.handle = Objects.requireNonNull(handle, "handle");
         this.input = input;
-        this.textInput = textInput;
     }
 
     /** Creates a handle-only request. */
@@ -37,7 +32,7 @@ public final class CommandUiActionRequest {
     public static CommandUiActionRequest of(
             @Nonnull CommandUiActionHandle handle
     ) {
-        return new CommandUiActionRequest(handle, null);
+        return new CommandUiActionRequest(handle, (String) null);
     }
 
     /** Creates a request with a detached, typed action input value. */
@@ -47,7 +42,7 @@ public final class CommandUiActionRequest {
             @Nonnull CommandUiValue input
     ) {
         return new CommandUiActionRequest(handle,
-                Objects.requireNonNull(input, "input"), null);
+                Objects.requireNonNull(input, "input"));
     }
 
     @Nonnull
@@ -57,7 +52,8 @@ public final class CommandUiActionRequest {
 
     @Nullable
     public String textInput() {
-        return textInput;
+        return input == null || input.type() != CommandUiValue.Type.STRING
+                ? null : input.stringValue();
     }
 
     /** Returns the detached typed input, or null when no input was supplied. */
@@ -81,7 +77,7 @@ public final class CommandUiActionRequest {
 
     @Override
     public String toString() {
-        return "CommandUiActionRequest[handle=opaque, hasTextInput="
+        return "CommandUiActionRequest[handle=opaque, hasInput="
                 + (input != null) + "]";
     }
 }

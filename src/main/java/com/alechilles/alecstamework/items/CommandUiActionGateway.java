@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionHandle;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionRequest;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
+import com.alechilles.alecstamework.api.commandui.CommandUiValue;
 import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -256,7 +257,7 @@ final class CommandUiActionGateway {
             return completed(CommandUiActionResult.stale(
                     "confirmation handle expired"));
         }
-        InputValidation input = validateInput(binding, request.textInput());
+        InputValidation input = validateInput(binding, request.input());
         if (!input.valid) {
             return completed(CommandUiActionResult.denied(input.message));
         }
@@ -447,15 +448,20 @@ final class CommandUiActionGateway {
     @Nonnull
     private static InputValidation validateInput(
             @Nonnull Binding binding,
-            @Nullable String supplied
+            @Nullable CommandUiValue supplied
     ) {
         if (binding.inputPolicy == InputPolicy.NONE) {
             return supplied == null
                     ? InputValidation.valid(null)
                     : InputValidation.invalid(
-                            "command UI action does not accept text input");
+                            "command UI action does not accept input");
         }
-        String normalized = supplied == null ? null : supplied.trim();
+        if (supplied != null && supplied.type() != CommandUiValue.Type.STRING) {
+            return InputValidation.invalid(
+                    "command UI action accepts string input only");
+        }
+        String normalized = supplied == null
+                ? null : supplied.stringValue().trim();
         if (binding.inputPolicy == InputPolicy.REQUIRED_TEXT
                 && (normalized == null || normalized.isEmpty())) {
             return InputValidation.invalid(

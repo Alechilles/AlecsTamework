@@ -15,7 +15,7 @@ import javax.annotation.Nullable;
  */
 public final class CommandUiContributorActionContext {
     private final UUID sessionId;
-    private final UUID playerId;
+    private final UUID playerUuid;
     @Nullable
     private final String configId;
     @Nullable
@@ -31,7 +31,7 @@ public final class CommandUiContributorActionContext {
     /** Creates a detached contributor action execution context. */
     public CommandUiContributorActionContext(
             @Nonnull UUID sessionId,
-            @Nonnull UUID playerId,
+            @Nonnull UUID playerUuid,
             @Nullable String configId,
             @Nullable UUID rowId,
             @Nullable UUID companionId,
@@ -40,7 +40,7 @@ public final class CommandUiContributorActionContext {
             boolean confirmed
     ) {
         this.sessionId = Objects.requireNonNull(sessionId, "sessionId");
-        this.playerId = Objects.requireNonNull(playerId, "playerId");
+        this.playerUuid = Objects.requireNonNull(playerUuid, "playerUuid");
         this.configId = normalize(configId);
         this.rowId = rowId;
         this.companionId = companionId;
@@ -54,15 +54,10 @@ public final class CommandUiContributorActionContext {
         return sessionId;
     }
 
-    @Nonnull
-    public UUID playerId() {
-        return playerId;
-    }
-
-    /** Alias that makes the UUID nature of the player identity explicit. */
+    /** Returns the stable player identity for this action. */
     @Nonnull
     public UUID playerUuid() {
-        return playerId;
+        return playerUuid;
     }
 
     @Nullable

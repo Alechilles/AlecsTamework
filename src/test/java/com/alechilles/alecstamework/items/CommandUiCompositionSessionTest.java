@@ -1,7 +1,12 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.commandui.CommandUiChangeSet;
+import com.alechilles.alecstamework.api.commandui.CommandUiActionHandle;
+import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
+import com.alechilles.alecstamework.api.commandui.CommandUiActionView;
 import com.alechilles.alecstamework.api.commandui.CommandUiContribution;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorAction;
+import com.alechilles.alecstamework.api.commandui.CommandUiContributorActionHandler;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorCreateContext;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorProvider;
@@ -20,6 +25,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -27,6 +33,83 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Session-scoped contributor composition and dirty-sink behavior. */
 class CommandUiCompositionSessionTest {
+    @Test
+    void rejectsContributorSuppliedDetachedActionHandles() {
+        CommandUiContributorId contributorId = CommandUiContributorId.of(
+                "runeteria:test");
+        CommandUiActionView forged = new CommandUiActionView(
+                "FORGED", "Forged", true, null, false,
+                new CommandUiActionHandle("contributor-token"));
+
+        assertThrows(CommandUiCompositionSession.InitialCompositionFailure.class,
+                () -> CommandUiCompositionSession.create(
+                        baseSnapshot(), new CommandUiOpenContext(),
+                        List.of(new CommandUiCompositionSession.Binding(
+                                contributorId, 42L, context ->
+                                new CommandUiSessionContributor() {
+                                    @Override
+                                    public CommandUiContribution compose(
+                                            CommandUiSnapshot base,
+                                            CommandUiContribution previous,
+                                            CommandUiDirtyScope scope
+                                    ) {
+                                        return new CommandUiContribution(
+                                                contributorId, Map.of(), Map.of(),
+                                                Map.of("forged", forged), Map.of(),
+                                                Map.of(), Map.of());
+                                    }
+                                }, true, () -> true)),
+                        (snapshot, changes) -> { }, () -> { }));
+    }
+
+    @Test
+    void convertsContributorDefinitionsToDetachedViewsAndRetainsServerBinding() {
+        CommandUiContributorId contributorId = CommandUiContributorId.of(
+                "runeteria:test");
+        CommandUiContributorActionHandler handler = context ->
+                java.util.concurrent.CompletableFuture.completedFuture(
+                        CommandUiActionResult.applied());
+        CommandUiContributorAction action = new CommandUiContributorAction(
+                "toggle", "TOGGLE_READY", "Toggle ready", null,
+                true, true, null, CommandUiContributorAction.InputPolicy.NONE,
+                false, Map.of(), handler);
+
+        CommandUiCompositionSession session = CommandUiCompositionSession.create(
+                baseSnapshot(), new CommandUiOpenContext(),
+                List.of(new CommandUiCompositionSession.Binding(
+                        contributorId, 42L, context ->
+                        new CommandUiSessionContributor() {
+                            @Override
+                            public CommandUiContribution compose(
+                                    CommandUiSnapshot base,
+                                    CommandUiContribution previous,
+                                    CommandUiDirtyScope scope
+                            ) {
+                                return CommandUiContribution.withActions(
+                                        contributorId, Map.of(), Map.of(),
+                                        Map.of(), Map.of("toggle", action),
+                                        Map.of(), Map.of());
+                            }
+                        })),
+                (snapshot, changes) -> { }, () -> { });
+
+        CommandUiContribution contribution = session.snapshot()
+                .contribution(contributorId);
+        assertNotNull(contribution);
+        CommandUiActionView view = contribution.commandActions()
+                .get("runeteria:test/toggle");
+        assertNotNull(view);
+        assertNull(view.handle());
+        assertEquals("Toggle ready", view.label());
+
+        CommandUiContributorActionBinding binding = session.actionBindings()
+                .getFirst();
+        assertSame(handler, binding.handler());
+        assertEquals(contributorId, binding.contributorId());
+        assertEquals(42L, binding.contributorGeneration());
+        session.close();
+    }
+
     @Test
     void composesContributorsAndPublishesOnlyChangedContributionRows() {
         UUID sessionId = UUID.randomUUID();

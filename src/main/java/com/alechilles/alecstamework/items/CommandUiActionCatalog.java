@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.api.commandui.CommandUiActionResult;
 import com.alechilles.alecstamework.api.commandui.CommandUiActionView;
 import com.alechilles.alecstamework.api.commandui.CommandUiCommandOption;
 import com.alechilles.alecstamework.api.commandui.CommandUiCompanionRow;
+import com.alechilles.alecstamework.api.commandui.CommandUiContribution;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorAction;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
 import com.alechilles.alecstamework.api.commandui.CommandUiPanelState;
@@ -123,6 +124,88 @@ final class CommandUiActionCatalog {
     @Nonnull
     List<CommandUiContributorActionBinding> contributorBindings() {
         return contributors.stream().map(ContributorEntry::binding).toList();
+    }
+
+    /**
+     * Converts contributor-owned server definitions into detached views while
+     * retaining the bindings needed by the server action gateway.
+     */
+    @Nonnull
+    ContributorActionComposition bindContributorActions(
+            @Nonnull CommandUiContributorId contributorId,
+            long contributorGeneration,
+            @Nonnull CommandUiContribution source
+    ) {
+        Objects.requireNonNull(contributorId, "contributorId");
+        Objects.requireNonNull(source, "source");
+        if (!contributorId.equals(source.contributorId())) {
+            throw new IllegalArgumentException(
+                    "Contributor action source has a different contributor ID.");
+        }
+        if (!source.pageActions().isEmpty()
+                || !source.commandActions().isEmpty()
+                || !source.rowActions().isEmpty()
+                || !source.flowActions().isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Contributors must submit server action definitions, not detached views.");
+        }
+        Map<String, CommandUiActionView> pageActions = new LinkedHashMap<>();
+        Map<String, CommandUiActionView> commandActions = new LinkedHashMap<>();
+        Map<UUID, Map<String, CommandUiActionView>> rowActions =
+                new LinkedHashMap<>();
+        Map<String, CommandUiActionView> flowActions = new LinkedHashMap<>();
+
+        bindDefinitions(CommandUiContributorAction.Scope.PAGE, null,
+                source.pageActionDefinitions(), contributorId,
+                contributorGeneration, pageActions);
+        bindDefinitions(CommandUiContributorAction.Scope.COMMAND, null,
+                source.commandActionDefinitions(), contributorId,
+                contributorGeneration, commandActions);
+        for (Map.Entry<UUID, Map<String, CommandUiContributorAction>> entry
+                : source.rowActionDefinitions().entrySet()) {
+            Map<String, CommandUiActionView> views = rowActions.computeIfAbsent(
+                    entry.getKey(), ignored -> new LinkedHashMap<>());
+            bindDefinitions(CommandUiContributorAction.Scope.ROW, entry.getKey(),
+                    entry.getValue(), contributorId, contributorGeneration, views);
+        }
+        bindDefinitions(CommandUiContributorAction.Scope.FLOW, null,
+                source.flowActionDefinitions(), contributorId,
+                contributorGeneration, flowActions);
+
+        CommandUiContribution detached = new CommandUiContribution(
+                source.contributorId(), source.pageData(), source.rowData(),
+                pageActions, commandActions, rowActions, flowActions,
+                source.status(), source.diagnosticReason());
+        return new ContributorActionComposition(detached,
+                contributorBindings());
+    }
+
+    private void bindDefinitions(
+            @Nonnull CommandUiContributorAction.Scope scope,
+            @Nullable UUID rowId,
+            @Nonnull Map<String, CommandUiContributorAction> definitions,
+            @Nonnull CommandUiContributorId contributorId,
+            long contributorGeneration,
+            @Nonnull Map<String, CommandUiActionView> views
+    ) {
+        for (CommandUiContributorAction action : definitions.values()) {
+            CommandUiActionResult result = addContributor(scope, rowId,
+                    contributorId, contributorGeneration, action);
+            if (result.status() !=
+                    com.alechilles.alecstamework.api.commandui.CommandUiActionStatus.APPLIED) {
+                throw new IllegalArgumentException(result.message());
+            }
+            CommandUiContributorActionBinding binding = contributors.getLast().binding();
+            CommandUiActionView view = binding.view(null);
+            if (view != null) {
+                if (views.containsKey(binding.effectiveId())) {
+                    throw new IllegalArgumentException(
+                            "Contributor action ID conflicts with an existing action: "
+                                    + binding.effectiveId());
+                }
+                views.put(binding.effectiveId(), view);
+            }
+        }
     }
 
     List<CommandSelectionPageService.GenericUiActionBinding> genericBindings() {
@@ -355,6 +438,11 @@ final class CommandUiActionCatalog {
     private record ContributorEntry(
             @Nonnull ContributorKey key,
             @Nonnull CommandUiContributorActionBinding binding
+    ) { }
+
+    record ContributorActionComposition(
+            @Nonnull CommandUiContribution contribution,
+            @Nonnull List<CommandUiContributorActionBinding> bindings
     ) { }
 
     private record ActionKey(Scope scope, String key, UUID rowId) { }

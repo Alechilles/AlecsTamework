@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.api.commandui.CommandUiActionStatus;
 import com.alechilles.alecstamework.api.commandui.CommandUiChangeSet;
 import com.alechilles.alecstamework.api.commandui.CommandUiPanelState;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
+import com.alechilles.alecstamework.api.commandui.CommandUiValue;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import java.nio.charset.StandardCharsets;
@@ -32,6 +33,72 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Behavior tests for session lifecycle, dispatch, and opaque action authority. */
 class CommandUiSessionTask2Test {
+    @Test
+    void typedObjectInputCannotBypassExistingInputPolicies() {
+        UUID sessionId = UUID.randomUUID();
+        CommandUiSessionImpl session = session(sessionId,
+                CommandUiSessionImpl.Mode.GENERIC,
+                new CommandUiActionGateway(), 1L);
+        AtomicInteger executions = new AtomicInteger();
+        var handleOnly = session.issueRequest(
+                CommandUiActionGateway.Route.GENERIC,
+                new CommandUiAction("SELECT_COMMAND"), ignored -> true,
+                (ignored, input) -> {
+                    executions.incrementAndGet();
+                    return CompletableFuture.completedFuture(
+                            CommandUiActionResult.applied());
+                }, CommandUiActionGateway.InputPolicy.NONE, 0, false);
+        var textAction = session.issueRequest(
+                CommandUiActionGateway.Route.GENERIC,
+                new CommandUiAction("SET_FILTER_TEXT"), ignored -> true,
+                (ignored, input) -> {
+                    executions.incrementAndGet();
+                    return CompletableFuture.completedFuture(
+                            CommandUiActionResult.applied());
+                }, CommandUiActionGateway.InputPolicy.OPTIONAL_TEXT, 20, false);
+        CommandUiValue objectInput = CommandUiValue.object(
+                java.util.Map.of("value", CommandUiValue.string("abc")));
+
+        assertEquals(CommandUiActionStatus.DENIED,
+                session.invoke(CommandUiActionRequest.withInput(
+                                handleOnly, objectInput))
+                        .toCompletableFuture().join().status());
+        assertEquals(CommandUiActionStatus.DENIED,
+                session.invoke(CommandUiActionRequest.withInput(
+                                textAction, objectInput))
+                        .toCompletableFuture().join().status());
+        assertEquals(0, executions.get());
+        session.close();
+    }
+
+    @Test
+    void equivalentStringRequestsCompareAndDispatchTheSameInput() {
+        UUID sessionId = UUID.randomUUID();
+        CommandUiSessionImpl session = session(sessionId,
+                CommandUiSessionImpl.Mode.GENERIC,
+                new CommandUiActionGateway(), 1L);
+        AtomicReference<String> received = new AtomicReference<>();
+        var handle = session.issueRequest(
+                CommandUiActionGateway.Route.GENERIC,
+                new CommandUiAction("SET_FILTER_TEXT"), ignored -> true,
+                (ignored, input) -> {
+                    received.set(input);
+                    return CompletableFuture.completedFuture(
+                            CommandUiActionResult.applied());
+                }, CommandUiActionGateway.InputPolicy.REQUIRED_TEXT, 20, false);
+        CommandUiActionRequest legacy = new CommandUiActionRequest(handle,
+                " abc ");
+        CommandUiActionRequest typed = CommandUiActionRequest.withInput(handle,
+                CommandUiValue.string(" abc "));
+
+        assertEquals(legacy, typed);
+        assertEquals(legacy.hashCode(), typed.hashCode());
+        assertEquals(CommandUiActionStatus.APPLIED,
+                session.invoke(typed).toCompletableFuture().join().status());
+        assertEquals("abc", received.get());
+        session.close();
+    }
+
     @Test
     void actionInputIsValidatedBeforeAuthorityAndExecution() {
         UUID sessionId = UUID.randomUUID();

@@ -33,6 +33,21 @@ class CommandUiManagedContractTest {
     }
 
     @Test
+    void legacySessionRejectsEveryTypedInputValue() {
+        CommandUiActionHandle handle = new CommandUiActionHandle("issued-token");
+        LegacySession session = new LegacySession();
+
+        CommandUiActionResult denied = session.invoke(
+                CommandUiActionRequest.withInput(handle,
+                        CommandUiValue.object(Map.of(
+                                "unexpected", CommandUiValue.string("value")))))
+                .toCompletableFuture().join();
+
+        assertEquals(CommandUiActionStatus.DENIED, denied.status());
+        assertEquals(null, session.lastHandle.get());
+    }
+
+    @Test
     void managedFlowResultKeepsAnImmutableDetachedView() {
         CommandUiActionView action = new CommandUiActionView(
                 "CREATE_GROUP", "Create", true, null, false,

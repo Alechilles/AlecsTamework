@@ -79,6 +79,16 @@ final class CommandUiCompositionSession implements AutoCloseable {
         }
     }
 
+    /** Returns the current server-owned contributor action bindings. */
+    @Nonnull
+    List<CommandUiContributorActionBinding> actionBindings() {
+        synchronized (lock) {
+            List<CommandUiContributorActionBinding> bindings = new ArrayList<>();
+            for (State state : states) bindings.addAll(state.actionBindings);
+            return List.copyOf(bindings);
+        }
+    }
+
     /** Replaces the Tamework base and composes all contributors without publishing. */
     @Nonnull
     CommandUiSnapshot rebase(@Nonnull CommandUiSnapshot baseSnapshot) {
@@ -172,9 +182,6 @@ final class CommandUiCompositionSession implements AutoCloseable {
                     abortRequired);
             if (next != null) {
                 state.lastPublishedContribution = next;
-                if (state.lastComposeValid) {
-                    state.lastValidContribution = next;
-                }
                 contributions.put(state.binding.id(), next);
             }
         }
@@ -202,6 +209,7 @@ final class CommandUiCompositionSession implements AutoCloseable {
     ) {
         state.failure = null;
         state.lastComposeValid = false;
+        state.actionBindings = List.of();
         if (state.contributor == null) {
             state.failure = "contributor factory returned null";
             return compositionFailure(state, initial, abortRequired);
@@ -216,8 +224,14 @@ final class CommandUiCompositionSession implements AutoCloseable {
                         : "contributor returned a different contributor ID";
                 return compositionFailure(state, initial, abortRequired);
             }
+            CommandUiActionCatalog.ContributorActionComposition composed =
+                    new CommandUiActionCatalog().bindContributorActions(
+                            state.binding.id(), state.binding.generation(),
+                            contribution);
+            state.lastValidContribution = contribution;
+            state.actionBindings = composed.bindings();
             state.lastComposeValid = true;
-            return contribution;
+            return composed.contribution();
         } catch (RuntimeException | LinkageError failure) {
             state.failure = failure.getClass().getSimpleName();
             return compositionFailure(state, initial, abortRequired);
@@ -269,6 +283,7 @@ final class CommandUiCompositionSession implements AutoCloseable {
             State state = closing.get(index);
             closeQuietly(state.contributor);
             state.contributor = null;
+            state.actionBindings = List.of();
         }
     }
 
@@ -328,6 +343,7 @@ final class CommandUiCompositionSession implements AutoCloseable {
         private String failure;
         private CommandUiDirtyScope dirtyScope = CommandUiDirtyScope.empty();
         private boolean lastComposeValid;
+        private List<CommandUiContributorActionBinding> actionBindings = List.of();
 
         private State(Binding binding) {
             this.binding = binding;
