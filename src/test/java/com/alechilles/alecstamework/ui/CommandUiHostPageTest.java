@@ -279,6 +279,30 @@ class CommandUiHostPageTest {
     }
 
     @Test
+    void customOpenFailureClaimsStandardFallbackForOpener() {
+        CommandUiRegistry registry = new CommandUiRegistry();
+        var registration = registry.registerRenderer(
+                "example:menu", ignored -> new TestController()).registration();
+        List<String> pageOrder = new ArrayList<>();
+        CommandUiHostPage.FallbackOpener fallbackOpener =
+                ignored -> pageOrder.add("standard");
+        TestSession session = new TestSession(snapshot(1L));
+        CommandUiHostPage<TestEvent> host = rendererHostForRegistration(
+                registry, registration.generation(), session, new TestController(),
+                directDispatcher(), fallbackOpener);
+
+        assertTrue(host.takePageOwnership());
+        assertFalse(host.finishPageOpening(false));
+        host.closeSession(CommandUiCloseReason.FAILURE);
+        if (host.claimFallbackForOpener()) {
+            fallbackOpener.open(new CommandUiHostPage.CurrentWorld(null, null));
+        }
+
+        assertEquals(List.of("standard"), pageOrder);
+        registration.close();
+    }
+
+    @Test
     void rendererGenerationEndingBeforeHostConstructionOpensFallbackOnce() {
         CommandUiRegistry registry = new CommandUiRegistry();
         var registration = registry.registerRenderer(

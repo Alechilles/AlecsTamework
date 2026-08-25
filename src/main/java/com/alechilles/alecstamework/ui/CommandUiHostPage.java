@@ -280,7 +280,15 @@ public final class CommandUiHostPage<T> extends InteractiveCustomUIPage<T> {
         if (!customProvider) return opened && open.get();
         synchronized (lifecycleLock) {
             if (fallbackOwnership != FallbackOwnership.OPENING) return false;
-            if (!opened || !open.get()) {
+            if (!opened) {
+                if (open.get()) {
+                    fallbackOwnership = FallbackOwnership.PRE_SHOW_FALLBACK;
+                } else {
+                    fallbackOwnership = FallbackOwnership.CLOSED;
+                }
+                return false;
+            }
+            if (!open.get()) {
                 fallbackOwnership = FallbackOwnership.CLOSED;
                 return false;
             }

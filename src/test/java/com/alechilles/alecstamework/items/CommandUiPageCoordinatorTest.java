@@ -3,6 +3,9 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
 import com.alechilles.alecstamework.api.commandui.CommandUiPageController;
 import com.alechilles.alecstamework.api.commandui.CommandUiPanelState;
+import com.alechilles.alecstamework.api.commandui.CommandUiContribution;
+import com.alechilles.alecstamework.api.commandui.CommandUiUpdate;
+import com.alechilles.alecstamework.api.commandui.CommandUiValue;
 import com.alechilles.alecstamework.api.commandui.CommandUiProviderId;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorId;
 import com.alechilles.alecstamework.api.commandui.CommandUiContributorRequirement;
@@ -19,11 +22,16 @@ import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -59,6 +67,61 @@ class CommandUiPageCoordinatorTest {
         assertEquals(generation, created.providerGeneration());
         assertSame(base, custom.initialSnapshot);
         assertSame(base, created.session().snapshot());
+        created.session().close();
+    }
+
+    @Test
+    void initialContributorDirtySignalPublishesAfterPageIsOwned() {
+        CommandUiRegistry registry = new CommandUiRegistry();
+        RecordingController custom = new RecordingController();
+        CommandUiContributorId contributorId = CommandUiContributorId.of(
+                "runeteria:data");
+        UUID rowId = UUID.randomUUID();
+        AtomicInteger composeCount = new AtomicInteger();
+        registry.registerRenderer("runeteria:ui", ignored -> custom);
+        registry.registerContributor("runeteria:data", context ->
+                new CommandUiSessionContributor() {
+                    @Override
+                    public CommandUiContribution compose(
+                            CommandUiSnapshot base,
+                            CommandUiContribution previous,
+                            CommandUiDirtyScope scope
+                    ) {
+                        boolean refreshed = composeCount.incrementAndGet() > 1;
+                        if (!refreshed) {
+                            context.dirtySink().markRowsDirty(Set.of(rowId));
+                        }
+                        return new CommandUiContribution(
+                                contributorId,
+                                Map.of("ready", CommandUiValue.of(refreshed)),
+                                Map.of(rowId, Map.of("ready",
+                                        CommandUiValue.of(refreshed))));
+                    }
+                });
+        CommandUiPageCoordinator coordinator = new CommandUiPageCoordinator(
+                registry, new CommandSelectionPageService(
+                        null, null, null, null, null));
+        PlayerRef playerRef = new PlayerRef(
+                null, UUID.randomUUID(), "CoordinatorTester", "en-US", null, null);
+        CommandUiOpenContext context = new CommandUiOpenContext(
+                playerRef.getUuid(), "en-US", "tool-1", "config-1",
+                CommandUiRendererId.of("runeteria:ui"), "generic");
+
+        CommandUiPageCoordinator.Created created = coordinator.create(
+                playerRef, context, snapshot(), RecordingController::new,
+                List.of(new CommandUiContributorRequirement(
+                        contributorId, false)),
+                List.of(), List.of(), (current, handles) -> current,
+                directDispatcher(), ignored -> { });
+
+        assertNull(custom.updatedSnapshot);
+        assertTrue(created.host().takePageOwnership());
+        assertTrue(created.host().finishPageOpening(true));
+        created.pageOpened();
+
+        assertNotNull(custom.updatedSnapshot);
+        assertTrue(custom.updatedSnapshot.contribution(contributorId)
+                .rowValue(rowId, "ready").booleanValue());
         created.session().close();
     }
 
@@ -187,6 +250,7 @@ class CommandUiPageCoordinatorTest {
     private static final class RecordingController
             implements CommandUiPageController<TestEvent> {
         private CommandUiSnapshot initialSnapshot;
+        private CommandUiSnapshot updatedSnapshot;
         private int closeCount;
 
         @Override
@@ -201,6 +265,15 @@ class CommandUiPageCoordinatorTest {
                                  UICommandBuilder commands,
                                  UIEventBuilder events) {
             initialSnapshot = snapshot;
+        }
+
+        @Override
+        public void update(
+                CommandUiUpdate update,
+                UICommandBuilder commands,
+                UIEventBuilder events
+        ) {
+            updatedSnapshot = update.snapshot();
         }
 
         @Override

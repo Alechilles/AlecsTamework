@@ -373,6 +373,9 @@ final class CommandSelectionPageService {
                     com.alechilles.alecstamework.api.commandui
                             .CommandUiCloseReason.FAILURE);
         }
+        if (pageOwned) {
+            created.pageOpened();
+        }
         if (!pageOwned && created.host().claimFallbackForOpener()) {
             return open(player, store, config, working, toolId, actions,
                     genericAuthority, bondedAuthority, true);

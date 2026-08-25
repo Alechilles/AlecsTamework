@@ -142,9 +142,15 @@ final class CommandUiPageCoordinator {
                 new AtomicReference<>();
         java.util.concurrent.atomic.AtomicBoolean pendingCompositionRefresh =
                 new java.util.concurrent.atomic.AtomicBoolean();
+        java.util.concurrent.atomic.AtomicBoolean pageShown =
+                new java.util.concurrent.atomic.AtomicBoolean();
         AtomicReference<CommandUiHostPage<?>> host = new AtomicReference<>();
         AtomicReference<CommandUiSessionImpl> sessionRef = new AtomicReference<>();
         Runnable compositionRefreshRequest = () -> {
+            if (!pageShown.get()) {
+                pendingCompositionRefresh.set(true);
+                return;
+            }
             CommandUiCompositionSession current = compositionRef.get();
             if (current == null) {
                 pendingCompositionRefresh.set(true);
@@ -215,9 +221,6 @@ final class CommandUiPageCoordinator {
                     },
                     List.copyOf(genericActions), List.copyOf(bondedActions));
             sessionRef.set(createdSession.session());
-            if (pendingCompositionRefresh.getAndSet(false)) {
-                compositionRefreshRequest.run();
-            }
             CommandUiSnapshot finalSnapshot = Objects.requireNonNull(
                     snapshotFinalizer.finish(composedBase, createdSession.handles()),
                     "final snapshot");
@@ -237,10 +240,16 @@ final class CommandUiPageCoordinator {
             if (composition != null && !page.own(composition)) {
                 composition = null;
             }
+            Runnable onPageOpened = () -> {
+                if (!pageShown.compareAndSet(false, true)) return;
+                if (pendingCompositionRefresh.getAndSet(false)) {
+                    compositionRefreshRequest.run();
+                }
+            };
             return new Created(page, createdSession.session(),
                     createdSession.handles(), resolved.custom(),
                     resolved.providerGeneration(), resolved.rendererGeneration(),
-                    composition);
+                    composition, onPageOpened);
         } catch (RuntimeException | LinkageError failure) {
             if (page == null) {
                 if (createdSession != null) {
@@ -351,10 +360,16 @@ final class CommandUiPageCoordinator {
             boolean custom,
             long providerGeneration,
             long rendererGeneration,
-            @javax.annotation.Nullable CommandUiCompositionSession composition
+            @javax.annotation.Nullable CommandUiCompositionSession composition,
+            @Nonnull Runnable onPageOpened
     ) {
         Created {
             handles = List.copyOf(handles);
+            onPageOpened = Objects.requireNonNull(onPageOpened, "onPageOpened");
+        }
+
+        void pageOpened() {
+            onPageOpened.run();
         }
     }
 }
