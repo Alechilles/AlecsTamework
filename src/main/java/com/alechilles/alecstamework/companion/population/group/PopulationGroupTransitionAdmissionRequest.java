@@ -5,7 +5,10 @@ import java.util.List;
 import java.util.TreeSet;
 import javax.annotation.Nonnull;
 
-/** Exact group policy and lifecycle evidence for one canonical transition. */
+/**
+ * Exact group policy and lifecycle evidence for one canonical transition.
+ * An expected assignment revision of zero marks initial classification.
+ */
 public record PopulationGroupTransitionAdmissionRequest(
         @Nonnull CompanionLifecycle before,
         @Nonnull CompanionLifecycle after,
@@ -16,7 +19,7 @@ public record PopulationGroupTransitionAdmissionRequest(
 ) {
     public PopulationGroupTransitionAdmissionRequest {
         if (before == null || after == null
-                || expectedAssignmentRevision <= 0
+                || expectedAssignmentRevision < 0
                 || expectedPolicyRevision < 0 || policies == null
                 || !before.profileId().equals(after.profileId())
                 || !after.revision().equals(before.revision().next())) {

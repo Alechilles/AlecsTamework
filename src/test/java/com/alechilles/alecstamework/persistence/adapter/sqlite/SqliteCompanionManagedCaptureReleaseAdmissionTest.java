@@ -17,9 +17,15 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
+import com.alechilles.alecstamework.companion.population.domain.PopulationAdmissionComposition;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainBucket;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainScope;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignment;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupMembership;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupPolicy;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionRequest;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
@@ -81,6 +87,7 @@ class SqliteCompanionManagedCaptureReleaseAdmissionTest {
     private SqliteReadExecutor reads;
     private SqliteCompanionCaptureReleaseOperations releases;
     private int admissionCalls;
+    private boolean initializeGroupAssignment;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -101,6 +108,7 @@ class SqliteCompanionManagedCaptureReleaseAdmissionTest {
                 units
         );
         admissionCalls = 0;
+        initializeGroupAssignment = false;
         SqliteLifecycleAdmissionBinding binding =
                 new SqliteLifecycleAdmissionBinding();
         binding.bind(this::authorizeAdmission);
@@ -234,6 +242,34 @@ class SqliteCompanionManagedCaptureReleaseAdmissionTest {
     }
 
     @Test
+    void managedReleasePersistsInitialGroupAssignment() throws Exception {
+        setCapturedOwner(null);
+        initializeGroupAssignment = true;
+
+        OperationWorkflowResult result = submit(
+                23,
+                request(OWNER),
+                (request, operation) -> LiveOperationResult.confirmed(
+                        "capture_release_both_receipts_confirmed"
+                ).completed()
+        );
+
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLISHED,
+                result.status(),
+                String.valueOf(result.failure())
+        );
+        PopulationGroupAssignment assignment = groupAssignment();
+        assertEquals("role", assignment.roleId());
+        assertEquals(List.of(new PopulationGroupMembership(
+                "managed-test-group", PopulationGroupScope.GLOBAL
+        )), assignment.memberships());
+        assertEquals(1, assignment.assignmentRevision());
+        assertEquals(new LifecycleRevision(3),
+                assignment.sourceLifecycleRevision());
+    }
+
+    @Test
     void concurrentDifferentReleaseDoesNotSharePublishedResult()
             throws Exception {
         CompanionCaptureReleaseRequest firstRequest = request(OWNER);
@@ -356,7 +392,63 @@ class SqliteCompanionManagedCaptureReleaseAdmissionTest {
                         List.of(),
                         -400
                 );
-        return LifecycleAdmissionEvidence.managed(payload, null);
+        PopulationAdmissionComposition composition = initializeGroupAssignment
+                ? initialGroupComposition(operationId, payload)
+                : null;
+        return LifecycleAdmissionEvidence.managed(payload, composition);
+    }
+
+    private PopulationAdmissionComposition initialGroupComposition(
+            OperationId operationId,
+            PopulationDomainAdmissionOperation.Payload payload
+    ) {
+        CompanionLifecycle before = new CompanionLifecycle(
+                PROFILE,
+                payload.sourceOwnerId(),
+                LifecycleState.CAPTURED,
+                LifecycleLocation.keyed(
+                        LifecycleLocationKind.CAPTURE_ITEM,
+                        SNAPSHOT.toString()
+                ),
+                payload.expectedLifecycleRevision(),
+                null,
+                -9_500,
+                ReconciliationGeneration.INITIAL,
+                null,
+                payload.sourceWorldKey()
+        );
+        CompanionLifecycle after = new CompanionLifecycle(
+                PROFILE,
+                payload.ownerId(),
+                LifecycleState.ACTIVE,
+                LifecycleLocation.liveEntity(
+                        TARGET_ALIAS.toString(), payload.ownerWorldKey()
+                ),
+                payload.expectedLifecycleRevision().next(),
+                operationId,
+                payload.createdAtMs(),
+                ReconciliationGeneration.INITIAL,
+                null,
+                payload.ownerWorldKey()
+        );
+        PopulationGroupPolicy policy = new PopulationGroupPolicy(
+                "managed-test-group",
+                PopulationGroupScope.GLOBAL,
+                100,
+                100,
+                1
+        );
+        return new PopulationAdmissionComposition(
+                null,
+                new PopulationGroupTransitionAdmissionRequest(
+                        before,
+                        after,
+                        0,
+                        1,
+                        List.of(policy),
+                        payload.createdAtMs()
+                )
+        );
     }
 
     private CompanionCaptureReleaseRequest request(OwnerId ownerAssignment) {
@@ -639,6 +731,14 @@ class SqliteCompanionManagedCaptureReleaseAdmissionTest {
         try (Connection connection = connections.openReadConnection()) {
             return new SqliteCompanionLifecycleStore(connection)
                     .findByProfile(PROFILE)
+                    .orElseThrow();
+        }
+    }
+
+    private PopulationGroupAssignment groupAssignment() throws Exception {
+        try (Connection connection = connections.openReadConnection()) {
+            return new SqlitePopulationGroupStore(connection)
+                    .findAssignment(PROFILE)
                     .orElseThrow();
         }
     }

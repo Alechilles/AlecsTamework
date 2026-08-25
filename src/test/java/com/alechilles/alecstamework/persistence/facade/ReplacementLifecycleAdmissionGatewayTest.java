@@ -124,6 +124,39 @@ class ReplacementLifecycleAdmissionGatewayTest {
     }
 
     @Test
+    void capturedReleaseAuthorsInitialGroupEvidenceWhenAssignmentIsMissing()
+            throws Exception {
+        try (PersistenceBootstrap persistence = new PersistenceBootstrap(configuration());
+             AdmissionProviderRegistry providers = new AdmissionProviderRegistry()) {
+            assertTrue(persistence.start().toCompletableFuture().join().complete());
+            PopulationGroupConfigRegistry groups = new PopulationGroupConfigRegistry();
+            assertTrue(groups.replace(List.of(groupConfig()), 1L).applied());
+            ManagedActivityConfigRegistry managed =
+                    new ManagedActivityConfigRegistry(groups);
+            assertTrue(managed.replace(List.of(managedConfig()), 1L).applied());
+            providers.register("runeteria:provider", 1, ignored ->
+                    CompletableFuture.completedFuture(providerDecision(
+                            managed.snapshot().revision()
+                    )));
+            ReplacementLifecycleAdmissionGateway gateway =
+                    new ReplacementLifecycleAdmissionGateway(
+                            persistence, managed, groups, providers, () -> -50L
+            );
+
+            LifecycleAdmissionEvidence evidence = gateway.authorize(
+                    capturedReleaseRequest(null, new OwnerId(OWNER))
+            ).toCompletableFuture().join();
+
+            assertEquals(LifecycleAdmissionEvidence.Status.MANAGED, evidence.status());
+            assertTrue(evidence.composition().ownerPlan() != null);
+            assertEquals(0, evidence.composition().groupRequest()
+                    .expectedAssignmentRevision());
+            assertEquals("runeteria:livestock", evidence.composition()
+                    .groupRequest().policies().getFirst().groupId());
+        }
+    }
+
+    @Test
     void unownedReleaseKeepsDestinationSeparateFromOwnerWorld()
             throws Exception {
         try (PersistenceBootstrap persistence = new PersistenceBootstrap(configuration());
@@ -195,10 +228,17 @@ class ReplacementLifecycleAdmissionGatewayTest {
     }
 
     private LifecycleAdmissionRequest capturedReleaseRequest(OwnerId owner) {
+        return capturedReleaseRequest(owner, owner);
+    }
+
+    private LifecycleAdmissionRequest capturedReleaseRequest(
+            OwnerId sourceOwner,
+            OwnerId targetOwner
+    ) {
         LifecycleRevision revision = new LifecycleRevision(1);
         CompanionLifecycle source = new CompanionLifecycle(
                 PROFILE,
-                owner,
+                sourceOwner,
                 LifecycleState.CAPTURED,
                 LifecycleLocation.keyed(
                         com.alechilles.alecstamework.companion.lifecycle
@@ -210,19 +250,21 @@ class ReplacementLifecycleAdmissionGatewayTest {
                 -60L,
                 ReconciliationGeneration.INITIAL,
                 null,
-                owner == null ? null : "world"
+                sourceOwner == null ? null : "world"
         );
         PopulationAdmissionRequest admission = new PopulationAdmissionRequest(
                 new PopulationAdmissionIdentity(PROFILE.toString(), null, null),
-                owner == null
+                targetOwner == null
                         ? UUID.fromString("50000000-0000-0000-0000-000000000412")
                         : null,
                 revision.value(),
-                owner == null ? null : owner.value(),
-                owner == null ? null : owner.value(),
-                owner == null ? null : new PopulationAdmissionLocation("world", 0, 0),
+                sourceOwner == null ? null : sourceOwner.value(),
+                targetOwner == null ? null : targetOwner.value(),
+                sourceOwner == null
+                        ? null
+                        : new PopulationAdmissionLocation("world", 0, 0),
                 new PopulationAdmissionLocation("world-two", 0, 0),
-                owner == null
+                targetOwner == null
                         ? PopulationAdmissionOperation.LIFECYCLE_CHANGE
                         : PopulationAdmissionOperation.RESTORE,
                 1,
@@ -237,8 +279,8 @@ class ReplacementLifecycleAdmissionGatewayTest {
                 source,
                 LifecycleState.CAPTURED,
                 LifecycleState.ACTIVE,
-                owner,
-                owner == null ? null : "world"
+                sourceOwner,
+                sourceOwner == null ? null : "world"
         );
     }
 

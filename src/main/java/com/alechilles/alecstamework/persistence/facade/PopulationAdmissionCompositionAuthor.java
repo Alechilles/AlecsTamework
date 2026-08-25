@@ -79,6 +79,13 @@ final class PopulationAdmissionCompositionAuthor {
                     PopulationGroupAssignment assignment = found.value().stream()
                             .filter(value -> value.profileId().equals(source.profileId()))
                             .findFirst().orElse(null);
+                    if (assignment == null && capturedRelease(source, payload)) {
+                        return CompletableFuture.completedFuture(
+                                composition(
+                                        request, source, payload, operationId, null
+                                )
+                        );
+                    }
                     if (!currentAssignment(
                             request, source, assignment
                     )) {
@@ -116,6 +123,19 @@ final class PopulationAdmissionCompositionAuthor {
             ));
         }
         return memberships.equals(new TreeSet<>(assignment.memberships()));
+    }
+
+    private boolean capturedRelease(
+            CompanionLifecycle source,
+            PopulationDomainAdmissionOperation.Payload payload
+    ) {
+        return source.state() == LifecycleState.CAPTURED
+                && payload.sourceLifecycle() == LifecycleState.CAPTURED
+                && payload.targetLifecycle() == LifecycleState.ACTIVE
+                && source.profileId().equals(payload.profileId())
+                && source.revision().equals(
+                payload.expectedLifecycleRevision()
+        );
     }
 
     private PopulationAdmissionComposition newProfileComposition(
@@ -211,7 +231,8 @@ final class PopulationAdmissionCompositionAuthor {
     ) {
         List<PopulationGroupPolicy> policies = groups.snapshot()
                 .resolvePoliciesForRole(request.request().targetRoleId());
-        if (policies.isEmpty() && !assignment.memberships().isEmpty()) {
+        if (policies.isEmpty() && (assignment == null
+                || !assignment.memberships().isEmpty())) {
             throw new IllegalStateException("population-admission-group-policy-missing");
         }
         CompanionLifecycle after = new CompanionLifecycle(
@@ -230,8 +251,12 @@ final class PopulationAdmissionCompositionAuthor {
                 new PopulationGroupTransitionAdmissionRequest(
                         source,
                         after,
-                        assignment.assignmentRevision(),
-                        assignment.policyRevision(),
+                        assignment == null
+                                ? 0
+                                : assignment.assignmentRevision(),
+                        assignment == null
+                                ? policies.getFirst().policyRevision()
+                                : assignment.policyRevision(),
                         policies,
                         payload.createdAtMs()
                 );

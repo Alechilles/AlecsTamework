@@ -6,8 +6,11 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAdmission;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignment;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentChange;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentChangeCodec;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupBucket;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupLifecycleClassifier;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupMembership;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupPolicy;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupReservation;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
@@ -18,6 +21,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.PreparedOperationDetail;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
+import java.util.ArrayList;
 import java.util.List;
 
 /** Reusable shared-envelope participant for positive group lifecycle admission. */
@@ -112,10 +116,21 @@ public final class SqlitePopulationGroupTransitionParticipant
             int expected = plannedReservationCount(
                     transaction, operation
             );
-            List<ProjectionEventDraft> events =
-                    delegated.execute(transaction, operation);
+            ArrayList<ProjectionEventDraft> events = new ArrayList<>(
+                    delegated.execute(transaction, operation)
+            );
+            PopulationGroupAssignment initialized =
+                    initializeAssignment(transaction);
+            if (initialized != null) {
+                events.add(PopulationGroupAssignmentChangeCodec.draft(
+                        operation.operationId(),
+                        new PopulationGroupAssignmentChange(
+                                initialized.profileId(), null, initialized
+                        )
+                ));
+            }
             retireExact(transaction, operation, expected);
-            return events;
+            return List.copyOf(events);
         };
     }
 
@@ -165,12 +180,28 @@ public final class SqlitePopulationGroupTransitionParticipant
         PopulationGroupAssignment assignment =
                 transaction.populationGroups()
                         .findAssignment(request.before().profileId())
-                        .orElseThrow(() -> new IllegalStateException(
-                                "population_group_transition_assignment_missing"
-                        ));
+                        .orElse(null);
         if (!sourceMatches(lifecycle, operation)) {
             throw new IllegalStateException(
                     "population_group_transition_source_mismatch"
+            );
+        }
+        if (request.expectedAssignmentRevision() == 0) {
+            if (!initializesCapturedAssignment()) {
+                throw new IllegalStateException(
+                        "population_group_initial_transition_invalid"
+                );
+            }
+            if (assignment != null) {
+                throw new IllegalStateException(
+                        "population_group_transition_assignment_unexpected"
+                );
+            }
+            return initialPlan(operation, request.before().revision());
+        }
+        if (assignment == null) {
+            throw new IllegalStateException(
+                    "population_group_transition_assignment_missing"
             );
         }
         return PopulationGroupTransitionAdmissionPlanner.plan(
@@ -192,6 +223,13 @@ public final class SqlitePopulationGroupTransitionParticipant
     private List<PopulationGroupReservation> newProfilePlan(
             OperationEnvelope operation
     ) {
+        return initialPlan(operation, null);
+    }
+
+    private List<PopulationGroupReservation> initialPlan(
+            OperationEnvelope operation,
+            LifecycleRevision expectedLifecycleRevision
+    ) {
         CompanionLifecycle after = request.after();
         boolean owned = PopulationGroupLifecycleClassifier.consumesOwned(
                 after.state()
@@ -201,7 +239,12 @@ public final class SqlitePopulationGroupTransitionParticipant
         );
         return request.policies().stream()
                 .map(policy -> newProfileReservation(
-                        operation, after, policy, owned, active
+                        operation,
+                        after,
+                        policy,
+                        expectedLifecycleRevision,
+                        owned,
+                        active
                 ))
                 .filter(reservation -> reservation.ownedDelta() > 0
                         || reservation.activeDelta() > 0)
@@ -212,6 +255,7 @@ public final class SqlitePopulationGroupTransitionParticipant
             OperationEnvelope operation,
             CompanionLifecycle after,
             PopulationGroupPolicy policy,
+            LifecycleRevision expectedLifecycleRevision,
             boolean owned,
             boolean active
     ) {
@@ -226,7 +270,7 @@ public final class SqlitePopulationGroupTransitionParticipant
         return new PopulationGroupReservation(
                 operation.operationId(),
                 after.profileId(),
-                null,
+                expectedLifecycleRevision,
                 new PopulationGroupBucket(
                         after.ownerId(), policy.groupId(), policy.scope(), world
                 ),
@@ -237,6 +281,66 @@ public final class SqlitePopulationGroupTransitionParticipant
                 policy.policyRevision(),
                 request.requestedAtMs()
         );
+    }
+
+    private PopulationGroupAssignment initializeAssignment(
+            SqlitePersistenceTransactionContext transaction
+    ) {
+        if (!initializesCapturedAssignment()) {
+            return null;
+        }
+        CompanionLifecycle lifecycle = transaction.lifecycles()
+                .findByProfile(request.after().profileId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "population_group_initial_lifecycle_missing"
+                ));
+        var identity = transaction.identities()
+                .findProfile(request.after().profileId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "population_group_initial_profile_missing"
+                ));
+        if (lifecycle.state() != request.after().state()
+                || !java.util.Objects.equals(
+                lifecycle.ownerId(), request.after().ownerId()
+        )
+                || !java.util.Objects.equals(
+                lifecycle.ownerWorldKey(), request.after().ownerWorldKey()
+        )
+                || lifecycle.activeOperationId() != null
+                || lifecycle.quarantined()) {
+            throw new IllegalStateException(
+                    "population_group_initial_target_mismatch"
+            );
+        }
+        PopulationGroupAssignment assignment = new PopulationGroupAssignment(
+                identity.profileId(),
+                identity.roleId(),
+                request.policies().stream()
+                        .map(policy -> new PopulationGroupMembership(
+                                policy.groupId(), policy.scope()
+                        ))
+                        .toList(),
+                request.expectedPolicyRevision(),
+                identity.metadataRevision(),
+                lifecycle.revision(),
+                1,
+                request.requestedAtMs()
+        );
+        var result = transaction.populationGroups()
+                .replaceAssignment(null, assignment);
+        if (!result.applied()) {
+            throw new IllegalStateException(
+                    "population_group_initial_assignment_"
+                            + result.status().name().toLowerCase()
+            );
+        }
+        return result.value();
+    }
+
+    private boolean initializesCapturedAssignment() {
+        return request.expectedAssignmentRevision() == 0
+                && request.before().state() == LifecycleState.CAPTURED
+                && request.after().state() == LifecycleState.ACTIVE;
     }
 
     private boolean isNewProfileEvidence(OperationEnvelope operation) {
@@ -273,7 +377,7 @@ public final class SqlitePopulationGroupTransitionParticipant
                 && operation.operationId().equals(
                 lifecycle.activeOperationId()
         )
-                && lifecycle.stateChangedAtMs() == request.requestedAtMs()
+                && lifecycle.stateChangedAtMs() == operation.createdAtMs()
                 && lifecycle.lastReconciledGeneration().equals(
                 before.lastReconciledGeneration()
         )

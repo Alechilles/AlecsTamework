@@ -27,6 +27,8 @@
 
 - Owner-clearing capture items can capture both ordinarily tamed companions
   and managed-admission companions without failing lifecycle admission.
+- Captured companions that predate population-group classification can now
+  create their first managed group assignment when released.
 
 ## 3.2.2 - Flightmaster's Talisman Preview Hotfix - 2026-08-24
 
