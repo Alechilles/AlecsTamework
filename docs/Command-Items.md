@@ -219,27 +219,33 @@ Selection UI:
 - `TameworkCommandSelectionPage`
 - Target HUD: `Common/UI/Custom/TameworkCommandTargetHud.ui`
 
-### Custom Java command-menu providers
+### Custom Java command-menu composition
 
-An effective `TwCommandItemConfig` can set a namespaced `UiProviderId`. A Java
-plugin registers that ID through `TameworkApi.commandUi()` and returns one
-custom page controller per open menu.
+An effective `TwCommandItemConfig` can select one namespaced `UiRendererId`
+and an ordered `UiContributors` list. The renderer plugin owns the layout and
+client UI assets. Contributor plugins supply isolated page data, row data,
+server actions, and optional custom flows.
 
-The controller can use a different layout and different UI assets. Tamework
-still supplies the full detached snapshot, row and section change hints,
-opaque built-in action handles, current-world action validation, page cleanup,
-and standard-menu fallback. Provider updates are partial (`clear=false`), so a
-controller can update one card indicator without rebuilding the page.
+The controller can use a different layout and update one selector at a time.
+Tamework still supplies the full detached snapshot, row and section change
+hints, opaque built-in and contributor action handles, current-world action
+validation, page cleanup, and standard-menu fallback. Host updates are partial
+(`clear=false`), so one card indicator can change without a page rebuild.
 
-Version 1 exposes only Tamework-defined actions. See the durable wiki pages
-for the public contract and registration recipe.
+A required contributor that is missing, incompatible, or failed causes
+standard-menu fallback. An optional contributor can fail or unregister while
+the custom page continues with an unavailable status for that namespace.
+Selecting a renderer affects only command configs that name its exact ID.
 
-Providers that require `COMMAND_UI_MANAGED_FLOWS` can also reproduce the group
-manager and generic or bonded talent pages. Tamework returns detached flow
-models and opaque actions for group create, rename, recolor, delete, active
-selection, talent purchase, and talent reset. Text values have server-owned
-limits. Providers cannot supply targets, action kinds, costs, or profile
-revisions.
+Renderers can reproduce the built-in group manager and generic or bonded
+talent pages. Contributors can also define server-authoritative actions and
+custom `OPEN`, `REPLACE`, `UPDATE`, and `CLOSE` flows. Tamework validates
+targets, ownership, registration generations, revisions, input, confirmation,
+and costs. The client cannot supply gameplay authority.
+
+Client UI files live below `Common/UI/Custom`. Runtime append paths are
+relative to that directory. See the durable wiki reference and recipe for
+registration, capability, bounds, diagnostics, and cleanup details.
 
 Linked panel supports:
 - Mode toggle: `LinkedMode` / `NearbyMode`

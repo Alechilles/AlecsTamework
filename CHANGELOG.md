@@ -12,13 +12,15 @@
 - Added `TameworkCullNpc`, a reusable item interaction that lets a player cull
   an eligible owned and tamed NPC without opening a command panel. Consumer
   mods control the item, hold time, and other item behavior.
-- Added an experimental command UI provider API for Java plugins. Command-item
-  configs can select a fully custom menu layout with `UiProviderId`. Providers
+- Added an experimental command UI renderer and contributor API for Java
+  plugins. Command-item configs can select one custom layout with
+  `UiRendererId` and compose required or optional `UiContributors`. Renderers
   receive immutable snapshots, row and section change hints, guarded partial
-  updates, and opaque handles for Tamework-defined actions. The API also
-  supplies bounded filter input and complete managed group and generic or
-  bonded talent flows, including confirmations and fresh detached state after
-  mutations.
+  updates, and opaque action handles. Contributors can supply bounded
+  namespaced presentation, server-authoritative actions, and custom flows.
+  The API also supplies complete built-in group and generic or bonded talent
+  flows, redacted diagnostics, standard-menu fallback, and bounded callback
+  timing warnings.
 - Added optional per-tool `Highlight Active` indicators for generic linked
   panels on Update 6. The controller sees group-colored indicators above loaded
   active companions. Ungrouped companions use neutral gold. The setting is
