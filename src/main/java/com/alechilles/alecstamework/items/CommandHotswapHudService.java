@@ -195,7 +195,7 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
         CommandHotswapHudPresentation presentation = presentationCoordinator.present(
                 store, player, activeCommand.config(), activeCommand.toolIdentity(), model);
         if (presentation == null || presentation.closed()) {
-            presentationCoordinator.closePlayer(playerUuid);
+            presentationCoordinator.closePlayer(store, playerUuid);
             storeState.remove(playerUuid);
             return;
         }
@@ -294,9 +294,9 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
             return;
         }
         if (player != null && player.getPlayerRef() != null && player.getHudManager() != null) {
-            presentationCoordinator.hide(player);
+            presentationCoordinator.hide(store, player);
         } else {
-            presentationCoordinator.closePlayer(playerUuid);
+            presentationCoordinator.closePlayer(store, playerUuid);
         }
         StoreState storeState = existingStoreState(store);
         if (storeState != null) {
@@ -325,11 +325,11 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
                                   @Nonnull UUID playerUuid) {
         StoreState storeState = existingStoreState(store);
         if (storeState == null) {
-            presentationCoordinator.closePlayer(playerUuid);
+            presentationCoordinator.closePlayer(store, playerUuid);
             return;
         }
         storeState.remove(playerUuid);
-        presentationCoordinator.closePlayer(playerUuid);
+        presentationCoordinator.closePlayer(store, playerUuid);
     }
 
     private void clearStoreState(@Nonnull Store<EntityStore> store) {

@@ -31,7 +31,6 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-
 /** Selects and owns one player's standard or custom hotswap HUD. */
 final class CommandHotswapHudPresentationCoordinator {
     private final Object lock = new Object();
@@ -44,7 +43,6 @@ final class CommandHotswapHudPresentationCoordinator {
             new CommandHotswapHudSnapshotFactory();
     private final AtomicLong nextSessionGeneration = new AtomicLong();
     private final BiConsumer<Store<EntityStore>, UUID> invalidationSink;
-
     CommandHotswapHudPresentationCoordinator(
             @Nullable CommandHudRegistry registry,
             @Nonnull Consumer<UUID> invalidationSink
@@ -52,7 +50,6 @@ final class CommandHotswapHudPresentationCoordinator {
         this(registry == null ? null : new CommandHudCompositionResolver(registry),
                 (store, playerUuid) -> invalidationSink.accept(playerUuid));
     }
-
     CommandHotswapHudPresentationCoordinator(
             @Nullable CommandHudRegistry registry,
             @Nonnull BiConsumer<Store<EntityStore>, UUID> invalidationSink
@@ -60,7 +57,6 @@ final class CommandHotswapHudPresentationCoordinator {
         this(registry == null ? null : new CommandHudCompositionResolver(registry),
                 invalidationSink);
     }
-
     CommandHotswapHudPresentationCoordinator(
             @Nullable CommandHudCompositionResolver resolver,
             @Nonnull BiConsumer<Store<EntityStore>, UUID> invalidationSink
@@ -68,8 +64,6 @@ final class CommandHotswapHudPresentationCoordinator {
         this.resolver = resolver;
         this.invalidationSink = Objects.requireNonNull(invalidationSink, "invalidationSink");
     }
-
-    /** Presents the hotswap HUD for the current active command stack. */
     @Nullable
     CommandHotswapHudPresentation present(
             @Nullable Store<EntityStore> store,
@@ -85,13 +79,12 @@ final class CommandHotswapHudPresentationCoordinator {
         PlayerRef playerRef = player.getPlayerRef();
         UUID playerUuid = player.getUuid();
         if (playerRef == null || playerUuid == null || player.getHudManager() == null) {
-            if (playerUuid != null) closePlayer(playerUuid);
+            if (playerUuid != null) closePlayer(store, playerUuid);
             return null;
         }
         return present(store, playerRef, playerUuid, player.getHudManager(), config,
                 toolIdentity, model);
     }
-    /** Presents a hotswap HUD for an already resolved player connection. */
     @Nullable
     CommandHotswapHudPresentation present(
             @Nullable Store<EntityStore> store,
@@ -111,7 +104,7 @@ final class CommandHotswapHudPresentationCoordinator {
         synchronized (lock) {
             CommandHotswapHudPresentation previous = presentations.get(playerUuid);
             if (previous != null && !previous.matches(
-                    store, toolIdentity, config)) {
+                    store, playerRef, hudManager, toolIdentity, config)) {
                 presentations.remove(playerUuid, previous);
                 failedTools.remove(playerUuid);
                 closePresentation(previous, hudManager,
@@ -149,12 +142,10 @@ final class CommandHotswapHudPresentationCoordinator {
                     toolIdentity, model);
         }
     }
-    /** Hides the current HUD when the active command item leaves the hand. */
     void hide(@Nullable Player player) {
         if (player == null || player.getUuid() == null) return;
         hide(player.getUuid(), player.getHudManager());
     }
-    /** Hides a hotswap session using an already resolved HUD manager. */
     void hide(@Nonnull UUID playerUuid, @Nullable HudManager hudManager) {
         synchronized (lock) {
             CommandHotswapHudPresentation presentation = presentations.remove(playerUuid);
@@ -164,7 +155,18 @@ final class CommandHotswapHudPresentationCoordinator {
             }
         }
     }
-    /** Closes a player session after its ECS entity is removed. */
+    void hide(@Nonnull Store<EntityStore> store, @Nonnull Player player) {
+        UUID playerUuid = player.getUuid();
+        HudManager hudManager = player.getHudManager();
+        if (playerUuid == null) return;
+        synchronized (lock) {
+            CommandHotswapHudPresentation presentation = presentations.get(playerUuid);
+            if (presentation == null || presentation.store() != store) return;
+            presentations.remove(playerUuid, presentation);
+            removeFailedTool(store, playerUuid);
+            closePresentation(presentation, hudManager, CommandHudCloseReason.TOOL_CHANGED);
+        }
+    }
     void closePlayer(@Nonnull UUID playerUuid) {
         synchronized (lock) {
             CommandHotswapHudPresentation presentation = presentations.remove(playerUuid);
@@ -174,21 +176,29 @@ final class CommandHotswapHudPresentationCoordinator {
             }
         }
     }
-
-    /** Closes all sessions owned by one world store. */
+    void closePlayer(@Nonnull Store<EntityStore> store, @Nonnull UUID playerUuid) {
+        synchronized (lock) {
+            CommandHotswapHudPresentation presentation = presentations.get(playerUuid);
+            if (presentation != null && presentation.store() == store) {
+                presentations.remove(playerUuid, presentation);
+                removeFailedTool(store, playerUuid);
+                closePresentation(presentation, null, CommandHudCloseReason.PLAYER_UNLOADED);
+                return;
+            }
+            removeFailedTool(store, playerUuid);
+        }
+    }
     void closeStore(@Nonnull Store<EntityStore> store) {
         synchronized (lock) {
             for (CommandHotswapHudPresentation presentation :
                     new ArrayList<>(presentations.values())) {
                 if (presentation.store() != store) continue;
                 presentations.remove(presentation.playerUuid(), presentation);
-                failedTools.remove(presentation.playerUuid());
+                removeFailedTool(store, presentation.playerUuid());
                 closePresentation(presentation, null, CommandHudCloseReason.STORE_REMOVED);
             }
         }
     }
-
-    /** Closes every presentation owned by this coordinator. */
     void closeAll() {
         synchronized (lock) {
             for (CommandHotswapHudPresentation presentation : presentations.values()) {
@@ -198,14 +208,12 @@ final class CommandHotswapHudPresentationCoordinator {
             failedTools.clear();
         }
     }
-
     @Nullable
     CommandHotswapHudPresentation presentation(@Nonnull UUID playerUuid) {
         synchronized (lock) {
             return presentations.get(playerUuid);
         }
     }
-
     boolean needsRefresh(@Nonnull UUID playerUuid) {
         synchronized (lock) {
             CommandHotswapHudPresentation presentation = presentations.get(playerUuid);
@@ -214,7 +222,6 @@ final class CommandHotswapHudPresentationCoordinator {
                     && presentation.session().hasDirty());
         }
     }
-
     @Nonnull
     private CommandHotswapHudPresentation openSelected(
             @Nullable Store<EntityStore> store,
@@ -239,7 +246,7 @@ final class CommandHotswapHudPresentationCoordinator {
             String language = language(playerRef);
             CommandHotswapHudSnapshot snapshot = snapshotFactory.create(model);
             CommandHudOpenContext context = new CommandHudOpenContext(
-                    playerRef.getUuid(), language, toolIdentity.itemId(),
+                    playerRef.getUuid(), language, toolIdentity.toolId(),
                     toolIdentity.itemId(), config.getId(), CommandHudSurface.HOTSWAP,
                     resolution.rendererId(), null, null,
                     nextSessionGeneration.incrementAndGet());
@@ -283,7 +290,7 @@ final class CommandHotswapHudPresentationCoordinator {
             hostReference.set(host);
             CommandHotswapHudPresentation presentation =
                     CommandHotswapHudPresentation.custom(
-                            this, store, playerUuid, playerRef, toolIdentity,
+                            this, store, playerUuid, playerRef, hudManager, toolIdentity,
                             CommandHotswapHudPresentationSelection.from(config, toolIdentity),
                             pendingBaseChanges, model, snapshot, view, session, host);
             reference.set(presentation);
@@ -308,7 +315,6 @@ final class CommandHotswapHudPresentationCoordinator {
                     toolIdentity, model);
         }
     }
-
     @Nonnull
     private CommandHotswapHudPresentation failedCustomStandard(
             @Nonnull CommandHotswapHudPresentation presentation,
@@ -326,7 +332,6 @@ final class CommandHotswapHudPresentationCoordinator {
         return openStandard(presentation.store(), playerUuid, playerRef, hudManager,
                 config, toolIdentity, model);
     }
-
     @Nonnull
     private CommandHotswapHudPresentation failedStandard(
             @Nullable Store<EntityStore> store,
@@ -343,7 +348,6 @@ final class CommandHotswapHudPresentationCoordinator {
         return openStandard(store, playerUuid, playerRef, hudManager, config,
                 toolIdentity, model);
     }
-
     @Nonnull
     private CommandHotswapHudPresentation openStandard(
             @Nullable Store<EntityStore> store,
@@ -357,7 +361,7 @@ final class CommandHotswapHudPresentationCoordinator {
         TameworkCommandHotswapHud hud = new TameworkCommandHotswapHud(playerRef, model);
         CommandHotswapHudPresentation presentation =
                 CommandHotswapHudPresentation.standard(
-                        this, store, playerUuid, playerRef, toolIdentity,
+                        this, store, playerUuid, playerRef, hudManager, toolIdentity,
                         CommandHotswapHudPresentationSelection.from(config, toolIdentity),
                         model, hud);
         presentations.put(playerUuid, presentation);
@@ -369,7 +373,6 @@ final class CommandHotswapHudPresentationCoordinator {
         }
         return presentation;
     }
-
     private void updateCustom(
             @Nullable Store<EntityStore> store,
             @Nonnull CommandHotswapHudPresentation presentation,
@@ -409,7 +412,6 @@ final class CommandHotswapHudPresentationCoordinator {
             pendingBaseChanges.compareAndSet(baseChanges, null);
         }
     }
-
     @Nonnull
     private static CommandHotswapHudChangeSet merge(
             @Nonnull CommandHotswapHudChangeSet base,
@@ -427,7 +429,6 @@ final class CommandHotswapHudPresentationCoordinator {
                 base.groupStatusChanged() || composition.groupStatusChanged(),
                 composition.contributorPaths(), composition.fullRefreshContributors());
     }
-
     private void onHostFailure(
             @Nullable CommandHotswapHudPresentation presentation,
             @Nullable Store<EntityStore> store,
@@ -445,7 +446,6 @@ final class CommandHotswapHudPresentationCoordinator {
         }
         markCompositionDirty(store, presentation.playerUuid());
     }
-
     private void onCompositionFailure(
             @Nullable CommandHotswapHudPresentation presentation,
             @Nullable Store<EntityStore> store,
@@ -455,7 +455,6 @@ final class CommandHotswapHudPresentationCoordinator {
         onHostFailure(presentation, store,
                 new IllegalStateException("Contributor " + id.value() + " failed: " + reason));
     }
-
     private void markCompositionDirty(
             @Nullable Store<EntityStore> store,
             @Nonnull UUID playerUuid
@@ -463,10 +462,8 @@ final class CommandHotswapHudPresentationCoordinator {
         try {
             invalidationSink.accept(store, playerUuid);
         } catch (RuntimeException | LinkageError ignored) {
-            // A presentation callback must not escape the hotswap tick.
         }
     }
-
     private void closePresentation(
             @Nonnull CommandHotswapHudPresentation presentation,
             @Nullable HudManager hudManager,
@@ -474,13 +471,20 @@ final class CommandHotswapHudPresentationCoordinator {
     ) {
         presentation.close(hudManager, reason);
     }
-
+    private void removeFailedTool(
+            @Nonnull Store<EntityStore> store,
+            @Nonnull UUID playerUuid
+    ) {
+        CommandHotswapHudPresentationSupport.FailedTool failed = failedTools.get(playerUuid);
+        if (failed != null && failed.store() == store) {
+            failedTools.remove(playerUuid, failed);
+        }
+    }
     @Nullable
     private static String language(@Nonnull PlayerRef playerRef) {
         String value = playerRef.getLanguage();
         return value == null || value.isBlank() ? null : value;
     }
-
     void close(
             @Nonnull CommandHotswapHudPresentation presentation,
             @Nullable HudManager hudManager,
@@ -493,5 +497,4 @@ final class CommandHotswapHudPresentationCoordinator {
             presentation.close(hudManager, reason);
         }
     }
-
 }

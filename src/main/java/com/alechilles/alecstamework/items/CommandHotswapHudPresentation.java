@@ -27,6 +27,7 @@ final class CommandHotswapHudPresentation {
     private final Store<EntityStore> store;
     private final UUID playerUuid;
     private final PlayerRef playerRef;
+    private final HudManager hudManager;
     private final CommandHotswapHudToolIdentity toolIdentity;
     private final CommandHotswapHudPresentationSelection selection;
     @Nonnull
@@ -53,6 +54,7 @@ final class CommandHotswapHudPresentation {
             @Nullable Store<EntityStore> store,
             @Nonnull UUID playerUuid,
             @Nonnull PlayerRef playerRef,
+            @Nonnull HudManager hudManager,
             @Nonnull CommandHotswapHudToolIdentity toolIdentity,
             @Nonnull CommandHotswapHudPresentationSelection selection,
             @Nonnull AtomicReference<CommandHotswapHudChangeSet> pendingBaseChanges,
@@ -69,6 +71,7 @@ final class CommandHotswapHudPresentation {
         this.store = store;
         this.playerUuid = playerUuid;
         this.playerRef = playerRef;
+        this.hudManager = hudManager;
         this.toolIdentity = toolIdentity;
         this.selection = selection;
         this.pendingBaseChanges = pendingBaseChanges;
@@ -87,12 +90,14 @@ final class CommandHotswapHudPresentation {
             @Nullable Store<EntityStore> store,
             @Nonnull UUID playerUuid,
             @Nonnull PlayerRef playerRef,
+            @Nonnull HudManager hudManager,
             @Nonnull CommandHotswapHudToolIdentity toolIdentity,
             @Nonnull CommandHotswapHudPresentationSelection selection,
             @Nonnull CommandHotswapHudViewModel model,
             @Nonnull TameworkCommandHotswapHud hud
     ) {
         return new CommandHotswapHudPresentation(owner, store, playerUuid, playerRef,
+                hudManager,
                 toolIdentity, selection, new AtomicReference<>(), model, false, hud,
                 null, null, null, null);
     }
@@ -103,6 +108,7 @@ final class CommandHotswapHudPresentation {
             @Nullable Store<EntityStore> store,
             @Nonnull UUID playerUuid,
             @Nonnull PlayerRef playerRef,
+            @Nonnull HudManager hudManager,
             @Nonnull CommandHotswapHudToolIdentity toolIdentity,
             @Nonnull CommandHotswapHudPresentationSelection selection,
             @Nonnull AtomicReference<CommandHotswapHudChangeSet> pendingBaseChanges,
@@ -114,6 +120,7 @@ final class CommandHotswapHudPresentation {
             @Nonnull CommandHotswapHudHost host
     ) {
         return new CommandHotswapHudPresentation(owner, store, playerUuid, playerRef,
+                hudManager,
                 toolIdentity, selection, pendingBaseChanges, model, true, null, host,
                 session, snapshot, view);
     }
@@ -131,6 +138,11 @@ final class CommandHotswapHudPresentation {
     @Nonnull
     PlayerRef playerRef() {
         return playerRef;
+    }
+
+    @Nonnull
+    HudManager hudManager() {
+        return hudManager;
     }
 
     @Nonnull
@@ -185,10 +197,14 @@ final class CommandHotswapHudPresentation {
 
     boolean matches(
             @Nullable Store<EntityStore> currentStore,
+            @Nonnull PlayerRef currentPlayerRef,
+            @Nonnull HudManager currentHudManager,
             @Nonnull CommandHotswapHudToolIdentity currentTool,
             @Nonnull TwCommandItemConfig config
     ) {
         return store == currentStore
+                && playerRef == currentPlayerRef
+                && hudManager == currentHudManager
                 && toolIdentity.same(currentTool)
                 && selection.equals(CommandHotswapHudPresentationSelection.from(
                         config, currentTool));
@@ -213,16 +229,11 @@ final class CommandHotswapHudPresentation {
         failed = true;
     }
 
-    void close(@Nullable HudManager hudManager, @Nonnull CommandHudCloseReason reason) {
+    void close(@Nullable HudManager ignoredHudManager, @Nonnull CommandHudCloseReason reason) {
         if (closed) return;
         closed = true;
         try {
-            if (hudManager != null) {
-                hudManager.removeCustomHud(playerRef, TameworkCommandHotswapHud.HUD_KEY);
-            } else {
-                if (customHost != null) customHost.hideNow();
-                if (standardHud != null) standardHud.hideNow();
-            }
+            hudManager.removeCustomHud(playerRef, TameworkCommandHotswapHud.HUD_KEY);
         } catch (RuntimeException | LinkageError ignored) {
             // Cleanup below must still release renderer and contributor state.
         } finally {
