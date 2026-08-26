@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmission;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainCapacityException;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainReservation;
 import com.alechilles.alecstamework.persistence.operation.DurableOperationWork;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
@@ -49,6 +50,12 @@ public final class SqlitePopulationDomainParticipant
             PopulationDomainAdmission admission =
                     transaction.populationDomains().reserve(reservation);
             if (!admission.admitted()) {
+                if (admission.status()
+                        == PopulationDomainAdmission.Status.OWNED_CAPACITY_REACHED
+                        || admission.status()
+                        == PopulationDomainAdmission.Status.DEPLOYABLE_CAPACITY_REACHED) {
+                    throw PopulationDomainCapacityException.from(admission);
+                }
                 throw new IllegalStateException(
                         "population_domain_"
                                 + admission.status().name().toLowerCase()

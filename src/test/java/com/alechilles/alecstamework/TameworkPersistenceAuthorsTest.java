@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework;
 
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmission;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainCapacityException;
 import com.alechilles.alecstamework.items.persistence.SpawnerPersistenceAuthorResult;
 import java.util.concurrent.CompletionException;
 import org.junit.jupiter.api.Test;
@@ -13,20 +15,26 @@ class TameworkPersistenceAuthorsTest {
         // Protects the generic release message reported for the 2026-08-25
         // population_domain_deployable_capacity_reached failure.
         assertEquals(
-                "Your active companion limit has been reached.",
+                "Not enough deployed companion capacity: 8 / 8 slots used; "
+                        + "release needs 1 slot.",
                 TameworkPersistenceAuthors.spawnerFailureMessage(failed(
                         SpawnerPersistenceAuthorResult.Kind.CAPTURE_RELEASE,
-                        new CompletionException(new IllegalStateException(
-                                "population_domain_deployable_capacity_reached"
+                        new CompletionException(new PopulationDomainCapacityException(
+                                PopulationDomainAdmission.Status
+                                        .DEPLOYABLE_CAPACITY_REACHED,
+                                8, 1, 8
                         ))
                 ))
         );
         assertEquals(
-                "Your owned companion limit has been reached.",
+                "Not enough owned companion capacity: 11 / 12 slots used; "
+                        + "capture needs 2 slots.",
                 TameworkPersistenceAuthors.spawnerFailureMessage(failed(
                         SpawnerPersistenceAuthorResult.Kind.CAPTURE,
-                        new IllegalStateException(
-                                "population_domain_owned_capacity_reached"
+                        new PopulationDomainCapacityException(
+                                PopulationDomainAdmission.Status
+                                        .OWNED_CAPACITY_REACHED,
+                                11, 2, 12
                         )
                 ))
         );

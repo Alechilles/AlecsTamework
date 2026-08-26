@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmission;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainBucket;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainCapacityException;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainReservation;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainScope;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
@@ -112,11 +113,19 @@ class SqlitePopulationDomainParticipantTest {
             );
             assertEquals(2, transaction.populationDomains()
                     .counts(firstReservation.bucket()).pendingOwned());
-            assertThrows(IllegalStateException.class, () ->
+            PopulationDomainCapacityException failure = assertThrows(
+                    PopulationDomainCapacityException.class, () ->
                     new SqlitePopulationDomainParticipant(List.of(
                             secondReservation
                     )).prepare(transaction, second)
             );
+            assertEquals(
+                    PopulationDomainAdmission.Status.OWNED_CAPACITY_REACHED,
+                    failure.status()
+            );
+            assertEquals(2, failure.currentUsage());
+            assertEquals(2, failure.requestedUsage());
+            assertEquals(2, failure.limit());
             connection.rollback();
         }
     }

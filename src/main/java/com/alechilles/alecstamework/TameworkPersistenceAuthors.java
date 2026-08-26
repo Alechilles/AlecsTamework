@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework;
 
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmission;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainCapacityException;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.items.CommandRestorationCompletionListener;
 import com.alechilles.alecstamework.items.CompanionRevivePolicy;
@@ -53,9 +55,22 @@ final class TameworkPersistenceAuthors {
     ) {
         Throwable failure = result.failure();
         while (failure != null) {
+            if (failure instanceof PopulationDomainCapacityException capacity) {
+                String scope = capacity.status()
+                        == PopulationDomainAdmission.Status.DEPLOYABLE_CAPACITY_REACHED
+                        ? "deployed" : "owned";
+                String action = result.kind()
+                        == SpawnerPersistenceAuthorResult.Kind.CAPTURE
+                        ? "capture" : "release";
+                String slots = capacity.requestedUsage() == 1 ? "slot" : "slots";
+                return "Not enough " + scope + " companion capacity: "
+                        + capacity.currentUsage() + " / " + capacity.limit()
+                        + " slots used; " + action + " needs "
+                        + capacity.requestedUsage() + " " + slots + ".";
+            }
             String reason = failure.getMessage();
             if ("population_domain_deployable_capacity_reached".equals(reason)) {
-                return "Your active companion limit has been reached.";
+                return "Your deployed companion limit has been reached.";
             }
             if ("population_domain_owned_capacity_reached".equals(reason)) {
                 return "Your owned companion limit has been reached.";
