@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseDefinition;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceFeatureRegistry;
 import java.util.ArrayList;
@@ -256,6 +257,18 @@ class PersistenceStartupCoordinatorTest {
                 CompanionCaptureReleaseDefinition.INSTANCE.kind(),
                 "companion_capture",
                 List.of(OperationScope.profile(PROFILE))
+        );
+    }
+
+    /** Protects the managed-revival scope rejection reported on 2026-08-26. */
+    @Test
+    void managedRestorationAdmitsItsOwnerScope() {
+        PersistenceStartupCoordinator coordinator = readyCoordinator();
+
+        coordinator.requireAdmission(
+                CompanionRestorationDefinition.INSTANCE.kind(),
+                "companion_restoration",
+                captureScopes(PROFILE)
         );
     }
 

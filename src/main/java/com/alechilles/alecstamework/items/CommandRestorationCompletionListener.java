@@ -80,6 +80,12 @@ public final class CommandRestorationCompletionListener
     }
 
     static String workflowFailureMessage(CompanionLifecycleAuthorResult result) {
+        if (hasFailureCode(
+                result.failure(), "operation_scope_policy_mismatch:"
+        )) {
+            return "Companion revival is unavailable because its persistence "
+                    + "setup is incompatible.";
+        }
         String specific = PopulationAdmissionFailureFeedback.describe(
                 result.failure(), "revive"
         );
@@ -102,5 +108,16 @@ public final class CommandRestorationCompletionListener
                     "Companion revival was rolled back. Try again shortly.";
             case PUBLISHED -> "Companion revival completed.";
         };
+    }
+
+    private static boolean hasFailureCode(Throwable failure, String prefix) {
+        while (failure != null) {
+            if (failure.getMessage() != null
+                    && failure.getMessage().startsWith(prefix)) {
+                return true;
+            }
+            failure = failure.getCause();
+        }
+        return false;
     }
 }

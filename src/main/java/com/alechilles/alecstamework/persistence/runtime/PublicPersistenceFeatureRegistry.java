@@ -402,7 +402,9 @@ public final class PublicPersistenceFeatureRegistry {
                         CompanionDormantTransitionDefinition.INSTANCE,
                         Set.of(OperationScopeType.PROFILE),
                         CompanionRestorationDefinition.INSTANCE,
-                        Set.of(OperationScopeType.PROFILE),
+                        PublicPersistenceFeatureDescriptorFactory.policy(Set.of(
+                                OperationScopeType.PROFILE), Set.of(
+                                OperationScopeType.OWNER)),
                         ReviveReadyDefinition.INSTANCE,
                         Set.of(
                                 OperationScopeType.PROFILE,

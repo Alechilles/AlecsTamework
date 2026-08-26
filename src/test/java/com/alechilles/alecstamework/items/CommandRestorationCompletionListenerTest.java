@@ -8,6 +8,25 @@ import org.junit.jupiter.api.Test;
 
 class CommandRestorationCompletionListenerTest {
     @Test
+    void scopePolicyFailureExplainsPersistenceSetupConflict() {
+        CompanionLifecycleAuthorResult result = new CompanionLifecycleAuthorResult(
+                CompanionLifecycleAuthorResult.Kind.RESTORATION,
+                CompanionLifecycleAuthorResult.Status.WORKFLOW_FAILED,
+                null,
+                OperationWorkflowResult.Status.PREPARE_FAILED,
+                "restoration_workflow_not_published",
+                new IllegalArgumentException(
+                        "operation_scope_policy_mismatch:companion_restoration"
+                )
+        );
+
+        assertEquals(
+                "Companion revival is unavailable because its persistence setup is incompatible.",
+                CommandRestorationCompletionListener.workflowFailureMessage(result)
+        );
+    }
+
+    @Test
     void prepareFailureExplainsThatSavedStateCouldNotBeValidated() {
         CompanionLifecycleAuthorResult result = new CompanionLifecycleAuthorResult(
                 CompanionLifecycleAuthorResult.Kind.RESTORATION,
