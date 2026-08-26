@@ -48,6 +48,26 @@ final class TameworkPersistenceAuthors {
     }
 
     @Nonnull
+    static String spawnerFailureMessage(
+            @Nonnull SpawnerPersistenceAuthorResult result
+    ) {
+        Throwable failure = result.failure();
+        while (failure != null) {
+            String reason = failure.getMessage();
+            if ("population_domain_deployable_capacity_reached".equals(reason)) {
+                return "Your active companion limit has been reached.";
+            }
+            if ("population_domain_owned_capacity_reached".equals(reason)) {
+                return "Your owned companion limit has been reached.";
+            }
+            failure = failure.getCause();
+        }
+        return result.kind() == SpawnerPersistenceAuthorResult.Kind.CAPTURE
+                ? "Capture could not be completed."
+                : "Companion release could not be completed.";
+    }
+
+    @Nonnull
     static Bundle create(
             @Nonnull HytaleLogger logger,
             @Nonnull TameworkEventBus events,
@@ -264,9 +284,7 @@ final class TameworkPersistenceAuthors {
             }
             messages.show(
                     player,
-                    result.kind() == SpawnerPersistenceAuthorResult.Kind.CAPTURE
-                            ? "Capture could not be completed."
-                            : "Companion release could not be completed.",
+                    spawnerFailureMessage(result),
                     NotificationStyle.Warning
             );
             String message =
