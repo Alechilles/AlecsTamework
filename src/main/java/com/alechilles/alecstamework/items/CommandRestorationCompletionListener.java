@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.companion.population.domain.PopulationAdmissionFailureFeedback;
 import com.alechilles.alecstamework.items.persistence.CompanionLifecycleAuthorResult;
 import com.alechilles.alecstamework.items.persistence.CompanionRestorationCompletionListener;
 import com.alechilles.alecstamework.localization.LocalizedText;
@@ -44,13 +45,38 @@ public final class CommandRestorationCompletionListener
                     player,
                     "tamework.ui.notifications.command.respawn.notDeadOrLost"
             );
-            case COOLDOWN_ACTIVE, INVALID_CONTEXT, INVALID_EVIDENCE,
-                    EVIDENCE_FAILED, PROFILE_READ_FAILED,
-                    SNAPSHOT_DECODE_FAILED, SUBMISSION_REJECTED,
-                    WORKFLOW_FAILED -> feedback.showWarningKey(
+            case COOLDOWN_ACTIVE -> feedback.showWarningKey(
                     player,
-                    "tamework.ui.notifications.command.respawn.failed"
+                    "tamework.ui.notifications.command.shared.cooldown"
             );
+            case INVALID_CONTEXT, SUBMISSION_REJECTED ->
+                    feedback.showWarningKey(
+                            player,
+                            "tamework.ui.notifications.command.respawn.unavailable"
+                    );
+            case INVALID_EVIDENCE, EVIDENCE_FAILED, PROFILE_READ_FAILED,
+                    SNAPSHOT_DECODE_FAILED -> feedback.showWarningKey(
+                    player,
+                    "tamework.ui.notifications.command.respawn.recoverFailed"
+            );
+            case WORKFLOW_FAILED -> showWorkflowFailure(player, result);
         }
+    }
+
+    private void showWorkflowFailure(
+            Player player,
+            CompanionLifecycleAuthorResult result
+    ) {
+        String specific = PopulationAdmissionFailureFeedback.describe(
+                result.failure(), "revive"
+        );
+        if (specific != null) {
+            feedback.showWarning(player, specific);
+            return;
+        }
+        feedback.showWarningKey(
+                player,
+                "tamework.ui.notifications.command.respawn.failed"
+        );
     }
 }

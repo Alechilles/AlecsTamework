@@ -47,16 +47,61 @@ class TameworkPersistenceAuthorsTest {
         );
     }
 
+    @Test
+    void knownWorkflowFailuresExplainWhatWentWrong() {
+        assertEquals(
+                "No safe companion release location was available here.",
+                TameworkPersistenceAuthors.spawnerFailureMessage(result(
+                        SpawnerPersistenceAuthorResult.Kind.CAPTURE_RELEASE,
+                        SpawnerPersistenceAuthorResult.Status.PLACEMENT_FAILED,
+                        "capture_release_placement_failed",
+                        null
+                ))
+        );
+        assertEquals(
+                "The stored companion data could not be read.",
+                TameworkPersistenceAuthors.spawnerFailureMessage(result(
+                        SpawnerPersistenceAuthorResult.Kind.CAPTURE_RELEASE,
+                        SpawnerPersistenceAuthorResult.Status.SNAPSHOT_DECODE_FAILED,
+                        "capture_snapshot_decode_failed",
+                        null
+                ))
+        );
+        assertEquals(
+                "The companion record could not be loaded.",
+                TameworkPersistenceAuthors.spawnerFailureMessage(result(
+                        SpawnerPersistenceAuthorResult.Kind.CAPTURE_RELEASE,
+                        SpawnerPersistenceAuthorResult.Status.PROFILE_READ_FAILED,
+                        "capture_release_profile_read_failed",
+                        null
+                ))
+        );
+    }
+
     private static SpawnerPersistenceAuthorResult failed(
             SpawnerPersistenceAuthorResult.Kind kind,
             Throwable failure
     ) {
-        return new SpawnerPersistenceAuthorResult(
+        return result(
                 kind,
                 SpawnerPersistenceAuthorResult.Status.WORKFLOW_FAILED,
-                null,
-                null,
                 "workflow_not_published",
+                failure
+        );
+    }
+
+    private static SpawnerPersistenceAuthorResult result(
+            SpawnerPersistenceAuthorResult.Kind kind,
+            SpawnerPersistenceAuthorResult.Status status,
+            String detail,
+            Throwable failure
+    ) {
+        return new SpawnerPersistenceAuthorResult(
+                kind,
+                status,
+                null,
+                null,
+                detail,
                 failure
         );
     }

@@ -1,8 +1,7 @@
 package com.alechilles.alecstamework;
 
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
-import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmission;
-import com.alechilles.alecstamework.companion.population.domain.PopulationDomainCapacityException;
+import com.alechilles.alecstamework.companion.population.domain.PopulationAdmissionFailureFeedback;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.items.CommandRestorationCompletionListener;
 import com.alechilles.alecstamework.items.CompanionRevivePolicy;
@@ -53,33 +52,56 @@ final class TameworkPersistenceAuthors {
     static String spawnerFailureMessage(
             @Nonnull SpawnerPersistenceAuthorResult result
     ) {
-        Throwable failure = result.failure();
-        while (failure != null) {
-            if (failure instanceof PopulationDomainCapacityException capacity) {
-                String scope = capacity.status()
-                        == PopulationDomainAdmission.Status.DEPLOYABLE_CAPACITY_REACHED
-                        ? "deployed" : "owned";
-                String action = result.kind()
-                        == SpawnerPersistenceAuthorResult.Kind.CAPTURE
-                        ? "capture" : "release";
-                String slots = capacity.requestedUsage() == 1 ? "slot" : "slots";
-                return "Not enough " + scope + " companion capacity: "
-                        + capacity.currentUsage() + " / " + capacity.limit()
-                        + " slots used; " + action + " needs "
-                        + capacity.requestedUsage() + " " + slots + ".";
-            }
-            String reason = failure.getMessage();
-            if ("population_domain_deployable_capacity_reached".equals(reason)) {
-                return "Your deployed companion limit has been reached.";
-            }
-            if ("population_domain_owned_capacity_reached".equals(reason)) {
-                return "Your owned companion limit has been reached.";
-            }
-            failure = failure.getCause();
+        String action = result.kind()
+                == SpawnerPersistenceAuthorResult.Kind.CAPTURE
+                ? "capture" : "release";
+        String specific = PopulationAdmissionFailureFeedback.describe(
+                result.failure(), action
+        );
+        if (specific != null) {
+            return specific;
+        }
+        String known = knownSpawnerFailureMessage(result);
+        if (known != null) {
+            return known;
         }
         return result.kind() == SpawnerPersistenceAuthorResult.Kind.CAPTURE
                 ? "Capture could not be completed."
                 : "Companion release could not be completed.";
+    }
+
+    private static String knownSpawnerFailureMessage(
+            SpawnerPersistenceAuthorResult result
+    ) {
+        boolean release = result.kind()
+                == SpawnerPersistenceAuthorResult.Kind.CAPTURE_RELEASE;
+        return switch (result.status()) {
+            case INVALID_CONTEXT -> release
+                    ? "This capture item does not contain a valid companion."
+                    : "No valid companion was available to capture.";
+            case EVIDENCE_FAILED -> release
+                    ? "The stored companion state could not be verified."
+                    : "The companion state could not be verified for capture.";
+            case PROFILE_READ_FAILED ->
+                    "The companion record could not be loaded.";
+            case PROFILE_CONFLICT -> release
+                    ? "This capture item no longer matches the companion record."
+                    : "The companion record changed before capture completed.";
+            case ADOPTION_REJECTED ->
+                    "This companion cannot be added to managed ownership.";
+            case ADOPTION_FAILED ->
+                    "The companion could not be added to managed ownership.";
+            case SNAPSHOT_DECODE_FAILED ->
+                    "The stored companion data could not be read.";
+            case PLACEMENT_FAILED ->
+                    "No safe companion release location was available here.";
+            case SUBMISSION_REJECTED -> release
+                    ? "Companion release is temporarily unavailable. Try again shortly."
+                    : "Capture is temporarily unavailable. Try again shortly.";
+            case COMPENSATED ->
+                    "The action failed, and its changes were safely rolled back.";
+            case PUBLISHED, WORKFLOW_FAILED -> null;
+        };
     }
 
     @Nonnull
