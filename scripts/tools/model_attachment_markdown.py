@@ -158,11 +158,14 @@ def normalize_base_game_models(path: Path) -> Path:
     raise ReportError(f"Base-game Server/Models directory not found under: {root}")
 
 
-def find_base_game_models(source_path: Path, manual_path: Path | None = None) -> Path | None:
+def find_base_game_models(
+    source_path: Path | None = None,
+    manual_path: Path | None = None,
+) -> Path | None:
     if manual_path is not None:
         return normalize_base_game_models(manual_path)
     roots: list[Path] = []
-    inferred = inferred_hytale_root(source_path)
+    inferred = inferred_hytale_root(source_path) if source_path is not None else None
     if inferred is not None:
         roots.append(inferred)
     for root in default_hytale_roots():

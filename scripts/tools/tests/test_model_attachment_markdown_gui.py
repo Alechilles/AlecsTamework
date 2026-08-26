@@ -1,8 +1,10 @@
 import importlib.util
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -48,6 +50,31 @@ class ModelAttachmentMarkdownGuiTests(unittest.TestCase):
             )
 
             self.assertIn("| Tail | Tail | Long | Long | 1 | 100.0% |", report)
+
+    def test_auto_detects_the_default_install_before_an_input_is_selected(self):
+        """Catches the Auto button skipping detection when the input field is empty."""
+        with tempfile.TemporaryDirectory() as tmp:
+            appdata = Path(tmp) / "AppData" / "Roaming"
+            models = (
+                appdata
+                / "Hytale"
+                / "install"
+                / "release"
+                / "package"
+                / "game"
+                / "latest"
+                / "Assets"
+                / "Server"
+                / "Models"
+            )
+            models.mkdir(parents=True)
+            gui = self.load_gui_module()
+
+            with patch.dict(os.environ, {"APPDATA": str(appdata)}):
+                detect = getattr(gui, "detect_base_game_models", lambda _: "")
+                detected = detect("")
+
+            self.assertEqual(detected, str(models.resolve()))
 
     def test_batch_form_values_apply_selected_columns(self):
         """Catches GUI batch mode or column choices that do not reach the engine."""

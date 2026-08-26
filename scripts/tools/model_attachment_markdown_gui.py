@@ -18,6 +18,12 @@ if str(SCRIPT_DIRECTORY) not in sys.path:
 import model_attachment_markdown as report_engine
 
 
+def detect_base_game_models(input_path: str) -> str:
+    source_path = Path(input_path) if input_path.strip() else None
+    models = report_engine.find_base_game_models(source_path)
+    return str(models) if models is not None else ""
+
+
 def generate_report(
     input_path: str,
     model_roots: Sequence[str],
@@ -177,6 +183,7 @@ class AttachmentReportApplication:
         root.geometry("1000x850")
         root.minsize(780, 650)
         self.build_window()
+        self.auto_detect_base_game_models()
 
     def build_window(self) -> None:
         content = ttk.Frame(self.root, padding=12)
@@ -330,14 +337,9 @@ class AttachmentReportApplication:
         self.status.set("Using the selected base-game Models folder.")
 
     def auto_detect_base_game_models(self) -> None:
-        input_path = self.model_asset.get().strip()
-        models = (
-            report_engine.find_base_game_models(Path(input_path))
-            if input_path
-            else None
-        )
-        self.base_game_models.set(str(models) if models is not None else "")
-        if models is None:
+        detected = detect_base_game_models(self.model_asset.get())
+        self.base_game_models.set(detected)
+        if not detected:
             self.status.set(
                 "Base game was not detected. Select its Models folder if needed."
             )
