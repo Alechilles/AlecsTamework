@@ -36,7 +36,8 @@ final class CommandHudCompositionResolver {
 
     CommandHudCompositionResolver(@Nonnull CommandHudRegistry registry) {
         this(Objects.requireNonNull(registry, "registry").rendererRegistry(),
-                registry.contributorRegistry());
+                registry.contributorRegistry(), registry.diagnosticsService(),
+                new CommandHudTimingWarnings());
     }
 
     CommandHudCompositionResolver(
@@ -112,7 +113,7 @@ final class CommandHudCompositionResolver {
         }
         return new CommandHudTargetResolution(selected.id(), selected.provider(), selected.generation(),
                 true, bindings, compatibility,
-                () -> renderers.isTargetActive(selected.id(), selected.generation()));
+                () -> renderers.isTargetActive(selected.id(), selected.generation()), renderers);
     }
 
     /** Resolves target selection fields from an effective command config. */
@@ -172,7 +173,7 @@ final class CommandHudCompositionResolver {
         }
         return new CommandHudHotswapResolution(selected.id(), selected.provider(), selected.generation(),
                 true, bindings, compatibility,
-                () -> renderers.isHotswapActive(selected.id(), selected.generation()));
+                () -> renderers.isHotswapActive(selected.id(), selected.generation()), renderers);
     }
 
     /** Resolves hotswap selection fields from an effective command config. */

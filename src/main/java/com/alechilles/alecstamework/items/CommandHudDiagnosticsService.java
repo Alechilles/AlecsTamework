@@ -15,7 +15,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /** Owns redacted process-local command HUD diagnostics state. */
-final class CommandHudDiagnosticsService implements AutoCloseable {
+public final class CommandHudDiagnosticsService implements AutoCloseable {
     private static final java.util.Set<String> SAFE_REASON_CODES = java.util.Set.of(
             "initial_composition_failed",
             "required_composition_failed",
@@ -41,18 +41,18 @@ final class CommandHudDiagnosticsService implements AutoCloseable {
     private long slowWarningCount;
 
     /** Creates diagnostics backed by the monotonic system clock. */
-    CommandHudDiagnosticsService() {
+    public CommandHudDiagnosticsService() {
         this(new CommandHudTimingWarnings());
     }
 
     /** Creates diagnostics backed by an injected monotonic clock. */
-    CommandHudDiagnosticsService(@Nonnull LongSupplier nanoTime) {
+    public CommandHudDiagnosticsService(@Nonnull LongSupplier nanoTime) {
         this(new CommandHudTimingWarnings(
                 Objects.requireNonNull(nanoTime, "nanoTime"), null));
     }
 
     /** Creates diagnostics backed by an injected clock and warning sink. */
-    CommandHudDiagnosticsService(
+    public CommandHudDiagnosticsService(
             @Nonnull LongSupplier nanoTime,
             @Nullable Consumer<CommandHudTimingWarnings.Warning> warningSink
     ) {
@@ -66,7 +66,7 @@ final class CommandHudDiagnosticsService implements AutoCloseable {
     }
 
     /** Records a renderer registration for one independent HUD surface. */
-    void registerRenderer(
+    public void registerRenderer(
             @Nonnull CommandHudSurface surface,
             @Nonnull String rendererId,
             long generation
@@ -80,11 +80,11 @@ final class CommandHudDiagnosticsService implements AutoCloseable {
     }
 
     /** Compatibility overload that records a target renderer. */
-    void registerRenderer(@Nonnull String rendererId, long generation) {
+    public void registerRenderer(@Nonnull String rendererId, long generation) {
         registerRenderer(CommandHudSurface.TARGET, rendererId, generation);
     }
 
-    void unregisterRenderer(
+    public void unregisterRenderer(
             @Nonnull CommandHudSurface surface,
             @Nonnull String rendererId,
             long generation
@@ -98,12 +98,12 @@ final class CommandHudDiagnosticsService implements AutoCloseable {
         }
     }
 
-    void unregisterRenderer(@Nonnull String rendererId, long generation) {
+    public void unregisterRenderer(@Nonnull String rendererId, long generation) {
         unregisterRenderer(CommandHudSurface.TARGET, rendererId, generation);
     }
 
     /** Records a contributor registration for one independent HUD surface. */
-    void registerContributor(
+    public void registerContributor(
             @Nonnull CommandHudSurface surface,
             @Nonnull String contributorId,
             long generation
@@ -117,11 +117,11 @@ final class CommandHudDiagnosticsService implements AutoCloseable {
     }
 
     /** Compatibility overload that records a target contributor. */
-    void registerContributor(@Nonnull String contributorId, long generation) {
+    public void registerContributor(@Nonnull String contributorId, long generation) {
         registerContributor(CommandHudSurface.TARGET, contributorId, generation);
     }
 
-    void unregisterContributor(
+    public void unregisterContributor(
             @Nonnull CommandHudSurface surface,
             @Nonnull String contributorId,
             long generation
@@ -135,12 +135,12 @@ final class CommandHudDiagnosticsService implements AutoCloseable {
         }
     }
 
-    void unregisterContributor(@Nonnull String contributorId, long generation) {
+    public void unregisterContributor(@Nonnull String contributorId, long generation) {
         unregisterContributor(CommandHudSurface.TARGET, contributorId, generation);
     }
 
     /** Starts diagnostics for one active custom HUD session. */
-    void openSession(
+    public void openSession(
             @Nonnull UUID sessionId,
             @Nonnull CommandHudSurface surface,
             @Nullable String rendererId,
@@ -169,7 +169,7 @@ final class CommandHudDiagnosticsService implements AutoCloseable {
     }
 
     /** Compatibility overload retained for target-HUD callers. */
-    void openSession(
+    public void openSession(
             @Nonnull UUID sessionId,
             @Nullable String rendererId,
             long rendererGeneration,
@@ -182,7 +182,7 @@ final class CommandHudDiagnosticsService implements AutoCloseable {
     }
 
     /** Closes one active session and records only a safe reason code. */
-    void closeSession(@Nonnull UUID sessionId, @Nullable String reason) {
+    public void closeSession(@Nonnull UUID sessionId, @Nullable String reason) {
         Objects.requireNonNull(sessionId, "sessionId");
         String safeReason = safeReason(reason);
         synchronized (lock) {
@@ -193,7 +193,7 @@ final class CommandHudDiagnosticsService implements AutoCloseable {
     }
 
     /** Records a safe session failure without retaining its private cause. */
-    void recordSessionFailure(@Nonnull UUID sessionId, @Nullable String reason) {
+    public void recordSessionFailure(@Nonnull UUID sessionId, @Nullable String reason) {
         Objects.requireNonNull(sessionId, "sessionId");
         String safeReason = safeReason(reason);
         if (safeReason == null) return;
@@ -205,7 +205,7 @@ final class CommandHudDiagnosticsService implements AutoCloseable {
     }
 
     /** Marks one selected contributor generation as removed. */
-    void contributorRemoved(
+    public void contributorRemoved(
             @Nonnull UUID sessionId,
             @Nonnull String contributorId,
             long generation
@@ -224,12 +224,12 @@ final class CommandHudDiagnosticsService implements AutoCloseable {
         }
     }
 
-    long compositionStarted() {
+    public long compositionStarted() {
         return timingWarnings.start();
     }
 
     /** Records one callback result and its redacted timing summary. */
-    void compositionFinished(
+    public void compositionFinished(
             @Nonnull UUID sessionId,
             @Nonnull String contributorId,
             long generation,
@@ -261,7 +261,7 @@ final class CommandHudDiagnosticsService implements AutoCloseable {
 
     /** Returns a detached diagnostics snapshot with no HUD values or targets. */
     @Nonnull
-    CommandHudDiagnostics snapshot() {
+    public CommandHudDiagnostics snapshot() {
         synchronized (lock) {
             List<CommandHudDiagnostics.RendererRegistration> targetRenderers = new ArrayList<>();
             List<CommandHudDiagnostics.RendererRegistration> hotswapRenderers = new ArrayList<>();

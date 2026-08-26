@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.api.commandhud.CommandHudContributorId;
 import com.alechilles.alecstamework.api.commandhud.CommandHudRendererId;
 import com.alechilles.alecstamework.api.commandhud.CommandHudSurface;
 import com.alechilles.alecstamework.api.commandhud.CommandTargetHudRendererProvider;
+import com.alechilles.alecstamework.api.internal.CommandHudRendererRegistry;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,6 +30,8 @@ final class CommandHudTargetResolution {
     private final Map<CommandHudContributorId, CommandHudContribution> contributions;
     @Nonnull
     private final BooleanSupplier rendererActive;
+    @Nullable
+    private final CommandHudRendererRegistry rendererRegistry;
 
     CommandHudTargetResolution(
             @Nullable CommandHudRendererId rendererId,
@@ -39,6 +42,21 @@ final class CommandHudTargetResolution {
                     com.alechilles.alecstamework.api.commandhud.CommandTargetHudSnapshot>> contributors,
             @Nonnull Map<CommandHudContributorId, CommandHudContribution> contributions,
             @Nonnull BooleanSupplier rendererActive
+    ) {
+        this(rendererId, rendererProvider, rendererGeneration, custom, contributors,
+                contributions, rendererActive, null);
+    }
+
+    CommandHudTargetResolution(
+            @Nullable CommandHudRendererId rendererId,
+            @Nullable CommandTargetHudRendererProvider rendererProvider,
+            long rendererGeneration,
+            boolean custom,
+            @Nonnull List<CommandHudCompositionBinding<
+                    com.alechilles.alecstamework.api.commandhud.CommandTargetHudSnapshot>> contributors,
+            @Nonnull Map<CommandHudContributorId, CommandHudContribution> contributions,
+            @Nonnull BooleanSupplier rendererActive,
+            @Nullable CommandHudRendererRegistry rendererRegistry
     ) {
         if (rendererGeneration < 0L) {
             throw new IllegalArgumentException("Renderer generation cannot be negative.");
@@ -68,6 +86,7 @@ final class CommandHudTargetResolution {
         this.contributions = copied.isEmpty()
                 ? Map.of() : Collections.unmodifiableMap(copied);
         this.rendererActive = Objects.requireNonNull(rendererActive, "rendererActive");
+        this.rendererRegistry = rendererRegistry;
     }
 
     static CommandHudTargetResolution standard() {
@@ -101,6 +120,11 @@ final class CommandHudTargetResolution {
 
     long rendererGeneration() {
         return rendererGeneration;
+    }
+
+    @Nullable
+    CommandHudRendererRegistry rendererRegistry() {
+        return rendererRegistry;
     }
 
     @Nonnull

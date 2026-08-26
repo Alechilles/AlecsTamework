@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.api.commandhud.CommandHudContribution;
 import com.alechilles.alecstamework.api.commandhud.CommandHudContributorId;
 import com.alechilles.alecstamework.api.commandhud.CommandHudRendererId;
 import com.alechilles.alecstamework.api.commandhud.CommandHotswapHudRendererProvider;
+import com.alechilles.alecstamework.api.internal.CommandHudRendererRegistry;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,6 +29,8 @@ final class CommandHudHotswapResolution {
     private final Map<CommandHudContributorId, CommandHudContribution> contributions;
     @Nonnull
     private final BooleanSupplier rendererActive;
+    @Nullable
+    private final CommandHudRendererRegistry rendererRegistry;
 
     CommandHudHotswapResolution(
             @Nullable CommandHudRendererId rendererId,
@@ -38,6 +41,21 @@ final class CommandHudHotswapResolution {
                     com.alechilles.alecstamework.api.commandhud.CommandHotswapHudSnapshot>> contributors,
             @Nonnull Map<CommandHudContributorId, CommandHudContribution> contributions,
             @Nonnull BooleanSupplier rendererActive
+    ) {
+        this(rendererId, rendererProvider, rendererGeneration, custom, contributors,
+                contributions, rendererActive, null);
+    }
+
+    CommandHudHotswapResolution(
+            @Nullable CommandHudRendererId rendererId,
+            @Nullable CommandHotswapHudRendererProvider rendererProvider,
+            long rendererGeneration,
+            boolean custom,
+            @Nonnull List<CommandHudCompositionBinding<
+                    com.alechilles.alecstamework.api.commandhud.CommandHotswapHudSnapshot>> contributors,
+            @Nonnull Map<CommandHudContributorId, CommandHudContribution> contributions,
+            @Nonnull BooleanSupplier rendererActive,
+            @Nullable CommandHudRendererRegistry rendererRegistry
     ) {
         if (rendererGeneration < 0L) {
             throw new IllegalArgumentException("Renderer generation cannot be negative.");
@@ -67,6 +85,7 @@ final class CommandHudHotswapResolution {
         this.contributions = copied.isEmpty()
                 ? Map.of() : Collections.unmodifiableMap(copied);
         this.rendererActive = Objects.requireNonNull(rendererActive, "rendererActive");
+        this.rendererRegistry = rendererRegistry;
     }
 
     static CommandHudHotswapResolution standard() {
@@ -100,6 +119,11 @@ final class CommandHudHotswapResolution {
 
     long rendererGeneration() {
         return rendererGeneration;
+    }
+
+    @Nullable
+    CommandHudRendererRegistry rendererRegistry() {
+        return rendererRegistry;
     }
 
     @Nonnull

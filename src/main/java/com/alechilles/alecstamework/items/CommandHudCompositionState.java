@@ -31,6 +31,7 @@ final class CommandHudCompositionState<B> {
     @Nullable
     String failure;
     boolean registrationLost;
+    boolean unavailablePublished;
     @Nullable
     AutoCloseable unregisterSubscription;
 

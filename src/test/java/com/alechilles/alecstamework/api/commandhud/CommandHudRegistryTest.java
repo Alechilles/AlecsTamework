@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.api.commandhud;
 import com.alechilles.alecstamework.api.internal.CommandHudRegistry;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -223,6 +224,34 @@ class CommandHudRegistryTest {
         assertTrue(afterClose.hotswapRenderers().isEmpty());
         assertTrue(afterClose.targetContributors().isEmpty());
         assertTrue(afterClose.hotswapContributors().isEmpty());
+    }
+
+    @Test
+    void publicDiagnosticsMergeLiveRegistrationsWithDetachedRuntimeSessions() {
+        CommandHudRegistry registry = new CommandHudRegistry();
+        CommandHudRegistrationResult renderer = registry.registerTargetRenderer(
+                "runeteria:target", ignored -> null);
+        CommandHudRegistrationResult contributor = registry.registerTargetContributor(
+                "runeteria:data", ignored -> null);
+        UUID sessionId = UUID.randomUUID();
+        registry.diagnosticsService().openSession(sessionId, CommandHudSurface.TARGET,
+                "runeteria:target", renderer.registration().generation(),
+                "item", "config", List.of(new CommandHudDiagnostics.ContributorRegistration(
+                        "runeteria:data", contributor.registration().generation())));
+
+        CommandHudDiagnostics diagnostics = registry.diagnostics();
+
+        assertEquals(1, diagnostics.targetRenderers().size());
+        assertEquals(1, diagnostics.targetContributors().size());
+        assertEquals(1, diagnostics.activeSessionCount());
+        assertEquals(sessionId, diagnostics.sessions().get(0).sessionId());
+
+        registry.close();
+
+        assertTrue(registry.diagnostics().targetRenderers().isEmpty());
+        assertTrue(registry.diagnostics().targetContributors().isEmpty());
+        assertTrue(registry.diagnostics().sessions().isEmpty());
+        assertTrue(registry.diagnosticsService().snapshot().sessions().isEmpty());
     }
 
     private static void assertUnavailable(CommandHudRegistrationResult result) {

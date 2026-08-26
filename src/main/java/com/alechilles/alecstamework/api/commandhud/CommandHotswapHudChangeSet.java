@@ -42,13 +42,31 @@ public final class CommandHotswapHudChangeSet {
             boolean groupStatusChanged,
             @Nullable Map<CommandHudContributorId, Set<String>> contributorPaths
     ) {
+        this(fullRefresh, changedSlots, groupStatusChanged, contributorPaths, Set.of());
+    }
+
+    /** Creates a change set with explicit contributor path and full-refresh scopes. */
+    public CommandHotswapHudChangeSet(
+            boolean fullRefresh,
+            @Nullable Set<Slot> changedSlots,
+            boolean groupStatusChanged,
+            @Nullable Map<CommandHudContributorId, Set<String>> contributorPaths,
+            @Nullable Set<CommandHudContributorId> fullRefreshContributors
+    ) {
         this.fullRefresh = fullRefresh;
         this.changedSlots = fullRefresh
                 ? allSlots() : copySlots(changedSlots);
         this.groupStatusChanged = fullRefresh || groupStatusChanged;
         ContributorPathCopy copied = copyContributorPaths(contributorPaths);
+        LinkedHashSet<CommandHudContributorId> fullRefreshIds =
+                new LinkedHashSet<>(copied.fullRefreshes());
+        if (fullRefreshContributors != null) {
+            fullRefreshContributors.forEach(id -> {
+                if (id != null) fullRefreshIds.add(id);
+            });
+        }
         this.contributorPaths = copied.paths();
-        this.fullRefreshContributors = copied.fullRefreshes();
+        this.fullRefreshContributors = Set.copyOf(fullRefreshIds);
     }
 
     /** Creates a full hotswap refresh hint. */
@@ -74,6 +92,24 @@ public final class CommandHotswapHudChangeSet {
     ) {
         return new CommandHotswapHudChangeSet(false, Set.of(), false,
                 Map.of(contributorId, paths == null ? Set.of() : paths));
+    }
+
+    /** Creates an explicit full refresh hint for one contributor. */
+    @Nonnull
+    public static CommandHotswapHudChangeSet fullContributor(
+            @Nonnull CommandHudContributorId contributorId
+    ) {
+        return contributorScopes(Map.of(), Set.of(contributorId));
+    }
+
+    /** Creates contributor scopes without encoding overflow as path values. */
+    @Nonnull
+    public static CommandHotswapHudChangeSet contributorScopes(
+            @Nullable Map<CommandHudContributorId, Set<String>> contributorPaths,
+            @Nullable Set<CommandHudContributorId> fullRefreshContributors
+    ) {
+        return new CommandHotswapHudChangeSet(false, Set.of(), false,
+                contributorPaths, fullRefreshContributors);
     }
 
     public boolean fullRefresh() {

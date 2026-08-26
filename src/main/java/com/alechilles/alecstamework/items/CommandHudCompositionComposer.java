@@ -50,9 +50,22 @@ final class CommandHudCompositionComposer<B, V, U> {
     boolean hasDirty() {
         if (custom && !activeRenderer()) return true;
         for (CommandHudCompositionState<B> state : states) {
+            if (!state.binding.required() && state.unavailablePublished) continue;
             if (state.dirty.dirty() || !isActive(state)) return true;
         }
         return false;
+    }
+
+    boolean contributorsCurrent() {
+        for (CommandHudCompositionState<B> state : states) {
+            if (isActive(state)) continue;
+            if (state.binding.required() || state.lastPublishedContribution == null
+                    || state.lastPublishedContribution.status()
+                    != com.alechilles.alecstamework.api.commandhud.CommandHudContributionStatus.UNAVAILABLE) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Nonnull
@@ -70,6 +83,12 @@ final class CommandHudCompositionComposer<B, V, U> {
         CommandHudCompositionSupport.ChangeData changes =
                 new CommandHudCompositionSupport.ChangeData(initial);
         for (CommandHudCompositionState<B> state : states) {
+            if (!initial && !state.binding.required() && state.unavailablePublished) {
+                if (state.lastPublishedContribution != null) {
+                    values.put(state.binding.id(), state.lastPublishedContribution);
+                }
+                continue;
+            }
             if (!initial && !state.dirty.dirty() && isActive(state)) {
                 if (state.lastPublishedContribution != null) {
                     values.put(state.binding.id(), state.lastPublishedContribution);
@@ -85,6 +104,7 @@ final class CommandHudCompositionComposer<B, V, U> {
                 state.lastValidContribution = null;
                 state.lastPublishedContribution = CommandHudContribution.unavailable(
                         state.binding.id(), "optional contributor registration is unavailable");
+                state.unavailablePublished = true;
                 values.put(state.binding.id(), state.lastPublishedContribution);
                 changes.add(state.binding.id(), CommandHudDirtyScope.full());
                 continue;

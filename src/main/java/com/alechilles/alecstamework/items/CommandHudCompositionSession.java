@@ -14,6 +14,7 @@ import com.alechilles.alecstamework.api.commandhud.CommandTargetHudRendererProvi
 import com.alechilles.alecstamework.api.commandhud.CommandTargetHudSnapshot;
 import com.alechilles.alecstamework.api.commandhud.CommandTargetHudUpdate;
 import com.alechilles.alecstamework.api.commandhud.CommandTargetHudView;
+import com.alechilles.alecstamework.api.internal.CommandHudRendererRegistry;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -39,6 +40,7 @@ final class CommandHudCompositionSession<B, V, U> implements AutoCloseable {
             boolean custom,
             @Nonnull java.util.function.BooleanSupplier rendererActive,
             @Nullable Supplier<? extends AutoCloseable> rendererFactory,
+            @Nullable CommandHudRendererRegistry rendererRegistry,
             @Nullable CommandHudDiagnosticsService diagnostics,
             @Nullable CommandHudTimingWarnings timingWarnings,
             @Nullable Consumer<U> publisher,
@@ -47,7 +49,7 @@ final class CommandHudCompositionSession<B, V, U> implements AutoCloseable {
     ) {
         lifecycle = new CommandHudCompositionLifecycle<>(context, surface, rendererId,
                 rendererGeneration, adapter, bindings, contributions, custom,
-                rendererActive, rendererFactory, diagnostics, timingWarnings,
+                rendererActive, rendererFactory, rendererRegistry, diagnostics, timingWarnings,
                 publisher, refreshRequest, failureHandler);
     }
 
@@ -83,7 +85,8 @@ final class CommandHudCompositionSession<B, V, U> implements AutoCloseable {
                 resolution.rendererId() == null ? null : resolution.rendererId().value(),
                 resolution.rendererGeneration(), CommandHudCompositionSupport.TARGET_ADAPTER,
                 resolution.bindings(), resolution.contributions(), resolution.custom(),
-                resolution::rendererActive, factory, diagnostics, timingWarnings,
+                resolution::rendererActive, factory, resolution.rendererRegistry(), diagnostics,
+                timingWarnings,
                 publisher, refreshRequest, failureHandler);
     }
 
@@ -119,7 +122,8 @@ final class CommandHudCompositionSession<B, V, U> implements AutoCloseable {
                 resolution.rendererId() == null ? null : resolution.rendererId().value(),
                 resolution.rendererGeneration(), CommandHudCompositionSupport.HOTSWAP_ADAPTER,
                 resolution.bindings(), resolution.contributions(), resolution.custom(),
-                resolution::rendererActive, factory, diagnostics, timingWarnings,
+                resolution::rendererActive, factory, resolution.rendererRegistry(), diagnostics,
+                timingWarnings,
                 publisher, refreshRequest, failureHandler);
     }
 

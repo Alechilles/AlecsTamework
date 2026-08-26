@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.api.commandhud.CommandHudRendererId;
 import com.alechilles.alecstamework.api.commandhud.CommandHudRegistrationResult;
 import com.alechilles.alecstamework.api.commandhud.CommandTargetHudContributorProvider;
 import com.alechilles.alecstamework.api.commandhud.CommandTargetHudRendererProvider;
+import com.alechilles.alecstamework.items.CommandHudDiagnosticsService;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -23,6 +24,8 @@ import javax.annotation.Nullable;
 public final class CommandHudRegistry implements CommandHudApi, AutoCloseable {
     private final CommandHudRendererRegistry renderers;
     private final CommandHudContributorRegistry contributors;
+    private final CommandHudDiagnosticsService diagnostics =
+            new CommandHudDiagnosticsService();
 
     /** Creates an empty registry for both command HUD surfaces. */
     public CommandHudRegistry() {
@@ -217,6 +220,7 @@ public final class CommandHudRegistry implements CommandHudApi, AutoCloseable {
     @Override
     @Nonnull
     public CommandHudDiagnostics diagnostics() {
+        CommandHudDiagnostics runtime = diagnostics.snapshot();
         List<CommandHudDiagnostics.RendererRegistration> targetRendererValues =
                 renderers.targetIds().stream()
                         .map(id -> renderers.resolveTarget(id.value()).orElse(null))
@@ -257,12 +261,23 @@ public final class CommandHudRegistry implements CommandHudApi, AutoCloseable {
                 targetRendererValues,
                 hotswapRendererValues,
                 targetContributorValues,
-                hotswapContributorValues);
+                hotswapContributorValues,
+                runtime.sessions(),
+                runtime.latestFailureReason(),
+                runtime.slowCompositionCount(),
+                runtime.slowWarningCount());
+    }
+
+    /** Returns the shared internal diagnostics service for HUD composition. */
+    @Nonnull
+    public CommandHudDiagnosticsService diagnosticsService() {
+        return diagnostics;
     }
 
     @Override
     public synchronized void close() {
         renderers.close();
         contributors.close();
+        diagnostics.close();
     }
 }

@@ -130,6 +130,23 @@ class CommandHudSnapshotTest {
     }
 
     @Test
+    void explicitContributorFullRefreshFactoriesCarryNoSyntheticPaths() {
+        CommandHudContributorId contributorId =
+                CommandHudContributorId.of("runeteria:badge");
+
+        CommandTargetHudChangeSet targetChanges =
+                CommandTargetHudChangeSet.fullContributor(contributorId);
+        CommandHotswapHudChangeSet hotswapChanges =
+                CommandHotswapHudChangeSet.fullContributor(contributorId);
+
+        assertTrue(targetChanges.contributorFullRefresh(contributorId));
+        assertTrue(targetChanges.pathsFor(contributorId).isEmpty());
+        assertTrue(hotswapChanges.contributorFullRefresh(contributorId));
+        assertTrue(hotswapChanges.pathsFor(contributorId).isEmpty());
+        assertTrue(targetChanges.changed(CommandTargetHudChangeSet.Section.CONTRIBUTIONS));
+    }
+
+    @Test
     void compositeViewsRejectMismatchedContributionKeys() {
         CommandHudContributorId mapKey = CommandHudContributorId.of("runeteria:map-key");
         CommandHudContributorId contributionId =

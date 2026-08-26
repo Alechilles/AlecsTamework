@@ -9,10 +9,9 @@ import com.alechilles.alecstamework.api.commandhud.CommandHudDirtyScope;
 import com.alechilles.alecstamework.api.commandhud.CommandHudOpenContext;
 import com.alechilles.alecstamework.api.commandhud.CommandHudSurface;
 import com.alechilles.alecstamework.api.internal.CommandHudContributorRegistry;
+import com.alechilles.alecstamework.api.internal.CommandHudRendererRegistry;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -33,6 +32,8 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
     @Nullable
     private final String rendererId;
     private final long rendererGeneration;
+    @Nullable
+    private final CommandHudRendererRegistry rendererRegistry;
     private final Consumer<U> publisher;
     private final Runnable refreshRequest;
     private final CommandHudCompositionSession.RequiredFailureHandler failureHandler;
@@ -44,20 +45,23 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
     private final Map<CommandHudContributorId, CommandHudContribution>
             compatibilityContributions;
     private final BooleanSupplier rendererActive;
-    @Nullable
-    private final AutoCloseable rendererController;
+    @Nonnull
+    private final CommandHudCompositionCleanup<B> cleanup;
     private final boolean custom;
     private final CommandHudCompositionComposer<B, V, U> composer;
-    private boolean rendererClosed;
+    private boolean cleanupStarted;
+    private boolean requiredFailureNotified;
+    private long lifecycleVersion;
     private boolean open = true;
     private boolean initialized;
-    private boolean diagnosticsSessionOpen;
     @Nullable
     private V currentView;
     @Nullable
     private U lastUpdate;
     @Nullable
     private CommandHudCompositionSession.RequiredFailure requiredFailure;
+    @Nullable
+    private CommandHudCompositionSession.InitialCompositionFailure initialFailure;
 
     CommandHudCompositionLifecycle(
             @Nonnull CommandHudOpenContext openContext,
@@ -70,6 +74,7 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
             boolean custom,
             @Nonnull BooleanSupplier rendererActive,
             @Nullable Supplier<? extends AutoCloseable> rendererFactory,
+            @Nullable CommandHudRendererRegistry rendererRegistry,
             @Nullable CommandHudDiagnosticsService diagnostics,
             @Nullable CommandHudTimingWarnings timingWarnings,
             @Nullable Consumer<U> publisher,
@@ -83,6 +88,7 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
             throw new IllegalArgumentException("Renderer generation cannot be negative.");
         }
         this.rendererGeneration = rendererGeneration;
+        this.rendererRegistry = rendererRegistry;
         this.publisher = publisher == null ? ignored -> { } : publisher;
         this.refreshRequest = refreshRequest == null ? () -> { } : refreshRequest;
         this.failureHandler = failureHandler == null ? (id, reason) -> { } : failureHandler;
@@ -101,12 +107,14 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
             }
         }
         if (!rendererReady) closeQuietly(createdRenderer);
-        this.rendererController = createdRenderer;
         this.custom = rendererReady;
-        Map<CommandHudContributorId, CommandHudContribution> copied = copyContributions(
+        Map<CommandHudContributorId, CommandHudContribution> copied =
+                CommandHudCompositionSupport.copyContributions(
                 compatibility, rendererReady);
         this.compatibilityContributions = copied;
         this.states = rendererReady ? createStates(bindings) : List.of();
+        this.cleanup = new CommandHudCompositionCleanup<>(states, diagnostics,
+                sessionId, createdRenderer);
         try {
             this.composer = new CommandHudCompositionComposer<>(adapter, states, copied,
                     rendererReady, rendererActive, sessionId, diagnostics, timingWarnings);
@@ -115,45 +123,62 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
                 installSubscriptions();
             }
         } catch (RuntimeException | LinkageError failure) {
-            closeDiagnostics("initial_composition_failed");
-            closeStates(rendererReady ? states : List.of());
-            closeQuietly(createdRenderer);
+            cleanup.close("initial_composition_failed");
             throw failure;
         }
-    }
-
+}
     @Nonnull
     V compose(@Nonnull B base) {
         Objects.requireNonNull(base, "base");
         CommandHudCompositionSession.InitialCompositionFailure failure = null;
-        List<CommandHudCompositionState<B>> closing = List.of();
+        boolean cleanup = false;
         V result = null;
         synchronized (lock) {
-            if (!open && currentView != null) return currentView;
+            if (!open) {
+                if (initialFailure != null) throw initialFailure;
+                if (currentView != null) return currentView;
+                initialFailure = new CommandHudCompositionSession.InitialCompositionFailure(
+                        "HUD renderer registration is no longer active");
+                throw initialFailure;
+            }
+            long version = lifecycleVersion;
             try {
                 result = composer.compose(base, true).view();
-                currentView = result;
-                initialized = true;
+                if (!isCurrent(version)) {
+                    if (requiredFailure != null) {
+                        failure = new CommandHudCompositionSession.InitialCompositionFailure(
+                                requiredFailure.contributorId(), requiredFailure.reason());
+                        initialFailure = failure;
+                    } else {
+                        failure = new CommandHudCompositionSession.InitialCompositionFailure(
+                                "HUD renderer registration is no longer active");
+                        initialFailure = failure;
+                    }
+                } else {
+                    currentView = result;
+                    initialized = true;
+                }
             } catch (CommandHudCompositionSession.RequiredCompositionFailure required) {
-                open = false;
                 requiredFailure = required.failure;
-                closing = List.copyOf(states);
                 failure = new CommandHudCompositionSession.InitialCompositionFailure(
                         required.failure.contributorId(), required.failure.reason());
+                initialFailure = failure;
+                terminateLocked();
+                cleanup = true;
             } catch (CommandHudCompositionComposer.RendererUnavailableFailure unavailable) {
-                open = false;
-                closing = List.copyOf(states);
                 failure = new CommandHudCompositionSession.InitialCompositionFailure(
                         unavailable.getMessage());
+                initialFailure = failure;
+                terminateLocked();
+                cleanup = true;
             }
         }
-        if (failure != null) {
-            closeStates(closing);
-            closeDiagnostics("initial_composition_failed");
-            closeRenderer();
+        if (cleanup) {
+            cleanup("initial_composition_failed");
             notifyRequiredFailure(requiredFailure);
             throw failure;
         }
+        if (failure != null) throw failure;
         return result;
     }
 
@@ -175,36 +200,40 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
     U refresh(@Nonnull B base) {
         Objects.requireNonNull(base, "base");
         CommandHudCompositionSession.RequiredCompositionFailure failure = null;
-        List<CommandHudCompositionState<B>> closing = List.of();
+        boolean cleanup = false;
+        long publishVersion = -1L;
         U update = null;
         synchronized (lock) {
             if (!open || !initialized || !composer.hasDirty()) return null;
+            long version = lifecycleVersion;
             try {
                 V previous = currentView;
                 CommandHudCompositionComposer.Composition<V> composed =
                         composer.compose(base, false);
+                if (!isCurrent(version)) return null;
                 currentView = composed.view();
                 update = ((CommandHudCompositionSupport.SurfaceAdapter<B, V, U>)
                         getAdapter()).update(composed.view(), previous, composed.changeData());
+                if (!isCurrent(version)) return null;
                 lastUpdate = update;
+                publishVersion = version;
             } catch (CommandHudCompositionSession.RequiredCompositionFailure required) {
-                open = false;
                 requiredFailure = required.failure;
-                closing = List.copyOf(states);
                 failure = required;
+                terminateLocked();
+                cleanup = true;
             } catch (CommandHudCompositionComposer.RendererUnavailableFailure unavailable) {
-                open = false;
-                closing = List.copyOf(states);
+                terminateLocked();
+                cleanup = true;
             }
         }
-        if (failure != null || !closing.isEmpty() && !open) {
-            closeStates(closing);
-            closeDiagnostics("required_composition_failed");
-            closeRenderer();
+        if (cleanup) {
+            cleanup(failure == null
+                    ? "renderer_unavailable" : "required_composition_failed");
             if (failure != null) notifyRequiredFailure(failure.failure);
             return null;
         }
-        if (update != null) publish(update);
+        if (update != null) publish(update, publishVersion);
         return update;
     }
 
@@ -233,7 +262,7 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
 
     @Nullable
     AutoCloseable rendererController() {
-        return rendererController;
+        return cleanup.rendererController();
     }
 
     boolean custom() { return custom; }
@@ -274,15 +303,10 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
 
     @Override
     public void close() {
-        List<CommandHudCompositionState<B>> closing;
         synchronized (lock) {
-            if (!open && rendererClosed) return;
-            open = false;
-            closing = List.copyOf(states);
+            terminateLocked();
         }
-        closeDiagnostics(null);
-        closeStates(closing);
-        closeRenderer();
+        cleanup(null);
     }
 
     @Nonnull
@@ -310,14 +334,13 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
                 created.add(state);
             }
         } catch (RuntimeException | LinkageError failure) {
-            closeStates(created);
+            CommandHudCompositionCleanup.closeStates(created);
             throw failure;
         }
         return List.copyOf(created);
     }
 
     private void openDiagnostics() {
-        if (diagnostics == null || !custom) return;
         List<CommandHudDiagnostics.ContributorRegistration> selected = new ArrayList<>();
         for (CommandHudCompositionState<B> state : states) selected.add(
                 new CommandHudDiagnostics.ContributorRegistration(
@@ -326,31 +349,39 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
             selected.add(new CommandHudDiagnostics.ContributorRegistration(
                     contribution.contributorId().value(), 0L));
         }
-        diagnostics.openSession(sessionId, surface, rendererId, rendererGeneration,
-                openContext.itemId(), openContext.configId(), selected);
-        diagnosticsSessionOpen = true;
-    }
-
-    private void closeDiagnostics(@Nullable String reason) {
-        if (!diagnosticsSessionOpen || diagnostics == null) return;
-        diagnosticsSessionOpen = false;
-        diagnostics.closeSession(sessionId, reason);
+        cleanup.openDiagnostics(surface, rendererId, rendererGeneration,
+                openContext, selected);
     }
 
     private void installSubscriptions() {
-        for (CommandHudCompositionState<B> state : states) {
-            CommandHudContributorRegistry registry = state.binding.registry();
-            if (registry == null || state.binding.generation() <= 0L) continue;
-            CommandHudContributorRegistry.ExactSubscription subscription = state.binding.target()
-                    ? registry.subscribeExactTargetUnregister(state.binding.id(),
-                    state.binding.generation(), (id, generation) -> registrationEnded(state, id, generation))
-                    : registry.subscribeExactHotswapUnregister(state.binding.id(),
-                    state.binding.generation(), (id, generation) -> registrationEnded(state, id, generation));
-            state.unregisterSubscription = subscription.handle();
-            if (!subscription.active() || !isActive(state)) {
-                registrationEnded(state, state.binding.id(), state.binding.generation());
+        synchronized (lock) {
+            CommandHudCompositionRendererBinding.install(rendererRegistry, surface, rendererId,
+                    rendererGeneration, this::rendererActive, this::rendererRegistrationEnded,
+                    cleanup::setRendererSubscription);
+            if (!open) return;
+            for (CommandHudCompositionState<B> state : states) {
+                CommandHudContributorRegistry registry = state.binding.registry();
+                if (registry == null || state.binding.generation() <= 0L) continue;
+                CommandHudContributorRegistry.ExactSubscription subscription = state.binding.target()
+                        ? registry.subscribeExactTargetUnregister(state.binding.id(),
+                        state.binding.generation(), (id, generation) -> registrationEnded(state, id, generation))
+                        : registry.subscribeExactHotswapUnregister(state.binding.id(),
+                        state.binding.generation(), (id, generation) -> registrationEnded(state, id, generation));
+                state.unregisterSubscription = subscription.handle();
+                if (!subscription.active() || !isActive(state)) {
+                    registrationEnded(state, state.binding.id(), state.binding.generation());
+                }
+                if (!open) return;
             }
         }
+    }
+
+    private void rendererRegistrationEnded() {
+        synchronized (lock) {
+            if (!open) return;
+            terminateLocked();
+        }
+        cleanup("renderer_unavailable");
     }
 
     private void registrationEnded(
@@ -361,30 +392,28 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
         if (!state.binding.id().equals(id) || state.binding.generation() != generation) return;
         AutoCloseable contributor = null;
         CommandHudCompositionSession.RequiredFailure failure = null;
-        List<CommandHudCompositionState<B>> closing = List.of();
         synchronized (lock) {
             if (!open || state.registrationLost) return;
             state.registrationLost = true;
             state.dirty.clear();
             contributor = state.contributor;
             state.contributor = null;
+            lifecycleVersion++;
             if (state.binding.required()) {
-                open = false;
                 failure = new CommandHudCompositionSession.RequiredFailure(
                         state.binding.id(), "contributor registration was removed");
                 requiredFailure = failure;
-                closing = List.copyOf(states);
+                terminateLocked();
             } else {
                 state.lastValidContribution = null;
                 state.lastPublishedContribution = null;
+                state.unavailablePublished = false;
                 state.dirty.markAll();
             }
         }
         closeQuietly(contributor);
         if (failure != null) {
-            closeStates(closing);
-            closeDiagnostics("required_contributor_removed");
-            closeRenderer();
+            cleanup("required_contributor_removed");
             notifyRequiredFailure(failure);
         } else {
             if (diagnostics != null) diagnostics.contributorRemoved(
@@ -419,36 +448,47 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
         try { refreshRequest.run(); } catch (RuntimeException | LinkageError ignored) { }
     }
 
-    private void publish(@Nonnull U update) {
-        try { publisher.accept(update); } catch (RuntimeException | LinkageError ignored) { }
+    private boolean isCurrent(long version) {
+        return open && lifecycleVersion == version
+                && (!custom || rendererActive()) && composer.contributorsCurrent();
+    }
+
+    private boolean rendererActive() {
+        try {
+            return custom && rendererActive.getAsBoolean();
+        } catch (RuntimeException | LinkageError ignored) {
+            return false;
+        }
+    }
+
+    @Nonnull
+    private void terminateLocked() {
+        if (cleanupStarted) return;
+        open = false;
+        lifecycleVersion++;
+        cleanupStarted = true;
+    }
+
+    private void cleanup(@Nullable String reason) {
+        cleanup.close(reason);
+    }
+
+    private void publish(@Nonnull U update, long version) {
+        synchronized (lock) {
+            if (!isCurrent(version)) return;
+            try { publisher.accept(update); } catch (RuntimeException | LinkageError ignored) { }
+        }
     }
 
     private void notifyRequiredFailure(
             @Nullable CommandHudCompositionSession.RequiredFailure failure
     ) {
-        if (failure == null) return;
+        synchronized (lock) {
+            if (failure == null || requiredFailureNotified) return;
+            requiredFailureNotified = true;
+        }
         try { failureHandler.failed(failure.contributorId(), failure.reason()); }
         catch (RuntimeException | LinkageError ignored) { }
-    }
-
-    private void closeStates(@Nonnull List<CommandHudCompositionState<B>> closing) {
-        for (int index = closing.size() - 1; index >= 0; index--) {
-            CommandHudCompositionState<B> state = closing.get(index);
-            closeQuietly(state.unregisterSubscription);
-            state.unregisterSubscription = null;
-            closeQuietly(state.contributor);
-            state.contributor = null;
-        }
-    }
-
-    private void closeRenderer() {
-        AutoCloseable controller;
-        synchronized (lock) {
-            if (rendererClosed) return;
-            rendererClosed = true;
-            controller = rendererController;
-        }
-        closeQuietly(controller);
     }
 
     private static void closeQuietly(@Nullable AutoCloseable resource) {
@@ -456,20 +496,4 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
         try { resource.close(); } catch (Exception | LinkageError ignored) { }
     }
 
-    @Nonnull
-    private static Map<CommandHudContributorId, CommandHudContribution> copyContributions(
-            @Nonnull Map<CommandHudContributorId, CommandHudContribution> source,
-            boolean custom
-    ) {
-        if (!custom || source.isEmpty()) return Map.of();
-        LinkedHashMap<CommandHudContributorId, CommandHudContribution> copy = new LinkedHashMap<>();
-        source.forEach((id, contribution) -> {
-            if (id == null) return;
-            CommandHudContribution value = Objects.requireNonNull(contribution, "contribution");
-            if (!id.equals(value.contributorId())) throw new IllegalArgumentException(
-                    "Contribution key must match contributor ID.");
-            copy.put(id, value);
-        });
-        return copy.isEmpty() ? Map.of() : Collections.unmodifiableMap(copy);
-    }
 }

@@ -50,16 +50,33 @@ public final class CommandTargetHudChangeSet {
             @Nullable Set<Section> changedSections,
             @Nullable Map<CommandHudContributorId, Set<String>> contributorPaths
     ) {
+        this(fullRefresh, changedSections, contributorPaths, Set.of());
+    }
+
+    /** Creates a change set with explicit contributor path and full-refresh scopes. */
+    public CommandTargetHudChangeSet(
+            boolean fullRefresh,
+            @Nullable Set<Section> changedSections,
+            @Nullable Map<CommandHudContributorId, Set<String>> contributorPaths,
+            @Nullable Set<CommandHudContributorId> fullRefreshContributors
+    ) {
         this.fullRefresh = fullRefresh;
         Set<Section> sections = fullRefresh
                 ? Section.all() : copySections(changedSections);
         ContributorPathCopy copied = copyContributorPaths(contributorPaths);
-        if (!copied.paths().isEmpty() || !copied.fullRefreshes().isEmpty()) {
+        LinkedHashSet<CommandHudContributorId> fullRefreshIds =
+                new LinkedHashSet<>(copied.fullRefreshes());
+        if (fullRefreshContributors != null) {
+            fullRefreshContributors.forEach(id -> {
+                if (id != null) fullRefreshIds.add(id);
+            });
+        }
+        if (!copied.paths().isEmpty() || !fullRefreshIds.isEmpty()) {
             sections = withContributions(sections);
         }
         this.changedSections = sections;
         this.contributorPaths = copied.paths();
-        this.fullRefreshContributors = copied.fullRefreshes();
+        this.fullRefreshContributors = Set.copyOf(fullRefreshIds);
     }
 
     /** Creates a full target refresh hint. */
@@ -82,6 +99,24 @@ public final class CommandTargetHudChangeSet {
     ) {
         return new CommandTargetHudChangeSet(false, Set.of(Section.CONTRIBUTIONS),
                 Map.of(contributorId, paths == null ? Set.of() : paths));
+    }
+
+    /** Creates an explicit full refresh hint for one contributor. */
+    @Nonnull
+    public static CommandTargetHudChangeSet fullContributor(
+            @Nonnull CommandHudContributorId contributorId
+    ) {
+        return contributorScopes(Map.of(), Set.of(contributorId));
+    }
+
+    /** Creates contributor scopes without encoding overflow as path values. */
+    @Nonnull
+    public static CommandTargetHudChangeSet contributorScopes(
+            @Nullable Map<CommandHudContributorId, Set<String>> contributorPaths,
+            @Nullable Set<CommandHudContributorId> fullRefreshContributors
+    ) {
+        return new CommandTargetHudChangeSet(false, Set.of(Section.CONTRIBUTIONS),
+                contributorPaths, fullRefreshContributors);
     }
 
     public boolean fullRefresh() {

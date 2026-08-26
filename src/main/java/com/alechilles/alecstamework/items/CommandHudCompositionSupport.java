@@ -13,7 +13,6 @@ import com.alechilles.alecstamework.api.commandhud.CommandTargetHudUpdate;
 import com.alechilles.alecstamework.api.commandhud.CommandTargetHudView;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
@@ -64,34 +63,34 @@ final class CommandHudCompositionSupport {
     }
 
     @Nonnull
+    static Map<CommandHudContributorId, CommandHudContribution> copyContributions(
+            @Nonnull Map<CommandHudContributorId, CommandHudContribution> source,
+            boolean custom
+    ) {
+        if (!custom || source.isEmpty()) return Map.of();
+        Map<CommandHudContributorId, CommandHudContribution> copy = new LinkedHashMap<>();
+        source.forEach((id, contribution) -> {
+            if (id == null) return;
+            CommandHudContribution value = java.util.Objects.requireNonNull(
+                    contribution, "contribution");
+            if (!id.equals(value.contributorId())) throw new IllegalArgumentException(
+                    "Contribution key must match contributor ID.");
+            copy.put(id, value);
+        });
+        return copy.isEmpty() ? Map.of() : Map.copyOf(copy);
+    }
+
+    @Nonnull
     private static CommandTargetHudChangeSet targetChangeSet(@Nonnull ChangeData data) {
         if (data.fullSurface) return CommandTargetHudChangeSet.full();
-        return new CommandTargetHudChangeSet(false, Set.of(), boundedPaths(data));
+        return CommandTargetHudChangeSet.contributorScopes(data.paths, data.fullContributors);
     }
 
     @Nonnull
     private static CommandHotswapHudChangeSet hotswapChangeSet(@Nonnull ChangeData data) {
         if (data.fullSurface) return CommandHotswapHudChangeSet.full();
-        return new CommandHotswapHudChangeSet(false, Set.of(), false, boundedPaths(data));
-    }
-
-    @Nonnull
-    private static Map<CommandHudContributorId, Set<String>> boundedPaths(
-            @Nonnull ChangeData data
-    ) {
-        if (data.paths.isEmpty() && data.fullContributors.isEmpty()) return Map.of();
-        Map<CommandHudContributorId, Set<String>> values = new LinkedHashMap<>();
-        data.paths.forEach((id, paths) -> {
-            if (!data.fullContributors.contains(id)) values.put(id, paths);
-        });
-        for (CommandHudContributorId id : data.fullContributors) {
-            LinkedHashSet<String> overflowMarker = new LinkedHashSet<>();
-            for (int index = 0; index <= CommandHudDirtyScope.MAX_PATHS; index++) {
-                overflowMarker.add("__full_refresh__" + index);
-            }
-            values.put(id, overflowMarker);
-        }
-        return values;
+        return CommandHotswapHudChangeSet.contributorScopes(data.paths,
+                data.fullContributors);
     }
 
     /** Mutable only while composing; dirty paths do not survive this object. */
