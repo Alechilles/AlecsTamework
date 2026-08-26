@@ -49,12 +49,13 @@ generation handle as plugin state:
 private CommandHudRegistration targetRenderer;
 private CommandHudRegistration hotswapRenderer;
 private CommandHudRegistration targetContributor;
+private CommandHudRegistration hotswapContributor;
 
 void registerHud(CommandHudApi hud) {
     CommandHudRegistrationResult renderer = hud.registerTargetRenderer(
             "runeteria:husbandry_target",
             new CommandHudRendererDescriptor(Set.of("runeteria:husbandry")),
-            HusbandryTargetController::new);
+            ignored -> new HusbandryTargetController());
     if (renderer.registered()) {
         targetRenderer = renderer.registration();
     }
@@ -70,9 +71,11 @@ void registerHud(CommandHudApi hud) {
 
 void unregisterHud() {
     if (targetContributor != null) targetContributor.close();
+    if (hotswapContributor != null) hotswapContributor.close();
     if (hotswapRenderer != null) hotswapRenderer.close();
     if (targetRenderer != null) targetRenderer.close();
     targetContributor = null;
+    hotswapContributor = null;
     hotswapRenderer = null;
     targetRenderer = null;
 }
@@ -84,7 +87,7 @@ The hotswap calls use the matching types:
 CommandHudRegistrationResult hotswapResult = hud.registerHotswapRenderer(
         "runeteria:husbandry_hotswap",
         new CommandHudRendererDescriptor(Set.of("runeteria:husbandry")),
-        HusbandryHotswapController::new);
+        ignored -> new HusbandryHotswapController());
 if (hotswapResult.registered()) {
     hotswapRenderer = hotswapResult.registration();
 }
@@ -93,6 +96,9 @@ CommandHudRegistrationResult hotswapData = hud.registerHotswapContributor(
         "runeteria:husbandry",
         new CommandHudContributorDescriptor(Set.of("runeteria:husbandry")),
         HusbandryHotswapContributor::new);
+if (hotswapData.registered()) {
+    hotswapContributor = hotswapData.registration();
+}
 ```
 
 Use the `registered()` check before storing a result's `registration()`. The

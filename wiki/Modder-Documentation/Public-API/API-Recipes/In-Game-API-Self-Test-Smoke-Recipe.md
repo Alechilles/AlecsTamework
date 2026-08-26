@@ -22,6 +22,8 @@ Goal: run the built-in in-game API smoke flow against a live server.
 /tw api test run progression verbose
 /tw api test run interaction-extensions verbose
 /tw api test run trait-effects verbose
+/tw api test run command-ui verbose
+/tw api test run command-hud verbose
 ```
 
 ## Console-safe smoke
@@ -33,9 +35,10 @@ The server console can run the fixture-free aggregate without a player:
 /tw api test run all
 ```
 
-Console `all` runs only `core`, `diagnostics`, and
-`hydragon-integrations`. Player/world suites still require an in-game operator
-and prepared fixtures where applicable.
+Console `all` runs `core`, `command-hud`, `diagnostics`, and
+`hydragon-integrations`. The `command-hud` suite is fixture-free. The
+`command-ui` suite needs an in-game player context, while player/world suites
+still require an in-game operator and prepared fixtures where applicable.
 
 ## Notes
 - `prepare` and `reset` mutate fixtures. A player's full `run all` includes

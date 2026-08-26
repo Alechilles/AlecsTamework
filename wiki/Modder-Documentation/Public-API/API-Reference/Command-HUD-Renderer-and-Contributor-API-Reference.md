@@ -102,13 +102,13 @@ void register(CommandHudApi hud) {
     CommandHudRegistrationResult target = hud.registerTargetRenderer(
             "runeteria:husbandry_target",
             new CommandHudRendererDescriptor(Set.of("runeteria:husbandry")),
-            HusbandryTargetController::new);
+            ignored -> new HusbandryTargetController());
     if (target.registered()) targetRenderer = target.registration();
 
     CommandHudRegistrationResult hotswap = hud.registerHotswapRenderer(
             "runeteria:husbandry_hotswap",
             new CommandHudRendererDescriptor(Set.of("runeteria:husbandry")),
-            HusbandryHotswapController::new);
+            ignored -> new HusbandryHotswapController());
     if (hotswap.registered()) hotswapRenderer = hotswap.registration();
 
     CommandHudRegistrationResult targetData = hud.registerTargetContributor(
