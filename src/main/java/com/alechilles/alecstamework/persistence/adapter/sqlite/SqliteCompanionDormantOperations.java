@@ -14,6 +14,9 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChange;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainConvergencePlan;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainConvergencePlanner;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainPort;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
@@ -143,6 +146,9 @@ public final class SqliteCompanionDormantOperations {
                 current.quarantineIncidentId(),
                 current.ownerWorldKey()
         );
+        convergePopulationDomains(
+                transaction, operation, current, transitioned
+        );
         requireApplied(
                 transaction.lifecycles().transition(new LifecycleTransition(
                         current.revision(), null, transitioned
@@ -199,6 +205,42 @@ public final class SqliteCompanionDormantOperations {
                 dormant.source().observedAtMs()
         ));
         return List.copyOf(events);
+    }
+
+    private static void convergePopulationDomains(
+            SqlitePersistenceTransactionContext transaction,
+            OperationEnvelope operation,
+            CompanionLifecycle current,
+            CompanionLifecycle transitioned
+    ) {
+        PopulationDomainPort.ProfileEvidence evidence =
+                transaction.populationDomains().profileEvidence(
+                        current.profileId(), operation.operationId()
+                );
+        if (!evidence.currentOperationPending().isEmpty()
+                || !evidence.foreignPending().isEmpty()) {
+            throw new IllegalStateException(
+                    "dormant_population_domain_pending_conflict"
+            );
+        }
+        if (evidence.committed().isEmpty()) return;
+        PopulationDomainConvergencePlan plan =
+                PopulationDomainConvergencePlanner.plan(
+                        current.profileId(),
+                        current.revision(),
+                        current.ownerId(),
+                        current.ownerWorldKey(),
+                        current.state(),
+                        transitioned.ownerId(),
+                        transitioned.ownerWorldKey(),
+                        transitioned.state(),
+                        evidence.committed()
+                );
+        if (!transaction.populationDomains().convergeExact(plan)) {
+            throw new IllegalStateException(
+                    "dormant_population_domain_convergence_failed"
+            );
+        }
     }
 
     private static CompanionLifecycle requireExactSource(

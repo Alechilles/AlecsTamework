@@ -7,9 +7,11 @@ import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 
 /**
@@ -17,6 +19,7 @@ import javax.annotation.Nonnull;
  */
 public final class CommandRestorationCompletionListener
         implements CompanionRestorationCompletionListener {
+    private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     private final CommandFeedbackService feedback =
             new CommandFeedbackService(new TameworkUiMessageService());
 
@@ -67,16 +70,37 @@ public final class CommandRestorationCompletionListener
             Player player,
             CompanionLifecycleAuthorResult result
     ) {
+        var entry = LOGGER.at(Level.WARNING);
+        if (result.failure() != null) {
+            entry = entry.withCause(result.failure());
+        }
+        entry.log("Companion revival workflow failed (status="
+                + result.workflowStatus() + ", detail=" + result.detail() + ").");
+        feedback.showWarning(player, workflowFailureMessage(result));
+    }
+
+    static String workflowFailureMessage(CompanionLifecycleAuthorResult result) {
         String specific = PopulationAdmissionFailureFeedback.describe(
                 result.failure(), "revive"
         );
-        if (specific != null) {
-            feedback.showWarning(player, specific);
-            return;
+        if (specific != null) return specific;
+        if (result.workflowStatus() == null) {
+            return "Companion revival failed before its workflow could start.";
         }
-        feedback.showWarningKey(
-                player,
-                "tamework.ui.notifications.command.respawn.failed"
-        );
+        return switch (result.workflowStatus()) {
+            case PREPARE_FAILED, INVALID_PHASE ->
+                    "Companion revival could not validate its saved state.";
+            case TRANSITION_FAILED, LIVE_RETRYABLE, LIVE_UNKNOWN ->
+                    "Companion revival could not restore the companion in the world.";
+            case DURABLE_READ_FAILED, DURABLE_COMMIT_FAILED ->
+                    "Companion revival could not save the restored companion.";
+            case PUBLICATION_PENDING, TERMINALIZATION_FAILED ->
+                    "Companion revival is incomplete. Try again shortly.";
+            case COMPENSATED, COMPENSATION_REQUIRED,
+                    COMPENSATION_PREPARE_FAILED, COMPENSATION_RETRYABLE,
+                    COMPENSATION_UNKNOWN, COMPENSATION_COMMIT_FAILED ->
+                    "Companion revival was rolled back. Try again shortly.";
+            case PUBLISHED -> "Companion revival completed.";
+        };
     }
 }

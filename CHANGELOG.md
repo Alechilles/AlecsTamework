@@ -29,6 +29,10 @@
 
 ### Fixed
 
+- Dead companions now release deployed capacity. Companions affected by the
+  older stale-capacity behavior can revive without a database reset.
+- Revival failures now identify the failed stage and write the diagnostic
+  cause to the server log.
 - Owner-clearing capture items can capture both ordinarily tamed companions
   and managed-admission companions without failing lifecycle admission.
 - Captured companions that predate population-group classification can now

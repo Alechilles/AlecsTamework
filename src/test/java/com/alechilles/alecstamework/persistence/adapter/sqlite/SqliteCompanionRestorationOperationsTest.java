@@ -440,6 +440,47 @@ class SqliteCompanionRestorationOperationsTest {
         }
     }
 
+    /** Protects revival of companions made dormant before domain convergence. */
+    @Test
+    void managedFreeRestorationRepairsLegacyDeployedClaim()
+            throws Exception {
+        seedLegacyDeployedDomainSource();
+        SqliteLifecycleAdmissionBinding binding =
+                new SqliteLifecycleAdmissionBinding();
+        binding.bind(request -> CompletableFuture.completedFuture(
+                legacyManagedEvidence(request.operationId())
+        ));
+        SqliteCompanionRestorationOperations managed =
+                newManagedRestorations(binding);
+
+        OperationWorkflowResult result = managed.submit(
+                operationId(31),
+                new IdempotencyKey("restoration-31"),
+                restorationRequest(),
+                (request, operation) -> LiveOperationResult.confirmed(
+                        "spawn_receipt_confirmed"
+                ).completed()
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLISHED,
+                result.status(), String.valueOf(result.failure())
+        );
+        try (Connection connection = connections.openReadConnection()) {
+            assertEquals(
+                    1,
+                    new SqlitePopulationDomainStore(connection).counts(
+                            new PopulationDomainBucket(
+                                    OWNER,
+                                    "managed-legacy-deployed",
+                                    PopulationDomainScope.GLOBAL,
+                                    null
+                            )
+                    ).committedDeployable()
+            );
+        }
+    }
+
     @Test
     void managedEvidenceCannotBeInjectedIntoNeutralRestoration() {
         assertThrows(
@@ -756,6 +797,48 @@ class SqliteCompanionRestorationOperationsTest {
         return LifecycleAdmissionEvidence.managed(payload, null);
     }
 
+    private LifecycleAdmissionEvidence legacyManagedEvidence(
+            OperationId operationId
+    ) {
+        PopulationDomainAdmissionOperation.Payload payload =
+                new PopulationDomainAdmissionOperation.Payload(
+                        UUID.nameUUIDFromBytes((operationId.value()
+                                + ":lifecycle-admission").getBytes(
+                                java.nio.charset.StandardCharsets.UTF_8
+                        )),
+                        PROFILE,
+                        OWNER,
+                        new LifecycleRevision(1),
+                        "world-two",
+                        OWNER,
+                        "world",
+                        LifecycleState.DEAD_REVIVABLE,
+                        LifecycleState.ACTIVE,
+                        "managed-test-group",
+                        "managed-test-provider",
+                        1,
+                        "generation",
+                        1,
+                        1,
+                        Long.MAX_VALUE,
+                        1,
+                        List.of(new PopulationDomainAdmissionOperation.DomainInput(
+                                "managed-legacy-deployed",
+                                PopulationDomainScope.GLOBAL,
+                                null,
+                                0,
+                                1,
+                                1,
+                                0,
+                                6,
+                                1
+                        )),
+                        List.of(),
+                        -400
+                );
+        return LifecycleAdmissionEvidence.managed(payload, null);
+    }
+
     private void seedCommittedDomainSource() throws Exception {
         OperationId sourceOperation = operationId(190);
         try (Connection connection = connections.openWriterConnection()) {
@@ -794,6 +877,44 @@ class SqliteCompanionRestorationOperationsTest {
                         policy_revision, created_at_ms
                     ) VALUES (?, ?, 0, ?, 'managed-test-domain', 'PER_WORLD',
                               'world', 1, 0, 1, 100, 100, 1, -500)
+                    """)) {
+                statement.setString(1, sourceOperation.toString());
+                statement.setString(2, PROFILE.toString());
+                statement.setString(3, OWNER.toString());
+                statement.executeUpdate();
+            }
+            connection.commit();
+        }
+    }
+
+    private void seedLegacyDeployedDomainSource() throws Exception {
+        OperationId sourceOperation = operationId(191);
+        try (Connection connection = connections.openWriterConnection()) {
+            connection.setAutoCommit(false);
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO operation_envelope(
+                        operation_id, idempotency_key, operation_kind,
+                        payload_version, payload_json, phase, feature_scope,
+                        expected_lifecycle_revision, lease_owner, lease_until_ms,
+                        attempt_count, failure_kind, failure_code, created_at_ms,
+                        updated_at_ms, durable_at_ms, published_at_ms, terminal_at_ms
+                    ) VALUES (?, ?, 'seed_domain', 1, '{}', 'PUBLISHED',
+                              'seed', 0, NULL, 0, 0, NULL, NULL,
+                              -500, -500, -500, -500, NULL)
+                    """)) {
+                statement.setString(1, sourceOperation.toString());
+                statement.setString(2, "seed-domain-191");
+                statement.executeUpdate();
+            }
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO population_domain_reservation(
+                        operation_id, profile_id, expected_lifecycle_revision,
+                        owner_uuid, domain_id, scope_kind, owner_world_key,
+                        owned_delta, deployable_delta, weight,
+                        snapshotted_max_owned, snapshotted_max_deployable,
+                        policy_revision, created_at_ms
+                    ) VALUES (?, ?, 0, ?, 'managed-legacy-deployed',
+                              'GLOBAL', '', 0, 1, 1, 0, 6, 1, -500)
                     """)) {
                 statement.setString(1, sourceOperation.toString());
                 statement.setString(2, PROFILE.toString());

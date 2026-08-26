@@ -12,8 +12,10 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainConvergencePlan;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainConvergencePlanner;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainReservation;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
@@ -255,19 +257,38 @@ final class SqliteFreeRestorationLifecycleAdmission {
                     "free_restoration_admission_canonical_evidence_mismatch"
             );
         }
-        PopulationDomainConvergencePlan plan =
-                PopulationDomainConvergencePlanner.plan(
-                        requested.profileId(),
-                        source.lifecycle().revision(),
-                        source.lifecycle().ownerId(),
-                        source.lifecycle().ownerWorldKey(),
-                        LifecycleState.DEAD_REVIVABLE,
-                        source.lifecycle().ownerId(),
-                        targetWorld,
-                        LifecycleState.ACTIVE,
-                        source.committedDomainRows(),
-                        payload.reservations(operationId)
-                );
+        PopulationDomainConvergencePlan plan;
+        try {
+            plan = PopulationDomainConvergencePlanner.plan(
+                    requested.profileId(),
+                    source.lifecycle().revision(),
+                    source.lifecycle().ownerId(),
+                    source.lifecycle().ownerWorldKey(),
+                    LifecycleState.DEAD_REVIVABLE,
+                    source.lifecycle().ownerId(),
+                    targetWorld,
+                    LifecycleState.ACTIVE,
+                    source.committedDomainRows(),
+                    payload.reservations(operationId)
+            );
+        } catch (IllegalStateException mismatch) {
+            if (!"population_domain_source_state_mismatch".equals(
+                    mismatch.getMessage()
+            ) || !legacyClaimCoversAdmission(
+                    payload, operationId, source.committedDomainRows()
+            )) {
+                throw mismatch;
+            }
+            // Older builds left the deployed row in place on death. It has
+            // already consumed capacity, so restoration must not reserve it twice.
+            PopulationDomainAdmissionOperation.Payload repaired =
+                    withoutDomainReservations(payload);
+            return requested.withAdmissionEvidence(
+                    LifecycleAdmissionEvidence.managed(
+                            repaired, evidence.composition(), null
+                    )
+            );
+        }
         if (evidence.convergencePlan() != null
                 && !evidence.convergencePlan().equals(plan)) {
             throw new IllegalStateException(
@@ -278,6 +299,57 @@ final class SqliteFreeRestorationLifecycleAdmission {
                 LifecycleAdmissionEvidence.managed(
                         payload, evidence.composition(), plan
                 )
+        );
+    }
+
+    private static boolean legacyClaimCoversAdmission(
+            PopulationDomainAdmissionOperation.Payload payload,
+            OperationId operationId,
+            List<PopulationDomainReservation> committed
+    ) {
+        if (committed.isEmpty()
+                || payload.sourceLifecycle() != LifecycleState.DEAD_REVIVABLE
+                || payload.targetLifecycle() != LifecycleState.ACTIVE
+                || !Objects.equals(payload.sourceOwnerId(), payload.ownerId())) {
+            return false;
+        }
+        List<PopulationDomainReservation> requested =
+                payload.reservations(operationId);
+        if (requested.isEmpty()) return false;
+        return requested.stream().allMatch(target -> committed.stream()
+                .anyMatch(source -> source.profileId().equals(target.profileId())
+                        && source.bucket().equals(target.bucket())
+                        && source.weight() == target.weight()
+                        && source.ownedDelta() >= target.ownedDelta()
+                        && source.deployableDelta()
+                        >= target.deployableDelta()));
+    }
+
+    private static PopulationDomainAdmissionOperation.Payload
+            withoutDomainReservations(
+            PopulationDomainAdmissionOperation.Payload source
+    ) {
+        return new PopulationDomainAdmissionOperation.Payload(
+                source.reservationId(),
+                source.profileId(),
+                source.ownerId(),
+                source.expectedLifecycleRevision(),
+                source.ownerWorldKey(),
+                source.sourceOwnerId(),
+                source.sourceWorldKey(),
+                source.sourceLifecycle(),
+                source.targetLifecycle(),
+                source.familyGroupId(),
+                source.providerId(),
+                source.providerContractVersion(),
+                source.providerGenerationToken(),
+                source.providerSnapshotRevision(),
+                source.managedConfigRevision(),
+                source.expiresAtMs(),
+                source.requestedCount(),
+                List.of(),
+                source.provisionalChildIds(),
+                source.createdAtMs()
         );
     }
 

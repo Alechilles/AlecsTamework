@@ -20,6 +20,8 @@ import com.alechilles.alecstamework.companion.provisioning.ProvisionedCompanionL
 import com.alechilles.alecstamework.companion.provisioning.ProvisionedCompanionLifecyclePublishedEventMapper;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningOrigin;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningRecord;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainBucket;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainScope;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
@@ -74,7 +76,7 @@ class SqliteCompanionDormantOperationsTest {
         connections = new SqliteConnectionFactory(
                 tempDir.resolve("tamework-state.sqlite")
         );
-        new SqliteSchemaV1Manager(connections, () -> -10_000).initialize();
+        new SqliteSchemaV2Manager(connections, () -> -10_000).initialize();
         seedLiveProfile();
         writer = new SqliteSingleWriter(connections);
         reads = new SqliteReadExecutor(connections);
@@ -126,6 +128,27 @@ class SqliteCompanionDormantOperationsTest {
         assertEquals(LifecycleState.DEAD_REVIVABLE, outcome.state());
         assertEquals(request.snapshot().snapshotId(), outcome.snapshotId());
         assertDormant(request, LifecycleState.DEAD_REVIVABLE, 3);
+    }
+
+    /** Protects the 2026-08-26 regression where dead livestock stayed deployed. */
+    @Test
+    void deathRetainsOwnedCapacityAndReleasesDeployableCapacity()
+            throws Exception {
+        seedManagedDomainClaims();
+        CompanionDormantTransitionRequest request =
+                request(DormantSourceEvidence.Kind.DEATH_COMPONENT, 3);
+
+        OperationWorkflowResult result = submit(11, request);
+
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
+        try (Connection connection = connections.openReadConnection()) {
+            SqlitePopulationDomainStore domains =
+                    new SqlitePopulationDomainStore(connection);
+            assertEquals(1, domains.counts(domain("husbandry-owned"))
+                    .committedOwned());
+            assertEquals(0, domains.counts(domain("husbandry-deployed"))
+                    .committedDeployable());
+        }
     }
 
     @Test
@@ -516,6 +539,57 @@ class SqliteCompanionDormantOperationsTest {
             ));
             connection.commit();
         }
+    }
+
+    private void seedManagedDomainClaims() throws Exception {
+        OperationId sourceOperation = operationId(191);
+        try (Connection connection = connections.openWriterConnection()) {
+            connection.setAutoCommit(false);
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO operation_envelope(
+                        operation_id, idempotency_key, operation_kind,
+                        payload_version, payload_json, phase, feature_scope,
+                        expected_lifecycle_revision, lease_owner, lease_until_ms,
+                        attempt_count, failure_kind, failure_code, created_at_ms,
+                        updated_at_ms, durable_at_ms, published_at_ms, terminal_at_ms
+                    ) VALUES (?, ?, 'seed_domain', 1, '{}', 'PUBLISHED',
+                              'seed', 0, NULL, 0, 0, NULL, NULL,
+                              -500, -500, -500, -500, NULL)
+                    """)) {
+                statement.setString(1, sourceOperation.toString());
+                statement.setString(2, "seed-domain-191");
+                statement.executeUpdate();
+            }
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO population_domain_reservation(
+                        operation_id, profile_id, expected_lifecycle_revision,
+                        owner_uuid, domain_id, scope_kind, owner_world_key,
+                        owned_delta, deployable_delta, weight,
+                        snapshotted_max_owned, snapshotted_max_deployable,
+                        policy_revision, created_at_ms
+                    ) VALUES (?, ?, 0, ?, ?, 'GLOBAL', '', ?, ?, 1, 12, 6, 1, -500)
+                    """)) {
+                statement.setString(1, sourceOperation.toString());
+                statement.setString(2, PROFILE.toString());
+                statement.setString(3, OWNER.toString());
+                statement.setString(4, "husbandry-owned");
+                statement.setInt(5, 1);
+                statement.setInt(6, 0);
+                statement.addBatch();
+                statement.setString(4, "husbandry-deployed");
+                statement.setInt(5, 0);
+                statement.setInt(6, 1);
+                statement.addBatch();
+                statement.executeBatch();
+            }
+            connection.commit();
+        }
+    }
+
+    private PopulationDomainBucket domain(String id) {
+        return new PopulationDomainBucket(
+                OWNER, id, PopulationDomainScope.GLOBAL, null
+        );
     }
 
     private CompanionLifecycle lifecycle() throws Exception {
