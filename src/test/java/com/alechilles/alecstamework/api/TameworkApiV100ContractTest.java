@@ -19,8 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Public behavior checks for the experimental Tamework 0.12 API surface. */
-class TameworkApiV012ContractTest {
+/** Public behavior checks for the stable Tamework 1.0 API surface. */
+class TameworkApiV100ContractTest {
     @Test
     void oldImplementationsReceiveAnUnavailableCommandHudFacade() {
         TameworkApi legacy = new LegacyApiImplementation();
@@ -45,7 +45,7 @@ class TameworkApiV012ContractTest {
         TameworkEventBus events = new TameworkEventBus(null);
         TameworkApiImpl api = newBaseApi(events);
         try {
-            assertEquals("0.12.0", api.getApiVersion());
+            assertEquals("1.0.0", api.getApiVersion());
             assertTrue(api.getCapabilities().containsAll(EnumSet.of(
                     TameworkApiCapability.COMMAND_HUD_RENDERERS,
                     TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS)));
@@ -66,7 +66,7 @@ class TameworkApiV012ContractTest {
     void bondedOnlyRuntimeReportsVersionButFailsClosedForCommandHud() {
         TameworkApi api = new BondedOnlyTameworkApi(BondedCompanionApi.unavailable());
 
-        assertEquals("0.12.0", api.getApiVersion());
+        assertEquals("1.0.0", api.getApiVersion());
         assertFalse(api.getCapabilities().contains(
                 TameworkApiCapability.COMMAND_HUD_RENDERERS));
         assertFalse(api.getCapabilities().contains(
