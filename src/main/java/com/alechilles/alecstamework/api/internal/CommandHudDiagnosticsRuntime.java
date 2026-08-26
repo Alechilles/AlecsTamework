@@ -10,15 +10,35 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /** Bounded internal bridge from HUD composition to detached diagnostics. */
 public final class CommandHudDiagnosticsRuntime implements AutoCloseable {
     private static final int MAX_SOURCES = 2;
     private static final Object LEGACY_OWNER = new Object();
     private final Object lock = new Object();
-    private final IdentityHashMap<Object, Supplier<CommandHudDiagnostics>> snapshotSuppliers =
+    private final IdentityHashMap<Object, SourceState> snapshotSuppliers =
             new IdentityHashMap<>();
     private boolean closed;
+
+    /** A detached source snapshot with an optional process-local failure sequence. */
+    public record SourceSnapshot(
+            @Nonnull CommandHudDiagnostics diagnostics,
+            long failureSequence
+    ) {
+        public SourceSnapshot {
+            Objects.requireNonNull(diagnostics, "diagnostics");
+            if (failureSequence < 0L) {
+                throw new IllegalArgumentException("Failure sequence cannot be negative.");
+            }
+        }
+    }
+
+    /** Supplies detached diagnostics and its internal failure sequence. */
+    @FunctionalInterface
+    public interface SourceSupplier {
+        @Nullable SourceSnapshot get();
+    }
 
     /** Connects the legacy runtime-owned detached snapshot supplier. */
     public void connect(@Nonnull Supplier<CommandHudDiagnostics> supplier) {
@@ -39,13 +59,27 @@ public final class CommandHudDiagnosticsRuntime implements AutoCloseable {
     ) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(supplier, "supplier");
+        return connectSource(owner, () -> {
+            CommandHudDiagnostics diagnostics = supplier.get();
+            return diagnostics == null ? null : new SourceSnapshot(diagnostics, 0L);
+        });
+    }
+
+    /** Connects a source that can report the sequence of its latest failure. */
+    @Nonnull
+    public AutoCloseable connectSource(
+            @Nonnull Object owner,
+            @Nonnull SourceSupplier supplier
+    ) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(supplier, "supplier");
         synchronized (lock) {
             if (closed) return () -> { };
             if (!snapshotSuppliers.containsKey(owner)
                     && snapshotSuppliers.size() >= MAX_SOURCES) {
                 return () -> { };
             }
-            snapshotSuppliers.put(owner, supplier);
+            snapshotSuppliers.put(owner, new SourceState(supplier));
         }
         return () -> disconnect(owner, supplier);
     }
@@ -53,17 +87,17 @@ public final class CommandHudDiagnosticsRuntime implements AutoCloseable {
     /** Returns the current detached runtime snapshot. */
     @Nonnull
     public CommandHudDiagnostics snapshot() {
-        List<Supplier<CommandHudDiagnostics>> suppliers;
+        List<SourceState> suppliers;
         synchronized (lock) {
             if (closed || snapshotSuppliers.isEmpty()) {
                 return CommandHudDiagnostics.empty();
             }
             suppliers = List.copyOf(snapshotSuppliers.values());
         }
-        List<CommandHudDiagnostics> snapshots = new ArrayList<>(suppliers.size());
-        for (Supplier<CommandHudDiagnostics> supplier : suppliers) {
+        List<SourceSnapshot> snapshots = new ArrayList<>(suppliers.size());
+        for (SourceState source : suppliers) {
             try {
-                CommandHudDiagnostics snapshot = supplier.get();
+                SourceSnapshot snapshot = source.supplier.get();
                 if (snapshot != null) snapshots.add(snapshot);
             } catch (RuntimeException | LinkageError ignored) {
                 // One disconnected or failing surface must not hide another.
@@ -83,10 +117,11 @@ public final class CommandHudDiagnosticsRuntime implements AutoCloseable {
 
     private void disconnect(
             @Nonnull Object owner,
-            @Nonnull Supplier<CommandHudDiagnostics> supplier
+            @Nonnull SourceSupplier supplier
     ) {
         synchronized (lock) {
-            if (snapshotSuppliers.get(owner) == supplier) {
+            SourceState source = snapshotSuppliers.get(owner);
+            if (source != null && source.supplier == supplier) {
                 snapshotSuppliers.remove(owner);
             }
         }
@@ -94,7 +129,7 @@ public final class CommandHudDiagnosticsRuntime implements AutoCloseable {
 
     @Nonnull
     private static CommandHudDiagnostics merge(
-            @Nonnull List<CommandHudDiagnostics> snapshots
+            @Nonnull List<SourceSnapshot> snapshots
     ) {
         Map<String, CommandHudDiagnostics.RendererRegistration> targetRenderers =
                 new LinkedHashMap<>();
@@ -106,9 +141,11 @@ public final class CommandHudDiagnosticsRuntime implements AutoCloseable {
                 new LinkedHashMap<>();
         Map<java.util.UUID, CommandHudDiagnostics.SessionView> sessions = new LinkedHashMap<>();
         String latestFailureReason = null;
+        long latestFailureSequence = 0L;
         long slowCompositionCount = 0L;
         long slowWarningCount = 0L;
-        for (CommandHudDiagnostics snapshot : snapshots) {
+        for (SourceSnapshot source : snapshots) {
+            CommandHudDiagnostics snapshot = source.diagnostics();
             addRenderers(targetRenderers, snapshot.targetRenderers());
             addRenderers(hotswapRenderers, snapshot.hotswapRenderers());
             addContributors(targetContributors, snapshot.targetContributors());
@@ -117,7 +154,10 @@ public final class CommandHudDiagnosticsRuntime implements AutoCloseable {
                 sessions.putIfAbsent(session.sessionId(), session);
             }
             if (snapshot.latestFailureReason() != null) {
-                latestFailureReason = snapshot.latestFailureReason();
+                if (source.failureSequence() >= latestFailureSequence) {
+                    latestFailureReason = snapshot.latestFailureReason();
+                    latestFailureSequence = source.failureSequence();
+                }
             }
             slowCompositionCount += snapshot.slowCompositionCount();
             slowWarningCount += snapshot.slowWarningCount();
@@ -172,5 +212,13 @@ public final class CommandHudDiagnosticsRuntime implements AutoCloseable {
         return values.values().stream()
                 .sorted(Comparator.comparing(CommandHudDiagnostics.ContributorRegistration::contributorId))
                 .toList();
+    }
+
+    private static final class SourceState {
+        private final SourceSupplier supplier;
+
+        private SourceState(@Nonnull SourceSupplier supplier) {
+            this.supplier = supplier;
+        }
     }
 }

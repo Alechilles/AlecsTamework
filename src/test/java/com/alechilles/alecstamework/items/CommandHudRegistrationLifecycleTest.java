@@ -52,53 +52,6 @@ class CommandHudRegistrationLifecycleTest {
             "e839f9f4-cb53-4e9d-a8c4-2ea8d9f8a3a8");
 
     @Test
-    void selfTestUsesRegistryCompositionForBothSurfacesAndCleansUp() throws Exception {
-        CommandHudRegistry registry = new CommandHudRegistry();
-        String targetRendererId = "selftest:target-renderer";
-        String targetContributorId = "selftest:target-contributor";
-        String hotswapRendererId = "selftest:hotswap-renderer";
-        String hotswapContributorId = "selftest:hotswap-contributor";
-        CommandHudRegistration targetRenderer = registerTargetRenderer(
-                registry, targetRendererId, targetContributorId);
-        CommandHudRegistration targetContributor = registerTargetContributor(
-                registry, targetContributorId);
-        CommandHudRegistration hotswapRenderer = registerHotswapRenderer(
-                registry, hotswapRendererId, hotswapContributorId);
-        CommandHudRegistration hotswapContributor = registerHotswapContributor(
-                registry, hotswapContributorId);
-        try {
-            CommandHudSelfTestRuntime.CommandHudSelfTestResult result =
-                    CommandHudSelfTestRuntime.run(
-                            registry, PLAYER_UUID, targetRendererId, targetContributorId,
-                            hotswapRendererId, hotswapContributorId);
-
-            assertTrue(result.targetRendererCreated());
-            assertTrue(result.targetContributionReady());
-            assertTrue(result.targetFocusedRefresh());
-            assertTrue(result.targetSessionClosed());
-            assertTrue(result.hotswapRendererCreated());
-            assertTrue(result.hotswapContributionReady());
-            assertTrue(result.hotswapFocusedRefresh());
-            assertTrue(result.hotswapSessionClosed());
-            assertTrue(registry.diagnostics().sessions().isEmpty());
-        } finally {
-            close(targetContributor);
-            close(targetRenderer);
-            close(hotswapContributor);
-            close(hotswapRenderer);
-            assertFalse(registry.diagnostics().targetRenderers().stream()
-                    .anyMatch(value -> targetRendererId.equals(value.rendererId())));
-            assertFalse(registry.diagnostics().targetContributors().stream()
-                    .anyMatch(value -> targetContributorId.equals(value.contributorId())));
-            assertFalse(registry.diagnostics().hotswapRenderers().stream()
-                    .anyMatch(value -> hotswapRendererId.equals(value.rendererId())));
-            assertFalse(registry.diagnostics().hotswapContributors().stream()
-                    .anyMatch(value -> hotswapContributorId.equals(value.contributorId())));
-            registry.close();
-        }
-    }
-
-    @Test
     void playerAndStoreLifecycleSignalsReachBothSurfaceSinksOnce() throws Exception {
         RecordingSink target = new RecordingSink();
         RecordingSink hotswap = new RecordingSink();
@@ -360,58 +313,6 @@ class CommandHudRegistrationLifecycleTest {
                 true, "Q", "test/icon.png", "Q");
         return new CommandHotswapHudSnapshot(slot, slot, slot, slot, slot,
                 CommandHotswapHudSnapshot.GroupStatus.hidden());
-    }
-
-    private static CommandHudRegistration registerTargetRenderer(
-            CommandHudRegistry registry, String rendererId, String contributorId) {
-        CommandHudRegistrationResult result = registry.registerTargetRenderer(
-                rendererId, new CommandHudRendererDescriptor(Set.of(contributorId)), ignored ->
-                        new CommandTargetHudController() {
-                            @Override
-                            public void buildInitial(com.alechilles.alecstamework.api.commandhud.CommandHudOpenContext context,
-                                                     com.alechilles.alecstamework.api.commandhud.CommandTargetHudView view,
-                                                     UICommandBuilder commands) {
-                            }
-                        });
-        return result.registration();
-    }
-
-    private static CommandHudRegistration registerHotswapRenderer(
-            CommandHudRegistry registry, String rendererId, String contributorId) {
-        CommandHudRegistrationResult result = registry.registerHotswapRenderer(
-                rendererId, new CommandHudRendererDescriptor(Set.of(contributorId)), ignored ->
-                        new CommandHotswapHudController() {
-                            @Override
-                            public void buildInitial(com.alechilles.alecstamework.api.commandhud.CommandHudOpenContext context,
-                                                     com.alechilles.alecstamework.api.commandhud.CommandHotswapHudView view,
-                                                     UICommandBuilder commands) {
-                            }
-                        });
-        return result.registration();
-    }
-
-    private static CommandHudRegistration registerTargetContributor(
-            CommandHudRegistry registry, String contributorId) {
-        CommandHudRegistrationResult result = registry.registerTargetContributor(
-                contributorId, new CommandHudContributorDescriptor(Set.of("selftest")), context ->
-                        (CommandTargetHudSessionContributor) (base, previous, scope) ->
-                                CommandHudContribution.available(context.contributorId(),
-                                        Map.of("probe/value", CommandUiValue.of("ready"))));
-        return result.registration();
-    }
-
-    private static CommandHudRegistration registerHotswapContributor(
-            CommandHudRegistry registry, String contributorId) {
-        CommandHudRegistrationResult result = registry.registerHotswapContributor(
-                contributorId, new CommandHudContributorDescriptor(Set.of("selftest")), context ->
-                        (CommandHotswapHudSessionContributor) (base, previous, scope) ->
-                                CommandHudContribution.available(context.contributorId(),
-                                        Map.of("probe/value", CommandUiValue.of("ready"))));
-        return result.registration();
-    }
-
-    private static void close(CommandHudRegistration registration) {
-        if (registration != null) registration.close();
     }
 
     private static final class LifecycleCounters {

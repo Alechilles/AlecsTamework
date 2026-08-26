@@ -73,4 +73,28 @@ class CommandHudDiagnosticsServiceTest {
         assertEquals(1L, diagnostics.slowWarningCount());
         service.close();
     }
+
+    @Test
+    void failureSequenceOrdersRepeatedReasonsAcrossSurfaceServices() {
+        CommandHudDiagnosticsService target = new CommandHudDiagnosticsService();
+        CommandHudDiagnosticsService hotswap = new CommandHudDiagnosticsService();
+        UUID targetSession = UUID.randomUUID();
+        UUID hotswapSession = UUID.randomUUID();
+        target.openSession(targetSession, CommandHudSurface.TARGET,
+                "example:target", 1L, null, null, List.of());
+        hotswap.openSession(hotswapSession, CommandHudSurface.HOTSWAP,
+                "example:hotswap", 1L, null, null, List.of());
+
+        target.recordSessionFailure(targetSession, "renderer_failed");
+        long firstTargetSequence = target.runtimeSnapshot().failureSequence();
+        hotswap.recordSessionFailure(hotswapSession, "callback_failed");
+        long hotswapSequence = hotswap.runtimeSnapshot().failureSequence();
+        target.recordSessionFailure(targetSession, "renderer_failed");
+        long secondTargetSequence = target.runtimeSnapshot().failureSequence();
+
+        assertTrue(hotswapSequence > firstTargetSequence);
+        assertTrue(secondTargetSequence > hotswapSequence);
+        target.close();
+        hotswap.close();
+    }
 }

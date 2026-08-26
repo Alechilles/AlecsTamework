@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
@@ -16,6 +17,7 @@ import javax.annotation.Nullable;
 
 /** Owns redacted process-local command HUD diagnostics state. */
 final class CommandHudDiagnosticsService implements AutoCloseable {
+    private static final AtomicLong FAILURE_SEQUENCE = new AtomicLong();
     private static final java.util.Set<String> SAFE_REASON_CODES = java.util.Set.of(
             "initial_composition_failed",
             "required_composition_failed",
@@ -37,6 +39,7 @@ final class CommandHudDiagnosticsService implements AutoCloseable {
     private final Map<UUID, SessionState> sessions = new LinkedHashMap<>();
     @Nullable
     private String latestFailureReason;
+    private long latestFailureSequence;
     private long slowCompositionCount;
     private long slowWarningCount;
 
@@ -187,7 +190,7 @@ final class CommandHudDiagnosticsService implements AutoCloseable {
         String safeReason = safeReason(reason);
         synchronized (lock) {
             if (sessions.remove(sessionId) != null && safeReason != null) {
-                latestFailureReason = safeReason;
+                recordLatestFailure(safeReason);
             }
         }
     }
@@ -200,7 +203,7 @@ final class CommandHudDiagnosticsService implements AutoCloseable {
         synchronized (lock) {
             SessionState state = sessions.get(sessionId);
             if (state != null) state.failureReason = safeReason;
-            latestFailureReason = safeReason;
+            recordLatestFailure(safeReason);
         }
     }
 
@@ -220,7 +223,7 @@ final class CommandHudDiagnosticsService implements AutoCloseable {
             state.status = "OPTIONAL_REMOVED";
             state.failureReason = "optional_contributor_removed";
             session.failureReason = "optional_contributor_removed";
-            latestFailureReason = "optional_contributor_removed";
+            recordLatestFailure("optional_contributor_removed");
         }
     }
 
@@ -254,7 +257,7 @@ final class CommandHudDiagnosticsService implements AutoCloseable {
             state.record(generation, safeStatus, timing, safeReason);
             if (safeReason != null) {
                 session.failureReason = safeReason;
-                latestFailureReason = safeReason;
+                recordLatestFailure(safeReason);
             }
         }
     }
@@ -263,37 +266,52 @@ final class CommandHudDiagnosticsService implements AutoCloseable {
     @Nonnull
     CommandHudDiagnostics snapshot() {
         synchronized (lock) {
-            List<CommandHudDiagnostics.RendererRegistration> targetRenderers = new ArrayList<>();
-            List<CommandHudDiagnostics.RendererRegistration> hotswapRenderers = new ArrayList<>();
-            for (Map.Entry<RegistrationKey, CommandHudDiagnostics.RendererRegistration> entry
-                    : renderers.entrySet()) {
-                (entry.getKey().surface() == CommandHudSurface.TARGET
-                        ? targetRenderers : hotswapRenderers).add(entry.getValue());
-            }
-            Comparator<CommandHudDiagnostics.RendererRegistration> rendererOrder =
-                    Comparator.comparing(CommandHudDiagnostics.RendererRegistration::rendererId);
-            targetRenderers.sort(rendererOrder);
-            hotswapRenderers.sort(rendererOrder);
-
-            List<CommandHudDiagnostics.ContributorRegistration> targetContributors = new ArrayList<>();
-            List<CommandHudDiagnostics.ContributorRegistration> hotswapContributors = new ArrayList<>();
-            for (Map.Entry<RegistrationKey, CommandHudDiagnostics.ContributorRegistration> entry
-                    : contributors.entrySet()) {
-                (entry.getKey().surface() == CommandHudSurface.TARGET
-                        ? targetContributors : hotswapContributors).add(entry.getValue());
-            }
-            Comparator<CommandHudDiagnostics.ContributorRegistration> contributorOrder =
-                    Comparator.comparing(CommandHudDiagnostics.ContributorRegistration::contributorId);
-            targetContributors.sort(contributorOrder);
-            hotswapContributors.sort(contributorOrder);
-
-            List<CommandHudDiagnostics.SessionView> sessionValues = sessions.values().stream()
-                    .sorted(Comparator.comparing(state -> state.sessionId.toString()))
-                    .map(SessionState::view).toList();
-            return new CommandHudDiagnostics(targetRenderers, hotswapRenderers,
-                    targetContributors, hotswapContributors, sessionValues,
-                    latestFailureReason, slowCompositionCount, slowWarningCount);
+            return snapshotLocked();
         }
+    }
+
+    /** Returns diagnostics and failure order as one atomic detached value. */
+    @Nonnull
+    com.alechilles.alecstamework.api.internal.CommandHudDiagnosticsRuntime.SourceSnapshot
+    runtimeSnapshot() {
+        synchronized (lock) {
+            return new com.alechilles.alecstamework.api.internal.CommandHudDiagnosticsRuntime.SourceSnapshot(
+                    snapshotLocked(), latestFailureSequence);
+        }
+    }
+
+    @Nonnull
+    private CommandHudDiagnostics snapshotLocked() {
+        List<CommandHudDiagnostics.RendererRegistration> targetRenderers = new ArrayList<>();
+        List<CommandHudDiagnostics.RendererRegistration> hotswapRenderers = new ArrayList<>();
+        for (Map.Entry<RegistrationKey, CommandHudDiagnostics.RendererRegistration> entry
+                : renderers.entrySet()) {
+            (entry.getKey().surface() == CommandHudSurface.TARGET
+                    ? targetRenderers : hotswapRenderers).add(entry.getValue());
+        }
+        Comparator<CommandHudDiagnostics.RendererRegistration> rendererOrder =
+                Comparator.comparing(CommandHudDiagnostics.RendererRegistration::rendererId);
+        targetRenderers.sort(rendererOrder);
+        hotswapRenderers.sort(rendererOrder);
+
+        List<CommandHudDiagnostics.ContributorRegistration> targetContributors = new ArrayList<>();
+        List<CommandHudDiagnostics.ContributorRegistration> hotswapContributors = new ArrayList<>();
+        for (Map.Entry<RegistrationKey, CommandHudDiagnostics.ContributorRegistration> entry
+                : contributors.entrySet()) {
+            (entry.getKey().surface() == CommandHudSurface.TARGET
+                    ? targetContributors : hotswapContributors).add(entry.getValue());
+        }
+        Comparator<CommandHudDiagnostics.ContributorRegistration> contributorOrder =
+                Comparator.comparing(CommandHudDiagnostics.ContributorRegistration::contributorId);
+        targetContributors.sort(contributorOrder);
+        hotswapContributors.sort(contributorOrder);
+
+        List<CommandHudDiagnostics.SessionView> sessionValues = sessions.values().stream()
+                .sorted(Comparator.comparing(state -> state.sessionId.toString()))
+                .map(SessionState::view).toList();
+        return new CommandHudDiagnostics(targetRenderers, hotswapRenderers,
+                targetContributors, hotswapContributors, sessionValues,
+                latestFailureReason, slowCompositionCount, slowWarningCount);
     }
 
     @Override
@@ -303,10 +321,16 @@ final class CommandHudDiagnosticsService implements AutoCloseable {
             contributors.clear();
             sessions.clear();
             latestFailureReason = null;
+            latestFailureSequence = 0L;
             slowCompositionCount = 0L;
             slowWarningCount = 0L;
         }
         timingWarnings.clear();
+    }
+
+    private void recordLatestFailure(@Nonnull String safeReason) {
+        latestFailureReason = safeReason;
+        latestFailureSequence = FAILURE_SEQUENCE.incrementAndGet();
     }
 
     @Nonnull

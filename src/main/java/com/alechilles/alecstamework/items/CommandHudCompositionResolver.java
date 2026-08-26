@@ -46,7 +46,8 @@ final class CommandHudCompositionResolver {
         this(Objects.requireNonNull(registry, "registry").rendererRegistry(),
                 registry.contributorRegistry(), new CommandHudTimingWarnings());
         if (connectRuntimeDiagnostics) {
-            registry.diagnosticsRuntime().connect(this, diagnostics::snapshot);
+            registry.diagnosticsRuntime().connectSource(
+                    this, diagnostics::runtimeSnapshot);
         }
     }
 

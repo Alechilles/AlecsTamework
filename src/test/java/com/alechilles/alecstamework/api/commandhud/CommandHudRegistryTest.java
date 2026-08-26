@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.api.internal.CommandHudDiagnosticsRuntime;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -278,6 +279,32 @@ class CommandHudRegistryTest {
         assertEquals(Set.of(CommandHudSurface.TARGET, CommandHudSurface.HOTSWAP),
                 merged.sessions().stream().map(CommandHudDiagnostics.SessionView::surface)
                         .collect(java.util.stream.Collectors.toSet()));
+    }
+
+    @Test
+    void runtimeDiagnosticsSelectsLatestFailureAcrossSurfaceSources() {
+        CommandHudDiagnosticsRuntime runtime = new CommandHudDiagnosticsRuntime();
+        AtomicReference<CommandHudDiagnosticsRuntime.SourceSnapshot> target =
+                new AtomicReference<>(failureSnapshot("renderer_failed", 1L));
+        AtomicReference<CommandHudDiagnosticsRuntime.SourceSnapshot> hotswap =
+                new AtomicReference<>(failureSnapshot("callback_failed", 2L));
+        runtime.connectSource(new Object(), target::get);
+        runtime.connectSource(new Object(), hotswap::get);
+
+        assertEquals("callback_failed", runtime.snapshot().latestFailureReason());
+
+        target.set(failureSnapshot("renderer_failed", 3L));
+
+        assertEquals("renderer_failed", runtime.snapshot().latestFailureReason());
+    }
+
+    private static CommandHudDiagnosticsRuntime.SourceSnapshot failureSnapshot(
+            String reason,
+            long sequence
+    ) {
+        CommandHudDiagnostics diagnostics = new CommandHudDiagnostics(
+                List.of(), List.of(), List.of(), List.of(), List.of(), reason, 0L, 0L);
+        return new CommandHudDiagnosticsRuntime.SourceSnapshot(diagnostics, sequence);
     }
 
     private static CommandHudDiagnostics diagnosticsFor(

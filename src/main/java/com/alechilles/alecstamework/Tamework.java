@@ -1557,49 +1557,10 @@ public class Tamework extends JavaPlugin {
     }
     @Override
     protected void shutdown() {
-        if (runtimeHandle != null) {
-            try {
-                runtimeHandle.close();
-            } catch (RuntimeException exception) {
-                getLogger().at(Level.WARNING).withCause(exception).log(
-                        "Tamework runtime participant teardown was not clean."
-                );
-            }
-            runtimeHandle = null;
-        }
-        CompanionCombatDefeatSystem.clearAll();
-        spawnBeaconVisualizationService.close();
-        if (patchworkRuntime != null) {
-            try {
-                patchworkRuntime.close();
-                patchworkRuntime = null;
-            } catch (RuntimeException exception) {
-                getLogger().at(Level.SEVERE).withCause(exception).log(
-                        "Patchwork did not shut down cleanly; ownership is retained for a later shutdown retry."
-                );
-            }
-        }
-        if (hStatsIntegration != null) {
-            hStatsIntegration.close();
-            hStatsIntegration = null;
-        }
-        if (crashTelemetryService != null) {
-            crashTelemetryService.shutdown();
-        }
-        if (companionXpEventDebugLogService != null) {
-            companionXpEventDebugLogService.close();
-            companionXpEventDebugLogService = null;
-        }
-        overrideInitializedScopeKeys.clear();
-        if (commandItemFeatureHandler != null) {
-            commandItemFeatureHandler.close();
-            commandItemFeatureHandler = null;
-        }
-        if (apiComposition != null) {
-            ActivityRuntime.clear();
-            apiComposition.close();
-            apiComposition = null;
-        }
+        TameworkShutdownSequence.run(
+                this::closeRuntimeParticipants,
+                this::closeRuntimeApiDependents,
+                this::closeApiComposition);
         simpleClaimsCapabilityRuntime.close();
         api = null;
         closeBondedCompanions();
@@ -1632,6 +1593,58 @@ public class Tamework extends JavaPlugin {
         settingsAnnouncementService = null;
         runtimeActivationState = null;
         getLogger().at(Level.INFO).log("Alec's Tamework! has been disabled!");
+    }
+
+    private void closeRuntimeParticipants() {
+        if (runtimeHandle != null) {
+            try {
+                runtimeHandle.close();
+            } catch (RuntimeException exception) {
+                getLogger().at(Level.WARNING).withCause(exception).log(
+                        "Tamework runtime participant teardown was not clean."
+                );
+            }
+            runtimeHandle = null;
+        }
+    }
+
+    private void closeRuntimeApiDependents() {
+        CompanionCombatDefeatSystem.clearAll();
+        spawnBeaconVisualizationService.close();
+        if (patchworkRuntime != null) {
+            try {
+                patchworkRuntime.close();
+                patchworkRuntime = null;
+            } catch (RuntimeException exception) {
+                getLogger().at(Level.SEVERE).withCause(exception).log(
+                        "Patchwork did not shut down cleanly; ownership is retained for a later shutdown retry."
+                );
+            }
+        }
+        if (hStatsIntegration != null) {
+            hStatsIntegration.close();
+            hStatsIntegration = null;
+        }
+        if (crashTelemetryService != null) {
+            crashTelemetryService.shutdown();
+        }
+        if (companionXpEventDebugLogService != null) {
+            companionXpEventDebugLogService.close();
+            companionXpEventDebugLogService = null;
+        }
+        overrideInitializedScopeKeys.clear();
+        if (commandItemFeatureHandler != null) {
+            commandItemFeatureHandler.close();
+            commandItemFeatureHandler = null;
+        }
+    }
+
+    private void closeApiComposition() {
+        if (apiComposition != null) {
+            ActivityRuntime.clear();
+            apiComposition.close();
+            apiComposition = null;
+        }
     }
 
     private void shutdownPersistence() {
