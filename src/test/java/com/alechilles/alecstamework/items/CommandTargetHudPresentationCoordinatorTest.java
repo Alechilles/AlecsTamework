@@ -14,6 +14,7 @@ import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.protocol.ToClientPacket;
 import com.hypixel.hytale.protocol.ToServerPacket;
 import com.hypixel.hytale.protocol.io.ChannelConnection;
+import com.hypixel.hytale.protocol.packets.interface_.CustomHud;
 import com.hypixel.hytale.server.core.entity.entities.player.hud.HudManager;
 import com.hypixel.hytale.server.core.io.PacketHandler;
 import com.hypixel.hytale.server.core.io.ProtocolVersion;
@@ -23,7 +24,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
@@ -123,6 +127,49 @@ class CommandTargetHudPresentationCoordinatorTest {
         coordinator.closeAll();
     }
 
+    @Test
+    void blockingInitialBuildDropsPacketAfterExactRendererUnregister() throws Exception {
+        BlockingInitialController controller = new BlockingInitialController();
+        CommandHudRegistry registry = new CommandHudRegistry();
+        com.alechilles.alecstamework.api.commandhud.CommandHudRegistration registration =
+                registry.registerTargetRenderer("example:target", ignored -> controller)
+                        .registration();
+        CommandTargetHudPresentationCoordinator coordinator =
+                new CommandTargetHudPresentationCoordinator(registry, ignored -> { });
+        TargetHudClient player = player();
+        TwCommandItemConfig config = configWithRendererAndContributor(null);
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        Thread presentThread = new Thread(() -> {
+            try {
+                coordinator.present(null, player.playerRef(), PLAYER_UUID, player.hudManager(),
+                        config, "target-a", model(TARGET_A), "example:flute");
+            } catch (Throwable thrown) {
+                failure.set(thrown);
+            }
+        }, "target-hud-initial-build");
+
+        presentThread.start();
+        assertTrue(controller.initialStarted.await(5, TimeUnit.SECONDS));
+        registration.close();
+
+        assertEquals(0, player.packetHandler().writes.get());
+        assertEquals(0, controller.closes.get());
+        controller.releaseInitial.countDown();
+        presentThread.join(5_000L);
+
+        assertFalse(presentThread.isAlive());
+        assertNull(failure.get());
+        assertEquals(2, player.packetHandler().writes.get(),
+                "only the standard fallback may be sent after unregister");
+        assertTrue(((CustomHud) player.packetHandler().packets.get(0)).clear,
+                "the stale custom initial packet must not be sent");
+        CustomHud standardPacket = (CustomHud) player.packetHandler().packets.get(1);
+        assertTrue(standardPacket.commands != null && standardPacket.commands.length > 0);
+        assertEquals(1, controller.closes.get());
+        assertFalse(coordinator.presentation(PLAYER_UUID).custom());
+        coordinator.closeAll();
+    }
+
     private static int indexOf(List<String> events, String value) {
         int index = events.indexOf(value);
         assertTrue(index >= 0, "missing event: " + value + " in " + events);
@@ -149,13 +196,18 @@ class CommandTargetHudPresentationCoordinatorTest {
     }
 
     private static TargetHudClient player() {
+        CapturingPacketHandler packets = new CapturingPacketHandler();
         PlayerRef playerRef = new PlayerRef(
                 null, PLAYER_UUID, "TargetHudTester", "en-US",
-                new CapturingPacketHandler(), null);
-        return new TargetHudClient(playerRef, new HudManager());
+                packets, null);
+        return new TargetHudClient(playerRef, new HudManager(), packets);
     }
 
-    private record TargetHudClient(PlayerRef playerRef, HudManager hudManager) {
+    private record TargetHudClient(
+            PlayerRef playerRef,
+            HudManager hudManager,
+            CapturingPacketHandler packetHandler
+    ) {
     }
 
     private static final class RecordingController implements CommandTargetHudController {
@@ -194,6 +246,31 @@ class CommandTargetHudPresentationCoordinatorTest {
         }
     }
 
+    private static final class BlockingInitialController implements CommandTargetHudController {
+        private final CountDownLatch initialStarted = new CountDownLatch(1);
+        private final CountDownLatch releaseInitial = new CountDownLatch(1);
+        private final AtomicInteger closes = new AtomicInteger();
+
+        @Override
+        public void buildInitial(
+                CommandHudOpenContext context,
+                CommandTargetHudView view,
+                UICommandBuilder commands
+        ) {
+            initialStarted.countDown();
+            try {
+                releaseInitial.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        @Override
+        public void close() {
+            closes.incrementAndGet();
+        }
+    }
+
     private static final class RecordingContributor implements CommandTargetHudSessionContributor {
         private final List<String> events;
         private final String name;
@@ -221,6 +298,9 @@ class CommandTargetHudPresentationCoordinatorTest {
     }
 
     private static final class CapturingPacketHandler extends PacketHandler {
+        private final List<ToClientPacket> packets = new ArrayList<>();
+        private final AtomicInteger writes = new AtomicInteger();
+
         private CapturingPacketHandler() {
             super((ChannelConnection) null, new ProtocolVersion(0));
         }
@@ -236,6 +316,8 @@ class CommandTargetHudPresentationCoordinatorTest {
 
         @Override
         public void writeNoCache(ToClientPacket packet) {
+            packets.add(packet);
+            writes.incrementAndGet();
         }
     }
 }

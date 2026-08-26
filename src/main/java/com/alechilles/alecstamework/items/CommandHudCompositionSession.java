@@ -149,6 +149,13 @@ final class CommandHudCompositionSession<B, V, U> implements AutoCloseable {
 
     boolean runIfCurrent(@Nonnull Runnable action) { return lifecycle.runIfCurrent(action); }
 
+    boolean runInitialIfCurrent(
+            @Nonnull Runnable build,
+            @Nonnull Runnable initialUpdate
+    ) {
+        return lifecycle.runInitialIfCurrent(build, initialUpdate);
+    }
+
     @Nullable
     U lastUpdate() { return lifecycle.lastUpdate(); }
 

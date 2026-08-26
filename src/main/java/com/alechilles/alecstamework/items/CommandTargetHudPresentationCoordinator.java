@@ -296,7 +296,8 @@ final class CommandTargetHudPresentationCoordinator {
             CommandTargetHudHost host = new CommandTargetHudHost(
                     playerRef, context, controller, view,
                     (phase, failure) -> onHostFailure(reference.get(), store, failure),
-                    lifecycleSession::runIfCurrent);
+                    lifecycleSession::runIfCurrent,
+                    lifecycleSession::runInitialIfCurrent);
             hostReference.set(host);
             CommandTargetHudPresentation presentation = CommandTargetHudPresentation.custom(
                     this, playerUuid, playerRef, targetKey, activeItemId,
@@ -314,7 +315,7 @@ final class CommandTargetHudPresentationCoordinator {
                 return openStandard(playerUuid, playerRef, hudManager, config,
                         targetKey, model, activeItemId);
             }
-            if (!host.isOpen()) {
+            if (!host.isOpen() || !session.isOpen()) {
                 presentations.remove(playerUuid, presentation);
                 failedTargetKeys.put(playerUuid, targetKey);
                 closePresentation(presentation, hudManager, CommandHudCloseReason.RENDERER_FAILED);

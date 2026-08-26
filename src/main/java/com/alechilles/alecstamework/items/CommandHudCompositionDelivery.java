@@ -3,12 +3,14 @@ package com.alechilles.alecstamework.items;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.LongPredicate;
+import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /** Delivers lifecycle-validated updates and defers cleanup until delivery ends. */
 final class CommandHudCompositionDelivery<U> {
     private final Object lock;
+    private final LongSupplier versionSupplier;
     private final LongPredicate current;
     private final Consumer<U> publisher;
     private final Consumer<String> cleanup;
@@ -20,14 +22,38 @@ final class CommandHudCompositionDelivery<U> {
 
     CommandHudCompositionDelivery(
             @Nonnull Object lock,
+            @Nonnull LongSupplier versionSupplier,
             @Nonnull LongPredicate current,
             @Nonnull Consumer<U> publisher,
             @Nonnull Consumer<String> cleanup
     ) {
         this.lock = Objects.requireNonNull(lock, "lock");
+        this.versionSupplier = Objects.requireNonNull(versionSupplier, "versionSupplier");
         this.current = Objects.requireNonNull(current, "current");
         this.publisher = Objects.requireNonNull(publisher, "publisher");
         this.cleanup = Objects.requireNonNull(cleanup, "cleanup");
+    }
+
+    /** Runs and conditionally delivers a host's first build as one lifecycle operation. */
+    boolean runInitial(@Nonnull Runnable build, @Nonnull Runnable initialUpdate) {
+        Objects.requireNonNull(build, "build");
+        Objects.requireNonNull(initialUpdate, "initialUpdate");
+        long version;
+        synchronized (lock) {
+            version = versionSupplier.getAsLong();
+            if (!current.test(version)) return false;
+            publishing++;
+        }
+        try {
+            build.run();
+            synchronized (lock) {
+                if (!current.test(version)) return false;
+                initialUpdate.run();
+                return true;
+            }
+        } finally {
+            finishPublishing();
+        }
     }
 
     void publish(@Nonnull U update, long version) {

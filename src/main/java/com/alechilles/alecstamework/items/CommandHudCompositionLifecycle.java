@@ -118,6 +118,7 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
             this.composer = new CommandHudCompositionComposer<>(adapter, states, copied,
                     rendererReady, rendererActive, sessionId, diagnostics, timingWarnings);
             this.delivery = new CommandHudCompositionDelivery<>(lock,
+                    () -> lifecycleVersion,
                     version -> CommandHudCompositionLifecycleSupport.isCurrent(open,
                             lifecycleVersion, version, custom, this::rendererActive,
                             composer::contributorsCurrent), this.publisher, cleanup::close);
@@ -278,14 +279,12 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
             return composer.hasDirty();
         }
     }
-
     @Nullable
     U lastUpdate() {
         synchronized (lock) {
             return lastUpdate;
         }
     }
-
     @Nullable
     AutoCloseable rendererController() {
         return cleanup.rendererController();
@@ -316,7 +315,10 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
             return true;
         }
     }
-
+    /** Runs a host's initial build and packet through the lifecycle delivery gate. */
+    boolean runInitialIfCurrent(@Nonnull Runnable build, @Nonnull Runnable initialUpdate) {
+        return delivery.runInitial(build, initialUpdate);
+    }
     @Nullable
     CommandHudCompositionSession.RequiredFailure requiredFailure() {
         synchronized (lock) { return requiredFailure; }

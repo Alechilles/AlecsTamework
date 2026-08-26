@@ -6,7 +6,6 @@ import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Immutable, detached base presentation for one command target HUD. */
 public final class CommandTargetHudSnapshot {
     @Nullable
     private final UUID targetUuid;
@@ -43,7 +42,6 @@ public final class CommandTargetHudSnapshot {
     @Nullable
     private final String ownerDisplayName;
 
-    /** Creates a complete detached target snapshot. */
     public CommandTargetHudSnapshot(
             @Nullable UUID targetUuid,
             @Nullable String targetKey,
@@ -67,7 +65,6 @@ public final class CommandTargetHudSnapshot {
                 attachments, tameRequirement, progression, traits, ownerDisplayName);
     }
 
-    /** Creates a target snapshot with the standard happiness modifier detail. */
     public CommandTargetHudSnapshot(
             @Nullable UUID targetUuid,
             @Nullable String targetKey,
@@ -106,7 +103,6 @@ public final class CommandTargetHudSnapshot {
         this.ownerDisplayName = normalize(ownerDisplayName);
     }
 
-    /** Creates a snapshot without a separate target key, species label, or gender. */
     public CommandTargetHudSnapshot(
             @Nullable UUID targetUuid,
             @Nullable String displayName,
@@ -126,105 +122,82 @@ public final class CommandTargetHudSnapshot {
                 vitals, cooldowns, favoriteFood, compatibleFoods, attachments,
                 tameRequirement, progression, traits, ownerDisplayName);
     }
-
     @Nullable
     public UUID targetUuid() {
         return targetUuid;
     }
-
     @Nullable
     public UUID targetId() {
         return targetUuid;
     }
-
     @Nullable
     public String targetKey() {
         return targetKey;
     }
-
     @Nonnull
     public String displayName() {
         return displayName;
     }
-
     @Nullable
     public String speciesId() {
         return speciesId;
     }
-
     @Nullable
     public String speciesLabel() {
         return speciesLabel;
     }
-
     @Nullable
     public String gender() {
         return gender;
     }
-
     @Nonnull
     public String lifecycleStatus() {
         return lifecycleStatus;
     }
-
-    /** Alias for integrations that call the lifecycle field simply status. */
     @Nonnull
     public String status() {
         return lifecycleStatus;
     }
-
     @Nonnull
     public Vitals vitals() {
         return vitals;
     }
-
-    /** Returns the detached happiness modifier detail shown by the standard HUD. */
     @Nullable
     public String happinessModifierBreakdown() {
         return happinessModifierBreakdown;
     }
-
     @Nonnull
     public Cooldowns cooldowns() {
         return cooldowns;
     }
-
     @Nullable
     public FoodRow favoriteFood() {
         return favoriteFood;
     }
-
     @Nonnull
     public List<FoodRow> compatibleFoods() {
         return compatibleFoods;
     }
-
     @Nonnull
     public List<AttachmentRow> attachments() {
         return attachments;
     }
-
     @Nullable
     public TameRequirement tameRequirement() {
         return tameRequirement;
     }
-
     @Nonnull
     public Progression progression() {
         return progression;
     }
-
     @Nonnull
     public List<Trait> traits() {
         return traits;
     }
-
     @Nullable
     public String ownerDisplayName() {
         return ownerDisplayName;
     }
-
-    /** Detached health, happiness, hunger, and thirst values. */
     public record Vitals(
             @Nullable Integer currentHealth,
             @Nullable Integer maxHealth,
@@ -236,7 +209,6 @@ public final class CommandTargetHudSnapshot {
             @Nullable Integer currentThirst,
             @Nullable Integer maxThirst
     ) {
-        /** Creates vitals without a known happiness target. */
         public Vitals(
                 @Nullable Integer currentHealth,
                 @Nullable Integer maxHealth,
@@ -251,7 +223,6 @@ public final class CommandTargetHudSnapshot {
                     currentHunger, maxHunger, currentThirst, maxThirst);
         }
 
-        /** Returns an absent-value set of vitals. */
         public static Vitals empty() {
             return new Vitals(null, null, null, null, null, null, null, null, null);
         }
@@ -277,7 +248,6 @@ public final class CommandTargetHudSnapshot {
         }
     }
 
-    /** Presentation state for one known or absent cooldown. */
     public record Cooldown(
             @Nullable Boolean active,
             @Nullable Long remainingMillis,
@@ -290,7 +260,6 @@ public final class CommandTargetHudSnapshot {
             }
         }
 
-        /** Creates a cooldown with primitive presentation values. */
         public Cooldown(boolean active, long remainingMillis, double ratio, boolean known) {
             this(Boolean.valueOf(active), Long.valueOf(remainingMillis),
                     Double.valueOf(ratio), Boolean.valueOf(known));
@@ -301,7 +270,6 @@ public final class CommandTargetHudSnapshot {
         }
     }
 
-    /** Harvest and breeding cooldown presentations. */
     public record Cooldowns(
             @Nullable Cooldown harvest,
             @Nullable Cooldown breeding
@@ -324,7 +292,6 @@ public final class CommandTargetHudSnapshot {
         }
     }
 
-    /** One favorite or compatible food presentation row. */
     public record FoodRow(
             @Nonnull String itemId,
             @Nonnull String displayName,
@@ -349,7 +316,6 @@ public final class CommandTargetHudSnapshot {
         }
     }
 
-    /** One dynamic attachment presentation row. */
     public record AttachmentRow(
             @Nonnull String setLabel,
             @Nonnull String valueLabel
@@ -365,7 +331,6 @@ public final class CommandTargetHudSnapshot {
         }
     }
 
-    /** Tame or tranquilizer requirement presentation. */
     public record TameRequirement(
             @Nullable Boolean tranquilizerRequired,
             @Nullable Integer requiredStacks,
@@ -385,7 +350,6 @@ public final class CommandTargetHudSnapshot {
         }
     }
 
-    /** Level, experience, and talent presentation. */
     public record Progression(
             @Nullable Integer level,
             @Nullable Long experience,
@@ -396,7 +360,6 @@ public final class CommandTargetHudSnapshot {
             @Nullable String tooltipHeaderText,
             @Nullable String tooltipText
     ) {
-        /** Creates progression with maximum-level metadata but no tooltip text. */
         public Progression(
                 @Nullable Integer level,
                 @Nullable Long experience,
@@ -409,7 +372,6 @@ public final class CommandTargetHudSnapshot {
                     maxLevel, atMaxLevel, null, null);
         }
 
-        /** Creates progression without maximum-level metadata. */
         public Progression(
                 @Nullable Integer level,
                 @Nullable Long experience,
@@ -436,20 +398,17 @@ public final class CommandTargetHudSnapshot {
             return atMaxLevel;
         }
 
-        /** Returns the progression tooltip heading from the standard binder. */
         @Nullable
         public String tooltipHeaderText() {
             return tooltipHeaderText;
         }
 
-        /** Returns the progression tooltip detail from the standard binder. */
         @Nullable
         public String tooltipText() {
             return tooltipText;
         }
     }
 
-    /** One detached trait indicator. */
     public record Trait(
             @Nonnull String id,
             @Nonnull String label,
@@ -460,7 +419,6 @@ public final class CommandTargetHudSnapshot {
             boolean counterClockwise,
             boolean belowDefault
     ) {
-        /** Creates a trait with standard fallback presentation values. */
         public Trait(
                 @Nonnull String id,
                 @Nonnull String label,

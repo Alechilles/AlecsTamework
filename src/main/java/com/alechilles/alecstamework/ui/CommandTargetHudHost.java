@@ -20,6 +20,7 @@ public final class CommandTargetHudHost extends CustomUIHud {
     private final CommandTargetHudView initialView;
     private final FailureHandler failureHandler;
     private final UpdateGate updateGate;
+    private final InitialBuildGate initialBuildGate;
     private final AtomicBoolean open = new AtomicBoolean(true);
     private final AtomicBoolean built = new AtomicBoolean();
 
@@ -45,6 +46,10 @@ public final class CommandTargetHudHost extends CustomUIHud {
                 action -> {
                     action.run();
                     return true;
+                }, (build, initialUpdate) -> {
+                    build.run();
+                    initialUpdate.run();
+                    return true;
                 });
     }
 
@@ -57,25 +62,65 @@ public final class CommandTargetHudHost extends CustomUIHud {
             @Nonnull FailureHandler failureHandler,
             @Nonnull UpdateGate updateGate
     ) {
+        this(playerRef, context, controller, initialView, failureHandler, updateGate,
+                (build, initialUpdate) -> {
+                    build.run();
+                    initialUpdate.run();
+                    return true;
+                });
+    }
+
+    /** Creates a host with lifecycle gates for initial and incremental packets. */
+    public CommandTargetHudHost(
+            @Nonnull PlayerRef playerRef,
+            @Nonnull CommandHudOpenContext context,
+            @Nonnull CommandTargetHudController controller,
+            @Nonnull CommandTargetHudView initialView,
+            @Nonnull FailureHandler failureHandler,
+            @Nonnull UpdateGate updateGate,
+            @Nonnull InitialBuildGate initialBuildGate
+    ) {
         super(Objects.requireNonNull(playerRef, "playerRef"), HUD_KEY);
         this.context = Objects.requireNonNull(context, "context");
         this.controller = Objects.requireNonNull(controller, "controller");
         this.initialView = Objects.requireNonNull(initialView, "initialView");
         this.failureHandler = Objects.requireNonNull(failureHandler, "failureHandler");
         this.updateGate = Objects.requireNonNull(updateGate, "updateGate");
+        this.initialBuildGate = Objects.requireNonNull(initialBuildGate, "initialBuildGate");
+    }
+
+    @Override
+    public void show() {
+        if (!open.get()) return;
+        UICommandBuilder commandBuilder = new UICommandBuilder();
+        try {
+            boolean delivered = initialBuildGate.apply(
+                    () -> buildInitial(commandBuilder),
+                    () -> {
+                        if (open.get() && built.get()) update(true, commandBuilder);
+                    });
+            if (!delivered && open.get()) {
+                fail("initial build", new IllegalStateException(
+                        "HUD composition is no longer active"));
+            }
+        } catch (RuntimeException | LinkageError failure) {
+            fail("initial build", failure);
+        }
     }
 
     @Override
     protected void build(@Nonnull UICommandBuilder commandBuilder) {
-        if (!open.get()) {
-            return;
-        }
         try {
-            controller.buildInitial(context, initialView, commandBuilder);
-            built.set(true);
+            buildInitial(commandBuilder);
         } catch (RuntimeException | LinkageError failure) {
             fail("initial build", failure);
         }
+    }
+
+    private void buildInitial(@Nonnull UICommandBuilder commandBuilder) {
+        if (!open.get()) return;
+        controller.buildInitial(context, initialView, commandBuilder);
+        built.set(true);
     }
 
     /** Applies one complete detached update with partial HUD semantics. */
@@ -144,5 +189,11 @@ public final class CommandTargetHudHost extends CustomUIHud {
     @FunctionalInterface
     public interface UpdateGate {
         boolean apply(@Nonnull Runnable update);
+    }
+
+    /** Guards a first build and its full packet as one lifecycle operation. */
+    @FunctionalInterface
+    public interface InitialBuildGate {
+        boolean apply(@Nonnull Runnable build, @Nonnull Runnable initialUpdate);
     }
 }
