@@ -21,8 +21,8 @@ uses them.
 
 Prepared in-world fixtures are required for profile, command-link, config,
 progression, extension, trait-effect, and policy suites. From the server
-console, `core`, `diagnostics`, `hydragon-integrations`, and their read-only
-`all` aggregate are available.
+console, `core`, `command-hud`, `diagnostics`, `hydragon-integrations`, and
+their read-only `all` aggregate are available.
 
 ## Current suites
 
