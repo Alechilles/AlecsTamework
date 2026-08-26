@@ -24,6 +24,8 @@ public final class CommandTargetHudSnapshot {
     private final String lifecycleStatus;
     @Nonnull
     private final Vitals vitals;
+    @Nullable
+    private final String happinessModifierBreakdown;
     @Nonnull
     private final Cooldowns cooldowns;
     @Nullable
@@ -60,6 +62,31 @@ public final class CommandTargetHudSnapshot {
             @Nullable List<Trait> traits,
             @Nullable String ownerDisplayName
     ) {
+        this(targetUuid, targetKey, displayName, speciesId, speciesLabel, gender,
+                lifecycleStatus, vitals, null, cooldowns, favoriteFood, compatibleFoods,
+                attachments, tameRequirement, progression, traits, ownerDisplayName);
+    }
+
+    /** Creates a target snapshot with the standard happiness modifier detail. */
+    public CommandTargetHudSnapshot(
+            @Nullable UUID targetUuid,
+            @Nullable String targetKey,
+            @Nullable String displayName,
+            @Nullable String speciesId,
+            @Nullable String speciesLabel,
+            @Nullable String gender,
+            @Nullable String lifecycleStatus,
+            @Nullable Vitals vitals,
+            @Nullable String happinessModifierBreakdown,
+            @Nullable Cooldowns cooldowns,
+            @Nullable FoodRow favoriteFood,
+            @Nullable List<FoodRow> compatibleFoods,
+            @Nullable List<AttachmentRow> attachments,
+            @Nullable TameRequirement tameRequirement,
+            @Nullable Progression progression,
+            @Nullable List<Trait> traits,
+            @Nullable String ownerDisplayName
+    ) {
         this.targetUuid = targetUuid;
         this.targetKey = normalize(targetKey);
         this.displayName = normalize(displayName);
@@ -68,6 +95,7 @@ public final class CommandTargetHudSnapshot {
         this.gender = normalize(gender);
         this.lifecycleStatus = normalize(lifecycleStatus);
         this.vitals = vitals == null ? Vitals.empty() : vitals;
+        this.happinessModifierBreakdown = normalizeNullable(happinessModifierBreakdown);
         this.cooldowns = cooldowns == null ? Cooldowns.empty() : cooldowns;
         this.favoriteFood = favoriteFood;
         this.compatibleFoods = copyList(compatibleFoods);
@@ -148,6 +176,12 @@ public final class CommandTargetHudSnapshot {
     @Nonnull
     public Vitals vitals() {
         return vitals;
+    }
+
+    /** Returns the detached happiness modifier detail shown by the standard HUD. */
+    @Nullable
+    public String happinessModifierBreakdown() {
+        return happinessModifierBreakdown;
     }
 
     @Nonnull
@@ -358,8 +392,23 @@ public final class CommandTargetHudSnapshot {
             @Nullable Long experienceToNextLevel,
             @Nullable Integer availableTalentPoints,
             @Nullable Integer maxLevel,
-            @Nullable Boolean atMaxLevel
+            @Nullable Boolean atMaxLevel,
+            @Nullable String tooltipHeaderText,
+            @Nullable String tooltipText
     ) {
+        /** Creates progression with maximum-level metadata but no tooltip text. */
+        public Progression(
+                @Nullable Integer level,
+                @Nullable Long experience,
+                @Nullable Long experienceToNextLevel,
+                @Nullable Integer availableTalentPoints,
+                @Nullable Integer maxLevel,
+                @Nullable Boolean atMaxLevel
+        ) {
+            this(level, experience, experienceToNextLevel, availableTalentPoints,
+                    maxLevel, atMaxLevel, null, null);
+        }
+
         /** Creates progression without maximum-level metadata. */
         public Progression(
                 @Nullable Integer level,
@@ -368,11 +417,11 @@ public final class CommandTargetHudSnapshot {
                 @Nullable Integer availableTalentPoints
         ) {
             this(level, experience, experienceToNextLevel, availableTalentPoints,
-                    null, null);
+                    null, null, null, null);
         }
 
         public static Progression empty() {
-            return new Progression(null, null, null, null, null, null);
+            return new Progression(null, null, null, null, null, null, null, null);
         }
 
         public Integer talentPoints() {
@@ -385,6 +434,18 @@ public final class CommandTargetHudSnapshot {
 
         public Boolean maximumLevelState() {
             return atMaxLevel;
+        }
+
+        /** Returns the progression tooltip heading from the standard binder. */
+        @Nullable
+        public String tooltipHeaderText() {
+            return tooltipHeaderText;
+        }
+
+        /** Returns the progression tooltip detail from the standard binder. */
+        @Nullable
+        public String tooltipText() {
+            return tooltipText;
         }
     }
 
@@ -452,6 +513,8 @@ public final class CommandTargetHudSnapshot {
                 && Objects.equals(gender, that.gender)
                 && lifecycleStatus.equals(that.lifecycleStatus)
                 && vitals.equals(that.vitals)
+                && Objects.equals(happinessModifierBreakdown,
+                        that.happinessModifierBreakdown)
                 && cooldowns.equals(that.cooldowns)
                 && Objects.equals(favoriteFood, that.favoriteFood)
                 && compatibleFoods.equals(that.compatibleFoods)
@@ -465,7 +528,8 @@ public final class CommandTargetHudSnapshot {
     @Override
     public int hashCode() {
         return Objects.hash(targetUuid, targetKey, displayName, speciesId, speciesLabel,
-                gender, lifecycleStatus, vitals, cooldowns, favoriteFood,
+                gender, lifecycleStatus, vitals, happinessModifierBreakdown, cooldowns,
+                favoriteFood,
                 compatibleFoods, attachments, tameRequirement, progression,
                 traits, ownerDisplayName);
     }

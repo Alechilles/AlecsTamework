@@ -33,7 +33,9 @@ final class CommandTargetHudSnapshotDiffer {
                 || !Objects.equals(previous.lifecycleStatus(), current.lifecycleStatus())) {
             sections.add(CommandTargetHudChangeSet.Section.IDENTITY);
         }
-        if (!Objects.equals(previous.vitals(), current.vitals())) {
+        if (!Objects.equals(previous.vitals(), current.vitals())
+                || !Objects.equals(previous.happinessModifierBreakdown(),
+                        current.happinessModifierBreakdown())) {
             sections.add(CommandTargetHudChangeSet.Section.VITALS);
         }
         if (!Objects.equals(previous.cooldowns(), current.cooldowns())) {

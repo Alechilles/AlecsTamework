@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.commandhud.CommandHudContribution;
-import com.alechilles.alecstamework.api.commandhud.CommandHudContributorCreateContext;
 import com.alechilles.alecstamework.api.commandhud.CommandHudContributorDirtySink;
 import com.alechilles.alecstamework.api.commandhud.CommandHudContributorId;
 import com.alechilles.alecstamework.api.commandhud.CommandHudDiagnostics;
@@ -11,7 +10,6 @@ import com.alechilles.alecstamework.api.commandhud.CommandHudSurface;
 import com.alechilles.alecstamework.api.internal.CommandHudContributorRegistry;
 import com.alechilles.alecstamework.api.internal.CommandHudRendererRegistry;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -49,6 +47,7 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
     private final CommandHudCompositionCleanup<B> cleanup;
     private final boolean custom;
     private final CommandHudCompositionComposer<B, V, U> composer;
+    private final CommandHudCompositionDelivery<U> delivery;
     private boolean cleanupStarted;
     private boolean requiredFailureNotified;
     private long lifecycleVersion;
@@ -118,6 +117,10 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
         try {
             this.composer = new CommandHudCompositionComposer<>(adapter, states, copied,
                     rendererReady, rendererActive, sessionId, diagnostics, timingWarnings);
+            this.delivery = new CommandHudCompositionDelivery<>(lock,
+                    version -> CommandHudCompositionLifecycleSupport.isCurrent(open,
+                            lifecycleVersion, version, custom, this::rendererActive,
+                            composer::contributorsCurrent), this.publisher, cleanup::close);
             if (rendererReady) {
                 openDiagnostics();
                 installSubscriptions();
@@ -183,7 +186,7 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
             }
         }
         if (cleanup) {
-            this.cleanup.close("initial_composition_failed");
+            requestCleanup("initial_composition_failed");
             notifyRequiredFailure(requiredFailure);
             throw failure;
         }
@@ -200,20 +203,20 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
         }
     }
 
-    @Nonnull
-    V snapshot() {
-        return view();
+    @Nullable
+    U refresh(@Nonnull B base) {
+        return refresh(base, false);
     }
 
     @Nullable
-    U refresh(@Nonnull B base) {
+    private U refresh(@Nonnull B base, boolean includeBase) {
         Objects.requireNonNull(base, "base");
         CommandHudCompositionSession.RequiredCompositionFailure failure = null;
         boolean cleanup = false;
         long publishVersion = -1L;
         U update = null;
         synchronized (lock) {
-            if (!open || !initialized || !composer.hasDirty()) return null;
+            if (!open || !initialized || (!includeBase && !composer.hasDirty())) return null;
             long version = lifecycleVersion;
             try {
                 V previous = currentView;
@@ -225,7 +228,7 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
                 }
                 currentView = composed.view();
                 update = ((CommandHudCompositionSupport.SurfaceAdapter<B, V, U>)
-                        getAdapter()).update(composed.view(), previous, composed.changeData());
+                        composer.adapter()).update(composed.view(), previous, composed.changeData());
                 if (!CommandHudCompositionLifecycleSupport.isCurrent(open, lifecycleVersion,
                         version, custom, this::rendererActive, composer::contributorsCurrent)) {
                     return null;
@@ -243,18 +246,13 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
             }
         }
         if (cleanup) {
-            this.cleanup.close(failure == null
+            requestCleanup(failure == null
                     ? "renderer_unavailable" : "required_composition_failed");
             if (failure != null) notifyRequiredFailure(failure.failure);
             return null;
         }
         if (update != null) publish(update, publishVersion);
         return update;
-    }
-
-    @Nonnull
-    private CommandHudCompositionSupport.SurfaceAdapter<B, V, U> getAdapter() {
-        return composer.adapter();
     }
 
     @Nonnull
@@ -266,6 +264,19 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
         }
         refresh(base);
         return view();
+    }
+
+    /** Rebuilds only dirty contributors while replacing the detached base snapshot. */
+    @Nullable
+    U updateBase(@Nonnull B base) {
+        return refresh(base, true);
+    }
+
+    /** Returns whether a contributor or renderer has a pending refresh. */
+    boolean hasDirty() {
+        synchronized (lock) {
+            return composer.hasDirty();
+        }
     }
 
     @Nullable
@@ -290,6 +301,20 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
 
     boolean isOpen() {
         synchronized (lock) { return open; }
+    }
+
+    /** Runs one host-side UI write while the current session is still valid. */
+    boolean runIfCurrent(@Nonnull Runnable action) {
+        Objects.requireNonNull(action, "action");
+        synchronized (lock) {
+            if (!CommandHudCompositionLifecycleSupport.isCurrent(open, lifecycleVersion,
+                    lifecycleVersion, custom, this::rendererActive,
+                    composer::contributorsCurrent)) {
+                return false;
+            }
+            action.run();
+            return true;
+        }
     }
 
     @Nullable
@@ -321,38 +346,14 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
         synchronized (lock) {
             terminateLocked();
         }
-        cleanup.close(null);
+        requestCleanup(null);
     }
 
     @Nonnull
     private List<CommandHudCompositionState<B>> createStates(
             @Nonnull List<CommandHudCompositionBinding<B>> bindings
     ) {
-        Objects.requireNonNull(bindings, "bindings");
-        List<CommandHudCompositionState<B>> created = new ArrayList<>(bindings.size());
-        Set<CommandHudContributorId> ids = new HashSet<>();
-        try {
-            for (CommandHudCompositionBinding<B> binding : bindings) {
-                Objects.requireNonNull(binding, "binding");
-                if (!ids.add(binding.id())) throw new IllegalArgumentException(
-                        "HUD contributor IDs must be unique.");
-                CommandHudCompositionState<B> state = new CommandHudCompositionState<>(
-                        binding, this::mark);
-                try {
-                    state.contributor = binding.factory().create(new CommandHudContributorCreateContext(
-                            openContext, binding.id(), binding.generation(), state.sink));
-                    if (state.contributor == null) state.failure = "contributor factory returned null";
-                } catch (RuntimeException | LinkageError failure) {
-                    state.failure = failure.getClass().getSimpleName();
-                }
-                state.dirty.markAll();
-                created.add(state);
-            }
-        } catch (RuntimeException | LinkageError failure) {
-            CommandHudCompositionCleanup.closeStates(created);
-            throw failure;
-        }
-        return List.copyOf(created);
+        return CommandHudCompositionStateFactory.create(openContext, bindings, this::mark);
     }
 
     private void openDiagnostics() {
@@ -396,7 +397,7 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
             if (!open) return;
             terminateLocked();
         }
-        cleanup.close("renderer_unavailable");
+        requestCleanup("renderer_unavailable");
     }
 
     private void registrationEnded(
@@ -427,7 +428,7 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
             }
         }
         if (failure != null) {
-            cleanup.close("required_contributor_removed");
+            requestCleanup("required_contributor_removed");
             notifyRequiredFailure(failure);
         } else {
             CommandHudCompositionCleanup.closeQuietly(contributor);
@@ -479,12 +480,9 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
         cleanupStarted = true;
     }
 
-    private void publish(@Nonnull U update, long version) {
-        CommandHudCompositionLifecycleSupport.publish(lock, update, version,
-                () -> CommandHudCompositionLifecycleSupport.isCurrent(open,
-                        lifecycleVersion, version, custom, this::rendererActive,
-                        composer::contributorsCurrent), publisher);
-    }
+    private void publish(@Nonnull U update, long version) { delivery.publish(update, version); }
+
+    private void requestCleanup(@Nullable String reason) { delivery.requestCleanup(reason); }
 
     private void notifyRequiredFailure(
             @Nullable CommandHudCompositionSession.RequiredFailure failure

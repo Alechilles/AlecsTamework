@@ -261,12 +261,25 @@ final class CommandTargetHudPresentationCoordinator {
                     nextSessionGeneration.incrementAndGet()
             );
             AtomicReference<CommandTargetHudPresentation> reference = new AtomicReference<>();
+            AtomicReference<CommandTargetHudHost> hostReference = new AtomicReference<>();
+            AtomicReference<CommandTargetHudChangeSet> pendingBaseChanges =
+                    new AtomicReference<>();
             session = CommandHudCompositionSession.target(
                     context,
                     resolution,
                     currentResolver.diagnostics,
                     currentResolver.timingWarnings,
-                    ignored -> { },
+                    update -> {
+                        CommandTargetHudChangeSet baseChanges =
+                                pendingBaseChanges.getAndSet(null);
+                        CommandTargetHudUpdate effective = baseChanges == null
+                                ? update
+                                : new CommandTargetHudUpdate(update.view(),
+                                update.previousView(), merge(baseChanges,
+                                update.changeSet()));
+                        CommandTargetHudHost currentHost = hostReference.get();
+                        if (currentHost != null) currentHost.applyUpdate(effective);
+                    },
                     () -> markCompositionDirty(store, playerUuid),
                     (contributorId, reason) -> onCompositionFailure(
                             reference.get(), store, contributorId, reason));
@@ -278,13 +291,17 @@ final class CommandTargetHudPresentationCoordinator {
                 return openStandard(playerUuid, playerRef, hudManager, config,
                         targetKey, model, activeItemId);
             }
+            CommandHudCompositionSession<CommandTargetHudSnapshot,
+                    CommandTargetHudView, CommandTargetHudUpdate> lifecycleSession = session;
             CommandTargetHudHost host = new CommandTargetHudHost(
                     playerRef, context, controller, view,
-                    (phase, failure) -> onHostFailure(reference.get(), store, failure));
+                    (phase, failure) -> onHostFailure(reference.get(), store, failure),
+                    lifecycleSession::runIfCurrent);
+            hostReference.set(host);
             CommandTargetHudPresentation presentation = CommandTargetHudPresentation.custom(
                     this, playerUuid, playerRef, targetKey, activeItemId,
                     CommandTargetHudPresentationSelection.from(config, activeItemId),
-                    model, snapshot, view,
+                    pendingBaseChanges, model, snapshot, view,
                     session, host);
             reference.set(presentation);
             presentations.put(playerUuid, presentation);
@@ -356,34 +373,32 @@ final class CommandTargetHudPresentationCoordinator {
         }
         CommandTargetHudSnapshot snapshot = snapshotFactory.create(model, targetKey);
         CommandTargetHudView previous = presentation.view();
+        CommandTargetHudChangeSet baseChanges =
+                CommandTargetHudSnapshotDiffer.diff(previous.snapshot(), snapshot);
+        if (baseChanges.changedSections().isEmpty() && !session.hasDirty()) {
+            presentation.updateModel(model, snapshot, previous);
+            return;
+        }
+        AtomicReference<CommandTargetHudChangeSet> pendingBaseChanges =
+                presentation.pendingBaseChanges();
+        pendingBaseChanges.set(baseChanges);
         try {
-            CommandTargetHudView rebased = session.rebase(snapshot);
+            CommandTargetHudUpdate composed = session.updateBase(snapshot);
             if (!session.isOpen()) {
                 onHostFailure(presentation, store,
                         new IllegalStateException("target HUD composition session closed"));
                 return;
             }
             CommandTargetHudView current = session.view();
-            if (!Objects.equals(current.snapshot(), snapshot)) {
-                current = new CommandTargetHudView(snapshot, current.contributions());
-            }
-            CommandTargetHudUpdate composed = session.lastUpdate();
-            CommandTargetHudChangeSet baseChanges =
-                    CommandTargetHudSnapshotDiffer.diff(previous.snapshot(), snapshot);
-            CommandTargetHudChangeSet changes = merge(baseChanges,
-                    composed == null || !Objects.equals(composed.view(), rebased)
-                            ? null : composed.changeSet());
-            if (changes.changedSections().isEmpty()
-                    && Objects.equals(previous, current)) {
+            if (composed == null) {
                 presentation.updateModel(model, snapshot, current);
                 return;
             }
-            CommandTargetHudUpdate update = new CommandTargetHudUpdate(
-                    current, previous, changes);
             presentation.updateModel(model, snapshot, current);
-            host.applyUpdate(update);
         } catch (RuntimeException | LinkageError failure) {
             onHostFailure(presentation, store, failure);
+        } finally {
+            pendingBaseChanges.compareAndSet(baseChanges, null);
         }
     }
 

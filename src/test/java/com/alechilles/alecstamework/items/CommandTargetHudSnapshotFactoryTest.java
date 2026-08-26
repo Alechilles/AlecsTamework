@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies that target HUD data is detached without losing rendered fields. */
 class CommandTargetHudSnapshotFactoryTest {
@@ -39,7 +40,8 @@ class CommandTargetHudSnapshotFactoryTest {
                 false,
                 0L,
                 null,
-                new LinkedNpcEntry.FutureStat("Level 7 XP", 120, 300),
+                new LinkedNpcEntry.FutureStat("Level 7 XP", 120, 300,
+                        "Level: 7/20 - 120/300 XP", "Level modifiers"),
                 new LinkedNpcEntry.FutureStat("Talent Points", 3, 10),
                 new LinkedNpcTraitIndicator[]{
                         new LinkedNpcTraitIndicator(
@@ -106,6 +108,12 @@ class CommandTargetHudSnapshotFactoryTest {
         assertEquals(120L, snapshot.progression().experience());
         assertEquals(300L, snapshot.progression().experienceToNextLevel());
         assertEquals(3, snapshot.progression().availableTalentPoints());
+        assertEquals(20, snapshot.progression().maxLevel());
+        assertEquals(false, snapshot.progression().atMaxLevel());
+        assertEquals("Level: 7/20 - 120/300 XP",
+                snapshot.progression().tooltipHeaderText());
+        assertEquals("Level modifiers", snapshot.progression().tooltipText());
+        assertEquals("modifier details", snapshot.happinessModifierBreakdown());
         assertEquals("Brave", snapshot.traits().get(0).label());
         assertEquals("trait-0", snapshot.traits().get(0).id());
         assertEquals("Alec", snapshot.ownerDisplayName());
@@ -126,5 +134,25 @@ class CommandTargetHudSnapshotFactoryTest {
         assertNull(snapshot.vitals().currentHunger());
         assertNull(snapshot.vitals().currentThirst());
         assertEquals("captured", snapshot.lifecycleStatus());
+    }
+
+    @Test
+    void mapsMaxLevelAndMaxLevelTooltipState() {
+        LinkedNpcEntry status = new LinkedNpcEntry(
+                TARGET, "Moss", 80, 100, 65, 100, "modifier details",
+                40, 60, 30, 50, true, true, false, false, false, false, 0L,
+                new LinkedNpcEntry.FutureStat("Level 20 MAX", 1, 1,
+                        "Level: 20/20 - MAX XP", "Max-level modifiers"),
+                null, null, false, false, false, false);
+
+        CommandTargetHudSnapshot snapshot = new CommandTargetHudSnapshotFactory().create(
+                new CommandTargetHudViewModel(status, null, List.of(), List.of(), null, null));
+
+        assertEquals(20, snapshot.progression().level());
+        assertEquals(20, snapshot.progression().maxLevel());
+        assertTrue(snapshot.progression().atMaxLevel());
+        assertEquals("Level: 20/20 - MAX XP",
+                snapshot.progression().tooltipHeaderText());
+        assertEquals("Max-level modifiers", snapshot.progression().tooltipText());
     }
 }

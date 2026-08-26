@@ -12,6 +12,7 @@ import javax.annotation.Nullable;
 
 /** Tracks contributor-driven target HUD refresh requests. */
 final class CommandTargetHudDirtyTracker {
+    private final Object lock = new Object();
     private final Map<UUID, Long> dirtyVersions = new HashMap<>();
     private final Map<UUID, Long> presentedVersions = new HashMap<>();
     private final AtomicLong nextVersion = new AtomicLong();
@@ -24,33 +25,46 @@ final class CommandTargetHudDirtyTracker {
     }
 
     void markDirty(@Nullable Store<EntityStore> store, @Nonnull UUID playerUuid) {
-        dirtyVersions.put(playerUuid, nextVersion.incrementAndGet());
+        synchronized (lock) {
+            dirtyVersions.put(playerUuid, nextVersion.incrementAndGet());
+        }
         invalidate(store, playerUuid);
     }
 
     long version(@Nonnull UUID playerUuid) {
-        return dirtyVersions.getOrDefault(playerUuid, 0L);
+        synchronized (lock) {
+            return dirtyVersions.getOrDefault(playerUuid, 0L);
+        }
     }
 
     boolean pending(@Nonnull UUID playerUuid) {
-        return version(playerUuid) > presentedVersions.getOrDefault(playerUuid, 0L);
+        synchronized (lock) {
+            return dirtyVersions.getOrDefault(playerUuid, 0L)
+                    > presentedVersions.getOrDefault(playerUuid, 0L);
+        }
     }
 
     void markPresented(@Nonnull UUID playerUuid, long version) {
-        long current = version(playerUuid);
-        if (version > 0L && current == version) {
-            presentedVersions.put(playerUuid, version);
+        synchronized (lock) {
+            long current = dirtyVersions.getOrDefault(playerUuid, 0L);
+            if (version > 0L && current == version) {
+                presentedVersions.put(playerUuid, version);
+            }
         }
     }
 
     void clear(@Nonnull UUID playerUuid) {
-        dirtyVersions.remove(playerUuid);
-        presentedVersions.remove(playerUuid);
+        synchronized (lock) {
+            dirtyVersions.remove(playerUuid);
+            presentedVersions.remove(playerUuid);
+        }
     }
 
     void clearAll() {
-        dirtyVersions.clear();
-        presentedVersions.clear();
+        synchronized (lock) {
+            dirtyVersions.clear();
+            presentedVersions.clear();
+        }
     }
 
     void invalidate(@Nullable Store<EntityStore> store, @Nonnull UUID playerUuid) {

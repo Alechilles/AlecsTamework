@@ -24,6 +24,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -68,6 +70,46 @@ class CommandHudCompositionSessionTest {
         assertFalse(update.changeSet().fullRefresh());
         assertTrue(update.changeSet().changedSections().contains(
                 com.alechilles.alecstamework.api.commandhud.CommandTargetHudChangeSet.Section.CONTRIBUTIONS));
+        session.close();
+    }
+
+    @Test
+    void baseSnapshotChangeKeepsDirtyPathFocusedOnOneContributor() {
+        CommandHudContributorId indicatorId = CommandHudContributorId.of("example:indicator");
+        CommandHudContributorId badgeId = CommandHudContributorId.of("example:badge");
+        AtomicReference<CommandHudContributorDirtySink> indicatorSink = new AtomicReference<>();
+        AtomicInteger indicatorCalls = new AtomicInteger();
+        AtomicInteger badgeCalls = new AtomicInteger();
+        CommandHudContributorRegistry contributors = new CommandHudContributorRegistry();
+        contributors.registerTarget(indicatorId.value(), context -> {
+            indicatorSink.set(context.dirtySink());
+            return targetContributor(indicatorId, indicatorCalls);
+        });
+        contributors.registerTarget(badgeId.value(), context -> targetContributor(badgeId, badgeCalls));
+        CommandHudRendererRegistry renderers = new CommandHudRendererRegistry();
+        renderers.registerTarget("example:renderer", ignored -> targetController());
+        CommandHudCompositionResolver resolver = new CommandHudCompositionResolver(
+                renderers, contributors);
+        CommandHudTargetResolution resolution = resolver.resolveTarget(
+                "example:renderer", List.of(
+                        new com.alechilles.alecstamework.api.commandhud.CommandHudContributorRequirement(
+                                indicatorId, false),
+                        new com.alechilles.alecstamework.api.commandhud.CommandHudContributorRequirement(
+                                badgeId, false)));
+        CommandHudCompositionSession<CommandTargetHudSnapshot,
+                CommandTargetHudView, CommandTargetHudUpdate> session = resolver.openTarget(
+                new CommandHudOpenContext(), resolution);
+
+        session.compose(baseSnapshot());
+        indicatorSink.get().markPathsDirty(Set.of("indicator"));
+        CommandTargetHudUpdate update = session.updateBase(baseSnapshot("changed"));
+
+        assertNotNull(update);
+        assertEquals(2, indicatorCalls.get());
+        assertEquals(1, badgeCalls.get());
+        assertEquals(Set.of("indicator"), update.changeSet().pathsFor(indicatorId));
+        assertTrue(update.changeSet().pathsFor(badgeId).isEmpty());
+        assertFalse(update.changeSet().contributorFullRefresh(indicatorId));
         session.close();
     }
 
@@ -339,6 +381,63 @@ class CommandHudCompositionSessionTest {
     }
 
     @Test
+    void blockingTargetControllerDropsUpdateWhenExactRendererUnregisters() throws Exception {
+        BlockingTargetController controller = new BlockingTargetController();
+        CommandHudRendererRegistry renderers = new CommandHudRendererRegistry();
+        CommandHudRegistration registration = renderers.registerTarget(
+                "example:renderer", ignored -> controller).registration();
+        CommandHudCompositionResolver resolver = new CommandHudCompositionResolver(
+                renderers, new CommandHudContributorRegistry());
+        CommandHudTargetResolution resolution = resolver.resolveTarget(
+                "example:renderer", List.of());
+        AtomicReference<CommandHudCompositionSession<CommandTargetHudSnapshot,
+                CommandTargetHudView, CommandTargetHudUpdate>> sessionReference =
+                new AtomicReference<>();
+        AtomicInteger publishedCommands = new AtomicInteger();
+        CommandHudCompositionSession<CommandTargetHudSnapshot,
+                CommandTargetHudView, CommandTargetHudUpdate> session =
+                CommandHudCompositionSession.target(new CommandHudOpenContext(), resolution,
+                        resolver.diagnostics(), resolver.timingWarnings,
+                        update -> {
+                            controller.update(update,
+                                    new com.hypixel.hytale.server.core.ui.builder.UICommandBuilder());
+                            if (sessionReference.get().runIfCurrent(
+                                    publishedCommands::incrementAndGet)) {
+                                // The lifecycle gate accepted the client command batch.
+                            }
+                        }, null, null);
+        sessionReference.set(session);
+        session.compose(baseSnapshot());
+        CountDownLatch unregisterObserved = new CountDownLatch(1);
+        AutoCloseable observation = renderers.subscribeTargetUnregister(
+                (id, generation) -> unregisterObserved.countDown());
+        Thread updateThread = new Thread(
+                () -> session.updateBase(baseSnapshot("changed")), "target-hud-update");
+        Thread unregisterThread = new Thread(registration::close, "target-hud-unregister");
+        try {
+            updateThread.start();
+            assertTrue(controller.updateStarted.await(5, TimeUnit.SECONDS));
+            unregisterThread.start();
+            assertTrue(unregisterObserved.await(5, TimeUnit.SECONDS));
+            controller.releaseUpdate.countDown();
+            updateThread.join(5_000L);
+            unregisterThread.join(5_000L);
+
+            assertFalse(updateThread.isAlive());
+            assertFalse(unregisterThread.isAlive());
+            assertEquals(0, publishedCommands.get());
+            assertEquals(1, controller.closed.get());
+            assertFalse(session.isOpen());
+        } finally {
+            controller.releaseUpdate.countDown();
+            if (updateThread.isAlive()) updateThread.join(5_000L);
+            if (unregisterThread.isAlive()) unregisterThread.join(5_000L);
+            observation.close();
+            session.close();
+        }
+    }
+
+    @Test
     void optionalContributorUnregisterPublishesUnavailableOnlyOnce() {
         CommandHudContributorId id = CommandHudContributorId.of("example:optional");
         AtomicReference<CommandHudContributorDirtySink> sink = new AtomicReference<>();
@@ -494,7 +593,11 @@ class CommandHudCompositionSessionTest {
     }
 
     private static CommandTargetHudSnapshot baseSnapshot() {
-        return new CommandTargetHudSnapshot(null, "target", null, "ready",
+        return baseSnapshot("ready");
+    }
+
+    private static CommandTargetHudSnapshot baseSnapshot(String lifecycleStatus) {
+        return new CommandTargetHudSnapshot(null, "target", null, lifecycleStatus,
                 null, null, null, List.of(), List.of(), null, null, List.of(), null);
     }
 
@@ -600,5 +703,37 @@ class CommandHudCompositionSessionTest {
     ) {
         return (base, previous, scope) -> new CommandHudContribution(id,
                 Map.of("state", CommandUiValue.of(calls.incrementAndGet())));
+    }
+
+    private static final class BlockingTargetController implements CommandTargetHudController {
+        private final CountDownLatch updateStarted = new CountDownLatch(1);
+        private final CountDownLatch releaseUpdate = new CountDownLatch(1);
+        private final AtomicInteger closed = new AtomicInteger();
+
+        @Override
+        public void buildInitial(
+                CommandHudOpenContext context,
+                CommandTargetHudView view,
+                com.hypixel.hytale.server.core.ui.builder.UICommandBuilder commands
+        ) {
+        }
+
+        @Override
+        public void update(
+                CommandTargetHudUpdate update,
+                com.hypixel.hytale.server.core.ui.builder.UICommandBuilder commands
+        ) {
+            updateStarted.countDown();
+            try {
+                releaseUpdate.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        @Override
+        public void close() {
+            closed.incrementAndGet();
+        }
     }
 }

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.commandhud.CommandHudCloseReason;
 import com.alechilles.alecstamework.api.commandhud.CommandHudOpenContext;
+import com.alechilles.alecstamework.api.commandhud.CommandTargetHudChangeSet;
 import com.alechilles.alecstamework.api.commandhud.CommandTargetHudController;
 import com.alechilles.alecstamework.api.commandhud.CommandTargetHudSnapshot;
 import com.alechilles.alecstamework.api.commandhud.CommandTargetHudUpdate;
@@ -15,6 +16,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -27,6 +29,8 @@ final class CommandTargetHudPresentation {
     @Nullable
     private final String activeItemId;
     private final CommandTargetHudPresentationSelection selection;
+    @Nonnull
+    private final AtomicReference<CommandTargetHudChangeSet> pendingBaseChanges;
     private final boolean custom;
     @Nullable
     private final TameworkCommandTargetHud standardHud;
@@ -51,6 +55,7 @@ final class CommandTargetHudPresentation {
             @Nonnull String targetKey,
             @Nullable String activeItemId,
             @Nonnull CommandTargetHudPresentationSelection selection,
+            @Nonnull AtomicReference<CommandTargetHudChangeSet> pendingBaseChanges,
             @Nonnull CommandTargetHudViewModel model,
             boolean custom,
             @Nullable TameworkCommandTargetHud standardHud,
@@ -66,6 +71,7 @@ final class CommandTargetHudPresentation {
         this.targetKey = targetKey;
         this.activeItemId = activeItemId;
         this.selection = selection;
+        this.pendingBaseChanges = pendingBaseChanges;
         this.model = model;
         this.custom = custom;
         this.standardHud = standardHud;
@@ -87,7 +93,8 @@ final class CommandTargetHudPresentation {
             @Nonnull TameworkCommandTargetHud hud
     ) {
         return new CommandTargetHudPresentation(owner, playerUuid, playerRef, targetKey,
-                activeItemId, selection, model, false, hud, null, null, null, null);
+                activeItemId, selection, new AtomicReference<>(), model, false, hud,
+                null, null, null, null);
     }
 
     @Nonnull
@@ -98,6 +105,7 @@ final class CommandTargetHudPresentation {
             @Nonnull String targetKey,
             @Nullable String activeItemId,
             @Nonnull CommandTargetHudPresentationSelection selection,
+            @Nonnull AtomicReference<CommandTargetHudChangeSet> pendingBaseChanges,
             @Nonnull CommandTargetHudViewModel model,
             @Nonnull CommandTargetHudSnapshot snapshot,
             @Nonnull CommandTargetHudView view,
@@ -106,7 +114,8 @@ final class CommandTargetHudPresentation {
             @Nonnull CommandTargetHudHost host
     ) {
         return new CommandTargetHudPresentation(owner, playerUuid, playerRef, targetKey,
-                activeItemId, selection, model, true, null, host, session, snapshot, view);
+                activeItemId, selection, pendingBaseChanges, model, true, null, host,
+                session, snapshot, view);
     }
 
     UUID playerUuid() {
@@ -140,6 +149,11 @@ final class CommandTargetHudPresentation {
     @Nullable
     CommandTargetHudHost customHost() {
         return customHost;
+    }
+
+    @Nonnull
+    AtomicReference<CommandTargetHudChangeSet> pendingBaseChanges() {
+        return pendingBaseChanges;
     }
 
     @Nonnull

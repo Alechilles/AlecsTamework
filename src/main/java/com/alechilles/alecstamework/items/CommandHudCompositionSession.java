@@ -134,13 +134,20 @@ final class CommandHudCompositionSession<B, V, U> implements AutoCloseable {
     V view() { return lifecycle.view(); }
 
     @Nonnull
-    V snapshot() { return lifecycle.snapshot(); }
+    V snapshot() { return lifecycle.view(); }
 
     @Nullable
     U refresh(@Nonnull B base) { return lifecycle.refresh(base); }
 
     @Nonnull
     V rebase(@Nonnull B base) { return lifecycle.rebase(base); }
+
+    @Nullable
+    U updateBase(@Nonnull B base) { return lifecycle.updateBase(base); }
+
+    boolean hasDirty() { return lifecycle.hasDirty(); }
+
+    boolean runIfCurrent(@Nonnull Runnable action) { return lifecycle.runIfCurrent(action); }
 
     @Nullable
     U lastUpdate() { return lifecycle.lastUpdate(); }

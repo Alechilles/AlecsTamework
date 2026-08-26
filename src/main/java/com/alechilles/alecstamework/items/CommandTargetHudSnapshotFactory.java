@@ -36,6 +36,7 @@ final class CommandTargetHudSnapshotFactory {
                 status.gender(),
                 lifecycleStatus(status),
                 vitals(status),
+                status.happinessModifierBreakdown(),
                 cooldowns(status),
                 food(model.favoriteFood()),
                 foods(model.compatibleFoods()),
@@ -155,14 +156,50 @@ final class CommandTargetHudSnapshotFactory {
                 ? null : (long) experience.max();
         Integer availableTalentPoints = talentPoints == null
                 ? null : Math.max(0, talentPoints.current());
+        Integer maxLevel = experience == null
+                ? null : parseMaxLevel(experience.tooltipHeaderText());
+        Boolean atMaxLevel = experience == null
+                ? null : isMaxLevel(experience);
         return new CommandTargetHudSnapshot.Progression(
                 level,
                 currentExperience,
                 experienceToNextLevel,
                 availableTalentPoints,
-                null,
-                null
+                maxLevel,
+                atMaxLevel,
+                experience == null ? null : experience.tooltipHeaderText(),
+                experience == null ? null : experience.tooltipText()
         );
+    }
+
+    @Nullable
+    private static Integer parseMaxLevel(@Nullable String tooltipHeader) {
+        if (tooltipHeader == null || tooltipHeader.isBlank()) {
+            return null;
+        }
+        int colon = tooltipHeader.indexOf(':');
+        int slash = tooltipHeader.indexOf('/', colon + 1);
+        if (colon < 0 || slash < 0 || slash + 1 >= tooltipHeader.length()) {
+            return null;
+        }
+        int end = slash + 1;
+        while (end < tooltipHeader.length()
+                && Character.isDigit(tooltipHeader.charAt(end))) {
+            end++;
+        }
+        if (end == slash + 1) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(tooltipHeader.substring(slash + 1, end));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private static boolean isMaxLevel(@Nonnull LinkedNpcEntry.FutureStat experience) {
+        String label = experience.label();
+        return label != null && label.toUpperCase(java.util.Locale.ROOT).contains("MAX");
     }
 
     @Nullable

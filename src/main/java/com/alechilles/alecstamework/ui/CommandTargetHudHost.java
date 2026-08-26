@@ -19,6 +19,7 @@ public final class CommandTargetHudHost extends CustomUIHud {
     private final CommandTargetHudController controller;
     private final CommandTargetHudView initialView;
     private final FailureHandler failureHandler;
+    private final UpdateGate updateGate;
     private final AtomicBoolean open = new AtomicBoolean(true);
     private final AtomicBoolean built = new AtomicBoolean();
 
@@ -40,11 +41,28 @@ public final class CommandTargetHudHost extends CustomUIHud {
             @Nonnull CommandTargetHudView initialView,
             @Nonnull FailureHandler failureHandler
     ) {
+        this(playerRef, context, controller, initialView, failureHandler,
+                action -> {
+                    action.run();
+                    return true;
+                });
+    }
+
+    /** Creates a host with a lifecycle gate for the final client update. */
+    public CommandTargetHudHost(
+            @Nonnull PlayerRef playerRef,
+            @Nonnull CommandHudOpenContext context,
+            @Nonnull CommandTargetHudController controller,
+            @Nonnull CommandTargetHudView initialView,
+            @Nonnull FailureHandler failureHandler,
+            @Nonnull UpdateGate updateGate
+    ) {
         super(Objects.requireNonNull(playerRef, "playerRef"), HUD_KEY);
         this.context = Objects.requireNonNull(context, "context");
         this.controller = Objects.requireNonNull(controller, "controller");
         this.initialView = Objects.requireNonNull(initialView, "initialView");
         this.failureHandler = Objects.requireNonNull(failureHandler, "failureHandler");
+        this.updateGate = Objects.requireNonNull(updateGate, "updateGate");
     }
 
     @Override
@@ -69,8 +87,14 @@ public final class CommandTargetHudHost extends CustomUIHud {
         try {
             UICommandBuilder commandBuilder = new UICommandBuilder();
             controller.update(update, commandBuilder);
-            update(false, commandBuilder);
-            return true;
+            if (!open.get()) {
+                return false;
+            }
+            return updateGate.apply(() -> {
+                if (open.get()) {
+                    update(false, commandBuilder);
+                }
+            });
         } catch (RuntimeException | LinkageError failure) {
             fail("update", failure);
             return false;
@@ -114,5 +138,11 @@ public final class CommandTargetHudHost extends CustomUIHud {
 
         default void closed() {
         }
+    }
+
+    /** Guards the final UI packet against a concurrent session close. */
+    @FunctionalInterface
+    public interface UpdateGate {
+        boolean apply(@Nonnull Runnable update);
     }
 }

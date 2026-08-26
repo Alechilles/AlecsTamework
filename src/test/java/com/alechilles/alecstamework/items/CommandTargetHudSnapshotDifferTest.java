@@ -30,6 +30,17 @@ class CommandTargetHudSnapshotDifferTest {
     }
 
     @Test
+    void reportsHappinessModifierDetailAsAVitalsChange() {
+        CommandTargetHudSnapshot previous = snapshot(40, "Owner A", "old modifiers");
+        CommandTargetHudSnapshot current = snapshot(40, "Owner A", "new modifiers");
+
+        CommandTargetHudChangeSet changes = CommandTargetHudSnapshotDiffer.diff(previous, current);
+
+        assertEquals(Set.of(CommandTargetHudChangeSet.Section.VITALS),
+                changes.changedSections());
+    }
+
+    @Test
     void reportsNoSectionsWhenSnapshotsAreEqual() {
         CommandTargetHudSnapshot snapshot = snapshot(40, "Owner A");
 
@@ -49,6 +60,12 @@ class CommandTargetHudSnapshotDifferTest {
     }
 
     private static CommandTargetHudSnapshot snapshot(int health, String owner) {
+        return snapshot(health, owner, null);
+    }
+
+    private static CommandTargetHudSnapshot snapshot(
+            int health, String owner, String happinessModifierBreakdown
+    ) {
         return new CommandTargetHudSnapshot(
                 TARGET,
                 "target-key",
@@ -59,6 +76,7 @@ class CommandTargetHudSnapshotDifferTest {
                 "loaded",
                 new CommandTargetHudSnapshot.Vitals(
                         health, 100, 60, 100, 60, 40, 50, 30, 50),
+                happinessModifierBreakdown,
                 new CommandTargetHudSnapshot.Cooldowns(
                         new CommandTargetHudSnapshot.Cooldown(true, 100L, 0.2, true),
                         new CommandTargetHudSnapshot.Cooldown(false, 0L, 0.0, true)),

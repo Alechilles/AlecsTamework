@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.items;
 
 import java.util.function.BooleanSupplier;
-import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 
 /** Small validity helpers kept outside the session lifecycle owner. */
@@ -38,19 +37,4 @@ final class CommandHudCompositionLifecycleSupport {
         return false;
     }
 
-    static <U> void publish(
-            @Nonnull Object lock,
-            @Nonnull U update,
-            long version,
-            @Nonnull BooleanSupplier current,
-            @Nonnull Consumer<U> publisher
-    ) {
-        synchronized (lock) {
-            if (!current.getAsBoolean()) return;
-            try {
-                publisher.accept(update);
-            } catch (RuntimeException | LinkageError ignored) {
-            }
-        }
-    }
 }
