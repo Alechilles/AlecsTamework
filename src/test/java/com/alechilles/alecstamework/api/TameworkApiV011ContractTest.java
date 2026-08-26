@@ -168,7 +168,7 @@ class TameworkApiV011ContractTest {
         TameworkApi api = new BondedOnlyTameworkApi(
                 BondedCompanionApi.unavailable());
 
-        assertEquals("0.11.0", api.getApiVersion());
+        assertEquals("0.12.0", api.getApiVersion());
         assertFalse(api.getCapabilities().contains(
                 TameworkApiCapability.ACTIVITY_FEED_V2));
         assertFalse(api.activities().status("contract-consumer").available());

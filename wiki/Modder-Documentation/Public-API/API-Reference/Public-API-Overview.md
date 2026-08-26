@@ -43,6 +43,9 @@ authorize optional behavior.
 - `commandUi()` for registered Java command-menu renderers and namespaced
   contributors with detached snapshots, server-authoritative actions, partial
   UI updates, and built-in or custom flows.
+- `commandHud()` for registered Java target and equipped-tool HUD renderers and
+  namespaced presentation contributors with detached snapshots and partial UI
+  updates.
 
 The current capability enum contains `PROFILES`, `COMMAND_LINKS`,
 `PROGRESSION`, `PROGRESSION_MUTATIONS`, `POLICY`,
@@ -53,9 +56,10 @@ The current capability enum contains `PROFILES`, `COMMAND_LINKS`,
 `PAID_COMMAND_REVIVAL`, `COMMAND_FAMILY_ROSTERS`,
 `CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION`, `CAPTURE_TAME_AND_LINK`, and
 `BONDED_COMPANIONS`, `COMMAND_UI_RENDERERS`, `COMMAND_UI_CONTRIBUTORS`,
-`COMMAND_UI_CUSTOM_ACTIONS`, and `COMMAND_UI_CUSTOM_FLOWS`. The separate
-bonded surface advertises its capability only when its own database and
-runtime are ready.
+`COMMAND_UI_CUSTOM_ACTIONS`, `COMMAND_UI_CUSTOM_FLOWS`,
+`COMMAND_HUD_RENDERERS`, and `COMMAND_HUD_CONTRIBUTORS`. The separate bonded
+surface advertises its capability only when its own database and runtime are
+ready.
 
 ## Bonded companion boundary
 

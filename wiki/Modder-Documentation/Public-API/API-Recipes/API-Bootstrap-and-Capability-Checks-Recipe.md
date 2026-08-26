@@ -89,3 +89,22 @@ unavailable when their own persistence scope is quarantined. Resolve the
 capability and API for each player action; do not cache startup availability as
 a permanent answer. The default API implementations remain fail-closed for
 older Tamework versions.
+
+Command HUD features use two capabilities:
+
+```java
+EnumSet<TameworkApiCapability> requiredHud = EnumSet.of(
+        TameworkApiCapability.COMMAND_HUD_RENDERERS,
+        TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS
+);
+if (!capabilities.containsAll(requiredHud)
+        || !api.commandHud().available()) {
+    return; // Keep the standard target and equipped-tool HUDs active.
+}
+```
+
+`COMMAND_HUD_RENDERERS` permits custom target-HUD and equipped-tool hotswap-HUD
+renderer registration. `COMMAND_HUD_CONTRIBUTORS` permits namespaced detached
+presentation contributors for those surfaces. The two capabilities are
+advertised together by the current implementation. Older or degraded adapters
+return an unavailable `CommandHudApi` and must be treated as unsupported.

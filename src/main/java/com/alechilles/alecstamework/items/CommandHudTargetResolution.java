@@ -1,0 +1,163 @@
+package com.alechilles.alecstamework.items;
+
+import com.alechilles.alecstamework.api.commandhud.CommandHudContribution;
+import com.alechilles.alecstamework.api.commandhud.CommandHudContributorId;
+import com.alechilles.alecstamework.api.commandhud.CommandHudRendererId;
+import com.alechilles.alecstamework.api.commandhud.CommandHudSurface;
+import com.alechilles.alecstamework.api.commandhud.CommandTargetHudRendererProvider;
+import com.alechilles.alecstamework.api.internal.CommandHudRendererRegistry;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.BooleanSupplier;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+/** Immutable target-HUD renderer and contributor resolution. */
+final class CommandHudTargetResolution {
+    @Nullable
+    private final CommandHudRendererId rendererId;
+    @Nullable
+    private final CommandTargetHudRendererProvider rendererProvider;
+    private final long rendererGeneration;
+    private final boolean custom;
+    @Nonnull
+    private final List<CommandHudCompositionBinding<
+            com.alechilles.alecstamework.api.commandhud.CommandTargetHudSnapshot>> contributors;
+    @Nonnull
+    private final Map<CommandHudContributorId, CommandHudContribution> contributions;
+    @Nonnull
+    private final BooleanSupplier rendererActive;
+    @Nullable
+    private final CommandHudRendererRegistry rendererRegistry;
+
+    CommandHudTargetResolution(
+            @Nullable CommandHudRendererId rendererId,
+            @Nullable CommandTargetHudRendererProvider rendererProvider,
+            long rendererGeneration,
+            boolean custom,
+            @Nonnull List<CommandHudCompositionBinding<
+                    com.alechilles.alecstamework.api.commandhud.CommandTargetHudSnapshot>> contributors,
+            @Nonnull Map<CommandHudContributorId, CommandHudContribution> contributions,
+            @Nonnull BooleanSupplier rendererActive
+    ) {
+        this(rendererId, rendererProvider, rendererGeneration, custom, contributors,
+                contributions, rendererActive, null);
+    }
+
+    CommandHudTargetResolution(
+            @Nullable CommandHudRendererId rendererId,
+            @Nullable CommandTargetHudRendererProvider rendererProvider,
+            long rendererGeneration,
+            boolean custom,
+            @Nonnull List<CommandHudCompositionBinding<
+                    com.alechilles.alecstamework.api.commandhud.CommandTargetHudSnapshot>> contributors,
+            @Nonnull Map<CommandHudContributorId, CommandHudContribution> contributions,
+            @Nonnull BooleanSupplier rendererActive,
+            @Nullable CommandHudRendererRegistry rendererRegistry
+    ) {
+        if (rendererGeneration < 0L) {
+            throw new IllegalArgumentException("Renderer generation cannot be negative.");
+        }
+        if (custom && (rendererId == null || rendererProvider == null)) {
+            throw new IllegalArgumentException("Custom target resolution needs a renderer.");
+        }
+        if (!custom && (rendererId != null || rendererProvider != null
+                || rendererGeneration != 0L || !contributors.isEmpty()
+                || !Objects.requireNonNull(contributions, "contributions").isEmpty())) {
+            throw new IllegalArgumentException("Standard target resolution cannot carry custom state.");
+        }
+        this.rendererId = rendererId;
+        this.rendererProvider = rendererProvider;
+        this.rendererGeneration = rendererGeneration;
+        this.custom = custom;
+        this.contributors = List.copyOf(Objects.requireNonNull(contributors, "contributors"));
+        LinkedHashMap<CommandHudContributorId, CommandHudContribution> copied = new LinkedHashMap<>();
+        contributions.forEach((id, contribution) -> {
+            if (id == null) return;
+            CommandHudContribution value = Objects.requireNonNull(contribution, "contribution");
+            if (!id.equals(value.contributorId())) {
+                throw new IllegalArgumentException("Contribution key must match contributor ID.");
+            }
+            copied.put(id, value);
+        });
+        this.contributions = copied.isEmpty()
+                ? Map.of() : Collections.unmodifiableMap(copied);
+        this.rendererActive = Objects.requireNonNull(rendererActive, "rendererActive");
+        this.rendererRegistry = rendererRegistry;
+    }
+
+    static CommandHudTargetResolution standard() {
+        return new CommandHudTargetResolution(null, null, 0L, false,
+                List.of(), Map.of(), () -> false);
+    }
+
+    boolean custom() {
+        return custom;
+    }
+
+    @Nonnull
+    CommandHudSurface surface() {
+        return CommandHudSurface.TARGET;
+    }
+
+    @Nullable
+    CommandHudRendererId rendererId() {
+        return rendererId;
+    }
+
+    @Nullable
+    CommandTargetHudRendererProvider rendererProvider() {
+        return rendererProvider;
+    }
+
+    @Nullable
+    CommandTargetHudRendererProvider provider() {
+        return rendererProvider;
+    }
+
+    long rendererGeneration() {
+        return rendererGeneration;
+    }
+
+    @Nullable
+    CommandHudRendererRegistry rendererRegistry() {
+        return rendererRegistry;
+    }
+
+    @Nonnull
+    List<CommandHudCompositionBinding<
+            com.alechilles.alecstamework.api.commandhud.CommandTargetHudSnapshot>> contributors() {
+        return contributors;
+    }
+
+    @Nonnull
+    List<CommandHudCompositionBinding<
+            com.alechilles.alecstamework.api.commandhud.CommandTargetHudSnapshot>> bindings() {
+        return contributors;
+    }
+
+    @Nonnull
+    Map<CommandHudContributorId, CommandHudContribution> contributions() {
+        return contributions;
+    }
+
+    @Nonnull
+    Map<CommandHudContributorId, com.alechilles.alecstamework.api.commandhud.CommandHudContributionStatus>
+            contributorStatuses() {
+        Map<CommandHudContributorId, com.alechilles.alecstamework.api.commandhud.CommandHudContributionStatus>
+                statuses = new LinkedHashMap<>();
+        contributions.forEach((id, contribution) -> statuses.put(id, contribution.status()));
+        return statuses.isEmpty() ? Map.of() : Map.copyOf(statuses);
+    }
+
+    boolean rendererActive() {
+        try {
+            return custom && rendererActive.getAsBoolean();
+        } catch (RuntimeException | LinkageError ignored) {
+            return false;
+        }
+    }
+}

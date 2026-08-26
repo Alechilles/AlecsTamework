@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.api;
 
+import com.alechilles.alecstamework.api.commandhud.CommandHudApi;
 import com.alechilles.alecstamework.api.commandui.CommandUiApi;
 import java.util.EnumSet;
 
@@ -78,6 +79,17 @@ public interface TameworkApi {
      */
     default CommandUiApi commandUi() {
         return CommandUiApi.unavailable();
+    }
+
+    /**
+     * Returns the optional command HUD renderer and contributor registration
+     * facade.
+     *
+     * <p>The default keeps older, replacement, bonded-only, and degraded
+     * implementations fail-closed while they are upgraded.</p>
+     */
+    default CommandHudApi commandHud() {
+        return CommandHudApi.unavailable();
     }
 }
 

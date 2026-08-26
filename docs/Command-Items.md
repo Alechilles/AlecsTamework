@@ -247,6 +247,49 @@ Client UI files live below `Common/UI/Custom`. Runtime append paths are
 relative to that directory. See the durable wiki reference and recipe for
 registration, capability, bounds, diagnostics, and cleanup details.
 
+### Custom Java command-HUD composition
+
+The target HUD and equipped-tool hotswap strip are independent presentation
+surfaces. A Java plugin can register a renderer for either surface through
+`TameworkApi.commandHud()`. Command-item config selects them independently:
+
+```json
+{
+  "TargetHudRendererId": "runeteria:husbandry_target",
+  "TargetHudContributors": [
+    { "Id": "runeteria:husbandry", "Required": true }
+  ],
+  "HotswapHudRendererId": "runeteria:husbandry_hotswap",
+  "HotswapHudContributors": [
+    { "Id": "runeteria:husbandry", "Required": false }
+  ]
+}
+```
+
+Each renderer owns its `.ui` layout. A path passed to
+`UICommandBuilder.append(...)` is relative to `Common/UI/Custom`; for example,
+`Common/UI/Custom/Rune_UI/HusbandryTarget.ui` is appended as
+`Rune_UI/HusbandryTarget.ui`. Omitting or invalidating one renderer selects the
+standard HUD for that surface only.
+
+Target renderers receive an immutable `CommandTargetHudSnapshot` with target
+identity, vitals, cooldowns, food, attachments, tame requirements,
+progression, traits, and owner display data. Hotswap renderers receive an
+immutable `CommandHotswapHudSnapshot` with `primary`, `secondary`, `q`, `e`,
+`r`, and `groupStatus`. Both views also expose isolated contributor data.
+
+The host always sends the complete current view, but it uses `clear=false` for
+updates. Renderers can update one component, such as a card indicator, by
+using the focused change hint. Target hints identify `IDENTITY`, `VITALS`,
+`COOLDOWNS`, `FOOD`, `ATTACHMENTS`, `TAME_REQUIREMENTS`, `PROGRESSION`,
+`TRAITS`, `OWNER`, or `CONTRIBUTIONS`. Hotswap hints identify `PRIMARY`,
+`SECONDARY`, `Q`, `E`, `R`, or `groupStatus`. Contributor paths are local to
+the contributor namespace and are bounded to 256 paths; overflow requests a
+full contributor refresh.
+
+See [Command HUD Renderer and Contributor API Reference](/mod/alecs-tamework/command-hud-renderer-and-contributor-api-reference)
+for lifecycle, fallback, and registration details.
+
 Linked panel supports:
 - Mode toggle: `LinkedMode` / `NearbyMode`
 - Nearby radius controls in nearby mode

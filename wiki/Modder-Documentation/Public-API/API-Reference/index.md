@@ -10,7 +10,7 @@ Parent: [Public API](/mod/alecs-tamework/public-api) | [Modder Documentation](/m
 
 This subsection contains the reference contract for each public API family.
 
-> **Experimental API Contract (`0.9.0`, Tamework 3.0.0)**
+> **Experimental API Contract (`0.12.0`, Tamework 3.2.2)**
 > Reference pages describe the current contract and can change while the API remains experimental.
 
 ## Child Pages
@@ -33,6 +33,7 @@ This subsection contains the reference contract for each public API family.
 - [Paid Command Revival API Reference](/mod/alecs-tamework/paid-command-revival-api-reference)
 - [Bonded Companion API Reference](/mod/alecs-tamework/bonded-companion-api-reference)
 - [Command UI Renderer and Contributor API Reference](/mod/alecs-tamework/command-ui-provider-api-reference)
+- [Command HUD Renderer and Contributor API Reference](/mod/alecs-tamework/command-hud-renderer-and-contributor-api-reference)
 
 
 

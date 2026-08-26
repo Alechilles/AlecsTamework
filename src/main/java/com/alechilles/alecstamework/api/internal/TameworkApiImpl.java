@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.api.ClaimAccessDecisionView;
 import com.alechilles.alecstamework.api.CommandItemConfigView;
 import com.alechilles.alecstamework.api.CommandLinkView;
 import com.alechilles.alecstamework.api.CommandLinksApi;
+import com.alechilles.alecstamework.api.commandhud.CommandHudApi;
 import com.alechilles.alecstamework.api.commandui.CommandUiApi;
 import com.alechilles.alecstamework.api.DiagnosticsApi;
 import com.alechilles.alecstamework.api.DamagePolicyDecisionView;
@@ -118,7 +119,7 @@ import javax.annotation.Nullable;
 public final class TameworkApiImpl
         implements TameworkApi, NpcProfilesApi, ProfileDataApi, TameworkConfigReadApi, PolicyApi,
         AutoCloseable {
-    static final String API_VERSION = "0.11.0";
+    static final String API_VERSION = "0.12.0";
     private static final String SNAPSHOT_CAPTURE = "capture";
     private static final String SNAPSHOT_DEATH = "death";
     private static final String SNAPSHOT_LOST = "lost";
@@ -134,6 +135,7 @@ public final class TameworkApiImpl
     private final InteractionExtensionApi interactionExtensionApi;
     private final TraitEffectApi traitEffectApi;
     private final CommandUiRegistry commandUiRegistry;
+    private final CommandHudRegistry commandHudRegistry;
     private final BreedingCooldownResetService breedingCooldownResetService =
             new BreedingCooldownResetService();
     private final CommandLinksApi commandLinksApi = new CommandLinksApi() {
@@ -279,7 +281,9 @@ public final class TameworkApiImpl
             TameworkApiCapability.COMMAND_UI_RENDERERS,
             TameworkApiCapability.COMMAND_UI_CONTRIBUTORS,
             TameworkApiCapability.COMMAND_UI_CUSTOM_ACTIONS,
-            TameworkApiCapability.COMMAND_UI_CUSTOM_FLOWS
+            TameworkApiCapability.COMMAND_UI_CUSTOM_FLOWS,
+            TameworkApiCapability.COMMAND_HUD_RENDERERS,
+            TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS
     );
     private final Gson gson = new Gson();
     @Nullable
@@ -304,7 +308,8 @@ public final class TameworkApiImpl
                 interactionExtensionApi,
                 traitEffectApi,
                 damagePolicy,
-                new CommandUiRegistry()
+                new CommandUiRegistry(),
+                new CommandHudRegistry()
         );
     }
 
@@ -317,6 +322,30 @@ public final class TameworkApiImpl
                            @Nonnull TraitEffectApi traitEffectApi,
                            @Nonnull SimpleClaimsTamedDamagePolicy damagePolicy,
                            @Nonnull CommandUiRegistry commandUiRegistry) {
+        this(
+                profilesApi,
+                profileDataApi,
+                diagnosticsApi,
+                eventBus,
+                stateSnapshotService,
+                interactionExtensionApi,
+                traitEffectApi,
+                damagePolicy,
+                commandUiRegistry,
+                new CommandHudRegistry()
+        );
+    }
+
+    public TameworkApiImpl(@Nonnull NpcProfilesApi profilesApi,
+                           @Nonnull ProfileDataApi profileDataApi,
+                           @Nonnull DiagnosticsApi diagnosticsApi,
+                           @Nonnull TameworkEventBus eventBus,
+                           @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
+                           @Nonnull InteractionExtensionApi interactionExtensionApi,
+                           @Nonnull TraitEffectApi traitEffectApi,
+                           @Nonnull SimpleClaimsTamedDamagePolicy damagePolicy,
+                           @Nonnull CommandUiRegistry commandUiRegistry,
+                           @Nonnull CommandHudRegistry commandHudRegistry) {
         this.profilesApi = Objects.requireNonNull(profilesApi, "profilesApi");
         this.profileDataApi = Objects.requireNonNull(
                 profileDataApi, "profileDataApi"
@@ -336,6 +365,10 @@ public final class TameworkApiImpl
                 commandUiRegistry,
                 "commandUiRegistry"
         );
+        this.commandHudRegistry = Objects.requireNonNull(
+                commandHudRegistry,
+                "commandHudRegistry"
+        );
     }
 
     @Override
@@ -352,6 +385,10 @@ public final class TameworkApiImpl
                 current.remove(TameworkApiCapability.COMMAND_UI_CONTRIBUTORS);
                 current.remove(TameworkApiCapability.COMMAND_UI_CUSTOM_ACTIONS);
                 current.remove(TameworkApiCapability.COMMAND_UI_CUSTOM_FLOWS);
+            }
+            if (!commandHudRegistry.available()) {
+                current.remove(TameworkApiCapability.COMMAND_HUD_RENDERERS);
+                current.remove(TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS);
             }
             return current;
         }
@@ -377,11 +414,14 @@ public final class TameworkApiImpl
     public void close() {
         try {
             commandUiRegistry.close();
+            commandHudRegistry.close();
             synchronized (capabilities) {
                 capabilities.remove(TameworkApiCapability.COMMAND_UI_RENDERERS);
                 capabilities.remove(TameworkApiCapability.COMMAND_UI_CONTRIBUTORS);
                 capabilities.remove(TameworkApiCapability.COMMAND_UI_CUSTOM_ACTIONS);
                 capabilities.remove(TameworkApiCapability.COMMAND_UI_CUSTOM_FLOWS);
+                capabilities.remove(TameworkApiCapability.COMMAND_HUD_RENDERERS);
+                capabilities.remove(TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS);
             }
         } finally {
             damagePolicy.close();
@@ -401,6 +441,11 @@ public final class TameworkApiImpl
     @Override
     public CommandUiApi commandUi() {
         return commandUiRegistry;
+    }
+
+    @Override
+    public CommandHudApi commandHud() {
+        return commandHudRegistry;
     }
 
     @Override

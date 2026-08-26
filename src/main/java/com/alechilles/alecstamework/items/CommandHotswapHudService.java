@@ -1,12 +1,14 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.api.TameworkApi;
+import com.alechilles.alecstamework.api.internal.CommandHudRegistry;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.items.CommandHotswapAssignmentStore.Slot;
-import com.alechilles.alecstamework.ui.TameworkCommandHotswapHud;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -50,6 +52,7 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
     private final CommandHotswapAssignmentStore assignments = new CommandHotswapAssignmentStore();
     private final CommandTargetHudActivationTracker activationTracker;
     private final CommandTargetInspector targetInspector;
+    private final CommandHotswapHudPresentationCoordinator presentationCoordinator;
     private final CommandHotswapHudGroupStatusResolver groupStatusResolver =
             new CommandHotswapHudGroupStatusResolver(null, null, null);
     private final Object storesLock = new Object();
@@ -72,9 +75,19 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
     public CommandHotswapHudService(@Nonnull CommandItemRegistry registry,
                                     @Nonnull CommandTargetHudActivationTracker activationTracker,
                                     @Nonnull CommandTargetInspector targetInspector) {
+        this(registry, activationTracker, targetInspector, resolveCommandHudRegistry());
+    }
+
+    CommandHotswapHudService(@Nonnull CommandItemRegistry registry,
+                             @Nonnull CommandTargetHudActivationTracker activationTracker,
+                             @Nonnull CommandTargetInspector targetInspector,
+                             @Nullable CommandHudRegistry commandHudRegistry) {
         this.registry = registry;
         this.activationTracker = activationTracker;
         this.targetInspector = targetInspector;
+        this.presentationCoordinator = new CommandHotswapHudPresentationCoordinator(
+                commandHudRegistry, (store, playerUuid) ->
+                        activationTracker.markDirty(store, playerUuid));
         activationTracker.addLifecycleListener(new CommandTargetHudActivationTracker.LifecycleListener() {
             @Override
             public void onPlayerRemoved(@Nonnull Store<EntityStore> store, @Nonnull UUID playerUuid) {
@@ -175,20 +188,19 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
             removeHud(store, playerUuid, player, previous);
             return;
         }
-        PlayerRef playerRef = player.getPlayerRef();
-        if (playerRef == null || player.getHudManager() == null) {
+        if (activeCommand == null || player.getPlayerRef() == null
+                || player.getHudManager() == null) {
             return;
         }
-        if (previous == null || previous.playerRef() != playerRef) {
-            TameworkCommandHotswapHud hud = new TameworkCommandHotswapHud(playerRef, model);
-            player.getHudManager().addCustomHud(playerRef, hud);
-            storeState.put(playerUuid, new HudState(playerRef, hud, model));
+        CommandHotswapHudPresentation presentation = presentationCoordinator.present(
+                store, player, activeCommand.config(), activeCommand.toolIdentity(), model);
+        if (presentation == null || presentation.closed()) {
+            presentationCoordinator.closePlayer(store, playerUuid);
+            storeState.remove(playerUuid);
             return;
         }
-        if (!previous.model().equals(model)) {
-            previous.hud().refresh(model);
-            storeState.put(playerUuid, new HudState(playerRef, previous.hud(), model));
-        }
+        storeState.put(playerUuid, new HudState(
+                player.getPlayerRef(), activeCommand.toolIdentity(), presentation, model));
     }
 
     @Nonnull
@@ -278,14 +290,17 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
                             @Nullable Player player,
                             @Nullable HudState previous) {
         if (previous == null) {
+            if (player != null) {
+                presentationCoordinator.hide(store, player);
+            } else {
+                presentationCoordinator.closePlayer(store, playerUuid);
+            }
             return;
         }
         if (player != null && player.getPlayerRef() != null && player.getHudManager() != null) {
-            player.getHudManager().removeCustomHud(
-                    player.getPlayerRef(), TameworkCommandHotswapHud.HUD_KEY
-            );
+            presentationCoordinator.hide(store, player);
         } else {
-            previous.hud().hideNow();
+            presentationCoordinator.closePlayer(store, playerUuid);
         }
         StoreState storeState = existingStoreState(store);
         if (storeState != null) {
@@ -295,6 +310,9 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
 
     @Nullable
     private ActiveCommandItem resolveActiveCommand(@Nullable Player player) {
+        if (player == null) {
+            return null;
+        }
         ItemStack stack = PlayerInventoryAccess.getActiveHotbarItem(player);
         if (stack == null || stack.isEmpty() || stack.getItemId() == null || registry == null) {
             return null;
@@ -303,19 +321,19 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
         if (config == null || !config.isEnabled()) {
             return null;
         }
-        return new ActiveCommandItem(stack, stack.getItemId(), config);
+        return new ActiveCommandItem(stack, stack.getItemId(), config,
+                CommandHotswapHudToolIdentity.from(player, stack));
     }
 
     private void clearPlayerState(@Nonnull Store<EntityStore> store,
                                   @Nonnull UUID playerUuid) {
         StoreState storeState = existingStoreState(store);
         if (storeState == null) {
+            presentationCoordinator.closePlayer(store, playerUuid);
             return;
         }
-        HudState state = storeState.remove(playerUuid);
-        if (state != null) {
-            state.hud().hideNow();
-        }
+        storeState.remove(playerUuid);
+        presentationCoordinator.closePlayer(store, playerUuid);
     }
 
     private void clearStoreState(@Nonnull Store<EntityStore> store) {
@@ -323,9 +341,8 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
         synchronized (storesLock) {
             storeState = statesByStore.remove(store);
         }
-        if (storeState != null) {
-            storeState.clear();
-        }
+        presentationCoordinator.closeStore(store);
+        if (storeState != null) storeState.clear();
     }
 
     /** Serializes player HUD state within one store without locking unrelated stores. */
@@ -353,9 +370,6 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
         }
 
         private synchronized void clear() {
-            for (HudState state : statesByPlayer.values()) {
-                state.hud().hideNow();
-            }
             statesByPlayer.clear();
         }
     }
@@ -373,11 +387,23 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
     /** Holds one resolved active command stack so activation and HUD rendering share the lookup. */
     private record ActiveCommandItem(@Nonnull ItemStack stack,
                                      @Nonnull String itemId,
-                                     @Nonnull TwCommandItemConfig config) {
+                                     @Nonnull TwCommandItemConfig config,
+                                     @Nonnull CommandHotswapHudToolIdentity toolIdentity) {
     }
 
     private record HudState(@Nonnull PlayerRef playerRef,
-                            @Nonnull TameworkCommandHotswapHud hud,
+                            @Nonnull CommandHotswapHudToolIdentity toolIdentity,
+                            @Nonnull CommandHotswapHudPresentation presentation,
                             @Nonnull CommandHotswapHudViewModel model) {
+    }
+
+    @Nullable
+    private static CommandHudRegistry resolveCommandHudRegistry() {
+        Tamework plugin = Tamework.getInstance();
+        TameworkApi api = plugin == null ? null : plugin.getApi();
+        if (api == null || !(api.commandHud() instanceof CommandHudRegistry registry)) {
+            return null;
+        }
+        return registry;
     }
 }

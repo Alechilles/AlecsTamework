@@ -82,6 +82,7 @@ public final class ApiSelfTestRunner {
         TRAIT_EFFECTS,
         POLICIES,
         COMMAND_UI,
+        COMMAND_HUD,
         DIAGNOSTICS,
         HYDRAGON_INTEGRATIONS,
         ALL;
@@ -121,6 +122,9 @@ public final class ApiSelfTestRunner {
         }
         if (suite == Suite.ALL || suite == Suite.COMMAND_UI) {
             suites.add(runCommandUi(context));
+        }
+        if (suite == Suite.ALL || suite == Suite.COMMAND_HUD) {
+            suites.add(CommandHudApiSelfTestSuite.run(context));
         }
         if (suite == Suite.ALL || suite == Suite.DIAGNOSTICS) {
             suites.add(runDiagnostics(context));

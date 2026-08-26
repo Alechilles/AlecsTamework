@@ -1,5 +1,8 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.api.TameworkApi;
+import com.alechilles.alecstamework.api.internal.CommandHudRegistry;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
@@ -12,7 +15,6 @@ import com.alechilles.alecstamework.npc.components.TameworkTranquilizerPeakCompo
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.TranquilizerStackDisplayService;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
-import com.alechilles.alecstamework.ui.TameworkCommandTargetHud;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -52,25 +54,39 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     private final CommandTargetHudActivationTracker activationTracker;
     private final CommandTargetInspector targetInspector;
     private final CommandTargetHudStateStore hudStateStore;
+    private final CommandTargetHudPresentationCoordinator presentationCoordinator;
     private final Map<StaticTargetCacheKey, StaticTargetDisplay> staticTargetCache = new HashMap<>();
     private final Map<UUID, DebugLogState> debugLogStateByPlayer = new HashMap<>();
 
     public CommandTargetHudService(CommandItemRegistry registry) {
-        this(registry, new CommandTargetHudActivationTracker(), new CommandTargetInspector());
+        this(registry, new CommandTargetHudActivationTracker(), new CommandTargetInspector(),
+                resolveCommandHudRegistry());
     }
 
     public CommandTargetHudService(CommandItemRegistry registry,
                                    @Nonnull CommandTargetHudActivationTracker activationTracker) {
-        this(registry, activationTracker, new CommandTargetInspector());
+        this(registry, activationTracker, new CommandTargetInspector(),
+                resolveCommandHudRegistry());
     }
 
     public CommandTargetHudService(CommandItemRegistry registry,
                                    @Nonnull CommandTargetHudActivationTracker activationTracker,
                                    @Nonnull CommandTargetInspector targetInspector) {
+        this(registry, activationTracker, targetInspector, resolveCommandHudRegistry());
+    }
+
+    CommandTargetHudService(CommandItemRegistry registry,
+                            @Nonnull CommandTargetHudActivationTracker activationTracker,
+                            @Nonnull CommandTargetInspector targetInspector,
+                            @Nullable CommandHudRegistry commandHudRegistry) {
         this.registry = registry;
         this.activationTracker = activationTracker;
         this.targetInspector = targetInspector;
-        this.hudStateStore = new CommandTargetHudStateStore(activationTracker);
+        this.presentationCoordinator = new CommandTargetHudPresentationCoordinator(
+                commandHudRegistry, (store, playerUuid) ->
+                        activationTracker.markDirty(store, playerUuid));
+        this.hudStateStore = new CommandTargetHudStateStore(
+                activationTracker, presentationCoordinator);
         this.linkPolicyService = new CommandLinkPolicyService();
         CommandNpcNameResolver nameResolver = new CommandNpcNameResolver();
         this.loadedSnapshotService = new CommandLoadedNpcStatusSnapshotService(
@@ -83,6 +99,16 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         this.tameFoodDisplayResolver = new TameworkTameFoodDisplayResolver();
         this.attachmentResolver = new CommandTargetHudAttachmentResolver();
         this.tameRequirementResolver = new CommandTargetHudTameRequirementResolver();
+    }
+
+    @Nullable
+    private static CommandHudRegistry resolveCommandHudRegistry() {
+        Tamework plugin = Tamework.getInstance();
+        TameworkApi api = plugin == null ? null : plugin.getApi();
+        if (api == null || !(api.commandHud() instanceof CommandHudRegistry registry)) {
+            return null;
+        }
+        return registry;
     }
 
     @Override
@@ -172,7 +198,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                 nowMs
         );
         String targetKey = candidate != null ? candidate.key() : null;
-        if (!shouldRefresh(previous, targetKey, nowMs)) {
+        if (!shouldRefresh(playerUuid, previous, targetKey, nowMs)) {
             rememberScan(store, playerUuid, previous, activeCommand.itemId(), nowMs);
             return;
         }
@@ -189,7 +215,8 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             hideHudAndRememberNoTarget(store, playerUuid, player, activeCommand.itemId(), nowMs);
             return;
         }
-        showHud(store, playerUuid, player, model, targetKey, activeCommand.itemId(), nowMs);
+        showHud(store, playerUuid, player, activeCommand.config(), model,
+                targetKey, activeCommand.itemId(), nowMs);
     }
 
     @Nullable
@@ -459,34 +486,28 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     private void showHud(@Nonnull Store<EntityStore> store,
                          @Nonnull UUID playerUuid,
                          @Nonnull Player player,
+                         @Nonnull TwCommandItemConfig config,
                          @Nonnull CommandTargetHudViewModel model,
                          @Nonnull String targetKey,
                          @Nonnull String activeItemId,
                          long nowMs) {
-        PlayerRef playerRef = player.getPlayerRef();
-        if (playerRef == null || player.getHudManager() == null) {
+        CommandTargetHudPresentation presentation =
+                presentationCoordinator.present(
+                        store, player, config, targetKey, model, activeItemId);
+        if (presentation == null || presentation.closed()) {
+            presentationCoordinator.closePlayer(playerUuid);
             hudStateStore.remove(store, playerUuid);
             return;
         }
-        String language = playerRef.getLanguage();
-        CommandTargetHudStateStore.HudState previous = hudStateStore.stateForStore(store, playerUuid);
-        TameworkCommandTargetHud hud = previous != null ? previous.hud() : null;
-        if (hud == null) {
-            hud = new TameworkCommandTargetHud(playerRef, model, language);
-            player.getHudManager().addCustomHud(playerRef, hud);
-            debug(playerUuid, nowMs, "show:" + targetKey,
-                    "created hud; target=" + targetKey + ", item=" + activeItemId + ", display=" + model.status().displayName());
-        } else {
-            hud.refresh(model, language);
-            hud.present();
-            debug(playerUuid, nowMs, "refresh:" + targetKey,
-                    "refreshed hud; target=" + targetKey + ", item=" + activeItemId + ", display=" + model.status().displayName());
-        }
+        debug(playerUuid, nowMs, "present:" + targetKey,
+                "presented target hud; target=" + targetKey + ", item=" + activeItemId
+                        + ", custom=" + presentation.custom()
+                        + ", display=" + model.status().displayName());
         hudStateStore.put(
                 store,
                 playerUuid,
                 new CommandTargetHudStateStore.HudState(
-                        store, targetKey, nowMs, hud, true, nowMs, activeItemId
+                        store, targetKey, nowMs, presentation, true, nowMs, activeItemId
                 )
         );
     }
@@ -495,19 +516,19 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                          @Nonnull UUID playerUuid,
                          @Nullable Player player) {
         CommandTargetHudStateStore.HudState previous = hudStateStore.stateForStore(store, playerUuid);
-        if (previous == null || previous.hud() == null) {
+        if (previous == null || previous.presentation() == null) {
             debug(playerUuid, System.currentTimeMillis(), "hide-empty", "hide requested with no stored hud state");
             hudStateStore.remove(store, playerUuid);
             return;
         }
         if (player == null || player.getPlayerRef() == null || player.getHudManager() == null) {
-            previous.hud().hideNow();
+            presentationCoordinator.closePlayer(playerUuid);
             debug(playerUuid, System.currentTimeMillis(), "hide-fallback",
                     "hide fallback clear; previousTarget=" + previous.targetKey());
             hudStateStore.remove(store, playerUuid);
             return;
         }
-        player.getHudManager().removeCustomHud(player.getPlayerRef(), TameworkCommandTargetHud.HUD_KEY);
+        presentationCoordinator.hide(player);
         debug(playerUuid, System.currentTimeMillis(), "hide-manager",
                 "removed hud through manager; previousTarget=" + previous.targetKey());
         hudStateStore.remove(store, playerUuid);
@@ -519,13 +540,13 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                                             @Nonnull String activeItemId,
                                             long nowMs) {
         CommandTargetHudStateStore.HudState previous = hudStateStore.stateForStore(store, playerUuid);
-        if (previous != null && previous.hud() != null && previous.visible()) {
+        if (previous != null && previous.presentation() != null && previous.visible()) {
             if (player != null && player.getPlayerRef() != null && player.getHudManager() != null) {
-                player.getHudManager().removeCustomHud(player.getPlayerRef(), TameworkCommandTargetHud.HUD_KEY);
+                presentationCoordinator.hide(player);
                 debug(playerUuid, nowMs, "hide-no-target-manager",
                         "removed hud after target lost; previousTarget=" + previous.targetKey() + ", item=" + activeItemId);
             } else {
-                previous.hud().hideNow();
+                presentationCoordinator.closePlayer(playerUuid);
                 debug(playerUuid, nowMs, "hide-no-target-fallback",
                         "fallback clear after target lost; previousTarget=" + previous.targetKey() + ", item=" + activeItemId);
             }
@@ -567,7 +588,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                         store,
                         previous.targetKey(),
                         previous.lastRefreshMs(),
-                        previous.hud(),
+                        previous.presentation(),
                         previous.visible(),
                         nowMs,
                         activeItemId
@@ -612,13 +633,17 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         return buildTargetKey(npcUuid, activeItemId);
     }
 
-    private static boolean shouldRefresh(@Nullable CommandTargetHudStateStore.HudState previous,
-                                         @Nullable String targetKey,
-                                         long nowMs) {
+    private boolean shouldRefresh(@Nonnull UUID playerUuid,
+                                  @Nullable CommandTargetHudStateStore.HudState previous,
+                                  @Nullable String targetKey,
+                                  long nowMs) {
         if (targetKey == null || targetKey.isBlank()) {
             return previous != null && previous.visible();
         }
-        if (previous == null || previous.hud() == null || !previous.visible()) {
+        if (previous == null || previous.presentation() == null || !previous.visible()) {
+            return true;
+        }
+        if (presentationCoordinator.needsRefresh(playerUuid)) {
             return true;
         }
         return shouldRefreshForTests(previous.targetKey(), previous.visible(), targetKey, previous.lastRefreshMs(), nowMs, REFRESH_INTERVAL_MS);

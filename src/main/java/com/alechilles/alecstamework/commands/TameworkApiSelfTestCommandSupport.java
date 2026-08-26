@@ -135,6 +135,7 @@ final class TameworkApiSelfTestCommandSupport {
                 plugin, api, null, null, null, null, null);
         if (suite == ApiSelfTestRunner.Suite.CORE
                 || suite == ApiSelfTestRunner.Suite.DIAGNOSTICS
+                || suite == ApiSelfTestRunner.Suite.COMMAND_HUD
                 || suite == ApiSelfTestRunner.Suite.HYDRAGON_INTEGRATIONS) {
             return runner.run(context, suite);
         }
@@ -142,6 +143,7 @@ final class TameworkApiSelfTestCommandSupport {
         ArrayList<com.alechilles.alecstamework.selftest.ApiSelfTestSuiteResult> suites =
                 new ArrayList<>();
         suites.addAll(runner.run(context, ApiSelfTestRunner.Suite.CORE).suites());
+        suites.addAll(runner.run(context, ApiSelfTestRunner.Suite.COMMAND_HUD).suites());
         suites.addAll(runner.run(context, ApiSelfTestRunner.Suite.DIAGNOSTICS).suites());
         suites.addAll(runner.run(context, ApiSelfTestRunner.Suite.HYDRAGON_INTEGRATIONS).suites());
         return new ApiSelfTestRunReport(suites);

@@ -97,9 +97,12 @@ class ReplacementTameworkApiFactoryTest {
                         TameworkApiCapability.COMMAND_UI_RENDERERS,
                         TameworkApiCapability.COMMAND_UI_CONTRIBUTORS,
                         TameworkApiCapability.COMMAND_UI_CUSTOM_ACTIONS,
-                        TameworkApiCapability.COMMAND_UI_CUSTOM_FLOWS
+                        TameworkApiCapability.COMMAND_UI_CUSTOM_FLOWS,
+                        TameworkApiCapability.COMMAND_HUD_RENDERERS,
+                        TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS
                 )));
                 assertTrue(api.commandUi().available());
+                assertTrue(api.commandHud().available());
                 assertEquals(
                         "HEALTHY",
                         api.diagnostics().getPersistenceDiagnostics()

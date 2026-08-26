@@ -49,7 +49,7 @@ public final class TameworkApiTestRunCommand extends AbstractTameworkServerComma
         ParsedArgs parsed = parse(commandContext);
         if (parsed == null) {
             commandContext.sender().sendMessage(Message.raw(
-                    "Usage: /tw api test run [core|profile|command-links|configs|progression|interaction-extensions|trait-effects|policies|diagnostics|hydragon-integrations|all] [verbose]"
+                    "Usage: /tw api test run [core|profile|command-links|configs|progression|interaction-extensions|trait-effects|policies|command-ui|command-hud|diagnostics|hydragon-integrations|all] [verbose]"
             ));
             return;
         }
@@ -60,7 +60,7 @@ public final class TameworkApiTestRunCommand extends AbstractTameworkServerComma
             if (report == null) {
                 commandContext.sender().sendMessage(Message.raw(
                         "That suite requires prepared in-world fixtures. From the console use "
-                                + "core, diagnostics, hydragon-integrations, or all for the read-only aggregate."));
+                                + "core, command-hud, diagnostics, hydragon-integrations, or all for the read-only aggregate."));
                 return;
             }
             TameworkApiSelfTestCommandSupport.sendReport(

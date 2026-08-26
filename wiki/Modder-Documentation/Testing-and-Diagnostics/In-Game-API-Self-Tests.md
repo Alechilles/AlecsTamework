@@ -21,8 +21,8 @@ uses them.
 
 Prepared in-world fixtures are required for profile, command-link, config,
 progression, extension, trait-effect, and policy suites. From the server
-console, `core`, `diagnostics`, `hydragon-integrations`, and their read-only
-`all` aggregate are available.
+console, `core`, `command-hud`, `diagnostics`, `hydragon-integrations`, and
+their read-only `all` aggregate are available.
 
 ## Current suites
 
@@ -30,6 +30,12 @@ console, `core`, `diagnostics`, `hydragon-integrations`, and their read-only
   diagnostics availability
 - `profile`: canonical profile resolution by NPC alias and profile ID
 - `command-links`: linked tool IDs and saved home position
+- `command-ui`: command-menu renderer and contributor registration, custom
+  action dispatch, custom flow creation, and cleanup; this suite needs a
+  player context but does not need prepared fixtures
+- `command-hud`: target and equipped-tool HUD renderer and contributor
+  registration, detached composition, focused refresh, session cleanup, and
+  diagnostics; this fixture-free suite also runs from the server console
 - `configs`: framework and, when enabled, optional-example interaction,
   companion, progression, spawner, naming, and command-item config reads
 - `progression`: controlled mutations plus best-effort restoration of the
@@ -46,4 +52,6 @@ console, `core`, `diagnostics`, `hydragon-integrations`, and their read-only
 
 The runner logs a verbose report even when chat output is summarized. These
 checks validate the packaged public API; they do not replace the Maven suite or
-the replacement-persistence live smoke tests.
+the replacement-persistence live smoke tests. `command-hud` is included in the
+console-safe `all` aggregate. `command-ui` remains player-only because its
+runtime smoke flow needs a player context.

@@ -1,11 +1,15 @@
 package com.alechilles.alecstamework.config.assets;
 
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
+import com.alechilles.alecstamework.api.commandhud.CommandHudContributorId;
+import com.alechilles.alecstamework.api.commandhud.CommandHudContributorRequirement;
+import com.hypixel.hytale.codec.ExtraInfo;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -87,6 +91,28 @@ class TwConfigInheritanceContractTest {
 
         assertArrayEquals(new String[] { "Role_A" }, ((TwCommandItemConfig.AllowlistRoles) child.getAllowedRoles()).getAllowlist());
         assertSame(childCommands, child.getCommandList());
+    }
+
+    @Test
+    void commandItemHudSelectionsReplaceOnlyExplicitArrays() {
+        TwCommandItemConfig parent = decodeCommandItem(
+                "{\"TargetHudRendererId\":\"Runeteria:Target\","
+                        + "\"TargetHudContributors\":[{\"Id\":\"Runeteria:TargetBadge\",\"Required\":true}],"
+                        + "\"HotswapHudRendererId\":\"Runeteria:Hotswap\","
+                        + "\"HotswapHudContributors\":[{\"Id\":\"Runeteria:Badge\",\"Required\":false}]}"
+        );
+        TwCommandItemConfig child = decodeCommandItem("{\"TargetHudContributors\":[]}");
+
+        child.inheritMissingTopLevelFrom(parent, Set.of("TargetHudContributors"));
+
+        assertEquals("runeteria:target", child.getTargetHudRendererId());
+        assertTrue(child.getTargetHudContributors().isEmpty());
+        assertEquals("runeteria:hotswap", child.getHotswapHudRendererId());
+        assertEquals(
+                List.of(new CommandHudContributorRequirement(
+                        CommandHudContributorId.of("runeteria:badge"), false)),
+                child.getHotswapHudContributors()
+        );
     }
 
     @Test
@@ -538,5 +564,12 @@ class TwConfigInheritanceContractTest {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
         return field.getDouble(target);
+    }
+
+    private static TwCommandItemConfig decodeCommandItem(String json) {
+        return TwCommandItemConfig.CODEC.decode(
+                BsonDocument.parse(json),
+                new ExtraInfo()
+        );
     }
 }

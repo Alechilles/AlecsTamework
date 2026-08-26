@@ -82,7 +82,7 @@ class TameworkApiImplTest {
                     new TraitEffectRegistry(null, null),
                     new SimpleClaimsTamedDamagePolicy()
             )) {
-                assertEquals("0.11.0", api.getApiVersion());
+                assertEquals("0.12.0", api.getApiVersion());
                 assertEquals(expectedCapabilities(), api.getCapabilities());
 
                 assertEquals(
@@ -348,7 +348,9 @@ class TameworkApiImplTest {
                 TameworkApiCapability.COMMAND_UI_RENDERERS,
                 TameworkApiCapability.COMMAND_UI_CONTRIBUTORS,
                 TameworkApiCapability.COMMAND_UI_CUSTOM_ACTIONS,
-                TameworkApiCapability.COMMAND_UI_CUSTOM_FLOWS
+                TameworkApiCapability.COMMAND_UI_CUSTOM_FLOWS,
+                TameworkApiCapability.COMMAND_HUD_RENDERERS,
+                TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS
         );
     }
 

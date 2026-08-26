@@ -1,0 +1,499 @@
+package com.alechilles.alecstamework.items;
+
+import com.alechilles.alecstamework.api.commandhud.CommandHudContribution;
+import com.alechilles.alecstamework.api.commandhud.CommandHudContributorDirtySink;
+import com.alechilles.alecstamework.api.commandhud.CommandHudContributorId;
+import com.alechilles.alecstamework.api.commandhud.CommandHudDiagnostics;
+import com.alechilles.alecstamework.api.commandhud.CommandHudDirtyScope;
+import com.alechilles.alecstamework.api.commandhud.CommandHudOpenContext;
+import com.alechilles.alecstamework.api.commandhud.CommandHudSurface;
+import com.alechilles.alecstamework.api.internal.CommandHudContributorRegistry;
+import com.alechilles.alecstamework.api.internal.CommandHudRendererRegistry;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+/** Owns one HUD session's shared state, cleanup, and registry lifecycle. */
+final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
+    private final Object lock = new Object();
+    private final UUID sessionId = UUID.randomUUID();
+    private final CommandHudOpenContext openContext;
+    private final CommandHudSurface surface;
+    @Nullable
+    private final String rendererId;
+    private final long rendererGeneration;
+    @Nullable
+    private final CommandHudRendererRegistry rendererRegistry;
+    private final Consumer<U> publisher;
+    private final Runnable refreshRequest;
+    private final CommandHudCompositionSession.RequiredFailureHandler failureHandler;
+    @Nullable
+    private final CommandHudDiagnosticsService diagnostics;
+    @Nullable
+    private final CommandHudTimingWarnings timingWarnings;
+    private final List<CommandHudCompositionState<B>> states;
+    private final Map<CommandHudContributorId, CommandHudContribution>
+            compatibilityContributions;
+    private final BooleanSupplier rendererActive;
+    @Nonnull
+    private final CommandHudCompositionCleanup<B> cleanup;
+    private final boolean custom;
+    private final CommandHudCompositionComposer<B, V, U> composer;
+    private final CommandHudCompositionDelivery<U> delivery;
+    private boolean cleanupStarted;
+    private boolean requiredFailureNotified;
+    private long lifecycleVersion;
+    private boolean open = true;
+    private boolean initialized;
+    @Nullable
+    private V currentView;
+    @Nullable
+    private U lastUpdate;
+    @Nullable
+    private CommandHudCompositionSession.RequiredFailure requiredFailure;
+    @Nullable
+    private CommandHudCompositionSession.InitialCompositionFailure initialFailure;
+
+    CommandHudCompositionLifecycle(
+            @Nonnull CommandHudOpenContext openContext,
+            @Nonnull CommandHudSurface surface,
+            @Nullable String rendererId,
+            long rendererGeneration,
+            @Nonnull CommandHudCompositionSupport.SurfaceAdapter<B, V, U> adapter,
+            @Nonnull List<CommandHudCompositionBinding<B>> bindings,
+            @Nonnull Map<CommandHudContributorId, CommandHudContribution> compatibility,
+            boolean custom,
+            @Nonnull BooleanSupplier rendererActive,
+            @Nullable Supplier<? extends AutoCloseable> rendererFactory,
+            @Nullable CommandHudRendererRegistry rendererRegistry,
+            @Nullable CommandHudDiagnosticsService diagnostics,
+            @Nullable CommandHudTimingWarnings timingWarnings,
+            @Nullable Consumer<U> publisher,
+            @Nullable Runnable refreshRequest,
+            @Nullable CommandHudCompositionSession.RequiredFailureHandler failureHandler
+    ) {
+        this.openContext = Objects.requireNonNull(openContext, "openContext");
+        this.surface = Objects.requireNonNull(surface, "surface");
+        this.rendererId = rendererId == null || rendererId.isBlank() ? null : rendererId.trim();
+        if (rendererGeneration < 0L) {
+            throw new IllegalArgumentException("Renderer generation cannot be negative.");
+        }
+        this.rendererGeneration = rendererGeneration;
+        this.rendererRegistry = rendererRegistry;
+        this.publisher = publisher == null ? ignored -> { } : publisher;
+        this.refreshRequest = refreshRequest == null ? () -> { } : refreshRequest;
+        this.failureHandler = failureHandler == null ? (id, reason) -> { } : failureHandler;
+        this.diagnostics = diagnostics;
+        this.timingWarnings = timingWarnings;
+        this.rendererActive = Objects.requireNonNull(rendererActive, "rendererActive");
+
+        AutoCloseable createdRenderer = null;
+        boolean rendererReady = custom;
+        if (custom && rendererFactory != null) {
+            try {
+                createdRenderer = rendererFactory.get();
+                rendererReady = createdRenderer != null;
+            } catch (RuntimeException | LinkageError ignored) {
+                rendererReady = false;
+            }
+        }
+        if (!rendererReady) CommandHudCompositionCleanup.closeQuietly(createdRenderer);
+        this.custom = rendererReady;
+        Map<CommandHudContributorId, CommandHudContribution> copied =
+                CommandHudCompositionSupport.copyContributions(
+                compatibility, rendererReady);
+        this.compatibilityContributions = copied;
+        this.states = rendererReady ? createStates(bindings) : List.of();
+        this.cleanup = new CommandHudCompositionCleanup<>(states, diagnostics,
+                sessionId, createdRenderer);
+        try {
+            this.composer = new CommandHudCompositionComposer<>(adapter, states, copied,
+                    rendererReady, rendererActive, sessionId, diagnostics, timingWarnings);
+            this.delivery = new CommandHudCompositionDelivery<>(lock,
+                    () -> lifecycleVersion,
+                    version -> CommandHudCompositionLifecycleSupport.isCurrent(open,
+                            lifecycleVersion, version, custom, this::rendererActive,
+                            composer::contributorsCurrent), this.publisher, cleanup::close);
+            if (rendererReady) {
+                openDiagnostics();
+                installSubscriptions();
+            }
+        } catch (RuntimeException | LinkageError failure) {
+            this.cleanup.close("initial_composition_failed");
+            throw failure;
+        }
+}
+    @Nonnull
+    V compose(@Nonnull B base) {
+        Objects.requireNonNull(base, "base");
+        CommandHudCompositionSession.InitialCompositionFailure failure = null;
+        boolean cleanup = false;
+        V result = null;
+        synchronized (lock) {
+            if (!open) {
+                if (initialFailure != null) throw initialFailure;
+                if (currentView != null) return currentView;
+                initialFailure = new CommandHudCompositionSession.InitialCompositionFailure(
+                        "HUD renderer registration is no longer active");
+                throw initialFailure;
+            }
+            while (open) {
+                long version = lifecycleVersion;
+                try {
+                    result = composer.compose(base, true).view();
+                    if (CommandHudCompositionLifecycleSupport.isCurrent(open,
+                            lifecycleVersion, version, custom, this::rendererActive,
+                            composer::contributorsCurrent)) {
+                        currentView = result;
+                        initialized = true;
+                        break;
+                    }
+                    if (CommandHudCompositionLifecycleSupport.retryAfterOptionalInvalidation(
+                            open, lifecycleVersion, version, requiredFailure != null,
+                            this::rendererActive, states)) continue;
+                    if (requiredFailure != null) {
+                        failure = new CommandHudCompositionSession.InitialCompositionFailure(
+                                requiredFailure.contributorId(), requiredFailure.reason());
+                    } else {
+                        failure = new CommandHudCompositionSession.InitialCompositionFailure(
+                                "HUD renderer registration is no longer active");
+                    }
+                    initialFailure = failure;
+                    break;
+                } catch (CommandHudCompositionSession.RequiredCompositionFailure required) {
+                    requiredFailure = required.failure;
+                    failure = new CommandHudCompositionSession.InitialCompositionFailure(
+                            required.failure.contributorId(), required.failure.reason());
+                    initialFailure = failure;
+                    terminateLocked();
+                    cleanup = true;
+                    break;
+                } catch (CommandHudCompositionComposer.RendererUnavailableFailure unavailable) {
+                    failure = new CommandHudCompositionSession.InitialCompositionFailure(
+                            unavailable.getMessage());
+                    initialFailure = failure;
+                    terminateLocked();
+                    cleanup = true;
+                    break;
+                }
+            }
+        }
+        if (cleanup) {
+            requestCleanup("initial_composition_failed");
+            notifyRequiredFailure(requiredFailure);
+            throw failure;
+        }
+        if (failure != null) throw failure;
+        return result;
+    }
+
+    @Nonnull
+    V view() {
+        synchronized (lock) {
+            if (currentView == null) throw new IllegalStateException(
+                    "HUD composition has not started.");
+            return currentView;
+        }
+    }
+
+    @Nullable
+    U refresh(@Nonnull B base) {
+        return refresh(base, false);
+    }
+
+    @Nullable
+    private U refresh(@Nonnull B base, boolean includeBase) {
+        Objects.requireNonNull(base, "base");
+        CommandHudCompositionSession.RequiredCompositionFailure failure = null;
+        boolean cleanup = false;
+        long publishVersion = -1L;
+        U update = null;
+        synchronized (lock) {
+            if (!open || !initialized || (!includeBase && !composer.hasDirty())) return null;
+            long version = lifecycleVersion;
+            try {
+                V previous = currentView;
+                CommandHudCompositionComposer.Composition<V> composed =
+                        composer.compose(base, false);
+                if (!CommandHudCompositionLifecycleSupport.isCurrent(open, lifecycleVersion,
+                        version, custom, this::rendererActive, composer::contributorsCurrent)) {
+                    return null;
+                }
+                currentView = composed.view();
+                update = ((CommandHudCompositionSupport.SurfaceAdapter<B, V, U>)
+                        composer.adapter()).update(composed.view(), previous, composed.changeData());
+                if (!CommandHudCompositionLifecycleSupport.isCurrent(open, lifecycleVersion,
+                        version, custom, this::rendererActive, composer::contributorsCurrent)) {
+                    return null;
+                }
+                lastUpdate = update;
+                publishVersion = version;
+            } catch (CommandHudCompositionSession.RequiredCompositionFailure required) {
+                requiredFailure = required.failure;
+                failure = required;
+                terminateLocked();
+                cleanup = true;
+            } catch (CommandHudCompositionComposer.RendererUnavailableFailure unavailable) {
+                terminateLocked();
+                cleanup = true;
+            }
+        }
+        if (cleanup) {
+            requestCleanup(failure == null
+                    ? "renderer_unavailable" : "required_composition_failed");
+            if (failure != null) notifyRequiredFailure(failure.failure);
+            return null;
+        }
+        if (update != null) publish(update, publishVersion);
+        return update;
+    }
+
+    @Nonnull
+    V rebase(@Nonnull B base) {
+        Objects.requireNonNull(base, "base");
+        synchronized (lock) {
+            if (!initialized) return compose(base);
+            for (CommandHudCompositionState<B> state : states) state.dirty.markAll();
+        }
+        refresh(base);
+        return view();
+    }
+
+    /** Rebuilds only dirty contributors while replacing the detached base snapshot. */
+    @Nullable
+    U updateBase(@Nonnull B base) {
+        return refresh(base, true);
+    }
+
+    /** Returns whether a contributor or renderer has a pending refresh. */
+    boolean hasDirty() {
+        synchronized (lock) {
+            return composer.hasDirty();
+        }
+    }
+    @Nullable
+    U lastUpdate() {
+        synchronized (lock) {
+            return lastUpdate;
+        }
+    }
+    @Nullable
+    AutoCloseable rendererController() {
+        return cleanup.rendererController();
+    }
+
+    boolean custom() { return custom; }
+
+    @Nonnull
+    CommandHudSurface surface() { return surface; }
+
+    @Nonnull
+    UUID sessionId() { return sessionId; }
+
+    boolean isOpen() {
+        synchronized (lock) { return open; }
+    }
+
+    /** Runs one host-side UI write while the current session is still valid. */
+    boolean runIfCurrent(@Nonnull Runnable action) {
+        Objects.requireNonNull(action, "action");
+        synchronized (lock) {
+            if (!CommandHudCompositionLifecycleSupport.isCurrent(open, lifecycleVersion,
+                    lifecycleVersion, custom, this::rendererActive,
+                    composer::contributorsCurrent)) {
+                return false;
+            }
+            action.run();
+            return true;
+        }
+    }
+    /** Runs a host's initial build and packet through the lifecycle delivery gate. */
+    boolean runInitialIfCurrent(@Nonnull Runnable build, @Nonnull Runnable initialUpdate) {
+        return delivery.runInitial(build, initialUpdate);
+    }
+    @Nullable
+    CommandHudCompositionSession.RequiredFailure requiredFailure() {
+        synchronized (lock) { return requiredFailure; }
+    }
+
+    @Nonnull
+    CommandHudContributorDirtySink contributorSink(@Nonnull CommandHudContributorId id) {
+        Objects.requireNonNull(id, "id");
+        synchronized (lock) {
+            for (CommandHudCompositionState<B> state : states) {
+                if (state.binding.id().equals(id)) return state.sink;
+            }
+        }
+        return CommandHudContributorDirtySink.noop();
+    }
+
+    void markPathsDirty(@Nonnull CommandHudContributorId id, @Nonnull Set<String> paths) {
+        contributorSink(id).markPathsDirty(paths);
+    }
+
+    void markAllDirty(@Nonnull CommandHudContributorId id) {
+        contributorSink(id).markAllDirty();
+    }
+
+    @Override
+    public void close() {
+        synchronized (lock) {
+            terminateLocked();
+        }
+        requestCleanup(null);
+    }
+
+    @Nonnull
+    private List<CommandHudCompositionState<B>> createStates(
+            @Nonnull List<CommandHudCompositionBinding<B>> bindings
+    ) {
+        return CommandHudCompositionStateFactory.create(openContext, bindings, this::mark);
+    }
+
+    private void openDiagnostics() {
+        List<CommandHudDiagnostics.ContributorRegistration> selected = new ArrayList<>();
+        for (CommandHudCompositionState<B> state : states) selected.add(
+                new CommandHudDiagnostics.ContributorRegistration(
+                        state.binding.id().value(), state.binding.generation()));
+        for (CommandHudContribution contribution : compatibilityContributions.values()) {
+            selected.add(new CommandHudDiagnostics.ContributorRegistration(
+                    contribution.contributorId().value(), 0L));
+        }
+        cleanup.openDiagnostics(surface, rendererId, rendererGeneration,
+                openContext, selected);
+    }
+
+    private void installSubscriptions() {
+        synchronized (lock) {
+            CommandHudCompositionRendererBinding.install(rendererRegistry, surface, rendererId,
+                    rendererGeneration, this::rendererActive, this::rendererRegistrationEnded,
+                    cleanup::setRendererSubscription);
+            if (!open) return;
+            for (CommandHudCompositionState<B> state : states) {
+                CommandHudContributorRegistry registry = state.binding.registry();
+                if (registry == null || state.binding.generation() <= 0L) continue;
+                CommandHudContributorRegistry.ExactSubscription subscription = state.binding.target()
+                        ? registry.subscribeExactTargetUnregister(state.binding.id(),
+                        state.binding.generation(), (id, generation) -> registrationEnded(state, id, generation))
+                        : registry.subscribeExactHotswapUnregister(state.binding.id(),
+                        state.binding.generation(), (id, generation) -> registrationEnded(state, id, generation));
+                state.unregisterSubscription = subscription.handle();
+                if (!subscription.active() || !isActive(state)) {
+                    registrationEnded(state, state.binding.id(), state.binding.generation());
+                }
+                if (!open) return;
+            }
+        }
+    }
+
+    private void rendererRegistrationEnded() {
+        synchronized (lock) {
+            if (!open) return;
+            terminateLocked();
+        }
+        requestCleanup("renderer_unavailable");
+    }
+
+    private void registrationEnded(
+            @Nonnull CommandHudCompositionState<B> state,
+            @Nonnull CommandHudContributorId id,
+            long generation
+    ) {
+        if (!state.binding.id().equals(id) || state.binding.generation() != generation) return;
+        AutoCloseable contributor = null;
+        CommandHudCompositionSession.RequiredFailure failure = null;
+        synchronized (lock) {
+            if (!open || state.registrationLost) return;
+            state.registrationLost = true;
+            state.dirty.clear();
+            lifecycleVersion++;
+            if (state.binding.required()) {
+                failure = new CommandHudCompositionSession.RequiredFailure(
+                        state.binding.id(), "contributor registration was removed");
+                requiredFailure = failure;
+                terminateLocked();
+            } else {
+                contributor = state.contributor;
+                state.contributor = null;
+                state.lastValidContribution = null;
+                state.lastPublishedContribution = null;
+                state.unavailablePublished = false;
+                state.dirty.markAll();
+            }
+        }
+        if (failure != null) {
+            requestCleanup("required_contributor_removed");
+            notifyRequiredFailure(failure);
+        } else {
+            CommandHudCompositionCleanup.closeQuietly(contributor);
+            if (diagnostics != null) diagnostics.contributorRemoved(
+                    sessionId, id.value(), generation);
+            requestRefresh();
+        }
+    }
+
+    private void mark(
+            @Nonnull CommandHudCompositionState<B> state,
+            @Nonnull CommandHudDirtyScope scope
+    ) {
+        synchronized (lock) {
+            if (!open || !isActive(state)) return;
+            if (scope.fullRefresh()) state.dirty.markAll();
+            else state.dirty.markPaths(scope.paths());
+        }
+        requestRefresh();
+    }
+
+    private boolean isActive(@Nonnull CommandHudCompositionState<B> state) {
+        if (state.registrationLost) return false;
+        try {
+            return state.binding.active().getAsBoolean();
+        } catch (RuntimeException | LinkageError failure) {
+            state.failure = failure.getClass().getSimpleName();
+            return false;
+        }
+    }
+
+    private void requestRefresh() {
+        try { refreshRequest.run(); } catch (RuntimeException | LinkageError ignored) { }
+    }
+
+    private boolean rendererActive() {
+        try {
+            return custom && rendererActive.getAsBoolean();
+        } catch (RuntimeException | LinkageError ignored) {
+            return false;
+        }
+    }
+
+    @Nonnull
+    private void terminateLocked() {
+        if (cleanupStarted) return;
+        open = false;
+        lifecycleVersion++;
+        cleanupStarted = true;
+    }
+
+    private void publish(@Nonnull U update, long version) { delivery.publish(update, version); }
+
+    private void requestCleanup(@Nullable String reason) { delivery.requestCleanup(reason); }
+
+    private void notifyRequiredFailure(
+            @Nullable CommandHudCompositionSession.RequiredFailure failure
+    ) {
+        synchronized (lock) {
+            if (failure == null || requiredFailureNotified) return;
+            requiredFailureNotified = true;
+        }
+        try { failureHandler.failed(failure.contributorId(), failure.reason()); }
+        catch (RuntimeException | LinkageError ignored) { }
+    }
+}

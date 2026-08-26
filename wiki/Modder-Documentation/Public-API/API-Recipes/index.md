@@ -10,7 +10,7 @@ Parent: [Public API](/mod/alecs-tamework/public-api) | [Modder Documentation](/m
 
 This subsection provides task-focused examples for common Tamework API integration workflows.
 
-> **Experimental API Contract (`0.9.0`)**
+> **Experimental API Contract (`0.12.0`)**
 > Recipe behavior should always be gated behind runtime capability checks.
 
 ## Child Pages
@@ -33,6 +33,7 @@ This subsection provides task-focused examples for common Tamework API integrati
 - [Register Interaction Extensions in Plugin Lifecycle Recipe](/mod/alecs-tamework/register-interaction-extensions-in-plugin-lifecycle-recipe)
 - [Register Custom Trait Effect Key Recipe](/mod/alecs-tamework/register-custom-trait-effect-key-recipe)
 - [Register a Custom Command UI Recipe](/mod/alecs-tamework/register-a-custom-command-ui-recipe)
+- [Register Custom Command HUDs Recipe](/mod/alecs-tamework/register-custom-command-huds-recipe)
 
 ## Additional Recipes
 - [API Bootstrap and Capability Checks Recipe](/mod/alecs-tamework/api-bootstrap-and-capability-checks-recipe)

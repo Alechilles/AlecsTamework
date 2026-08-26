@@ -60,6 +60,12 @@
   The API also supplies complete built-in group and generic or bonded talent
   flows, redacted diagnostics, standard-menu fallback, and bounded callback
   timing warnings.
+- Added an experimental command HUD renderer and contributor API for Java
+  plugins. Command-item configs can select independent custom target and
+  equipped-tool HUD layouts with `TargetHudRendererId`,
+  `TargetHudContributors`, `HotswapHudRendererId`, and
+  `HotswapHudContributors`. Renderers receive complete detached snapshots and
+  focused update hints for either surface.
 - Added optional per-tool `Highlight Active` indicators for generic linked
   panels on Update 6. The controller sees group-colored indicators above loaded
   active companions. Ungrouped companions use neutral gold. The setting is
