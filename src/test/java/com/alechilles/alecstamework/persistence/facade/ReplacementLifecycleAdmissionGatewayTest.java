@@ -156,6 +156,39 @@ class ReplacementLifecycleAdmissionGatewayTest {
         }
     }
 
+    /** Protects revival of managed profiles created before group tracking. */
+    @Test
+    void deadRestorationAuthorsInitialGroupEvidenceWhenAssignmentIsMissing()
+            throws Exception {
+        try (PersistenceBootstrap persistence = new PersistenceBootstrap(configuration());
+             AdmissionProviderRegistry providers = new AdmissionProviderRegistry()) {
+            assertTrue(persistence.start().toCompletableFuture().join().complete());
+            PopulationGroupConfigRegistry groups = new PopulationGroupConfigRegistry();
+            assertTrue(groups.replace(List.of(groupConfig()), 1L).applied());
+            ManagedActivityConfigRegistry managed =
+                    new ManagedActivityConfigRegistry(groups);
+            assertTrue(managed.replace(List.of(managedConfig()), 1L).applied());
+            providers.register("runeteria:provider", 1, ignored ->
+                    CompletableFuture.completedFuture(providerDecision(
+                            managed.snapshot().revision()
+                    )));
+            ReplacementLifecycleAdmissionGateway gateway =
+                    new ReplacementLifecycleAdmissionGateway(
+                            persistence, managed, groups, providers, () -> -50L
+                    );
+
+            LifecycleAdmissionEvidence evidence = gateway.authorize(
+                    deadRestorationRequest()
+            ).toCompletableFuture().join();
+
+            assertEquals(LifecycleAdmissionEvidence.Status.MANAGED, evidence.status());
+            assertEquals(0, evidence.composition().groupRequest()
+                    .expectedAssignmentRevision());
+            assertEquals("runeteria:livestock", evidence.composition()
+                    .groupRequest().policies().getFirst().groupId());
+        }
+    }
+
     @Test
     void unownedReleaseKeepsDestinationSeparateFromOwnerWorld()
             throws Exception {
@@ -281,6 +314,48 @@ class ReplacementLifecycleAdmissionGatewayTest {
                 LifecycleState.ACTIVE,
                 sourceOwner,
                 sourceOwner == null ? null : "world"
+        );
+    }
+
+    private LifecycleAdmissionRequest deadRestorationRequest() {
+        LifecycleRevision revision = new LifecycleRevision(1);
+        CompanionLifecycle source = new CompanionLifecycle(
+                PROFILE,
+                new OwnerId(OWNER),
+                LifecycleState.DEAD_REVIVABLE,
+                LifecycleLocation.none(),
+                revision,
+                null,
+                -60L,
+                ReconciliationGeneration.INITIAL,
+                null,
+                "world"
+        );
+        PopulationAdmissionRequest admission = new PopulationAdmissionRequest(
+                new PopulationAdmissionIdentity(PROFILE.toString(), null, null),
+                null,
+                revision.value(),
+                OWNER,
+                OWNER,
+                new PopulationAdmissionLocation("world", 0, 0),
+                new PopulationAdmissionLocation("world-two", 0, 0),
+                PopulationAdmissionOperation.RESTORE,
+                1,
+                PopulationAdmissionForcePolicy.ENFORCE,
+                PopulationCompanionLifecycle.ACTIVE
+        );
+        return LifecycleAdmissionRequest.managed(
+                OperationId.parse("60000000-0000-0000-0000-000000000414"),
+                UUID.fromString("70000000-0000-0000-0000-000000000414"),
+                "managed-role",
+                new PopulationAdmissionRequestV2(
+                        admission, "managed-role", "world-two"
+                ),
+                source,
+                LifecycleState.DEAD_REVIVABLE,
+                LifecycleState.ACTIVE,
+                new OwnerId(OWNER),
+                "world"
         );
     }
 

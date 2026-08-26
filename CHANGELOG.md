@@ -38,6 +38,8 @@
   and managed-admission companions without failing lifecycle admission.
 - Captured companions that predate population-group classification can now
   create their first managed group assignment when released.
+- Dead managed companions that predate population-group classification can
+  now create their first group assignment when revived.
 
 ## 3.2.2 - Flightmaster's Talisman Preview Hotfix - 2026-08-24
 

@@ -81,7 +81,9 @@ final class PopulationAdmissionCompositionAuthor {
                     PopulationGroupAssignment assignment = found.value().stream()
                             .filter(value -> value.profileId().equals(source.profileId()))
                             .findFirst().orElse(null);
-                    if (assignment == null && capturedRelease(source, payload)) {
+                    if (assignment == null && initializesMissingAssignment(
+                            request, source, payload
+                    )) {
                         return CompletableFuture.completedFuture(
                                 composition(
                                         request, source, payload, operationId, null
@@ -138,6 +140,24 @@ final class PopulationAdmissionCompositionAuthor {
                 && source.revision().equals(
                 payload.expectedLifecycleRevision()
         );
+    }
+
+    private boolean initializesMissingAssignment(
+            PopulationAdmissionRequestV3 request,
+            CompanionLifecycle source,
+            PopulationDomainAdmissionOperation.Payload payload
+    ) {
+        return capturedRelease(source, payload)
+                || (request.request().request().operation()
+                        == PopulationAdmissionOperation.RESTORE
+                        && source.state() == LifecycleState.DEAD_REVIVABLE
+                        && payload.sourceLifecycle()
+                        == LifecycleState.DEAD_REVIVABLE
+                        && payload.targetLifecycle() == LifecycleState.ACTIVE
+                        && source.profileId().equals(payload.profileId())
+                        && source.revision().equals(
+                        payload.expectedLifecycleRevision()
+                ));
     }
 
     private PopulationAdmissionComposition newProfileComposition(

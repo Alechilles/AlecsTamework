@@ -197,7 +197,7 @@ public final class SqlitePopulationGroupTransitionParticipant
             );
         }
         if (request.expectedAssignmentRevision() == 0) {
-            if (!initializesCapturedAssignment()) {
+            if (!initializesExistingAssignment()) {
                 throw new IllegalStateException(
                         "population_group_initial_transition_invalid"
                 );
@@ -297,7 +297,7 @@ public final class SqlitePopulationGroupTransitionParticipant
             SqlitePersistenceTransactionContext transaction,
             OperationEnvelope operation
     ) {
-        if (!initializesCapturedAssignment()
+        if (!initializesExistingAssignment()
                 && !isNewProfileEvidence(operation)) {
             return null;
         }
@@ -349,9 +349,10 @@ public final class SqlitePopulationGroupTransitionParticipant
         return result.value();
     }
 
-    private boolean initializesCapturedAssignment() {
+    private boolean initializesExistingAssignment() {
         return request.expectedAssignmentRevision() == 0
-                && request.before().state() == LifecycleState.CAPTURED
+                && (request.before().state() == LifecycleState.CAPTURED
+                || request.before().state() == LifecycleState.DEAD_REVIVABLE)
                 && request.after().state() == LifecycleState.ACTIVE;
     }
 

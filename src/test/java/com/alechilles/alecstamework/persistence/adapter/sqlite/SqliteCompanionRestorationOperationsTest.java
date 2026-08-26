@@ -27,7 +27,10 @@ import com.alechilles.alecstamework.companion.provisioning.ProvisioningOrigin;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningRecord;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignment;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupMembership;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupPolicy;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionRequest;
+import com.alechilles.alecstamework.companion.population.domain.PopulationAdmissionComposition;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainBucket;
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainScope;
@@ -361,7 +364,7 @@ class SqliteCompanionRestorationOperationsTest {
     }
 
     @Test
-    void managedFreeRestorationUsesCanonicalAdmissionAndReplaysWithoutProvider()
+    void managedFreeRestorationRepairsMissingGroupAssignment()
             throws Exception {
         seedCommittedDomainSource();
         AtomicInteger admissionCalls = new AtomicInteger();
@@ -437,6 +440,18 @@ class SqliteCompanionRestorationOperationsTest {
                             "world-two"
                     )).committedDeployable()
             );
+            PopulationGroupAssignment assignment =
+                    new SqlitePopulationGroupAssignmentStore(connection)
+                            .find(PROFILE).orElseThrow();
+            assertEquals("role", assignment.roleId());
+            assertEquals(
+                    List.of(new PopulationGroupMembership(
+                            "managed-test-group", PopulationGroupScope.GLOBAL
+                    )),
+                    assignment.memberships()
+            );
+            assertEquals(new LifecycleRevision(3),
+                    assignment.sourceLifecycleRevision());
         }
     }
 
@@ -794,7 +809,52 @@ class SqliteCompanionRestorationOperationsTest {
                         List.of(),
                         -400
                 );
-        return LifecycleAdmissionEvidence.managed(payload, null);
+        CompanionLifecycle before = new CompanionLifecycle(
+                PROFILE,
+                OWNER,
+                LifecycleState.DEAD_REVIVABLE,
+                LifecycleLocation.none(),
+                new LifecycleRevision(1),
+                null,
+                -10_000,
+                new ReconciliationGeneration(4),
+                null,
+                "world"
+        );
+        CompanionLifecycle after = new CompanionLifecycle(
+                PROFILE,
+                OWNER,
+                LifecycleState.ACTIVE,
+                LifecycleLocation.liveEntity(
+                        TARGET_ALIAS.toString(), "world-two"
+                ),
+                new LifecycleRevision(2),
+                operationId,
+                -400,
+                new ReconciliationGeneration(4),
+                null,
+                "world-two"
+        );
+        PopulationGroupPolicy policy = new PopulationGroupPolicy(
+                "managed-test-group",
+                PopulationGroupScope.GLOBAL,
+                100,
+                100,
+                1
+        );
+        PopulationAdmissionComposition composition =
+                new PopulationAdmissionComposition(
+                        null,
+                        new PopulationGroupTransitionAdmissionRequest(
+                                before,
+                                after,
+                                0,
+                                1,
+                                List.of(policy),
+                                -400
+                        )
+                );
+        return LifecycleAdmissionEvidence.managed(payload, composition);
     }
 
     private LifecycleAdmissionEvidence legacyManagedEvidence(
