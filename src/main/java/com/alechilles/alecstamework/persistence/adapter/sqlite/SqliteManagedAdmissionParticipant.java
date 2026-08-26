@@ -139,6 +139,15 @@ public final class SqliteManagedAdmissionParticipant
             int settledUnits
     ) {
         domain.settleBatch(transaction, operation, requestedUnits, settledUnits);
+        if (groups != null && requestedUnits == 1 && settledUnits == 1) {
+            groups.settlePrepared(transaction, operation);
+            if (owner == null) {
+                retireOwnerRows(transaction, operation);
+            } else {
+                owner.retirePrepared(transaction, operation);
+            }
+            return;
+        }
         retireCompanionRows(transaction, operation);
     }
 

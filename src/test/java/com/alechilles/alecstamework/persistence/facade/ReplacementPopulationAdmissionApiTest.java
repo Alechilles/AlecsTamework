@@ -15,14 +15,18 @@ import com.alechilles.alecstamework.api.PopulationDomainClaim;
 import com.alechilles.alecstamework.api.internal.AdmissionProviderRegistry;
 import com.alechilles.alecstamework.companion.population.domain.ManagedBatchAdmissionRequest;
 import com.alechilles.alecstamework.companion.population.domain.ManagedAdmissionEvidenceAuthor;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignment;
 import com.alechilles.alecstamework.config.assets.TwManagedActivityConfig;
 import com.alechilles.alecstamework.config.assets.TwPopulationGroupConfig;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegistry;
+import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
+import com.alechilles.alecstamework.items.persistence.ReplacementProfileSnapshotSink;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceRuntimeConfiguration;
@@ -40,6 +44,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.bson.BsonDocument;
@@ -208,6 +213,118 @@ class ReplacementPopulationAdmissionApiTest {
             assertEquals(PopulationAdmissionDecision.Status.CANCELED,
                     api.cancel(afterRollback.token()).toCompletableFuture().join().status());
         }
+    }
+
+    @Test
+    void adminForceCanExceedManagedLimitsButStillConsumesCapacity()
+            throws Exception {
+        try (PersistenceBootstrap persistence =
+                     new PersistenceBootstrap(configuration());
+             AdmissionProviderRegistry providers =
+                     new AdmissionProviderRegistry()) {
+            assertTrue(persistence.start().toCompletableFuture().join().complete());
+            PopulationGroupConfigRegistry groups =
+                    new PopulationGroupConfigRegistry();
+            assertTrue(groups.replace(List.of(groupConfig(1)), 1L).applied());
+            ManagedActivityConfigRegistry managed =
+                    new ManagedActivityConfigRegistry(groups);
+            assertTrue(managed.replace(
+                    List.of(managedConfig()), 1L
+            ).applied());
+            AtomicBoolean allow = new AtomicBoolean();
+            providers.register("runeteria:provider", 1, ignored ->
+                    CompletableFuture.completedFuture(allow.get()
+                            ? providerDecision(
+                                    1, managed.snapshot().revision()
+                            )
+                            : new PopulationAdmissionProviderDecision(
+                                    PopulationAdmissionProviderStatus.DENY,
+                                    "runeteria:family_locked",
+                                    Set.of(),
+                                    Map.of(),
+                                    1L,
+                                    managed.snapshot().revision()
+                            )));
+            ReplacementPopulationAdmissionApi api =
+                    new ReplacementPopulationAdmissionApi(
+                            persistence,
+                            persistence.facades().operations(),
+                            managed,
+                            groups,
+                            providers,
+                            () -> -50L
+                    );
+
+            PopulationAdmissionDecision first = api.tryAdmitV3(
+                    forceRequest("40000000-0000-0000-0000-000000000421", "force-1")
+            ).toCompletableFuture().join();
+            assertEquals(PopulationAdmissionDecision.Status.RESERVED,
+                    first.status(), first.reason());
+            assertEquals(PopulationAdmissionDecision.Status.APPLYING,
+                    api.claimForApply(first.token()).status());
+            publishProfile(
+                    persistence,
+                    UUID.fromString("40000000-0000-0000-0000-000000000421")
+            );
+            assertEquals(PopulationAdmissionDecision.Status.COMMITTED,
+                    api.commit(first.token()).toCompletableFuture().join().status());
+
+            PopulationAdmissionDecision second = api.tryAdmitV3(
+                    forceRequest("40000000-0000-0000-0000-000000000422", "force-2")
+            ).toCompletableFuture().join();
+            assertEquals(PopulationAdmissionDecision.Status.RESERVED,
+                    second.status(), second.reason());
+            assertEquals(PopulationAdmissionDecision.Status.APPLYING,
+                    api.claimForApply(second.token()).status());
+            publishProfile(
+                    persistence,
+                    UUID.fromString("40000000-0000-0000-0000-000000000422")
+            );
+            assertEquals(PopulationAdmissionDecision.Status.COMMITTED,
+                    api.commit(second.token()).toCompletableFuture().join().status());
+
+            allow.set(true);
+            PopulationAdmissionDecision normal = api.tryAdmitV3(
+                    request("40000000-0000-0000-0000-000000000423", "normal-after-force")
+            ).toCompletableFuture().join();
+
+            assertEquals(PopulationAdmissionDecision.Status.UNAVAILABLE,
+                    normal.status());
+            PersistenceReadResult<List<PopulationGroupAssignment>> assignments =
+                    persistence.facades().queries()
+                            .findAllPopulationGroupAssignments()
+                            .toCompletableFuture().join();
+            assertTrue(assignments instanceof PersistenceReadResult.Found<
+                    List<PopulationGroupAssignment>> found
+                    && found.value().size() == 2, assignments.toString());
+        }
+    }
+
+    private void publishProfile(
+            PersistenceBootstrap persistence,
+            UUID npcUuid
+    ) {
+        ReplacementProfileSnapshotSink sink = new ReplacementProfileSnapshotSink(
+                persistence.facades().queries(),
+                persistence.facades().operations(),
+                () -> 10L,
+                ignored -> { }
+        );
+        sink.publish(
+                new CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot(
+                        npcUuid,
+                        OWNER,
+                        "Owner",
+                        new String[0],
+                        "unmanaged-role",
+                        true,
+                        null,
+                        "Cow",
+                        null,
+                        null
+                ),
+                "world"
+        ).toCompletableFuture().join();
     }
 
     @Test
@@ -464,11 +581,20 @@ class ReplacementPopulationAdmissionApiTest {
     }
 
     private PopulationAdmissionRequestV3 request() {
+        return request(
+                "40000000-0000-0000-0000-000000000411", "facade-test"
+        );
+    }
+
+    private PopulationAdmissionRequestV3 request(
+            String profileId,
+            String idempotencyKey
+    ) {
         PopulationAdmissionRequest admission = new PopulationAdmissionRequest(
                 new PopulationAdmissionIdentity(
                         null,
-                        "40000000-0000-0000-0000-000000000411",
-                        "facade-test"
+                        profileId,
+                        idempotencyKey
                 ),
                 null,
                 PopulationAdmissionRequest.NEW_PROFILE_REVISION,
@@ -479,6 +605,33 @@ class ReplacementPopulationAdmissionApiTest {
                 PopulationAdmissionOperation.NEW_OWNERSHIP,
                 1,
                 PopulationAdmissionForcePolicy.ENFORCE,
+                PopulationCompanionLifecycle.ACTIVE
+        );
+        return new PopulationAdmissionRequestV3(
+                new PopulationAdmissionRequestV2(
+                        admission, "unmanaged-role", "world"
+                ),
+                "runeteria:husbandry"
+        );
+    }
+
+    private PopulationAdmissionRequestV3 forceRequest(
+            String profileId,
+            String idempotencyKey
+    ) {
+        PopulationAdmissionRequest admission = new PopulationAdmissionRequest(
+                new PopulationAdmissionIdentity(
+                        null, profileId, idempotencyKey
+                ),
+                null,
+                PopulationAdmissionRequest.NEW_PROFILE_REVISION,
+                null,
+                OWNER,
+                null,
+                new PopulationAdmissionLocation("world", 0, 0),
+                PopulationAdmissionOperation.ADMIN_FORCE,
+                1,
+                PopulationAdmissionForcePolicy.ADMIN_OVERRIDE,
                 PopulationCompanionLifecycle.ACTIVE
         );
         return new PopulationAdmissionRequestV3(

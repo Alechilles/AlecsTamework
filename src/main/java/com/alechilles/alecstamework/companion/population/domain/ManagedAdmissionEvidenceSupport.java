@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.companion.population.domain;
 
 import com.alechilles.alecstamework.api.PopulationAdmissionRequest;
 import com.alechilles.alecstamework.api.PopulationAdmissionRequestV3;
+import com.alechilles.alecstamework.api.PopulationAdmissionOperation;
+import com.alechilles.alecstamework.api.PopulationCompanionLifecycle;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
@@ -67,5 +69,29 @@ final class ManagedAdmissionEvidenceSupport {
         return admission.destination() == null
                 ? request.request().ownershipWorldName()
                 : admission.destination().worldName();
+    }
+
+    static LifecycleState before(PopulationAdmissionRequest request) {
+        return request.operation() == PopulationAdmissionOperation.NEW_OWNERSHIP
+                || request.operation() == PopulationAdmissionOperation.BREEDING
+                || request.operation() == PopulationAdmissionOperation.LEGACY_ADOPTION
+                || request.operation() == PopulationAdmissionOperation.RESTORE
+                ? null : map(request.targetLifecycle());
+    }
+
+    static LifecycleState map(PopulationCompanionLifecycle lifecycle) {
+        return switch (lifecycle) {
+            case ACTIVE -> LifecycleState.ACTIVE;
+            case UNLOADED -> LifecycleState.UNLOADED;
+            case CAPTURED -> LifecycleState.CAPTURED;
+            case COOP -> LifecycleState.COOP;
+            case DEAD_REVIVABLE -> LifecycleState.DEAD_REVIVABLE;
+            case LOST -> LifecycleState.LOST;
+            case ROSTER_STORED -> LifecycleState.ROSTER_STORED;
+            case PROVISIONED_DORMANT -> LifecycleState.PROVISIONED_DORMANT;
+            case RELEASED -> LifecycleState.RELEASED;
+            case RESTORING, STORING -> LifecycleState.ACTIVE;
+            case UNKNOWN_DORMANT -> LifecycleState.UNRESOLVED;
+        };
     }
 }

@@ -5,7 +5,6 @@ import com.alechilles.alecstamework.api.PopulationAdmissionProviderRequest;
 import com.alechilles.alecstamework.api.PopulationAdmissionProviderStatus;
 import com.alechilles.alecstamework.api.PopulationAdmissionRequest;
 import com.alechilles.alecstamework.api.PopulationAdmissionRequestV3;
-import com.alechilles.alecstamework.api.PopulationCompanionLifecycle;
 import com.alechilles.alecstamework.api.PopulationDomainClaim;
 import com.alechilles.alecstamework.api.RequiredContentProfileStatus;
 import com.alechilles.alecstamework.api.internal.AdmissionProviderRegistry;
@@ -63,8 +62,12 @@ public final class ManagedAdmissionEvidenceAuthor {
                 operationId,
                 reservationId,
                 request,
-                admission == null ? null : before(admission),
-                admission == null ? null : map(admission.targetLifecycle())
+                admission == null ? null
+                        : ManagedAdmissionEvidenceSupport.before(admission),
+                admission == null ? null
+                        : ManagedAdmissionEvidenceSupport.map(
+                                admission.targetLifecycle()
+                        )
         );
     }
 
@@ -151,6 +154,36 @@ public final class ManagedAdmissionEvidenceAuthor {
                             Map.of(),
                             0,
                             readiness.configRevision()
+                    );
+            try {
+                return CompletableFuture.completedFuture(new Authoring(
+                        payload(
+                                operationId,
+                                reservationId,
+                                request,
+                                readiness,
+                                providerReadiness,
+                                resolution,
+                                decision,
+                                sourceOwner,
+                                sourceWorld,
+                                beforeState,
+                                afterState,
+                                1,
+                                List.of()
+                        ),
+                        readiness,
+                        providerReadiness,
+                        decision
+                ));
+            } catch (RuntimeException invalid) {
+                return CompletableFuture.failedFuture(invalid);
+            }
+        }
+        if (ManagedAdminOverrideEvidence.applies(admission)) {
+            PopulationAdmissionProviderDecision decision =
+                    ManagedAdminOverrideEvidence.decision(
+                            readiness, resolution
                     );
             try {
                 return CompletableFuture.completedFuture(new Authoring(
@@ -270,7 +303,8 @@ public final class ManagedAdmissionEvidenceAuthor {
                 ? null : batch.admission().request().request();
         return authorBatch(
                 batch,
-                admission == null ? null : before(admission),
+                admission == null ? null
+                        : ManagedAdmissionEvidenceSupport.before(admission),
                 admission == null || admission.oldOwnerUuid() == null
                         ? null : new OwnerId(admission.oldOwnerUuid()),
                 admission == null || admission.source() == null
@@ -295,7 +329,9 @@ public final class ManagedAdmissionEvidenceAuthor {
                         .getBytes(java.nio.charset.StandardCharsets.UTF_8)),
                 batch.admission(),
                 beforeState,
-                map(batch.admission().request().request().targetLifecycle()),
+                ManagedAdmissionEvidenceSupport.map(
+                        batch.admission().request().request().targetLifecycle()
+                ),
                 sourceOwner,
                 sourceWorld
         ).thenApply(authoring -> ManagedAdmissionBatchSupport.scale(
@@ -436,32 +472,6 @@ public final class ManagedAdmissionEvidenceAuthor {
                 children,
                 now
         );
-    }
-
-    private LifecycleState before(PopulationAdmissionRequest request) {
-        if (request.operation() == com.alechilles.alecstamework.api.PopulationAdmissionOperation.NEW_OWNERSHIP
-                || request.operation() == com.alechilles.alecstamework.api.PopulationAdmissionOperation.BREEDING
-                || request.operation() == com.alechilles.alecstamework.api.PopulationAdmissionOperation.LEGACY_ADOPTION
-                || request.operation() == com.alechilles.alecstamework.api.PopulationAdmissionOperation.RESTORE) {
-            return null;
-        }
-        return map(request.targetLifecycle());
-    }
-
-    private LifecycleState map(PopulationCompanionLifecycle lifecycle) {
-        return switch (lifecycle) {
-            case ACTIVE -> LifecycleState.ACTIVE;
-            case UNLOADED -> LifecycleState.UNLOADED;
-            case CAPTURED -> LifecycleState.CAPTURED;
-            case COOP -> LifecycleState.COOP;
-            case DEAD_REVIVABLE -> LifecycleState.DEAD_REVIVABLE;
-            case LOST -> LifecycleState.LOST;
-            case ROSTER_STORED -> LifecycleState.ROSTER_STORED;
-            case PROVISIONED_DORMANT -> LifecycleState.PROVISIONED_DORMANT;
-            case RELEASED -> LifecycleState.RELEASED;
-            case RESTORING, STORING -> LifecycleState.ACTIVE;
-            case UNKNOWN_DORMANT -> LifecycleState.UNRESOLVED;
-        };
     }
 
     /** Frozen evidence ready for one shared operation envelope. */

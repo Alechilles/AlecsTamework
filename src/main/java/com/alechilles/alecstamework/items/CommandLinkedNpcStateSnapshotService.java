@@ -259,9 +259,25 @@ public final class CommandLinkedNpcStateSnapshotService {
         refreshFromEntityStage(reference, store);
     }
 
+    /** Publishes the profile created by one admitted admin spawn. */
+    public CompletionStage<Void> publishAdminSpawnProfile(
+            Ref<EntityStore> reference,
+            Store<EntityStore> store
+    ) {
+        return refreshFromEntityStage(reference, store, true);
+    }
+
     private CompletionStage<Void> refreshFromEntityStage(
             Ref<EntityStore> reference,
             Store<EntityStore> store
+    ) {
+        return refreshFromEntityStage(reference, store, false);
+    }
+
+    private CompletionStage<Void> refreshFromEntityStage(
+            Ref<EntityStore> reference,
+            Store<EntityStore> store,
+            boolean publishProjection
     ) {
         if (reference == null || !reference.isValid() || store == null) {
             return CompletableFuture.completedFuture(null);
@@ -279,7 +295,7 @@ public final class CommandLinkedNpcStateSnapshotService {
             return CompletableFuture.completedFuture(null);
         }
         snapshotsByNpc.put(npcUuid, snapshot);
-        if (!hasProjectionIdentity(reference, store)) {
+        if (publishProjection || !hasProjectionIdentity(reference, store)) {
             return upsertProfile(snapshot, worldKey(store));
         }
         return CompletableFuture.completedFuture(null);
@@ -322,6 +338,7 @@ public final class CommandLinkedNpcStateSnapshotService {
                 || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_CAPTURE_SOURCE.equals(kind)
                 || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_IMPORT_ADOPTION.equals(kind)
                 || TameworkProjectionIdentityComponent.KIND_BREEDING_CHILD.equals(kind)
+                || TameworkProjectionIdentityComponent.KIND_ADMIN_FORCE.equals(kind)
                 || TameworkProjectionIdentityComponent.KIND_COMMAND_ROSTER.equals(kind);
     }
 

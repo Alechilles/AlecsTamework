@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.persistence.facade;
 
 import com.alechilles.alecstamework.api.PopulationAdmissionRequest;
 import com.alechilles.alecstamework.api.PopulationAdmissionRequestV3;
+import com.alechilles.alecstamework.api.PopulationAdmissionForcePolicy;
+import com.alechilles.alecstamework.api.PopulationAdmissionOperation;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
@@ -148,6 +150,17 @@ final class PopulationAdmissionCompositionAuthor {
         if (policies.isEmpty()) {
             throw new IllegalStateException("population-admission-group-policy-missing");
         }
+        if (adminOverride(request)) {
+            policies = policies.stream().map(policy ->
+                    new PopulationGroupPolicy(
+                            policy.groupId(),
+                            policy.scope(),
+                            0,
+                            0,
+                            policy.policyRevision()
+                    )
+            ).toList();
+        }
         CompanionLifecycle before = new CompanionLifecycle(
                 payload.profileId(),
                 null,
@@ -182,18 +195,20 @@ final class PopulationAdmissionCompositionAuthor {
                         payload.createdAtMs()
                 );
         return new PopulationAdmissionComposition(
-                newProfileOwnerPlan(payload), groupRequest
+                newProfileOwnerPlan(request, payload), groupRequest
         );
     }
 
     private OwnerPopulationAdmissionPlan newProfileOwnerPlan(
+            PopulationAdmissionRequestV3 request,
             PopulationDomainAdmissionOperation.Payload payload
     ) {
         TwGlobalConfig config = TwGlobalConfig.resolveActive();
         if (config == null) {
             config = TwGlobalConfig.defaultConfig();
         }
-        int limit = config.getPopulationLimitPerPlayerOwnedTotal();
+        int limit = adminOverride(request)
+                ? 0 : config.getPopulationLimitPerPlayerOwnedTotal();
         TwGlobalConfig.PerPlayerLimitScope configuredScope =
                 config.getPopulationPerPlayerLimitScope();
         OwnerPopulationScope scope = configuredScope
@@ -209,6 +224,13 @@ final class PopulationAdmissionCompositionAuthor {
                         scope, 1, limit
                 ))
         );
+    }
+
+    private boolean adminOverride(PopulationAdmissionRequestV3 request) {
+        PopulationAdmissionRequest admission = request.request().request();
+        return admission.operation() == PopulationAdmissionOperation.ADMIN_FORCE
+                && admission.forcePolicy()
+                == PopulationAdmissionForcePolicy.ADMIN_OVERRIDE;
     }
 
     private String requireOwnerWorld(

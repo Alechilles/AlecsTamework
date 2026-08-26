@@ -1816,6 +1816,13 @@ public class Tamework extends JavaPlugin {
         return managedActivityConfigRegistry;
     }
 
+    /** Returns the internal profile publisher used by admitted admin spawns. */
+    @Nullable
+    public CommandLinkedNpcStateSnapshotService
+    getCommandLinkedNpcStateSnapshotService() {
+        return commandLinkedNpcStateSnapshotService;
+    }
+
     /** Refreshes runtime-backed API settings without exposing its implementation. */
     public void onRuntimeSettingsChanged() {
         CompanionMovementSpeedSyncSystem.invalidateConfigRevision();

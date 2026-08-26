@@ -120,7 +120,7 @@ public final class SqlitePopulationGroupTransitionParticipant
                     delegated.execute(transaction, operation)
             );
             PopulationGroupAssignment initialized =
-                    initializeAssignment(transaction);
+                    initializeAssignment(transaction, operation);
             if (initialized != null) {
                 events.add(PopulationGroupAssignmentChangeCodec.draft(
                         operation.operationId(),
@@ -141,6 +141,16 @@ public final class SqlitePopulationGroupTransitionParticipant
     ) {
         int expected = transaction.populationGroups()
                 .findReservations(operation.operationId()).size();
+        retireExact(transaction, operation, expected);
+    }
+
+    /** Commits a single new-profile assignment and retires its reservation. */
+    public void settlePrepared(
+            SqlitePersistenceTransactionContext transaction,
+            OperationEnvelope operation
+    ) {
+        int expected = plannedReservationCount(transaction, operation);
+        initializeAssignment(transaction, operation);
         retireExact(transaction, operation, expected);
     }
 
@@ -284,9 +294,11 @@ public final class SqlitePopulationGroupTransitionParticipant
     }
 
     private PopulationGroupAssignment initializeAssignment(
-            SqlitePersistenceTransactionContext transaction
+            SqlitePersistenceTransactionContext transaction,
+            OperationEnvelope operation
     ) {
-        if (!initializesCapturedAssignment()) {
+        if (!initializesCapturedAssignment()
+                && !isNewProfileEvidence(operation)) {
             return null;
         }
         CompanionLifecycle lifecycle = transaction.lifecycles()
