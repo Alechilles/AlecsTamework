@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.ui.TameworkCommandTargetHud;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.HashMap;
@@ -14,11 +13,22 @@ import javax.annotation.Nullable;
 final class CommandTargetHudStateStore {
     private final Object storesLock = new Object();
     private final Map<Store<EntityStore>, StoreState> statesByStore = new IdentityHashMap<>();
+    @Nullable
+    private final CommandTargetHudPresentationCoordinator coordinator;
 
     CommandTargetHudStateStore(@Nonnull CommandTargetHudActivationTracker activationTracker) {
+        this(activationTracker, null);
+    }
+
+    CommandTargetHudStateStore(
+            @Nonnull CommandTargetHudActivationTracker activationTracker,
+            @Nullable CommandTargetHudPresentationCoordinator coordinator
+    ) {
+        this.coordinator = coordinator;
         activationTracker.addLifecycleListener(new CommandTargetHudActivationTracker.LifecycleListener() {
             @Override
             public void onPlayerRemoved(@Nonnull Store<EntityStore> store, @Nonnull UUID playerUuid) {
+                closeCoordinatorPlayer(playerUuid);
                 clearPlayerState(store, playerUuid);
             }
 
@@ -66,7 +76,13 @@ final class CommandTargetHudStateStore {
             state = statesByStore.remove(store);
         }
         if (state != null) {
-            state.clearStore();
+            state.clearStore(this::closeCoordinatorPlayer);
+        }
+    }
+
+    private void closeCoordinatorPlayer(@Nonnull UUID playerUuid) {
+        if (coordinator != null) {
+            coordinator.closePlayer(playerUuid);
         }
     }
 
@@ -84,9 +100,9 @@ final class CommandTargetHudStateStore {
         }
     }
 
-    private static void hide(@Nonnull HudState state) {
-        if (state.hud() != null) {
-            state.hud().hideNow();
+    private static void closePresentation(@Nonnull HudState state) {
+        if (state.presentation() != null) {
+            state.presentation().closeFromStateStore();
         }
     }
 
@@ -115,13 +131,16 @@ final class CommandTargetHudStateStore {
         private synchronized void clearPlayer(@Nonnull UUID playerUuid) {
             HudState previous = stateByPlayer.remove(playerUuid);
             if (previous != null) {
-                hide(previous);
+                closePresentation(previous);
             }
         }
 
-        private synchronized void clearStore() {
+        private synchronized void clearStore(@Nonnull java.util.function.Consumer<UUID> coordinatorCloser) {
             for (HudState state : stateByPlayer.values()) {
-                hide(state);
+                if (state.presentation() != null) {
+                    coordinatorCloser.accept(state.presentation().playerUuid());
+                    closePresentation(state);
+                }
             }
             stateByPlayer.clear();
         }
@@ -130,7 +149,7 @@ final class CommandTargetHudStateStore {
     record HudState(@Nonnull Store<EntityStore> store,
                     @Nullable String targetKey,
                     long lastRefreshMs,
-                    @Nullable TameworkCommandTargetHud hud,
+                    @Nullable CommandTargetHudPresentation presentation,
                     boolean visible,
                     long lastTargetScanMs,
                     @Nullable String activeItemId) {
