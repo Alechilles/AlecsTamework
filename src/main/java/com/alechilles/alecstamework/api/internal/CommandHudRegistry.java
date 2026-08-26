@@ -11,7 +11,6 @@ import com.alechilles.alecstamework.api.commandhud.CommandHudRendererId;
 import com.alechilles.alecstamework.api.commandhud.CommandHudRegistrationResult;
 import com.alechilles.alecstamework.api.commandhud.CommandTargetHudContributorProvider;
 import com.alechilles.alecstamework.api.commandhud.CommandTargetHudRendererProvider;
-import com.alechilles.alecstamework.items.CommandHudDiagnosticsService;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -24,8 +23,8 @@ import javax.annotation.Nullable;
 public final class CommandHudRegistry implements CommandHudApi, AutoCloseable {
     private final CommandHudRendererRegistry renderers;
     private final CommandHudContributorRegistry contributors;
-    private final CommandHudDiagnosticsService diagnostics =
-            new CommandHudDiagnosticsService();
+    private final CommandHudDiagnosticsRuntime diagnostics =
+            new CommandHudDiagnosticsRuntime();
 
     /** Creates an empty registry for both command HUD surfaces. */
     public CommandHudRegistry() {
@@ -268,9 +267,9 @@ public final class CommandHudRegistry implements CommandHudApi, AutoCloseable {
                 runtime.slowWarningCount());
     }
 
-    /** Returns the shared internal diagnostics service for HUD composition. */
+    /** Returns the narrow internal runtime bridge for HUD composition. */
     @Nonnull
-    public CommandHudDiagnosticsService diagnosticsService() {
+    public CommandHudDiagnosticsRuntime diagnosticsRuntime() {
         return diagnostics;
     }
 

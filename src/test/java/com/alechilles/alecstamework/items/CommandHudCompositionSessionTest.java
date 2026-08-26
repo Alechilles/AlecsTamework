@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.api.commandhud.CommandHudOpenContext;
 import com.alechilles.alecstamework.api.commandhud.CommandHudRegistration;
 import com.alechilles.alecstamework.api.commandhud.CommandTargetHudSessionContributor;
 import com.alechilles.alecstamework.api.commandhud.CommandTargetHudSnapshot;
+import com.alechilles.alecstamework.api.commandhud.CommandTargetHudController;
 import com.alechilles.alecstamework.api.commandhud.CommandTargetHudUpdate;
 import com.alechilles.alecstamework.api.commandhud.CommandTargetHudView;
 import com.alechilles.alecstamework.api.commandhud.CommandHotswapHudSessionContributor;
@@ -221,6 +222,85 @@ class CommandHudCompositionSessionTest {
     }
 
     @Test
+    void optionalContributorUnregisterDuringInitialComposeKeepsCustomSession() {
+        CommandHudContributorId id = CommandHudContributorId.of("example:optional");
+        AtomicReference<CommandHudRegistration> registration = new AtomicReference<>();
+        AtomicInteger calls = new AtomicInteger();
+        CommandHudContributorRegistry contributors = new CommandHudContributorRegistry();
+        registration.set(contributors.registerTarget(id.value(), ignored -> (base, previous, scope) -> {
+            if (calls.incrementAndGet() == 1) registration.get().close();
+            return new CommandHudContribution(id, Map.of(
+                    "state", CommandUiValue.of("stale")));
+        }).registration());
+        CommandHudRendererRegistry renderers = new CommandHudRendererRegistry();
+        renderers.registerTarget("example:renderer", ignored -> targetController());
+        CommandHudCompositionResolver resolver = new CommandHudCompositionResolver(
+                renderers, contributors);
+        CommandHudTargetResolution resolution = resolver.resolveTarget(
+                "example:renderer", List.of(
+                        new com.alechilles.alecstamework.api.commandhud.CommandHudContributorRequirement(
+                                id, false)));
+        CommandHudCompositionSession<CommandTargetHudSnapshot,
+                CommandTargetHudView, CommandTargetHudUpdate> session = resolver.openTarget(
+                new CommandHudOpenContext(), resolution);
+
+        CommandTargetHudView view = session.compose(baseSnapshot());
+
+        assertTrue(session.custom());
+        assertTrue(session.isOpen());
+        assertEquals(CommandHudContributionStatus.UNAVAILABLE,
+                view.contribution(id).status());
+        assertEquals(1, calls.get());
+        session.close();
+    }
+
+    @Test
+    void requiredContributorRemovalClosesAllContributorsInReverseOrderThenRenderer() {
+        CommandHudContributorId requiredId = CommandHudContributorId.of("example:required");
+        CommandHudContributorId optionalId = CommandHudContributorId.of("example:optional");
+        List<String> closed = new java.util.ArrayList<>();
+        CommandHudContributorRegistry contributors = new CommandHudContributorRegistry();
+        CommandHudRegistration requiredRegistration = contributors.registerTarget(
+                requiredId.value(), ignored -> closeCountingTargetContributor(
+                        requiredId, "required", closed)).registration();
+        contributors.registerTarget(optionalId.value(), ignored -> closeCountingTargetContributor(
+                optionalId, "optional", closed));
+        CommandHudRendererRegistry renderers = new CommandHudRendererRegistry();
+        renderers.registerTarget("example:renderer", ignored -> new CommandTargetHudController() {
+            @Override
+            public void buildInitial(
+                    CommandHudOpenContext context,
+                    CommandTargetHudView view,
+                    com.hypixel.hytale.server.core.ui.builder.UICommandBuilder commands
+            ) {
+            }
+
+            @Override
+            public void close() {
+                closed.add("renderer");
+            }
+        });
+        CommandHudCompositionResolver resolver = new CommandHudCompositionResolver(
+                renderers, contributors);
+        CommandHudTargetResolution resolution = resolver.resolveTarget(
+                "example:renderer", List.of(
+                        new com.alechilles.alecstamework.api.commandhud.CommandHudContributorRequirement(
+                                requiredId, true),
+                        new com.alechilles.alecstamework.api.commandhud.CommandHudContributorRequirement(
+                                optionalId, false)));
+        CommandHudCompositionSession<CommandTargetHudSnapshot,
+                CommandTargetHudView, CommandTargetHudUpdate> session = resolver.openTarget(
+                new CommandHudOpenContext(), resolution);
+        session.compose(baseSnapshot());
+
+        requiredRegistration.close();
+
+        assertFalse(session.isOpen());
+        assertEquals(List.of("optional", "required", "renderer"), closed);
+        session.close();
+    }
+
+    @Test
     void staleTargetUpdateIsDroppedWhenRendererUnregistersDuringCallback() {
         CommandHudContributorId id = CommandHudContributorId.of("example:race");
         AtomicReference<CommandHudContributorDirtySink> sink = new AtomicReference<>();
@@ -428,6 +508,28 @@ class CommandHudCompositionSessionTest {
     ) {
         return (base, previous, scope) -> new CommandHudContribution(id,
                 Map.of("state", CommandUiValue.of(calls.incrementAndGet())));
+    }
+
+    private static CommandTargetHudSessionContributor closeCountingTargetContributor(
+            CommandHudContributorId id,
+            String label,
+            List<String> closed
+    ) {
+        return new CommandTargetHudSessionContributor() {
+            @Override
+            public CommandHudContribution compose(
+                    CommandTargetHudSnapshot base,
+                    CommandHudContribution previous,
+                    com.alechilles.alecstamework.api.commandhud.CommandHudDirtyScope scope
+            ) {
+                return new CommandHudContribution(id, Map.of());
+            }
+
+            @Override
+            public void close() {
+                closed.add(label);
+            }
+        };
     }
 
     private static com.alechilles.alecstamework.api.commandhud.CommandTargetHudController

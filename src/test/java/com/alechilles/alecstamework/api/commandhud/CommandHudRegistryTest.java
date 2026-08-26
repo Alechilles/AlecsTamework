@@ -234,10 +234,13 @@ class CommandHudRegistryTest {
         CommandHudRegistrationResult contributor = registry.registerTargetContributor(
                 "runeteria:data", ignored -> null);
         UUID sessionId = UUID.randomUUID();
-        registry.diagnosticsService().openSession(sessionId, CommandHudSurface.TARGET,
-                "runeteria:target", renderer.registration().generation(),
-                "item", "config", List.of(new CommandHudDiagnostics.ContributorRegistration(
-                        "runeteria:data", contributor.registration().generation())));
+        CommandHudDiagnostics runtime = new CommandHudDiagnostics(
+                List.of(), List.of(), List.of(), List.of(),
+                List.of(new CommandHudDiagnostics.SessionView(
+                        sessionId, CommandHudSurface.TARGET, "runeteria:target",
+                        renderer.registration().generation(), List.of(),
+                        "item", "config", null)), null, 0L, 0L);
+        registry.diagnosticsRuntime().connect(() -> runtime);
 
         CommandHudDiagnostics diagnostics = registry.diagnostics();
 
@@ -251,7 +254,7 @@ class CommandHudRegistryTest {
         assertTrue(registry.diagnostics().targetRenderers().isEmpty());
         assertTrue(registry.diagnostics().targetContributors().isEmpty());
         assertTrue(registry.diagnostics().sessions().isEmpty());
-        assertTrue(registry.diagnosticsService().snapshot().sessions().isEmpty());
+        assertTrue(registry.diagnosticsRuntime().snapshot().sessions().isEmpty());
     }
 
     private static void assertUnavailable(CommandHudRegistrationResult result) {

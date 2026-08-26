@@ -108,7 +108,7 @@ final class CommandHudCompositionCleanup<B> {
         closeQuietly(controller);
     }
 
-    private static void closeQuietly(@Nullable AutoCloseable resource) {
+    static void closeQuietly(@Nullable AutoCloseable resource) {
         if (resource == null) return;
         try {
             resource.close();

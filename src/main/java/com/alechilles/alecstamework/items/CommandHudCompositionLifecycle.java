@@ -106,7 +106,7 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
                 rendererReady = false;
             }
         }
-        if (!rendererReady) closeQuietly(createdRenderer);
+        if (!rendererReady) CommandHudCompositionCleanup.closeQuietly(createdRenderer);
         this.custom = rendererReady;
         Map<CommandHudContributorId, CommandHudContribution> copied =
                 CommandHudCompositionSupport.copyContributions(
@@ -123,7 +123,7 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
                 installSubscriptions();
             }
         } catch (RuntimeException | LinkageError failure) {
-            cleanup.close("initial_composition_failed");
+            this.cleanup.close("initial_composition_failed");
             throw failure;
         }
 }
@@ -141,40 +141,49 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
                         "HUD renderer registration is no longer active");
                 throw initialFailure;
             }
-            long version = lifecycleVersion;
-            try {
-                result = composer.compose(base, true).view();
-                if (!isCurrent(version)) {
+            while (open) {
+                long version = lifecycleVersion;
+                try {
+                    result = composer.compose(base, true).view();
+                    if (CommandHudCompositionLifecycleSupport.isCurrent(open,
+                            lifecycleVersion, version, custom, this::rendererActive,
+                            composer::contributorsCurrent)) {
+                        currentView = result;
+                        initialized = true;
+                        break;
+                    }
+                    if (CommandHudCompositionLifecycleSupport.retryAfterOptionalInvalidation(
+                            open, lifecycleVersion, version, requiredFailure != null,
+                            this::rendererActive, states)) continue;
                     if (requiredFailure != null) {
                         failure = new CommandHudCompositionSession.InitialCompositionFailure(
                                 requiredFailure.contributorId(), requiredFailure.reason());
-                        initialFailure = failure;
                     } else {
                         failure = new CommandHudCompositionSession.InitialCompositionFailure(
                                 "HUD renderer registration is no longer active");
-                        initialFailure = failure;
                     }
-                } else {
-                    currentView = result;
-                    initialized = true;
+                    initialFailure = failure;
+                    break;
+                } catch (CommandHudCompositionSession.RequiredCompositionFailure required) {
+                    requiredFailure = required.failure;
+                    failure = new CommandHudCompositionSession.InitialCompositionFailure(
+                            required.failure.contributorId(), required.failure.reason());
+                    initialFailure = failure;
+                    terminateLocked();
+                    cleanup = true;
+                    break;
+                } catch (CommandHudCompositionComposer.RendererUnavailableFailure unavailable) {
+                    failure = new CommandHudCompositionSession.InitialCompositionFailure(
+                            unavailable.getMessage());
+                    initialFailure = failure;
+                    terminateLocked();
+                    cleanup = true;
+                    break;
                 }
-            } catch (CommandHudCompositionSession.RequiredCompositionFailure required) {
-                requiredFailure = required.failure;
-                failure = new CommandHudCompositionSession.InitialCompositionFailure(
-                        required.failure.contributorId(), required.failure.reason());
-                initialFailure = failure;
-                terminateLocked();
-                cleanup = true;
-            } catch (CommandHudCompositionComposer.RendererUnavailableFailure unavailable) {
-                failure = new CommandHudCompositionSession.InitialCompositionFailure(
-                        unavailable.getMessage());
-                initialFailure = failure;
-                terminateLocked();
-                cleanup = true;
             }
         }
         if (cleanup) {
-            cleanup("initial_composition_failed");
+            this.cleanup.close("initial_composition_failed");
             notifyRequiredFailure(requiredFailure);
             throw failure;
         }
@@ -210,11 +219,17 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
                 V previous = currentView;
                 CommandHudCompositionComposer.Composition<V> composed =
                         composer.compose(base, false);
-                if (!isCurrent(version)) return null;
+                if (!CommandHudCompositionLifecycleSupport.isCurrent(open, lifecycleVersion,
+                        version, custom, this::rendererActive, composer::contributorsCurrent)) {
+                    return null;
+                }
                 currentView = composed.view();
                 update = ((CommandHudCompositionSupport.SurfaceAdapter<B, V, U>)
                         getAdapter()).update(composed.view(), previous, composed.changeData());
-                if (!isCurrent(version)) return null;
+                if (!CommandHudCompositionLifecycleSupport.isCurrent(open, lifecycleVersion,
+                        version, custom, this::rendererActive, composer::contributorsCurrent)) {
+                    return null;
+                }
                 lastUpdate = update;
                 publishVersion = version;
             } catch (CommandHudCompositionSession.RequiredCompositionFailure required) {
@@ -228,7 +243,7 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
             }
         }
         if (cleanup) {
-            cleanup(failure == null
+            this.cleanup.close(failure == null
                     ? "renderer_unavailable" : "required_composition_failed");
             if (failure != null) notifyRequiredFailure(failure.failure);
             return null;
@@ -306,7 +321,7 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
         synchronized (lock) {
             terminateLocked();
         }
-        cleanup(null);
+        cleanup.close(null);
     }
 
     @Nonnull
@@ -381,7 +396,7 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
             if (!open) return;
             terminateLocked();
         }
-        cleanup("renderer_unavailable");
+        cleanup.close("renderer_unavailable");
     }
 
     private void registrationEnded(
@@ -396,8 +411,6 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
             if (!open || state.registrationLost) return;
             state.registrationLost = true;
             state.dirty.clear();
-            contributor = state.contributor;
-            state.contributor = null;
             lifecycleVersion++;
             if (state.binding.required()) {
                 failure = new CommandHudCompositionSession.RequiredFailure(
@@ -405,17 +418,19 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
                 requiredFailure = failure;
                 terminateLocked();
             } else {
+                contributor = state.contributor;
+                state.contributor = null;
                 state.lastValidContribution = null;
                 state.lastPublishedContribution = null;
                 state.unavailablePublished = false;
                 state.dirty.markAll();
             }
         }
-        closeQuietly(contributor);
         if (failure != null) {
-            cleanup("required_contributor_removed");
+            cleanup.close("required_contributor_removed");
             notifyRequiredFailure(failure);
         } else {
+            CommandHudCompositionCleanup.closeQuietly(contributor);
             if (diagnostics != null) diagnostics.contributorRemoved(
                     sessionId, id.value(), generation);
             requestRefresh();
@@ -448,11 +463,6 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
         try { refreshRequest.run(); } catch (RuntimeException | LinkageError ignored) { }
     }
 
-    private boolean isCurrent(long version) {
-        return open && lifecycleVersion == version
-                && (!custom || rendererActive()) && composer.contributorsCurrent();
-    }
-
     private boolean rendererActive() {
         try {
             return custom && rendererActive.getAsBoolean();
@@ -469,15 +479,11 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
         cleanupStarted = true;
     }
 
-    private void cleanup(@Nullable String reason) {
-        cleanup.close(reason);
-    }
-
     private void publish(@Nonnull U update, long version) {
-        synchronized (lock) {
-            if (!isCurrent(version)) return;
-            try { publisher.accept(update); } catch (RuntimeException | LinkageError ignored) { }
-        }
+        CommandHudCompositionLifecycleSupport.publish(lock, update, version,
+                () -> CommandHudCompositionLifecycleSupport.isCurrent(open,
+                        lifecycleVersion, version, custom, this::rendererActive,
+                        composer::contributorsCurrent), publisher);
     }
 
     private void notifyRequiredFailure(
@@ -490,10 +496,4 @@ final class CommandHudCompositionLifecycle<B, V, U> implements AutoCloseable {
         try { failureHandler.failed(failure.contributorId(), failure.reason()); }
         catch (RuntimeException | LinkageError ignored) { }
     }
-
-    private static void closeQuietly(@Nullable AutoCloseable resource) {
-        if (resource == null) return;
-        try { resource.close(); } catch (Exception | LinkageError ignored) { }
-    }
-
 }

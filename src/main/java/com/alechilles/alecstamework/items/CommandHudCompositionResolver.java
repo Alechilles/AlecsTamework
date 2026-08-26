@@ -36,8 +36,8 @@ final class CommandHudCompositionResolver {
 
     CommandHudCompositionResolver(@Nonnull CommandHudRegistry registry) {
         this(Objects.requireNonNull(registry, "registry").rendererRegistry(),
-                registry.contributorRegistry(), registry.diagnosticsService(),
-                new CommandHudTimingWarnings());
+                registry.contributorRegistry(), new CommandHudTimingWarnings());
+        registry.diagnosticsRuntime().connect(diagnostics::snapshot);
     }
 
     CommandHudCompositionResolver(
