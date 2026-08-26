@@ -2,13 +2,18 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.commandhud.CommandHotswapHudChangeSet;
 import com.alechilles.alecstamework.api.commandhud.CommandHotswapHudController;
+import com.alechilles.alecstamework.api.commandhud.CommandHotswapHudSessionContributor;
 import com.alechilles.alecstamework.api.commandhud.CommandHotswapHudUpdate;
 import com.alechilles.alecstamework.api.commandhud.CommandHotswapHudView;
+import com.alechilles.alecstamework.api.commandhud.CommandHudContribution;
+import com.alechilles.alecstamework.api.commandhud.CommandHudContributionStatus;
+import com.alechilles.alecstamework.api.commandhud.CommandHudContributorId;
 import com.alechilles.alecstamework.api.commandhud.CommandHudOpenContext;
 import com.alechilles.alecstamework.api.commandhud.CommandHudRegistration;
 import com.alechilles.alecstamework.api.internal.CommandHudRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.api.commandui.CommandUiValue;
 import com.alechilles.alecstamework.ui.TameworkCommandHotswapHud;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.ExtraInfo;
@@ -27,6 +32,8 @@ import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -174,6 +181,167 @@ class CommandHotswapHudPresentationCoordinatorTest {
     }
 
     @Test
+    void missingRequiredContributorUsesStandardHudWithoutRetrying() {
+        AtomicInteger rendererCreates = new AtomicInteger();
+        CommandHudRegistry registry = new CommandHudRegistry();
+        registry.registerHotswapRenderer("example:hotswap", ignored -> {
+            rendererCreates.incrementAndGet();
+            return new CapturingController(null, null);
+        });
+        CommandHotswapHudPresentationCoordinator coordinator =
+                new CommandHotswapHudPresentationCoordinator(registry, ignored -> { });
+        HudClient client = client("MissingRequired");
+        TwCommandItemConfig config = configWithContributors(
+                new ContributorSetting("example:missing", true));
+        CommandHotswapHudToolIdentity tool = tool("example:flute");
+
+        CommandHotswapHudPresentation first = coordinator.present(
+                null, client.playerRef(), PLAYER_UUID, client.hudManager(), config,
+                tool, model("one"));
+        CommandHotswapHudPresentation second = coordinator.present(
+                null, client.playerRef(), PLAYER_UUID, client.hudManager(), config,
+                tool, model("two"));
+
+        assertFalse(first.custom());
+        assertSame(first, second);
+        assertEquals(0, rendererCreates.get(),
+                "a missing required contributor must prevent custom renderer creation");
+        assertInstanceOf(TameworkCommandHotswapHud.class,
+                client.hudManager().getCustomHud(TameworkCommandHotswapHud.HUD_KEY));
+        coordinator.closeAll();
+    }
+
+    @Test
+    void failedRequiredContributorUsesStandardHudWithoutRetrying() {
+        AtomicInteger contributorCreates = new AtomicInteger();
+        CommandHudRegistry registry = new CommandHudRegistry();
+        registry.registerHotswapRenderer("example:hotswap", ignored ->
+                new CapturingController(null, null));
+        CommandHudContributorId contributorId = CommandHudContributorId.of(
+                "example:required");
+        registry.registerHotswapContributor(contributorId.value(), ignored -> {
+            contributorCreates.incrementAndGet();
+            return (base, previous, scope) -> {
+                throw new IllegalStateException("required contributor failed");
+            };
+        });
+        CommandHotswapHudPresentationCoordinator coordinator =
+                new CommandHotswapHudPresentationCoordinator(registry, ignored -> { });
+        HudClient client = client("FailedRequired");
+        TwCommandItemConfig config = configWithContributors(
+                new ContributorSetting(contributorId.value(), true));
+        CommandHotswapHudToolIdentity tool = tool("example:flute");
+
+        CommandHotswapHudPresentation first = coordinator.present(
+                null, client.playerRef(), PLAYER_UUID, client.hudManager(), config,
+                tool, model("one"));
+        CommandHotswapHudPresentation second = coordinator.present(
+                null, client.playerRef(), PLAYER_UUID, client.hudManager(), config,
+                tool, model("two"));
+
+        assertFalse(first.custom());
+        assertSame(first, second);
+        assertEquals(1, contributorCreates.get(),
+                "a failed required contributor must not retry for the same tool");
+        assertInstanceOf(TameworkCommandHotswapHud.class,
+                client.hudManager().getCustomHud(TameworkCommandHotswapHud.HUD_KEY));
+        coordinator.closeAll();
+    }
+
+    @Test
+    void missingOptionalContributorKeepsCustomHudAndPublishesUnavailableStatus() {
+        AtomicReference<CommandHotswapHudView> initial = new AtomicReference<>();
+        CommandHudRegistry registry = new CommandHudRegistry();
+        registry.registerHotswapRenderer("example:hotswap", ignored ->
+                new CapturingController(initial, null));
+        CommandHudContributorId contributorId = CommandHudContributorId.of(
+                "example:optional-missing");
+        CommandHotswapHudPresentationCoordinator coordinator =
+                new CommandHotswapHudPresentationCoordinator(registry, ignored -> { });
+        HudClient client = client("OptionalMissing");
+        TwCommandItemConfig config = configWithContributors(
+                new ContributorSetting(contributorId.value(), false));
+
+        CommandHotswapHudPresentation presentation = coordinator.present(
+                null, client.playerRef(), PLAYER_UUID, client.hudManager(), config,
+                tool("example:flute"), model("one"));
+
+        assertTrue(presentation.custom());
+        assertEquals(CommandHudContributionStatus.UNAVAILABLE,
+                initial.get().contribution(contributorId).status());
+        coordinator.closeAll();
+    }
+
+    @Test
+    void failedOptionalContributorKeepsCustomHudAndPublishesFailedStatus() {
+        AtomicReference<CommandHotswapHudView> initial = new AtomicReference<>();
+        CommandHudRegistry registry = new CommandHudRegistry();
+        registry.registerHotswapRenderer("example:hotswap", ignored ->
+                new CapturingController(initial, null));
+        CommandHudContributorId contributorId = CommandHudContributorId.of(
+                "example:optional-failed");
+        registry.registerHotswapContributor(contributorId.value(), ignored ->
+                (base, previous, scope) -> {
+                    throw new IllegalStateException("optional contributor failed");
+                });
+        CommandHotswapHudPresentationCoordinator coordinator =
+                new CommandHotswapHudPresentationCoordinator(registry, ignored -> { });
+        HudClient client = client("OptionalFailed");
+        TwCommandItemConfig config = configWithContributors(
+                new ContributorSetting(contributorId.value(), false));
+
+        CommandHotswapHudPresentation presentation = coordinator.present(
+                null, client.playerRef(), PLAYER_UUID, client.hudManager(), config,
+                tool("example:flute"), model("one"));
+
+        assertTrue(presentation.custom());
+        assertEquals(CommandHudContributionStatus.FAILED,
+                initial.get().contribution(contributorId).status());
+        coordinator.closeAll();
+    }
+
+    @Test
+    void focusedContributorPathReachesRendererWithoutUnrelatedChanges() {
+        AtomicReference<CommandHotswapHudUpdate> update = new AtomicReference<>();
+        AtomicInteger focusedComposes = new AtomicInteger();
+        AtomicInteger unrelatedComposes = new AtomicInteger();
+        CommandHudRegistry registry = new CommandHudRegistry();
+        registry.registerHotswapRenderer("example:hotswap", ignored ->
+                new CapturingController(null, update));
+        CommandHudContributorId focusedId = CommandHudContributorId.of(
+                "example:focused");
+        CommandHudContributorId unrelatedId = CommandHudContributorId.of(
+                "example:unrelated");
+        registry.registerHotswapContributor(focusedId.value(), ignored ->
+                contributor(focusedId, focusedComposes));
+        registry.registerHotswapContributor(unrelatedId.value(), ignored ->
+                contributor(unrelatedId, unrelatedComposes));
+        CommandHotswapHudPresentationCoordinator coordinator =
+                new CommandHotswapHudPresentationCoordinator(registry, ignored -> { });
+        HudClient client = client("FocusedPath");
+        TwCommandItemConfig config = configWithContributors(
+                new ContributorSetting(focusedId.value(), false),
+                new ContributorSetting(unrelatedId.value(), false));
+        CommandHotswapHudToolIdentity tool = tool("example:flute");
+
+        CommandHotswapHudPresentation presentation = coordinator.present(
+                null, client.playerRef(), PLAYER_UUID, client.hudManager(), config,
+                tool, model("one"));
+        presentation.session().markPathsDirty(focusedId, Set.of("indicator/value"));
+        coordinator.present(null, client.playerRef(), PLAYER_UUID, client.hudManager(),
+                config, tool, model("one"));
+
+        assertEquals(2, focusedComposes.get());
+        assertEquals(1, unrelatedComposes.get());
+        assertEquals(Set.of("indicator/value"), update.get().changeSet().pathsFor(focusedId));
+        assertTrue(update.get().changeSet().pathsFor(unrelatedId).isEmpty());
+        assertTrue(update.get().changeSet().changedSlots().isEmpty());
+        assertFalse(update.get().changeSet().groupStatusChanged());
+        assertFalse(update.get().changeSet().fullRefresh());
+        coordinator.closeAll();
+    }
+
+    @Test
     void unequipClosesTheSessionOwnedByTheCurrentStore() throws Exception {
         Store<EntityStore> store = store();
         HudClient client = client("Unequip");
@@ -213,6 +381,32 @@ class CommandHotswapHudPresentationCoordinatorTest {
                 newStore, client.playerRef(), PLAYER_UUID, client.hudManager(),
                 config, tool, model("two"));
         coordinator.closePlayer(oldStore, PLAYER_UUID);
+
+        assertSame(current, coordinator.presentation(PLAYER_UUID));
+        assertFalse(current.closed());
+        assertNotNull(client.hudManager().getCustomHud(TameworkCommandHotswapHud.HUD_KEY));
+        coordinator.closeStore(newStore);
+    }
+
+    @Test
+    void staleStoreUnequipDoesNotCloseTheNewStorePresentation() throws Exception {
+        Store<EntityStore> oldStore = store();
+        Store<EntityStore> newStore = store();
+        HudClient client = client("StaleUnequip");
+        CommandHudRegistry registry = new CommandHudRegistry();
+        registry.registerHotswapRenderer("example:hotswap", ignored ->
+                new RecordingController(new ArrayList<>(), "controller"));
+        CommandHotswapHudPresentationCoordinator coordinator =
+                new CommandHotswapHudPresentationCoordinator(registry, ignored -> { });
+        TwCommandItemConfig config = config();
+        CommandHotswapHudToolIdentity tool = tool("example:flute");
+
+        CommandHotswapHudPresentation current = coordinator.present(
+                newStore, client.playerRef(), PLAYER_UUID, client.hudManager(),
+                config, tool, model("one"));
+        Player stalePlayer = allocate(Player.class);
+        stalePlayer.setLegacyUUID(PLAYER_UUID);
+        coordinator.hide(oldStore, stalePlayer);
 
         assertSame(current, coordinator.presentation(PLAYER_UUID));
         assertFalse(current.closed());
@@ -360,6 +554,34 @@ class CommandHotswapHudPresentationCoordinatorTest {
                 new ExtraInfo());
     }
 
+    private static TwCommandItemConfig configWithContributors(
+            ContributorSetting... settings
+    ) {
+        StringBuilder json = new StringBuilder(
+                "{\"HotswapHudRendererId\":\"example:hotswap\","
+                        + "\"HotswapHudContributors\":[");
+        for (int index = 0; index < settings.length; index++) {
+            if (index > 0) json.append(',');
+            ContributorSetting setting = settings[index];
+            json.append("{\"Id\":\"").append(setting.id())
+                    .append("\",\"Required\":").append(setting.required()).append('}');
+        }
+        json.append("]}");
+        return TwCommandItemConfig.CODEC.decode(
+                BsonDocument.parse(json.toString()), new ExtraInfo());
+    }
+
+    private static CommandHotswapHudSessionContributor contributor(
+            CommandHudContributorId id,
+            AtomicInteger composeCount
+    ) {
+        return (base, previous, scope) -> {
+            composeCount.incrementAndGet();
+            return CommandHudContribution.available(id,
+                    Map.of("indicator/value", CommandUiValue.of("ready")));
+        };
+    }
+
     private static CommandHotswapHudViewModel model(String qGlyph) {
         return new CommandHotswapHudViewModel(
                 new CommandHotswapHudViewModel.Slot(true, "LMB", "", "P"),
@@ -397,6 +619,9 @@ class CommandHotswapHudPresentationCoordinatorTest {
     }
 
     private record HudClient(PlayerRef playerRef, HudManager hudManager) {
+    }
+
+    private record ContributorSetting(String id, boolean required) {
     }
 
     private static final class RecordingController implements CommandHotswapHudController {
@@ -463,6 +688,29 @@ class CommandHotswapHudPresentationCoordinatorTest {
         public void close() {
             closes.incrementAndGet();
             events.add(name + "-close");
+        }
+    }
+
+    private static final class CapturingController implements CommandHotswapHudController {
+        private final AtomicReference<CommandHotswapHudView> initial;
+        private final AtomicReference<CommandHotswapHudUpdate> update;
+
+        private CapturingController(AtomicReference<CommandHotswapHudView> initial,
+                                     AtomicReference<CommandHotswapHudUpdate> update) {
+            this.initial = initial;
+            this.update = update;
+        }
+
+        @Override
+        public void buildInitial(CommandHudOpenContext context,
+                                 CommandHotswapHudView view,
+                                 UICommandBuilder commands) {
+            if (initial != null) initial.set(view);
+        }
+
+        @Override
+        public void update(CommandHotswapHudUpdate value, UICommandBuilder commands) {
+            if (update != null) update.set(value);
         }
     }
 

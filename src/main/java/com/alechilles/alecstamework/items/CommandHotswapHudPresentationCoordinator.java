@@ -107,7 +107,7 @@ final class CommandHotswapHudPresentationCoordinator {
                     store, playerRef, hudManager, toolIdentity, config)) {
                 presentations.remove(playerUuid, previous);
                 failedTools.remove(playerUuid);
-                closePresentation(previous, hudManager,
+                previous.close(hudManager,
                         CommandHotswapHudPresentationSupport.closeReason(previous, store,
                         toolIdentity));
                 previous = null;
@@ -118,7 +118,7 @@ final class CommandHotswapHudPresentationCoordinator {
                             new CommandHotswapHudPresentationSupport.FailedTool(previous.store(),
                             previous.toolIdentity(), previous.selection()));
                     presentations.remove(playerUuid, previous);
-                    closePresentation(previous, hudManager,
+                    previous.close(hudManager,
                             CommandHudCloseReason.RENDERER_FAILED);
                     previous = null;
                 } else {
@@ -151,7 +151,7 @@ final class CommandHotswapHudPresentationCoordinator {
             CommandHotswapHudPresentation presentation = presentations.remove(playerUuid);
             failedTools.remove(playerUuid);
             if (presentation != null) {
-                closePresentation(presentation, hudManager, CommandHudCloseReason.TOOL_CHANGED);
+                presentation.close(hudManager, CommandHudCloseReason.TOOL_CHANGED);
             }
         }
     }
@@ -164,7 +164,7 @@ final class CommandHotswapHudPresentationCoordinator {
             if (presentation == null || presentation.store() != store) return;
             presentations.remove(playerUuid, presentation);
             removeFailedTool(store, playerUuid);
-            closePresentation(presentation, hudManager, CommandHudCloseReason.TOOL_CHANGED);
+            presentation.close(hudManager, CommandHudCloseReason.TOOL_CHANGED);
         }
     }
     void closePlayer(@Nonnull UUID playerUuid) {
@@ -172,7 +172,7 @@ final class CommandHotswapHudPresentationCoordinator {
             CommandHotswapHudPresentation presentation = presentations.remove(playerUuid);
             failedTools.remove(playerUuid);
             if (presentation != null) {
-                closePresentation(presentation, null, CommandHudCloseReason.PLAYER_UNLOADED);
+                presentation.close(null, CommandHudCloseReason.PLAYER_UNLOADED);
             }
         }
     }
@@ -182,7 +182,7 @@ final class CommandHotswapHudPresentationCoordinator {
             if (presentation != null && presentation.store() == store) {
                 presentations.remove(playerUuid, presentation);
                 removeFailedTool(store, playerUuid);
-                closePresentation(presentation, null, CommandHudCloseReason.PLAYER_UNLOADED);
+                presentation.close(null, CommandHudCloseReason.PLAYER_UNLOADED);
                 return;
             }
             removeFailedTool(store, playerUuid);
@@ -195,14 +195,14 @@ final class CommandHotswapHudPresentationCoordinator {
                 if (presentation.store() != store) continue;
                 presentations.remove(presentation.playerUuid(), presentation);
                 removeFailedTool(store, presentation.playerUuid());
-                closePresentation(presentation, null, CommandHudCloseReason.STORE_REMOVED);
+                presentation.close(null, CommandHudCloseReason.STORE_REMOVED);
             }
         }
     }
     void closeAll() {
         synchronized (lock) {
             for (CommandHotswapHudPresentation presentation : presentations.values()) {
-                closePresentation(presentation, null, CommandHudCloseReason.SHUTDOWN);
+                presentation.close(null, CommandHudCloseReason.SHUTDOWN);
             }
             presentations.clear();
             failedTools.clear();
@@ -328,7 +328,7 @@ final class CommandHotswapHudPresentationCoordinator {
         failedTools.put(playerUuid,
                 new CommandHotswapHudPresentationSupport.FailedTool(presentation.store(),
                 presentation.toolIdentity(), presentation.selection()));
-        closePresentation(presentation, hudManager, CommandHudCloseReason.RENDERER_FAILED);
+        presentation.close(hudManager, CommandHudCloseReason.RENDERER_FAILED);
         return openStandard(presentation.store(), playerUuid, playerRef, hudManager,
                 config, toolIdentity, model);
     }
@@ -463,13 +463,6 @@ final class CommandHotswapHudPresentationCoordinator {
             invalidationSink.accept(store, playerUuid);
         } catch (RuntimeException | LinkageError ignored) {
         }
-    }
-    private void closePresentation(
-            @Nonnull CommandHotswapHudPresentation presentation,
-            @Nullable HudManager hudManager,
-            @Nonnull CommandHudCloseReason reason
-    ) {
-        presentation.close(hudManager, reason);
     }
     private void removeFailedTool(
             @Nonnull Store<EntityStore> store,

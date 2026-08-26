@@ -290,7 +290,11 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
                             @Nullable Player player,
                             @Nullable HudState previous) {
         if (previous == null) {
-            presentationCoordinator.hide(playerUuid, player != null ? player.getHudManager() : null);
+            if (player != null) {
+                presentationCoordinator.hide(store, player);
+            } else {
+                presentationCoordinator.closePlayer(store, playerUuid);
+            }
             return;
         }
         if (player != null && player.getPlayerRef() != null && player.getHudManager() != null) {
