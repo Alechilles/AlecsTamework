@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
+import platform
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -74,6 +76,104 @@ def find_batch_layout(batch_root: Path) -> tuple[Path, Path]:
     if not models_root.is_dir():
         raise ReportError(f"Server/Models directory not found: {models_root}")
     return models_root, mod_root
+
+
+def default_hytale_roots() -> list[Path]:
+    roots: list[Path] = []
+    system = platform.system()
+    if system == "Windows" and os.environ.get("APPDATA"):
+        roots.append(Path(os.environ["APPDATA"]) / "Hytale")
+    elif system == "Darwin":
+        roots.append(Path.home() / "Library" / "Application Support" / "Hytale")
+    return roots
+
+
+def inferred_hytale_root(source_path: Path) -> Path | None:
+    resolved = source_path.resolve()
+    for candidate in (resolved, *resolved.parents):
+        if candidate.name.casefold() == "hytale":
+            return candidate
+    return None
+
+
+def install_model_candidates(
+    hytale_root: Path,
+    source_path: Path | None = None,
+) -> list[Path]:
+    patchlines: list[str] = []
+    if source_path is not None:
+        try:
+            relative_parts = (
+                source_path.resolve().relative_to(hytale_root.resolve()).parts
+            )
+        except ValueError:
+            relative_parts = ()
+        if len(relative_parts) >= 2 and relative_parts[0].casefold() == "data":
+            patchlines.append(relative_parts[1])
+        elif relative_parts and relative_parts[0].casefold() == "userdata":
+            patchlines.append("release")
+    for patchline in ("release", "pre-release"):
+        if patchline not in patchlines:
+            patchlines.append(patchline)
+    install_root = hytale_root / "install"
+    if install_root.is_dir():
+        for child in sorted(install_root.iterdir(), key=lambda path: path.name.casefold()):
+            if child.is_dir() and child.name not in patchlines:
+                patchlines.append(child.name)
+    return [
+        install_root
+        / patchline
+        / "package"
+        / "game"
+        / "latest"
+        / "Assets"
+        / "Server"
+        / "Models"
+        for patchline in patchlines
+    ]
+
+
+def normalize_base_game_models(path: Path) -> Path:
+    root = path.expanduser().resolve()
+    candidates = [root]
+    if root.name.casefold() == "server":
+        candidates.append(root / "Models")
+    candidates.extend(
+        (
+            root / "Server" / "Models",
+            root / "Assets" / "Server" / "Models",
+            root / "package" / "game" / "latest" / "Assets" / "Server" / "Models",
+        )
+    )
+    candidates.extend(
+        install_model_candidates(root.parent if root.name.casefold() == "install" else root)
+    )
+    for candidate in candidates:
+        if (
+            candidate.is_dir()
+            and candidate.name.casefold() == "models"
+            and candidate.parent.name.casefold() == "server"
+        ):
+            return candidate
+    raise ReportError(f"Base-game Server/Models directory not found under: {root}")
+
+
+def find_base_game_models(source_path: Path, manual_path: Path | None = None) -> Path | None:
+    if manual_path is not None:
+        return normalize_base_game_models(manual_path)
+    roots: list[Path] = []
+    inferred = inferred_hytale_root(source_path)
+    if inferred is not None:
+        roots.append(inferred)
+    for root in default_hytale_roots():
+        resolved = root.resolve()
+        if resolved not in roots:
+            roots.append(resolved)
+    for root in roots:
+        for candidate in install_model_candidates(root, source_path):
+            if candidate.is_dir():
+                return candidate.resolve()
+    return None
 
 
 def add_index_key(index: dict[str, list[Path]], key: str, path: Path) -> None:
@@ -358,7 +458,7 @@ def markdown_text(
                 "attachment": attachment_id,
                 "attachment-display": value_label,
                 "weight": format_number(weight),
-                "chance": f"{format_number(chance)}%",
+                "chance": f"{chance:.1f}%",
             }
             lines.append(
                 "| "
@@ -424,6 +524,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         type=Path,
         help="Extra mod root or Server/Models directory for inherited parents. Repeat as needed.",
     )
+    parser.add_argument(
+        "--base-game-models",
+        type=Path,
+        help="Custom Hytale install root or base-game Server/Models directory. Auto-detected by default.",
+    )
     parser.add_argument("--model-id", help="Model asset ID used for display matching. Defaults to the filename.")
     parser.add_argument("--role-id", help="Optional NPC role ID used for display matching.")
     parser.add_argument(
@@ -456,7 +561,14 @@ def prepare_model_index(
 def run_single(args: argparse.Namespace, columns: Sequence[str]) -> str:
     model_path = args.model_asset.resolve()
     models_root, mod_root = find_asset_layout(model_path)
-    _, model_index = prepare_model_index(models_root, args.model_root)
+    base_game_models = find_base_game_models(
+        model_path,
+        getattr(args, "base_game_models", None),
+    )
+    model_roots = list(args.model_root)
+    if base_game_models is not None:
+        model_roots.append(base_game_models)
+    _, model_index = prepare_model_index(models_root, model_roots)
     model = resolve_inheritance(model_path, model_index)
     configs = load_display_configs(display_directories(mod_root, args.display_root))
     sets = attachment_sets(model, model_path)
@@ -471,7 +583,14 @@ def run_single(args: argparse.Namespace, columns: Sequence[str]) -> str:
 
 def run_batch(args: argparse.Namespace, columns: Sequence[str]) -> str:
     models_root, mod_root = find_batch_layout(args.batch_root)
-    _, model_index = prepare_model_index(models_root, args.model_root)
+    base_game_models = find_base_game_models(
+        args.batch_root,
+        getattr(args, "base_game_models", None),
+    )
+    model_roots = list(args.model_root)
+    if base_game_models is not None:
+        model_roots.append(base_game_models)
+    _, model_index = prepare_model_index(models_root, model_roots)
     discovered = sorted(
         (path.resolve() for path in models_root.rglob("*.json")),
         key=lambda path: str(path).casefold(),

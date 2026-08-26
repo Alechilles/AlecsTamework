@@ -22,8 +22,7 @@ def generate_report(
     input_path: str,
     model_roots: Sequence[str],
     display_roots: Sequence[str],
-    model_id: str = "",
-    role_id: str = "",
+    base_game_models: str = "",
     batch: bool = False,
     columns: Sequence[str] = report_engine.DEFAULT_COLUMNS,
 ) -> str:
@@ -36,8 +35,9 @@ def generate_report(
         batch_root=Path(input_path) if batch else None,
         model_root=[Path(value) for value in model_roots],
         display_root=[Path(value) for value in display_roots],
-        model_id=model_id.strip() or None,
-        role_id=role_id.strip() or None,
+        base_game_models=Path(base_game_models) if base_game_models.strip() else None,
+        model_id=None,
+        role_id=None,
         columns=columns,
         output=None,
     )
@@ -170,8 +170,7 @@ class AttachmentReportApplication:
         self.input_mode = tk.StringVar(value="single")
         self.model_asset = tk.StringVar()
         self.input_label = tk.StringVar(value="ModelAsset JSON")
-        self.model_id = tk.StringVar()
-        self.role_id = tk.StringVar()
+        self.base_game_models = tk.StringVar()
         self.status = tk.StringVar(value="Select a ModelAsset to begin.")
 
         root.title("Tamework Model Attachment Report")
@@ -218,19 +217,24 @@ class AttachmentReportApplication:
             row=1, column=2, padx=(8, 0)
         )
 
-        ttk.Label(inputs, text="Model ID (optional)").grid(
+        ttk.Label(inputs, text="Base Game Models").grid(
             row=2, column=0, sticky="w", padx=(0, 8), pady=(10, 0)
         )
-        self.model_id_entry = ttk.Entry(inputs, textvariable=self.model_id)
-        self.model_id_entry.grid(
+        ttk.Entry(inputs, textvariable=self.base_game_models).grid(
             row=2, column=1, sticky="ew", pady=(10, 0)
         )
-        ttk.Label(inputs, text="Role ID (optional)").grid(
-            row=3, column=0, sticky="w", padx=(0, 8), pady=(8, 0)
-        )
-        ttk.Entry(inputs, textvariable=self.role_id).grid(
-            row=3, column=1, sticky="ew", pady=(8, 0)
-        )
+        base_game_buttons = ttk.Frame(inputs)
+        base_game_buttons.grid(row=2, column=2, sticky="w", padx=(8, 0), pady=(10, 0))
+        ttk.Button(
+            base_game_buttons,
+            text="Browse...",
+            command=self.choose_base_game_models,
+        ).grid(row=0, column=0)
+        ttk.Button(
+            base_game_buttons,
+            text="Auto",
+            command=self.auto_detect_base_game_models,
+        ).grid(row=0, column=1, padx=(5, 0))
 
         roots = ttk.Frame(content)
         roots.grid(row=1, column=0, sticky="ew", pady=(10, 0))
@@ -294,8 +298,6 @@ class AttachmentReportApplication:
         batch = self.input_mode.get() == "batch"
         self.input_label.set("Mod Root or Server/Models" if batch else "ModelAsset JSON")
         self.model_asset.set("")
-        self.model_id.set("")
-        self.model_id_entry.configure(state=tk.DISABLED if batch else tk.NORMAL)
         expected = "batch folder" if batch else "ModelAsset"
         self.status.set(f"Select a {expected} to begin.")
 
@@ -311,7 +313,36 @@ class AttachmentReportApplication:
             )
         if selected:
             self.model_asset.set(selected)
-            self.status.set("Ready to generate.")
+            self.auto_detect_base_game_models()
+
+    def choose_base_game_models(self) -> None:
+        selected = filedialog.askdirectory(
+            title="Select a Hytale install root or base-game Server/Models directory"
+        )
+        if not selected:
+            return
+        try:
+            models = report_engine.normalize_base_game_models(Path(selected))
+        except (OSError, report_engine.ReportError) as exc:
+            messagebox.showerror("Cannot Use Base Game Path", str(exc), parent=self.root)
+            return
+        self.base_game_models.set(str(models))
+        self.status.set("Using the selected base-game Models folder.")
+
+    def auto_detect_base_game_models(self) -> None:
+        input_path = self.model_asset.get().strip()
+        models = (
+            report_engine.find_base_game_models(Path(input_path))
+            if input_path
+            else None
+        )
+        self.base_game_models.set(str(models) if models is not None else "")
+        if models is None:
+            self.status.set(
+                "Base game was not detected. Select its Models folder if needed."
+            )
+        else:
+            self.status.set("Base-game Models detected. Ready to generate.")
 
     def generate(self) -> None:
         try:
@@ -319,8 +350,7 @@ class AttachmentReportApplication:
                 self.model_asset.get(),
                 self.model_roots.values(),
                 self.display_roots.values(),
-                self.model_id.get(),
-                self.role_id.get(),
+                self.base_game_models.get(),
                 batch=self.input_mode.get() == "batch",
                 columns=self.columns.values(),
             )

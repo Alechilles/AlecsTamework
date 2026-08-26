@@ -27,50 +27,27 @@ class ModelAttachmentMarkdownGuiTests(unittest.TestCase):
         except FileNotFoundError:
             self.fail("The GUI report adapter is not implemented.")
 
-    def test_form_values_generate_a_role_specific_report(self):
-        """Catches GUI fields that are not passed to the report engine."""
+    def test_form_values_use_a_manual_base_game_models_path(self):
+        """Catches a manual base-game Models selection that does not reach the engine."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             model = root / "ExampleMod" / "Server" / "Models" / "Cat.json"
+            write_json(model, {"Parent": "BaseCat"})
+            base_models = root / "CustomGame" / "Assets" / "Server" / "Models"
             write_json(
-                model,
+                base_models / "BaseCat.json",
                 {"RandomAttachmentSets": {"Tail": {"Long": {"Weight": 1}}}},
-            )
-            labels_root = root / "LabelsMod"
-            write_json(
-                labels_root
-                / "Server"
-                / "Tamework"
-                / "AttachmentDisplays"
-                / "CatLabels.json",
-                {
-                    "Entries": [
-                        {
-                            "AppliesTo": {"RoleIds": ["TamedCat"]},
-                            "Sets": {
-                                "Tail": {
-                                    "Label": "Tail Length",
-                                    "Values": {"Long": "Long Tail"},
-                                }
-                            },
-                        }
-                    ]
-                },
             )
             gui = self.load_gui_module()
 
             report = gui.generate_report(
                 str(model),
                 model_roots=[],
-                display_roots=[str(labels_root)],
-                model_id="",
-                role_id="TamedCat",
+                display_roots=[],
+                base_game_models=str(base_models),
             )
 
-            self.assertIn(
-                "| Tail | Tail Length | Long | Long Tail | 1 | 100% |",
-                report,
-            )
+            self.assertIn("| Tail | Tail | Long | Long | 1 | 100.0% |", report)
 
     def test_batch_form_values_apply_selected_columns(self):
         """Catches GUI batch mode or column choices that do not reach the engine."""

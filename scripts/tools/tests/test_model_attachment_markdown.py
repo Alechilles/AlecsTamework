@@ -64,10 +64,10 @@ class ModelAttachmentMarkdownTests(unittest.TestCase):
                 result.stdout,
                 "| Attachment Set | Set Display | Attachment | Attachment Display | Weight | Chance |\n"
                 "| --- | --- | --- | --- | ---: | ---: |\n"
-                "| Coat | Coat | Black | Black | 1 | 25% |\n"
-                "| Coat | Coat | White | White | 3 | 75% |\n"
-                "| Horns | Horns | Long | Long | 1 | 50% |\n"
-                "| Horns | Horns | Short | Short | 1 | 50% |\n",
+                "| Coat | Coat | Black | Black | 1 | 25.0% |\n"
+                "| Coat | Coat | White | White | 3 | 75.0% |\n"
+                "| Horns | Horns | Long | Long | 1 | 50.0% |\n"
+                "| Horns | Horns | Short | Short | 1 | 50.0% |\n",
             )
 
     def test_prefers_exact_model_displays_over_higher_priority_global_displays(self):
@@ -123,7 +123,7 @@ class ModelAttachmentMarkdownTests(unittest.TestCase):
             result = self.run_report(model, "--display-root", str(extra_root))
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("| Coat | Coat Color | Black | Midnight | 1 | 100% |", result.stdout)
+            self.assertIn("| Coat | Coat Color | Black | Midnight | 1 | 100.0% |", result.stdout)
             self.assertNotIn("Global Coat", result.stdout)
 
     def test_inherits_omitted_attachment_display_entries(self):
@@ -162,7 +162,7 @@ class ModelAttachmentMarkdownTests(unittest.TestCase):
             result = self.run_report(model)
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("| Eyes | Eye Color | Blue | Ocean Blue | 1 | 100% |", result.stdout)
+            self.assertIn("| Eyes | Eye Color | Blue | Ocean Blue | 1 | 100.0% |", result.stdout)
 
     def test_resolves_parent_from_an_extra_model_root(self):
         """Catches failure to report mod models that inherit from another asset pack."""
@@ -179,7 +179,94 @@ class ModelAttachmentMarkdownTests(unittest.TestCase):
             result = self.run_report(model, "--model-root", str(base_models))
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("| Tail | Tail | Long | Long | 2 | 100% |", result.stdout)
+            self.assertIn("| Tail | Tail | Long | Long | 2 | 100.0% |", result.stdout)
+
+    def test_resolves_parent_from_the_hytale_install_beside_user_data(self):
+        """Catches failure to find base-game parents from a normal Hytale layout."""
+        with tempfile.TemporaryDirectory() as tmp:
+            hytale_root = Path(tmp) / "Hytale"
+            model = (
+                hytale_root
+                / "UserData"
+                / "Mods"
+                / "ExampleMod"
+                / "Server"
+                / "Models"
+                / "Child.json"
+            )
+            write_json(model, {"Parent": "BaseCreature"})
+            write_json(
+                hytale_root
+                / "install"
+                / "release"
+                / "package"
+                / "game"
+                / "latest"
+                / "Assets"
+                / "Server"
+                / "Models"
+                / "BaseCreature.json",
+                {"RandomAttachmentSets": {"Tail": {"Long": {"Weight": 2}}}},
+            )
+
+            result = self.run_report(model)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("| Tail | Tail | Long | Long | 2 | 100.0% |", result.stdout)
+
+    def test_manual_base_game_models_path_resolves_a_parent(self):
+        """Catches a custom base-game path that the report engine ignores."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            model = root / "ExampleMod" / "Server" / "Models" / "Child.json"
+            write_json(model, {"Parent": "BaseCreature"})
+            custom_install = root / "NonstandardHytale" / "install"
+            base_models = (
+                custom_install
+                / "release"
+                / "package"
+                / "game"
+                / "latest"
+                / "Assets"
+                / "Server"
+                / "Models"
+            )
+            write_json(
+                base_models / "BaseCreature.json",
+                {"RandomAttachmentSets": {"Tail": {"Long": {"Weight": 2}}}},
+            )
+
+            result = self.run_report(
+                model,
+                "--base-game-models",
+                str(custom_install),
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("| Tail | Tail | Long | Long | 2 | 100.0% |", result.stdout)
+
+    def test_rounds_attachment_chances_to_one_decimal_place(self):
+        """Catches long or inconsistently formatted percentage values."""
+        with tempfile.TemporaryDirectory() as tmp:
+            model = Path(tmp) / "Server" / "Models" / "Cat.json"
+            write_json(
+                model,
+                {
+                    "RandomAttachmentSets": {
+                        "Coat": {
+                            "Black": {},
+                            "Brown": {},
+                            "White": {},
+                        }
+                    }
+                },
+            )
+
+            result = self.run_report(model, "--columns", "attachment,chance")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("| Black | 33.3% |", result.stdout)
+            self.assertNotIn("33.333", result.stdout)
 
     def test_batch_report_omits_models_without_random_attachments(self):
         """Catches empty ModelAssets appearing as useless batch sections."""
@@ -202,7 +289,7 @@ class ModelAttachmentMarkdownTests(unittest.TestCase):
                 "## Cat\n\n"
                 "| Attachment Set | Set Display | Attachment | Attachment Display | Weight | Chance |\n"
                 "| --- | --- | --- | --- | ---: | ---: |\n"
-                "| Tail | Tail | Long | Long | 1 | 100% |\n",
+                "| Tail | Tail | Long | Long | 1 | 100.0% |\n",
             )
 
     def test_columns_flag_controls_visible_fields_and_order(self):
@@ -232,8 +319,8 @@ class ModelAttachmentMarkdownTests(unittest.TestCase):
                 result.stdout,
                 "| Chance | Attachment | Weight |\n"
                 "| ---: | --- | ---: |\n"
-                "| 25% | Black | 1 |\n"
-                "| 75% | White | 3 |\n",
+                "| 25.0% | Black | 1 |\n"
+                "| 75.0% | White | 3 |\n",
             )
 
 
