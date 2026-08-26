@@ -25,6 +25,15 @@ class ModelAttachmentMarkdownTests(unittest.TestCase):
             check=False,
         )
 
+    def run_batch(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [sys.executable, str(SCRIPT), "--batch-root", str(root), *args],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+
     def test_reports_inherited_attachment_weights_as_set_percentages(self):
         """Catches lost ModelAsset inheritance, default weights, or a global denominator."""
         with tempfile.TemporaryDirectory() as tmp:
@@ -171,6 +180,61 @@ class ModelAttachmentMarkdownTests(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("| Tail | Tail | Long | Long | 2 | 100% |", result.stdout)
+
+    def test_batch_report_omits_models_without_random_attachments(self):
+        """Catches empty ModelAssets appearing as useless batch sections."""
+        with tempfile.TemporaryDirectory() as tmp:
+            mod_root = Path(tmp) / "ExampleMod"
+            models = mod_root / "Server" / "Models"
+            write_json(
+                models / "Animals" / "Cat.json",
+                {"RandomAttachmentSets": {"Tail": {"Long": {"Weight": 1}}}},
+            )
+            write_json(models / "Animals" / "Empty.json", {"Model": "Empty.blockymodel"})
+
+            result = self.run_batch(mod_root)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                result.stdout,
+                "# Model Attachment Report\n\n"
+                "Discovered: 2 | Reported: 1 | Omitted: 1\n\n"
+                "## Cat\n\n"
+                "| Attachment Set | Set Display | Attachment | Attachment Display | Weight | Chance |\n"
+                "| --- | --- | --- | --- | ---: | ---: |\n"
+                "| Tail | Tail | Long | Long | 1 | 100% |\n",
+            )
+
+    def test_columns_flag_controls_visible_fields_and_order(self):
+        """Catches renderers that ignore the requested column selection."""
+        with tempfile.TemporaryDirectory() as tmp:
+            model = Path(tmp) / "Server" / "Models" / "Cat.json"
+            write_json(
+                model,
+                {
+                    "RandomAttachmentSets": {
+                        "Coat": {
+                            "Black": {"Weight": 1},
+                            "White": {"Weight": 3},
+                        }
+                    }
+                },
+            )
+
+            result = self.run_report(
+                model,
+                "--columns",
+                "chance,attachment,weight",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                result.stdout,
+                "| Chance | Attachment | Weight |\n"
+                "| ---: | --- | ---: |\n"
+                "| 25% | Black | 1 |\n"
+                "| 75% | White | 3 |\n",
+            )
 
 
 if __name__ == "__main__":

@@ -12,6 +12,24 @@ from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
 
+DEFAULT_COLUMNS = (
+    "attachment-set",
+    "set-display",
+    "attachment",
+    "attachment-display",
+    "weight",
+    "chance",
+)
+COLUMN_DEFINITIONS = {
+    "attachment-set": ("Attachment Set", "---"),
+    "set-display": ("Set Display", "---"),
+    "attachment": ("Attachment", "---"),
+    "attachment-display": ("Attachment Display", "---"),
+    "weight": ("Weight", "---:"),
+    "chance": ("Chance", "---:"),
+}
+
+
 class ReportError(Exception):
     """Raised when an input asset cannot produce a reliable report."""
 
@@ -43,6 +61,19 @@ def find_asset_layout(model_path: Path) -> tuple[Path, Path | None]:
         if candidate.name.casefold() == "models" and candidate.parent.name.casefold() == "server":
             return candidate, candidate.parent.parent
     return model_path.parent, None
+
+
+def find_batch_layout(batch_root: Path) -> tuple[Path, Path]:
+    root = batch_root.resolve()
+    if root.name.casefold() == "models" and root.parent.name.casefold() == "server":
+        models_root = root
+        mod_root = root.parent.parent
+    else:
+        models_root = root / "Server" / "Models"
+        mod_root = root
+    if not models_root.is_dir():
+        raise ReportError(f"Server/Models directory not found: {models_root}")
+    return models_root, mod_root
 
 
 def add_index_key(index: dict[str, list[Path]], key: str, path: Path) -> None:
@@ -301,10 +332,16 @@ def markdown_text(
     configs: Sequence[tuple[str, dict]],
     role_id: str | None,
     model_id: str,
+    columns: Sequence[str] = DEFAULT_COLUMNS,
 ) -> str:
+    selected_columns = normalize_columns(columns)
     lines = [
-        "| Attachment Set | Set Display | Attachment | Attachment Display | Weight | Chance |",
-        "| --- | --- | --- | --- | ---: | ---: |",
+        "| "
+        + " | ".join(COLUMN_DEFINITIONS[key][0] for key in selected_columns)
+        + " |",
+        "| "
+        + " | ".join(COLUMN_DEFINITIONS[key][1] for key in selected_columns)
+        + " |",
     ]
     for set_id in sorted(sets, key=str.casefold):
         options = sets[set_id]
@@ -315,16 +352,39 @@ def markdown_text(
                 configs, role_id, model_id, set_id, attachment_id
             )
             chance = weight / total_weight * 100
-            cells = (
-                set_id,
-                set_label,
-                attachment_id,
-                value_label,
-                format_number(weight),
-                f"{format_number(chance)}%",
+            values = {
+                "attachment-set": set_id,
+                "set-display": set_label,
+                "attachment": attachment_id,
+                "attachment-display": value_label,
+                "weight": format_number(weight),
+                "chance": f"{format_number(chance)}%",
+            }
+            lines.append(
+                "| "
+                + " | ".join(
+                    escape_markdown(values[key]) for key in selected_columns
+                )
+                + " |"
             )
-            lines.append("| " + " | ".join(escape_markdown(cell) for cell in cells) + " |")
     return "\n".join(lines) + "\n"
+
+
+def normalize_columns(columns: str | Sequence[str] | None) -> tuple[str, ...]:
+    if columns is None:
+        return DEFAULT_COLUMNS
+    if isinstance(columns, str):
+        selected = tuple(piece.strip() for piece in columns.split(",") if piece.strip())
+    else:
+        selected = tuple(columns)
+    if not selected:
+        raise ReportError("Select at least one report column.")
+    unknown = [key for key in selected if key not in COLUMN_DEFINITIONS]
+    if unknown:
+        raise ReportError(f"Unknown report column: {unknown[0]}")
+    if len(set(selected)) != len(selected):
+        raise ReportError("Report columns cannot contain duplicates.")
+    return selected
 
 
 def format_number(value: float) -> str:
@@ -339,7 +399,17 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Create a Markdown table of ModelAsset attachment weights, chances, and Tamework displays."
     )
-    parser.add_argument("model_asset", type=Path, help="Path to a ModelAsset JSON file.")
+    parser.add_argument(
+        "model_asset",
+        nargs="?",
+        type=Path,
+        help="Path to one ModelAsset JSON file.",
+    )
+    parser.add_argument(
+        "--batch-root",
+        type=Path,
+        help="Create one report for every ModelAsset under a mod root or Server/Models directory.",
+    )
     parser.add_argument(
         "--display-root",
         action="append",
@@ -356,14 +426,22 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--model-id", help="Model asset ID used for display matching. Defaults to the filename.")
     parser.add_argument("--role-id", help="Optional NPC role ID used for display matching.")
+    parser.add_argument(
+        "--columns",
+        help="Comma-separated columns in display order. Defaults to all columns.",
+    )
     parser.add_argument("--output", type=Path, help="Write the table to this file instead of stdout.")
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if (args.model_asset is None) == (args.batch_root is None):
+        parser.error("provide either model_asset or --batch-root")
+    return args
 
 
-def run(args: argparse.Namespace) -> str:
-    model_path = args.model_asset.resolve()
-    models_root, mod_root = find_asset_layout(model_path)
-    model_roots = model_directories(models_root, args.model_root)
+def prepare_model_index(
+    primary_root: Path,
+    extra_roots: Sequence[Path],
+) -> tuple[list[Path], dict[str, list[Path]]]:
+    model_roots = model_directories(primary_root, extra_roots)
     model_files = sorted(
         (path.resolve() for root in model_roots for path in root.rglob("*.json")),
         key=lambda path: str(path).casefold(),
@@ -372,11 +450,64 @@ def run(args: argparse.Namespace) -> str:
         path: next(root for root in model_roots if path.is_relative_to(root))
         for path in model_files
     }
-    model_index = build_asset_index(model_files, root_by_file)
+    return model_files, build_asset_index(model_files, root_by_file)
+
+
+def run_single(args: argparse.Namespace, columns: Sequence[str]) -> str:
+    model_path = args.model_asset.resolve()
+    models_root, mod_root = find_asset_layout(model_path)
+    _, model_index = prepare_model_index(models_root, args.model_root)
     model = resolve_inheritance(model_path, model_index)
     configs = load_display_configs(display_directories(mod_root, args.display_root))
     sets = attachment_sets(model, model_path)
-    return markdown_text(sets, configs, args.role_id, args.model_id or model_path.stem)
+    return markdown_text(
+        sets,
+        configs,
+        args.role_id,
+        args.model_id or model_path.stem,
+        columns,
+    )
+
+
+def run_batch(args: argparse.Namespace, columns: Sequence[str]) -> str:
+    models_root, mod_root = find_batch_layout(args.batch_root)
+    _, model_index = prepare_model_index(models_root, args.model_root)
+    discovered = sorted(
+        (path.resolve() for path in models_root.rglob("*.json")),
+        key=lambda path: str(path).casefold(),
+    )
+    configs = load_display_configs(display_directories(mod_root, args.display_root))
+    sections: list[str] = []
+    for model_path in discovered:
+        model = resolve_inheritance(model_path, model_index)
+        sets = attachment_sets(model, model_path)
+        if not any(sets.values()):
+            continue
+        table = markdown_text(
+            sets,
+            configs,
+            args.role_id,
+            model_path.stem,
+            columns,
+        ).rstrip()
+        sections.append(f"## {escape_markdown(model_path.stem)}\n\n{table}")
+
+    reported = len(sections)
+    lines = [
+        "# Model Attachment Report",
+        "",
+        f"Discovered: {len(discovered)} | Reported: {reported} | Omitted: {len(discovered) - reported}",
+    ]
+    if sections:
+        lines.extend(("", "\n\n".join(sections)))
+    return "\n".join(lines) + "\n"
+
+
+def run(args: argparse.Namespace) -> str:
+    columns = normalize_columns(getattr(args, "columns", None))
+    if getattr(args, "batch_root", None) is not None:
+        return run_batch(args, columns)
+    return run_single(args, columns)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

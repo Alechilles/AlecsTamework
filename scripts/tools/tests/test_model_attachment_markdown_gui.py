@@ -72,6 +72,31 @@ class ModelAttachmentMarkdownGuiTests(unittest.TestCase):
                 report,
             )
 
+    def test_batch_form_values_apply_selected_columns(self):
+        """Catches GUI batch mode or column choices that do not reach the engine."""
+        with tempfile.TemporaryDirectory() as tmp:
+            mod_root = Path(tmp) / "ExampleMod"
+            write_json(
+                mod_root / "Server" / "Models" / "Cat.json",
+                {"RandomAttachmentSets": {"Tail": {"Long": {"Weight": 1}}}},
+            )
+            gui = self.load_gui_module()
+
+            try:
+                report = gui.generate_report(
+                    str(mod_root),
+                    model_roots=[],
+                    display_roots=[],
+                    batch=True,
+                    columns=["attachment", "chance"],
+                )
+            except TypeError:
+                self.fail("The GUI batch and column adapter is not implemented.")
+
+            self.assertIn("# Model Attachment Report", report)
+            self.assertIn("| Attachment | Chance |", report)
+            self.assertNotIn("Attachment Set", report)
+
 
 if __name__ == "__main__":
     unittest.main()

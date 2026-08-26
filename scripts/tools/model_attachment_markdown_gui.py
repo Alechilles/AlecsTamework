@@ -19,21 +19,26 @@ import model_attachment_markdown as report_engine
 
 
 def generate_report(
-    model_asset: str,
+    input_path: str,
     model_roots: Sequence[str],
     display_roots: Sequence[str],
     model_id: str = "",
     role_id: str = "",
+    batch: bool = False,
+    columns: Sequence[str] = report_engine.DEFAULT_COLUMNS,
 ) -> str:
     """Convert GUI field values into a report-engine request."""
-    if not model_asset.strip():
-        raise report_engine.ReportError("Select a ModelAsset JSON file.")
+    if not input_path.strip():
+        expected = "batch folder" if batch else "ModelAsset JSON file"
+        raise report_engine.ReportError(f"Select a {expected}.")
     args = SimpleNamespace(
-        model_asset=Path(model_asset),
+        model_asset=None if batch else Path(input_path),
+        batch_root=Path(input_path) if batch else None,
         model_root=[Path(value) for value in model_roots],
         display_root=[Path(value) for value in display_roots],
         model_id=model_id.strip() or None,
         role_id=role_id.strip() or None,
+        columns=columns,
         output=None,
     )
     return report_engine.run(args)
@@ -76,20 +81,102 @@ class DirectoryList(ttk.LabelFrame):
         return list(self.listbox.get(0, tk.END))
 
 
+class ColumnSelector(ttk.LabelFrame):
+    """Select and order the columns used in the Markdown tables."""
+
+    def __init__(self, master: tk.Misc) -> None:
+        super().__init__(master, text="Table Columns", padding=8)
+        self.labels_by_key = {
+            key: definition[0]
+            for key, definition in report_engine.COLUMN_DEFINITIONS.items()
+        }
+        self.keys_by_label = {
+            label: key for key, label in self.labels_by_key.items()
+        }
+        self.columnconfigure(0, weight=1)
+        self.columnconfigure(2, weight=1)
+
+        ttk.Label(self, text="Displayed Columns (in order)").grid(
+            row=0, column=0, sticky="w"
+        )
+        ttk.Label(self, text="Hidden Columns").grid(
+            row=0, column=2, sticky="w", padx=(8, 0)
+        )
+        self.displayed = tk.Listbox(self, height=6, exportselection=False)
+        self.displayed.grid(row=1, column=0, sticky="nsew")
+        for key in report_engine.DEFAULT_COLUMNS:
+            self.displayed.insert(tk.END, self.labels_by_key[key])
+
+        controls = ttk.Frame(self)
+        controls.grid(row=1, column=1, padx=8)
+        ttk.Button(controls, text="Move Up", command=lambda: self.move(-1)).grid(
+            row=0, column=0, sticky="ew"
+        )
+        ttk.Button(controls, text="Move Down", command=lambda: self.move(1)).grid(
+            row=1, column=0, sticky="ew", pady=(5, 0)
+        )
+        ttk.Button(controls, text="Hide >", command=self.hide).grid(
+            row=2, column=0, sticky="ew", pady=(12, 0)
+        )
+        ttk.Button(controls, text="< Show", command=self.show).grid(
+            row=3, column=0, sticky="ew", pady=(5, 0)
+        )
+
+        self.hidden = tk.Listbox(self, height=6, exportselection=False)
+        self.hidden.grid(row=1, column=2, sticky="nsew")
+
+    def move(self, direction: int) -> None:
+        selection = self.displayed.curselection()
+        if not selection:
+            return
+        index = selection[0]
+        destination = index + direction
+        if destination < 0 or destination >= self.displayed.size():
+            return
+        label = self.displayed.get(index)
+        self.displayed.delete(index)
+        self.displayed.insert(destination, label)
+        self.displayed.selection_set(destination)
+
+    def hide(self) -> None:
+        selection = self.displayed.curselection()
+        if not selection or self.displayed.size() == 1:
+            return
+        index = selection[0]
+        label = self.displayed.get(index)
+        self.displayed.delete(index)
+        self.hidden.insert(tk.END, label)
+
+    def show(self) -> None:
+        selection = self.hidden.curselection()
+        if not selection:
+            return
+        index = selection[0]
+        label = self.hidden.get(index)
+        self.hidden.delete(index)
+        self.displayed.insert(tk.END, label)
+
+    def values(self) -> list[str]:
+        labels = self.displayed.get(0, tk.END)
+        return [self.keys_by_label[label] for label in labels]
+
+
 class AttachmentReportApplication:
     """Tkinter application for generating and saving attachment reports."""
 
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.report = ""
+        self.input_mode = tk.StringVar(value="single")
         self.model_asset = tk.StringVar()
+        self.input_label = tk.StringVar(value="ModelAsset JSON")
         self.model_id = tk.StringVar()
         self.role_id = tk.StringVar()
         self.status = tk.StringVar(value="Select a ModelAsset to begin.")
 
         root.title("Tamework Model Attachment Report")
-        root.geometry("960x720")
-        root.minsize(720, 560)
+        root.geometry("1000x850")
+        root.minsize(780, 650)
         self.build_window()
 
     def build_window(self) -> None:
@@ -98,33 +185,51 @@ class AttachmentReportApplication:
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         content.columnconfigure(0, weight=1)
-        content.rowconfigure(3, weight=1)
+        content.rowconfigure(4, weight=1)
 
         inputs = ttk.LabelFrame(content, text="Report Input", padding=10)
         inputs.grid(row=0, column=0, sticky="ew")
         inputs.columnconfigure(1, weight=1)
 
-        ttk.Label(inputs, text="ModelAsset JSON").grid(
-            row=0, column=0, sticky="w", padx=(0, 8)
+        modes = ttk.Frame(inputs)
+        modes.grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 10))
+        ttk.Radiobutton(
+            modes,
+            text="Single ModelAsset",
+            variable=self.input_mode,
+            value="single",
+            command=self.change_input_mode,
+        ).grid(row=0, column=0)
+        ttk.Radiobutton(
+            modes,
+            text="Batch Folder",
+            variable=self.input_mode,
+            value="batch",
+            command=self.change_input_mode,
+        ).grid(row=0, column=1, padx=(12, 0))
+
+        ttk.Label(inputs, textvariable=self.input_label).grid(
+            row=1, column=0, sticky="w", padx=(0, 8)
         )
         ttk.Entry(inputs, textvariable=self.model_asset).grid(
-            row=0, column=1, sticky="ew"
+            row=1, column=1, sticky="ew"
         )
-        ttk.Button(inputs, text="Browse...", command=self.choose_model).grid(
-            row=0, column=2, padx=(8, 0)
+        ttk.Button(inputs, text="Browse...", command=self.choose_input).grid(
+            row=1, column=2, padx=(8, 0)
         )
 
         ttk.Label(inputs, text="Model ID (optional)").grid(
-            row=1, column=0, sticky="w", padx=(0, 8), pady=(10, 0)
+            row=2, column=0, sticky="w", padx=(0, 8), pady=(10, 0)
         )
-        ttk.Entry(inputs, textvariable=self.model_id).grid(
-            row=1, column=1, sticky="ew", pady=(10, 0)
+        self.model_id_entry = ttk.Entry(inputs, textvariable=self.model_id)
+        self.model_id_entry.grid(
+            row=2, column=1, sticky="ew", pady=(10, 0)
         )
         ttk.Label(inputs, text="Role ID (optional)").grid(
-            row=2, column=0, sticky="w", padx=(0, 8), pady=(8, 0)
+            row=3, column=0, sticky="w", padx=(0, 8), pady=(8, 0)
         )
         ttk.Entry(inputs, textvariable=self.role_id).grid(
-            row=2, column=1, sticky="ew", pady=(8, 0)
+            row=3, column=1, sticky="ew", pady=(8, 0)
         )
 
         roots = ttk.Frame(content)
@@ -144,8 +249,11 @@ class AttachmentReportApplication:
         )
         self.display_roots.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
 
+        self.columns = ColumnSelector(content)
+        self.columns.grid(row=2, column=0, sticky="ew", pady=(10, 0))
+
         actions = ttk.Frame(content)
-        actions.grid(row=2, column=0, sticky="ew", pady=10)
+        actions.grid(row=3, column=0, sticky="ew", pady=10)
         ttk.Button(actions, text="Generate Report", command=self.generate).grid(
             row=0, column=0
         )
@@ -161,7 +269,7 @@ class AttachmentReportApplication:
         )
 
         preview = ttk.LabelFrame(content, text="Markdown Preview", padding=8)
-        preview.grid(row=3, column=0, sticky="nsew")
+        preview.grid(row=4, column=0, sticky="nsew")
         preview.columnconfigure(0, weight=1)
         preview.rowconfigure(0, weight=1)
         self.preview = tk.Text(
@@ -182,11 +290,25 @@ class AttachmentReportApplication:
             xscrollcommand=horizontal.set,
         )
 
-    def choose_model(self) -> None:
-        selected = filedialog.askopenfilename(
-            title="Select a ModelAsset",
-            filetypes=(("JSON files", "*.json"), ("All files", "*.*")),
-        )
+    def change_input_mode(self) -> None:
+        batch = self.input_mode.get() == "batch"
+        self.input_label.set("Mod Root or Server/Models" if batch else "ModelAsset JSON")
+        self.model_asset.set("")
+        self.model_id.set("")
+        self.model_id_entry.configure(state=tk.DISABLED if batch else tk.NORMAL)
+        expected = "batch folder" if batch else "ModelAsset"
+        self.status.set(f"Select a {expected} to begin.")
+
+    def choose_input(self) -> None:
+        if self.input_mode.get() == "batch":
+            selected = filedialog.askdirectory(
+                title="Select a mod root or Server/Models directory"
+            )
+        else:
+            selected = filedialog.askopenfilename(
+                title="Select a ModelAsset",
+                filetypes=(("JSON files", "*.json"), ("All files", "*.*")),
+            )
         if selected:
             self.model_asset.set(selected)
             self.status.set("Ready to generate.")
@@ -199,6 +321,8 @@ class AttachmentReportApplication:
                 self.display_roots.values(),
                 self.model_id.get(),
                 self.role_id.get(),
+                batch=self.input_mode.get() == "batch",
+                columns=self.columns.values(),
             )
         except (OSError, report_engine.ReportError) as exc:
             self.status.set("Report generation failed.")
@@ -211,17 +335,20 @@ class AttachmentReportApplication:
         self.preview.insert("1.0", report)
         self.preview.configure(state=tk.DISABLED)
         self.save_button.configure(state=tk.NORMAL)
-        row_count = max(0, report.count("\n") - 2)
-        self.status.set(f"Generated {row_count} attachment rows.")
+        self.status.set("Report generated.")
 
     def save(self) -> None:
         if not self.report:
             return
-        model_name = Path(self.model_asset.get()).stem or "model"
+        input_name = Path(self.model_asset.get()).stem or "model"
+        if self.input_mode.get() == "batch":
+            default_name = f"{input_name}-model-attachments.md"
+        else:
+            default_name = f"{input_name}-attachments.md"
         selected = filedialog.asksaveasfilename(
             title="Save Markdown Report",
             defaultextension=".md",
-            initialfile=f"{model_name}-attachments.md",
+            initialfile=default_name,
             filetypes=(("Markdown files", "*.md"), ("All files", "*.*")),
         )
         if not selected:
