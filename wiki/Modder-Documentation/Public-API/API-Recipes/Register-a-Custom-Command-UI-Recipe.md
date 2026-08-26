@@ -162,6 +162,12 @@ Put the UI file at `Common/UI/Custom/Rune_UI/HusbandryCommand.ui`. The string
 passed to `append` starts below `Common/UI/Custom`; it must not repeat that
 prefix.
 
+> **Client safety warning:** A missing or malformed third-party `.ui` document
+> can disconnect the client when Hytale applies the append command. Tamework
+> cannot catch this client-side error or open the standard menu. A successful
+> Java build does not validate UI markup. Test each document on the target
+> Hytale client and package it at the exact path below `Common/UI/Custom`.
+
 Bind only `action.handle().token()` into the client event. Disabled actions
 have no usable handle. Set input only for an action that declares optional or
 required input.

@@ -8,7 +8,7 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Experimental API Contract (`0.11.0`)**
+> **Stable API Contract (`1.0.0`)**
 > This reference tracks the current `TameworkApi.commandUi()` contract.
 
 The contract has four independent capabilities:
@@ -119,6 +119,13 @@ Paths passed to `UICommandBuilder.append(...)` are relative to
 `Common/UI/Custom/Rune_UI/HusbandryCommand.ui` must be appended as
 `Rune_UI/HusbandryCommand.ui`. Do not include `Common/UI/Custom/` in the
 runtime path.
+
+> **Client safety warning:** A missing or malformed third-party `.ui` document
+> can disconnect the client when Hytale applies the append command. This error
+> occurs after Tamework sends the command, so Tamework cannot catch it or open
+> the standard menu as a fallback. A successful Java build does not validate UI
+> markup. Test each document on the target Hytale client and package it at the
+> exact path below `Common/UI/Custom`.
 
 ## Snapshot and Partial Updates
 

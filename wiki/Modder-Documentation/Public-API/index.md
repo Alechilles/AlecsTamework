@@ -10,11 +10,13 @@ Parent: [Modder Documentation](/mod/alecs-tamework/modder-documentation) | [Alec
 
 This subsection is the parent category for all public Java API docs.
 
-> **Experimental API Contract (`0.12.0`, shipped in Tamework 3.2.2)**
-> This is a public integration surface, but the contract is still experimental. Keep capability checks in downstream mods.
+> **Stable API Contract (`1.0.0`)**
+> This is the supported public integration surface. Keep capability checks in
+> downstream mods because optional and reduced-function runtimes can omit API
+> families.
 
-These pages describe the current Tamework 3.2.2 source. The previous public
-release predates this API; it did not ship an earlier `0.8` public contract.
+These pages describe the current development branch. The `1.0.0` API is
+scheduled for the next Tamework release. It did not ship in Tamework 3.2.2.
 
 ## Child Pages
 - [API Reference](/mod/alecs-tamework/api-reference)

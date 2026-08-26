@@ -8,9 +8,8 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Experimental API Contract (`0.12.0`)**
-> This page describes the current `TameworkApi.commandHud()` contract. The
-> contract can change while the API is experimental.
+> **Stable API Contract (`1.0.0`)**
+> This page describes the supported `TameworkApi.commandHud()` contract.
 
 `CommandHudApi` exposes two independent presentation surfaces:
 
@@ -200,6 +199,13 @@ UI files belong below `Common/UI/Custom`. Paths passed to
 `Common/UI/Custom/Rune_UI/HusbandryTarget.ui` is appended as
 `Rune_UI/HusbandryTarget.ui`; do not include `Common/UI/Custom/` in the path.
 
+> **Client safety warning:** A missing or malformed third-party `.ui` document
+> can disconnect the client when Hytale applies the append command. This error
+> occurs after Tamework sends the command, so Tamework cannot catch it or
+> restore the standard HUD as a fallback. A successful Java build does not
+> validate UI markup. Test each document on the target Hytale client and
+> package it at the exact path below `Common/UI/Custom`.
+
 The target HUD is active while the player holds a registered command item and
 looks at a supported NPC. The hotswap HUD is active while the matching command
 item is equipped. Tamework binds each session to the exact target or equipped
@@ -380,7 +386,7 @@ stacks, private contribution values, or exception objects. Use the snapshot to
 diagnose registration conflicts, fallback, unavailable contributors, and
 slow composition without coupling to Tamework internals.
 
-## Version 0.12.0 non-goals
+## Version 1.0.0 non-goals
 
 This API is passive in v1. It does not add custom HUD event handlers, custom
 server actions, confirmation flows, or multi-step UI flows. It only lets a Java

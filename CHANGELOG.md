@@ -4,6 +4,10 @@
 
 ### Added
 
+- Added the stable `1.0.0` public Java API contract. It includes custom command
+  page and command HUD renderers, namespaced contributors, partial-update
+  hints, command-page actions and flows, redacted diagnostics, and standard UI
+  fallback.
 - Added a durable population-group owned count for integrations that must
   include unloaded, dead, and lost companions in capacity checks.
 - Generic command panels can permanently abandon owned companions. This
@@ -51,21 +55,6 @@
 - Added `TameworkCullNpc`, a reusable item interaction that lets a player cull
   an eligible owned and tamed NPC without opening a command panel. Consumer
   mods control the item, hold time, and other item behavior.
-- Added an experimental command UI renderer and contributor API for Java
-  plugins. Command-item configs can select one custom layout with
-  `UiRendererId` and compose required or optional `UiContributors`. Renderers
-  receive immutable snapshots, row and section change hints, guarded partial
-  updates, and opaque action handles. Contributors can supply bounded
-  namespaced presentation, server-authoritative actions, and custom flows.
-  The API also supplies complete built-in group and generic or bonded talent
-  flows, redacted diagnostics, standard-menu fallback, and bounded callback
-  timing warnings.
-- Added an experimental command HUD renderer and contributor API for Java
-  plugins. Command-item configs can select independent custom target and
-  equipped-tool HUD layouts with `TargetHudRendererId`,
-  `TargetHudContributors`, `HotswapHudRendererId`, and
-  `HotswapHudContributors`. Renderers receive complete detached snapshots and
-  focused update hints for either surface.
 - Added optional per-tool `Highlight Active` indicators for generic linked
   panels on Update 6. The controller sees group-colored indicators above loaded
   active companions. Ungrouped companions use neutral gold. The setting is

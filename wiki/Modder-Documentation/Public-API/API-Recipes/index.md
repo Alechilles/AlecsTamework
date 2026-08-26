@@ -10,8 +10,8 @@ Parent: [Public API](/mod/alecs-tamework/public-api) | [Modder Documentation](/m
 
 This subsection provides task-focused examples for common Tamework API integration workflows.
 
-> **Experimental API Contract (`0.12.0`)**
-> Recipe behavior should always be gated behind runtime capability checks.
+> **Stable API Contract (`1.0.0`)**
+> Gate recipe behavior behind runtime capability checks.
 
 ## Child Pages
 - [Increase Mob Happiness from Custom Interaction Recipe](/mod/alecs-tamework/increase-mob-happiness-from-custom-interaction-recipe)

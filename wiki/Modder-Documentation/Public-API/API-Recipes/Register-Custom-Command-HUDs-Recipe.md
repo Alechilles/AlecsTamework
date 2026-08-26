@@ -12,8 +12,8 @@ Goal: let a Java plugin replace the target HUD, the equipped command-item
 hotswap HUD, or both with a bespoke layout. Tamework continues to own the
 snapshot, lifecycle, fallback, and server state.
 
-This is the experimental `0.12.0` API. It is passive: it does not add custom
-HUD actions, event handlers, or flows.
+The stable `1.0.0` HUD API is passive. It does not add custom HUD actions,
+event handlers, or flows.
 
 ## 1. Check capabilities
 
@@ -186,6 +186,12 @@ so a renderer can update only one card indicator or slot.
 Put the UI asset at `Common/UI/Custom/Rune_UI/HusbandryTarget.ui`. The runtime
 path is `Rune_UI/HusbandryTarget.ui`; do not repeat the
 `Common/UI/Custom/` prefix in `UICommandBuilder.append(...)`.
+
+> **Client safety warning:** A missing or malformed third-party `.ui` document
+> can disconnect the client when Hytale applies the append command. Tamework
+> cannot catch this client-side error or restore the standard HUD. A successful
+> Java build does not validate UI markup. Test each document on the target
+> Hytale client and package it at the exact path below `Common/UI/Custom`.
 
 ## 5. Read the target snapshot
 

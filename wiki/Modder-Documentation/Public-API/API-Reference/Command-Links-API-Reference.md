@@ -8,7 +8,7 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Experimental API Contract (`0.9.0`)**
+> **Stable API Contract (`1.0.0`)**
 > This reference tracks the current `commandLinks()` contract in `TameworkApi`.
 
 Capability: `COMMAND_LINKS`
