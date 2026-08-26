@@ -14,7 +14,7 @@ import com.alechilles.alecstamework.api.commandhud.CommandHudRendererDescriptor;
 import com.alechilles.alecstamework.api.commandhud.CommandTargetHudController;
 import com.alechilles.alecstamework.api.commandhud.CommandTargetHudSessionContributor;
 import com.alechilles.alecstamework.api.commandui.CommandUiValue;
-import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
+import com.alechilles.alecstamework.items.CommandHudSelfTestRuntime;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -93,9 +93,8 @@ public final class CommandHudApiSelfTestSuite {
                     || hotswapRenderer == null || hotswapContributor == null) {
                 return new ApiSelfTestSuiteResult("command-hud", assertions);
             }
-            CommandItemFeatureHandler handler = context.plugin().getCommandItemFeatureHandler();
-            CommandItemFeatureHandler.CommandHudSelfTestResult result =
-                    handler == null ? null : handler.runCommandHudSelfTest(
+            CommandHudSelfTestRuntime.CommandHudSelfTestResult result =
+                    CommandHudSelfTestRuntime.run(
                             commandHud, playerUuid, targetRendererId, targetContributorId,
                             hotswapRendererId, hotswapContributorId);
             assertions.add(check(

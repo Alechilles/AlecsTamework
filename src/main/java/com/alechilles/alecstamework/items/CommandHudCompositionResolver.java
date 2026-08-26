@@ -35,9 +35,19 @@ final class CommandHudCompositionResolver {
     }
 
     CommandHudCompositionResolver(@Nonnull CommandHudRegistry registry) {
+        this(registry, true);
+    }
+
+    /** Creates a registry resolver, optionally publishing runtime diagnostics. */
+    CommandHudCompositionResolver(
+            @Nonnull CommandHudRegistry registry,
+            boolean connectRuntimeDiagnostics
+    ) {
         this(Objects.requireNonNull(registry, "registry").rendererRegistry(),
                 registry.contributorRegistry(), new CommandHudTimingWarnings());
-        registry.diagnosticsRuntime().connect(diagnostics::snapshot);
+        if (connectRuntimeDiagnostics) {
+            registry.diagnosticsRuntime().connect(this, diagnostics::snapshot);
+        }
     }
 
     CommandHudCompositionResolver(

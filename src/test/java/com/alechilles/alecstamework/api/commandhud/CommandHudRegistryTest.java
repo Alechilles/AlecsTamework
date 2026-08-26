@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.api.commandhud;
 
 import com.alechilles.alecstamework.api.internal.CommandHudRegistry;
+import com.alechilles.alecstamework.api.internal.CommandHudDiagnosticsRuntime;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -255,6 +256,40 @@ class CommandHudRegistryTest {
         assertTrue(registry.diagnostics().targetContributors().isEmpty());
         assertTrue(registry.diagnostics().sessions().isEmpty());
         assertTrue(registry.diagnosticsRuntime().snapshot().sessions().isEmpty());
+    }
+
+    @Test
+    void runtimeDiagnosticsAggregatesLiveSourcesAndIgnoresTemporaryProbeSource() {
+        CommandHudDiagnosticsRuntime runtime = new CommandHudDiagnosticsRuntime();
+        UUID targetSession = UUID.randomUUID();
+        UUID hotswapSession = UUID.randomUUID();
+        runtime.connect(new Object(), () -> diagnosticsFor(
+                targetSession, CommandHudSurface.TARGET, "runeteria:target"));
+        runtime.connect(new Object(), () -> diagnosticsFor(
+                hotswapSession, CommandHudSurface.HOTSWAP, "runeteria:hotswap"));
+
+        runtime.connect(new Object(), CommandHudDiagnostics::empty);
+
+        CommandHudDiagnostics merged = runtime.snapshot();
+
+        assertEquals(2, merged.activeSessionCount());
+        assertEquals(Set.of(targetSession, hotswapSession), merged.sessions().stream()
+                .map(CommandHudDiagnostics.SessionView::sessionId).collect(java.util.stream.Collectors.toSet()));
+        assertEquals(Set.of(CommandHudSurface.TARGET, CommandHudSurface.HOTSWAP),
+                merged.sessions().stream().map(CommandHudDiagnostics.SessionView::surface)
+                        .collect(java.util.stream.Collectors.toSet()));
+    }
+
+    private static CommandHudDiagnostics diagnosticsFor(
+            UUID sessionId,
+            CommandHudSurface surface,
+            String rendererId
+    ) {
+        return new CommandHudDiagnostics(
+                List.of(), List.of(), List.of(), List.of(),
+                List.of(new CommandHudDiagnostics.SessionView(
+                        sessionId, surface, rendererId, 1L, List.of(),
+                        "item", "config", null)), null, 0L, 0L);
     }
 
     private static void assertUnavailable(CommandHudRegistrationResult result) {
