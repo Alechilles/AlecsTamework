@@ -1,7 +1,7 @@
-Creditor 1.1.0
+Creditor 1.1.1
 Copyright 2026 Lordimass
 License: MIT
-Source: https://github.com/Lordimass/Creditor/tree/1.1.0
-Source commit: e2b9ba6b0b6c40374994edd7080e7a5858af5696
+Source: https://github.com/Lordimass/Creditor/tree/1.1.1
+Source commit: abc083633259d9e4d490d42fce1e234165bb04e6
 CurseForge project: https://www.curseforge.com/hytale/mods/creditor
-CurseForge file ID: 8334074
+CurseForge file ID: 8724366

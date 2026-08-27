@@ -2,6 +2,10 @@
 
 ## 3.2.3 - Stable 0.6 Compatibility Hotfix - 2026-08-27
 
+### Changed
+
+- Updated the embedded Creditor library to 1.1.1 for stable Hytale 0.6 support.
+
 ### Fixed
 
 - Updated the build target to stable Hytale `0.6.0`. The Update 5 chunk-save
