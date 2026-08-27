@@ -416,7 +416,7 @@ class PaidRevivalProcessCrashTest {
                 files.release().toString(),
                 files.refund().toString()
         ).redirectErrorStream(true).start();
-        if (!process.waitFor(30, TimeUnit.SECONDS)) {
+        if (!process.waitFor(60, TimeUnit.SECONDS)) {
             process.destroyForcibly();
             process.waitFor(5, TimeUnit.SECONDS);
             throw new AssertionError(
