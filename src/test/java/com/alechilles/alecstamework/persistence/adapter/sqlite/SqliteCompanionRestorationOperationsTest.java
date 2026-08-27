@@ -455,6 +455,56 @@ class SqliteCompanionRestorationOperationsTest {
         }
     }
 
+    /** Protects revival of companions created before domain rows were stored. */
+    @Test
+    void managedFreeRestorationInitializesMissingDomainRows()
+            throws Exception {
+        SqliteLifecycleAdmissionBinding binding =
+                new SqliteLifecycleAdmissionBinding();
+        binding.bind(request -> CompletableFuture.completedFuture(
+                missingDomainRowsManagedEvidence(request)
+        ));
+        SqliteCompanionRestorationOperations managed =
+                newManagedRestorations(binding);
+
+        OperationWorkflowResult result = managed.submit(
+                operationId(32),
+                new IdempotencyKey("restoration-32"),
+                restorationRequest(),
+                (request, operation) -> LiveOperationResult.confirmed(
+                        "spawn_receipt_confirmed"
+                ).completed()
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLISHED,
+                result.status(), String.valueOf(result.failure())
+        );
+        assertEquals(LifecycleState.ACTIVE, lifecycle().state());
+        try (Connection connection = connections.openReadConnection()) {
+            SqlitePopulationDomainStore domains =
+                    new SqlitePopulationDomainStore(connection);
+            assertEquals(
+                    1,
+                    domains.counts(new PopulationDomainBucket(
+                            OWNER,
+                            "managed-owned",
+                            PopulationDomainScope.GLOBAL,
+                            null
+                    )).committedOwned()
+            );
+            assertEquals(
+                    1,
+                    domains.counts(new PopulationDomainBucket(
+                            OWNER,
+                            "managed-deployed",
+                            PopulationDomainScope.GLOBAL,
+                            null
+                    )).committedDeployable()
+            );
+        }
+    }
+
     /** Protects revival of companions made dormant before domain convergence. */
     @Test
     void managedFreeRestorationRepairsLegacyDeployedClaim()
@@ -897,6 +947,75 @@ class SqliteCompanionRestorationOperationsTest {
                         -400
                 );
         return LifecycleAdmissionEvidence.managed(payload, null);
+    }
+
+    private LifecycleAdmissionEvidence missingDomainRowsManagedEvidence(
+            LifecycleAdmissionRequest request
+    ) {
+        boolean initializes = request.sourceOwner() == null;
+        List<PopulationDomainAdmissionOperation.DomainInput> domains = initializes
+                ? List.of(
+                        new PopulationDomainAdmissionOperation.DomainInput(
+                                "managed-deployed",
+                                PopulationDomainScope.GLOBAL,
+                                null,
+                                0,
+                                1,
+                                1,
+                                0,
+                                100,
+                                1
+                        ),
+                        new PopulationDomainAdmissionOperation.DomainInput(
+                                "managed-owned",
+                                PopulationDomainScope.GLOBAL,
+                                null,
+                                1,
+                                0,
+                                1,
+                                100,
+                                0,
+                                1
+                        )
+                )
+                : List.of(new PopulationDomainAdmissionOperation.DomainInput(
+                        "managed-deployed",
+                        PopulationDomainScope.GLOBAL,
+                        null,
+                        0,
+                        1,
+                        1,
+                        0,
+                        100,
+                        1
+                ));
+        PopulationDomainAdmissionOperation.Payload payload =
+                new PopulationDomainAdmissionOperation.Payload(
+                        request.reservationId(),
+                        PROFILE,
+                        OWNER,
+                        new LifecycleRevision(1),
+                        "world-two",
+                        request.sourceOwner(),
+                        request.sourceWorld(),
+                        LifecycleState.DEAD_REVIVABLE,
+                        LifecycleState.ACTIVE,
+                        "managed-test-group",
+                        "managed-test-provider",
+                        1,
+                        "generation",
+                        1,
+                        1,
+                        Long.MAX_VALUE,
+                        1,
+                        domains,
+                        List.of(),
+                        -400
+                );
+        return LifecycleAdmissionEvidence.managed(
+                payload,
+                managedEvidence(request.operationId()).composition()
+        );
     }
 
     private void seedCommittedDomainSource() throws Exception {

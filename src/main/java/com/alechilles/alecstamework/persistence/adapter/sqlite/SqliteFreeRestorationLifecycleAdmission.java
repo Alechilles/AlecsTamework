@@ -174,6 +174,7 @@ final class SqliteFreeRestorationLifecycleAdmission {
     ) {
         CompanionLifecycle lifecycle = source.lifecycle();
         boolean owned = lifecycle.ownerId() != null;
+        boolean initializesDomains = initializesDomains(source);
         PopulationAdmissionOperation operation = owned
                 ? PopulationAdmissionOperation.RESTORE
                 : PopulationAdmissionOperation.LIFECYCLE_CHANGE;
@@ -215,8 +216,8 @@ final class SqliteFreeRestorationLifecycleAdmission {
                 lifecycle,
                 LifecycleState.DEAD_REVIVABLE,
                 LifecycleState.ACTIVE,
-                lifecycle.ownerId(),
-                lifecycle.ownerWorldKey()
+                initializesDomains ? null : lifecycle.ownerId(),
+                initializesDomains ? null : lifecycle.ownerWorldKey()
         );
     }
 
@@ -235,6 +236,11 @@ final class SqliteFreeRestorationLifecycleAdmission {
             return requested.withAdmissionEvidence(evidence);
         }
         var payload = evidence.payload();
+        boolean initializesDomains = initializesDomains(source);
+        var admissionSourceOwner = initializesDomains
+                ? null : source.lifecycle().ownerId();
+        String admissionSourceWorld = initializesDomains
+                ? null : source.lifecycle().ownerWorldKey();
         String targetWorld = source.lifecycle().ownerId() == null
                 ? null : requested.targetWorldKey();
         if (payload == null
@@ -245,10 +251,10 @@ final class SqliteFreeRestorationLifecycleAdmission {
         )
                 || payload.sourceLifecycle() != LifecycleState.DEAD_REVIVABLE
                 || !Objects.equals(
-                payload.sourceOwnerId(), source.lifecycle().ownerId()
+                payload.sourceOwnerId(), admissionSourceOwner
         )
                 || !Objects.equals(
-                payload.sourceWorldKey(), source.lifecycle().ownerWorldKey()
+                payload.sourceWorldKey(), admissionSourceWorld
         )
                 || payload.targetLifecycle() != LifecycleState.ACTIVE
                 || !Objects.equals(payload.ownerId(), source.lifecycle().ownerId())
@@ -262,8 +268,8 @@ final class SqliteFreeRestorationLifecycleAdmission {
             plan = PopulationDomainConvergencePlanner.plan(
                     requested.profileId(),
                     source.lifecycle().revision(),
-                    source.lifecycle().ownerId(),
-                    source.lifecycle().ownerWorldKey(),
+                    admissionSourceOwner,
+                    admissionSourceWorld,
                     LifecycleState.DEAD_REVIVABLE,
                     source.lifecycle().ownerId(),
                     targetWorld,
@@ -300,6 +306,13 @@ final class SqliteFreeRestorationLifecycleAdmission {
                         payload, evidence.composition(), plan
                 )
         );
+    }
+
+    private static boolean initializesDomains(
+            SqliteLifecycleAdmissionSourceReader.SourceReadModel source
+    ) {
+        return source.lifecycle().ownerId() != null
+                && source.committedDomainRows().isEmpty();
     }
 
     private static boolean legacyClaimCoversAdmission(
