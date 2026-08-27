@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.api.InteractionEffectContext;
 import com.alechilles.alecstamework.api.InteractionEffectSpec;
 import com.alechilles.alecstamework.api.InteractionPresetDefinition;
@@ -41,6 +42,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
@@ -244,10 +246,22 @@ final class TameworkInteractEffects {
         }
         DropItemEffect dropItem = effects.getDropItem();
         if (dropItem != null) {
-            boolean dropped = inventoryEffects.applyDropItem(dropItem, npcRef, role, store, harvestInteraction);
+            InteractionInventoryEffects.DropItemOutcome dropOutcome =
+                    inventoryEffects.applyDropItem(dropItem, npcRef, role, store, harvestInteraction);
+            boolean dropped = dropOutcome.applied();
             applied |= dropped;
             if (dropped && harvestInteraction) {
-                CompanionLevelingService.awardHarvestXp(npcRef, store);
+                CompanionLevelingService.AwardResult award =
+                        CompanionLevelingService.awardHarvestXp(npcRef, store);
+                ActivityRuntime.publishHarvest(
+                        UUID.randomUUID(),
+                        role == null ? null : role.getRoleName(),
+                        resolveHarvestContext(role, ctx),
+                        ActivityRuntime.resolveOwnerId(npcRef, store),
+                        ActivityRuntime.resolveCompanionId(npcRef, store),
+                        dropOutcome.itemQuantities(),
+                        award
+                );
             }
         }
         HookEffect hookEffect = effects.getTriggerNpcHook();
@@ -359,6 +373,16 @@ final class TameworkInteractEffects {
             }
         }
         return roleId;
+    }
+
+    private String resolveHarvestContext(Role role, InteractionContextSnapshot ctx) {
+        com.alechilles.alecstamework.config.assets.TwGlobalConfig global =
+                com.alechilles.alecstamework.config.assets.TwGlobalConfig.resolveActive();
+        String paramName = global == null
+                ? "HarvestInteractionContext"
+                : global.getHarvestContextParam();
+        return new InteractionParamResolver(null, null, null)
+                .getStringParam(role, ctx, paramName);
     }
 
     boolean applyFeeding(Ref<EntityStore> npcRef,

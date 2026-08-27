@@ -27,12 +27,12 @@ public final class HusbandryOutcomeRuntime {
     }
 
     /** Installs one live API facade for authoritative Tamework actions. */
-    public static void install(@Nonnull HusbandryOutcomeApi api) {
+    static void install(@Nonnull HusbandryOutcomeApi api) {
         CURRENT.set(api);
     }
 
     /** Clears the live facade only when it is still the supplied API instance. */
-    public static void clear(@Nullable HusbandryOutcomeApi expected) {
+    static void clear(@Nullable HusbandryOutcomeApi expected) {
         if (expected != null) {
             CURRENT.compareAndSet(expected, UNAVAILABLE);
         }

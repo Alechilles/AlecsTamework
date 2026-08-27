@@ -26,6 +26,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
@@ -219,31 +220,32 @@ final class InteractionInventoryEffects {
     }
 
     // Drops items from the NPC into the world based on drop config.
-    boolean applyDropItem(DropItemEffect effect,
-                          Ref<EntityStore> npcRef,
-                          Role role,
-                          Store<EntityStore> store,
-                          boolean harvestInteraction) {
+    DropItemOutcome applyDropItem(DropItemEffect effect,
+                                  Ref<EntityStore> npcRef,
+                                  Role role,
+                                  Store<EntityStore> store,
+                                  boolean harvestInteraction) {
         if (effect == null || npcRef == null || store == null) {
-            return false;
+            return DropItemOutcome.empty();
         }
         List<ItemStack> drops = resolveDropItems(effect);
         if (drops.isEmpty()) {
-            return false;
+            return DropItemOutcome.empty();
         }
+        int bonusCopies = 0;
         if (harvestInteraction) {
-            int bonusCopies = CompanionHarvestBonusService.resolveBonusCopies(
+            bonusCopies = CompanionHarvestBonusService.resolveBonusCopies(
                     npcRef,
                     store,
                     role,
                     resolveProductId(drops),
                     ThreadLocalRandom.current()::nextDouble
             );
-            drops = CompanionOutputService.finalizeDrops(drops, bonusCopies).itemStacks();
         }
+        DropItemOutcome output = finalizeDropOutput(drops, bonusCopies);
         float throwSpeed = effect.getThrowSpeed() != null ? effect.getThrowSpeed().floatValue() : 0.0f;
         boolean applied = false;
-        for (ItemStack stack : drops) {
+        for (ItemStack stack : output.itemStacks()) {
             if (stack == null || stack.isEmpty()) {
                 continue;
             }
@@ -254,7 +256,18 @@ final class InteractionInventoryEffects {
             }
             applied = true;
         }
-        return applied;
+        return output.withApplied(applied);
+    }
+
+    /** Finalizes loose output once so the materialized stacks and activity receipt stay aligned. */
+    static DropItemOutcome finalizeDropOutput(List<ItemStack> baseDrops, int bonusCopies) {
+        CompanionOutputService.FinalizedOutput output =
+                CompanionOutputService.finalizeDrops(baseDrops, bonusCopies);
+        return new DropItemOutcome(
+                !output.itemStacks().isEmpty(),
+                output.itemStacks(),
+                output.itemQuantities()
+        );
     }
 
     /** Adds product copies to the current inventory and returns the committed quantity. */
@@ -462,6 +475,23 @@ final class InteractionInventoryEffects {
         Tamework instance = Tamework.getInstance();
         if (instance != null && instance.getLogger() != null) {
             instance.getLogger().at(Level.FINE).log(message);
+        }
+    }
+
+    record DropItemOutcome(boolean applied,
+                           List<ItemStack> itemStacks,
+                           Map<String, Integer> itemQuantities) {
+        DropItemOutcome {
+            itemStacks = List.copyOf(itemStacks == null ? List.of() : itemStacks);
+            itemQuantities = Map.copyOf(itemQuantities == null ? Map.of() : itemQuantities);
+        }
+
+        static DropItemOutcome empty() {
+            return new DropItemOutcome(false, List.of(), Map.of());
+        }
+
+        DropItemOutcome withApplied(boolean applied) {
+            return new DropItemOutcome(applied, itemStacks, itemQuantities);
         }
     }
 }

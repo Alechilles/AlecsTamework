@@ -9,6 +9,7 @@ import javax.annotation.Nonnull;
 
 /** Finalizes companion item output before materialization and activity publication. */
 public final class CompanionOutputService {
+    private static final int MAX_BONUS_COPIES = 3;
 
     private CompanionOutputService() {
     }
@@ -29,7 +30,7 @@ public final class CompanionOutputService {
             int bonusCopies
     ) {
         ArrayList<ItemStack> finalDrops = new ArrayList<>();
-        int copies = Math.max(0, bonusCopies);
+        int copies = Math.max(0, Math.min(MAX_BONUS_COPIES, bonusCopies));
         if (baseDrops != null) {
             for (ItemStack stack : baseDrops) {
                 if (!isUsable(stack)) {

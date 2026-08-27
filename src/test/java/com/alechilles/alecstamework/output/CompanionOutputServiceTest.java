@@ -47,6 +47,22 @@ class CompanionOutputServiceTest {
         );
     }
 
+    @Test
+    void bonusCopiesAreClampedToTheSupportedRuntimeRange() {
+        CompanionOutputService.FinalizedOutput output =
+                CompanionOutputService.finalizeDrops(
+                        List.of(new TestItemStack(
+                                "Ingredient_Fabric_Scrap_Wool", 2)),
+                        4
+                );
+
+        assertEquals(4, output.itemStacks().size());
+        assertEquals(
+                Map.of("Ingredient_Fabric_Scrap_Wool", 8),
+                output.itemQuantities()
+        );
+    }
+
     private static final class TestItemStack extends ItemStack {
         private final String itemId;
         private final int quantity;
