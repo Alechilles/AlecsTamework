@@ -28,6 +28,7 @@ authorize optional behavior.
 - `policies()` for ownership, damage, claim access, durable owner-cap
   preflight, and mutation-bound owner admission;
 - `interactionExtensions()` and `traitEffects()` for registered extensions;
+- `husbandryOutcomes()` for bounded, owner-scoped husbandry modifiers;
 - `profileData()` for namespaced canonical-profile data;
 - `events()` for immutable notifications;
 - `configs()` for detached config views;
@@ -49,7 +50,8 @@ authorize optional behavior.
 
 The current capability enum contains `PROFILES`, `COMMAND_LINKS`,
 `PROGRESSION`, `PROGRESSION_MUTATIONS`, `POLICY`,
-`INTERACTION_EXTENSIONS`, `TRAIT_EFFECTS`, `PROFILE_DATA`, `EVENTS`,
+`INTERACTION_EXTENSIONS`, `TRAIT_EFFECTS`, `HUSBANDRY_OUTCOMES`,
+`PROFILE_DATA`, `EVENTS`,
 `COMPANION_XP_EVENTS`, `CONFIG_READ`, `DIAGNOSTICS`, `CAPTURE_POLICY`,
 `PROFILE_DATA_TRANSACTIONS`, `PERSISTENCE_RESILIENCE`, `POPULATION_GROUPS`,
 `COMPANION_PROVISIONING`, `COMMAND_TIMED_SUMMONING`,

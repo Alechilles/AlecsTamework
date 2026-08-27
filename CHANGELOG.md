@@ -17,6 +17,9 @@
   interactions to a domestic drop list and a `tamework:cull_success` Activity
   V2 event. Profiles that omit the mapping keep the normal cull death drops
   and publish no cull activity.
+- Added the capability-gated `husbandryOutcomes()` API. One optional provider
+  can adjust care restoration, product bonus chances, and parent breeding
+  cooldowns. Tamework keeps ownership of random rolls and game-state changes.
 
 ### Changed
 

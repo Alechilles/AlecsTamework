@@ -25,6 +25,7 @@ This subsection contains the reference contract for each public API family.
 - [Events API Reference](/mod/alecs-tamework/events-api-reference)
 - [Interaction Extensions API Reference](/mod/alecs-tamework/interaction-extensions-api-reference)
 - [Trait Effects API Reference](/mod/alecs-tamework/trait-effects-api-reference)
+- [Husbandry Outcomes API Reference](/mod/alecs-tamework/husbandry-outcomes-api-reference)
 - [Diagnostics API Reference](/mod/alecs-tamework/diagnostics-api-reference)
 - [Capture Policy API Reference](/mod/alecs-tamework/capture-policy-api-reference)
 - [Population Groups API Reference](/mod/alecs-tamework/population-groups-api-reference)
