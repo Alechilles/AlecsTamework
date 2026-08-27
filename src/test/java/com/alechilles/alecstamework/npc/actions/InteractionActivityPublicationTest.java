@@ -20,12 +20,16 @@ import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegis
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService.AwardResult;
 import com.alechilles.alecstamework.npc.progression.CompanionXpTransition;
 import com.alechilles.alecstamework.damage.SimpleClaimsDamageHytaleFixture;
+import com.alechilles.alecstamework.npc.compat.NpcSupportTestFixture;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.hypixel.hytale.assetstore.TestItemAssetStore;
+import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.TestEntityComponentStore;
 import com.hypixel.hytale.codec.ExtraInfo;
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.modules.entity.EntityModule;
@@ -127,6 +131,103 @@ class InteractionActivityPublicationTest {
                 activity.itemQuantities());
         assertEquals(transition.toOutcomeView(), activity.companionXpOutcome());
         assertNull(activity.careCreditOutcome());
+    }
+
+    @Test
+    void mixedContainerAndLooseHarvestPublishesOneCombinedOutcome() throws Exception {
+        List<ActivityView> published = new ArrayList<>();
+        ActivityRuntime.install(published::add, managedRegistry());
+        try (SimpleClaimsDamageHytaleFixture.HytaleModuleScope ignored =
+                     SimpleClaimsDamageHytaleFixture.HytaleModuleScope.install();
+             TestEntityComponentStore store = new TestEntityComponentStore(
+                     new EntityStore(null))) {
+            Field itemStoreField = Item.class.getDeclaredField("ASSET_STORE");
+            itemStoreField.setAccessible(true);
+            Object previousItemStore = itemStoreField.get(null);
+            itemStoreField.set(null, new TestItemAssetStore(new DefaultAssetMap<>(Map.of(
+                    "Product_Milk", new Item("Product_Milk")
+            ))));
+            try {
+                Ref<EntityStore> npcRef = store.createReference();
+                NPCEntity npc = new NPCEntity();
+                npc.setLegacyUUID(COMPANION);
+                npc.setRoleName("RoleA");
+                store.put(npcRef, NPCEntity.getComponentType(), npc);
+                store.put(npcRef, TameworkOwnerComponent.getComponentType(),
+                        new TameworkOwnerComponent(OWNER, "Owner"));
+                Role role = NpcSupportTestFixture.bindRoleWithSensorScope(
+                        new com.hypixel.hytale.server.npc.util.expression.StdScope(null));
+                set(role, "roleName", "RoleA");
+
+                InteractionExecutor executor = newExecutor();
+                TameworkInteractEffects effects = (TameworkInteractEffects) field(
+                        executor, "effects");
+                TwInteractionConfig.HarvestInteraction entry =
+                        TwInteractionConfig.HARVEST_INTERACTION_CODEC.decode(
+                                BsonDocument.parse("""
+                                        {
+                                          "Effects": {
+                                            "DropItem": {
+                                              "Item": "Product_Milk",
+                                              "QuantityMin": 2,
+                                              "QuantityMax": 2
+                                            }
+                                          }
+                                        }
+                                        """), new ExtraInfo());
+
+                TameworkInteractEffects.HarvestCustomEffectsOutcome looseOutcome =
+                        effects.applyHarvestCustomEffects(
+                                "mixed-harvest",
+                                0,
+                                entry,
+                                entry.getEffects(),
+                                npcRef,
+                                role,
+                                null,
+                                store,
+                                null,
+                                null
+                        );
+                assertTrue(looseOutcome.applied());
+
+                AtomicInteger awards = new AtomicInteger();
+                executor.publishContainerHarvest(
+                        UUID.randomUUID(),
+                        "RoleA",
+                        "Milk",
+                        OWNER,
+                        COMPANION,
+                        new TameworkInteractEffects.HarvestContainerOutcome(
+                                TameworkInteractEffects.HarvestContainerResult.APPLIED,
+                                false,
+                                Map.of("Container_Bucket_State_Filled_Milk", 1)
+                        ),
+                        false,
+                        () -> {
+                            awards.incrementAndGet();
+                            return null;
+                        },
+                        looseOutcome.itemQuantities()
+                );
+
+                assertEquals(1, published.size());
+                assertEquals(1, awards.get());
+                ManagedActivityView activity = assertInstanceOf(
+                        ManagedActivityView.class, published.getFirst());
+                assertEquals(
+                        Map.of(
+                                "Container_Bucket_State_Filled_Milk", 1,
+                                "Product_Milk", 2
+                        ),
+                        activity.itemQuantities()
+                );
+            } finally {
+                itemStoreField.set(null, previousItemStore);
+            }
+        } finally {
+            NpcSupportTestFixture.clear();
+        }
     }
 
     @Test
@@ -264,7 +365,10 @@ class InteractionActivityPublicationTest {
                   "Activities": {
                     "Feed":"runeteria:feed",
                     "HarvestContexts":{"Milk":"runeteria:milk"},
-                    "PendingOutputItems":{"Food_Egg":"runeteria:egg"},
+                    "PendingOutputItems":{
+                      "Food_Egg":"runeteria:egg",
+                      "Product_Milk":"runeteria:milk_pending"
+                    },
                     "BreedingSuccess":"runeteria:breed",
                     "TameSuccess":"runeteria:tame_success",
                     "NeedSatisfied":"runeteria:need_satisfied"
@@ -314,4 +418,5 @@ class InteractionActivityPublicationTest {
         field.setAccessible(true);
         field.set(target, value);
     }
+
 }

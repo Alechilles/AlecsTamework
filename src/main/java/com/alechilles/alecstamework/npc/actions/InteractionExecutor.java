@@ -23,6 +23,8 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -195,21 +197,25 @@ final class InteractionExecutor {
                     role,
                     ctx
             );
-            boolean customApplied = effects.applyCustomEffects(
-                    interactionConfigId,
-                    interactionIndex,
-                    entry,
-                    entry.getEffects(),
-                    npcRef,
-                    role,
-                    infoProvider,
-                    store,
-                    player,
-                    ctx,
-                    harvestInteraction
-            );
-            if (containerOutcome.result == TameworkInteractEffects.HarvestContainerResult.APPLIED
-                    && isInteractingOwner(npcRef, store, player)) {
+            TameworkInteractEffects.HarvestCustomEffectsOutcome customOutcome =
+                    effects.applyHarvestCustomEffects(
+                            interactionConfigId,
+                            interactionIndex,
+                            entry,
+                            entry.getEffects(),
+                            npcRef,
+                            role,
+                            infoProvider,
+                            store,
+                            player,
+                            ctx
+                    );
+            boolean dropActionExpected = hasHarvestDropAction(role, ctx);
+            if (isInteractingOwner(npcRef, store, player)
+                    && !dropActionExpected
+                    && (containerOutcome.result
+                    == TameworkInteractEffects.HarvestContainerResult.APPLIED
+                    || !customOutcome.itemQuantities().isEmpty())) {
                 publishContainerHarvest(
                         operationId,
                         role == null ? null : role.getRoleName(),
@@ -217,11 +223,12 @@ final class InteractionExecutor {
                         resolveOwnerId(npcRef, store),
                         resolveCompanionId(npcRef, store),
                         containerOutcome,
-                        hasHarvestDropAction(role, ctx),
-                        () -> CompanionLevelingService.awardHarvestXp(npcRef, store)
+                        false,
+                        () -> CompanionLevelingService.awardHarvestXp(npcRef, store),
+                        customOutcome.itemQuantities()
                 );
             }
-            return true | customApplied;
+            return true | customOutcome.applied();
         }
         if (entry instanceof MountInteraction) {
             effects.logMountExecution("selected", interactionConfigId, interactionIndex, role, ctx);
@@ -337,9 +344,39 @@ final class InteractionExecutor {
             boolean dropActionExpected,
             Supplier<AwardResult> awardSupplier
     ) {
-        if (outcome == null
-                || outcome.result != TameworkInteractEffects.HarvestContainerResult.APPLIED
-                || dropActionExpected) {
+        publishContainerHarvest(
+                operationId,
+                roleId,
+                harvestContext,
+                ownerId,
+                companionId,
+                outcome,
+                dropActionExpected,
+                awardSupplier,
+                Map.of()
+        );
+    }
+
+    void publishContainerHarvest(
+            UUID operationId,
+            String roleId,
+            String harvestContext,
+            UUID ownerId,
+            UUID companionId,
+            TameworkInteractEffects.HarvestContainerOutcome outcome,
+            boolean dropActionExpected,
+            Supplier<AwardResult> awardSupplier,
+            Map<String, Integer> looseItemQuantities
+    ) {
+        if (outcome == null || dropActionExpected) {
+            return;
+        }
+        LinkedHashMap<String, Integer> itemQuantities = new LinkedHashMap<>();
+        if (outcome.result == TameworkInteractEffects.HarvestContainerResult.APPLIED) {
+            mergeQuantities(itemQuantities, outcome.itemQuantities);
+        }
+        mergeQuantities(itemQuantities, looseItemQuantities);
+        if (itemQuantities.isEmpty()) {
             return;
         }
         AwardResult award = awardSupplier == null ? null : awardSupplier.get();
@@ -349,10 +386,25 @@ final class InteractionExecutor {
                 harvestContext,
                 ownerId,
                 companionId,
-                CompanionOutputService.finalizeQuantities(
-                        outcome.itemQuantities).itemQuantities(),
+                CompanionOutputService.finalizeQuantities(itemQuantities).itemQuantities(),
                 award
         );
+    }
+
+    private static void mergeQuantities(Map<String, Integer> target,
+                                        Map<String, Integer> additions) {
+        if (target == null || additions == null) {
+            return;
+        }
+        for (Map.Entry<String, Integer> entry : additions.entrySet()) {
+            String itemId = entry.getKey();
+            Integer quantity = entry.getValue();
+            if (itemId == null || itemId.isBlank() || quantity == null || quantity <= 0) {
+                continue;
+            }
+            target.merge(itemId, quantity, (left, right) ->
+                    (int) Math.min(Integer.MAX_VALUE, (long) left + right));
+        }
     }
 
     private boolean hasHarvestDropAction(

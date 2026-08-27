@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.api.InteractionEffectContext;
 import com.alechilles.alecstamework.api.InteractionEffectSpec;
 import com.alechilles.alecstamework.api.InteractionPresetDefinition;
@@ -28,7 +27,6 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SpawnParti
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.UiMessageEffect;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
-import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsConsumeService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.hypixel.hytale.component.Ref;
@@ -42,7 +40,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
@@ -124,6 +121,67 @@ final class TameworkInteractEffects {
                                InteractionContextSnapshot ctx,
                                boolean harvestInteraction,
                                @Nullable Consumer<String> appliedRoleObserver) {
+        return applyCustomEffectsInternal(
+                interactionConfigId,
+                interactionIndex,
+                entry,
+                effects,
+                npcRef,
+                role,
+                infoProvider,
+                store,
+                player,
+                ctx,
+                harvestInteraction,
+                appliedRoleObserver,
+                null
+        );
+    }
+
+    HarvestCustomEffectsOutcome applyHarvestCustomEffects(
+            @Nullable String interactionConfigId,
+            int interactionIndex,
+            @Nonnull InteractionEntry entry,
+            Effects effects,
+            Ref<EntityStore> npcRef,
+            Role role,
+            InfoProvider infoProvider,
+            Store<EntityStore> store,
+            Player player,
+            InteractionContextSnapshot ctx
+    ) {
+        LinkedHashMap<String, Integer> itemQuantities = new LinkedHashMap<>();
+        boolean applied = applyCustomEffectsInternal(
+                interactionConfigId,
+                interactionIndex,
+                entry,
+                effects,
+                npcRef,
+                role,
+                infoProvider,
+                store,
+                player,
+                ctx,
+                true,
+                null,
+                itemQuantities
+        );
+        return new HarvestCustomEffectsOutcome(applied, itemQuantities);
+    }
+
+    private boolean applyCustomEffectsInternal(@Nullable String interactionConfigId,
+                                               int interactionIndex,
+                                               @Nonnull InteractionEntry entry,
+                                               Effects effects,
+                                               Ref<EntityStore> npcRef,
+                                               Role role,
+                                               InfoProvider infoProvider,
+                                               Store<EntityStore> store,
+                                               Player player,
+                                               InteractionContextSnapshot ctx,
+                                               boolean harvestInteraction,
+                                               @Nullable Consumer<String> appliedRoleObserver,
+                                               @Nullable Map<String, Integer> harvestItemQuantities) {
         InteractionOwnerContinuationEffects.OwnerEffectAttempt ownerAttempt =
                 ownerContinuationEffects.applyOwnerEffect(
                         effects,
@@ -144,7 +202,8 @@ final class TameworkInteractEffects {
                                 livePlayer,
                                 liveContext,
                                 harvestInteraction,
-                                appliedRoleObserver
+                                appliedRoleObserver,
+                                harvestItemQuantities
                         )
                 );
         if (ownerAttempt.present()) {
@@ -162,7 +221,8 @@ final class TameworkInteractEffects {
                 player,
                 ctx,
                 harvestInteraction,
-                appliedRoleObserver
+                appliedRoleObserver,
+                harvestItemQuantities
         );
     }
 
@@ -177,7 +237,8 @@ final class TameworkInteractEffects {
                                                    Player player,
                                                    InteractionContextSnapshot ctx,
                                                    boolean harvestInteraction,
-                                                   @Nullable Consumer<String> appliedRoleObserver) {
+                                                   @Nullable Consumer<String> appliedRoleObserver,
+                                                   @Nullable Map<String, Integer> harvestItemQuantities) {
         boolean applied = false;
         if (entry instanceof CustomInteraction customInteraction) {
             applied |= applyPresetEffects(
@@ -250,18 +311,8 @@ final class TameworkInteractEffects {
                     inventoryEffects.applyDropItem(dropItem, npcRef, role, store, harvestInteraction);
             boolean dropped = dropOutcome.applied();
             applied |= dropped;
-            if (dropped && harvestInteraction) {
-                CompanionLevelingService.AwardResult award =
-                        CompanionLevelingService.awardHarvestXp(npcRef, store);
-                ActivityRuntime.publishHarvest(
-                        UUID.randomUUID(),
-                        role == null ? null : role.getRoleName(),
-                        resolveHarvestContext(role, ctx),
-                        ActivityRuntime.resolveOwnerId(npcRef, store),
-                        ActivityRuntime.resolveCompanionId(npcRef, store),
-                        dropOutcome.itemQuantities(),
-                        award
-                );
+            if (dropped && harvestInteraction && harvestItemQuantities != null) {
+                mergeQuantities(harvestItemQuantities, dropOutcome.itemQuantities());
             }
         }
         HookEffect hookEffect = effects.getTriggerNpcHook();
@@ -365,6 +416,22 @@ final class TameworkInteractEffects {
         return applied;
     }
 
+    private static void mergeQuantities(Map<String, Integer> target,
+                                        Map<String, Integer> additions) {
+        if (target == null || additions == null) {
+            return;
+        }
+        for (Map.Entry<String, Integer> entry : additions.entrySet()) {
+            String itemId = entry.getKey();
+            Integer quantity = entry.getValue();
+            if (itemId == null || itemId.isBlank() || quantity == null || quantity <= 0) {
+                continue;
+            }
+            target.merge(itemId, quantity, (left, right) ->
+                    (int) Math.min(Integer.MAX_VALUE, (long) left + right));
+        }
+    }
+
     private String resolveRoleId(String roleId, String roleParam, Role role, InteractionContextSnapshot ctx) {
         if (roleParam != null && !roleParam.isBlank()) {
             String resolved = owner.getRoleStringParam(role, ctx, roleParam);
@@ -373,16 +440,6 @@ final class TameworkInteractEffects {
             }
         }
         return roleId;
-    }
-
-    private String resolveHarvestContext(Role role, InteractionContextSnapshot ctx) {
-        com.alechilles.alecstamework.config.assets.TwGlobalConfig global =
-                com.alechilles.alecstamework.config.assets.TwGlobalConfig.resolveActive();
-        String paramName = global == null
-                ? "HarvestInteractionContext"
-                : global.getHarvestContextParam();
-        return new InteractionParamResolver(null, null, null)
-                .getStringParam(role, ctx, paramName);
     }
 
     boolean applyFeeding(Ref<EntityStore> npcRef,
@@ -659,6 +716,14 @@ final class TameworkInteractEffects {
 
     private static String text(@Nullable String value) {
         return value != null && !value.isBlank() ? value : "<null>";
+    }
+
+    record HarvestCustomEffectsOutcome(boolean applied,
+                                       Map<String, Integer> itemQuantities) {
+        HarvestCustomEffectsOutcome {
+            itemQuantities = Map.copyOf(
+                    itemQuantities == null ? Map.of() : itemQuantities);
+        }
     }
 
     enum HarvestContainerResult {
