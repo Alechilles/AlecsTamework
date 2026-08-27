@@ -14,6 +14,7 @@ import javax.annotation.Nullable;
 public final class HusbandryOutcomeRegistry implements HusbandryOutcomeApi, AutoCloseable {
     private final AtomicReference<HusbandryOutcomeProvider> provider = new AtomicReference<>();
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final Object lifecycleLock = new Object();
 
     @Override
     public boolean available() {
@@ -24,16 +25,15 @@ public final class HusbandryOutcomeRegistry implements HusbandryOutcomeApi, Auto
     @Nonnull
     public AutoCloseable register(@Nonnull HusbandryOutcomeProvider candidate) {
         HusbandryOutcomeProvider checked = requireProvider(candidate);
-        if (closed.get()) {
-            throw new IllegalStateException("Husbandry outcome registry is closed");
+        synchronized (lifecycleLock) {
+            if (closed.get()) {
+                throw new IllegalStateException("Husbandry outcome registry is closed");
+            }
+            if (!provider.compareAndSet(null, checked)) {
+                throw new IllegalStateException("A husbandry outcome provider is already registered");
+            }
+            return new RegistrationHandle(checked);
         }
-        if (!provider.compareAndSet(null, checked)) {
-            throw new IllegalStateException("A husbandry outcome provider is already registered");
-        }
-        if (closed.get() && provider.compareAndSet(checked, null)) {
-            throw new IllegalStateException("Husbandry outcome registry is closed");
-        }
-        return new RegistrationHandle(checked);
     }
 
     @Override
@@ -56,8 +56,10 @@ public final class HusbandryOutcomeRegistry implements HusbandryOutcomeApi, Auto
 
     @Override
     public void close() {
-        if (closed.compareAndSet(false, true)) {
-            provider.set(null);
+        synchronized (lifecycleLock) {
+            if (closed.compareAndSet(false, true)) {
+                provider.set(null);
+            }
         }
     }
 
@@ -87,6 +89,12 @@ public final class HusbandryOutcomeRegistry implements HusbandryOutcomeApi, Auto
 
     @Nonnull
     private HusbandryOutcomeModifiers normalize(@Nonnull HusbandryOutcomeModifiers modifiers) {
+        if (!Double.isFinite(modifiers.careRestorationMultiplier())
+                || !Double.isFinite(modifiers.productBonusChance())
+                || !Double.isFinite(modifiers.doubleBonusChance())
+                || !Double.isFinite(modifiers.breedingCooldownMultiplier())) {
+            return HusbandryOutcomeModifiers.identity();
+        }
         HusbandryOutcomeModifiers identity = HusbandryOutcomeModifiers.identity();
         return new HusbandryOutcomeModifiers(
                 clamp(modifiers.careRestorationMultiplier(), 1.0, 2.0,
@@ -117,8 +125,10 @@ public final class HusbandryOutcomeRegistry implements HusbandryOutcomeApi, Auto
 
         @Override
         public void close() {
-            if (closed.compareAndSet(false, true)) {
-                provider.compareAndSet(registered, null);
+            synchronized (lifecycleLock) {
+                if (closed.compareAndSet(false, true)) {
+                    provider.compareAndSet(registered, null);
+                }
             }
         }
     }

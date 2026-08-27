@@ -46,6 +46,17 @@ class HusbandryOutcomeRegistryTest {
     }
 
     @Test
+    void anyNonFiniteModifierReturnsFullIdentity() throws Exception {
+        try (HusbandryOutcomeRegistry registry = new HusbandryOutcomeRegistry()) {
+            registry.register(ignored -> new HusbandryOutcomeModifiers(
+                    1.5, Double.NaN, 0.5, 0.7
+            ));
+
+            assertEquals(HusbandryOutcomeModifiers.identity(), registry.resolve(context()));
+        }
+    }
+
+    @Test
     void providerFailureReturnsIdentityInsteadOfEscapingIntoAction() throws Exception {
         try (HusbandryOutcomeRegistry registry = new HusbandryOutcomeRegistry()) {
             registry.register(ignored -> {
@@ -120,6 +131,19 @@ class HusbandryOutcomeRegistryTest {
             second.close();
             assertEquals(HusbandryOutcomeModifiers.identity(), registry.resolve(context()));
         }
+    }
+
+    @Test
+    void closedRegistryRejectsNewRegistrationAndReturnsIdentity() {
+        HusbandryOutcomeRegistry registry = new HusbandryOutcomeRegistry();
+        registry.close();
+
+        assertFalse(registry.available());
+        assertThrows(
+                IllegalStateException.class,
+                () -> registry.register(ignored -> HusbandryOutcomeModifiers.identity())
+        );
+        assertEquals(HusbandryOutcomeModifiers.identity(), registry.resolve(context()));
     }
 
     @Test
