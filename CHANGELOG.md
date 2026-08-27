@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 3.2.3 - Stable 0.6 Compatibility Hotfix - 2026-08-27
 
 ### Fixed
 
