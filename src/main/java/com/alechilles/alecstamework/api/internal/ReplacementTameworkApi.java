@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
 import com.alechilles.alecstamework.api.CompanionProvisioningApi;
 import com.alechilles.alecstamework.api.DiagnosticsApi;
 import com.alechilles.alecstamework.api.InteractionExtensionApi;
+import com.alechilles.alecstamework.api.HusbandryOutcomeApi;
 import com.alechilles.alecstamework.api.NpcProfilesApi;
 import com.alechilles.alecstamework.api.PaidCommandRevivalApi;
 import com.alechilles.alecstamework.api.PolicyApi;
@@ -168,6 +169,11 @@ public final class ReplacementTameworkApi
     @Override
     public CommandHudApi commandHud() {
         return base.commandHud();
+    }
+
+    @Override
+    public HusbandryOutcomeApi husbandryOutcomes() {
+        return base.husbandryOutcomes();
     }
 
     @Override

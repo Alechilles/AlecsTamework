@@ -63,6 +63,8 @@ public enum TameworkApiCapability {
     /** External command HUD renderers can register with the live runtime. */
     COMMAND_HUD_RENDERERS,
     /** External command HUD contributors can register with the live runtime. */
-    COMMAND_HUD_CONTRIBUTORS
+    COMMAND_HUD_CONTRIBUTORS,
+    /** External husbandry providers can supply bounded action modifiers. */
+    HUSBANDRY_OUTCOMES
 }
 

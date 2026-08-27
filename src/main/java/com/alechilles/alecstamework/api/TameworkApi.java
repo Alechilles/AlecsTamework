@@ -91,5 +91,10 @@ public interface TameworkApi {
     default CommandHudApi commandHud() {
         return CommandHudApi.unavailable();
     }
+
+    /** Returns the optional synchronous husbandry outcome provider facade. */
+    default HusbandryOutcomeApi husbandryOutcomes() {
+        return HusbandryOutcomeApi.unavailable();
+    }
 }
 

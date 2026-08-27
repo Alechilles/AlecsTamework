@@ -41,6 +41,17 @@ class TameworkApiV100ContractTest {
     }
 
     @Test
+    void oldImplementationsReceiveAnUnavailableHusbandryOutcomeFacade() {
+        TameworkApi legacy = new LegacyApiImplementation();
+
+        assertFalse(legacy.husbandryOutcomes().available());
+        assertEquals(
+                HusbandryOutcomeModifiers.identity(),
+                legacy.husbandryOutcomes().resolve(husbandryContext())
+        );
+    }
+
+    @Test
     void fullRuntimeAdvertisesCommandHudCapabilitiesUntilClosed() {
         TameworkEventBus events = new TameworkEventBus(null);
         TameworkApiImpl api = newBaseApi(events);
@@ -50,12 +61,29 @@ class TameworkApiV100ContractTest {
                     TameworkApiCapability.COMMAND_HUD_RENDERERS,
                     TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS)));
             assertTrue(api.commandHud().available());
+            assertTrue(api.getCapabilities().contains(
+                    TameworkApiCapability.HUSBANDRY_OUTCOMES));
+            assertTrue(api.husbandryOutcomes().available());
+            api.husbandryOutcomes().register(ignored -> new HusbandryOutcomeModifiers(
+                    1.25, 0.2, 0.05, 0.75
+            ));
+            assertEquals(
+                    new HusbandryOutcomeModifiers(1.25, 0.2, 0.05, 0.75),
+                    api.husbandryOutcomes().resolve(husbandryContext())
+            );
             api.close();
             assertFalse(api.getCapabilities().contains(
                     TameworkApiCapability.COMMAND_HUD_RENDERERS));
             assertFalse(api.getCapabilities().contains(
                     TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS));
             assertFalse(api.commandHud().available());
+            assertFalse(api.getCapabilities().contains(
+                    TameworkApiCapability.HUSBANDRY_OUTCOMES));
+            assertFalse(api.husbandryOutcomes().available());
+            assertEquals(
+                    HusbandryOutcomeModifiers.identity(),
+                    api.husbandryOutcomes().resolve(husbandryContext())
+            );
         } finally {
             api.close();
             events.close();
@@ -72,6 +100,9 @@ class TameworkApiV100ContractTest {
         assertFalse(api.getCapabilities().contains(
                 TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS));
         assertFalse(api.commandHud().available());
+        assertFalse(api.getCapabilities().contains(
+                TameworkApiCapability.HUSBANDRY_OUTCOMES));
+        assertFalse(api.husbandryOutcomes().available());
     }
 
     private static TameworkApiImpl newBaseApi(TameworkEventBus events) {
@@ -84,6 +115,18 @@ class TameworkApiV100ContractTest {
                 new InteractionExtensionRegistry(null),
                 new TraitEffectRegistry(null, null),
                 new SimpleClaimsTamedDamagePolicy()
+        );
+    }
+
+    private static HusbandryOutcomeContext husbandryContext() {
+        return new HusbandryOutcomeContext(
+                HusbandryOutcomeKind.CARE_RESTORATION,
+                UUID.fromString("10000000-0000-0000-0000-000000000001"),
+                UUID.fromString("20000000-0000-0000-0000-000000000001"),
+                "Tamed_Cow",
+                "runeteria:husbandry",
+                Set.of("runeteria:husbandry"),
+                null
         );
     }
 
