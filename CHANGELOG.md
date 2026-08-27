@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Updated the build target to stable Hytale `0.6.0`. The Update 5 chunk-save
+  fallback now binds the removed `WorldChunk.toHolder()` method only on an
+  Update 5 runtime.
+
 ## 3.2.2 - Flightmaster's Talisman Preview Hotfix - 2026-08-24
 
 ### Fixed
