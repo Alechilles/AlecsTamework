@@ -16,12 +16,33 @@ class CompanionOutputServiceTest {
                 CompanionOutputService.finalizeDrops(
                         List.of(new TestItemStack(
                                 "Ingredient_Fabric_Scrap_Wool", 2)),
-                        true
+                        1
                 );
 
         assertEquals(2, output.itemStacks().size());
         assertEquals(
                 Map.of("Ingredient_Fabric_Scrap_Wool", 4),
+                output.itemQuantities()
+        );
+    }
+
+    @Test
+    void doubleBonusCopiesApplyToEveryBaseStack() {
+        CompanionOutputService.FinalizedOutput output =
+                CompanionOutputService.finalizeDrops(
+                        List.of(
+                                new TestItemStack("Ingredient_Fabric_Scrap_Wool", 2),
+                                new TestItemStack("Ingredient_Fabric_Scrap_Cloth", 3)
+                        ),
+                        2
+                );
+
+        assertEquals(6, output.itemStacks().size());
+        assertEquals(
+                Map.of(
+                        "Ingredient_Fabric_Scrap_Wool", 6,
+                        "Ingredient_Fabric_Scrap_Cloth", 9
+                ),
                 output.itemQuantities()
         );
     }

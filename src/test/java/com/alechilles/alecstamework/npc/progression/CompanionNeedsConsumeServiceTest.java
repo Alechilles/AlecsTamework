@@ -106,4 +106,18 @@ class CompanionNeedsConsumeServiceTest {
                 new org.joml.Vector3d(Double.NaN, 64.0, 2.5)
         ));
     }
+
+    @Test
+    void careMultiplierIncreasesRestorationBeforeNeedsClamping() {
+        assertEquals(
+                12.5,
+                CompanionNeedsConsumeService.scaleRestoration(10.0, 1.25),
+                0.000001
+        );
+        assertEquals(
+                5.0,
+                Math.min(5.0, CompanionNeedsConsumeService.scaleRestoration(10.0, 1.25)),
+                0.000001
+        );
+    }
 }

@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemQuanti
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RemoveItemsHandEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RemoveItemsInventoryEffect;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
+import com.alechilles.alecstamework.output.CompanionOutputService;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -230,8 +231,15 @@ final class InteractionInventoryEffects {
         if (drops.isEmpty()) {
             return false;
         }
-        if (harvestInteraction && shouldDoubleHarvestDrops(npcRef, role, store)) {
-            drops = duplicateDrops(drops);
+        if (harvestInteraction) {
+            int bonusCopies = CompanionHarvestBonusService.resolveBonusCopies(
+                    npcRef,
+                    store,
+                    role,
+                    resolveProductId(drops),
+                    ThreadLocalRandom.current()::nextDouble
+            );
+            drops = CompanionOutputService.finalizeDrops(drops, bonusCopies).itemStacks();
         }
         float throwSpeed = effect.getThrowSpeed() != null ? effect.getThrowSpeed().floatValue() : 0.0f;
         boolean applied = false;
@@ -249,50 +257,37 @@ final class InteractionInventoryEffects {
         return applied;
     }
 
-    private boolean shouldDoubleHarvestDrops(Ref<EntityStore> npcRef, Role role, Store<EntityStore> store) {
-        if (npcRef == null || !npcRef.isValid() || store == null) {
-            return false;
+    /** Adds product copies to the current inventory and returns the committed quantity. */
+    int addOutputCopies(Player player, String itemId, int copies) {
+        if (player == null || itemId == null || itemId.isBlank() || copies <= 0) {
+            return 0;
         }
-        return CompanionHarvestBonusService.shouldDuplicateDrops(npcRef, store, role);
+        CombinedItemContainer container = resolveInventoryContainer(player);
+        if (container == null) {
+            return 0;
+        }
+        ItemStackTransaction transaction = container.addItemStack(new ItemStack(itemId, copies));
+        if (transaction == null) {
+            return 0;
+        }
+        ItemStack remainder = transaction.getRemainder();
+        if (remainder == null || remainder.isEmpty()) {
+            return copies;
+        }
+        return Math.max(0, copies - Math.max(0, remainder.getQuantity()));
     }
 
-    private List<ItemStack> duplicateDrops(List<ItemStack> drops) {
-        if (drops == null || drops.isEmpty()) {
-            return List.of();
+    private String resolveProductId(List<ItemStack> drops) {
+        if (drops == null) {
+            return null;
         }
-        ArrayList<ItemStack> out = new ArrayList<>(drops.size() * 2);
-        for (ItemStack stack : drops) {
-            if (stack == null || stack.isEmpty()) {
-                continue;
-            }
-            out.add(stack);
-            ItemStack duplicate = cloneStack(stack);
-            if (duplicate != null && !duplicate.isEmpty()) {
-                out.add(duplicate);
+        for (ItemStack drop : drops) {
+            if (drop != null && !drop.isEmpty()
+                    && drop.getItemId() != null && !drop.getItemId().isBlank()) {
+                return drop.getItemId();
             }
         }
-        return out;
-    }
-
-    private ItemStack cloneStack(ItemStack stack) {
-        if (stack == null || stack.isEmpty()) {
-            return null;
-        }
-        String itemId = stack.getItemId();
-        if (itemId == null || itemId.isBlank()) {
-            return null;
-        }
-        int quantity = stack.getQuantity();
-        if (quantity <= 0) {
-            return null;
-        }
-        return new ItemStack(
-                itemId,
-                quantity,
-                stack.getDurability(),
-                stack.getMaxDurability(),
-                stack.getMetadata()
-        );
+        return null;
     }
 
     private ItemStack cloneWithQuantity(ItemStack stack, int quantity) {

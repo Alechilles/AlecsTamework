@@ -19,14 +19,24 @@ public final class CompanionOutputService {
             List<ItemStack> baseDrops,
             boolean duplicate
     ) {
+        return finalizeDrops(baseDrops, duplicate ? 1 : 0);
+    }
+
+    /** Apply a bounded number of additional copies and report exact quantities. */
+    @Nonnull
+    public static FinalizedOutput finalizeDrops(
+            List<ItemStack> baseDrops,
+            int bonusCopies
+    ) {
         ArrayList<ItemStack> finalDrops = new ArrayList<>();
+        int copies = Math.max(0, bonusCopies);
         if (baseDrops != null) {
             for (ItemStack stack : baseDrops) {
                 if (!isUsable(stack)) {
                     continue;
                 }
                 finalDrops.add(stack);
-                if (duplicate) {
+                for (int copy = 0; copy < copies; copy++) {
                     finalDrops.add(copy(stack));
                 }
             }

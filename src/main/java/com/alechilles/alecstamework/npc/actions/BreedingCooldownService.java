@@ -1,5 +1,8 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.api.HusbandryOutcomeKind;
+import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
+import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRuntime;
 import com.alechilles.alecstamework.npc.compat.NpcAlarmAccess;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
@@ -130,7 +133,17 @@ final class BreedingCooldownService {
         if (!npcRef.isValid()) {
             return;
         }
-        CooldownWindow window = resolveWindow(nowMs, cooldownMs);
+        HusbandryOutcomeModifiers outcome = HusbandryOutcomeRuntime.resolve(
+                HusbandryOutcomeKind.BREEDING_COOLDOWN,
+                npcRef,
+                store,
+                npc == null ? null : npc.getRoleName(),
+                null
+        );
+        CooldownWindow window = resolveWindow(
+                nowMs,
+                applyParentOutcomeMultiplier(cooldownMs, outcome.breedingCooldownMultiplier())
+        );
         breeding.setReady(false);
         breeding.setCooldownUntilMs(window.untilMs());
         breeding.setCooldownStartedAtMs(window.startedAtMs());
@@ -153,6 +166,33 @@ final class BreedingCooldownService {
                 BreedingTimeService.cooldownStartedAt(nowMs, durationMs),
                 durationMs
         );
+    }
+
+    /** Applies trait and husbandry multipliers to a parent duration with saturation. */
+    static long applyParentOutcomeMultiplier(long baseCooldownMs,
+                                             double traitMultiplier,
+                                             double outcomeMultiplier) {
+        return applyParentOutcomeMultiplier(
+                multiplyDuration(baseCooldownMs, traitMultiplier), outcomeMultiplier);
+    }
+
+    /** Applies only the husbandry multiplier to an already trait-adjusted duration. */
+    static long applyParentOutcomeMultiplier(long cooldownMs, double outcomeMultiplier) {
+        return multiplyDuration(cooldownMs, outcomeMultiplier);
+    }
+
+    private static long multiplyDuration(long durationMs, double multiplier) {
+        if (durationMs <= 0L) {
+            return 0L;
+        }
+        if (!Double.isFinite(multiplier) || multiplier <= 0.0) {
+            return durationMs;
+        }
+        double scaled = (double) durationMs * multiplier;
+        if (!Double.isFinite(scaled) || scaled >= Long.MAX_VALUE) {
+            return Long.MAX_VALUE;
+        }
+        return Math.max(0L, Math.round(scaled));
     }
 
     private static void applyCooldownAlarm(Ref<EntityStore> npcRef,

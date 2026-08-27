@@ -373,6 +373,7 @@ public final class TameworkApiImpl
                 commandHudRegistry,
                 "commandHudRegistry"
         );
+        HusbandryOutcomeRuntime.install(husbandryOutcomeRegistry);
     }
 
     @Override
@@ -423,6 +424,7 @@ public final class TameworkApiImpl
             commandUiRegistry.close();
             commandHudRegistry.close();
             husbandryOutcomeRegistry.close();
+            HusbandryOutcomeRuntime.clear(husbandryOutcomeRegistry);
             synchronized (capabilities) {
                 capabilities.remove(TameworkApiCapability.COMMAND_UI_RENDERERS);
                 capabilities.remove(TameworkApiCapability.COMMAND_UI_CONTRIBUTORS);

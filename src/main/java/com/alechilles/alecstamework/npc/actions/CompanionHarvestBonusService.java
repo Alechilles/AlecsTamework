@@ -1,5 +1,9 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.api.HusbandryOutcomeContext;
+import com.alechilles.alecstamework.api.HusbandryOutcomeKind;
+import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
+import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRuntime;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.params.StdScopeLookupCache;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
@@ -39,6 +43,51 @@ final class CompanionHarvestBonusService {
             return false;
         }
         return roll(multiplier, random);
+    }
+
+    /** Resolves trait and husbandry product bonuses with one authoritative roll path. */
+    static int resolveBonusCopies(@Nullable Ref<EntityStore> npcRef,
+                                  @Nullable Store<EntityStore> store,
+                                  @Nullable Role role,
+                                  @Nullable String productId,
+                                  @Nonnull DoubleSupplier random) {
+        boolean traitDuplicate = shouldDuplicateDrops(
+                resolveHarvestBonusMode(role),
+                resolveHarvestMultiplier(npcRef, store),
+                random
+        );
+        HusbandryOutcomeModifiers modifiers = HusbandryOutcomeRuntime.resolve(
+                HusbandryOutcomeKind.PRODUCT_BONUS,
+                npcRef,
+                store,
+                role,
+                productId
+        );
+        return resolveBonusCopies(traitDuplicate, modifiers, random);
+    }
+
+    /** Resolves a product bonus for a pre-built action context. */
+    static int resolveBonusCopies(boolean traitDuplicate,
+                                  @Nonnull HusbandryOutcomeContext context,
+                                  @Nonnull DoubleSupplier random) {
+        return resolveBonusCopies(
+                traitDuplicate,
+                HusbandryOutcomeRuntime.resolve(context),
+                random
+        );
+    }
+
+    /** Combines an existing trait proc with the provider's product rolls. */
+    static int resolveBonusCopies(boolean traitDuplicate,
+                                  @Nullable HusbandryOutcomeModifiers modifiers,
+                                  @Nonnull DoubleSupplier random) {
+        int copies = traitDuplicate ? 1 : 0;
+        HusbandryOutcomeModifiers safe = modifiers == null
+                ? HusbandryOutcomeModifiers.identity() : modifiers;
+        if (rollChance(safe.productBonusChance(), random)) {
+            copies += rollChance(safe.doubleBonusChance(), random) ? 2 : 1;
+        }
+        return copies;
     }
 
     static boolean shouldPreserveCooldown(@Nullable String mode,
@@ -122,6 +171,14 @@ final class CompanionHarvestBonusService {
         }
         double chance = Math.max(0.0, Math.min(1.0, multiplier - 1.0));
         return chance > 0.0 && random.getAsDouble() < chance;
+    }
+
+    private static boolean rollChance(double chance, @Nonnull DoubleSupplier random) {
+        if (!Double.isFinite(chance)) {
+            return false;
+        }
+        double bounded = Math.max(0.0, Math.min(1.0, chance));
+        return random.getAsDouble() < bounded;
     }
 
     private static double resolveHarvestMultiplier(@Nullable Ref<EntityStore> npcRef,

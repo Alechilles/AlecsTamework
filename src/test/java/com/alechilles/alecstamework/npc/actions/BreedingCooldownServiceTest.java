@@ -24,4 +24,14 @@ class BreedingCooldownServiceTest {
                 BreedingCooldownService.resolveWindow(Long.MAX_VALUE - 5L, 10L).untilMs()
         );
     }
+
+    @Test
+    void husbandryMultiplierScalesOnlyAlreadyTraitAdjustedParentDuration() {
+        assertEquals(
+                70_000L,
+                BreedingCooldownService.applyParentOutcomeMultiplier(
+                        200_000L, 0.5, 0.70
+                )
+        );
+    }
 }

@@ -31,10 +31,10 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Drop-item action for harvest flows that supports trait-driven bonus drops.
+ * Drop-item action for harvest flows that supports trait- and husbandry-driven bonus drops.
  *
  * <p>This action behaves like {@code DropItem} for regular output and then performs
- * one additional identical drop pass when the Bounty trait proc succeeds.
+ * the resolved number of additional identical drop passes.
  */
 public final class ActionTameworkHarvestDrop extends ActionDropItem {
     private final boolean awardXp;
@@ -62,10 +62,14 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
                     + " dropList=" + valueOrNull(this.dropList));
             return true;
         }
-        FinalizedOutput output = CompanionOutputService.finalizeDrops(
-                baseDrops,
-                CompanionHarvestBonusService.shouldDuplicateDrops(ref, store, role)
+        int bonusCopies = CompanionHarvestBonusService.resolveBonusCopies(
+                ref,
+                store,
+                role,
+                resolveProductId(baseDrops),
+                java.util.concurrent.ThreadLocalRandom.current()::nextDouble
         );
+        FinalizedOutput output = CompanionOutputService.finalizeDrops(baseDrops, bonusCopies);
         List<ItemStack> drops = output.itemStacks();
         UUID operationId = UUID.randomUUID();
         String activityContext = resolveActivityContext(
@@ -177,6 +181,17 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
             drops.add(randomItem);
         }
         return drops;
+    }
+
+    @Nullable
+    private static String resolveProductId(@Nonnull List<ItemStack> drops) {
+        for (ItemStack drop : drops) {
+            if (drop != null && !drop.isEmpty()
+                    && drop.getItemId() != null && !drop.getItemId().isBlank()) {
+                return drop.getItemId();
+            }
+        }
+        return null;
     }
 
     private void logHarvestDropAward(@Nonnull Ref<EntityStore> ref,

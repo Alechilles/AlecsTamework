@@ -28,7 +28,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameIntera
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.UiMessageEffect;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
-import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
+import com.alechilles.alecstamework.npc.progression.CompanionNeedsConsumeService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -37,10 +37,12 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -369,7 +371,12 @@ final class TameworkInteractEffects {
             presentationEffects.showFeedingCombatText(npcRef, store, player, healAmount);
         }
         String heldItemId = ctx != null ? ctx.activeItemId : null;
-        CompanionNeedsService.applyFeedInteractionRefill(npcRef, store, heldItemId, false);
+        CompanionNeedsConsumeService.applyFeedInteractionRefill(
+                npcRef,
+                store,
+                null,
+                heldItemId
+        );
         CompanionHappinessService.reconcileWithFeedEffects(
                 npcRef,
                 store,
@@ -425,7 +432,23 @@ final class TameworkInteractEffects {
                                                            Role role,
                                                            Player player,
                                                            InteractionContextSnapshot ctx) {
-        return harvestEffects.applyContainerTransform(npcRef, store, role, player, ctx);
+        HarvestContainerOutcome outcome = harvestEffects.applyContainerTransform(
+                npcRef, store, role, player, ctx);
+        if (outcome.result != HarvestContainerResult.APPLIED
+                || outcome.itemQuantities.isEmpty()) {
+            return outcome;
+        }
+        String productId = outcome.itemQuantities.keySet().iterator().next();
+        int requestedCopies = CompanionHarvestBonusService.resolveBonusCopies(
+                npcRef,
+                store,
+                role,
+                productId,
+                ThreadLocalRandom.current()::nextDouble
+        );
+        int committedCopies = inventoryEffects.addOutputCopies(
+                player, productId, requestedCopies);
+        return outcome.withOutputCopies(productId, committedCopies);
     }
 
     // Mounts the interacting player using the mount helper.
@@ -635,6 +658,15 @@ final class TameworkInteractEffects {
             this.result = result;
             this.preserveCooldown = preserveCooldown;
             this.itemQuantities = Map.copyOf(itemQuantities);
+        }
+
+        HarvestContainerOutcome withOutputCopies(String productId, int copies) {
+            if (productId == null || productId.isBlank() || copies <= 0) {
+                return this;
+            }
+            LinkedHashMap<String, Integer> quantities = new LinkedHashMap<>(itemQuantities);
+            quantities.merge(productId, copies, Integer::sum);
+            return new HarvestContainerOutcome(result, preserveCooldown, quantities);
         }
     }
 
