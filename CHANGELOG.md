@@ -44,6 +44,18 @@
 - Dead managed companions that predate population tracking can now initialize
   their group and owned or deployed domain claims when revived.
 
+## 3.2.3 - Stable 0.6 Compatibility Hotfix - 2026-08-27
+
+### Changed
+
+- Updated the embedded Creditor library to 1.1.1 for stable Hytale 0.6 support.
+
+### Fixed
+
+- Updated the build target to stable Hytale `0.6.0`. The Update 5 chunk-save
+  fallback now binds the removed `WorldChunk.toHolder()` method only on an
+  Update 5 runtime.
+
 ## 3.2.2 - Flightmaster's Talisman Preview Hotfix - 2026-08-24
 
 ### Fixed

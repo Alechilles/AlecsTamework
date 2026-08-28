@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.compat;
 
 import com.hypixel.hytale.component.ComponentAccessor;
+import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
@@ -25,6 +26,7 @@ import javax.annotation.Nullable;
 public final class HytaleChunkAccess {
     private static final MethodHandle LEGACY_GET_CHUNK_REF = bindLegacyGetChunkRef();
     private static final MethodHandle LEGACY_MARK_CHUNK_DIRTY = bindLegacyMarkChunkDirty();
+    private static final MethodHandle LEGACY_TO_HOLDER = bindLegacyToHolder();
 
     private HytaleChunkAccess() {
     }
@@ -92,7 +94,7 @@ public final class HytaleChunkAccess {
                     ForkJoinPool.commonPool(),
                     null);
         }
-        return saver.saveHolder(chunk.getX(), chunk.getZ(), chunk.toHolder());
+        return saver.saveHolder(chunk.getX(), chunk.getZ(), legacyHolder(chunk));
     }
 
     @Nullable
@@ -120,6 +122,19 @@ public final class HytaleChunkAccess {
             return null;
         }
         return chunks.getComponent(sectionRef, EntitySection.getComponentType());
+    }
+
+    @SuppressWarnings("unchecked")
+    @Nonnull
+    private static Holder<ChunkStore> legacyHolder(@Nonnull WorldChunk chunk) {
+        if (LEGACY_TO_HOLDER == null) {
+            throw new IllegalStateException("Missing Update 5 WorldChunk.toHolder accessor");
+        }
+        try {
+            return (Holder<ChunkStore>) LEGACY_TO_HOLDER.invoke(chunk);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Could not snapshot an Update 5 chunk holder", throwable);
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -160,6 +175,21 @@ public final class HytaleChunkAccess {
                     TransformComponent.class,
                     "markChunkDirty",
                     MethodType.methodType(void.class, ComponentAccessor.class));
+        } catch (NoSuchMethodException | IllegalAccessException exception) {
+            throw new ExceptionInInitializerError(exception);
+        }
+    }
+
+    @Nullable
+    private static MethodHandle bindLegacyToHolder() {
+        if (HytaleApiLevel.isUpdate6OrLater()) {
+            return null;
+        }
+        try {
+            return MethodHandles.publicLookup().findVirtual(
+                    WorldChunk.class,
+                    "toHolder",
+                    MethodType.methodType(Holder.class));
         } catch (NoSuchMethodException | IllegalAccessException exception) {
             throw new ExceptionInInitializerError(exception);
         }

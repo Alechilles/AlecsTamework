@@ -1,12 +1,12 @@
 # Update 6 Compatibility
 
-Last reviewed: 2026-08-22
+Last reviewed: 2026-08-27
 
 Branch: `main`
 
 ## Supported baseline
 
-Tamework compiles against Hytale `0.6.0-pre.11` for development compatibility.
+Tamework compiles against stable Hytale `0.6.0`.
 The release manifest accepts stable server versions `>=0.5.0 <0.7.0`. It does
 not advertise prerelease server builds.
 
@@ -15,11 +15,11 @@ The compatibility target is:
 | Patch line | Version | Current evidence |
 | --- | --- | --- |
 | Update 5 | `0.5.7` | Compatibility adapters and dual NPC callback bases initialize on an isolated Update 5 classpath. |
-| Update 6 | `0.6.0-pre.11` | Production compile, manifest validation, and the full Java test suite pass. |
+| Update 6 | `0.6.0` | Production compile, manifest validation, and the full Java test suite pass. |
 
 Stable release validation uses the isolated Update 5 classpath probe, manifest
 validation, and the full Java and packaging test suites. A dual-version live
-smoke test is required before Update 6 prerelease support is advertised. External
+smoke test is still required before runtime compatibility is certified. External
 Update 5 reflection that enumerates every method on a dual callback base can
 resolve the absent Update 6 `ExecutionSupport` type. The indexed Update 5 NPC
 engine does not do this. Third-party instrumentation remains an accepted,
@@ -29,12 +29,12 @@ non-blocking risk for the stable release.
 
 - The official [Update 6 prerelease patch notes](https://hytale.com/news/2026/5/pre-release-patch-notes-update-6),
   including Parts 1 through 11 available on 2026-08-11.
-- Hytale Workshop indexes for `0.5.7` and `0.6.0-pre.11`.
+- Hytale Workshop indexes for `0.5.7` and stable `0.6.0`.
 - The Workshop code diff: 8,503 entities added, 793 removed, and 8,117 modified.
 - The Workshop game-data diff: 566 assets added, 67 removed, and 1,628 modified.
 - The Workshop client diff: 16 entities added, 1 removed, and 31 modified.
-- Local compile and test results against the resolved `0.6.0-pre.11` Maven artifact.
-- Isolated class-loading probes with the resolved `0.5.7` and `0.6.0-pre.11`
+- Local compile and test results against the resolved stable `0.6.0` Maven artifact.
+- Isolated class-loading probes with the resolved `0.5.7` and `0.6.0`
   server JARs.
 
 The Workshop documentation corpus does not contain the patch-note page. Patch-note
@@ -80,13 +80,16 @@ existing null fallback.
 
 Update 6 stores entity and block references in chunk sections. Update 5 stores
 them against chunk columns. Several old column helpers and
-`TransformComponent.getChunkRef()` are absent in pre.11.
+`TransformComponent.getChunkRef()` and `WorldChunk.toHolder()` are absent in
+stable `0.6.0`.
 
 Tamework now:
 
 - Resolves an Update 6 section to its owning chunk-column reference.
 - Keeps the Update 5 direct chunk-column path.
-- Uses `saveChunkColumn(...)` on Update 6 and the legacy holder save on Update 5.
+- Uses `saveChunkColumn(...)` on Update 6 and a cached method-handle binding for
+  the legacy holder save on Update 5. This avoids a stable compile-time link to
+  the removed `WorldChunk.toHolder()` method.
 - Marks the source `EntitySection` before an Update 6 relocation unload so the
   removed entity reference cannot return after restart.
 - Uses stable world-position block-component lookup where both versions support it.
@@ -98,7 +101,7 @@ other persistence barriers tied to the correct current chunk column.
 
 ### Native mounts and movement profiles
 
-In pre.11, `MountedComponent` changes its attachment offset from `Rotation3f` to a
+In Update 6, `MountedComponent` changes its attachment offset from `Rotation3f` to a
 JOML vector. Player movement also changes from a boolean `canFly` value to a
 three-state `FlyMode`, and `MovementManager.setDefaultSettings(...)` now accepts a
 `MovementConfig`.
@@ -109,8 +112,8 @@ boolean flight, and packet-settings path.
 
 ### Relative look rotations
 
-Update 5 exposes `Rotation3f.lookAt(Vector3d)`. Pre.11 replaces that descriptor
-with `lookAt(Vector3dc)` and component-based overloads. A direct pre.11 call caused
+Update 5 exposes `Rotation3f.lookAt(Vector3d)`. Update 6 replaces that descriptor
+with `lookAt(Vector3dc)` and component-based overloads. A direct Update 6 call caused
 a `NoSuchMethodError` on the Update 5 world thread when a captured companion was
 released.
 
@@ -132,7 +135,7 @@ safely on a world thread.
 
 ### Build and manifest
 
-The branch targets `0.6.0-pre.11` from the prerelease dependency line. The
+The branch targets stable `0.6.0` from the release dependency line. The
 generated release manifest uses `>=0.5.0 <0.7.0` instead of the old `0.5.x`
 range. Hytale's semver rules exclude prereleases from this range, as intended
 for stable releases.
@@ -144,7 +147,7 @@ exist.
 
 ## Verification completed
 
-- `compileJava` against `0.6.0-pre.11`: passed.
+- `compileJava` against stable `0.6.0`: passed.
 - Manifest validation: passed.
 - The manifest range accepts `0.5.7` with the engine's exact `SemverRange`
   implementation: passed.
@@ -161,19 +164,20 @@ exist.
 - Particle and spatial compatibility bindings initialized with the exact Update 5
   and Update 6 server JARs: passed.
 - The four production Patchwork vanilla targets for fence sets, container buckets,
-  decorative buckets, and capture crates are present in the pre.11 game-data index.
+  decorative buckets, and capture crates are present in the stable `0.6.0`
+  game-data index.
 - Tamework command gates use explicit `tamework.*` permission nodes, so the Update 6
   plugin-name space-to-underscore normalization does not change them.
 - Removed API call scan: only adapter-owned Update 6 support getters and
   Tamework-owned metadata setters remain.
 - ECS player-access safety scan: no new unsafe runtime access was introduced.
 
-## Open prerelease compatibility gates
+## Open runtime compatibility gates
 
-These items need live or asset-specific evidence before Update 6 prerelease
-support is advertised. They do not block a stable-range release.
+These items need live or asset-specific evidence before stable Update 6 runtime
+compatibility is certified. They do not block compile and package compatibility.
 
-1. Load the packaged JAR on a real `0.6.0-pre.11` server and repeat the `0.5.7`
+1. Load the packaged JAR on a real `0.6.0` server and repeat the `0.5.7`
    baseline as a comparison.
 2. Confirm NPC builder registration and one action, sensor, filter, and motion path
    on each version.
@@ -194,7 +198,7 @@ must cover that contract.
 
 ## Deprecation backlog
 
-The pre.11 compiler reports APIs that still exist but are marked for removal. These
+The stable `0.6.0` compiler reports APIs that still exist but are marked for removal. These
 are follow-up migrations, not current Update 6 blockers:
 
 - `Entity.getUuid()` to `UUIDComponent`.
