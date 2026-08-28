@@ -123,7 +123,7 @@ public final class SqliteReviveReadyOperations {
                 current.payloadVersion(),
                 payload,
                 Sha256Hash.ofUtf8(payload),
-                current.sourceLifecycleRevision(),
+                lifecycle.revision(),
                 true,
                 request.requestedAtMs()
         );

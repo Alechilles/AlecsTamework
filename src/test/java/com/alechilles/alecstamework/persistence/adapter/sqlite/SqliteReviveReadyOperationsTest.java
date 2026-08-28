@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
 import com.alechilles.alecstamework.companion.revival.ReviveReadyDefinition;
 import com.alechilles.alecstamework.companion.revival.ReviveReadyRequest;
@@ -52,6 +53,10 @@ class SqliteReviveReadyOperationsTest {
             OwnerId.parse("20000000-0000-0000-0000-000000000001");
     private static final UUID TOOL_ID =
             UUID.fromString("25000000-0000-0000-0000-000000000001");
+    private static final LifecycleRevision DEATH_SNAPSHOT_REVISION =
+            LifecycleRevision.INITIAL;
+    private static final LifecycleRevision CURRENT_LIFECYCLE_REVISION =
+            DEATH_SNAPSHOT_REVISION.next();
 
     @TempDir
     Path tempDir;
@@ -122,6 +127,8 @@ class SqliteReviveReadyOperationsTest {
                 replacement.payloadJson()
         );
         assertNotEquals(originalSnapshot.snapshotId(), replacement.snapshotId());
+        assertEquals(CURRENT_LIFECYCLE_REVISION,
+                replacement.sourceLifecycleRevision());
         assertEquals(-300L, death.respawnAvailableAtMs());
         assertEquals(-500L, death.diedAtMs());
         assertEquals(
@@ -196,7 +203,7 @@ class SqliteReviveReadyOperationsTest {
                 2,
                 payload,
                 Sha256Hash.ofUtf8(payload),
-                LifecycleRevision.INITIAL,
+                DEATH_SNAPSHOT_REVISION,
                 true,
                 -500L
         );
@@ -221,13 +228,28 @@ class SqliteReviveReadyOperationsTest {
                     OWNER,
                     LifecycleState.DEAD_REVIVABLE,
                     LifecycleLocation.none(),
-                    LifecycleRevision.INITIAL,
+                    DEATH_SNAPSHOT_REVISION,
                     null,
                     -500L,
                     ReconciliationGeneration.INITIAL,
                     null
             ));
             transaction.snapshots().replaceCurrent(originalSnapshot);
+            transaction.lifecycles().transition(new LifecycleTransition(
+                    DEATH_SNAPSHOT_REVISION,
+                    null,
+                    new CompanionLifecycle(
+                            PROFILE,
+                            OWNER,
+                            LifecycleState.DEAD_REVIVABLE,
+                            LifecycleLocation.none(),
+                            CURRENT_LIFECYCLE_REVISION,
+                            null,
+                            -400L,
+                            ReconciliationGeneration.INITIAL,
+                            null
+                    )
+            ));
             transaction.toolLinks().link(new CompanionToolLink(
                     PROFILE,
                     TOOL_ID,

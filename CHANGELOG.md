@@ -32,6 +32,9 @@
 
 ### Fixed
 
+- Revive-ready updates now correlate replacement death snapshots with the
+  current lifecycle revision. Interrupted updates no longer block Tamework
+  startup because of a stale snapshot revision.
 - Dead companions now release deployed capacity. Companions affected by the
   older stale-capacity behavior can revive without a database reset.
 - Managed companions can now revive through owner-scoped capacity admission.
