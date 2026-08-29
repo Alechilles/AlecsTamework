@@ -1,5 +1,8 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.api.HusbandryOutcomeKind;
+import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
+import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRuntime;
 import com.alechilles.alecstamework.output.CompanionOutputService;
 import com.alechilles.alecstamework.output.CompanionOutputService.FinalizedOutput;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
@@ -17,6 +20,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.DoubleSupplier;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.bson.BsonDocument;
 
@@ -35,7 +40,8 @@ final class CullRewardService {
         if (dropList == null || dropList.getContainer() == null) {
             return Outcome.unavailable();
         }
-        Roll roll = roll(dropList, ThreadLocalRandom.current());
+        Random random = ThreadLocalRandom.current();
+        Roll roll = roll(dropList, random);
         List<ItemStack> stacks = new ArrayList<>();
         for (Reward reward : roll.rewards()) {
             stacks.add(new ItemStack(
@@ -44,11 +50,43 @@ final class CullRewardService {
                     reward.metadata()
             ));
         }
-        FinalizedOutput output = CompanionOutputService.finalizeDrops(stacks, false);
+        int bonusCopies = resolveBonusCopies(
+                npcRef, store, random::nextDouble);
+        FinalizedOutput output = CompanionOutputService.finalizeDrops(
+                stacks, bonusCopies);
         for (ItemStack stack : output.itemStacks()) {
             ItemUtils.dropItem(npcRef, stack, store);
         }
         return new Outcome(true, output.itemQuantities());
+    }
+
+    /** Resolves one cull batch bonus from the current husbandry provider. */
+    static int resolveBonusCopies(
+            @Nullable Ref<EntityStore> npcRef,
+            @Nullable Store<EntityStore> store,
+            @Nonnull DoubleSupplier random
+    ) {
+        HusbandryOutcomeModifiers modifiers = HusbandryOutcomeRuntime.resolve(
+                HusbandryOutcomeKind.CULL_YIELD,
+                npcRef,
+                store,
+                (String) null,
+                null
+        );
+        return resolveBonusCopies(modifiers, random);
+    }
+
+    /** Rolls the primary and gated triple-upgrade cull chances. */
+    static int resolveBonusCopies(
+            @Nullable HusbandryOutcomeModifiers modifiers,
+            @Nonnull DoubleSupplier random
+    ) {
+        HusbandryOutcomeModifiers safe = modifiers == null
+                ? HusbandryOutcomeModifiers.identity() : modifiers;
+        if (!rollChance(safe.bonusOutputChance(), random)) {
+            return 0;
+        }
+        return rollChance(safe.tripleOutputChance(), random) ? 2 : 1;
     }
 
     static Roll roll(ItemDropList dropList, Random random) {
@@ -75,6 +113,14 @@ final class CullRewardService {
             quantities.merge(itemId, quantity, Integer::sum);
         }
         return new Roll(rewards, quantities);
+    }
+
+    private static boolean rollChance(double chance, @Nonnull DoubleSupplier random) {
+        if (!Double.isFinite(chance)) {
+            return false;
+        }
+        double bounded = Math.max(0.0, Math.min(1.0, chance));
+        return random.getAsDouble() < bounded;
     }
 
     @Nullable

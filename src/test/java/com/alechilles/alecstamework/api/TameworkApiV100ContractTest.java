@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Public behavior checks for the stable Tamework 1.0 API surface. */
+/** Public behavior checks for the stable Tamework 2.0 API surface. */
 class TameworkApiV100ContractTest {
     @Test
     void oldImplementationsReceiveAnUnavailableCommandHudFacade() {
@@ -41,22 +41,11 @@ class TameworkApiV100ContractTest {
     }
 
     @Test
-    void oldImplementationsReceiveAnUnavailableHusbandryOutcomeFacade() {
-        TameworkApi legacy = new LegacyApiImplementation();
-
-        assertFalse(legacy.husbandryOutcomes().available());
-        assertEquals(
-                HusbandryOutcomeModifiers.identity(),
-                legacy.husbandryOutcomes().resolve(husbandryContext())
-        );
-    }
-
-    @Test
     void fullRuntimeAdvertisesCommandHudCapabilitiesUntilClosed() {
         TameworkEventBus events = new TameworkEventBus(null);
         TameworkApiImpl api = newBaseApi(events);
         try {
-            assertEquals("1.0.0", api.getApiVersion());
+            assertEquals("2.0.0", api.getApiVersion());
             assertTrue(api.getCapabilities().containsAll(EnumSet.of(
                     TameworkApiCapability.COMMAND_HUD_RENDERERS,
                     TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS)));
@@ -65,12 +54,19 @@ class TameworkApiV100ContractTest {
                     TameworkApiCapability.HUSBANDRY_OUTCOMES));
             assertTrue(api.husbandryOutcomes().available());
             api.husbandryOutcomes().register(ignored -> new HusbandryOutcomeModifiers(
-                    1.25, 0.2, 0.05, 0.75
+                    0.7, 1.3, 0.2, 0.4, 0.75
             ));
+            HusbandryOutcomeModifiers resolved = api.husbandryOutcomes()
+                    .resolve(husbandryContext());
             assertEquals(
-                    new HusbandryOutcomeModifiers(1.25, 0.2, 0.05, 0.75),
-                    api.husbandryOutcomes().resolve(husbandryContext())
+                    new HusbandryOutcomeModifiers(0.7, 1.3, 0.2, 0.4, 0.75),
+                    resolved
             );
+            assertEquals(0.7, resolved.needsDecayMultiplier());
+            assertEquals(1.3, resolved.happinessDispositionMultiplier());
+            assertEquals(0.2, resolved.bonusOutputChance());
+            assertEquals(0.4, resolved.tripleOutputChance());
+            assertEquals(0.75, resolved.breedingCooldownMultiplier());
             api.close();
             assertFalse(api.getCapabilities().contains(
                     TameworkApiCapability.COMMAND_HUD_RENDERERS));
@@ -94,7 +90,7 @@ class TameworkApiV100ContractTest {
     void bondedOnlyRuntimeReportsVersionButFailsClosedForCommandHud() {
         TameworkApi api = new BondedOnlyTameworkApi(BondedCompanionApi.unavailable());
 
-        assertEquals("1.0.0", api.getApiVersion());
+        assertEquals("2.0.0", api.getApiVersion());
         assertFalse(api.getCapabilities().contains(
                 TameworkApiCapability.COMMAND_HUD_RENDERERS));
         assertFalse(api.getCapabilities().contains(
@@ -120,7 +116,7 @@ class TameworkApiV100ContractTest {
 
     private static HusbandryOutcomeContext husbandryContext() {
         return new HusbandryOutcomeContext(
-                HusbandryOutcomeKind.CARE_RESTORATION,
+                HusbandryOutcomeKind.NEEDS_DECAY,
                 UUID.fromString("10000000-0000-0000-0000-000000000001"),
                 UUID.fromString("20000000-0000-0000-0000-000000000001"),
                 "Tamed_Cow",

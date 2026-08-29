@@ -1,5 +1,10 @@
 package com.alechilles.alecstamework.npc.progression;
 
+import com.alechilles.alecstamework.api.HusbandryOutcomeApi;
+import com.alechilles.alecstamework.api.HusbandryOutcomeKind;
+import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
+import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRegistry;
+import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRuntime;
 import com.alechilles.alecstamework.damage.SimpleClaimsDamageHytaleFixture.HytaleModuleScope;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
@@ -13,6 +18,7 @@ import com.hypixel.hytale.server.core.modules.entity.component.TransformComponen
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.UUID;
 import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
@@ -47,6 +53,41 @@ class CompanionHappinessModifierServiceTest {
     void applyDispositionToOffsetFallsBackToNeutralForInvalidMultiplier() {
         double adjusted = CompanionHappinessModifierService.applyDispositionToOffset(10.0, -1.0);
         assertEquals(10.0, adjusted, 0.000001);
+    }
+
+    @Test
+    void husbandryDispositionScalesPositiveAndNegativeOffsets() throws Exception {
+        try (HytaleModuleScope ignored = HytaleModuleScope.install();
+             TestEntityComponentStore store = new TestEntityComponentStore(new EntityStore(null))) {
+            Ref<EntityStore> npcRef = store.createReference();
+            NPCEntity npc = new NPCEntity();
+            npc.setLegacyUUID(UUID.fromString("50000000-0000-0000-0000-000000000001"));
+            npc.setRoleName("RoleWithoutHappinessConfig");
+            store.put(npcRef, NPCEntity.getComponentType(), npc);
+
+            HusbandryOutcomeRegistry registry = new HusbandryOutcomeRegistry();
+            registry.register(context -> {
+                assertEquals(HusbandryOutcomeKind.HAPPINESS_DISPOSITION, context.kind());
+                return new HusbandryOutcomeModifiers(1.0, 1.30, 0.0, 0.0, 1.0);
+            });
+            installRuntime(registry);
+            try {
+                TwHappinessConfig positiveConfig = happinessConfig(true);
+                setOwnerNearbyOffset(positiveConfig, 10.0);
+                CompanionHappinessModifierService.ModifierSnapshot positive =
+                        CompanionHappinessModifierService.resolve(npcRef, store, positiveConfig);
+                assertEquals(13.0, positive.modifiers().get(0).value(), 0.000001);
+
+                TwHappinessConfig negativeConfig = happinessConfig(true);
+                setOwnerNearbyOffset(negativeConfig, -10.0);
+                CompanionHappinessModifierService.ModifierSnapshot negative =
+                        CompanionHappinessModifierService.resolve(npcRef, store, negativeConfig);
+                assertEquals(-10.0 / 1.30, negative.modifiers().get(0).value(), 0.000001);
+            } finally {
+                clearRuntime(registry);
+                registry.close();
+            }
+        }
     }
 
     @Test
@@ -134,6 +175,25 @@ class CompanionHappinessModifierServiceTest {
         TwHappinessConfig config = ctor.newInstance();
         setField(config, "enabled", enabled);
         return config;
+    }
+
+    private static void setOwnerNearbyOffset(TwHappinessConfig config, double offset) throws Exception {
+        setField(config.getModifiers(), "ownerNearbyOffset", offset);
+    }
+
+    private static void installRuntime(HusbandryOutcomeApi api) throws Exception {
+        invokeRuntime("install", api);
+    }
+
+    private static void clearRuntime(HusbandryOutcomeApi api) throws Exception {
+        invokeRuntime("clear", api);
+    }
+
+    private static void invokeRuntime(String methodName, HusbandryOutcomeApi api) throws Exception {
+        Method method = HusbandryOutcomeRuntime.class.getDeclaredMethod(
+                methodName, HusbandryOutcomeApi.class);
+        method.setAccessible(true);
+        method.invoke(null, api);
     }
 
     private static void setField(Object target, String fieldName, Object value) throws Exception {

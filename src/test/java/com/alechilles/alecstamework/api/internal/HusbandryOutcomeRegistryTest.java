@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.api.HusbandryOutcomeApi;
 import com.alechilles.alecstamework.api.HusbandryOutcomeContext;
 import com.alechilles.alecstamework.api.HusbandryOutcomeKind;
 import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -32,14 +33,53 @@ class HusbandryOutcomeRegistryTest {
     }
 
     @Test
+    void resolvesEveryOutcomeKindWithNormalizedConsumerValues() throws Exception {
+        EnumSet<HusbandryOutcomeKind> expectedKinds = EnumSet.of(
+                HusbandryOutcomeKind.NEEDS_DECAY,
+                HusbandryOutcomeKind.HAPPINESS_DISPOSITION,
+                HusbandryOutcomeKind.HARVEST_YIELD,
+                HusbandryOutcomeKind.CULL_YIELD,
+                HusbandryOutcomeKind.BREEDING_COOLDOWN
+        );
+        EnumSet<HusbandryOutcomeKind> observedKinds = EnumSet.noneOf(HusbandryOutcomeKind.class);
+
+        try (HusbandryOutcomeRegistry registry = new HusbandryOutcomeRegistry()) {
+            registry.register(context -> {
+                observedKinds.add(context.kind());
+                return switch (context.kind()) {
+                    case NEEDS_DECAY -> new HusbandryOutcomeModifiers(
+                            -1.0, 1.0, 0.0, 0.0, 1.0);
+                    case HAPPINESS_DISPOSITION -> new HusbandryOutcomeModifiers(
+                            1.0, 4.0, 0.0, 0.0, 1.0);
+                    case HARVEST_YIELD -> new HusbandryOutcomeModifiers(
+                            1.0, 1.0, -1.0, 2.0, 1.0);
+                    case CULL_YIELD -> new HusbandryOutcomeModifiers(
+                            1.0, 1.0, 2.0, -1.0, 1.0);
+                    case BREEDING_COOLDOWN -> new HusbandryOutcomeModifiers(
+                            1.0, 1.0, 0.0, 0.0, 0.1);
+                };
+            });
+
+            for (HusbandryOutcomeKind kind : expectedKinds) {
+                assertEquals(
+                        expectedModifiers(kind),
+                        registry.resolve(context(kind))
+                );
+            }
+        }
+
+        assertEquals(expectedKinds, observedKinds);
+    }
+
+    @Test
     void clampsProviderModifiersToSafeGameplayRanges() throws Exception {
         try (HusbandryOutcomeRegistry registry = new HusbandryOutcomeRegistry()) {
             registry.register(ignored -> new HusbandryOutcomeModifiers(
-                    4.0, -1.0, 3.0, 0.1
+                    4.0, -1.0, 3.0, 4.0, 0.1
             ));
 
             assertEquals(
-                    new HusbandryOutcomeModifiers(2.0, 0.0, 1.0, 0.25),
+                    new HusbandryOutcomeModifiers(1.0, 1.0, 1.0, 1.0, 0.25),
                     registry.resolve(context())
             );
         }
@@ -49,7 +89,7 @@ class HusbandryOutcomeRegistryTest {
     void anyNonFiniteModifierReturnsFullIdentity() throws Exception {
         try (HusbandryOutcomeRegistry registry = new HusbandryOutcomeRegistry()) {
             registry.register(ignored -> new HusbandryOutcomeModifiers(
-                    1.5, Double.NaN, 0.5, 0.7
+                    0.8, Double.NaN, 0.5, 0.7, 0.8
             ));
 
             assertEquals(HusbandryOutcomeModifiers.identity(), registry.resolve(context()));
@@ -81,7 +121,7 @@ class HusbandryOutcomeRegistryTest {
         HashSet<String> mutableGroups = new HashSet<>();
         mutableGroups.add("runeteria:husbandry");
         HusbandryOutcomeContext input = new HusbandryOutcomeContext(
-                HusbandryOutcomeKind.PRODUCT_BONUS,
+                HusbandryOutcomeKind.HARVEST_YIELD,
                 OWNER_ID,
                 COMPANION_ID,
                 "Tamed_Cow",
@@ -111,7 +151,7 @@ class HusbandryOutcomeRegistryTest {
     void allowsOnlyOneActiveProviderAndClosesExactRegistration() throws Exception {
         try (HusbandryOutcomeRegistry registry = new HusbandryOutcomeRegistry()) {
             AutoCloseable first = registry.register(ignored -> new HusbandryOutcomeModifiers(
-                    1.2, 0.1, 0.0, 0.8
+                    0.8, 1.2, 0.1, 0.0, 0.8
             ));
             assertThrows(
                     IllegalStateException.class,
@@ -121,11 +161,11 @@ class HusbandryOutcomeRegistryTest {
             first.close();
             first.close();
             AutoCloseable second = registry.register(ignored -> new HusbandryOutcomeModifiers(
-                    1.4, 0.2, 0.1, 0.7
+                    0.9, 1.4, 0.2, 0.1, 0.7
             ));
             first.close();
             assertEquals(
-                    new HusbandryOutcomeModifiers(1.4, 0.2, 0.1, 0.7),
+                    new HusbandryOutcomeModifiers(0.9, 1.4, 0.2, 0.1, 0.7),
                     registry.resolve(context())
             );
             second.close();
@@ -156,7 +196,7 @@ class HusbandryOutcomeRegistryTest {
                 () -> unavailable.register(null)
         );
         AutoCloseable handle = unavailable.register(ignored -> new HusbandryOutcomeModifiers(
-                2.0, 1.0, 1.0, 0.25
+                1.0, 2.0, 1.0, 1.0, 0.25
         ));
         assertTrue(handle != null);
         handle.close();
@@ -164,8 +204,12 @@ class HusbandryOutcomeRegistryTest {
     }
 
     private static HusbandryOutcomeContext context() {
+        return context(HusbandryOutcomeKind.NEEDS_DECAY);
+    }
+
+    private static HusbandryOutcomeContext context(HusbandryOutcomeKind kind) {
         return new HusbandryOutcomeContext(
-                HusbandryOutcomeKind.CARE_RESTORATION,
+                kind,
                 OWNER_ID,
                 COMPANION_ID,
                 "Tamed_Cow",
@@ -173,5 +217,16 @@ class HusbandryOutcomeRegistryTest {
                 Set.of("runeteria:husbandry"),
                 null
         );
+    }
+
+    private static HusbandryOutcomeModifiers expectedModifiers(HusbandryOutcomeKind kind) {
+        return switch (kind) {
+            case NEEDS_DECAY -> new HusbandryOutcomeModifiers(0.25, 1.0, 0.0, 0.0, 1.0);
+            case HAPPINESS_DISPOSITION -> new HusbandryOutcomeModifiers(
+                    1.0, 2.0, 0.0, 0.0, 1.0);
+            case HARVEST_YIELD -> new HusbandryOutcomeModifiers(1.0, 1.0, 0.0, 1.0, 1.0);
+            case CULL_YIELD -> new HusbandryOutcomeModifiers(1.0, 1.0, 1.0, 0.0, 1.0);
+            case BREEDING_COOLDOWN -> new HusbandryOutcomeModifiers(1.0, 1.0, 0.0, 0.0, 0.25);
+        };
     }
 }

@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.api.HusbandryOutcomeKind;
+import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
+import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRuntime;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.damage.DamageTargetMemoryService;
 import com.alechilles.alecstamework.damage.RecentNeedsDeathCauseService;
@@ -640,7 +643,7 @@ public final class CompanionNeedsService {
         if (effectiveElapsedMs > 0L) {
             double elapsedMinutes = effectiveElapsedMs / MILLIS_PER_MINUTE;
             TwNeedsConfig.DecaySettings decay = config.getDecay();
-            double needsDecayMultiplier = resolveNeedsDecayMultiplier(npcRef, store);
+            double needsDecayMultiplier = resolveNeedsDecayMultiplier(npcRef, store, roleId);
             double hungerDecay = decay.getHungerPerMinute() * elapsedMinutes * needsDecayMultiplier;
             double thirstDecay = decay.getThirstPerMinute() * elapsedMinutes * needsDecayMultiplier;
             hunger = clamp(hunger - hungerDecay, values.getHungerMin(), values.getHungerMax());
@@ -1445,13 +1448,22 @@ public final class CompanionNeedsService {
     }
 
     private static double resolveNeedsDecayMultiplier(@Nullable Ref<EntityStore> npcRef,
-                                                      @Nullable Store<EntityStore> store) {
-        double value = CompanionProgressionModifierService.resolveMultiplier(
+                                                      @Nullable Store<EntityStore> store,
+                                                      @Nullable String roleId) {
+        double traitMultiplier = CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,
                 store,
                 NEEDS_DECAY_MULTIPLIER_EFFECT_KEY,
                 1.0
         );
+        HusbandryOutcomeModifiers husbandryModifiers = HusbandryOutcomeRuntime.resolve(
+                HusbandryOutcomeKind.NEEDS_DECAY,
+                npcRef,
+                store,
+                roleId,
+                null
+        );
+        double value = traitMultiplier * husbandryModifiers.needsDecayMultiplier();
         if (!Double.isFinite(value) || value <= 0.0) {
             return 1.0;
         }

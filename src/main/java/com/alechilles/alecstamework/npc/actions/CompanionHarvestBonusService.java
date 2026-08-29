@@ -45,7 +45,7 @@ final class CompanionHarvestBonusService {
         return roll(multiplier, random);
     }
 
-    /** Resolves trait and husbandry product bonuses with one authoritative roll path. */
+    /** Resolves trait and husbandry harvest bonuses with one authoritative roll path. */
     static int resolveBonusCopies(@Nullable Ref<EntityStore> npcRef,
                                   @Nullable Store<EntityStore> store,
                                   @Nullable Role role,
@@ -57,7 +57,7 @@ final class CompanionHarvestBonusService {
                 random
         );
         HusbandryOutcomeModifiers modifiers = HusbandryOutcomeRuntime.resolve(
-                HusbandryOutcomeKind.PRODUCT_BONUS,
+                HusbandryOutcomeKind.HARVEST_YIELD,
                 npcRef,
                 store,
                 role,
@@ -66,7 +66,7 @@ final class CompanionHarvestBonusService {
         return resolveBonusCopies(traitDuplicate, modifiers, random);
     }
 
-    /** Resolves a product bonus for a pre-built action context. */
+    /** Resolves a harvest bonus for a pre-built action context. */
     static int resolveBonusCopies(boolean traitDuplicate,
                                   @Nonnull HusbandryOutcomeContext context,
                                   @Nonnull DoubleSupplier random) {
@@ -77,15 +77,15 @@ final class CompanionHarvestBonusService {
         );
     }
 
-    /** Combines an existing trait proc with the provider's product rolls. */
+    /** Combines an existing trait proc with the provider's harvest rolls. */
     static int resolveBonusCopies(boolean traitDuplicate,
                                   @Nullable HusbandryOutcomeModifiers modifiers,
                                   @Nonnull DoubleSupplier random) {
         int copies = traitDuplicate ? 1 : 0;
         HusbandryOutcomeModifiers safe = modifiers == null
                 ? HusbandryOutcomeModifiers.identity() : modifiers;
-        if (rollChance(safe.productBonusChance(), random)) {
-            copies += rollChance(safe.doubleBonusChance(), random) ? 2 : 1;
+        if (rollChance(safe.bonusOutputChance(), random)) {
+            copies += rollChance(safe.tripleOutputChance(), random) ? 2 : 1;
         }
         return copies;
     }

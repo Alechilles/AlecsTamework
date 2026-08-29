@@ -8,7 +8,7 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Stable API Contract (`1.0.0`)**
+> **Stable API Contract (`2.0.0`)**
 > This reference tracks the current `husbandryOutcomes()` contract in
 > `TameworkApi`.
 
@@ -36,7 +36,8 @@ values and does not retain a provider.
 
 The provider receives an immutable `HusbandryOutcomeContext` with:
 
-- `kind`: `CARE_RESTORATION`, `PRODUCT_BONUS`, or `BREEDING_COOLDOWN`;
+- `kind`: `NEEDS_DECAY`, `HAPPINESS_DISPOSITION`, `HARVEST_YIELD`,
+  `CULL_YIELD`, or `BREEDING_COOLDOWN`;
 - `ownerId` and `companionId`, when known;
 - `roleId` and `profileId`, when known;
 - a detached `groupIds` set; and
@@ -44,18 +45,22 @@ The provider receives an immutable `HusbandryOutcomeContext` with:
 
 The provider returns `HusbandryOutcomeModifiers`:
 
-- `careRestorationMultiplier`, clamped to `1.0` through `2.0`;
-- `productBonusChance`, clamped to `0.0` through `1.0`;
-- `doubleBonusChance`, clamped to `0.0` through `1.0`; and
+- `needsDecayMultiplier`, clamped to `0.25` through `1.0`;
+- `happinessDispositionMultiplier`, clamped to `1.0` through `2.0`;
+- `bonusOutputChance`, clamped to `0.0` through `1.0`;
+- `tripleOutputChance`, clamped to `0.0` through `1.0`; and
 - `breedingCooldownMultiplier`, clamped to `0.25` through `1.0`.
 
-The identity result is `(1.0, 0.0, 0.0, 1.0)`. Tamework uses it when no
+The identity result is `(1.0, 1.0, 0.0, 0.0, 1.0)`. Tamework uses it when no
 provider is active, the provider returns `null`, the provider throws, or any
 returned field is not finite.
 
-`doubleBonusChance` is an independent roll after `productBonusChance`
-succeeds. It changes one bonus copy into two bonus copies. Tamework applies
-the breeding multiplier to parent cooldowns only.
+Tamework applies the needs-decay, happiness-disposition, output, and breeding
+cooldown modifiers to their matching husbandry actions. Output modifiers apply
+to harvest and cull results. Tamework applies the breeding multiplier to parent
+cooldowns only. Tamework rolls `tripleOutputChance` only after
+`bonusOutputChance` succeeds. A successful triple roll adds two output batches
+instead of one.
 
 ## Authority Boundary
 

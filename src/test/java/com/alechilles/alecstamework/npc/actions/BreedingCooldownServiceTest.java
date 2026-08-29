@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRegistry;
 import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRuntime;
 import com.alechilles.alecstamework.damage.SimpleClaimsDamageHytaleFixture;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -62,27 +63,36 @@ class BreedingCooldownServiceTest {
     }
 
     @Test
-    void parentCooldownMutationAppliesOutcomeAndLeavesChildLockUnchanged() throws Exception {
+    void parentCooldownMutationUsesEachOwnerModifierOnceAndLeavesChildLockUnchanged() throws Exception {
         try (SimpleClaimsDamageHytaleFixture.HytaleModuleScope ignored =
                      SimpleClaimsDamageHytaleFixture.HytaleModuleScope.install();
              TestEntityComponentStore store = new TestEntityComponentStore(new EntityStore(null))) {
             ComponentType<EntityStore, TameworkBreedingComponent> breedingType = new ComponentType<>();
             setField(Tamework.getInstance(), "breedingComponentType", breedingType);
             Ref<EntityStore> parentRef = store.createReference();
+            Ref<EntityStore> otherParentRef = store.createReference();
             Ref<EntityStore> childRef = store.createReference();
             UUID parentUuid = UUID.fromString("30000000-0000-0000-0000-000000000001");
             UUID partnerUuid = UUID.fromString("30000000-0000-0000-0000-000000000002");
             UUID childUuid = UUID.fromString("30000000-0000-0000-0000-000000000003");
+            UUID parentOwnerUuid = UUID.fromString("40000000-0000-0000-0000-000000000001");
+            UUID otherParentOwnerUuid = UUID.fromString("40000000-0000-0000-0000-000000000002");
             NPCEntity parentNpc = new NPCEntity();
             parentNpc.setLegacyUUID(parentUuid);
             parentNpc.setRoleName("RoleA");
             store.put(parentRef, NPCEntity.getComponentType(), parentNpc);
+            NPCEntity otherParentNpc = new NPCEntity();
+            otherParentNpc.setLegacyUUID(partnerUuid);
+            otherParentNpc.setRoleName("RoleB");
+            store.put(otherParentRef, NPCEntity.getComponentType(), otherParentNpc);
             NPCEntity childNpc = new NPCEntity();
             childNpc.setLegacyUUID(childUuid);
             childNpc.setRoleName("Baby_Role");
             store.put(childRef, NPCEntity.getComponentType(), childNpc);
             TameworkBreedingComponent parent = new TameworkBreedingComponent(
                     "breeding-test", 80.0, 10L, true, true, 0L, null);
+            TameworkBreedingComponent otherParent = new TameworkBreedingComponent(
+                    "breeding-test", 75.0, 10L, true, true, 0L, null);
             TameworkBreedingComponent child = new TameworkBreedingComponent(
                     "breeding-test", 50.0, 10L, true, true, 77_000L,
                     UUID.fromString("30000000-0000-0000-0000-000000000004"),
@@ -90,7 +100,14 @@ class BreedingCooldownServiceTest {
                     UUID.fromString("30000000-0000-0000-0000-000000000004"),
                     88_000L);
             store.put(parentRef, breedingType, parent);
+            store.put(otherParentRef, breedingType, otherParent);
             store.put(childRef, breedingType, child);
+            ComponentType<EntityStore, TameworkOwnerComponent> ownerType =
+                    TameworkOwnerComponent.getComponentType();
+            store.put(parentRef, ownerType,
+                    new TameworkOwnerComponent(parentOwnerUuid, "Parent Owner"));
+            store.put(otherParentRef, ownerType,
+                    new TameworkOwnerComponent(otherParentOwnerUuid, "Other Parent Owner"));
 
             Field statsInstanceField = EntityStatsModule.class.getDeclaredField("instance");
             statsInstanceField.setAccessible(true);
@@ -122,14 +139,28 @@ class BreedingCooldownServiceTest {
             resourcesField.set(store, resources);
 
             HusbandryOutcomeRegistry registry = new HusbandryOutcomeRegistry();
-            registry.register(context -> new HusbandryOutcomeModifiers(1.0, 0.0, 0.0, 0.70));
+            registry.register(context -> parentOwnerUuid.equals(context.ownerId())
+                    ? new HusbandryOutcomeModifiers(1.0, 1.0, 0.0, 0.0, 0.70)
+                    : HusbandryOutcomeModifiers.identity());
             installRuntime(registry);
             try {
-                new BreedingCooldownService().applyParentCooldown(
+                BreedingCooldownService cooldownService = new BreedingCooldownService();
+                cooldownService.applyParentCooldown(
                         parentRef,
                         parent,
                         null,
                         partnerUuid,
+                        200_000L,
+                        1_000_000L,
+                        900_000L,
+                        store,
+                        null
+                );
+                cooldownService.applyParentCooldown(
+                        otherParentRef,
+                        otherParent,
+                        null,
+                        parentUuid,
                         200_000L,
                         1_000_000L,
                         900_000L,
@@ -144,6 +175,12 @@ class BreedingCooldownServiceTest {
                 assertEquals(partnerUuid, parent.getLastPartnerUuid());
                 assertEquals(900_000L, parent.getLastHappinessUpdateMs());
                 assertTrue(parent.getManualBreedingPlayerUuid() == null);
+                assertFalse(otherParent.isReady());
+                assertEquals(1_200_000L, otherParent.getCooldownUntilMs());
+                assertEquals(1_000_000L, otherParent.getCooldownStartedAtMs());
+                assertEquals(200_000L, otherParent.getCooldownDurationMs());
+                assertEquals(parentUuid, otherParent.getLastPartnerUuid());
+                assertEquals(900_000L, otherParent.getLastHappinessUpdateMs());
                 new BreedingOffspringProgressionService().applyOffspringState(
                         childRef,
                         null,

@@ -89,20 +89,23 @@ public final class HusbandryOutcomeRegistry implements HusbandryOutcomeApi, Auto
 
     @Nonnull
     private HusbandryOutcomeModifiers normalize(@Nonnull HusbandryOutcomeModifiers modifiers) {
-        if (!Double.isFinite(modifiers.careRestorationMultiplier())
-                || !Double.isFinite(modifiers.productBonusChance())
-                || !Double.isFinite(modifiers.doubleBonusChance())
+        if (!Double.isFinite(modifiers.needsDecayMultiplier())
+                || !Double.isFinite(modifiers.happinessDispositionMultiplier())
+                || !Double.isFinite(modifiers.bonusOutputChance())
+                || !Double.isFinite(modifiers.tripleOutputChance())
                 || !Double.isFinite(modifiers.breedingCooldownMultiplier())) {
             return HusbandryOutcomeModifiers.identity();
         }
         HusbandryOutcomeModifiers identity = HusbandryOutcomeModifiers.identity();
         return new HusbandryOutcomeModifiers(
-                clamp(modifiers.careRestorationMultiplier(), 1.0, 2.0,
-                        identity.careRestorationMultiplier()),
-                clamp(modifiers.productBonusChance(), 0.0, 1.0,
-                        identity.productBonusChance()),
-                clamp(modifiers.doubleBonusChance(), 0.0, 1.0,
-                        identity.doubleBonusChance()),
+                clamp(modifiers.needsDecayMultiplier(), 0.25, 1.0,
+                        identity.needsDecayMultiplier()),
+                clamp(modifiers.happinessDispositionMultiplier(), 1.0, 2.0,
+                        identity.happinessDispositionMultiplier()),
+                clamp(modifiers.bonusOutputChance(), 0.0, 1.0,
+                        identity.bonusOutputChance()),
+                clamp(modifiers.tripleOutputChance(), 0.0, 1.0,
+                        identity.tripleOutputChance()),
                 clamp(modifiers.breedingCooldownMultiplier(), 0.25, 1.0,
                         identity.breedingCooldownMultiplier())
         );

@@ -1,15 +1,19 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.HusbandryOutcomeApi;
+import com.alechilles.alecstamework.api.HusbandryOutcomeKind;
 import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
 import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRegistry;
 import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRuntime;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.damage.SimpleClaimsDamageHytaleFixture;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.hypixel.hytale.assetstore.AssetStore;
 import com.hypixel.hytale.assetstore.AssetUpdateQuery;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
@@ -20,6 +24,7 @@ import com.hypixel.hytale.event.IEventBus;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatsModule;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.file.Path;
@@ -34,6 +39,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompanionNeedsConsumeServiceTest {
+    @AfterEach
+    void tearDown() {
+        CompanionRuntimeClock.resetForTests();
+    }
+
     @Test
     void resolvesCommittedContainerFoodWithActualItemAndValues() {
         List<NeedsSatisfactionOutcome> outcomes =
@@ -132,37 +142,55 @@ class CompanionNeedsConsumeServiceTest {
     }
 
     @Test
-    void careMultiplierIncreasesRestorationBeforeNeedsClamping() {
-        assertEquals(
-                12.5,
-                CompanionNeedsConsumeService.scaleRestoration(10.0, 1.25),
-                0.000001
-        );
-        assertEquals(
-                5.0,
-                Math.min(5.0, CompanionNeedsConsumeService.scaleRestoration(10.0, 1.25)),
-                0.000001
-        );
+    void feedRefillKeepsNormalRestorationBeforeTheProductionClamp() throws Exception {
+        try (NeedsFixture fixture = new NeedsFixture()) {
+            assertTrue(CompanionNeedsConsumeService.applyFeedInteractionRefill(
+                    fixture.firstRef, fixture.store, null, null));
+            assertTrue(CompanionNeedsConsumeService.applyFeedInteractionRefill(
+                    fixture.clampedRef, fixture.store, null, null));
+            assertEquals(90.0, fixture.firstNeeds().getHunger(), 0.000001);
+            assertEquals(100.0, fixture.clampedNeeds().getHunger(), 0.000001);
+        }
     }
 
     @Test
-    void feedRefillUsesCareMultiplierBeforeTheProductionClamp() throws Exception {
+    void needsDecayOutcomeScalesBaseAndTraitDecayTogether() throws Exception {
         try (NeedsFixture fixture = new NeedsFixture()) {
             HusbandryOutcomeRegistry registry = new HusbandryOutcomeRegistry();
-            registry.register(context -> new HusbandryOutcomeModifiers(1.25, 0.0, 0.0, 1.0));
+            registry.register(context -> {
+                assertEquals(HusbandryOutcomeKind.NEEDS_DECAY, context.kind());
+                return new HusbandryOutcomeModifiers(0.70, 1.30, 0.0, 0.0, 1.0);
+            });
             installRuntime(registry);
             try {
-                assertTrue(CompanionNeedsConsumeService.applyFeedInteractionRefill(
-                        fixture.firstRef, fixture.store, null, null));
-                assertTrue(CompanionNeedsConsumeService.applyFeedInteractionRefill(
-                        fixture.clampedRef, fixture.store, null, null));
-                assertEquals(92.5, fixture.firstNeeds().getHunger(), 0.000001);
-                assertEquals(100.0, fixture.clampedNeeds().getHunger(), 0.000001);
+                fixture.prepareDecayState(fixture.firstRef, true);
+                fixture.prepareDecayState(fixture.clampedRef, false);
+                CompanionRuntimeClock.advanceByDeltaSeconds(30.002f);
+
+                assertTrue(runNeedsUpdate(fixture.firstRef, fixture.store));
+                assertTrue(runNeedsUpdate(fixture.clampedRef, fixture.store));
+                assertEquals(94.4, fixture.firstNeeds().getHunger(), 0.000001);
+                assertEquals(93.0, fixture.clampedNeeds().getHunger(), 0.000001);
             } finally {
                 clearRuntime(registry);
                 registry.close();
             }
         }
+    }
+
+    private static boolean runNeedsUpdate(Ref<EntityStore> npcRef,
+                                           TestEntityComponentStore store) {
+        return CompanionNeedsService.runNeedsUpdate(
+                npcRef,
+                store,
+                null,
+                0.0,
+                0.0,
+                false,
+                false,
+                null,
+                null
+        );
     }
 
     private static void installRuntime(HusbandryOutcomeApi api) throws Exception {
@@ -196,7 +224,9 @@ class CompanionNeedsConsumeServiceTest {
         private final SimpleClaimsDamageHytaleFixture.HytaleModuleScope hytaleScope;
         private final EntityStatsModule previousStatsModule;
         private final Object previousNeedsAssetStore;
+        private final Object previousTraitAssetStore;
         private final ComponentType<EntityStore, TameworkNeedsComponent> needsType = new ComponentType<>();
+        private final ComponentType<EntityStore, TameworkTraitsComponent> traitsType = new ComponentType<>();
         private final TestEntityComponentStore store;
         private final Ref<EntityStore> firstRef;
         private final Ref<EntityStore> clampedRef;
@@ -205,17 +235,28 @@ class CompanionNeedsConsumeServiceTest {
             hytaleScope = SimpleClaimsDamageHytaleFixture.HytaleModuleScope.install();
             previousStatsModule = installStatsModule();
             previousNeedsAssetStore = staticField(TwNeedsConfig.class, "ASSET_STORE").get(null);
+            previousTraitAssetStore = staticField(TwTraitConfig.class, "ASSET_STORE").get(null);
             setField(Tamework.getInstance(), "needsComponentType", needsType);
+            setField(Tamework.getInstance(), "traitsComponentType", traitsType);
             store = new TestEntityComponentStore(new EntityStore(null));
             firstRef = store.createReference();
             clampedRef = store.createReference();
             installConfig();
+            installTraitConfig();
             putNpc(firstRef, UUID.fromString("40000000-0000-0000-0000-000000000001"));
             putNpc(clampedRef, UUID.fromString("40000000-0000-0000-0000-000000000002"));
             store.put(firstRef, needsType,
                     new TameworkNeedsComponent("care-test", 80.0, 40.0, 0.0, 0L, 0L));
             store.put(clampedRef, needsType,
                     new TameworkNeedsComponent("care-test", 95.0, 40.0, 0.0, 0L, 0L));
+            store.put(firstRef, traitsType,
+                    new TameworkTraitsComponent(
+                            "trait-test",
+                            1L,
+                            new TameworkTraitsComponent.TraitValue[] {
+                                    new TameworkTraitsComponent.TraitValue("Trait_Decay", 0.8)
+                            }
+                    ));
         }
 
         private void putNpc(Ref<EntityStore> ref, UUID uuid) {
@@ -233,11 +274,30 @@ class CompanionNeedsConsumeServiceTest {
             return store.getComponent(clampedRef, needsType);
         }
 
+        private void prepareDecayState(Ref<EntityStore> ref, boolean traitAttached) {
+            TameworkNeedsComponent component = store.getComponent(ref, needsType);
+            component.setHunger(100.0);
+            component.setThirst(100.0);
+            component.setLastUpdateMs(1L);
+            component.setLastPassiveSweepMs(1L);
+            store.put(ref, needsType, component);
+            if (!traitAttached && store.getComponent(ref, traitsType) != null) {
+                store.tryRemoveComponent(ref, traitsType);
+            }
+        }
+
         private void installConfig() throws Exception {
             TwNeedsConfig config = TwNeedsConfig.CODEC.decode(
                     org.bson.BsonDocument.parse("""
                             {
                               "Enabled": true,
+                              "Decay": {
+                                "HungerPerMinute": 20.0,
+                                "ThirstPerMinute": 20.0
+                              },
+                              "Timing": {
+                                "Basis": "REAL_TIME"
+                              },
                               "Values": {
                                 "HungerDefault": 100.0,
                                 "HungerMin": 0.0,
@@ -257,11 +317,29 @@ class CompanionNeedsConsumeServiceTest {
             TwNeedsConfig.clearRoleCache();
         }
 
+        private void installTraitConfig() throws Exception {
+            Constructor<TwTraitConfig> constructor = TwTraitConfig.class.getDeclaredConstructor();
+            constructor.setAccessible(true);
+            TwTraitConfig config = constructor.newInstance();
+            setField(config, "id", "trait-test");
+            setField(config, "enabled", true);
+            TwTraitConfig.TraitDefinition definition = new TwTraitConfig.TraitDefinition();
+            setField(definition, "id", "Trait_Decay");
+            setField(definition, "displayName", "Trait Decay");
+            setField(definition, "effectKey", "NeedsDecayMultiplier");
+            setField(config, "traits", new TwTraitConfig.TraitDefinition[] {definition});
+            staticField(TwTraitConfig.class, "ASSET_STORE").set(null,
+                    new TestTraitAssetStore(new DefaultAssetMap<>(Map.of("trait-test", config))));
+            TwTraitConfig.clearRoleCache();
+        }
+
         @Override
         public void close() throws Exception {
             store.close();
             staticField(TwNeedsConfig.class, "ASSET_STORE").set(null, previousNeedsAssetStore);
+            staticField(TwTraitConfig.class, "ASSET_STORE").set(null, previousTraitAssetStore);
             TwNeedsConfig.clearRoleCache();
+            TwTraitConfig.clearRoleCache();
             staticField(EntityStatsModule.class, "instance").set(null, previousStatsModule);
             hytaleScope.close();
         }
@@ -317,6 +395,51 @@ class CompanionNeedsConsumeServiceTest {
             public AssetStore<String, TwNeedsConfig,
                     DefaultAssetMap<String, TwNeedsConfig>> build() {
                 return new TestNeedsAssetStore(map);
+            }
+        }
+    }
+
+    private static final class TestTraitAssetStore extends AssetStore<String,
+            TwTraitConfig, DefaultAssetMap<String, TwTraitConfig>> {
+        private TestTraitAssetStore(DefaultAssetMap<String, TwTraitConfig> map) {
+            super(new Builder(map));
+        }
+
+        @Override
+        protected IEventBus getEventBus() {
+            return null;
+        }
+
+        @Override
+        public void addFileMonitor(String pack, Path path) {
+        }
+
+        @Override
+        public void removeFileMonitor(Path path) {
+        }
+
+        @Override
+        protected void handleRemoveOrUpdate(Set<String> removed,
+                                            Map<String, TwTraitConfig> changed,
+                                            AssetUpdateQuery query) {
+        }
+
+        private static final class Builder extends AssetStore.Builder<String,
+                TwTraitConfig, DefaultAssetMap<String, TwTraitConfig>, Builder> {
+            private final DefaultAssetMap<String, TwTraitConfig> map;
+
+            private Builder(DefaultAssetMap<String, TwTraitConfig> map) {
+                super(String.class, TwTraitConfig.class, map);
+                this.map = map;
+                setPath("Tamework/Traits");
+                setCodec(TwTraitConfig.CODEC);
+                setKeyFunction(TwTraitConfig::getId);
+            }
+
+            @Override
+            public AssetStore<String, TwTraitConfig,
+                    DefaultAssetMap<String, TwTraitConfig>> build() {
+                return new TestTraitAssetStore(map);
             }
         }
     }

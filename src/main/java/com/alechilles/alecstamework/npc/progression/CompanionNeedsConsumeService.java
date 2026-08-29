@@ -1,9 +1,6 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.activity.ActivityRuntime;
-import com.alechilles.alecstamework.api.HusbandryOutcomeKind;
-import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
-import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRuntime;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
@@ -290,18 +287,6 @@ public final class CompanionNeedsConsumeService {
             }
         }
 
-        HusbandryOutcomeModifiers careModifiers = HusbandryOutcomeRuntime.resolve(
-                HusbandryOutcomeKind.CARE_RESTORATION,
-                npcRef,
-                store,
-                roleId,
-                null
-        );
-        hungerGain = scaleRestoration(
-                hungerGain, careModifiers.careRestorationMultiplier());
-        thirstGain = scaleRestoration(
-                thirstGain, careModifiers.careRestorationMultiplier());
-
         if (hungerGain <= 0.0 && thirstGain <= 0.0) {
             if (failureReasons.length() == 0) {
                 NeedsConsumeDiagnostics.appendFailureReason(failureReasons, "no_refill_applied");
@@ -428,7 +413,7 @@ public final class CompanionNeedsConsumeService {
         return false;
     }
 
-    /** Applies manual feed gains through the shared care modifier before needs clamping. */
+    /** Applies manual feed gains before needs clamping. */
     public static boolean applyFeedInteractionRefill(
             @Nullable Ref<EntityStore> npcRef,
             @Nullable Store<EntityStore> store,
@@ -450,25 +435,11 @@ public final class CompanionNeedsConsumeService {
             return false;
         }
         TwNeedsConfig.ManualRefillSettings manualRefill = config.getManualRefill();
-        HusbandryOutcomeModifiers careModifiers = HusbandryOutcomeRuntime.resolve(
-                HusbandryOutcomeKind.CARE_RESTORATION,
-                npcRef,
-                store,
-                roleId,
-                null
-        );
-        double careMultiplier = careModifiers.careRestorationMultiplier();
-        double hungerGain = scaleRestoration(
-                manualRefill.getHungerGainOnFeedInteraction(),
-                careMultiplier
-        );
+        double hungerGain = manualRefill.getHungerGainOnFeedInteraction();
         double thirstGain = ENVIRONMENT_SERVICE.isConfiguredWaterBucketItem(
                 heldItemId, config
         )
-                ? scaleRestoration(
-                        manualRefill.getThirstGainOnWaterBucket(),
-                        careMultiplier
-                )
+                ? manualRefill.getThirstGainOnWaterBucket()
                 : 0.0;
         return CompanionNeedsService.runNeedsUpdate(
                 npcRef,
@@ -481,16 +452,6 @@ public final class CompanionNeedsConsumeService {
                 null,
                 heldItemId
         );
-    }
-
-    /** Scales a positive restoration while preserving invalid or non-positive inputs. */
-    static double scaleRestoration(double gain, double multiplier) {
-        if (!Double.isFinite(gain) || gain <= 0.0
-                || !Double.isFinite(multiplier) || multiplier <= 0.0) {
-            return gain;
-        }
-        double scaled = gain * multiplier;
-        return Double.isFinite(scaled) ? scaled : gain;
     }
 
     static boolean canUseTargetFirstConsumeProbeForTests(@Nullable Vector3d consumeOrigin) {

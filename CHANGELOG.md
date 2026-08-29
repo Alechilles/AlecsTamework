@@ -4,7 +4,7 @@
 
 ### Added
 
-- Added the stable `1.0.0` public Java API contract. It includes custom command
+- Added the stable `2.0.0` public Java API contract. It includes custom command
   page and command HUD renderers, namespaced contributors, partial-update
   hints, command-page actions and flows, redacted diagnostics, and standard UI
   fallback.
@@ -17,9 +17,10 @@
   interactions to a domestic drop list and a `tamework:cull_success` Activity
   V2 event. Profiles that omit the mapping keep the normal cull death drops
   and publish no cull activity.
-- Added the capability-gated `husbandryOutcomes()` API. One optional provider
-  can adjust care restoration, product bonus chances, and parent breeding
-  cooldowns. Tamework keeps ownership of random rolls and game-state changes.
+- Revised the capability-gated `husbandryOutcomes()` API. One optional provider
+  can adjust needs decay, happiness disposition, harvest and cull output, and
+  parent breeding cooldowns. Tamework keeps ownership of random rolls and
+  game-state changes.
 
 ### Changed
 

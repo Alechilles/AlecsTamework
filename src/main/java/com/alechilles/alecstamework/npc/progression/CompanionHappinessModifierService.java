@@ -1,5 +1,8 @@
 package com.alechilles.alecstamework.npc.progression;
 
+import com.alechilles.alecstamework.api.HusbandryOutcomeKind;
+import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
+import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRuntime;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
@@ -229,12 +232,20 @@ public final class CompanionHappinessModifierService {
 
     private static double resolveDispositionMultiplier(@Nullable Ref<EntityStore> npcRef,
                                                        @Nullable Store<EntityStore> store) {
-        double multiplier = CompanionProgressionModifierService.resolveMultiplier(
+        double traitMultiplier = CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,
                 store,
                 "HappinessGainMultiplier",
                 1.0
         );
+        HusbandryOutcomeModifiers husbandryModifiers = HusbandryOutcomeRuntime.resolve(
+                HusbandryOutcomeKind.HAPPINESS_DISPOSITION,
+                npcRef,
+                store,
+                (String) null,
+                null
+        );
+        double multiplier = traitMultiplier * husbandryModifiers.happinessDispositionMultiplier();
         return sanitizeDispositionMultiplier(multiplier);
     }
 

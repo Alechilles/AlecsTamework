@@ -5,11 +5,13 @@ import com.alechilles.alecstamework.api.HusbandryOutcomeKind;
 import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
 import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRegistry;
 import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRuntime;
+import com.alechilles.alecstamework.output.CompanionOutputService;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.Set;
 import java.util.UUID;
 
@@ -49,10 +51,57 @@ class CompanionHarvestBonusServiceTest {
                 3,
                 CompanionHarvestBonusService.resolveBonusCopies(
                         true,
-                        new HusbandryOutcomeModifiers(1.0, 1.0, 1.0, 1.0),
+                        new HusbandryOutcomeModifiers(1.0, 1.0, 1.0, 1.0, 1.0),
                         sequence(0.10, 0.20)
                 )
         );
+    }
+
+    @Test
+    void failedPrimaryHarvestRollKeepsNormalOutput() {
+        assertEquals(
+                Map.of("Product_Milk", 2),
+                harvestQuantities(sequence(0.25))
+        );
+    }
+
+    @Test
+    void successfulPrimaryHarvestRollDoublesOutput() {
+        assertEquals(
+                Map.of("Product_Milk", 4),
+                harvestQuantities(sequence(0.24, 0.05))
+        );
+    }
+
+    @Test
+    void successfulPrimaryAndUpgradeHarvestRollTriplesOutput() {
+        assertEquals(
+                Map.of("Product_Milk", 6),
+                harvestQuantities(sequence(0.24, 0.04))
+        );
+    }
+
+    @Test
+    void harvestResolvesHarvestYieldOutcome() throws Exception {
+        HusbandryOutcomeRegistry registry = new HusbandryOutcomeRegistry();
+        AtomicReference<HusbandryOutcomeKind> observedKind = new AtomicReference<>();
+        registry.register(context -> {
+            observedKind.set(context.kind());
+            return new HusbandryOutcomeModifiers(1.0, 1.0, 0.25, 0.05, 1.0);
+        });
+        installRuntime(registry);
+        try {
+            assertEquals(
+                    1,
+                    CompanionHarvestBonusService.resolveBonusCopies(
+                            null, null, null, "Product_Milk", sequence(0.10, 0.90)
+                    )
+            );
+            assertEquals(HusbandryOutcomeKind.HARVEST_YIELD, observedKind.get());
+        } finally {
+            clearRuntime(registry);
+            registry.close();
+        }
     }
 
     @Test
@@ -68,14 +117,14 @@ class CompanionHarvestBonusServiceTest {
     }
 
     @Test
-    void providerThrowFallsBackToBaselineProductCopies() throws Exception {
+    void providerThrowFallsBackToBaselineHarvestCopies() throws Exception {
         HusbandryOutcomeRegistry registry = new HusbandryOutcomeRegistry();
         registry.register(context -> {
             throw new IllegalStateException("provider failure");
         });
         installRuntime(registry);
         HusbandryOutcomeContext context = new HusbandryOutcomeContext(
-                HusbandryOutcomeKind.PRODUCT_BONUS,
+                HusbandryOutcomeKind.HARVEST_YIELD,
                 UUID.fromString("10000000-0000-0000-0000-000000000001"),
                 UUID.fromString("20000000-0000-0000-0000-000000000001"),
                 "Tamed_Cow",
@@ -119,9 +168,26 @@ class CompanionHarvestBonusServiceTest {
 
             @Override
             public double getAsDouble() {
-                return values[Math.min(index++, values.length - 1)];
+                if (index >= values.length) {
+                    throw new AssertionError("Unexpected random roll");
+                }
+                return values[index++];
             }
         };
+    }
+
+    private static Map<String, Integer> harvestQuantities(
+            java.util.function.DoubleSupplier random
+    ) {
+        int bonusCopies = CompanionHarvestBonusService.resolveBonusCopies(
+                false,
+                new HusbandryOutcomeModifiers(1.0, 1.0, 0.25, 0.05, 1.0),
+                random
+        );
+        return CompanionOutputService.finalizeDrops(
+                List.of(new TestItemStack("Product_Milk", 2)),
+                bonusCopies
+        ).itemQuantities();
     }
 
     private static final class TestItemStack extends ItemStack {
