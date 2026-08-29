@@ -24,6 +24,12 @@
 
 ### Changed
 
+- Breaking API change: the Husbandry outcomes contract is now `2.0.0`.
+  Providers must replace `CARE_RESTORATION` and `PRODUCT_BONUS` with the new
+  outcome kinds and use the five-field `HusbandryOutcomeModifiers` record.
+  The old four-field constructor and the `careRestorationMultiplier`,
+  `productBonusChance`, and `doubleBonusChance` accessors are removed. Update
+  providers before using this API version.
 - Clearing a companion owner through the owner-population transition now
   commits the terminal `RELEASED` lifecycle and clears its durable capacity
   claims and command-tool links in the same transaction.
