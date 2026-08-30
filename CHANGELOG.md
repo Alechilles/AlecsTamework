@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.3.1 - Embedded Telemetry Metadata Hotfix - 2026-08-30
+
+### Fixed
+
+- Corrected the embedded Alec's Telemetry version metadata. Tamework now
+  reports the concrete runtime version `1.2.3` in shaded builds.
+
 ## 3.3.0 - Public API and Husbandry Runtime Update - 2026-08-30
 
 ### Added

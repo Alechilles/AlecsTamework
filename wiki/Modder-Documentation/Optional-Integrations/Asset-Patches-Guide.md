@@ -9,7 +9,7 @@ draft: false
 
 Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
-Tamework includes Patchwork 1.3.4 for non-destructive JSON asset patches. Patchwork is standalone and embeddable: the highest compatible runtime version wins, and standalone wins only an equal-version tie. Passive copies forward their host contributions to the elected runtime.
+Tamework includes Patchwork 1.3.5 for non-destructive JSON asset patches. Patchwork is standalone and embeddable: the highest compatible runtime version wins, and standalone wins only an equal-version tie. Passive copies forward their host contributions to the elected runtime.
 
 Asset-only packs need no Java integration. Declare Patchwork as a dependency and put definitions under:
 
@@ -100,7 +100,7 @@ Patchwork generates during early startup asset load, after an authorized `/patch
 
 Commands require `patchwork.admin` and default to `hytale:Admin`. Status reports runtime election, contributions, roots, generation results, integrity, and per-target outcomes.
 
-Patchwork 1.3.4 can confirm a live reload for monitored Hytale server stores when Hytale reports the expected generated provider and asset path. Tamework contributes no separate host adapter. Common, custom, unknown, disabled-monitor, or unconfirmed routes remain `restart-required`; restart the server to activate those changes. `/patchwork selftest` validates isolated generation and conditions without modifying the production pack.
+Patchwork 1.3.5 can confirm a live reload for monitored Hytale server stores when Hytale reports the expected generated provider and asset path. Tamework contributes no separate host adapter. Common, custom, unknown, disabled-monitor, or unconfirmed routes remain `restart-required`; restart the server to activate those changes. `/patchwork selftest` validates isolated generation and conditions without modifying the production pack.
 
 Generated pack ID: `Alechilles:Patchwork_GeneratedPatches`
 

@@ -26,7 +26,7 @@ For an isolated generation and condition check, run:
 /patchwork selftest
 ```
 
-This creates one isolated Patchwork run, verifies expected JSON pointers, and cleans that exact run without modifying the production generated pack. Patchwork 1.3.4 truthfully reports a successful self-test as restart-required because it validates generation rather than live Hytale activation.
+This creates one isolated Patchwork run, verifies expected JSON pointers, and cleans that exact run without modifying the production generated pack. Patchwork 1.3.5 truthfully reports a successful self-test as restart-required because it validates generation rather than live Hytale activation.
 
 ## Patch File Is Not Found
 
@@ -173,7 +173,7 @@ Check:
 
 ## Restart Required After Reload
 
-This is an expected Patchwork 1.3.4 result after `/patchwork reload` when Hytale cannot confirm the generated target through a monitored server store. Patchwork commits the desired generated state to disk but does not invoke a generic asset reload. Tamework contributes no host-specific reload adapter, so restart the server to consume any target reported as `restart-required`.
+This is an expected Patchwork 1.3.5 result after `/patchwork reload` when Hytale cannot confirm the generated target through a monitored server store. Patchwork commits the desired generated state to disk but does not invoke a generic asset reload. Tamework contributes no host-specific reload adapter, so restart the server to consume any target reported as `restart-required`.
 
 Do not treat file presence alone as proof of activation. For `stale`, `rollback-failed`, or `RECOVERY_REQUIRED`, preserve the diagnostic directories, stop repeated reload attempts, and follow the first related Patchwork error in the server log.
 
