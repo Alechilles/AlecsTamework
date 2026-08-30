@@ -15,8 +15,7 @@ This subsection is the parent category for all public Java API docs.
 > downstream mods because optional and reduced-function runtimes can omit API
 > families.
 
-These pages describe the current development branch. The `2.0.0` API is
-scheduled for the next Tamework release. It did not ship in Tamework 3.2.3.
+These pages describe the stable `2.0.0` API that ships with Tamework 3.2.4.
 
 ## Child Pages
 - [API Reference](/mod/alecs-tamework/api-reference)

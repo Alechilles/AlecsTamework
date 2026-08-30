@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 3.2.4 - Public API and Husbandry Runtime Update - 2026-08-30
 
 ### Added
 
