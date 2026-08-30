@@ -23,7 +23,8 @@ import javax.annotation.Nonnull;
  * Bounded, lane-isolated executor for typed replacement persistence reads.
  *
  * <p>It never converts saturation, connection, query, or decode failure into absence. Shutdown
- * stops admission and drains accepted reads without using {@code shutdownNow()}.</p>
+ * stops admission and drains accepted reads without using {@code shutdownNow()}. Each command
+ * reads one SQLite snapshot so a concurrent writer cannot produce a torn multi-table result.</p>
  */
 public final class SqliteReadExecutor implements AutoCloseable {
     private final SqliteConnectionFactory connections;
@@ -151,8 +152,10 @@ public final class SqliteReadExecutor implements AutoCloseable {
                 0, executionStarted - acceptedAtNanos
         );
         try (Connection connection = connections.openReadConnection()) {
+            connection.setAutoCommit(false);
             PersistenceReadResult<T> returned =
                     command.work().execute(connection);
+            connection.commit();
             PersistenceReadResult<T> result = returned == null
                     ? failure(command, "read_contract_returned_null",
                     StorageFailureKind.DECODE, false, null)

@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.persistence.kernel.PersistenceShutdownResult
 import com.alechilles.alecstamework.persistence.kernel.StorageFailureKind;
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
@@ -63,6 +64,47 @@ class SqliteReadExecutorTest {
             PersistenceReadResult.Failed<String> typedFailure =
                     assertInstanceOf(PersistenceReadResult.Failed.class, failed);
             assertEquals(StorageFailureKind.CORRUPT, typedFailure.failure().kind());
+        }
+    }
+
+    @Test
+    void oneReadCommandKeepsOneSnapshotAcrossConcurrentCommit() throws Exception {
+        // Regression for the 2026-08-30 coop lifecycle/profile checkpoint failure.
+        try (Connection connection = connections.openWriterConnection();
+             Statement statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE snapshot_value (value TEXT NOT NULL)");
+            statement.execute("INSERT INTO snapshot_value(value) VALUES ('before')");
+        }
+        CountDownLatch firstSelectCompleted = new CountDownLatch(1);
+        CountDownLatch commitCompleted = new CountDownLatch(1);
+
+        try (SqliteReadExecutor reads = new SqliteReadExecutor(connections)) {
+            var result = reads.execute(command(
+                    PersistenceReadPriority.GAMEPLAY_CRITICAL,
+                    connection -> {
+                        String first = readSnapshotValue(connection);
+                        firstSelectCompleted.countDown();
+                        assertTrue(commitCompleted.await(1, TimeUnit.SECONDS));
+                        String second = readSnapshotValue(connection);
+                        return PersistenceReadResult.found(
+                                first + ":" + second, 0
+                        );
+                    }
+            ));
+            assertTrue(firstSelectCompleted.await(1, TimeUnit.SECONDS));
+            try (Connection connection = connections.openWriterConnection();
+                 Statement statement = connection.createStatement()) {
+                statement.executeUpdate(
+                        "UPDATE snapshot_value SET value = 'after'"
+                );
+            }
+            commitCompleted.countDown();
+
+            PersistenceReadResult.Found<String> found = assertInstanceOf(
+                    PersistenceReadResult.Found.class,
+                    await(result)
+            );
+            assertEquals("before:before", found.value());
         }
     }
 
@@ -194,6 +236,17 @@ class SqliteReadExecutorTest {
     private SqliteReadCommand<String> command(PersistenceReadPriority priority,
                                               SqliteReadWork<String> work) {
         return new SqliteReadCommand<>(TEST_READ, priority, work);
+    }
+
+    private static String readSnapshotValue(Connection connection)
+            throws SQLException {
+        try (Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery(
+                     "SELECT value FROM snapshot_value"
+             )) {
+            assertTrue(rows.next());
+            return rows.getString(1);
+        }
     }
 
     private static <T> PersistenceReadResult<T> await(

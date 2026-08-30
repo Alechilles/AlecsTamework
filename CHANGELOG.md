@@ -6,6 +6,9 @@
 
 - Corrected the embedded Alec's Telemetry version metadata. Tamework now
   reports the concrete runtime version `1.2.3` in shaded builds.
+- Persistence reads now use one consistent SQLite snapshot. Concurrent coop
+  capture or release no longer causes a false profile mismatch that disables
+  other companion capture and release actions until restart.
 
 ## 3.3.0 - Public API and Husbandry Runtime Update - 2026-08-30
 
