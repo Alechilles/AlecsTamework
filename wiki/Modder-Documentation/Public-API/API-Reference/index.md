@@ -12,7 +12,7 @@ This subsection contains the reference contract for each public API family.
 
 > **Stable API Contract (`2.0.0`)**
 > Reference pages describe the supported public contract that ships with
-> Tamework 3.2.4.
+> Tamework 3.3.0.
 
 ## Child Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
