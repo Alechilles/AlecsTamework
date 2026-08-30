@@ -213,7 +213,7 @@ specific to each NPC.
 - `HookTargetZ`
 
 ## NPC Entity Filter Builder IDs
-- `TameworkAttitudeFromTargetSlot`
+- `TameworkAttitudeFromTargetSlot` (checks a candidate NPC's attitude toward a marked target slot)
 - `TameworkAttackedTargetSlotRecently`
 
 ## Runtime ECS Components

@@ -36,7 +36,7 @@ Use this page when you need the shared building blocks rather than one specific 
 - `TameworkEffectActive`
 - `TameworkNeedBelow`
 - `TameworkNeedsResourceTarget`
-- `TameworkAttitudeFromTargetSlot`
+- `TameworkAttitudeFromTargetSlot` (checks a candidate NPC's attitude toward a marked target slot)
 - `TameworkAttackedTargetSlotRecently`
 
 ## Core runtime components

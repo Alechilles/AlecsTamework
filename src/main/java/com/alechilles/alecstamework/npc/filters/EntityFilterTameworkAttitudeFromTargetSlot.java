@@ -6,6 +6,7 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.asset.type.attitude.Attitude;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.MarkedEntitySupport;
 import com.hypixel.hytale.server.npc.role.support.WorldSupport;
@@ -14,7 +15,7 @@ import java.util.EnumSet;
 import javax.annotation.Nonnull;
 
 /**
- * Entity filter that checks attitude from a marked target slot toward the candidate target.
+ * Entity filter that checks a candidate NPC's attitude toward a marked target slot.
  */
 public final class EntityFilterTameworkAttitudeFromTargetSlot extends TameworkEntityFilterBase {
     public static final String TYPE = "TameworkAttitudeFromTargetSlot";
@@ -43,25 +44,20 @@ public final class EntityFilterTameworkAttitudeFromTargetSlot extends TameworkEn
         if (sourceRef == null || !sourceRef.isValid()) {
             return false;
         }
-        WorldSupport worldSupport = NpcSupportAccess.world(role, ref, store);
+        NPCEntity targetNpc = store.getComponent(targetRef, NPCEntity.getComponentType());
+        Role targetRole = targetNpc != null ? targetNpc.getRole() : null;
+        WorldSupport worldSupport = NpcSupportAccess.world(targetRole, targetRef, store);
         if (worldSupport == null) {
             return false;
         }
-        Attitude attitude = worldSupport.getAttitude(sourceRef, targetRef, store);
+        worldSupport.requireAttitudeCache();
+        Attitude attitude = worldSupport.getAttitude(targetRef, sourceRef, store);
         return attitude != null && attitudes.contains(attitude);
     }
 
     @Override
     public int cost() {
         return 0;
-    }
-
-    @Override
-    public void registerWithSupport(@Nonnull Role role) {
-        WorldSupport worldSupport = NpcSupportAccess.world(role);
-        if (worldSupport != null) {
-            worldSupport.requireAttitudeCache();
-        }
     }
 
     private Ref<EntityStore> resolveSourceRef(@Nonnull Ref<EntityStore> selfRef,

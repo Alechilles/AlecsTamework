@@ -36,13 +36,13 @@ public final class BuilderEntityFilterTameworkAttitudeFromTargetSlot extends Bui
     @Nonnull
     @Override
     public String getShortDescription() {
-        return "Matches when the source target slot is hostile to the candidate.";
+        return "Matches when the candidate has a selected attitude toward the source target slot.";
     }
 
     @Nonnull
     @Override
     public String getLongDescription() {
-        return "Checks the attitude from a marked target slot (for example MasterTarget) toward the candidate target.";
+        return "Checks a candidate NPC's attitude toward a marked target slot (for example MasterTarget).";
     }
 
     @Nonnull
@@ -61,7 +61,7 @@ public final class BuilderEntityFilterTameworkAttitudeFromTargetSlot extends Bui
                 "MasterTarget",
                 StringNullOrNotEmptyValidator.get(),
                 BuilderDescriptorState.Stable,
-                "Target slot used as the source attitude entity.",
+                "Target slot used as the attitude target.",
                 null
         );
         this.requireEnumSet(
@@ -70,7 +70,7 @@ public final class BuilderEntityFilterTameworkAttitudeFromTargetSlot extends Bui
                 this.attitudes,
                 Attitude.class,
                 BuilderDescriptorState.Stable,
-                "Attitudes from the source entity to the candidate that should pass.",
+                "Candidate attitudes toward the marked entity that should pass.",
                 null
         );
         this.getBoolean(

@@ -39,6 +39,9 @@
 
 ### Fixed
 
+- Companion attack and defend sensors no longer remove the companion when the
+  marked owner is a player. Threat checks now use the candidate NPC's attitude
+  toward the owner.
 - Revive-ready updates now correlate replacement death snapshots with the
   current lifecycle revision. Interrupted updates no longer block Tamework
   startup because of a stale snapshot revision.

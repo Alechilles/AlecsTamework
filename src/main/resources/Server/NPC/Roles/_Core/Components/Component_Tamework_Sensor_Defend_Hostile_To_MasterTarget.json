@@ -26,11 +26,11 @@
       "Value": [
         "Hostile"
       ],
-      "Description": "Attitudes from MasterTarget to a candidate that should be considered defend threats."
+      "Description": "Candidate NPC attitudes toward MasterTarget that should be considered defend threats."
     },
     "SourceTargetSlot": {
       "Value": "MasterTarget",
-      "Description": "Marked target slot used as the source for attitude checks."
+      "Description": "Marked target slot used as the target for attitude checks."
     },
     "ExcludeGroups": {
       "Value": [],
