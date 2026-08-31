@@ -137,7 +137,6 @@ import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
 import com.alechilles.alecstamework.localization.ModLanguageDiscovery;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.metrics.CrashTelemetryService;
-import com.alechilles.alecstamework.metrics.BondedCompanionPersistenceTelemetry;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.metrics.TameworkHStatsIntegration;
 import com.alechilles.alecstamework.runtime.activation.TameworkReloadTopologyReport;
@@ -313,7 +312,7 @@ public class Tamework extends JavaPlugin {
     private Runnable runtimeServiceInitializer;
     private TameworkPersistenceActivationEvidence genericPersistenceActivationEvidence;
     private TameworkPersistenceActivationEvidence bondedPersistenceActivationEvidence;
-    private CrashTelemetryService crashTelemetryService;
+    private TameworkDiagnosticRuntime diagnosticRuntime;
     private final TameworkTelemetryEvents telemetryEvents = new TameworkTelemetryEvents();
     private TameworkSettingsAnnouncementService settingsAnnouncementService;
     private final SpawnBeaconVisualizationService spawnBeaconVisualizationService =
@@ -638,17 +637,26 @@ public class Tamework extends JavaPlugin {
         runtimeDataDirectory = new TameworkDataPathService(getLogger())
                 .resolveAndInitializeDataPathLayout(getDataDirectory())
                 .targetDirectory();
+        if (diagnosticRuntime != null) {
+            diagnosticRuntime.preparePersistence(runtimeDataDirectory);
+        }
         bondedCompanionComposition = TameworkBondedCompanionComposition.openIfActive(
                 runtimeDataDirectory,
                 bondedCompanionRosterRegistry,
                 getLogger(),
                 System::currentTimeMillis,
                 apiEventBus::publishPersistenceEvent,
-                BondedCompanionPersistenceTelemetry::recordRuntimeFailure,
+                diagnosticRuntime == null
+                        ? null : diagnosticRuntime::onBondedFailure,
                 runtimeStartupPlan,
                 bondedPersistenceActivationEvidence
         );
         if (bondedCompanionComposition != null) {
+        if (diagnosticRuntime != null) {
+            diagnosticRuntime.useBondedExporter(
+                    bondedCompanionComposition.diagnostics()
+            );
+        }
         runtimeStartupDiagnostics.recordDatabaseOpen(TameworkRuntimeModule.BONDED_PERSISTENCE);
         deferEntitySystem(TameworkRuntimeModule.BONDED_PERSISTENCE,
                 "bonded-companion-maintenance",
@@ -701,7 +709,11 @@ public class Tamework extends JavaPlugin {
                     populationGroupConfigRegistry,
                     runtimeStartupPlan,
                     genericPersistenceActivationEvidence,
-                    runtimeParticipants
+                    runtimeParticipants,
+                    diagnosticRuntime == null
+                            ? ignored -> { } : diagnosticRuntime.failureSink(),
+                    diagnosticRuntime == null
+                            ? ignored -> { } : diagnosticRuntime::useExporter
             );
             if (persistenceComposition == null) {
                 if (runtimeStartupPlan.isActive(TameworkRuntimeModule.GENERIC_PERSISTENCE)) {
@@ -1383,8 +1395,8 @@ public class Tamework extends JavaPlugin {
                             .detail("Tamework plugin start duration.")
                             .build()
             );
-            if (crashTelemetryService != null) {
-                crashTelemetryService.recordBreadcrumb("lifecycle", "Tamework start completed.");
+            if (diagnosticRuntime != null) {
+                diagnosticRuntime.recordStartCompleted();
             }
         } catch (Throwable throwable) {
             int durationMs = telemetryEvents.elapsedMillis(startedAtNanos);
@@ -1421,7 +1433,9 @@ public class Tamework extends JavaPlugin {
                             .detail("Tamework startInternal threw an exception.")
                             .build()
             );
-            captureStartFailure(throwable);
+            if (diagnosticRuntime != null) {
+                diagnosticRuntime.captureStartFailure(throwable);
+            }
             throw throwable;
         }
     }
@@ -1429,7 +1443,7 @@ public class Tamework extends JavaPlugin {
     private void startInternal() {
         prepareRuntimeActivation();
         if (runtimeStartupPlan.isActive(TameworkRuntimeModule.CORE_OWNERSHIP)) {
-            initializeCrashTelemetry();
+            diagnosticRuntime = TameworkDiagnosticRuntime.create(this);
         }
         TameworkActiveAssetInitializer.initialize(
                 runtimeStartupPlan,
@@ -1451,9 +1465,9 @@ public class Tamework extends JavaPlugin {
             initializeOverridesForLoadedWorlds();
         }
         getLogger().at(Level.INFO).log("Alec's Tamework! has been enabled!");
-        if (crashTelemetryService != null
+        if (diagnosticRuntime != null
                 && runtimeStartupPlan.isActive(TameworkRuntimeModule.CORE_OWNERSHIP)) {
-            crashTelemetryService.start();
+            diagnosticRuntime.start();
         }
         if (assetEditorPackService != null
                 && runtimeStartupPlan.isActive(TameworkRuntimeModule.CORE_OWNERSHIP)) {
@@ -1563,12 +1577,16 @@ public class Tamework extends JavaPlugin {
                 this::closeApiComposition);
         simpleClaimsCapabilityRuntime.close();
         api = null;
-        closeBondedCompanions();
         if (commandNpcRelocationService != null) {
             commandNpcRelocationService.close();
             commandNpcRelocationService = null;
         }
         shutdownPersistence();
+        closeBondedCompanions();
+        if (diagnosticRuntime != null) {
+            diagnosticRuntime.close();
+            diagnosticRuntime = null;
+        }
         if (companionXpLegacyAdapter != null) {
             try {
                 companionXpLegacyAdapter.close();
@@ -1589,7 +1607,6 @@ public class Tamework extends JavaPlugin {
         runtimeDataDirectory = null;
         apiSelfTestFixtureManager = null;
         apiSelfTestRunner = null;
-        crashTelemetryService = null;
         settingsAnnouncementService = null;
         runtimeActivationState = null;
         getLogger().at(Level.INFO).log("Alec's Tamework! has been disabled!");
@@ -1624,9 +1641,6 @@ public class Tamework extends JavaPlugin {
         if (hStatsIntegration != null) {
             hStatsIntegration.close();
             hStatsIntegration = null;
-        }
-        if (crashTelemetryService != null) {
-            crashTelemetryService.shutdown();
         }
         if (companionXpEventDebugLogService != null) {
             companionXpEventDebugLogService.close();
@@ -1672,32 +1686,10 @@ public class Tamework extends JavaPlugin {
         persistenceBootstrap = null;
     }
 
-    private void initializeCrashTelemetry() {
-        if (crashTelemetryService != null) {
-            return;
-        }
-        try {
-            crashTelemetryService = CrashTelemetryService.create(this);
-        } catch (Exception ex) {
-            getLogger().at(Level.WARNING).withCause(ex)
-                    .log("Failed to initialize Tamework embedded telemetry; continuing without telemetry.");
-        }
-    }
-
-    private void captureStartFailure(@Nullable Throwable throwable) {
-        if (crashTelemetryService == null || throwable == null) {
-            return;
-        }
-        crashTelemetryService.captureStartFailure(throwable);
-    }
-
     private void onWorldRemovedForCrashTelemetry(@Nonnull RemoveWorldEvent event) {
-        if (event == null
-                || event.getRemovalReason() != RemoveWorldEvent.RemovalReason.EXCEPTIONAL
-                || crashTelemetryService == null) {
-            return;
+        if (diagnosticRuntime != null) {
+            diagnosticRuntime.captureExceptionalWorldRemoval(event);
         }
-        crashTelemetryService.captureExceptionalWorldRemoval(event.getWorld(), event.getRemovalReason());
     }
 
     private void onWorldRemovedForProgressionTiming(@Nonnull RemoveWorldEvent event) {
@@ -1856,7 +1848,7 @@ public class Tamework extends JavaPlugin {
 
     @Nullable
     public CrashTelemetryService getCrashTelemetryService() {
-        return crashTelemetryService;
+        return diagnosticRuntime == null ? null : diagnosticRuntime.telemetry();
     }
 
     @Nonnull
@@ -2173,12 +2165,15 @@ public class Tamework extends JavaPlugin {
     /** Keeps the isolated bonded authority reachable after generic startup aborts. */
     private void activateBondedOnlyFallback(RuntimeException failure) {
         api = new BondedOnlyTameworkApi(bondedCompanionComposition.api());
+        PersistenceDiagnosticExporter exporter = diagnosticRuntime == null
+                ? PersistenceDiagnosticExporter.bondedOnly(
+                        runtimeDataDirectory,
+                        bondedCompanionComposition.diagnostics()
+                )
+                : diagnosticRuntime.useBondedExporter(
+                        bondedCompanionComposition.diagnostics()
+                );
         if (getCommandRegistry() != null) {
-            PersistenceDiagnosticExporter exporter =
-                    PersistenceDiagnosticExporter.bondedOnly(
-                            runtimeDataDirectory,
-                            bondedCompanionComposition.diagnostics()
-                    );
             getCommandRegistry().registerCommand(new TameworkCommandRoot(
                     null,
                     exporter,
