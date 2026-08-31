@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.4.0 - Automatic Persistence Diagnostics - 2026-08-30
+## 3.4.0 - Persistence Diagnostics and Schema Compatibility - 2026-08-31
 
 ### Added
 
