@@ -25,6 +25,9 @@ Status and detail actions are read-only. `export` writes a bounded, redacted
 support ZIP without changing persistence state. Every response line is sent to
 the command caller and written to the server log. This includes the export
 bundle path.
+`/tw debug persistence simulateerror` is also console-safe. It sends one
+synthetic failure through the real automatic diagnostic path and prints a
+unique token. It does not read or change the SQLite database.
 
 Commands that operate on a world but not a player use Hytale's optional world
 argument. Console callers must provide the target world for `/tw reloadconfig`,
@@ -118,6 +121,9 @@ player-scoped. In particular, `/tw config`, `/tw settings`, `/tw news`,
   settings, or disable Error events in `/telemetry consent`, to opt out. A
   disabled or failed local submission stays eligible when the same failure
   classification occurs again.
+- Use `/tw debug persistence simulateerror` to test this path without causing a
+  real persistence failure. Run `/tw debug telemetry crash flush`, then find
+  the printed token in the diagnostic `reason` attribute in Alec's Telemetry.
 - The automatic ZIP excludes the SQLite database, save data, player identity,
   coordinates, inventory payloads, secrets, exception messages, and unrestricted
   logs. Alec's Telemetry treats the ZIP as opaque evidence.

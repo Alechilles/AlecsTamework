@@ -8,7 +8,9 @@ import com.alechilles.alecstamework.persistence.diagnostics
         .BondedCompanionDiagnosticContributor;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceOperations;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceQueries;
+import com.alechilles.alecstamework.persistence.runtime.PersistenceFailureSignal;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractCommandCollection;
+import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -91,6 +93,26 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
             @Nullable PublicPersistenceQueries persistenceQueries,
             @Nullable PublicPersistenceOperations persistenceOperations
     ) {
+        this(
+                persistenceDiagnostics,
+                persistenceExporter,
+                bondedDiagnostics,
+                spawnBeaconVisualizationService,
+                persistenceQueries,
+                persistenceOperations,
+                null
+        );
+    }
+
+    public TameworkCommandRoot(
+            @Nullable PersistenceDiagnosticsReader persistenceDiagnostics,
+            @Nullable PersistenceDiagnosticExporter persistenceExporter,
+            @Nullable BondedCompanionDiagnosticContributor bondedDiagnostics,
+            @Nonnull SpawnBeaconVisualizationService spawnBeaconVisualizationService,
+            @Nullable PublicPersistenceQueries persistenceQueries,
+            @Nullable PublicPersistenceOperations persistenceOperations,
+            @Nullable Consumer<PersistenceFailureSignal> persistenceFailureSink
+    ) {
         super("tw", "Tamework commands.");
         requirePermission(ROOT_PERMISSION);
         setPermissionGroups(TameworkConfigPermission.adminPermissionGroups());
@@ -100,7 +122,8 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
                 bondedDiagnostics,
                 spawnBeaconVisualizationService,
                 persistenceQueries,
-                persistenceOperations
+                persistenceOperations,
+                persistenceFailureSink
         ));
         addSubCommand(new TameworkNpcCommand());
         addSubCommand(new TameworkApiCommandCollection());

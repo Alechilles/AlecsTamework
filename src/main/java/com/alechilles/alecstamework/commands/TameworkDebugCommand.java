@@ -5,8 +5,10 @@ import com.alechilles.alecstamework.persistence.diagnostics.PersistenceDiagnosti
 import com.alechilles.alecstamework.persistence.runtime.PersistenceDiagnosticsReader;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceOperations;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceQueries;
+import com.alechilles.alecstamework.persistence.runtime.PersistenceFailureSignal;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractCommandCollection;
 import javax.annotation.Nullable;
+import java.util.function.Consumer;
 
 /**
  * Groups Tamework's developer-facing NPC inspection and mutation commands.
@@ -18,7 +20,8 @@ public final class TameworkDebugCommand extends AbstractCommandCollection {
             BondedCompanionDiagnosticContributor bondedDiagnostics,
             SpawnBeaconVisualizationService spawnBeaconVisualizationService,
             @Nullable PublicPersistenceQueries persistenceQueries,
-            @Nullable PublicPersistenceOperations persistenceOperations
+            @Nullable PublicPersistenceOperations persistenceOperations,
+            @Nullable Consumer<PersistenceFailureSignal> persistenceFailureSink
     ) {
         super("debug", "Tamework debug commands.");
         addSubCommand(new TameworkDebugSetCommand());
@@ -31,7 +34,8 @@ public final class TameworkDebugCommand extends AbstractCommandCollection {
                 persistenceExporter,
                 bondedDiagnostics,
                 persistenceQueries,
-                persistenceOperations
+                persistenceOperations,
+                persistenceFailureSink
         ));
         addSubCommand(new TameworkDebugAvatarCommand());
     }

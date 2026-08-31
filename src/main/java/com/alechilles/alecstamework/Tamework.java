@@ -34,7 +34,6 @@ import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceRecoverySystem;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightStaleOwnerRecoveryRegistry;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceVisibilitySystem;
-import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.commands.SpawnBeaconVisualizationService;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
@@ -1476,15 +1475,12 @@ public class Tamework extends JavaPlugin {
 
     private void registerCommandRoot() {
         if (getCommandRegistry() != null) {
-            getCommandRegistry().registerCommand(new TameworkCommandRoot(
-                    persistenceComposition == null ? null : persistenceComposition.diagnosticsReader(),
-                    persistenceComposition == null ? null : persistenceComposition.diagnosticsExporter(),
-                    bondedCompanionComposition == null ? null : bondedCompanionComposition.diagnostics(),
+            getCommandRegistry().registerCommand(TameworkCommandRootFactory.create(
+                    persistenceComposition,
+                    bondedCompanionComposition,
                     spawnBeaconVisualizationService,
-                    persistenceComposition == null
-                            ? null : persistenceComposition.facades().queries(),
-                    persistenceComposition == null
-                            ? null : persistenceComposition.facades().operations()
+                    diagnosticRuntime == null
+                            ? null : diagnosticRuntime.failureSink()
             ));
         }
     }
@@ -2171,14 +2167,14 @@ public class Tamework extends JavaPlugin {
                 )
                 : diagnosticRuntime.useBondedExporter(
                         bondedCompanionComposition.diagnostics()
-                );
+        );
         if (getCommandRegistry() != null) {
-            getCommandRegistry().registerCommand(new TameworkCommandRoot(
-                    null,
+            getCommandRegistry().registerCommand(TameworkCommandRootFactory.bondedOnly(
                     exporter,
-                    bondedCompanionComposition.diagnostics(),
+                    bondedCompanionComposition,
                     spawnBeaconVisualizationService,
-                    null
+                    diagnosticRuntime == null
+                            ? null : diagnosticRuntime.failureSink()
             ));
         }
         getLogger().at(Level.SEVERE).withCause(failure).log(

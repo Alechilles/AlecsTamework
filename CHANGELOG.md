@@ -8,6 +8,8 @@
   bounded, redacted debug database package with the error classification.
   This includes generic and bonded persistence startup, read, write,
   checkpoint, runtime, and shutdown failures.
+- Added `/tw debug persistence simulateerror` for a harmless, console-safe
+  end-to-end diagnostic test. It does not change persistence data.
 
 ### Changed
 
