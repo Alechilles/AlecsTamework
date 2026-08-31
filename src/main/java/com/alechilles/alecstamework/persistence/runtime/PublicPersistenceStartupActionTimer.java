@@ -37,12 +37,13 @@ final class PublicPersistenceStartupActionTimer {
                 );
                 return null;
             }
-            return result.whenComplete((ignored, failure) ->
-                    metrics.startupNodeTimed(
-                            node, elapsed(started)
-                    ));
+            return result.whenComplete((ignored, failure) -> {
+                metrics.startupNodeTimed(node, elapsed(started));
+                if (failure != null) metrics.startupNodeFailed(node, failure);
+            });
         } catch (RuntimeException | Error failure) {
             metrics.startupNodeTimed(node, elapsed(started));
+            metrics.startupNodeFailed(node, failure);
             throw failure;
         }
     }

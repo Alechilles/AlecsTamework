@@ -23,7 +23,8 @@ public record PublicPersistenceRuntimeConfiguration(
         @Nonnull ReplacementPublicApiEventSink publicEventSink,
         @Nonnull PublicPersistenceLiveBoundaries liveBoundaries,
         @Nonnull PublicPersistenceWorldReconciliationFactory worldReconciliationFactory,
-        @Nonnull Duration shutdownTimeout
+        @Nonnull Duration shutdownTimeout,
+        @Nonnull Consumer<PersistenceFailureSignal> failureSink
 ) {
     public PublicPersistenceRuntimeConfiguration {
         if (dataDirectory == null || persistenceSourceDirectories == null
@@ -34,7 +35,7 @@ public record PublicPersistenceRuntimeConfiguration(
                 || publicEventSink == null
                 || liveBoundaries == null || worldReconciliationFactory == null
                 || shutdownTimeout == null || shutdownTimeout.isNegative()
-                || shutdownTimeout.isZero()) {
+                || shutdownTimeout.isZero() || failureSink == null) {
             throw new IllegalArgumentException(
                     "Complete public persistence runtime configuration is required"
             );
@@ -46,6 +47,26 @@ public record PublicPersistenceRuntimeConfiguration(
                 normalizedSources.add(path.toAbsolutePath().normalize()));
         persistenceSourceDirectories = List.copyOf(normalizedSources);
         workerId = workerId.trim();
+    }
+
+    /** Compatibility constructor with no automatic failure consumer. */
+    public PublicPersistenceRuntimeConfiguration(
+            Path dataDirectory,
+            List<Path> persistenceSourceDirectories,
+            String workerId,
+            LongSupplier clock,
+            RefundDeliveryBoundary refunds,
+            Consumer<NpcProfileChangedEvent> profileListener,
+            ReplacementPublicApiEventSink publicEventSink,
+            PublicPersistenceLiveBoundaries liveBoundaries,
+            PublicPersistenceWorldReconciliationFactory worldReconciliationFactory,
+            Duration shutdownTimeout
+    ) {
+        this(
+                dataDirectory, persistenceSourceDirectories, workerId, clock,
+                refunds, profileListener, publicEventSink, liveBoundaries,
+                worldReconciliationFactory, shutdownTimeout, ignored -> { }
+        );
     }
 
     /**

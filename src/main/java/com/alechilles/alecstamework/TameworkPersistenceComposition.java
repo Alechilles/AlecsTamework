@@ -64,6 +64,8 @@ import com.alechilles.alecstamework.persistence.runtime
 import com.alechilles.alecstamework.persistence.runtime
         .PersistenceDomainFacades;
 import com.alechilles.alecstamework.persistence.runtime
+        .PersistenceFailureSignal;
+import com.alechilles.alecstamework.persistence.runtime
         .PublicPersistenceRuntimeConfiguration;
 import com.alechilles.alecstamework.persistence.runtime
         .PublicPersistenceShutdownReport;
@@ -86,6 +88,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -185,7 +188,9 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 populationGroups,
                 null,
                 null,
-                null
+                null,
+                ignored -> { },
+                ignored -> { }
         );
     }
 
@@ -206,7 +211,9 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             @Nonnull PopulationGroupConfigRegistry populationGroups,
             @Nonnull TameworkRuntimeActivationPlan activationPlan,
             @Nonnull TameworkPersistenceActivationEvidence activationEvidence,
-            @Nonnull TameworkRuntimeParticipantRegistry runtimeParticipants
+            @Nonnull TameworkRuntimeParticipantRegistry runtimeParticipants,
+            @Nonnull Consumer<PersistenceFailureSignal> failureSink,
+            @Nonnull Consumer<PersistenceDiagnosticExporter> exporterReady
     ) {
         if (!TameworkPersistenceActivationGate.shouldConstruct(
                 activationPlan,
@@ -224,7 +231,9 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 populationGroups,
                 activationPlan,
                 activationEvidence,
-                runtimeParticipants
+                runtimeParticipants,
+                failureSink,
+                exporterReady
         );
     }
 
@@ -237,7 +246,9 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             @Nonnull PopulationGroupConfigRegistry populationGroups,
             @Nullable TameworkRuntimeActivationPlan activationPlan,
             @Nullable TameworkPersistenceActivationEvidence activationEvidence,
-            @Nullable TameworkRuntimeParticipantRegistry runtimeParticipants
+            @Nullable TameworkRuntimeParticipantRegistry runtimeParticipants,
+            @Nonnull Consumer<PersistenceFailureSignal> failureSink,
+            @Nonnull Consumer<PersistenceDiagnosticExporter> exporterReady
     ) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(components, "components");
@@ -263,7 +274,9 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 populationGroups,
                 activationPlan,
                 activationEvidence,
-                runtimeParticipants
+                runtimeParticipants,
+                failureSink,
+                exporterReady
         );
         AtomicBoolean startupWorldsLoaded = new AtomicBoolean();
         Runnable startWorldRegistration = () -> TameworkEventRegistrationSupport.registerGlobal(
@@ -353,7 +366,9 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 populationGroups,
                 null,
                 null,
-                null
+                null,
+                ignored -> { },
+                ignored -> { }
         );
     }
 
@@ -386,7 +401,9 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             @Nonnull PopulationGroupConfigRegistry populationGroups,
             @Nullable TameworkRuntimeActivationPlan activationPlan,
             @Nullable TameworkPersistenceActivationEvidence activationEvidence,
-            @Nullable TameworkRuntimeParticipantRegistry runtimeParticipants
+            @Nullable TameworkRuntimeParticipantRegistry runtimeParticipants,
+            @Nonnull Consumer<PersistenceFailureSignal> failureSink,
+            @Nonnull Consumer<PersistenceDiagnosticExporter> exporterReady
     ) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(pluginDataDirectory, "pluginDataDirectory");
@@ -408,9 +425,16 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                         coopReceipts,
                         retirement,
                         inventoryReceipts,
-                        breedingAdmissions
+                        breedingAdmissions,
+                        failureSink
                 )
         );
+        PersistenceDiagnosticExporter diagnosticsExporter =
+                new PersistenceDiagnosticExporter(
+                        paths.targetDirectory(),
+                        bootstrap.diagnosticsReader()
+                );
+        exporterReady.accept(diagnosticsExporter);
         PersistenceDomainFacades facades = bootstrap.facades();
         TameworkRestoredFeatureComposition restoredFeatures;
         try {
@@ -452,11 +476,6 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 .toCompletableFuture()
                 .join();
         requireProjectionsBuilt(initial, bootstrap);
-        PersistenceDiagnosticExporter diagnosticsExporter =
-                new PersistenceDiagnosticExporter(
-                        paths.targetDirectory(),
-                        bootstrap.diagnosticsReader()
-                );
         TameworkPersistenceAuthors.Bundle authors =
                 TameworkPersistenceAuthors.create(
                         logger,
@@ -503,7 +522,8 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                     retirement,
             ComponentType<EntityStore, TameworkInventoryOperationReceiptsComponent>
                     inventoryReceipts,
-            AtomicReference<ManagedBatchAdmissionAuthority> breedingAdmissions
+            AtomicReference<ManagedBatchAdmissionAuthority> breedingAdmissions,
+            Consumer<PersistenceFailureSignal> failureSink
     ) {
         return new PublicPersistenceRuntimeConfiguration(
                 paths.targetDirectory(),
@@ -525,7 +545,8 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                         identityIndex,
                         System::currentTimeMillis
                 ),
-                SHUTDOWN_TIMEOUT
+                SHUTDOWN_TIMEOUT,
+                failureSink
         );
     }
 

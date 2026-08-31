@@ -107,6 +107,20 @@ player-scoped. In particular, `/tw config`, `/tw settings`, `/tw news`,
   status, counters, and durable diagnostic summaries. It excludes the SQLite
   database, save data, player identities, coordinates, inventory payloads,
   secrets, and unrestricted logs.
+- When Tamework telemetry is enabled, a terminal persistence error creates the
+  automatic evidence in memory and sends it to Alec's Telemetry as a diagnostic
+  bundle. The report includes a safe error classification and a ZIP of at most
+  512 KiB. It does not write a local export file. Its status data uses a strict
+  allowlist and omits the durable detail snapshot from the manual export.
+- Automatic diagnostics cover generic and bonded persistence. They run on a
+  separate bounded worker and cannot change a read, write, startup, checkpoint,
+  or shutdown result. Set `telemetry.enabled` to `false` in Tamework's global
+  settings, or disable Error events in `/telemetry consent`, to opt out. A
+  disabled or failed local submission stays eligible when the same failure
+  classification occurs again.
+- The automatic ZIP excludes the SQLite database, save data, player identity,
+  coordinates, inventory payloads, secrets, exception messages, and unrestricted
+  logs. Alec's Telemetry treats the ZIP as opaque evidence.
 
 ## Needs/resource seek troubleshooting
 - Confirm seek sensor/action components are in the role/template:

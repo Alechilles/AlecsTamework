@@ -1,15 +1,27 @@
 package com.alechilles.alecstamework.persistence.diagnostics;
 
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureId;
+import com.alechilles.alecstamework.persistence.control.PersistenceEngineLineage;
+import com.alechilles.alecstamework.persistence.control.PersistenceReadinessLevel;
+import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
+import com.alechilles.alecstamework.persistence.control.PersistenceStartupReport;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Instant;
 import java.util.Map;
 import java.util.LinkedHashMap;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
+import java.util.Random;
+import java.io.ByteArrayInputStream;
+import java.util.zip.ZipInputStream;
 import java.util.zip.ZipFile;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceThroughputSnapshot;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceMetricsSnapshot;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceOperationalStatus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -23,6 +35,112 @@ class PersistenceDiagnosticExporterTest {
 
     @TempDir
     java.nio.file.Path temporaryDirectory;
+
+    @Test
+    void failurePackageStillExistsWhenDatabaseEvidenceIsUnavailable()
+            throws Exception {
+        PersistenceDiagnosticExporter.FailurePackage result =
+                PersistenceDiagnosticExporter.buildFailurePackage(
+                        new PersistenceFailureContext(
+                                "persistence_write_failed",
+                                "incident-1",
+                                "SAVE_PROFILE",
+                                "final_write",
+                                "sqlite_failure",
+                                new IllegalStateException("sensitive message")
+                        ),
+                        524_288,
+                        Map.of()
+                );
+
+        Map<String, String> members = zipMembers(result.content());
+        assertTrue(members.containsKey("failure.json"));
+        assertTrue(members.containsKey("manifest.json"));
+        assertFalse(members.get("failure.json").contains("sensitive message"));
+        assertTrue(members.get("failure.json").contains("IllegalStateException"));
+    }
+
+    @Test
+    void automaticStatusOmitsFreeTextAndLocalPaths() {
+        EnumMap<PersistenceStartupNode,
+                PublicPersistenceOperationalStatus.NodeState> nodes =
+                new EnumMap<>(PersistenceStartupNode.class);
+        for (PersistenceStartupNode node : PersistenceStartupNode.values()) {
+            nodes.put(node, PublicPersistenceOperationalStatus.NodeState.PENDING);
+        }
+        PublicPersistenceOperationalStatus status =
+                new PublicPersistenceOperationalStatus(
+                        PersistenceEngineLineage.REPLACEMENT,
+                        temporaryDirectory.resolve("secret-data-path"),
+                        Optional.of(temporaryDirectory.resolve("secret.db")),
+                        Optional.empty(),
+                        OptionalInt.empty(),
+                        PublicPersistenceOperationalStatus.StorageMode.STARTING,
+                        new PersistenceStartupReport(
+                                Set.of(), null, null,
+                                PersistenceStartupNode.OPEN_TARGET,
+                                "secret-token-message",
+                                PersistenceReadinessLevel.GLOBAL_READ_ONLY
+                        ),
+                        nodes,
+                        new PublicPersistenceOperationalStatus.CheckpointEvidence(
+                                PublicPersistenceOperationalStatus
+                                        .CheckpointEvidence.Status.NOT_ATTEMPTED,
+                                0, 0, null
+                        ),
+                        List.of("open secret-data-path to repair")
+                );
+
+        String json = PersistenceDiagnosticExporter
+                .automaticStatusJson(status).toString();
+
+        assertFalse(json.contains("secret-token-message"));
+        assertFalse(json.contains("secret-data-path"));
+        assertFalse(json.contains("secret.db"));
+        assertFalse(json.contains("guidance"));
+        assertTrue(json.contains("GLOBAL_READ_ONLY"));
+    }
+
+    @Test
+    void failurePackageDropsDetailBeforeEssentialEvidence() throws Exception {
+        byte[] detail = new byte[200_000];
+        new Random(7L).nextBytes(detail);
+        Map<String, byte[]> evidence = new LinkedHashMap<>();
+        evidence.put("operational-status.json", "{}".getBytes(StandardCharsets.UTF_8));
+        evidence.put("metrics.json", "{}".getBytes(StandardCharsets.UTF_8));
+        evidence.put("diagnostic-detail.json", detail);
+
+        PersistenceDiagnosticExporter.FailurePackage result =
+                PersistenceDiagnosticExporter.buildFailurePackage(
+                        new PersistenceFailureContext(
+                                "persistence_read_failed",
+                                "incident-2",
+                                "READ_PROFILE",
+                                "read",
+                                "read_failed",
+                                null
+                        ),
+                        32_000,
+                        evidence
+                );
+
+        Map<String, String> members = zipMembers(result.content());
+        assertTrue(result.content().length <= 32_000);
+        assertTrue(members.containsKey("failure.json"));
+        assertTrue(members.containsKey("operational-status.json"));
+        assertTrue(members.containsKey("metrics.json"));
+        assertFalse(members.containsKey("diagnostic-detail.json"));
+    }
+
+    private static Map<String, String> zipMembers(byte[] content) throws Exception {
+        LinkedHashMap<String, String> members = new LinkedHashMap<>();
+        try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(content))) {
+            for (var entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
+                members.put(entry.getName(), new String(zip.readAllBytes(), StandardCharsets.UTF_8));
+            }
+        }
+        return Map.copyOf(members);
+    }
 
     @Test
     void bundleContainsOnlyManifestAndSuppliedSanitizedMembers()

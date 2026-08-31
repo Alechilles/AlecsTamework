@@ -63,7 +63,9 @@ final class PublicPersistenceRuntimeState {
         this.configuration = configuration;
         this.registry = registry;
         this.workflows = workflows;
-        control = new PublicPersistenceControlPlane(registry);
+        control = new PublicPersistenceControlPlane(
+                registry, configuration.failureSink()
+        );
         targets = new PublicPersistenceTargetOpener(configuration.clock());
         operations = new PublicPersistenceOperations(
                 this::requireMutationAdapter,
