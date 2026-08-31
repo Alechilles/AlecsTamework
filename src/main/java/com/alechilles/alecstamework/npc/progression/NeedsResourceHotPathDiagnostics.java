@@ -8,8 +8,9 @@ import java.util.logging.Logger;
 /**
  * Collects optional aggregate diagnostics for needs-resource hot paths.
  *
- * <p>The disabled path is one volatile branch. Enabled diagnostics emit one
- * summary at most every 30 seconds and never log per NPC.</p>
+ * <p>The disabled path is one volatile branch. The explicit needs-seek debug
+ * channel enables collection. Enabled diagnostics emit one summary at most
+ * every 30 seconds and never log per NPC.</p>
  */
 public final class NeedsResourceHotPathDiagnostics {
     private static final Logger LOGGER =

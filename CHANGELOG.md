@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- Needs telemetry no longer enables the needs-resource hot-path INFO summary.
+  Release builds keep privacy-safe needs telemetry without writing a diagnostic
+  line every 30 seconds.
 - Corrected the embedded Alec's Telemetry version metadata. Tamework now
   reports the concrete runtime version `1.2.3` in shaded builds.
 - Persistence reads now use one consistent SQLite snapshot. Concurrent coop

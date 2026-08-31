@@ -3669,9 +3669,7 @@ public class Tamework extends JavaPlugin {
     }
 
     private void refreshNeedsResourceHotPathDiagnostics() {
-        NeedsResourceHotPathDiagnostics.setEnabled(
-                debugNeedsSeekDiagnosticsLogs || debugNeedsTelemetryDiagnostics
-        );
+        NeedsResourceHotPathDiagnostics.setEnabled(debugNeedsSeekDiagnosticsLogs);
     }
 
     public boolean isDebugHarvestEnabled() {

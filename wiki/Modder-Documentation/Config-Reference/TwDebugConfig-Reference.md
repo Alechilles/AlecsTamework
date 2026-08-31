@@ -62,6 +62,7 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 ## Defaults and Usage Notes
 - The bundled default asset in `src/main/resources/Server/Tamework/Debug/TwDebugDefault.json` ships with local log-heavy debug toggles disabled and `NeedsTelemetry` enabled.
 - `NeedsTelemetry` does not bypass the Tamework telemetry setting. If telemetry is disabled in `/tw settings`, no needs telemetry events are recorded.
+- `NeedsTelemetry` does not enable the local needs-resource hot-path INFO summary. Enable `NeedsSeek` when you need that aggregate diagnostic.
 - This family controls default startup state. It does not replace the runtime commands themselves.
 - `DespawnRoleFilter` is only meaningful when `Despawn` debugging is enabled.
 
