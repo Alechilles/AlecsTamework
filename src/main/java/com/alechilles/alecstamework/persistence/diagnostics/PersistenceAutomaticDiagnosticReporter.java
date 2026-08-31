@@ -178,14 +178,37 @@ public final class PersistenceAutomaticDiagnosticReporter
                             List.of(attachment)
                     )
             );
-            if (result == null || !result.accepted()) {
-                release(reportKey);
-            }
+            handleResult(result, reportKey, diagnosticId);
         } catch (RuntimeException failure) {
             release(reportKey);
             warn("Could not build or submit an automatic persistence diagnostic.", failure);
         } finally {
             reporting.remove();
+        }
+    }
+
+    private void handleResult(
+            @Nullable TelemetryDiagnosticBundleResult result,
+            @Nonnull String reportKey,
+            @Nonnull String diagnosticId
+    ) {
+        if (result == null || !result.accepted()) {
+            release(reportKey);
+            if (logger != null) {
+                String detail = result == null
+                        ? "no result"
+                        : result.status() + ": " + result.detail();
+                logger.at(Level.WARNING).log(
+                        "Automatic persistence diagnostic was not accepted ("
+                                + detail + ")."
+                );
+            }
+            return;
+        }
+        if (logger != null) {
+            logger.at(Level.INFO).log(
+                    "Automatic persistence diagnostic queued: " + diagnosticId
+            );
         }
     }
 
