@@ -190,7 +190,7 @@ final class PublicPersistenceControlPlane
             enterGlobal(unknown.failure());
         } else if (result instanceof
                 PersistenceTransactionResult.RolledBack<?> rolledBack
-                && globalRolledBackFailure(rolledBack.failure())) {
+                && requiresGlobalReadOnly(rolledBack.failure())) {
             enterGlobal(rolledBack.failure());
         }
     }
@@ -215,7 +215,7 @@ final class PublicPersistenceControlPlane
             if ("read_executor_saturated".equals(failed.failure().code())) {
                 readSaturationFailures.increment();
             }
-            if (globalFailure(failed.failure())) {
+            if (requiresGlobalReadOnly(failed.failure())) {
                 enterGlobal(failed.failure());
             }
             failures.read(readKind, failed);
@@ -231,7 +231,6 @@ final class PublicPersistenceControlPlane
         String normalized = checkpoint == null || checkpoint.isBlank()
                 ? "unknown"
                 : checkpoint.trim().toLowerCase(Locale.ROOT);
-        enterGlobal("checkpoint_failure:" + normalized);
         failures.checkpoint(normalized, failure);
     }
 
@@ -427,20 +426,9 @@ final class PublicPersistenceControlPlane
         }
     }
 
-    private boolean globalFailure(StorageFailure failure) {
-        if (failure.retryable()
-                || "unknown_commit_proven_absent".equals(failure.code())) {
-            return false;
-        }
-        return switch (failure.kind()) {
-            case IO, CORRUPT, SCHEMA, UNAVAILABLE, DECODE, UNKNOWN -> true;
-            case BUSY, TIMEOUT -> false;
-        };
-    }
-
-    private boolean globalRolledBackFailure(StorageFailure failure) {
-        return failure.kind() != StorageFailureKind.UNKNOWN
-                && globalFailure(failure);
+    private boolean requiresGlobalReadOnly(StorageFailure failure) {
+        return failure.kind() == StorageFailureKind.CORRUPT
+                || failure.kind() == StorageFailureKind.SCHEMA;
     }
 
     private void enterGlobal(StorageFailure failure) {

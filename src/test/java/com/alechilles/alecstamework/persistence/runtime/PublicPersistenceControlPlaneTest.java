@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.persistence.runtime;
 
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
-import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureDefinition;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteFailureClassifier;
@@ -190,31 +189,30 @@ class PublicPersistenceControlPlaneTest {
     }
 
     @Test
-    void unknownReadFailureEntersGlobalReadOnlyMode() {
-        PersistenceFeatureRegistry registry =
-                PublicPersistenceFeatureRegistry.create();
-        PersistenceStartupCoordinator startup = ready(registry);
-        PublicPersistenceControlPlane control =
-                new PublicPersistenceControlPlane(registry);
-        control.bind(startup);
+    void routineReadFailuresDoNotDisableUnrelatedMutations() {
+        for (StorageFailureKind kind : List.of(
+                StorageFailureKind.UNKNOWN,
+                StorageFailureKind.IO,
+                StorageFailureKind.UNAVAILABLE,
+                StorageFailureKind.DECODE
+        )) {
+            Fixture fixture = fixture();
 
-        control.readCompleted(
-                TEST_READ,
-                PersistenceReadResult.failed(failure(
-                        StorageFailureKind.UNKNOWN,
-                        "sqlite_unknown",
-                        false
-                ))
-        );
+            fixture.control().readCompleted(
+                    TEST_READ,
+                    PersistenceReadResult.failed(failure(
+                            kind, "read_" + kind.name(), false
+                    ))
+            );
 
-        assertEquals(
-                PersistenceReadinessLevel.GLOBAL_READ_ONLY,
-                startup.report().readiness()
-        );
-        assertEquals(
-                "sqlite_unknown",
-                control.snapshot().lastGlobalFailureCode()
-        );
+            assertUnrelatedCaptureReady(fixture);
+            assertEquals(1, fixture.control().snapshot().readsFailed());
+            assertEquals(1, fixture.signals().size());
+            assertEquals(
+                    "persistence_read_failed",
+                    fixture.signals().getFirst().eventName()
+            );
+        }
     }
 
     @Test
@@ -252,30 +250,77 @@ class PublicPersistenceControlPlaneTest {
     }
 
     @Test
-    void rolledBackIoFailureEntersGlobalReadOnlyMode() {
-        PersistenceFeatureRegistry registry =
-                PublicPersistenceFeatureRegistry.create();
-        PersistenceStartupCoordinator startup = ready(registry);
-        PublicPersistenceControlPlane control =
-                new PublicPersistenceControlPlane(registry);
-        control.bind(startup);
+    void confirmedRollbacksDoNotDisableUnrelatedMutations() {
+        for (StorageFailureKind kind : List.of(
+                StorageFailureKind.UNKNOWN,
+                StorageFailureKind.IO,
+                StorageFailureKind.UNAVAILABLE,
+                StorageFailureKind.DECODE
+        )) {
+            Fixture fixture = fixture();
 
-        control.unitOfWorkCompleted(
-                CompanionCoopCaptureDefinition.KIND,
-                new PersistenceTransactionResult.RolledBack<>(failure(
-                        StorageFailureKind.IO,
-                        "sqlite_io",
+            fixture.control().unitOfWorkCompleted(
+                    CompanionCaptureDefinition.KIND,
+                    new PersistenceTransactionResult.RolledBack<>(failure(
+                            kind, "rollback_" + kind.name(), false
+                    ))
+            );
+
+            assertUnrelatedCaptureReady(fixture);
+            assertEquals(
+                    1,
+                    fixture.control().snapshot().features().get(
+                            PublicPersistenceFeatureRegistry.CAPTURE
+                    ).unitsFailed()
+            );
+        }
+    }
+
+    @Test
+    void checkpointFailureReportsWithoutDisablingMutations() {
+        Fixture fixture = fixture();
+
+        fixture.control().checkpointFailure(
+                "after_commit", new IllegalStateException("checkpoint")
+        );
+
+        assertUnrelatedCaptureReady(fixture);
+        assertEquals(1, fixture.control().snapshot().checkpointFailures());
+        assertEquals(1, fixture.signals().size());
+        assertEquals(
+                "persistence_checkpoint_failed",
+                fixture.signals().getFirst().eventName()
+        );
+    }
+
+    @Test
+    void corruptionAndSchemaFailureRemainGlobal() {
+        Fixture corruptRead = fixture();
+        corruptRead.control().readCompleted(
+                TEST_READ,
+                PersistenceReadResult.failed(failure(
+                        StorageFailureKind.CORRUPT,
+                        "sqlite_corrupt",
                         false
                 ))
         );
-
         assertEquals(
                 PersistenceReadinessLevel.GLOBAL_READ_ONLY,
-                startup.report().readiness()
+                corruptRead.startup().report().readiness()
+        );
+
+        Fixture schemaRollback = fixture();
+        schemaRollback.control().unitOfWorkCompleted(
+                CompanionCaptureDefinition.KIND,
+                new PersistenceTransactionResult.RolledBack<>(failure(
+                        StorageFailureKind.SCHEMA,
+                        "sqlite_schema",
+                        false
+                ))
         );
         assertEquals(
-                "sqlite_io",
-                control.snapshot().lastGlobalFailureCode()
+                PersistenceReadinessLevel.GLOBAL_READ_ONLY,
+                schemaRollback.startup().report().readiness()
         );
     }
 
@@ -313,34 +358,27 @@ class PublicPersistenceControlPlaneTest {
         );
     }
 
-    /** Guards a rolled-back co-op failure from disabling unrelated persistence. */
-    @Test
-    void confirmedUnknownRollbackDoesNotMakeAllPersistenceReadOnly() {
+    private Fixture fixture() {
         PersistenceFeatureRegistry registry =
                 PublicPersistenceFeatureRegistry.create();
         PersistenceStartupCoordinator startup = ready(registry);
+        ArrayList<PersistenceFailureSignal> signals = new ArrayList<>();
         PublicPersistenceControlPlane control =
-                new PublicPersistenceControlPlane(registry);
+                new PublicPersistenceControlPlane(registry, signals::add);
         control.bind(startup);
+        return new Fixture(control, startup, signals);
+    }
 
-        control.unitOfWorkCompleted(
-                CompanionCoopCaptureDefinition.KIND,
-                new PersistenceTransactionResult.RolledBack<>(failure(
-                        StorageFailureKind.UNKNOWN,
-                        "sqlite_unknown",
-                        false
-                ))
-        );
-
+    private void assertUnrelatedCaptureReady(Fixture fixture) {
         assertEquals(
                 PersistenceReadinessLevel.MUTATION_READY,
-                startup.report().readiness()
+                fixture.startup().report().readiness()
         );
-        assertNull(control.snapshot().lastGlobalFailureCode());
-        control.requireAdmission(
+        assertNull(fixture.control().snapshot().lastGlobalFailureCode());
+        fixture.control().requireAdmission(
                 CompanionCaptureDefinition.KIND,
                 "companion_capture",
-                captureScopes(PROFILE)
+                captureScopes(OTHER_PROFILE)
         );
     }
 
@@ -379,5 +417,12 @@ class PublicPersistenceControlPlaneTest {
         return new StorageFailure(
                 kind, code, "control_plane_test", retryable, null
         );
+    }
+
+    private record Fixture(
+            PublicPersistenceControlPlane control,
+            PersistenceStartupCoordinator startup,
+            ArrayList<PersistenceFailureSignal> signals
+    ) {
     }
 }
