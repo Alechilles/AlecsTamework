@@ -38,12 +38,47 @@ public final class TameworkDebugPersistenceCommand extends AbstractCommandCollec
             @Nullable Consumer<PersistenceFailureSignal> failureSink
     ) {
         super("persistence", "Tamework persistence diagnostics.");
-        addSubCommand(new TameworkDebugDbCommand(
-                persistenceDiagnostics, persistenceExporter, bondedDiagnostics
+        addSubCommand(diagnostic(
+                TameworkDebugDbCommand.Action.STATUS,
+                persistenceDiagnostics,
+                persistenceExporter,
+                bondedDiagnostics
+        ));
+        addSubCommand(diagnostic(
+                TameworkDebugDbCommand.Action.HEALTH,
+                persistenceDiagnostics,
+                persistenceExporter,
+                bondedDiagnostics
+        ));
+        addSubCommand(diagnostic(
+                TameworkDebugDbCommand.Action.DETAIL,
+                persistenceDiagnostics,
+                persistenceExporter,
+                bondedDiagnostics
+        ));
+        addSubCommand(diagnostic(
+                TameworkDebugDbCommand.Action.EXPORT,
+                persistenceDiagnostics,
+                persistenceExporter,
+                bondedDiagnostics
         ));
         addSubCommand(new TameworkDebugReviveReadyCommand(
                 persistenceQueries, persistenceOperations
         ));
         addSubCommand(new TameworkDebugPersistenceFailureCommand(failureSink));
+    }
+
+    private TameworkDebugDbCommand diagnostic(
+            TameworkDebugDbCommand.Action action,
+            PersistenceDiagnosticsReader persistenceDiagnostics,
+            PersistenceDiagnosticExporter persistenceExporter,
+            BondedCompanionDiagnosticContributor bondedDiagnostics
+    ) {
+        return new TameworkDebugDbCommand(
+                action,
+                persistenceDiagnostics,
+                persistenceExporter,
+                bondedDiagnostics
+        );
     }
 }

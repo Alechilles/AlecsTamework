@@ -16,7 +16,6 @@ import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceOperati
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import java.util.Locale;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -26,37 +25,39 @@ import javax.annotation.Nullable;
  */
 public final class TameworkDebugDbCommand
         extends AbstractTameworkServerCommand {
+    enum Action {
+        STATUS("status"),
+        HEALTH("health"),
+        DETAIL("detail"),
+        EXPORT("export");
+
+        private final String commandName;
+
+        Action(String commandName) {
+            this.commandName = commandName;
+        }
+    }
+
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
+    private final Action action;
     private final PersistenceDiagnosticsReader diagnostics;
     private final PersistenceDiagnosticExporter exporter;
     private final BondedCompanionDiagnosticContributor bonded;
 
     public TameworkDebugDbCommand(
-            @Nullable PersistenceDiagnosticsReader diagnostics
-    ) {
-        this(diagnostics, null);
-    }
-
-    public TameworkDebugDbCommand(
-            @Nullable PersistenceDiagnosticsReader diagnostics,
-            @Nullable PersistenceDiagnosticExporter exporter
-    ) {
-        this(diagnostics, exporter, null);
-    }
-
-    public TameworkDebugDbCommand(
+            @Nonnull Action action,
             @Nullable PersistenceDiagnosticsReader diagnostics,
             @Nullable PersistenceDiagnosticExporter exporter,
             @Nullable BondedCompanionDiagnosticContributor bonded
     ) {
         super(
-                "debugdb",
+                action.commandName,
                 "Inspect bounded replacement persistence diagnostics."
         );
+        this.action = action;
         this.diagnostics = diagnostics;
         this.exporter = exporter;
         this.bonded = bonded;
-        setAllowsExtraArguments(true);
     }
 
     @Override
@@ -65,25 +66,11 @@ public final class TameworkDebugDbCommand
             send(context, "Replacement persistence runtime is not available.");
             return;
         }
-        String action = action(context);
-        if (action == null || "health".equals(action)
-                || "status".equals(action) || "integrity".equals(action)) {
-            printStatus(context);
-            return;
+        switch (action) {
+            case STATUS, HEALTH -> printStatus(context);
+            case DETAIL -> printDetail(context);
+            case EXPORT -> export(context);
         }
-        if ("detail".equals(action)) {
-            printDetail(context);
-            return;
-        }
-        if ("export".equals(action)) {
-            export(context);
-            return;
-        }
-        send(
-                context,
-                "Usage: /tw debugdb "
-                        + "[status|health|integrity|detail|export]"
-        );
     }
 
     private void printStatus(CommandContext context) {
@@ -248,17 +235,6 @@ public final class TameworkDebugDbCommand
                 .mapToLong(value -> value.busyRetries()).sum();
     }
 
-    @Nullable
-    private String action(CommandContext context) {
-        String input = context.getInputString();
-        if (input == null) {
-            return null;
-        }
-        String[] tokens = input.trim().split("\\s+");
-        return tokens.length < 3
-                ? null : tokens[2].toLowerCase(Locale.ROOT);
-    }
-
     private String value(@Nullable Object value) {
         return value == null ? "<none>" : value.toString();
     }
@@ -272,7 +248,9 @@ public final class TameworkDebugDbCommand
     }
 
     private void send(CommandContext context, String message) {
-        LOGGER.at(Level.INFO).log("/tw debugdb: " + message);
+        LOGGER.at(Level.INFO).log(
+                "/tw debug persistence " + action.commandName + ": " + message
+        );
         context.sender().sendMessage(Message.raw(message));
     }
 }

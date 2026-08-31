@@ -45,10 +45,13 @@ class TameworkCommandRootTest {
                 root.getSubCommands().get("npc").getSubCommands().get("spawn")
                         .getSubCommands().get("tamed").getPermission()
         );
+        var persistenceStatus = root.getSubCommands().get("debug")
+                .getSubCommands().get("persistence").getSubCommands()
+                .get("status");
         assertEquals(
-                "tamework.command.tw.debug.persistence.debugdb",
-                root.getSubCommands().get("debug").getSubCommands().get("persistence")
-                        .getSubCommands().get("debugdb").getPermission()
+                "tamework.command.tw.debug.persistence.status",
+                persistenceStatus == null
+                        ? "<missing>" : persistenceStatus.getPermission()
         );
         assertEquals(
                 "tamework.command.tw.debug.persistence.reviveready",
