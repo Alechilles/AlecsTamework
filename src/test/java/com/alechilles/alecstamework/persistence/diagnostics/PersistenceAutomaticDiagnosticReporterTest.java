@@ -8,11 +8,14 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PersistenceAutomaticDiagnosticReporterTest {
 
@@ -45,7 +48,10 @@ class PersistenceAutomaticDiagnosticReporterTest {
         );
 
         reporter.accept(signal);
-        reporter.accept(signal);
+        reporter.accept(new PersistenceFailureSignal(
+                signal.eventName(), "another-operation-id", signal.operation(),
+                signal.phase(), signal.reason(), signal.cause()
+        ));
 
         assertEquals(1, submitted.size());
         TelemetryDiagnosticBundle bundle = submitted.getFirst();
@@ -101,8 +107,8 @@ class PersistenceAutomaticDiagnosticReporterTest {
 
     @Test
     void queuedReportCanDrainAfterCloseStarts() {
-        List<Runnable> queued = new ArrayList<>();
         AtomicInteger submissions = new AtomicInteger();
+        ExecutorService executor = Executors.newSingleThreadExecutor();
         PersistenceAutomaticDiagnosticReporter reporter =
                 new PersistenceAutomaticDiagnosticReporter(
                         ignored -> new PersistenceDiagnosticExporter.FailurePackage(
@@ -115,8 +121,9 @@ class PersistenceAutomaticDiagnosticReporterTest {
                                     null
                             );
                         },
-                        queued::add,
-                        null
+                        executor,
+                        null,
+                        true
                 );
 
         reporter.accept(new PersistenceFailureSignal(
@@ -124,8 +131,8 @@ class PersistenceAutomaticDiagnosticReporterTest {
                 "shutdown", "outstanding_operations", null
         ));
         reporter.close();
-        queued.getFirst().run();
 
         assertEquals(1, submissions.get());
+        assertTrue(executor.isTerminated());
     }
 }

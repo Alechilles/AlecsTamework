@@ -85,6 +85,18 @@ public final class PersistenceAutomaticDiagnosticReporter
         this(packageFactory, submitter, executor, logger, false);
     }
 
+    PersistenceAutomaticDiagnosticReporter(
+            @Nonnull Function<PersistenceFailureContext,
+                    PersistenceDiagnosticExporter.FailurePackage> packageFactory,
+            @Nonnull Function<TelemetryDiagnosticBundle,
+                    TelemetryDiagnosticBundleResult> submitter,
+            @Nonnull ExecutorService executor,
+            @Nullable HytaleLogger logger,
+            boolean ownsExecutor
+    ) {
+        this(packageFactory, submitter, (Executor) executor, logger, ownsExecutor);
+    }
+
     private PersistenceAutomaticDiagnosticReporter(
             @Nonnull Function<PersistenceFailureContext,
                     PersistenceDiagnosticExporter.FailurePackage> packageFactory,
@@ -109,16 +121,17 @@ public final class PersistenceAutomaticDiagnosticReporter
     @Override
     public void accept(@Nonnull PersistenceFailureSignal signal) {
         Objects.requireNonNull(signal, "signal");
-        if (closed.get() || reporting.get() || !reserve(signal.incidentKey())) {
+        String reportKey = fingerprint(signal);
+        if (closed.get() || reporting.get() || !reserve(reportKey)) {
             return;
         }
         try {
             executor.execute(() -> submit(signal));
         } catch (RejectedExecutionException rejected) {
-            release(signal.incidentKey());
+            release(reportKey);
             warn("Automatic persistence diagnostic queue is full.", rejected);
         } catch (RuntimeException failure) {
-            release(signal.incidentKey());
+            release(reportKey);
             warn("Could not schedule an automatic persistence diagnostic.", failure);
         }
     }
@@ -250,8 +263,9 @@ public final class PersistenceAutomaticDiagnosticReporter
         }
         ownedExecutor.shutdown();
         try {
-            if (!ownedExecutor.awaitTermination(2, TimeUnit.SECONDS)) {
+            if (!ownedExecutor.awaitTermination(3, TimeUnit.SECONDS)) {
                 ownedExecutor.shutdownNow();
+                ownedExecutor.awaitTermination(1, TimeUnit.SECONDS);
             }
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();

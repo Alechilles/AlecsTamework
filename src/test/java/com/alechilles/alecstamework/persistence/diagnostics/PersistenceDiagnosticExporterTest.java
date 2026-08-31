@@ -1,11 +1,19 @@
 package com.alechilles.alecstamework.persistence.diagnostics;
 
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureId;
+import com.alechilles.alecstamework.persistence.control.PersistenceEngineLineage;
+import com.alechilles.alecstamework.persistence.control.PersistenceReadinessLevel;
+import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
+import com.alechilles.alecstamework.persistence.control.PersistenceStartupReport;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Instant;
 import java.util.Map;
 import java.util.LinkedHashMap;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.Random;
 import java.io.ByteArrayInputStream;
@@ -13,6 +21,7 @@ import java.util.zip.ZipInputStream;
 import java.util.zip.ZipFile;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceThroughputSnapshot;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceMetricsSnapshot;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceOperationalStatus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -49,6 +58,47 @@ class PersistenceDiagnosticExporterTest {
         assertTrue(members.containsKey("manifest.json"));
         assertFalse(members.get("failure.json").contains("sensitive message"));
         assertTrue(members.get("failure.json").contains("IllegalStateException"));
+    }
+
+    @Test
+    void automaticStatusOmitsFreeTextAndLocalPaths() {
+        EnumMap<PersistenceStartupNode,
+                PublicPersistenceOperationalStatus.NodeState> nodes =
+                new EnumMap<>(PersistenceStartupNode.class);
+        for (PersistenceStartupNode node : PersistenceStartupNode.values()) {
+            nodes.put(node, PublicPersistenceOperationalStatus.NodeState.PENDING);
+        }
+        PublicPersistenceOperationalStatus status =
+                new PublicPersistenceOperationalStatus(
+                        PersistenceEngineLineage.REPLACEMENT,
+                        temporaryDirectory.resolve("secret-data-path"),
+                        Optional.of(temporaryDirectory.resolve("secret.db")),
+                        Optional.empty(),
+                        OptionalInt.empty(),
+                        PublicPersistenceOperationalStatus.StorageMode.STARTING,
+                        new PersistenceStartupReport(
+                                Set.of(), null, null,
+                                PersistenceStartupNode.OPEN_TARGET,
+                                "secret-token-message",
+                                PersistenceReadinessLevel.GLOBAL_READ_ONLY
+                        ),
+                        nodes,
+                        new PublicPersistenceOperationalStatus.CheckpointEvidence(
+                                PublicPersistenceOperationalStatus
+                                        .CheckpointEvidence.Status.NOT_ATTEMPTED,
+                                0, 0, null
+                        ),
+                        List.of("open secret-data-path to repair")
+                );
+
+        String json = PersistenceDiagnosticExporter
+                .automaticStatusJson(status).toString();
+
+        assertFalse(json.contains("secret-token-message"));
+        assertFalse(json.contains("secret-data-path"));
+        assertFalse(json.contains("secret.db"));
+        assertFalse(json.contains("guidance"));
+        assertTrue(json.contains("GLOBAL_READ_ONLY"));
     }
 
     @Test

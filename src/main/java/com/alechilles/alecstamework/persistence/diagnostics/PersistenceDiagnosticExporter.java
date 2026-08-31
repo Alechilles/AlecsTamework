@@ -127,7 +127,10 @@ public final class PersistenceDiagnosticExporter {
         LinkedHashMap<String, byte[]> evidence = new LinkedHashMap<>();
         if (diagnostics != null) {
             try {
-                evidence.put("operational-status.json", json(statusJson(diagnostics.status())));
+                evidence.put(
+                        "operational-status.json",
+                        json(automaticStatusJson(diagnostics.status()))
+                );
             } catch (RuntimeException ignored) {
                 // The failure package remains useful without runtime status.
             }
@@ -135,17 +138,6 @@ public final class PersistenceDiagnosticExporter {
                 evidence.put("metrics.json", metricsJson(diagnostics.metrics()));
             } catch (RuntimeException ignored) {
                 // The failure package remains useful without metrics.
-            }
-            try {
-                PersistenceReadResult<PublicPersistenceDiagnosticsSnapshot> read =
-                        diagnostics.details().toCompletableFuture()
-                                .get(MAX_COLLECTION_SECONDS, TimeUnit.SECONDS);
-                if (read instanceof PersistenceReadResult.Found<
-                        PublicPersistenceDiagnosticsSnapshot> found) {
-                    evidence.put("diagnostic-detail.json", json(found.value()));
-                }
-            } catch (Exception ignored) {
-                // Detail reads are optional evidence.
             }
         }
         BondedCompanionDiagnosticContributor contributor = bondedContributor.get();
@@ -439,6 +431,32 @@ public final class PersistenceDiagnosticExporter {
         json.add("startupNodes", JSON.toJsonTree(status.startupNodes()));
         json.add("checkpoint", JSON.toJsonTree(status.lastCheckpoint()));
         json.add("guidance", JSON.toJsonTree(status.guidance()));
+        return json;
+    }
+
+    /** Serializes the allowlisted status fields used by automatic reports. */
+    static JsonObject automaticStatusJson(
+            PublicPersistenceOperationalStatus status
+    ) {
+        JsonObject json = new JsonObject();
+        json.addProperty("engine", status.engine().name());
+        json.addProperty("storageMode", status.storageMode().name());
+        json.addProperty(
+                "targetOrigin",
+                status.targetOrigin().map(Enum::name).orElse(null)
+        );
+        if (status.schemaVersion().isPresent()) {
+            json.addProperty(
+                    "schemaVersion",
+                    status.schemaVersion().getAsInt()
+            );
+        }
+        json.addProperty(
+                "startupReadiness",
+                status.startup().readiness().name()
+        );
+        json.add("startupNodes", JSON.toJsonTree(status.startupNodes()));
+        json.add("checkpoint", JSON.toJsonTree(status.lastCheckpoint()));
         return json;
     }
 

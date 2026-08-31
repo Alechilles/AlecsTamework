@@ -6,9 +6,11 @@ import com.alechilles.alecstamework.persistence.control.PersistenceFeatureId;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceOperationAdmissionGate;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupCoordinator;
+import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
 import com.alechilles.alecstamework.items.persistence.maintenance.MaintenanceMetricsSnapshot;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceKernelMetrics;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadKind;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceReadPriority;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceWriteRejection;
@@ -17,8 +19,10 @@ import com.alechilles.alecstamework.persistence.kernel.StorageFailureKind;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -36,7 +40,7 @@ final class PublicPersistenceControlPlane
         PersistenceContainmentListener,
         PersistenceThroughputMetrics {
     private final PersistenceFeatureRegistry registry;
-    private final Consumer<PersistenceFailureSignal> failureSink;
+    private final PersistenceFailureEmitter failures;
     private final Map<PersistenceFeatureId, FeatureCounters> features;
     private final LongAdder readsCompleted = new LongAdder();
     private final LongAdder readsFailed = new LongAdder();
@@ -44,8 +48,8 @@ final class PublicPersistenceControlPlane
     private final LongAdder shutdownTimeouts = new LongAdder();
     private final AtomicReference<String> lastGlobalFailure =
             new AtomicReference<>();
-    private final Map<com.alechilles.alecstamework.persistence.control
-            .PersistenceStartupNode, PersistenceLatencyHistogram> startupTimings;
+    private final Map<PersistenceStartupNode,
+            PersistenceLatencyHistogram> startupTimings;
     private final PersistenceLatencyHistogram writerWait =
             new PersistenceLatencyHistogram();
     private final PersistenceLatencyHistogram writerExecution =
@@ -87,7 +91,7 @@ final class PublicPersistenceControlPlane
             );
         }
         this.registry = registry;
-        this.failureSink = failureSink == null ? ignored -> { } : failureSink;
+        this.failures = new PersistenceFailureEmitter(failureSink);
         HashMap<PersistenceFeatureId, FeatureCounters> counters =
                 new HashMap<>();
         for (PersistenceFeatureDescriptor descriptor
@@ -98,14 +102,9 @@ final class PublicPersistenceControlPlane
             );
         }
         features = Map.copyOf(counters);
-        java.util.EnumMap<com.alechilles.alecstamework.persistence.control
-                .PersistenceStartupNode, PersistenceLatencyHistogram> timings =
-                new java.util.EnumMap<>(
-                        com.alechilles.alecstamework.persistence.control
-                                .PersistenceStartupNode.class
-                );
-        for (var node : com.alechilles.alecstamework.persistence.control
-                .PersistenceStartupNode.values()) {
+        EnumMap<PersistenceStartupNode, PersistenceLatencyHistogram> timings =
+                new EnumMap<>(PersistenceStartupNode.class);
+        for (var node : PersistenceStartupNode.values()) {
             timings.put(node, new PersistenceLatencyHistogram());
         }
         startupTimings = Map.copyOf(timings);
@@ -202,25 +201,7 @@ final class PublicPersistenceControlPlane
             OperationKind operationKind,
             PersistenceTransactionResult<?> result
     ) {
-        if (result instanceof PersistenceTransactionResult.RolledBack<?> rolledBack) {
-            emit(new PersistenceFailureSignal(
-                    "persistence_write_failed",
-                    operationId.toString(),
-                    operationKind.toString(),
-                    "final_write",
-                    rolledBack.failure().code(),
-                    rolledBack.failure().cause()
-            ));
-        } else if (result instanceof PersistenceTransactionResult.Unknown<?> unknown) {
-            emit(new PersistenceFailureSignal(
-                    "persistence_write_failed",
-                    operationId.toString(),
-                    operationKind.toString(),
-                    "final_write",
-                    unknown.failure().code(),
-                    unknown.failure().cause()
-            ));
-        }
+        failures.write(operationId, operationKind, result);
     }
 
     @Override
@@ -237,14 +218,7 @@ final class PublicPersistenceControlPlane
             if (globalFailure(failed.failure())) {
                 enterGlobal(failed.failure());
             }
-            emit(new PersistenceFailureSignal(
-                    "persistence_read_failed",
-                    "read:" + readKind + ":" + failed.failure().code(),
-                    readKind.toString(),
-                    "read",
-                    failed.failure().code(),
-                    failed.failure().cause()
-            ));
+            failures.read(readKind, failed);
         }
     }
 
@@ -256,29 +230,15 @@ final class PublicPersistenceControlPlane
         checkpointFailures.increment();
         String normalized = checkpoint == null || checkpoint.isBlank()
                 ? "unknown"
-                : checkpoint.trim().toLowerCase(java.util.Locale.ROOT);
+                : checkpoint.trim().toLowerCase(Locale.ROOT);
         enterGlobal("checkpoint_failure:" + normalized);
-        emit(new PersistenceFailureSignal(
-                "persistence_checkpoint_failed",
-                "checkpoint:" + normalized + ":" + failure.getClass().getName(),
-                normalized,
-                "checkpoint",
-                "checkpoint_failure",
-                failure
-        ));
+        failures.checkpoint(normalized, failure);
     }
 
     @Override
     public void shutdownTimedOut(int outstandingOperations) {
         shutdownTimeouts.increment();
-        emit(new PersistenceFailureSignal(
-                "persistence_shutdown_timeout",
-                "shutdown_timeout:" + Math.max(0, outstandingOperations),
-                "shutdown",
-                "shutdown",
-                "outstanding_operations",
-                null
-        ));
+        failures.shutdownTimeout(outstandingOperations);
     }
 
     @Override
@@ -298,8 +258,7 @@ final class PublicPersistenceControlPlane
     @Override
     public void readTimed(
             PersistenceReadKind readKind,
-            com.alechilles.alecstamework.persistence.kernel
-                    .PersistenceReadPriority priority,
+            PersistenceReadPriority priority,
             int acceptedQueueDepth,
             long queueWaitNanos,
             long executionNanos
@@ -371,35 +330,12 @@ final class PublicPersistenceControlPlane
         criticalFlushFailures.increment();
     }
 
-    void startupNodeTimed(
-            com.alechilles.alecstamework.persistence.control
-                    .PersistenceStartupNode node,
-            long elapsedNanos
-    ) {
+    void startupNodeTimed(PersistenceStartupNode node, long elapsedNanos) {
         startupTimings.get(node).observe(elapsedNanos);
     }
 
-    void startupNodeFailed(
-            com.alechilles.alecstamework.persistence.control
-                    .PersistenceStartupNode node,
-            Throwable failure
-    ) {
-        emit(new PersistenceFailureSignal(
-                "persistence_startup_failed",
-                "startup:" + node.name() + ":" + failure.getClass().getName(),
-                node.name(),
-                "startup",
-                "startup_action_failed",
-                failure
-        ));
-    }
-
-    private void emit(PersistenceFailureSignal signal) {
-        try {
-            failureSink.accept(signal);
-        } catch (RuntimeException ignored) {
-            // Diagnostics must never alter persistence control flow.
-        }
+    void startupNodeFailed(PersistenceStartupNode node, Throwable failure) {
+        failures.startup(node, failure);
     }
 
     @Override
@@ -421,13 +357,9 @@ final class PublicPersistenceControlPlane
     }
 
     PublicPersistencePerformanceSnapshot performance(long walBytes) {
-        java.util.EnumMap<com.alechilles.alecstamework.persistence.control
-                .PersistenceStartupNode,
+        EnumMap<PersistenceStartupNode,
                 PublicPersistencePerformanceSnapshot.Latency> startup =
-                new java.util.EnumMap<>(
-                        com.alechilles.alecstamework.persistence.control
-                                .PersistenceStartupNode.class
-                );
+                new EnumMap<>(PersistenceStartupNode.class);
         startupTimings.forEach((node, histogram) ->
                 startup.put(node, histogram.snapshot()));
         return new PublicPersistencePerformanceSnapshot(

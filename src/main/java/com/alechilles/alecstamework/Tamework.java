@@ -1444,6 +1444,9 @@ public class Tamework extends JavaPlugin {
         prepareRuntimeActivation();
         if (runtimeStartupPlan.isActive(TameworkRuntimeModule.CORE_OWNERSHIP)) {
             diagnosticRuntime = TameworkDiagnosticRuntime.create(this);
+            if (diagnosticRuntime != null) {
+                diagnosticRuntime.start();
+            }
         }
         TameworkActiveAssetInitializer.initialize(
                 runtimeStartupPlan,
@@ -1465,10 +1468,6 @@ public class Tamework extends JavaPlugin {
             initializeOverridesForLoadedWorlds();
         }
         getLogger().at(Level.INFO).log("Alec's Tamework! has been enabled!");
-        if (diagnosticRuntime != null
-                && runtimeStartupPlan.isActive(TameworkRuntimeModule.CORE_OWNERSHIP)) {
-            diagnosticRuntime.start();
-        }
         if (assetEditorPackService != null
                 && runtimeStartupPlan.isActive(TameworkRuntimeModule.CORE_OWNERSHIP)) {
             assetEditorPackService.ensurePackVisible();

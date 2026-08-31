@@ -108,9 +108,10 @@ player-scoped. In particular, `/tw config`, `/tw settings`, `/tw news`,
   database, save data, player identities, coordinates, inventory payloads,
   secrets, and unrestricted logs.
 - When Tamework telemetry is enabled, a terminal persistence error creates the
-  same bounded evidence in memory and sends it to Alec's Telemetry as an
-  automatic diagnostic bundle. The report includes a safe error classification
-  and a ZIP of at most 512 KiB. It does not write a local export file.
+  automatic evidence in memory and sends it to Alec's Telemetry as a diagnostic
+  bundle. The report includes a safe error classification and a ZIP of at most
+  512 KiB. It does not write a local export file. Its status data uses a strict
+  allowlist and omits the durable detail snapshot from the manual export.
 - Automatic diagnostics cover generic and bonded persistence. They run on a
   separate bounded worker and cannot change a read, write, startup, checkpoint,
   or shutdown result. Set `telemetry.enabled` to `false` in Tamework's global

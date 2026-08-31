@@ -116,10 +116,8 @@ public final class CrashTelemetryService {
 
     public synchronized void shutdown() {
         legacyMigrationExecutor.shutdownNow();
-        if (!started.compareAndSet(true, false)) {
-            return;
-        }
-        if (breadcrumbsEnabled.get()) {
+        boolean wasStarted = started.getAndSet(false);
+        if (wasStarted && breadcrumbsEnabled.get()) {
             telemetry.recordBreadcrumb("lifecycle", "Embedded telemetry shutdown.");
         }
         telemetry.shutdown();

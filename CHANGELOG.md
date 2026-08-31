@@ -5,7 +5,7 @@
 ### Added
 
 - When Tamework telemetry is enabled, terminal persistence failures now send a
-  bounded, redacted `/tw debugdb export` package with the error classification.
+  bounded, redacted debug database package with the error classification.
   This includes generic and bonded persistence startup, read, write,
   checkpoint, runtime, and shutdown failures.
 

@@ -74,6 +74,16 @@ class CrashTelemetryServiceTest {
     }
 
     @Test
+    void shutdownStopsEmbeddedRuntimeBeforeStart() {
+        FakeEmbeddedRuntime runtime = new FakeEmbeddedRuntime();
+        CrashTelemetryService service = createService(true, true, runtime);
+
+        service.shutdown();
+
+        assertEquals(1, runtime.shutdownCalls);
+    }
+
+    @Test
     void disablingBreadcrumbsClearsBufferedBreadcrumbs() {
         FakeEmbeddedRuntime runtime = new FakeEmbeddedRuntime();
         CrashTelemetryService service = createService(true, true, runtime);
