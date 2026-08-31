@@ -122,8 +122,9 @@ player-scoped. In particular, `/tw config`, `/tw settings`, `/tw news`,
   disabled or failed local submission stays eligible when the same failure
   classification occurs again.
 - Use `/tw debug persistence simulateerror` to test this path without causing a
-  real persistence failure. Run `/tw debug telemetry crash flush`, then find
-  the printed token in the diagnostic `reason` attribute in Alec's Telemetry.
+  real persistence failure. The diagnostic requests an automatic upload. Run
+  `/telemetry flush` if you want to force the queue, then find the printed token
+  in the diagnostic `reason` attribute in Alec's Telemetry.
 - The automatic ZIP excludes the SQLite database, save data, player identity,
   coordinates, inventory payloads, secrets, exception messages, and unrestricted
   logs. Alec's Telemetry treats the ZIP as opaque evidence.
