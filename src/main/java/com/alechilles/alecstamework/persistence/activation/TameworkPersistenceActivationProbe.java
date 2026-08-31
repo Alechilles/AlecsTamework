@@ -4,6 +4,8 @@ import com.alechilles.alecstamework.persistence.TameworkDataPathLayout;
 import com.alechilles.alecstamework.persistence.adapter.sqlite
         .SqliteConnectionFactory;
 import com.alechilles.alecstamework.persistence.adapter.sqlite
+        .SqliteReleasedRoutedV2Gateway;
+import com.alechilles.alecstamework.persistence.adapter.sqlite
         .SqliteSchemaV1ReadOnlyGateway;
 import com.alechilles.alecstamework.persistence.adapter.sqlite
         .SqliteSchemaV2ReadOnlyGateway;
@@ -173,9 +175,9 @@ public final class TameworkPersistenceActivationProbe {
                 );
             } catch (Exception v2Failure) {
                 try {
-                    SqliteSchemaV1ReadOnlyGateway.verify(connection);
+                    SqliteReleasedRoutedV2Gateway.verify(connection);
                     LinkedHashSet<String> evidence = new LinkedHashSet<>();
-                    evidence.add("persistence-schema-upgrade-v1");
+                    evidence.add("persistence-schema-upgrade-released-v2");
                     evidence.addAll(durableEvidence(
                             connection, V1_DURABLE_TABLES
                     ));
@@ -185,8 +187,23 @@ public final class TameworkPersistenceActivationProbe {
                     return TameworkPersistenceActivationEvidence.active(
                             evidence
                     );
-                } catch (Exception v1Failure) {
-                    return readOnly(true, diagnosticCode(v1Failure));
+                } catch (Exception releasedV2Failure) {
+                    try {
+                        SqliteSchemaV1ReadOnlyGateway.verify(connection);
+                        LinkedHashSet<String> evidence = new LinkedHashSet<>();
+                        evidence.add("persistence-schema-upgrade-v1");
+                        evidence.addAll(durableEvidence(
+                                connection, V1_DURABLE_TABLES
+                        ));
+                        if (recoverySidecarPresent) {
+                            evidence.add("persistence-wal-recovery");
+                        }
+                        return TameworkPersistenceActivationEvidence.active(
+                                evidence
+                        );
+                    } catch (Exception v1Failure) {
+                        return readOnly(true, diagnosticCode(v1Failure));
+                    }
                 }
             }
         } catch (Exception failure) {

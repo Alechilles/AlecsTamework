@@ -21,6 +21,13 @@
   that cannot enter the telemetry queue remains eligible on the next matching
   failure.
 
+### Fixed
+
+- Existing replacement databases from Tamework 3.2.x now upgrade to the
+  expanded persistence schema without deleting profiles or resetting player
+  data. The upgrade creates a verified sibling backup before it changes the
+  database.
+
 ## 3.3.1 - Embedded Telemetry Metadata Hotfix - 2026-08-30
 
 ### Fixed

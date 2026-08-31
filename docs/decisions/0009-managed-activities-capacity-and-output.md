@@ -43,6 +43,11 @@ one version-2 row. If DDL fails, the transaction rolls back and the source
 remains verifiable as v1. V2 verification requires the version-2 row and
 allows at most one valid version-1 predecessor.
 
+Tamework 3.2.x already shipped a smaller routed-read schema under version 2.
+The upgrade accepts only its exact schema definitions and released hash. It
+creates and verifies a sibling backup, then adds the managed tables and
+indexes in one transaction. Unknown version-2 definitions still fail closed.
+
 Unknown tables, indexes, triggers, views, and definition changes fail closed.
 The v2 manager owns fresh creation, v1 upgrade, verification, and latest
 startup wiring. Read-only activation uses the v2 gateway.

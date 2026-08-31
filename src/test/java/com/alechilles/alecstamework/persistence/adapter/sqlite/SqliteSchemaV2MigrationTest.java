@@ -1,7 +1,10 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceSchemaStatus;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
+import com.alechilles.alecstamework.persistence.kernel.StorageFailure;
+import com.alechilles.alecstamework.persistence.kernel.StorageFailureKind;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -20,6 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Behavior tests for fresh v2 targets and the v1-to-v2 migration boundary. */
 class SqliteSchemaV2MigrationTest {
+    private static final String RELEASED_ROUTED_V2_HASH =
+            "b72b00e5e77277f936866aa2f20555c3d35473379e40b6608890b9f0a382d5d7";
+
     @TempDir
     Path tempDir;
 
@@ -82,6 +88,93 @@ class SqliteSchemaV2MigrationTest {
                 manager.initialize());
         assertEquals(2, rowCount(database, "schema_history"));
         assertEquals(1, backupCount(database));
+    }
+
+    /** Regression: 3.3.0 must upgrade the routed-read v2 schema without losing profiles. */
+    @Test
+    void releasedRoutedV2MigrationPreservesRowsAndCreatesVerifiedBackup()
+            throws Exception {
+        Path database = tempDir.resolve("released-v2.sqlite");
+        SqliteConnectionFactory connections =
+                new SqliteConnectionFactory(database);
+        initializeReleasedRoutedV2(connections);
+        insertProfile(connections, "profile-before-3.3.0");
+
+        SqliteSchemaV2Manager current = manager(database, -50);
+        PersistenceTransactionResult<?> migrationResult = current.initialize();
+        assertInstanceOf(PersistenceTransactionResult.Committed.class,
+                migrationResult, migrationResult::toString);
+
+        assertEquals("profile-before-3.3.0", queryString(
+                database, "SELECT profile_id FROM companion_profile"));
+        assertEquals(current.schemaHash(), queryString(
+                database, "SELECT schema_hash FROM schema_history "
+                        + "WHERE version = 2"));
+        assertInstanceOf(PersistenceReadResult.Found.class, current.verify());
+        assertEquals(1, releasedV2BackupCount(database));
+        Path backup = onlyReleasedV2Backup(database);
+        assertEquals("profile-before-3.3.0", queryString(
+                backup, "SELECT profile_id FROM companion_profile"));
+        assertEquals(RELEASED_ROUTED_V2_HASH, queryString(
+                backup, "SELECT schema_hash FROM schema_history"));
+        try (Connection connection = new SqliteConnectionFactory(backup)
+                .openReadConnection()) {
+            SqliteReleasedRoutedV2Gateway.verify(connection);
+        }
+        assertInstanceOf(PersistenceTransactionResult.Committed.class,
+                current.initialize());
+        assertEquals(1, releasedV2BackupCount(database));
+    }
+
+    /** Regression: a committed migration with failed readback is not rolled back. */
+    @Test
+    void committedMigrationWithUnavailableReadbackIsUnknown() {
+        StorageFailure readFailure = new StorageFailure(
+                StorageFailureKind.UNAVAILABLE,
+                "schema_readback_unavailable",
+                "verify_schema_v2",
+                true,
+                null
+        );
+
+        PersistenceTransactionResult<PersistenceSchemaStatus> result =
+                SqliteSchemaUpgradeCoordinator.run(
+                        () -> { },
+                        () -> PersistenceReadResult.failed(readFailure),
+                        (failure, operation) -> readFailure,
+                        "schema_upgrade_unverified",
+                        "upgrade_schema"
+                );
+
+        assertInstanceOf(PersistenceTransactionResult.Unknown.class, result);
+    }
+
+    /** Regression: an ambiguous commit with failed readback remains unknown. */
+    @Test
+    void ambiguousCommitWithUnavailableReadbackIsUnknown() {
+        StorageFailure readFailure = new StorageFailure(
+                StorageFailureKind.UNAVAILABLE,
+                "schema_readback_unavailable",
+                "verify_schema_v2",
+                true,
+                null
+        );
+
+        PersistenceTransactionResult<PersistenceSchemaStatus> result =
+                SqliteSchemaUpgradeCoordinator.run(
+                        () -> {
+                            throw new SqliteSchemaUpgradeCoordinator
+                                    .OutcomeUnknownException(
+                                    new java.sql.SQLException("commit failed")
+                            );
+                        },
+                        () -> PersistenceReadResult.failed(readFailure),
+                        (failure, operation) -> readFailure,
+                        "schema_upgrade_unverified",
+                        "upgrade_schema"
+                );
+
+        assertInstanceOf(PersistenceTransactionResult.Unknown.class, result);
     }
 
     @Test
@@ -155,6 +248,35 @@ class SqliteSchemaV2MigrationTest {
         }
     }
 
+    private void initializeReleasedRoutedV2(
+            SqliteConnectionFactory connections
+    ) throws Exception {
+        assertInstanceOf(PersistenceTransactionResult.Committed.class,
+                new SqliteSchemaV1Manager(connections, () -> -200)
+                        .initialize());
+        try (Connection connection = connections.openWriterConnection();
+             Statement statement = connection.createStatement()) {
+            statement.execute("CREATE INDEX idx_projection_outbox_type_sequence "
+                    + "ON projection_outbox(event_type, event_sequence)");
+            statement.execute("ALTER TABLE schema_history "
+                    + "RENAME TO schema_history_v1_migration");
+            statement.execute("""
+                    CREATE TABLE schema_history (
+                        version INTEGER PRIMARY KEY CHECK (version IN (1, 2)),
+                        lineage TEXT NOT NULL CHECK (lineage = 'tamework-state'),
+                        applied_at_ms INTEGER NOT NULL,
+                        schema_hash TEXT NOT NULL CHECK (length(schema_hash) = 64)
+                    )
+                    """);
+            statement.executeUpdate("""
+                    INSERT INTO schema_history(
+                        version, lineage, applied_at_ms, schema_hash
+                    ) VALUES (2, 'tamework-state', -100, '"""
+                    + RELEASED_ROUTED_V2_HASH + "')");
+            statement.execute("DROP TABLE schema_history_v1_migration");
+        }
+    }
+
     private Set<String> tableNames(Path database) throws Exception {
         Set<String> names = new HashSet<>();
         try (Connection connection =
@@ -218,6 +340,27 @@ class SqliteSchemaV2MigrationTest {
             return (int) paths
                     .filter(path -> path.getFileName().toString().startsWith(prefix))
                     .count();
+        }
+    }
+
+    private int releasedV2BackupCount(Path database) throws Exception {
+        Path parent = database.getParent();
+        String prefix = database.getFileName() + ".released-v2-backup.";
+        try (var paths = Files.list(parent)) {
+            return (int) paths
+                    .filter(path -> path.getFileName().toString()
+                            .startsWith(prefix))
+                    .count();
+        }
+    }
+
+    private Path onlyReleasedV2Backup(Path database) throws Exception {
+        try (var paths = Files.list(database.getParent())) {
+            return paths.filter(path -> path.getFileName().toString()
+                            .startsWith(database.getFileName()
+                                    + ".released-v2-backup."))
+                    .findFirst()
+                    .orElseThrow();
         }
     }
 }

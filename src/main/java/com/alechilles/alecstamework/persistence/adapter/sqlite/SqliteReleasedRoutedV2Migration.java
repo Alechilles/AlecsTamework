@@ -10,16 +10,10 @@ import java.sql.Statement;
 import java.util.UUID;
 import java.util.function.LongSupplier;
 
-/**
- * Upgrades one verified replacement v1 database to v2.
- *
- * <p>The migration creates an immutable sibling backup before it begins. All
- * DDL and the v2 history insert run in one transaction. The caller must hold
- * the replacement engine lease and must not have a runtime writer active.</p>
- */
-public final class SqliteSchemaV2Migration {
+/** Upgrades the exact routed-read v2 schema shipped before Tamework 3.3.0. */
+public final class SqliteReleasedRoutedV2Migration {
     private static final String RESOURCE =
-            "/persistence/migration/v1-to-v2.sql";
+            "/persistence/migration/released-routed-v2-to-v2.sql";
     private static final String APPLIED_AT_TOKEN = "__APPLIED_AT_MS__";
     private static final String HASH_TOKEN = "__V2_SCHEMA_HASH__";
 
@@ -28,23 +22,13 @@ public final class SqliteSchemaV2Migration {
     private final String schemaHash;
     private final String script;
 
-    public SqliteSchemaV2Migration(
+    public SqliteReleasedRoutedV2Migration(
             SqliteConnectionFactory connections,
             LongSupplier clock,
             String schemaHash
     ) {
-        this(connections, clock, schemaHash, loadScript());
-    }
-
-    SqliteSchemaV2Migration(
-            SqliteConnectionFactory connections,
-            LongSupplier clock,
-            String schemaHash,
-            String script
-    ) {
         if (connections == null || clock == null
-                || schemaHash == null || schemaHash.length() != 64
-                || script == null) {
+                || schemaHash == null || schemaHash.length() != 64) {
             throw new IllegalArgumentException(
                     "Schema migration dependencies are required"
             );
@@ -52,15 +36,10 @@ public final class SqliteSchemaV2Migration {
         this.connections = connections;
         this.clock = clock;
         this.schemaHash = schemaHash;
-        this.script = script.replace("\r\n", "\n").replace('\r', '\n');
+        this.script = loadScript();
     }
 
-    /**
-     * Creates the sibling backup and applies the migration.
-     *
-     * @return the retained sibling backup path
-     * @throws Exception when backup creation, DDL, rollback, or commit fails
-     */
+    /** Creates a verified sibling backup and applies the migration. */
     public Path migrate() throws Exception {
         Path backup = createBackup();
         Connection connection = null;
@@ -80,6 +59,7 @@ public final class SqliteSchemaV2Migration {
                 }
             }
             SqliteSchemaV2ReadOnlyGateway.verify(connection);
+            SqliteReleasedRoutedV2Gateway.verifyIntegrity(connection);
             try {
                 connection.commit();
             } catch (SQLException failure) {
@@ -105,13 +85,12 @@ public final class SqliteSchemaV2Migration {
                 try {
                     connection.close();
                 } catch (SQLException ignored) {
-                    // The transaction outcome is already known to the caller.
+                    // The transaction outcome is already known.
                 }
             }
         }
     }
 
-    /** Returns the next sibling backup name without touching the source. */
     private Path createBackup() throws Exception {
         Path source = connections.databasePath();
         Path parent = source.getParent();
@@ -122,21 +101,16 @@ public final class SqliteSchemaV2Migration {
         }
         Files.createDirectories(parent);
         Path backup = source.resolveSibling(
-                source.getFileName() + ".v1-backup." + UUID.randomUUID()
-                        + ".sqlite"
+                source.getFileName() + ".released-v2-backup."
+                        + UUID.randomUUID() + ".sqlite"
         );
         try (Connection connection = connections.openWriterConnection();
              Statement statement = connection.createStatement()) {
             statement.execute("VACUUM INTO '" + sqlLiteral(backup) + "'");
         }
-        try {
-            if (!(new SqliteSchemaV1Manager(
-                    new SqliteConnectionFactory(backup)
-            ).verify() instanceof
-                    com.alechilles.alecstamework.persistence.kernel
-                            .PersistenceReadResult.Found<?>)) {
-                throw new SQLException("replacement_v1_backup_unverified");
-            }
+        try (Connection connection = new SqliteConnectionFactory(backup)
+                .openReadConnection()) {
+            SqliteReleasedRoutedV2Gateway.verify(connection);
             return backup;
         } catch (Exception failure) {
             try {
@@ -154,14 +128,16 @@ public final class SqliteSchemaV2Migration {
     }
 
     private static String loadScript() {
-        try (InputStream stream = SqliteSchemaV2Migration.class
+        try (InputStream stream = SqliteReleasedRoutedV2Migration.class
                 .getResourceAsStream(RESOURCE)) {
             if (stream == null) {
                 throw new IllegalStateException(
                         "Missing schema migration resource: " + RESOURCE
                 );
             }
-            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+            return new String(stream.readAllBytes(), StandardCharsets.UTF_8)
+                    .replace("\r\n", "\n")
+                    .replace('\r', '\n');
         } catch (Exception failure) {
             throw new IllegalStateException(
                     "Unable to load schema migration resource", failure

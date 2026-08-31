@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.persistence.activation;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV2Manager;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteReleasedRoutedV2Gateway;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceFiles;
 import com.alechilles.alecstamework.persistence.TameworkDataPathLayout;
@@ -75,6 +76,43 @@ class TameworkPersistenceActivationProbeTest {
         assertTrue(evidence.schemaValid());
         assertTrue(evidence.evidence().contains(
                 "persistence-schema-upgrade-v1"));
+    }
+
+    /** Regression: the released routed-read v2 target must enter the upgrade path. */
+    @Test
+    void releasedRoutedV2SchemaActivatesCompatibilityUpgrade() throws Exception {
+        Path database = temporaryDirectory.resolve("tamework-state.sqlite");
+        initializeReleasedRoutedV2Schema(database);
+
+        TameworkPersistenceActivationEvidence evidence = probe(database);
+
+        assertEquals(PersistenceActivationMode.ACTIVE, evidence.mode());
+        assertTrue(evidence.mutationAllowed());
+        assertTrue(evidence.schemaValid());
+        assertTrue(evidence.evidence().contains(
+                "persistence-schema-upgrade-released-v2"));
+        assertEquals(1, queryInt(database,
+                "SELECT COUNT(*) FROM schema_history"));
+    }
+
+    /** Regression: a released-shaped target with the wrong hash remains read-only. */
+    @Test
+    void releasedRoutedV2SchemaWithWrongHashRemainsReadOnly() throws Exception {
+        Path database = temporaryDirectory.resolve("tamework-state.sqlite");
+        initializeReleasedRoutedV2Schema(database);
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openWriterConnection();
+             Statement statement = connection.createStatement()) {
+            statement.executeUpdate("UPDATE schema_history SET schema_hash = '"
+                    + "0".repeat(64) + "'");
+        }
+
+        TameworkPersistenceActivationEvidence evidence = probe(database);
+
+        assertEquals(PersistenceActivationMode.READ_ONLY, evidence.mode());
+        assertFalse(evidence.mutationAllowed());
+        assertFalse(evidence.evidence().contains(
+                "persistence-schema-upgrade-released-v2"));
     }
 
     /** Regression: an invalid v1-shaped target must not be migrated by probing. */
@@ -376,6 +414,33 @@ class TameworkPersistenceActivationProbeTest {
         SqliteSchemaV1Manager manager = new SqliteSchemaV1Manager(
                 new SqliteConnectionFactory(database));
         assertTrue(manager.initialize() instanceof PersistenceTransactionResult.Committed<?>);
+    }
+
+    private void initializeReleasedRoutedV2Schema(Path database)
+            throws Exception {
+        initializeV1Schema(database);
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openWriterConnection();
+             Statement statement = connection.createStatement()) {
+            statement.execute("CREATE INDEX idx_projection_outbox_type_sequence "
+                    + "ON projection_outbox(event_type, event_sequence)");
+            statement.execute("ALTER TABLE schema_history "
+                    + "RENAME TO schema_history_v1_migration");
+            statement.execute("""
+                    CREATE TABLE schema_history (
+                        version INTEGER PRIMARY KEY CHECK (version IN (1, 2)),
+                        lineage TEXT NOT NULL CHECK (lineage = 'tamework-state'),
+                        applied_at_ms INTEGER NOT NULL,
+                        schema_hash TEXT NOT NULL CHECK (length(schema_hash) = 64)
+                    )
+                    """);
+            statement.executeUpdate("""
+                    INSERT INTO schema_history(
+                        version, lineage, applied_at_ms, schema_hash
+                    ) VALUES (2, 'tamework-state', -100, '"""
+                    + SqliteReleasedRoutedV2Gateway.SCHEMA_HASH + "')");
+            statement.execute("DROP TABLE schema_history_v1_migration");
+        }
     }
 
     private int queryInt(Path database, String sql) throws Exception {

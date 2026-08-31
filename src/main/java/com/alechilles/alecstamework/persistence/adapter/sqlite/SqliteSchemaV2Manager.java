@@ -129,6 +129,10 @@ public final class SqliteSchemaV2Manager implements PersistenceSchemaManager {
         if (inspection.objects().equals(REQUIRED_OBJECTS)) {
             return initializeExisting();
         }
+        if (SqliteReleasedRoutedV2Gateway.matches(inspection)
+                && validReleasedRoutedV2Schema()) {
+            return upgradeReleasedRoutedV2();
+        }
         if (inspection.objects().equals(V1_OBJECTS)
                 && validV1Schema()) {
             return upgradeV1();
@@ -216,36 +220,42 @@ public final class SqliteSchemaV2Manager implements PersistenceSchemaManager {
     }
 
     private PersistenceTransactionResult<PersistenceSchemaStatus> upgradeV1() {
-        try {
-            new SqliteSchemaV2Migration(
-                    connections, clock, scriptHash
-            ).migrate();
-            PersistenceReadResult<PersistenceSchemaStatus> verified = verify();
-            if (verified instanceof PersistenceReadResult.Found<PersistenceSchemaStatus> found) {
-                return new PersistenceTransactionResult.Committed<>(found.value());
-            }
-            return new PersistenceTransactionResult.RolledBack<>(
-                    schemaFailure(
-                            new SchemaVerificationException(
-                                    "replacement_schema_upgrade_verification_failed"
-                            ),
-                            "upgrade_schema_v1_to_v2"
-                    )
-            );
-        } catch (Exception failure) {
-            PersistenceReadResult<PersistenceSchemaStatus> afterFailure = verify();
-            if (afterFailure instanceof PersistenceReadResult.Found<PersistenceSchemaStatus> found) {
-                return new PersistenceTransactionResult.Committed<>(found.value());
-            }
-            return new PersistenceTransactionResult.RolledBack<>(
-                    schemaFailure(failure, "upgrade_schema_v1_to_v2")
-            );
-        }
+        return SqliteSchemaUpgradeCoordinator.run(
+                () -> new SqliteSchemaV2Migration(
+                        connections, clock, scriptHash
+                ).migrate(),
+                this::verify,
+                this::schemaFailure,
+                "replacement_schema_upgrade_verification_failed",
+                "upgrade_schema_v1_to_v2"
+        );
+    }
+
+    private PersistenceTransactionResult<PersistenceSchemaStatus>
+    upgradeReleasedRoutedV2() {
+        return SqliteSchemaUpgradeCoordinator.run(
+                () -> new SqliteReleasedRoutedV2Migration(
+                        connections, clock, scriptHash
+                ).migrate(),
+                this::verify,
+                this::schemaFailure,
+                "replacement_released_v2_upgrade_verification_failed",
+                "upgrade_released_schema_v2"
+        );
     }
 
     private boolean validV1Schema() {
         return new SqliteSchemaV1Manager(connections, clock).verify()
                 instanceof PersistenceReadResult.Found<?>;
+    }
+
+    private boolean validReleasedRoutedV2Schema() {
+        try (Connection connection = connections.openReadConnection()) {
+            SqliteReleasedRoutedV2Gateway.verify(connection);
+            return true;
+        } catch (Exception failure) {
+            return false;
+        }
     }
 
     private void createSchema(Connection connection) throws Exception {
