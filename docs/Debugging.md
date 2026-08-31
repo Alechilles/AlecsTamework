@@ -20,7 +20,7 @@ the server-global `debug*` logging toggles. Patchwork administration requires
 the `patchwork.admin` permission.
 `/tw debugcrashtelemetry` status and `flush` are also console-safe; its simulated
 event/crash actions remain restricted to the existing allowlisted player identities.
-`/tw debugdb [status|health|integrity|detail|export]` is console-safe.
+`/tw debug persistence [status|health|detail|export]` is console-safe.
 Status and detail actions are read-only. `export` writes a bounded, redacted
 support ZIP without changing persistence state. Every response line is sent to
 the command caller and written to the server log. This includes the export
@@ -91,21 +91,21 @@ player-scoped. In particular, `/tw config`, `/tw settings`, `/tw news`,
   active directory). Restoring only `tamework.sqlite` leaves the previous target
   authoritative. The first clean import reports `IMPORTED_PUBLIC`; `EXISTING`
   means no import ran during that startup.
-- After a clean import, wait for `/tw debugdb status` to report storage mode
+- After a clean import, wait for `/tw debug persistence status` to report storage mode
   `READ_WRITE` and startup readiness `MUTATION_READY` before testing capture,
   release, or recovery. `STARTING` with `RECONCILE_WORLD` running is a transient
   safety gate: an attempted mutation is rejected with `world_evidence_pending`,
   the source item remains untouched, and the player should retry after startup
   becomes mutation-ready.
-- Use `/tw debugdb status` for engine, target-origin, schema, startup, operation,
-  validation, and checkpoint state. `health` and `integrity` are aliases for
-  the same bounded summary.
-- Use `/tw debugdb detail` for bounded feature, outbox, operation-phase,
+- Use `/tw debug persistence status` for engine, target-origin, schema, startup,
+  operation, validation, and checkpoint state. `health` is an alias for the
+  same bounded summary.
+- Use `/tw debug persistence detail` for bounded feature, outbox, operation-phase,
   incident, quarantine, and `openCircuits` counts. It does not repair or retry
   persistence work. Circuit evidence comes from the one replacement feature
   registry and shared `feature_circuit` table, not an old failure catalog;
   there is no separate persistence rehearsal runtime.
-- Use `/tw debugdb export` to create a bounded support ZIP under the universe's
+- Use `/tw debug persistence export` to create a bounded support ZIP under the universe's
   Tamework `Data/diagnostics` directory. It contains sanitized operational
   status, counters, and durable diagnostic summaries. It excludes the SQLite
   database, save data, player identities, coordinates, inventory payloads,

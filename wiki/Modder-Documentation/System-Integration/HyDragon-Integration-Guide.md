@@ -159,9 +159,9 @@ generic API as a fallback for one bonded profile.
 Use:
 
 ```text
-/tw debugdb status
-/tw debugdb detail
-/tw debugdb export
+/tw debug persistence status
+/tw debug persistence detail
+/tw debug persistence export
 ```
 
 The export includes a redacted `bonded-companions.json` member containing only

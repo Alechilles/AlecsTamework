@@ -165,7 +165,7 @@ HyDragon bonded database or legacy generic fallback.
 
 Tamework reports redacted aggregate bonded readiness, schema version, state
 counts, active leases, bounded cleanup count, and a fixed failure category.
-`/tw debugdb export` includes `bonded-companions.json` without owners, profile
+`/tw debug persistence export` includes `bonded-companions.json` without owners, profile
 IDs, NPC UUIDs, snapshots, or extension payloads.
 
 HyDragon reports capability names, per-feature gate state, missing

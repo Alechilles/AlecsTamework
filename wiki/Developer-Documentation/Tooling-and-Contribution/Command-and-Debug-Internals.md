@@ -30,7 +30,7 @@ Additional diagnostics that are command-driven (not startup-toggle defaults) inc
 - `/tw showhitboxes`
 - `/tw showspawnbeacons [radius|off]`
 - `/tw debugcrashtelemetry`
-- `/tw debugdb [status|health|integrity|detail|export]`
+- `/tw debug persistence [status|health|detail|export]`
 
 `TameworkShowSpawnBeaconsCommand` maintains per-player radius sessions while
 `SpawnBeaconVisualizationService` owns one non-persistent visual proxy per

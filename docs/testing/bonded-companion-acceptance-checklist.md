@@ -23,7 +23,7 @@ background monitor running while waiting for manual feedback.
   available for the timer pass.
 - Hytale logs remain available if a pass fails.
 
-For passes 1–9, run `/tw debugdb export` only if the pass fails, then provide
+For passes 1–9, run `/tw debug persistence export` only if the pass fails, then provide
 the reported archive path and relevant server-log excerpt. Pass 10 always runs
 all three diagnostic commands as its actual acceptance action.
 
@@ -42,7 +42,7 @@ Expected visible result:
 - name, species, gender, health, details, and valid action buttons are visible
   immediately without relogging.
 
-Failure collection: `/tw debugdb export`.
+Failure collection: `/tw debug persistence export`.
 
 ## 2. Summon from the Horn
 
@@ -57,7 +57,7 @@ Expected visible result:
 - Follow/Hold/other configured Horn commands affect that exact dragon; and
 - no "persistence evidence isn't ready" or "NPC is not linked" message appears.
 
-Failure collection: `/tw debugdb export`.
+Failure collection: `/tw debug persistence export`.
 
 ## 3. Dismiss/store
 
@@ -72,7 +72,7 @@ Expected visible result:
   and
 - Summon reflects the configured cooldown/capacity state.
 
-Failure collection: `/tw debugdb export`.
+Failure collection: `/tw debug persistence export`.
 
 ## 4. Capacity and cooldown
 
@@ -86,7 +86,7 @@ Expected visible result:
 - an eligible different profile summons only when the family has capacity; and
 - denied clicks do not create a projection, duplicate lease, or generic error.
 
-Failure collection: `/tw debugdb export`.
+Failure collection: `/tw debug persistence export`.
 
 ## 5. Death and paid revival
 
@@ -103,7 +103,7 @@ Expected visible result:
 - no NPC appears until Summon is clicked; and
 - manual summon creates one projection of the revived profile.
 
-Failure collection: `/tw debugdb export`.
+Failure collection: `/tw debug persistence export`.
 
 ## 6. Finite and unlimited sessions
 
@@ -117,7 +117,7 @@ Expected visible result:
 - the zero-duration lease remains active past the finite test window; and
 - signed world-time values do not make either timer immediately invalid.
 
-Failure collection: `/tw debugdb export`.
+Failure collection: `/tw debug persistence export`.
 
 ## 7. Relog and world transfer
 
@@ -130,7 +130,7 @@ Expected visible result:
 - leaving one world and entering another stores it instead of copying it; and
 - the Horn shows `STORED` with full details, never Lost or Unloaded.
 
-Failure collection: `/tw debugdb export`.
+Failure collection: `/tw debug persistence export`.
 
 ## 8. Soul-bond a Miniwyvern
 
@@ -148,7 +148,7 @@ Expected visible result:
   summon, store, and relog; and
 - death produces `DEAD`, revival produces `STORED`, and summon is manual.
 
-Failure collection: `/tw debugdb export`.
+Failure collection: `/tw debug persistence export`.
 
 ## 9. Active full-dragon eligibility
 
@@ -164,12 +164,12 @@ Expected visible result:
 - an active Miniwyvern does not qualify; and
 - stale NPCs or old generic population evidence do not qualify.
 
-Failure collection: `/tw debugdb export`.
+Failure collection: `/tw debug persistence export`.
 
 ## 10. Diagnostics and redaction
 
-- [ ] Run `/tw debugdb status`, `/tw debugdb detail`, and
-  `/tw debugdb export`. Verify aggregate bonded status and a redacted bonded
+- [ ] Run `/tw debug persistence status`, `/tw debug persistence detail`, and
+  `/tw debug persistence export`. Verify aggregate bonded status and a redacted bonded
   bundle entry.
 
 Expected visible result:

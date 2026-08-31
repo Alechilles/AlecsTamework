@@ -195,7 +195,8 @@ Bonded data is stored in the universe-scoped
 cleanup intents, leases, and readiness are isolated from generic replacement
 persistence. Integrations must not open this file or depend on its tables.
 
-`/tw debugdb status`, `/tw debugdb detail`, and `/tw debugdb export` include
+`/tw debug persistence status`, `/tw debug persistence detail`, and
+`/tw debug persistence export` include
 aggregate bonded readiness and counts. The export member is
 `bonded-companions.json` and is restricted to readiness, schema version, state
 counts, lease count, pending bounded-cleanup count, and a fixed failure

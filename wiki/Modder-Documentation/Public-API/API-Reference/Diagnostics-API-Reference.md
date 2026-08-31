@@ -27,5 +27,5 @@ Health status is one of `HEALTHY`, `READ_ONLY`, `STARTING`, `DRAINING`, or
 `CLOSED`. Queue fields are a compatibility-shaped summary of the replacement
 writer, not access to an internal work queue.
 
-This API view is intentionally smaller than the operator-only `/tw debugdb
-detail` output.
+This API view is intentionally smaller than the operator-only `/tw debug
+persistence detail` output.

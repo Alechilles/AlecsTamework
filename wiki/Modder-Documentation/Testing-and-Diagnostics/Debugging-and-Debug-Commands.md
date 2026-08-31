@@ -27,7 +27,7 @@ Use this page when an asset or integration loads but behaves incorrectly.
 - `/tw npc clean <roleId>`
 - `/tw debug view hitboxes`
 - `/tw debug view spawnbeacons [radius|off]`
-- `/tw debug persistence debugdb [status|health|integrity|detail|export]`
+- `/tw debug persistence [status|health|detail|export]`
 - `/tw debug persistence reviveready`
 
 `/tw debug view spawnbeacons` tracks loaded natural spawn beacons around the caller
@@ -86,7 +86,7 @@ Command status comes from the canonical lifecycle projection. A relocation
 timeout only drops the pending retry; it cannot manufacture `LOST`, and none of
 the debug toggles changes that rule.
 
-`/tw debug persistence debugdb status`, `health`, and `integrity` print the same bounded
+`/tw debug persistence status` and `health` print the same bounded
 replacement-persistence summary. `detail` adds bounded feature, outbox,
 operation-phase, incident, quarantine, and circuit counts. `export` writes a
 bounded redacted support ZIP under Tamework's universe data directory without

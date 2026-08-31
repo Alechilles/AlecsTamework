@@ -62,7 +62,7 @@ public final class TameworkSettingsAnnouncementStore {
     };
     private static final String[] DEFAULT_BODY_LINES = {
             "The new persistence system is designed to make companion data more reliable, but a major rework can still have hiccups. Please keep an eye out for unexpected companion, capture, storage, or restore behavior.",
-            "If you run into an issue, run /tw debugdb export before restarting if possible. This creates a redacted support package under Data/diagnostics.",
+            "If you run into an issue, run /tw debug persistence export before restarting if possible. This creates a redacted support package under Data/diagnostics.",
             "Then create an issue in the Discord server's Issues and Bug Reports channel: https://discord.gg/uP5bNTVSze. Include your full server log and the exported package."
     };
 

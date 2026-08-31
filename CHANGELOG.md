@@ -13,6 +13,8 @@
 
 ### Changed
 
+- Persistence diagnostics now use the direct `/tw debug persistence
+  status|health|detail|export` commands.
 - Automatic persistence reports run outside the storage path and use a bounded
   queue. They never block or change the result of a persistence operation.
 - Disabling Tamework telemetry remains the opt-out for all automatic Tamework

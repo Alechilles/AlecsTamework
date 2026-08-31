@@ -80,7 +80,7 @@ directory, or move the existing `tamework-state.sqlite` target and its WAL/SHM
 sidecars, `persistence-engine.json`, and prior `persistence-import-*.json` report
 out of the active directory before starting the migration candidate. Restoring
 only `tamework.sqlite` does not create a fresh migration. On the first successful
-startup, `/tw debugdb status` reports target origin `IMPORTED_PUBLIC`; `EXISTING`
+startup, `/tw debug persistence status` reports target origin `IMPORTED_PUBLIC`; `EXISTING`
 means a replacement target was reused and no import ran during that startup.
 
 Do not test capture, filled-item release, or recovery until that status also
@@ -153,18 +153,18 @@ directly.
 
 ## Operator diagnostics
 
-`/tw debugdb status`, `health`, and `integrity` print the same bounded
+`/tw debug persistence status` and `health` print the same bounded
 replacement status: engine lineage, storage mode, target origin, schema
 version, startup state, operation counters, schema validation, and checkpoint
 status.
 
-`/tw debugdb detail` adds bounded feature, outbox, operation-phase, incident,
+`/tw debug persistence detail` adds bounded feature, outbox, operation-phase, incident,
 quarantine, and circuit counts. It does not repair data, retry an operation,
 clear evidence, import coop residents, or change feature state.
 
-`/tw debugdb export` writes a bounded redacted support ZIP under
+`/tw debug persistence export` writes a bounded redacted support ZIP under
 `Data/diagnostics`. The bundle contains the same sanitized replacement status,
 metrics, and durable detail exposed by the diagnostic reader. It excludes the
 SQLite database, saves, player identities, coordinates, inventory payloads,
-secrets, and unrestricted logs. All `debugdb` response lines also go to the
+secrets, and unrestricted logs. All persistence diagnostic response lines also go to the
 server log so operators can collect them after command chat closes.
