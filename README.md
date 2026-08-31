@@ -122,7 +122,8 @@ If you run into a bug, integration issue, or behavior problem, report it in the 
 https://discord.gg/E8n8RgTTdq
 
 <H2>Telemetry</H2>
-<p><a href="https://www.curseforge.com/hytale/mods/alecs-tamework">Alec's Tamework</a> uses <a href="https://www.curseforge.com/hytale/mods/alecs-telemetry">Alec's Telemetry</a> for its own crash, error, performance, and usage telemetry. The Patchwork runtime embedded in Tamework reports Patchwork operations through a separate hosted-only project.</p>
+<p><a href="https://www.curseforge.com/hytale/mods/alecs-tamework">Alec's Tamework</a> uses <a href="https://www.curseforge.com/hytale/mods/alecs-telemetry">Alec's Telemetry</a> for its own crash, error, performance, usage, and automatic persistence diagnostics. The Patchwork runtime embedded in Tamework reports Patchwork operations through a separate hosted-only project.</p>
+<p>Automatic Tamework persistence diagnostics contain a bounded, redacted debug database ZIP and a safe error classification. They exclude the SQLite database, save data, player identity, coordinates, inventory payloads, secrets, exception messages, and unrestricted logs. Set <code>telemetry.enabled</code> to <code>false</code> in Tamework's global settings to opt out.</p>
 <p>Automatic aggregate Tamework and Patchwork telemetry does not include personally identifiable information and is used to diagnose issues and improve the mods. Reports you submit manually can include the contact text and server-log attachments you choose to send; review those fields and files before submitting.</p>
 <p>Tamework and Patchwork have independent consent entries, so disabling Tamework telemetry does not implicitly disable Patchwork telemetry. You may change either entry at any time in the `/telemetry consent` menu.</p>
 <p>Alec's Tamework also reports anonymized active user numbers to <a href="https://hstats.dev/">HStats</a> to track active user count summaries.</p>
