@@ -23,6 +23,9 @@
 
 ### Fixed
 
+- A failed persistence request no longer disables unrelated companion actions
+  unless Tamework detects database corruption, an incompatible schema, or an
+  unresolved commit outcome.
 - Existing replacement databases from Tamework 3.2.x now upgrade to the
   expanded persistence schema without deleting profiles or resetting player
   data. The upgrade creates a verified sibling backup before it changes the

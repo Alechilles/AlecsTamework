@@ -45,6 +45,17 @@ Deterministic gates cover 10,000 unrelated projection events followed by one
 relevant event and 500 distinct live profile observations. A staged server
 test must still measure the live p95 spawn and Recall latency target.
 
+## 2026-08-31 failure-containment amendment
+
+Runtime read failures and confirmed rollbacks remain request-local unless they
+prove schema mismatch or database corruption. Unresolved transaction outcomes
+remain globally read-only. Checkpoint observer and shutdown checkpoint
+failures remain diagnostic-only. Every failure still reaches passive metrics
+and automatic diagnostics.
+
+This amendment changes failure impact only. It does not change schemas, stored
+fields, public import, operation payloads, or bonded persistence.
+
 ## Context
 
 The replacement architecture needs fewer independent mechanisms than the unreleased v5-v9
