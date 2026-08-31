@@ -23,6 +23,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.ArrayList;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -43,6 +44,50 @@ class PublicPersistenceControlPlaneTest {
     private static final OwnerId OWNER = OwnerId.parse(
             "20000000-0000-0000-0000-000000000001"
     );
+
+    @Test
+    void emitsSignalsOnlyForTerminalPersistenceFailures() {
+        PersistenceFeatureRegistry registry = PublicPersistenceFeatureRegistry.create();
+        ArrayList<PersistenceFailureSignal> signals = new ArrayList<>();
+        PublicPersistenceControlPlane control =
+                new PublicPersistenceControlPlane(registry, signals::add);
+        control.bind(ready(registry));
+        OperationId operationId = OperationId.create();
+
+        control.writeCompleted(
+                operationId,
+                CompanionCaptureDefinition.KIND,
+                new PersistenceTransactionResult.Committed<>("done")
+        );
+        assertTrue(signals.isEmpty());
+
+        control.writeCompleted(
+                operationId,
+                CompanionCaptureDefinition.KIND,
+                new PersistenceTransactionResult.RolledBack<>(failure(
+                        StorageFailureKind.IO,
+                        "sqlite_write_failed",
+                        false
+                ))
+        );
+        control.readCompleted(
+                TEST_READ,
+                PersistenceReadResult.failed(failure(
+                        StorageFailureKind.CORRUPT,
+                        "sqlite_read_failed",
+                        false
+                ))
+        );
+        control.checkpointFailure("shutdown", new IllegalStateException("checkpoint"));
+        control.shutdownTimedOut(2);
+
+        assertEquals(4, signals.size());
+        assertEquals("persistence_write_failed", signals.get(0).eventName());
+        assertEquals(operationId.toString(), signals.get(0).incidentKey());
+        assertEquals("persistence_read_failed", signals.get(1).eventName());
+        assertEquals("persistence_checkpoint_failed", signals.get(2).eventName());
+        assertEquals("persistence_shutdown_timeout", signals.get(3).eventName());
+    }
 
     @Test
     void derivesEveryFeatureMetricAndKeepsBoundedFailuresBounded() {

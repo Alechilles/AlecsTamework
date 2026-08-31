@@ -10,6 +10,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.io.IOException;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,6 +19,7 @@ import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
@@ -111,6 +113,50 @@ public final class PersistenceDiagnosticExporter {
                         && read instanceof PersistenceReadResult.Found<?>
                         ? export(status, metrics, read)
                         : exportBondedOnly());
+    }
+
+    /**
+     * Builds a best-effort in-memory failure package for telemetry submission.
+     * The caller owns its execution thread.
+     */
+    @Nonnull
+    public FailurePackage exportFailurePackage(
+            @Nonnull PersistenceFailureContext failure,
+            int maxBytes
+    ) {
+        LinkedHashMap<String, byte[]> evidence = new LinkedHashMap<>();
+        if (diagnostics != null) {
+            try {
+                evidence.put("operational-status.json", json(statusJson(diagnostics.status())));
+            } catch (RuntimeException ignored) {
+                // The failure package remains useful without runtime status.
+            }
+            try {
+                evidence.put("metrics.json", metricsJson(diagnostics.metrics()));
+            } catch (RuntimeException ignored) {
+                // The failure package remains useful without metrics.
+            }
+            try {
+                PersistenceReadResult<PublicPersistenceDiagnosticsSnapshot> read =
+                        diagnostics.details().toCompletableFuture()
+                                .get(MAX_COLLECTION_SECONDS, TimeUnit.SECONDS);
+                if (read instanceof PersistenceReadResult.Found<
+                        PublicPersistenceDiagnosticsSnapshot> found) {
+                    evidence.put("diagnostic-detail.json", json(found.value()));
+                }
+            } catch (Exception ignored) {
+                // Detail reads are optional evidence.
+            }
+        }
+        BondedCompanionDiagnosticContributor contributor = bondedContributor.get();
+        if (contributor != null) {
+            try {
+                appendBondedEntry(evidence, contributor);
+            } catch (RuntimeException ignored) {
+                // Bonded evidence must not prevent a generic failure package.
+            }
+        }
+        return buildFailurePackage(failure, maxBytes, evidence);
     }
 
     private ExportResult exportBondedOnly() {
@@ -239,34 +285,131 @@ public final class PersistenceDiagnosticExporter {
                     "Diagnostic bundle exceeds its bounded evidence budget"
             );
         }
-        byte[] manifest = manifest(
-                supportId,
-                createdAt,
-                members,
-                uncompressedBytes
-        );
+        byte[] bundle = bundleBytes(supportId, createdAt, members, uncompressedBytes);
         Files.createDirectories(bundleDirectory);
         Path destination = bundleDirectory.resolve(
                 "tamework-persistence-" + supportId + ".zip"
         );
-        try (ZipOutputStream zip = new ZipOutputStream(
-                Files.newOutputStream(
-                        destination,
-                        StandardOpenOption.CREATE_NEW,
-                        StandardOpenOption.WRITE
-                )
-        )) {
-            writeEntry(zip, "manifest.json", manifest);
-            for (Map.Entry<String, byte[]> member : members.entrySet()) {
-                writeEntry(zip, member.getKey(), member.getValue());
-            }
-        }
+        Files.write(
+                destination,
+                bundle,
+                StandardOpenOption.CREATE_NEW,
+                StandardOpenOption.WRITE
+        );
         return new ExportResult(
                 supportId,
                 destination.toAbsolutePath().normalize(),
                 Files.size(destination),
                 members.size() + 1
         );
+    }
+
+    static FailurePackage buildFailurePackage(
+            @Nonnull PersistenceFailureContext failure,
+            int maxBytes,
+            @Nonnull Map<String, byte[]> evidence
+    ) {
+        Objects.requireNonNull(failure, "failure");
+        Objects.requireNonNull(evidence, "evidence");
+        if (maxBytes < 1) {
+            throw new IllegalArgumentException("A positive failure package limit is required");
+        }
+        String supportId = UUID.randomUUID().toString().replace("-", "");
+        Instant createdAt = Instant.now();
+        LinkedHashMap<String, byte[]> members = new LinkedHashMap<>();
+        members.put("failure.json", failureJson(failure));
+        evidence.forEach((name, content) -> {
+            if (content != null && !"failure.json".equals(name)) members.put(name, content);
+        });
+
+        byte[] bundle = boundedFailureBundle(supportId, createdAt, members, maxBytes);
+        return new FailurePackage(supportId, bundle, countZipMembers(members));
+    }
+
+    @Nonnull
+    private static byte[] boundedFailureBundle(
+            @Nonnull String supportId,
+            @Nonnull Instant createdAt,
+            @Nonnull LinkedHashMap<String, byte[]> members,
+            int maxBytes
+    ) {
+        byte[] bundle = bundleBytes(supportId, createdAt, members, evidenceBytes(members));
+        if (bundle.length <= maxBytes) return bundle;
+
+        members.remove("diagnostic-detail.json");
+        bundle = bundleBytes(supportId, createdAt, members, evidenceBytes(members));
+        if (bundle.length <= maxBytes) return bundle;
+
+        members.remove("bonded-companions.json");
+        bundle = bundleBytes(supportId, createdAt, members, evidenceBytes(members));
+        if (bundle.length <= maxBytes) return bundle;
+
+        members.keySet().removeIf(name -> !Set.of(
+                "failure.json", "operational-status.json", "metrics.json"
+        ).contains(name));
+        bundle = bundleBytes(supportId, createdAt, members, evidenceBytes(members));
+        if (bundle.length <= maxBytes) return bundle;
+
+        throw new IllegalArgumentException("Minimal diagnostic failure package exceeds its limit");
+    }
+
+    private static long evidenceBytes(@Nonnull Map<String, byte[]> members) {
+        long bytes = members.values().stream().mapToLong(value -> value.length).sum();
+        if (bytes > MAX_UNCOMPRESSED_BYTES) {
+            throw new IllegalArgumentException("Diagnostic bundle exceeds its bounded evidence budget");
+        }
+        return bytes;
+    }
+
+    @Nonnull
+    private static byte[] bundleBytes(
+            @Nonnull String supportId,
+            @Nonnull Instant createdAt,
+            @Nonnull Map<String, byte[]> members,
+            long uncompressedBytes
+    ) {
+        try {
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            try (ZipOutputStream zip = new ZipOutputStream(output)) {
+                writeEntry(zip, "manifest.json", manifest(
+                        supportId, createdAt, members, uncompressedBytes
+                ));
+                for (Map.Entry<String, byte[]> member : members.entrySet()) {
+                    writeEntry(zip, member.getKey(), member.getValue());
+                }
+            }
+            return output.toByteArray();
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not build persistence diagnostic bundle", failure);
+        }
+    }
+
+    private static int countZipMembers(@Nonnull Map<String, byte[]> members) {
+        return members.size() + 1;
+    }
+
+    @Nonnull
+    private static byte[] failureJson(@Nonnull PersistenceFailureContext failure) {
+        JsonObject json = new JsonObject();
+        json.addProperty("eventName", failure.eventName());
+        json.addProperty("incidentHash", sha256(
+                failure.incidentKey().getBytes(StandardCharsets.UTF_8)
+        ).substring(0, 16));
+        json.addProperty("operation", failure.operation());
+        json.addProperty("phase", failure.phase());
+        json.addProperty("reason", failure.reason());
+        Throwable cause = failure.cause();
+        if (cause != null) {
+            json.addProperty("exceptionClass", cause.getClass().getName());
+            JsonArray frames = new JsonArray();
+            StackTraceElement[] trace = cause.getStackTrace();
+            for (int index = 0; index < Math.min(trace.length, 20); index++) {
+                StackTraceElement frame = trace[index];
+                frames.add(frame.getClassName() + "#" + frame.getMethodName());
+            }
+            json.add("stackFrames", frames);
+        }
+        return json(json);
     }
 
     private static JsonObject statusJson(
@@ -380,6 +523,24 @@ public final class PersistenceDiagnosticExporter {
                         "Complete diagnostic export result is required"
                 );
             }
+        }
+    }
+
+    /** In-memory redacted package for one automatic diagnostic bundle. */
+    public record FailurePackage(@Nonnull String supportId,
+                                 @Nonnull byte[] content,
+                                 int memberCount) {
+        public FailurePackage {
+            if (supportId == null || supportId.isBlank() || content == null
+                    || content.length < 1 || memberCount < 2) {
+                throw new IllegalArgumentException("Complete failure package is required");
+            }
+            content = content.clone();
+        }
+
+        @Override
+        public byte[] content() {
+            return content.clone();
         }
     }
 }

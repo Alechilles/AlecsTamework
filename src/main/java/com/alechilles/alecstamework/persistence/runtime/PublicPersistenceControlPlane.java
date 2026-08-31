@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.LongAdder;
+import java.util.function.Consumer;
 
 /**
  * One passive bridge from kernel outcomes and durable containment to the
@@ -35,6 +36,7 @@ final class PublicPersistenceControlPlane
         PersistenceContainmentListener,
         PersistenceThroughputMetrics {
     private final PersistenceFeatureRegistry registry;
+    private final Consumer<PersistenceFailureSignal> failureSink;
     private final Map<PersistenceFeatureId, FeatureCounters> features;
     private final LongAdder readsCompleted = new LongAdder();
     private final LongAdder readsFailed = new LongAdder();
@@ -72,12 +74,20 @@ final class PublicPersistenceControlPlane
     private volatile PersistenceStartupCoordinator startup;
 
     PublicPersistenceControlPlane(PersistenceFeatureRegistry registry) {
+        this(registry, ignored -> { });
+    }
+
+    PublicPersistenceControlPlane(
+            PersistenceFeatureRegistry registry,
+            Consumer<PersistenceFailureSignal> failureSink
+    ) {
         if (registry == null) {
             throw new IllegalArgumentException(
                     "Control plane feature registry is required"
             );
         }
         this.registry = registry;
+        this.failureSink = failureSink == null ? ignored -> { } : failureSink;
         HashMap<PersistenceFeatureId, FeatureCounters> counters =
                 new HashMap<>();
         for (PersistenceFeatureDescriptor descriptor
@@ -187,6 +197,33 @@ final class PublicPersistenceControlPlane
     }
 
     @Override
+    public void writeCompleted(
+            OperationId operationId,
+            OperationKind operationKind,
+            PersistenceTransactionResult<?> result
+    ) {
+        if (result instanceof PersistenceTransactionResult.RolledBack<?> rolledBack) {
+            emit(new PersistenceFailureSignal(
+                    "persistence_write_failed",
+                    operationId.toString(),
+                    operationKind.toString(),
+                    "final_write",
+                    rolledBack.failure().code(),
+                    rolledBack.failure().cause()
+            ));
+        } else if (result instanceof PersistenceTransactionResult.Unknown<?> unknown) {
+            emit(new PersistenceFailureSignal(
+                    "persistence_write_failed",
+                    operationId.toString(),
+                    operationKind.toString(),
+                    "final_write",
+                    unknown.failure().code(),
+                    unknown.failure().cause()
+            ));
+        }
+    }
+
+    @Override
     public void readCompleted(
             PersistenceReadKind readKind,
             PersistenceReadResult<?> result
@@ -200,6 +237,14 @@ final class PublicPersistenceControlPlane
             if (globalFailure(failed.failure())) {
                 enterGlobal(failed.failure());
             }
+            emit(new PersistenceFailureSignal(
+                    "persistence_read_failed",
+                    "read:" + readKind + ":" + failed.failure().code(),
+                    readKind.toString(),
+                    "read",
+                    failed.failure().code(),
+                    failed.failure().cause()
+            ));
         }
     }
 
@@ -213,11 +258,27 @@ final class PublicPersistenceControlPlane
                 ? "unknown"
                 : checkpoint.trim().toLowerCase(java.util.Locale.ROOT);
         enterGlobal("checkpoint_failure:" + normalized);
+        emit(new PersistenceFailureSignal(
+                "persistence_checkpoint_failed",
+                "checkpoint:" + normalized + ":" + failure.getClass().getName(),
+                normalized,
+                "checkpoint",
+                "checkpoint_failure",
+                failure
+        ));
     }
 
     @Override
     public void shutdownTimedOut(int outstandingOperations) {
         shutdownTimeouts.increment();
+        emit(new PersistenceFailureSignal(
+                "persistence_shutdown_timeout",
+                "shutdown_timeout:" + Math.max(0, outstandingOperations),
+                "shutdown",
+                "shutdown",
+                "outstanding_operations",
+                null
+        ));
     }
 
     @Override
@@ -316,6 +377,29 @@ final class PublicPersistenceControlPlane
             long elapsedNanos
     ) {
         startupTimings.get(node).observe(elapsedNanos);
+    }
+
+    void startupNodeFailed(
+            com.alechilles.alecstamework.persistence.control
+                    .PersistenceStartupNode node,
+            Throwable failure
+    ) {
+        emit(new PersistenceFailureSignal(
+                "persistence_startup_failed",
+                "startup:" + node.name() + ":" + failure.getClass().getName(),
+                node.name(),
+                "startup",
+                "startup_action_failed",
+                failure
+        ));
+    }
+
+    private void emit(PersistenceFailureSignal signal) {
+        try {
+            failureSink.accept(signal);
+        } catch (RuntimeException ignored) {
+            // Diagnostics must never alter persistence control flow.
+        }
     }
 
     @Override

@@ -7,6 +7,9 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.Set;
+import java.util.Random;
+import java.io.ByteArrayInputStream;
+import java.util.zip.ZipInputStream;
 import java.util.zip.ZipFile;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceThroughputSnapshot;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceMetricsSnapshot;
@@ -23,6 +26,71 @@ class PersistenceDiagnosticExporterTest {
 
     @TempDir
     java.nio.file.Path temporaryDirectory;
+
+    @Test
+    void failurePackageStillExistsWhenDatabaseEvidenceIsUnavailable()
+            throws Exception {
+        PersistenceDiagnosticExporter.FailurePackage result =
+                PersistenceDiagnosticExporter.buildFailurePackage(
+                        new PersistenceFailureContext(
+                                "persistence_write_failed",
+                                "incident-1",
+                                "SAVE_PROFILE",
+                                "final_write",
+                                "sqlite_failure",
+                                new IllegalStateException("sensitive message")
+                        ),
+                        524_288,
+                        Map.of()
+                );
+
+        Map<String, String> members = zipMembers(result.content());
+        assertTrue(members.containsKey("failure.json"));
+        assertTrue(members.containsKey("manifest.json"));
+        assertFalse(members.get("failure.json").contains("sensitive message"));
+        assertTrue(members.get("failure.json").contains("IllegalStateException"));
+    }
+
+    @Test
+    void failurePackageDropsDetailBeforeEssentialEvidence() throws Exception {
+        byte[] detail = new byte[200_000];
+        new Random(7L).nextBytes(detail);
+        Map<String, byte[]> evidence = new LinkedHashMap<>();
+        evidence.put("operational-status.json", "{}".getBytes(StandardCharsets.UTF_8));
+        evidence.put("metrics.json", "{}".getBytes(StandardCharsets.UTF_8));
+        evidence.put("diagnostic-detail.json", detail);
+
+        PersistenceDiagnosticExporter.FailurePackage result =
+                PersistenceDiagnosticExporter.buildFailurePackage(
+                        new PersistenceFailureContext(
+                                "persistence_read_failed",
+                                "incident-2",
+                                "READ_PROFILE",
+                                "read",
+                                "read_failed",
+                                null
+                        ),
+                        32_000,
+                        evidence
+                );
+
+        Map<String, String> members = zipMembers(result.content());
+        assertTrue(result.content().length <= 32_000);
+        assertTrue(members.containsKey("failure.json"));
+        assertTrue(members.containsKey("operational-status.json"));
+        assertTrue(members.containsKey("metrics.json"));
+        assertFalse(members.containsKey("diagnostic-detail.json"));
+    }
+
+    private static Map<String, String> zipMembers(byte[] content) throws Exception {
+        LinkedHashMap<String, String> members = new LinkedHashMap<>();
+        try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(content))) {
+            for (var entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
+                members.put(entry.getName(), new String(zip.readAllBytes(), StandardCharsets.UTF_8));
+            }
+        }
+        return Map.copyOf(members);
+    }
 
     @Test
     void bundleContainsOnlyManifestAndSuppliedSanitizedMembers()
