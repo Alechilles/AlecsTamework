@@ -15,6 +15,9 @@
   queue. They never block or change the result of a persistence operation.
 - Disabling Tamework telemetry remains the opt-out for all automatic Tamework
   persistence diagnostics.
+- Error events consent also gates automatic persistence diagnostics. A report
+  that cannot enter the telemetry queue remains eligible on the next matching
+  failure.
 
 ## 3.3.1 - Embedded Telemetry Metadata Hotfix - 2026-08-30
 

@@ -126,7 +126,7 @@ public final class PersistenceAutomaticDiagnosticReporter
             return;
         }
         try {
-            executor.execute(() -> submit(signal));
+            executor.execute(() -> submit(signal, reportKey));
         } catch (RejectedExecutionException rejected) {
             release(reportKey);
             warn("Automatic persistence diagnostic queue is full.", rejected);
@@ -136,8 +136,12 @@ public final class PersistenceAutomaticDiagnosticReporter
         }
     }
 
-    private void submit(@Nonnull PersistenceFailureSignal signal) {
+    private void submit(
+            @Nonnull PersistenceFailureSignal signal,
+            @Nonnull String reportKey
+    ) {
         if (reporting.get()) {
+            release(reportKey);
             return;
         }
         reporting.set(true);
@@ -157,22 +161,28 @@ public final class PersistenceAutomaticDiagnosticReporter
                             "application/zip",
                             failurePackage.content()
                     );
-            submitter.apply(new TelemetryDiagnosticBundle(
-                    diagnosticId,
-                    Instant.now().toString(),
-                    "automatic",
-                    "persistence_failure",
-                    "Tamework persistence failure",
-                    "Tamework detected a terminal persistence failure. "
-                            + "A redacted debug database export is attached.",
-                    "error",
-                    TelemetryDiagnosticDisposition.createOrJoinIssue(
-                            fingerprint(signal)
-                    ),
-                    attributes(signal),
-                    List.of(attachment)
-            ));
+            TelemetryDiagnosticBundleResult result = submitter.apply(
+                    new TelemetryDiagnosticBundle(
+                            diagnosticId,
+                            Instant.now().toString(),
+                            "automatic",
+                            "persistence_failure",
+                            "Tamework persistence failure",
+                            "Tamework detected a terminal persistence failure. "
+                                    + "A redacted debug database export is attached.",
+                            "error",
+                            TelemetryDiagnosticDisposition.createOrJoinIssue(
+                                    fingerprint(signal)
+                            ),
+                            attributes(signal),
+                            List.of(attachment)
+                    )
+            );
+            if (result == null || !result.accepted()) {
+                release(reportKey);
+            }
         } catch (RuntimeException failure) {
+            release(reportKey);
             warn("Could not build or submit an automatic persistence diagnostic.", failure);
         } finally {
             reporting.remove();

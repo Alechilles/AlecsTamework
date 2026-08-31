@@ -106,6 +106,39 @@ class PersistenceAutomaticDiagnosticReporterTest {
     }
 
     @Test
+    void disabledSubmissionAllowsSameFailureAfterTelemetryIsEnabled() {
+        AtomicInteger submissions = new AtomicInteger();
+        PersistenceAutomaticDiagnosticReporter reporter =
+                new PersistenceAutomaticDiagnosticReporter(
+                        ignored -> new PersistenceDiagnosticExporter.FailurePackage(
+                                "support-id", new byte[]{1}, 2
+                        ),
+                        bundle -> new TelemetryDiagnosticBundleResult(
+                                submissions.incrementAndGet() == 1
+                                        ? TelemetryDiagnosticBundleResult.Status.DISABLED
+                                        : TelemetryDiagnosticBundleResult.Status.QUEUED,
+                                null
+                        ),
+                        Runnable::run,
+                        null
+                );
+        PersistenceFailureSignal first = new PersistenceFailureSignal(
+                "persistence_write_failed", "operation-1", "profile_write",
+                "final_write", "storage_failure", null
+        );
+        PersistenceFailureSignal second = new PersistenceFailureSignal(
+                first.eventName(), "operation-2", first.operation(),
+                first.phase(), first.reason(), first.cause()
+        );
+
+        reporter.accept(first);
+        reporter.accept(second);
+
+        assertEquals(2, submissions.get());
+        reporter.close();
+    }
+
+    @Test
     void queuedReportCanDrainAfterCloseStarts() {
         AtomicInteger submissions = new AtomicInteger();
         ExecutorService executor = Executors.newSingleThreadExecutor();
