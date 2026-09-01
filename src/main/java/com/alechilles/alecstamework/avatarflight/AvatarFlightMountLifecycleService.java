@@ -104,7 +104,7 @@ public final class AvatarFlightMountLifecycleService {
         AvatarFlightRestorationPolicy.Position restoration = selectRestorationPosition(
                 store, playerRef, session, reason);
         AvatarFlightActivator.Result disabled = activator.disable(store, playerRef, playerUuid);
-        restoreSourceAndPlacePlayer(store, playerRef, session, restoration);
+        restoreSourceAndPlacePlayer(store, playerRef, session, restoration, reason);
         store.tryRemoveComponent(playerRef, sessionType);
         log(reason == EndReason.NORMAL ? Level.INFO : Level.WARNING, "ended", session, reason);
         if (disabled.ok()) {
@@ -164,7 +164,8 @@ public final class AvatarFlightMountLifecycleService {
     private void restoreSourceAndPlacePlayer(Store<EntityStore> store,
                                              Ref<EntityStore> playerRef,
                                              AvatarFlightMountSessionComponent session,
-                                             AvatarFlightRestorationPolicy.Position restoration) {
+                                             AvatarFlightRestorationPolicy.Position restoration,
+                                             EndReason reason) {
         Ref<EntityStore> sourceRef = resolve(store, session.getSourceNpcUuid());
         TwAvatarFlightConfig config = TwAvatarFlightConfig.resolve(session.getConfigId());
         AvatarFlightMountingSettings settings = config == null
@@ -181,9 +182,13 @@ public final class AvatarFlightMountLifecycleService {
                 store.tryRemoveComponent(sourceRef, sourceType);
             }
         }
-        placePlayer(store, playerRef,
-                restoration.x(), restoration.y(), restoration.z(), restoration.yaw(),
-                settings.getPlayerDismountOffset());
+        placePlayer(
+                store,
+                playerRef,
+                AvatarFlightRestorationPolicy.selectPlayerPosition(
+                        restoration, settings, reason
+                )
+        );
     }
 
     private AvatarFlightRestorationPolicy.Position selectRestorationPosition(
@@ -229,16 +234,14 @@ public final class AvatarFlightMountLifecycleService {
 
     private static void placePlayer(Store<EntityStore> store,
                                     Ref<EntityStore> playerRef,
-                                    double x,
-                                    double y,
-                                    double z,
-                                    float yaw,
-                                    double offset) {
+                                    AvatarFlightRestorationPolicy.Position position) {
         Player player = store.getComponent(playerRef, Player.getComponentType());
         if (player == null) return;
-        double targetX = x - Math.sin(yaw) * offset;
-        double targetZ = z - Math.cos(yaw) * offset;
-        player.moveTo(playerRef, targetX, y, targetZ, store);
+        player.moveTo(
+                playerRef,
+                position.x(), position.y(), position.z(),
+                store
+        );
     }
 
     @Nullable

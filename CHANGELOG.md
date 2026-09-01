@@ -30,6 +30,11 @@
 
 ### Fixed
 
+- Avatar Flight now keeps the transformed player and hidden companion below
+  Hytale's maximum entity height. Reaching the build ceiling no longer removes
+  the companion or ends the flight with a missing source.
+- If an Avatar Flight source is missing, cleanup now returns the player to the
+  last recorded safe-ground position instead of an unsafe airborne origin.
 - A failed persistence request no longer disables unrelated companion actions
   unless Tamework detects database corruption, an incompatible schema, or an
   unresolved commit outcome.

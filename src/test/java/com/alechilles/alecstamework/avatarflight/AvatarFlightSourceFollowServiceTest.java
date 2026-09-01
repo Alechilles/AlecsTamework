@@ -23,4 +23,18 @@ final class AvatarFlightSourceFollowServiceTest {
         assertEquals(rider.getRotation().pitch(), source.getRotation().pitch());
         assertEquals(rider.getRotation().roll(), source.getRotation().roll());
     }
+
+    /** Protects parked source NPCs from Hytale's destructive Y=320 entity removal. */
+    @Test
+    void buildCeilingKeepsRiderAndParkedSourceInNpcHeightRange() {
+        TransformComponent rider = new TransformComponent(
+                new Vector3d(-214.09, 320.1873, 578.67), new Rotation3f());
+        TransformComponent source = new TransformComponent(
+                new Vector3d(2.0, 3.0, 4.0), new Rotation3f());
+
+        assertTrue(new AvatarFlightSourceFollowService().sync(rider, source));
+
+        assertEquals(319.0, rider.getPosition().y);
+        assertEquals(rider.getPosition(), source.getPosition());
+    }
 }
