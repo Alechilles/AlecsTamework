@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Recall can restore an eligible missing companion from its exact saved
+  checkpoint when Update 6 confirms that no source entity section exists.
+
 ## 3.4.0 - Persistence Diagnostics and Schema Compatibility - 2026-08-31
 
 ### Added

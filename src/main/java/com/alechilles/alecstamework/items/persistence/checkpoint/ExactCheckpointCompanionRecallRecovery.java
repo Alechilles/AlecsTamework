@@ -23,11 +23,12 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.universe.world.storage.GetChunkFlags;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BooleanSupplier;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -291,12 +292,29 @@ public final class ExactCheckpointCompanionRecallRecovery
             return CompletableFuture.completedFuture(false);
         }
         int flags = GetChunkFlags.SET_TICKING | GetChunkFlags.NO_GENERATE;
-        return chunks.getChunkSectionReferenceAtBlockAsync(
-                floor(checkpoint.x()),
-                floor(checkpoint.y()),
-                floor(checkpoint.z()),
-                flags
-        ).handle((section, failure) -> failure == null && section != null);
+        CompletionStage<?> sectionLoad =
+                chunks.getChunkSectionReferenceAtBlockAsync(
+                        floor(checkpoint.x()),
+                        floor(checkpoint.y()),
+                        floor(checkpoint.z()),
+                        flags
+                );
+        return sourceProbeCompleted(
+                sectionLoad,
+                () -> source.isAlive() && !chunks.getStore().isShutdown()
+        );
+    }
+
+    /** Accepts clean absence while rejecting load and shutdown failures. */
+    static CompletionStage<Boolean> sourceProbeCompleted(
+            CompletionStage<?> sectionLoad,
+            BooleanSupplier sourceAvailable
+    ) {
+        Objects.requireNonNull(sectionLoad, "sectionLoad");
+        Objects.requireNonNull(sourceAvailable, "sourceAvailable");
+        return sectionLoad.handle((section, failure) ->
+                failure == null && sourceAvailable.getAsBoolean()
+        );
     }
 
     private CompletionStage<RecoveryOutcome> restore(
