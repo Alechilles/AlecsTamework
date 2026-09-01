@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items.persistence;
 
+import com.alechilles.alecstamework.companion.identity.CanonicalCompanionRolePolicy;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.CompanionToolLink;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
@@ -240,6 +241,11 @@ public final class ReplacementProfileSnapshotSink
             CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot snapshot,
             String worldKey
     ) {
+        if (CanonicalCompanionRolePolicy.isTemporaryParkingRole(
+                snapshot.roleId()
+        )) {
+            return CompletableFuture.completedFuture(null);
+        }
         long now = clock.getAsLong();
         OwnerId ownerId = snapshot.ownerId() == null
                 ? null : new OwnerId(snapshot.ownerId());
@@ -277,7 +283,9 @@ public final class ReplacementProfileSnapshotSink
         String displayName = first(
                 snapshot.displayName(), before.displayName()
         );
-        String roleId = first(snapshot.roleId(), before.roleId());
+        String roleId = CanonicalCompanionRolePolicy.isTemporaryParkingRole(
+                snapshot.roleId()
+        ) ? before.roleId() : first(snapshot.roleId(), before.roleId());
         boolean ownerMatches = current.lifecycle().ownerId() != null
                 && snapshot.ownerId() != null
                 && current.lifecycle().ownerId().value().equals(

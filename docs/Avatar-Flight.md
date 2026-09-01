@@ -8,6 +8,8 @@ Avatar flight can start from an ordinary optimized `Mount` interaction. Set the 
 
 During the ride, Tamework keeps the same source NPC entity and its ownership, name, needs, traits, health, inventory, and integration components. The NPC is placed in an inert role and hidden from interaction/tracking while the real player uses the configured transformed model. Dismount and forced recovery restore that same NPC instead of spawning a copy.
 
+The inert `Empty_Role` state is live-only. Tamework does not create or replace a saved companion identity from that temporary role. A parked companion keeps its canonical role, and a new saved profile waits until the real role is visible.
+
 ```json
 "IsMountable": { "Value": true },
 "MountMode": { "Value": "TameworkAvatarFlight" },

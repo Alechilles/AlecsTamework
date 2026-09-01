@@ -136,6 +136,96 @@ class ReplacementProfileSnapshotSinkTest {
     }
 
     @Test
+    void temporaryParkingRoleCannotReplaceCanonicalProfileRole()
+            throws Exception {
+        AtomicLong clock = new AtomicLong(-100L);
+        try (PersistenceBootstrap persistence =
+                     new PersistenceBootstrap(configuration(clock))) {
+            assertTrue(persistence.start().toCompletableFuture().join().complete());
+            var facades = persistence.facades();
+            ReplacementProfileSnapshotSink sink =
+                    new ReplacementProfileSnapshotSink(
+                            facades.queries(),
+                            facades.operations(),
+                            clock::get,
+                            warning -> {
+                            }
+                    );
+            UUID npcUuid = UUID.fromString(
+                    "10000000-0000-0000-0000-000000000201"
+            );
+            UUID toolId = UUID.fromString(
+                    "20000000-0000-0000-0000-000000000201"
+            );
+            sink.publish(snapshot(npcUuid, toolId, "Before"), "world")
+                    .toCompletableFuture().join();
+
+            clock.set(-50L);
+            sink.publish(
+                    snapshot(
+                            npcUuid, toolId, "Parked", "Empty_Role"
+                    ),
+                    "world"
+            ).toCompletableFuture().join();
+
+            var read = facades.queries().findProfile(
+                    new NpcAlias(npcUuid)
+            ).toCompletableFuture().join();
+            var found = assertInstanceOf(
+                    PersistenceReadResult.Found.class, read
+            );
+            var profile = (com.alechilles.alecstamework.companion.profile
+                    .CompanionProfileReadModel) found.value();
+            assertEquals("Mob_Test", profile.identity().roleId());
+            assertEquals(
+                    "Parked",
+                    facades.queries().projectedProfile(
+                            new NpcAlias(npcUuid)
+                    ).orElseThrow().customName()
+            );
+        }
+    }
+
+    @Test
+    void temporaryParkingRoleCannotCreateCanonicalProfile() throws Exception {
+        AtomicLong clock = new AtomicLong(-100L);
+        try (PersistenceBootstrap persistence =
+                     new PersistenceBootstrap(configuration(clock))) {
+            assertTrue(persistence.start().toCompletableFuture().join().complete());
+            var facades = persistence.facades();
+            ReplacementProfileSnapshotSink sink =
+                    new ReplacementProfileSnapshotSink(
+                            facades.queries(),
+                            facades.operations(),
+                            clock::get,
+                            warning -> {
+                            }
+                    );
+            UUID npcUuid = UUID.fromString(
+                    "10000000-0000-0000-0000-000000000202"
+            );
+
+            sink.publish(
+                    snapshot(
+                            npcUuid,
+                            UUID.fromString(
+                                    "20000000-0000-0000-0000-000000000202"
+                            ),
+                            "Parked",
+                            "Empty_Role"
+                    ),
+                    "world"
+            ).toCompletableFuture().join();
+
+            assertInstanceOf(
+                    PersistenceReadResult.Absent.class,
+                    facades.queries().findProfile(new NpcAlias(npcUuid))
+                            .toCompletableFuture().join()
+            );
+        }
+    }
+
+    @Test
     void exactImportedUnloadedAliasReturnsToActiveWhenObserved()
             throws Exception {
         AtomicLong clock = new AtomicLong(-100L);
@@ -361,6 +451,15 @@ class ReplacementProfileSnapshotSinkTest {
             UUID toolId,
             String customName
     ) {
+        return snapshot(npcUuid, toolId, customName, "Mob_Test");
+    }
+
+    private CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot snapshot(
+            UUID npcUuid,
+            UUID toolId,
+            String customName,
+            String roleId
+    ) {
         return new CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot(
                 npcUuid,
                 UUID.fromString(
@@ -368,7 +467,7 @@ class ReplacementProfileSnapshotSinkTest {
                 ),
                 "Owner",
                 new String[]{toolId.toString()},
-                "Mob_Test",
+                roleId,
                 true,
                 customName,
                 "Companion",

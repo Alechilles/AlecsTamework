@@ -30,6 +30,9 @@
 
 ### Fixed
 
+- Temporary mount parking can no longer replace a companion's saved role with
+  `Empty_Role`. Existing companions keep their canonical role, and Tamework
+  waits for a real role before it creates a new saved profile.
 - Dead or lost companions whose saved state contains Hytale's temporary
   `Empty_Role` mount role can now be restored with their canonical companion
   role.

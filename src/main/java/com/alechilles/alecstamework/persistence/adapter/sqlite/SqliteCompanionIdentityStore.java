@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
+import com.alechilles.alecstamework.companion.identity.CanonicalCompanionRolePolicy;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentityPort;
@@ -67,6 +68,13 @@ public final class SqliteCompanionIdentityStore implements CompanionIdentityPort
                     ? PersistenceMutationResult.applied(existing.get())
                     : PersistenceMutationResult.rejected(PersistenceMutationStatus.CONFLICT);
         }
+        if (CanonicalCompanionRolePolicy.isTemporaryParkingRole(
+                profile.roleId()
+        )) {
+            return PersistenceMutationResult.rejected(
+                    PersistenceMutationStatus.CONFLICT
+            );
+        }
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO companion_profile(
                     profile_id, display_name, role_id, metadata_json, metadata_hash,
@@ -101,6 +109,13 @@ public final class SqliteCompanionIdentityStore implements CompanionIdentityPort
         }
         if (current.createdAtMs() != next.createdAtMs()) {
             return PersistenceMutationResult.rejected(PersistenceMutationStatus.CONFLICT);
+        }
+        if (CanonicalCompanionRolePolicy.isTemporaryParkingRole(
+                next.roleId()
+        )) {
+            return PersistenceMutationResult.rejected(
+                    PersistenceMutationStatus.CONFLICT
+            );
         }
         try (PreparedStatement statement = connection.prepareStatement("""
                 UPDATE companion_profile

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.movement;
 
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSnapshotRoleResolver;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
+import com.alechilles.alecstamework.companion.identity.CanonicalCompanionRolePolicy;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -15,8 +16,6 @@ import javax.annotation.Nullable;
 
 /** Resolves the durable NPC role hidden by temporary mount parking roles. */
 public final class MountedNpcSnapshotRoleResolver {
-    private static final String EMPTY_ROLE_ID = "Empty_Role";
-
     private MountedNpcSnapshotRoleResolver() {
     }
 
@@ -52,7 +51,8 @@ public final class MountedNpcSnapshotRoleResolver {
                                            int originalRoleIndex,
                                            @Nonnull IntFunction<String> roleLookup) {
         String liveRole = clean(liveRoleId);
-        if (!EMPTY_ROLE_ID.equals(liveRole) || originalRoleIndex < 0) {
+        if (!CanonicalCompanionRolePolicy.isTemporaryParkingRole(liveRole)
+                || originalRoleIndex < 0) {
             return new Resolution(liveRole, false);
         }
         String originalRole = clean(roleLookup.apply(originalRoleIndex));

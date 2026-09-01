@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.avatarflight;
 
+import com.alechilles.alecstamework.companion.identity.CanonicalCompanionRolePolicy;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -9,8 +10,6 @@ import javax.annotation.Nullable;
 
 /** Resolves the durable NPC role hidden by Avatar Flight's temporary parking role. */
 public final class AvatarFlightSnapshotRoleResolver {
-    private static final String EMPTY_ROLE_ID = "Empty_Role";
-
     private AvatarFlightSnapshotRoleResolver() {
     }
 
@@ -21,7 +20,8 @@ public final class AvatarFlightSnapshotRoleResolver {
             @Nullable AvatarFlightSourceComponent source
     ) {
         String liveRole = clean(liveRoleId);
-        if (!EMPTY_ROLE_ID.equals(liveRole) || source == null) {
+        if (!CanonicalCompanionRolePolicy.isTemporaryParkingRole(liveRole)
+                || source == null) {
             return liveRole;
         }
         String originalRole = clean(source.getOriginalRoleId());
@@ -48,12 +48,9 @@ public final class AvatarFlightSnapshotRoleResolver {
             @Nullable String storedRoleId,
             @Nullable String profileRoleId
     ) {
-        String storedRole = clean(storedRoleId);
-        String profileRole = clean(profileRoleId);
-        return EMPTY_ROLE_ID.equals(storedRole)
-                && !profileRole.isEmpty()
-                && !EMPTY_ROLE_ID.equals(profileRole)
-                ? profileRole : storedRole;
+        return CanonicalCompanionRolePolicy.repairTemporaryRole(
+                storedRoleId, profileRoleId
+        );
     }
 
     @Nonnull
