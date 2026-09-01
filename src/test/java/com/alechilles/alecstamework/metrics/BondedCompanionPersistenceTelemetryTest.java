@@ -2,7 +2,7 @@ package com.alechilles.alecstamework.metrics;
 
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionStorageFailureEvidence;
-import com.alechilles.alecstelemetry.api.TelemetryEventContext;
+import com.alechilles.beacon.api.TelemetryEventContext;
 import java.sql.SQLException;
 import org.junit.jupiter.api.Test;
 

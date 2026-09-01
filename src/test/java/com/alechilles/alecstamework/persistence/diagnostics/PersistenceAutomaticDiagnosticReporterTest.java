@@ -1,8 +1,8 @@
 package com.alechilles.alecstamework.persistence.diagnostics;
 
-import com.alechilles.alecstelemetry.api.TelemetryDiagnosticBundle;
-import com.alechilles.alecstelemetry.api.TelemetryDiagnosticBundleResult;
-import com.alechilles.alecstelemetry.api.TelemetryDiagnosticDisposition;
+import com.alechilles.beacon.api.TelemetryDiagnosticBundle;
+import com.alechilles.beacon.api.TelemetryDiagnosticBundleResult;
+import com.alechilles.beacon.api.TelemetryDiagnosticDisposition;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceFailureSignal;
 import org.junit.jupiter.api.Test;
 

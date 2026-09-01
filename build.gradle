@@ -15,7 +15,7 @@ def property = { String name ->
 group = 'com.alechilles'
 version = property('mod_version')
 def patchworkVersion = property('patchwork_version')
-def telemetryCoordinates = "com.alechilles:alecstelemetry-runtime:${property('alecstelemetry_version')}"
+def beaconCoordinates = "com.alechilles:beacon-runtime:${property('beacon_version')}"
 def embeddedAssetPackDirectory = layout.buildDirectory.dir('generated/embeddedAssetPack')
 def exampleAssetPackDirectory = layout.buildDirectory.dir('generated/exampleAssetPack')
 def exampleAssetPackVersion = project.version.toString()
@@ -29,7 +29,7 @@ java {
 repositories {
     mavenLocal()
     mavenCentral()
-    maven { url = uri('https://telemetry.alecsmods.com/maven/releases') }
+    maven { url = uri('https://beacon.modstats.io/maven/releases') }
     maven { url = uri('https://www.cursemaven.com') }
 }
 
@@ -46,18 +46,18 @@ configurations {
     }
 }
 
-if (rootProject.findProject(':alecstelemetry:runtime') != null) {
+if (rootProject.findProject(':beacon:runtime') != null) {
     configurations.configureEach {
         resolutionStrategy.dependencySubstitution {
-            substitute module('com.alechilles:alecstelemetry-runtime') using project(':alecstelemetry:runtime')
+            substitute module('com.alechilles:beacon-runtime') using project(':beacon:runtime')
         }
     }
 }
 
 dependencies {
     compileOnly files(property('nameplatebuilder_jar_path'))
-    implementation telemetryCoordinates
-    telemetryAssetPack telemetryCoordinates
+    implementation beaconCoordinates
+    telemetryAssetPack beaconCoordinates
     implementation "com.alechilles:patchwork-runtime:${patchworkVersion}"
     implementation "curse.maven:creditor-1560961:${property('creditor_file_id')}"
     implementation "org.xerial:sqlite-jdbc:${property('sqlite_jdbc_version')}"
@@ -100,8 +100,8 @@ tasks.register('prepareEmbeddedAssetPack', Sync) {
     group = 'hytale'
     dependsOn(tasks.named('createManifestIfMissing'))
     dependsOn(tasks.named('updatePluginManifest'))
-    if (rootProject.findProject(':alecstelemetry:runtime') != null) {
-        dependsOn(':alecstelemetry:runtime:jar')
+    if (rootProject.findProject(':beacon:runtime') != null) {
+        dependsOn(':beacon:runtime:jar')
     }
     from(layout.projectDirectory.dir('src/main/resources')) {
         exclude '**/*.bak'

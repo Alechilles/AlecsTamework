@@ -1,12 +1,12 @@
 package com.alechilles.alecstamework.metrics;
 
-import com.alechilles.alecstelemetry.api.TelemetryEventContext;
-import com.alechilles.alecstelemetry.api.TelemetryBreadcrumbContext;
-import com.alechilles.alecstelemetry.api.TelemetryDiagnosticBundle;
-import com.alechilles.alecstelemetry.api.TelemetryDiagnosticBundleResult;
-import com.alechilles.alecstelemetry.embedded.EmbeddedTelemetryBootstrap;
-import com.alechilles.alecstelemetry.embedded.EmbeddedTelemetryDiagnostics;
-import com.alechilles.alecstelemetry.embedded.EmbeddedTelemetryService;
+import com.alechilles.beacon.api.TelemetryEventContext;
+import com.alechilles.beacon.api.TelemetryBreadcrumbContext;
+import com.alechilles.beacon.api.TelemetryDiagnosticBundle;
+import com.alechilles.beacon.api.TelemetryDiagnosticBundleResult;
+import com.alechilles.beacon.embedded.EmbeddedTelemetryBootstrap;
+import com.alechilles.beacon.embedded.EmbeddedTelemetryDiagnostics;
+import com.alechilles.beacon.embedded.EmbeddedTelemetryService;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.alechilles.alecstamework.settings.ResolvedTameworkSettings;
@@ -30,7 +30,7 @@ import java.util.logging.Level;
 import java.util.stream.Stream;
 
 /**
- * Tamework compatibility layer over the standard embedded Alec's Telemetry runtime.
+ * Tamework compatibility layer over the standard embedded Beacon runtime.
  */
 public final class CrashTelemetryService {
 
