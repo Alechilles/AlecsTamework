@@ -553,6 +553,10 @@
   "stats": {
     "enabled": true
   },
+  "diagnostics": {
+    "supported": true,
+    "defaultEnabled": true
+  },
   "reports": {
     "enabled": true,
     "issue": {

@@ -21,9 +21,11 @@
   queue. They never block or change the result of a persistence operation.
 - Disabling Tamework telemetry remains the opt-out for all automatic Tamework
   persistence diagnostics.
-- Error events consent also gates automatic persistence diagnostics. A report
-  that cannot enter the telemetry queue remains eligible on the next matching
-  failure.
+- Automatic persistence diagnostics now use the independent `Diag` consent
+  category. Error consent does not enable or disable these reports. Existing
+  projects that already reviewed consent must select Save and Close in
+  `/telemetry consent` before Diagnostics can run. A report that cannot enter
+  the telemetry queue remains eligible on the next matching failure.
 
 ### Fixed
 
