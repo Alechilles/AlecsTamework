@@ -4,8 +4,9 @@
 
 ### Added
 
-- When Tamework telemetry is enabled, terminal persistence failures now send a
-  bounded, redacted debug database package with the error classification.
+- When Tamework telemetry and `Diag` consent are enabled, terminal persistence
+  failures now send a bounded, redacted debug database package with the error
+  classification.
   This includes generic and bonded persistence startup, read, write,
   checkpoint, runtime, and shutdown failures.
 - Added `/tw debug persistence simulateerror` for a harmless, console-safe
