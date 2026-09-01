@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items.persistence;
 
+import com.alechilles.alecstamework.avatarflight.AvatarFlightSnapshotRoleResolver;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
@@ -171,6 +172,7 @@ public final class TameworkRestorationSnapshotResolver {
         }
         CoopResidentStateSnapshot state = ((SnapshotDecodeResult.Decoded<
                 CoopResidentStateSnapshot>) decoded).value();
+        state = repairStoredSnapshotRole(profile, state);
         NpcAlias sourceAlias = evidence.modernSourceAlias(profile, state);
         evidence.validateComplete(profile, sourceAlias, state);
         return encodeProjection(sourceAlias, state);
@@ -189,7 +191,9 @@ public final class TameworkRestorationSnapshotResolver {
         DeathSnapshotV2Payload death =
                 ((SnapshotDecodeResult.Decoded<DeathSnapshotV2Payload>) decoded)
                         .value();
-        CoopResidentStateSnapshot state = death.fullState();
+        CoopResidentStateSnapshot state = repairStoredSnapshotRole(
+                profile, death.fullState()
+        );
         NpcAlias sourceAlias = evidence.modernSourceAlias(profile, state);
         evidence.validateComplete(profile, sourceAlias, state);
         return encodeProjection(
@@ -243,6 +247,42 @@ public final class TameworkRestorationSnapshotResolver {
                 source.createdAtMs()
         );
         return encodeProjection(sourceAlias, state);
+    }
+
+    private CoopResidentStateSnapshot repairStoredSnapshotRole(
+            CompanionProfileReadModel profile,
+            CoopResidentStateSnapshot state
+    ) {
+        String roleId = AvatarFlightSnapshotRoleResolver.repairStoredRole(
+                state.roleId(), profile.identity().roleId()
+        );
+        String storedRoleId = state.roleId() == null
+                ? "" : state.roleId().trim();
+        if (roleId.equals(storedRoleId)) {
+            return state;
+        }
+        return new CoopResidentStateSnapshot(
+                state.npcUuid(),
+                state.coopId(),
+                state.residentSlot(),
+                roleId,
+                state.commandLinks(),
+                state.owner(),
+                state.tamed(),
+                state.npcName(),
+                state.happiness(),
+                state.needs(),
+                state.breeding(),
+                state.leveling(),
+                state.traits(),
+                state.talents(),
+                state.lifeStage(),
+                state.attachments(),
+                state.currentHealth(),
+                state.maximumHealth(),
+                state.healthPercent(),
+                state.capturedAtMs()
+        );
     }
 
     private Resolution encodeProjection(

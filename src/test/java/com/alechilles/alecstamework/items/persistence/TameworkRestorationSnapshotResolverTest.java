@@ -344,6 +344,64 @@ class TameworkRestorationSnapshotResolverTest {
         assertNull(restored.needs());
     }
 
+    /**
+     * Protects the 2026-09-01 skeleton-horse report where a mounted death
+     * snapshot stored Hytale's temporary Empty_Role parking role.
+     */
+    @Test
+    void modernDeathRepairsTemporaryParkingRoleFromCanonicalProfile() {
+        CoopResidentStateSnapshot parkedState =
+                new CoopResidentStateSnapshot(
+                        SOURCE,
+                        null,
+                        -1,
+                        "Empty_Role",
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        -77L
+                );
+        SnapshotCodecRegistry.EncodedSnapshot encoded = codecs.encode(
+                TameworkSnapshotCodecs.DEATH,
+                2,
+                DeathSnapshotV2Payload.class,
+                DeathSnapshotV2Payload.capture(
+                        parkedState,
+                        -260L,
+                        -1_000L,
+                        DeathSnapshotV2Payload.DeathCauseKind.ENVIRONMENT,
+                        null
+                )
+        );
+        CompanionSnapshot source = snapshot(
+                encoded.kind(), encoded.payloadVersion(),
+                encoded.payloadJson(), -77L
+        );
+        CompanionProfileReadModel profile = profile(
+                source,
+                LifecycleState.DEAD_REVIVABLE,
+                "Tamed_Horse_Skeleton",
+                null,
+                List.of()
+        );
+
+        CoopResidentStateSnapshot restored = fullState(
+                resolved(resolver.resolve(profile, source))
+        );
+
+        assertEquals("Tamed_Horse_Skeleton", restored.roleId());
+    }
+
     @Test
     void malformedNestedEvidenceAndPartialLostRecoveryFailClosed() {
         CompanionSnapshot malformed = snapshot(

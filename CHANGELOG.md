@@ -30,6 +30,9 @@
 
 ### Fixed
 
+- Dead or lost companions whose saved state contains Hytale's temporary
+  `Empty_Role` mount role can now be restored with their canonical companion
+  role.
 - Avatar Flight now keeps the transformed player and hidden companion below
   Hytale's maximum entity height. Reaching the build ceiling no longer removes
   the companion or ends the flight with a missing source.
