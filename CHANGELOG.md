@@ -13,6 +13,8 @@
 
 ### Changed
 
+- Updated the embedded Patchwork runtime to 1.4.0. Asset patches can now use
+  an empty path with safe object-merge operations to merge the document root.
 - Persistence diagnostics now use the direct `/tw debug persistence
   status|health|detail|export` commands.
 - Automatic persistence reports run outside the storage path and use a bounded
