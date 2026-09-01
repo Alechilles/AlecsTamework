@@ -25,7 +25,7 @@ class PatchworkPackagingIT {
         URL packagedUrl = packagedJar.toUri().toURL();
         try (URLClassLoader loader = new PackagedRuntimeClassLoader(packagedUrl, getClass().getClassLoader())) {
             Class<?> versionType = Class.forName("com.alechilles.patchwork.PatchworkVersion", true, loader);
-            assertEquals("1.3.5", invoke(versionType.getMethod("current"), null));
+            assertEquals("1.4.0", invoke(versionType.getMethod("current"), null));
 
             Class<?> telemetryType = Class.forName("com.alechilles.patchwork.telemetry.PatchworkTelemetry", true, loader);
             Class<?> javaPluginType = Class.forName(
