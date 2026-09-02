@@ -25,7 +25,7 @@ class PatchworkPackagingIT {
         URL packagedUrl = packagedJar.toUri().toURL();
         try (URLClassLoader loader = new PackagedRuntimeClassLoader(packagedUrl, getClass().getClassLoader())) {
             Class<?> versionType = Class.forName("com.alechilles.patchwork.PatchworkVersion", true, loader);
-            assertEquals("1.4.0", invoke(versionType.getMethod("current"), null));
+            assertEquals("1.4.1", invoke(versionType.getMethod("current"), null));
 
             Class<?> telemetryType = Class.forName("com.alechilles.patchwork.telemetry.PatchworkTelemetry", true, loader);
             Class<?> javaPluginType = Class.forName(
@@ -65,7 +65,7 @@ class PatchworkPackagingIT {
         @Override
         protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
             if (name.startsWith("com.alechilles.patchwork.")
-                    || name.startsWith("com.alechilles.alecstelemetry.")) {
+                    || name.startsWith("com.alechilles.beacon.")) {
                 synchronized (getClassLoadingLock(name)) {
                     Class<?> loaded = findLoadedClass(name);
                     if (loaded == null) {
@@ -87,7 +87,7 @@ class PatchworkPackagingIT {
         @Override
         public URL getResource(String name) {
             if (name.startsWith("META-INF/maven/com.alechilles/patchwork-runtime/")
-                    || name.startsWith("META-INF/maven/com.alechilles/alecstelemetry-runtime/")) {
+                    || name.startsWith("META-INF/maven/com.alechilles/beacon-runtime/")) {
                 URL packagedResource = findResource(name);
                 if (packagedResource != null) {
                     return packagedResource;

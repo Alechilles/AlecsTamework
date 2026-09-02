@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.npc.systems;
 
-import com.alechilles.alecstelemetry.api.TelemetryBreadcrumbContext;
+import com.alechilles.beacon.api.TelemetryBreadcrumbContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.npc.progression.CompanionRuntimeClock;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsBatchRunner;

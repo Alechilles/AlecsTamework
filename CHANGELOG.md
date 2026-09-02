@@ -7,6 +7,16 @@
 - Recall can restore an eligible missing companion from its exact saved
   checkpoint when Update 6 confirms that no source entity section exists.
 
+## 3.4.1 - Beacon Runtime Migration - 2026-09-01
+
+### Changed
+
+- Replaced the Alec's Telemetry runtime with Beacon `2.0.0`. This is a breaking
+  namespace and command change for integrations; use `com.alechilles.beacon`
+  and `/beacon consent`.
+- Updated the embedded Patchwork runtime to `1.4.1` so Tamework and Patchwork
+  share the Beacon runtime.
+
 ## 3.4.0 - Persistence Diagnostics and Schema Compatibility - 2026-08-31
 
 ### Added

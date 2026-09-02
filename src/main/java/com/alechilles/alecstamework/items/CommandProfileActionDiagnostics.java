@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstelemetry.api.TelemetryBreadcrumbContext;
+import com.alechilles.beacon.api.TelemetryBreadcrumbContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import java.util.Locale;

@@ -18,11 +18,11 @@ Parent: [Tooling and Contribution](/mod/alecs-tamework/tooling-and-contribution)
 - `TameworkHStatsIntegration` boots HStats support
 - `TameworkDependencyMetricsReporter` and related metrics classes detect installed mods and forward tracked data
 - Server owners can opt out through `hstats-server-uuid.txt`
-- Crash and operational telemetry are separate from HStats and are handled by Alec's Telemetry `1.2.3`
-- Tamework uses the conventional project descriptor loaded by `CrashTelemetryService`. The embedded Patchwork `1.3.5` runtime contributes a separate logical `patchwork` project through the generic contribution API. Patchwork's contribution is hosted-only in this release.
+- Crash and operational telemetry are separate from HStats and are handled by Beacon `2.0.0`.
+- Tamework uses the conventional project descriptor loaded by `CrashTelemetryService`. The embedded Patchwork `1.4.1` runtime contributes a separate logical `patchwork` project through the generic contribution API. Patchwork's contribution is hosted-only in this release.
 - The direct Tamework dependency and Patchwork's transitive dependency converge on one host-local Telemetry provider. This is one physical provider, not one shared consent setting: Tamework and Patchwork consent are independent project settings.
 - Telemetry settings live in `universe/Tamework/Settings/tamework-settings.json` under `telemetry.enabled` and `telemetry.breadcrumbsEnabled`
-- `/tw settings` persists those values and mirrors them into the embedded runtime project override at `Telemetry/Settings/projects/alecs-tamework.json`
+- `/tw settings` persists those values and mirrors them into the embedded runtime project override at `mods/Alechilles_Beacon/Settings/projects/alecs-tamework.json`.
 - Legacy `crash-telemetry.json` and `tamework-crash-telemetry.txt` files are imported once when no global telemetry values exist, then left in place
 - Crash telemetry defaults to enabled and supports runtime opt-out via `/tw settings` or settings-file edits
 - Only Tamework-attributed fatal failures are captured:
@@ -32,19 +32,19 @@ Parent: [Tooling and Contribution](/mod/alecs-tamework/tooling-and-contribution)
 - Attribution gate before capture:
   - `PluginIdentifier.identifyThirdPartyPlugin(throwable)` must match Tamework, or
   - throwable stack trace must contain the Tamework package prefix
-- Crash and event queues, deduplication, attribution, HTTP delivery, breadcrumbs, and persistence are owned by `alecstelemetry-runtime`
+- Crash and event queues, deduplication, attribution, HTTP delivery, breadcrumbs, and persistence are owned by `beacon-runtime`.
 - Upload behavior follows the shared runtime: queued first, flushed asynchronously, and never allowed to throw into runtime/gameplay threads
 - Debug command: `/tw debugcrashtelemetry` (status), `/tw debugcrashtelemetry flush` (manual async upload pass), `/tw debugcrashtelemetry simulate` (manual simulation path for privileged users)
 - Privacy: payload excludes player-identifying gameplay data by default (stack trace + runtime metadata only)
-- Disabling Tamework consent does not disable Patchwork consent. Use the `/telemetry consent` menu to manage each project independently.
-- The `1.2.x` contribution contract does not promise live same-ID replacement or failover. If the elected Patchwork project retires or is replaced, restart the server before expecting a new candidate to write.
+- Disabling Tamework consent does not disable Patchwork consent. Use the `/beacon consent` menu to manage each project independently.
+- Restart the server after replacing an elected project contribution before you expect the new candidate to write.
 
 ## Build and packaging
 - Maven produces a jar-only plugin artifact
 - Resources include Java code plus `src/main/resources`
 - Manifest versioning is filtered from Maven properties
 - Maven Shade includes Creditor from Cursemaven and filters Creditor's root `manifest.json` so it cannot replace Tamework's plugin manifest.
-- Gradle packages Tamework's direct Telemetry edge and Patchwork's transitive edge at the aligned `1.2.3` runtime. `patchwork_version=1.3.5` and `alecstelemetry_version=1.2.3` are the source-of-truth properties.
+- Gradle packages Tamework's direct Beacon edge and Patchwork's transitive edge at the aligned `2.0.0` runtime. `patchwork_version=1.4.1` and `beacon_version=2.0.0` are the source-of-truth properties.
 - `packagingTest` runs an isolated packaged behavior smoke for Patchwork's version and graceful no-host telemetry path; it does not assert raw shaded-jar entry inventories.
 - `install-plugin`, `run-server`, and `prerelease` are the main build profiles called out in the repo docs
 

@@ -1,10 +1,10 @@
 package com.alechilles.alecstamework.metrics;
 
-import com.alechilles.alecstelemetry.api.TelemetryEventContext;
-import com.alechilles.alecstelemetry.api.TelemetryDiagnosticBundle;
-import com.alechilles.alecstelemetry.api.TelemetryDiagnosticBundleResult;
-import com.alechilles.alecstelemetry.api.TelemetryDiagnosticDisposition;
-import com.alechilles.alecstelemetry.embedded.EmbeddedTelemetryDiagnostics;
+import com.alechilles.beacon.api.TelemetryEventContext;
+import com.alechilles.beacon.api.TelemetryDiagnosticBundle;
+import com.alechilles.beacon.api.TelemetryDiagnosticBundleResult;
+import com.alechilles.beacon.api.TelemetryDiagnosticDisposition;
+import com.alechilles.beacon.embedded.EmbeddedTelemetryDiagnostics;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.events.RemoveWorldEvent;
 import org.junit.jupiter.api.Test;

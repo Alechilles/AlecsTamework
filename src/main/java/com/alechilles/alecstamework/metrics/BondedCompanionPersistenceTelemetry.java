@@ -2,7 +2,7 @@ package com.alechilles.alecstamework.metrics;
 
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionStorageFailureEvidence;
-import com.alechilles.alecstelemetry.api.TelemetryEventContext;
+import com.alechilles.beacon.api.TelemetryEventContext;
 import javax.annotation.Nonnull;
 
 /** Emits descriptor-approved diagnostics for bonded persistence containment. */

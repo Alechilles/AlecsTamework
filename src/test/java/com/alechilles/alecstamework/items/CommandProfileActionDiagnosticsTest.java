@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstelemetry.api.TelemetryBreadcrumbContext;
+import com.alechilles.beacon.api.TelemetryBreadcrumbContext;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
