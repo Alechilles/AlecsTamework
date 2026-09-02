@@ -6,7 +6,7 @@ import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.alechilles.alecstamework.runtime.activation.TameworkReloadTopologyReport;
-import com.alechilles.alecstelemetry.api.TelemetryEventContext;
+import com.alechilles.beacon.api.TelemetryEventContext;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;

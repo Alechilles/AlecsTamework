@@ -14,6 +14,10 @@ entity while the rider uses the configured flight model, then restores it on
 dismount or recovery. This preserves the NPC's owner, name, health, inventory,
 needs, traits, and other supported companion state.
 
+The parked NPC's `Empty_Role` state is temporary. Tamework does not use it as
+the NPC's saved companion identity. Existing companions keep their canonical
+role, and a new saved profile waits until the real role is visible.
+
 Use this for dragon-style companions and other rideable NPCs whose flight form
 should be controlled as the player rather than as a conventional mounted NPC.
 

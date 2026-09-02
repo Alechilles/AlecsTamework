@@ -71,6 +71,37 @@ class SqliteCompanionIdentityStoreTest {
     }
 
     @Test
+    void rejectsTemporaryParkingRoleAsCanonicalIdentity() throws Exception {
+        try (Connection connection = transaction()) {
+            SqliteCompanionIdentityStore store =
+                    new SqliteCompanionIdentityStore(connection);
+
+            assertEquals(
+                    PersistenceMutationStatus.CONFLICT,
+                    store.createProfile(profile(
+                            0, "Parked", "Empty_Role", -9_000
+                    )).status()
+            );
+            assertTrue(store.findProfile(PROFILE).isEmpty());
+
+            assertTrue(store.createProfile(
+                    profile(0, "Companion", "Mob_Test", -9_000)
+            ).applied());
+            assertEquals(
+                    PersistenceMutationStatus.CONFLICT,
+                    store.updateProfile(
+                            profile(1, "Parked", "Empty_Role", -8_000),
+                            0
+                    ).status()
+            );
+            assertEquals(
+                    "Mob_Test",
+                    store.findProfile(PROFILE).orElseThrow().roleId()
+            );
+        }
+    }
+
+    @Test
     void leasesAndPromotesAliasesThroughTheExactOperationFence() throws Exception {
         try (Connection connection = transaction()) {
             SqliteCompanionIdentityStore store = new SqliteCompanionIdentityStore(connection);
@@ -194,9 +225,18 @@ class SqliteCompanionIdentityStoreTest {
     }
 
     private CompanionIdentity profile(long revision, String name, long updatedAt) throws Exception {
+        return profile(revision, name, "role", updatedAt);
+    }
+
+    private CompanionIdentity profile(
+            long revision,
+            String name,
+            String roleId,
+            long updatedAt
+    ) throws Exception {
         String json = "{\"source\":\"test\"}";
         return new CompanionIdentity(
-                PROFILE, name, "role", json, Sha256Hash.ofUtf8(json), "world",
+                PROFILE, name, roleId, json, Sha256Hash.ofUtf8(json), "world",
                 -10_000, updatedAt, updatedAt, revision
         );
     }

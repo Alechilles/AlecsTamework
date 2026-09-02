@@ -16,15 +16,17 @@ art graph.
 - The release jar embeds Creditor so `/credits` does not require another mod.
 - Tamework keeps its own root `manifest.json` and shades the Patchwork runtime
   into its release jar; it does not advertise Patchwork as a separate plugin.
-- Tamework keeps a direct `alecstelemetry-runtime` dependency because its
+- Tamework keeps a direct `beacon-runtime` dependency because its
   conventional project is used by `CrashTelemetryService`. Patchwork carries
   the same runtime transitively for its contributed project. The release line
-  is Patchwork `1.3.5` with Alec's Telemetry `1.3.0`; Gradle dependency
-  convergence must select `1.3.0` for both edges.
+  is Patchwork `1.4.1` with Beacon `2.0.0`; Gradle dependency convergence must
+  select `2.0.0` for both edges.
 - The two telemetry projects are independent: Tamework uses its conventional
   project and the embedded Patchwork runtime contributes a hosted-only
   `patchwork` project. They share one host-local Telemetry provider and one
   writable token per project, while consent remains project-specific.
+- For integration details and the breaking package migration, see the
+  [Beacon 2.0 migration guide](https://wiki.hytalemodding.dev/mod/beacon/migrate-to-beacon-2-0).
 - The shared workspace links both mods' asset files into its `run/mods` tree,
   so edits in Tamework and HyDragon can reload together.
 
@@ -83,11 +85,11 @@ It is a behavior smoke test, not a ZIP-entry inventory check. Dependency
 convergence can be inspected with:
 
 ```bash
-./gradlew dependencyInsight --dependency alecstelemetry-runtime --configuration runtimeClasspath
+./gradlew dependencyInsight --dependency beacon-runtime --configuration runtimeClasspath
 ```
 
-The expected selected version is `1.3.0`, whether Alec's Telemetry is reached
-directly from Tamework or transitively through Patchwork.
+The expected selected version is `2.0.0`, whether Beacon is reached directly
+from Tamework or transitively through Patchwork.
 
 Tamework and Patchwork expose separate telemetry consent entries. The
 contributed Patchwork project is hosted-only in this release. Do not document

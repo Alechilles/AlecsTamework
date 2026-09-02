@@ -1283,14 +1283,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsTelemetrySectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 24);
-                Text: "Telemetry Consent";
+                Text: "Beacon Consent";
                 Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsCrashTelemetrySectionTooltip {
                 Anchor: (Left: 0, Right: 0, Height: 24);
                 Text: "";
-                TooltipText: "Telemetry consent is managed by the shared Alec's Telemetry command.";
+                TooltipText: "Telemetry consent is managed by the shared Beacon command.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -1301,7 +1301,7 @@ $C.@PageOverlay {
 
               Label #TwSettingsTelemetryConsentInstructionLabel {
                 Anchor: (Left: 0, Right: 16, Height: 42);
-                Text: "Use /telemetry consent to review or change Tamework telemetry consent. This settings page no longer edits telemetry.";
+                Text: "Use /beacon consent to review or change Tamework telemetry consent. This settings page no longer edits telemetry.";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
               }
             }

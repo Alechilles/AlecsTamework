@@ -8,15 +8,17 @@ Avatar flight can start from an ordinary optimized `Mount` interaction. Set the 
 
 During the ride, Tamework keeps the same source NPC entity and its ownership, name, needs, traits, health, inventory, and integration components. The NPC is placed in an inert role and hidden from interaction/tracking while the real player uses the configured transformed model. Dismount and forced recovery restore that same NPC instead of spawning a copy.
 
+The inert `Empty_Role` state is live-only. Tamework does not create or replace a saved companion identity from that temporary role. A parked companion keeps its canonical role, and a new saved profile waits until the real role is visible.
+
 ```json
 "IsMountable": { "Value": true },
 "MountMode": { "Value": "TameworkAvatarFlight" },
 "AvatarFlightConfig": { "Value": "MyDragonAvatarFlight" }
 ```
 
-The player and source NPC carry paired `TameworkAvatarFlightMountSession` and `TameworkAvatarFlightSource` components. Death, disconnect, world transfer, source removal, disabled/missing config, and orphan recovery use the same idempotent cleanup path. Cross-world mounted travel is not supported; transferring worlds ends the session.
+The player and source NPC carry paired `TameworkAvatarFlightMountSession` and `TameworkAvatarFlightSource` components. Death, disconnect, world transfer, source removal, disabled/missing config, and orphan recovery use the same idempotent cleanup path. Cross-world mounted travel is not supported; transferring worlds ends the session. The paired entities stay at or below Hytale's maximum valid entity height, so flying into the build ceiling cannot remove the parked source NPC.
 
-On a clean disconnect, Tamework queues that cleanup on the player's world thread before the entity is discarded. If the player is already gone after a client crash, the source-side watchdog detects the missing rider and restores the parked NPC. Persisted mount pairs also include a server-runtime epoch, so a pair saved before a server crash or restart is treated as stale instead of silently resuming in the next process. When that stale source belongs to an active command-roster summon, Tamework stores and despawns it through the roster transition when its owner next joins a world. Stale player sessions restore the ordinary player model from the saved skin when the process-local pre-mount model snapshot is no longer available. Exceptional cleanup restores the companion at its original mount position; the last-safe-ground option applies only to normal dismounts.
+On a clean disconnect, Tamework queues that cleanup on the player's world thread before the entity is discarded. If the player is already gone after a client crash, the source-side watchdog detects the missing rider and restores the parked NPC. Persisted mount pairs also include a server-runtime epoch, so a pair saved before a server crash or restart is treated as stale instead of silently resuming in the next process. When that stale source belongs to an active command-roster summon, Tamework stores and despawns it through the roster transition when its owner next joins a world. Stale player sessions restore the ordinary player model from the saved skin when the process-local pre-mount model snapshot is no longer available. Source-missing cleanup returns the player to the latest recorded safe-ground position. Other exceptional cleanup restores the companion at its original mount position; the last-safe-ground option applies only to normal dismounts.
 
 ## Controls
 

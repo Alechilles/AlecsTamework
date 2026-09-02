@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.npc.progression;
 
-import com.alechilles.alecstelemetry.api.TelemetryBreadcrumbContext;
+import com.alechilles.beacon.api.TelemetryBreadcrumbContext;
 
 import javax.annotation.Nonnull;
 import java.util.Objects;

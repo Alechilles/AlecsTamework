@@ -62,6 +62,33 @@ class AvatarFlightRestorationPolicyTest {
         assertEquals(new AvatarFlightRestorationPolicy.Position(1.0, 2.0, 3.0, 0.25f), selected);
     }
 
+    /** Protects source-loss cleanup from returning the player to an unsafe airborne origin. */
+    @Test
+    void sourceMissingUsesLastSafeGround() {
+        AvatarFlightMountSessionComponent session = sessionWithOriginAndSafeGround();
+        AvatarFlightRestorationPolicy.Position current =
+                new AvatarFlightRestorationPolicy.Position(40.0, 320.0, 90.0, 1.25f);
+
+        AvatarFlightRestorationPolicy.Position selected = AvatarFlightRestorationPolicy.select(
+                session,
+                settings,
+                AvatarFlightMountLifecycleService.EndReason.SOURCE_MISSING,
+                current,
+                false
+        );
+        AvatarFlightRestorationPolicy.Position playerPosition =
+                AvatarFlightRestorationPolicy.selectPlayerPosition(
+                        selected,
+                        settings,
+                        AvatarFlightMountLifecycleService.EndReason.SOURCE_MISSING
+                );
+
+        AvatarFlightRestorationPolicy.Position safeGround =
+                new AvatarFlightRestorationPolicy.Position(4.0, 5.0, 6.0, 0.75f);
+        assertEquals(safeGround, selected);
+        assertEquals(safeGround, playerPosition);
+    }
+
     private static AvatarFlightMountSessionComponent sessionWithOriginAndSafeGround() {
         AvatarFlightMountSessionComponent session = new AvatarFlightMountSessionComponent(
                 "26684248-7c9d-4618-bb65-ced5c14bd04a", "default", "AHAvatarFlight", 42L);

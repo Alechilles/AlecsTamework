@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.4.1 - Beacon Runtime Migration - 2026-09-01
+
+### Changed
+
+- Replaced the Alec's Telemetry runtime with Beacon `2.0.0`. This is a breaking
+  namespace and command change for integrations; use `com.alechilles.beacon`
+  and `/beacon consent`.
+- Updated the embedded Patchwork runtime to `1.4.1` so Tamework and Patchwork
+  share the Beacon runtime.
+
 ## 3.4.0 - Persistence Diagnostics and Schema Compatibility - 2026-08-31
 
 ### Added
@@ -30,6 +40,17 @@
 
 ### Fixed
 
+- Temporary mount parking can no longer replace a companion's saved role with
+  `Empty_Role`. Existing companions keep their canonical role, and Tamework
+  waits for a real role before it creates a new saved profile.
+- Dead or lost companions whose saved state contains Hytale's temporary
+  `Empty_Role` mount role can now be restored with their canonical companion
+  role.
+- Avatar Flight now keeps the transformed player and hidden companion below
+  Hytale's maximum entity height. Reaching the build ceiling no longer removes
+  the companion or ends the flight with a missing source.
+- If an Avatar Flight source is missing, cleanup now returns the player to the
+  last recorded safe-ground position instead of an unsafe airborne origin.
 - A failed persistence request no longer disables unrelated companion actions
   unless Tamework detects database corruption, an incompatible schema, or an
   unresolved commit outcome.

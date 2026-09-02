@@ -1,8 +1,8 @@
 package com.alechilles.alecstamework.metrics;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstelemetry.api.TelemetryEventContext;
-import com.alechilles.alecstelemetry.api.TelemetryBreadcrumbContext;
+import com.alechilles.beacon.api.TelemetryEventContext;
+import com.alechilles.beacon.api.TelemetryBreadcrumbContext;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;

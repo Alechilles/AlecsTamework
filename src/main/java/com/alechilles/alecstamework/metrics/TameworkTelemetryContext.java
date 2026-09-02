@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.metrics;
 
-import com.alechilles.alecstelemetry.api.TelemetryEventContext;
+import com.alechilles.beacon.api.TelemetryEventContext;
 import java.util.Locale;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;

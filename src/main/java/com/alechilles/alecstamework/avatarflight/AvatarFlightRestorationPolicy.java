@@ -19,6 +19,10 @@ final class AvatarFlightRestorationPolicy {
     ) {
         Position origin = new Position(
                 session.getOriginX(), session.getOriginY(), session.getOriginZ(), session.getOriginYaw());
+        if (reason == AvatarFlightMountLifecycleService.EndReason.SOURCE_MISSING
+                && session.isLastSafeGroundValid()) {
+            return lastSafeGround(session);
+        }
         if (reason != AvatarFlightMountLifecycleService.EndReason.NORMAL) {
             return origin;
         }
@@ -34,6 +38,24 @@ final class AvatarFlightRestorationPolicy {
             return lastSafeGround(session);
         }
         return origin;
+    }
+
+    @Nonnull
+    static Position selectPlayerPosition(
+            @Nonnull Position restoration,
+            @Nonnull AvatarFlightMountingSettings settings,
+            @Nonnull AvatarFlightMountLifecycleService.EndReason reason
+    ) {
+        if (reason == AvatarFlightMountLifecycleService.EndReason.SOURCE_MISSING) {
+            return restoration;
+        }
+        double offset = settings.getPlayerDismountOffset();
+        return new Position(
+                restoration.x() - Math.sin(restoration.yaw()) * offset,
+                restoration.y(),
+                restoration.z() - Math.cos(restoration.yaw()) * offset,
+                restoration.yaw()
+        );
     }
 
     private static Position lastSafeGround(AvatarFlightMountSessionComponent session) {

@@ -79,7 +79,7 @@ public final class AvatarFlightMountSessionSystem extends EntityTickingSystem<En
             scheduleEnd(playerRef, playerUuid.getUuid(), session, forced, commandBuffer);
             return;
         }
-        syncSourceToRider(store, session, transform, commandBuffer);
+        syncSourceToRider(store, playerRef, session, transform, commandBuffer);
         if (input.isOnGround() && transform.getPosition() != null && transform.getRotation() != null) {
             session.captureLastSafeGround(
                     transform.getPosition().x,
@@ -144,6 +144,7 @@ public final class AvatarFlightMountSessionSystem extends EntityTickingSystem<En
 
     private void syncSourceToRider(
             Store<EntityStore> store,
+            Ref<EntityStore> playerRef,
             AvatarFlightMountSessionComponent session,
             TransformComponent riderTransform,
             CommandBuffer<EntityStore> commandBuffer) {
@@ -151,8 +152,18 @@ public final class AvatarFlightMountSessionSystem extends EntityTickingSystem<En
         if (sourceRef == null || !sourceRef.isValid()) {
             return;
         }
-        sourceFollow.sync(riderTransform,
-                commandBuffer.getComponent(sourceRef, transformType));
+        TransformComponent sourceTransform = commandBuffer.getComponent(
+                sourceRef, transformType
+        );
+        double riderY = riderTransform.getPosition() == null
+                ? Double.NaN : riderTransform.getPosition().y;
+        if (!sourceFollow.sync(riderTransform, sourceTransform)) {
+            return;
+        }
+        if (riderTransform.getPosition().y != riderY) {
+            commandBuffer.putComponent(playerRef, transformType, riderTransform);
+        }
+        commandBuffer.putComponent(sourceRef, transformType, sourceTransform);
     }
 
     private void scheduleEnd(Ref<EntityStore> playerRef,

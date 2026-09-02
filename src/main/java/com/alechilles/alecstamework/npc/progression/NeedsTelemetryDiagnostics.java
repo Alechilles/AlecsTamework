@@ -2,7 +2,7 @@ package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
-import com.alechilles.alecstelemetry.api.TelemetryEventContext;
+import com.alechilles.beacon.api.TelemetryEventContext;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
