@@ -14,6 +14,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import it.unimi.dsi.fastutil.Pair;
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
@@ -29,8 +30,6 @@ import org.joml.Vector3d;
 final class BreedingOffspringBirthService {
     private static final double SPAWN_HEIGHT_OFFSET = 1.0;
 
-    private final BreedingFertilityOffspringService fertilityService =
-            new BreedingFertilityOffspringService();
     private final BreedingOffspringSpawnService spawnService =
             new BreedingOffspringSpawnService(new BreedingOffspringRoleResolver());
     private final BreedingClaimLimitPolicyService limitPolicy;
@@ -57,7 +56,8 @@ final class BreedingOffspringBirthService {
         this.limitPolicy = limitPolicy;
     }
 
-    void spawn(@Nonnull World world, @Nonnull BreedingPairContext context) {
+    void spawn(@Nonnull World world, @Nonnull BreedingPairContext context,
+               @Nonnull BreedingLitterPlanner.Plan plan) {
         Store<EntityStore> store = resolveStore(world);
         ParentRefs parents = resolveParents(world, store, context);
         if (store == null || parents == null) {
@@ -74,16 +74,17 @@ final class BreedingOffspringBirthService {
             return;
         }
         BreedingFertilityOffspringService.FertilityRoll fertility =
-                fertilityService.rollOffspring(parents.parentA(), parents.parentB(), store);
+                plan.fertility();
         if (fertility.offspringCount() <= 0) {
             logNoOffspring(liveContext, fertility);
             return;
         }
         BirthAllowance allowance = resolveAllowance(
-                store, liveContext, setup, fertility.offspringCount()
+                store, liveContext, setup, plan.resolvedRoles().size(),
+                plan.resolvedRoles().getFirst()
         );
         int spawnedCount = spawnChildren(
-                store, parents, liveContext, setup, allowance
+                store, parents, liveContext, setup, allowance, plan.resolvedRoles()
         );
         finishLitter(store, parents, liveContext, fertility, spawnedCount);
     }
@@ -165,12 +166,9 @@ final class BreedingOffspringBirthService {
             @Nonnull Store<EntityStore> store,
             @Nonnull BreedingPairContext context,
             @Nonnull SpawnSetup setup,
-            int requested
+            int requested,
+            @Nonnull BreedingResolvedSpawnRole firstRole
     ) {
-        BreedingResolvedSpawnRole firstRole = resolveRole(setup, context);
-        if (firstRole == null) {
-            return BirthAllowance.none();
-        }
         BreedingClaimLimitPolicyService.Decision decision = limitPolicy.evaluate(
                 store,
                 setup.position(),
@@ -232,13 +230,12 @@ final class BreedingOffspringBirthService {
             @Nonnull ParentRefs parents,
             @Nonnull BreedingPairContext context,
             @Nonnull SpawnSetup setup,
-            @Nonnull BirthAllowance allowance
+            @Nonnull BirthAllowance allowance,
+            @Nonnull List<BreedingResolvedSpawnRole> roles
     ) {
         int spawned = 0;
         for (int index = 0; index < allowance.count(); index++) {
-            BreedingResolvedSpawnRole role = index == 0
-                    ? allowance.firstRole()
-                    : resolveRole(setup, context);
+            BreedingResolvedSpawnRole role = roles.get(index);
             if (role == null) {
                 continue;
             }
@@ -293,23 +290,6 @@ final class BreedingOffspringBirthService {
                         physics -> logSpawnSuccess(context, childNpc, role, physics)
                 )),
                 failure -> logWarn("Breeding offspring initialization failed.", failure)
-        );
-    }
-
-    @Nullable
-    private BreedingResolvedSpawnRole resolveRole(
-            @Nonnull SpawnSetup setup,
-            @Nonnull BreedingPairContext context
-    ) {
-        return spawnService.resolveSpawnRole(
-                setup.parentARole(),
-                setup.parentBRole(),
-                setup.config(),
-                context.parentARoleIndex(),
-                context.parentBRoleIndex(),
-                setup.npcPlugin(),
-                Math.random(),
-                Math.random()
         );
     }
 

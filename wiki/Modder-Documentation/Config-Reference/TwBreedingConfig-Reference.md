@@ -11,6 +11,9 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 ## What It Controls
 `TwBreedingConfig` defines breeding readiness, partner eligibility, pairing rules, cooldowns, passive breeding scans, inheritance behavior, offspring lifecycle defaults, and role-specific breeding overrides.
 
+Ordinary animals do not require `TwManagedActivityConfig` to breed. Managed
+offspring still require their configured population admission checks.
+
 Use it when you want to control:
 - which companions are allowed to breed
 - how often they can breed

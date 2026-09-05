@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.api.PopulationAdmissionToken;
 import com.alechilles.alecstamework.api.PopulationCompanionLifecycle;
 import com.alechilles.alecstamework.companion.population.domain.ManagedBatchAdmissionRequest;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.math.TameworkRotationUtil;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -22,7 +23,9 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
@@ -62,6 +65,7 @@ final class BreedingLitterPlanner {
         );
         ArrayList<BreedingLitterOperation.ChildPlan> children =
                 new ArrayList<>(roll.offspringCount());
+        ArrayList<BreedingResolvedSpawnRole> resolvedRoles = new ArrayList<>(roll.offspringCount());
         for (int ordinal = 0; ordinal < roll.offspringCount(); ordinal++) {
             BreedingResolvedSpawnRole role = roles.resolveSpawnRole(
                     context.parentARoleId(),
@@ -77,6 +81,7 @@ final class BreedingLitterPlanner {
                 return null;
             }
             TwBreedingConfig.RoleFamily family = role.lifecycleFamily();
+            resolvedRoles.add(role);
             children.add(new BreedingLitterOperation.ChildPlan(
                     childIds.get(ordinal),
                     role.roleId(),
@@ -88,9 +93,20 @@ final class BreedingLitterPlanner {
             ));
         }
         String targetRole = children.getFirst().roleId();
-        String managedProfile = resolveManagedProfile(plugin, children);
-        if (managedProfile == null || managedProfile.isBlank()) {
+        // Retained mappings still require managed admission when a config reload
+        // makes them stale. The admission service checks profile readiness.
+        Map<String, ManagedActivityConfigRegistry.RoleResolution> managedRoles =
+                plugin.getManagedActivityConfigRegistry().snapshot().rolesById();
+        String managedProfile = resolveManagedProfile(children, roleId -> {
+            ManagedActivityConfigRegistry.RoleResolution resolution = managedRoles.get(roleId);
+            return resolution == null ? null : resolution.profile().profileId();
+        });
+        if (managedProfile == null) {
             return null;
+        }
+        if (managedProfile.isEmpty()) {
+            return new Plan(litterId, roll, List.copyOf(children), null,
+                    rotation(parentARef, parentBRef, store), List.copyOf(resolvedRoles));
         }
         UUID inheritedOwner = BreedingInheritedOwnerResolver.resolve(
                 config,
@@ -135,23 +151,24 @@ final class BreedingLitterPlanner {
                 ManagedBatchAdmissionRequest.create(
                         litterId, v3, roll.offspringCount()
                 ),
-                rotation(parentARef, parentBRef, store)
+                rotation(parentARef, parentBRef, store),
+                List.copyOf(resolvedRoles)
         );
     }
 
+    /** Returns an empty profile for ordinary births, or null for incompatible profiles. */
     @Nullable
-    private static String resolveManagedProfile(
-            @Nonnull Tamework plugin,
-            @Nonnull List<BreedingLitterOperation.ChildPlan> children
+    static String resolveManagedProfile(
+            @Nonnull List<BreedingLitterOperation.ChildPlan> children,
+            @Nonnull Function<String, String> profileForRole
     ) {
         String profileId = null;
         for (BreedingLitterOperation.ChildPlan child : children) {
-            String childProfile = plugin.getManagedActivityConfigRegistry()
-                    .resolveRole(child.roleId())
-                    .map(resolution -> resolution.profile().profileId())
-                    .orElse(null);
-            if (childProfile == null || childProfile.isBlank()
-                    || profileId != null && !profileId.equals(childProfile)) {
+            String childProfile = profileForRole.apply(child.roleId());
+            childProfile = childProfile == null ? "" : childProfile.trim();
+            // An ordinary litter needs no managed profile. Mixed litters must
+            // still fail admission instead of bypassing a managed child's cap.
+            if (profileId != null && !profileId.equals(childProfile)) {
                 return null;
             }
             profileId = childProfile;
@@ -269,13 +286,14 @@ final class BreedingLitterPlanner {
             @Nonnull BreedingFertilityOffspringService.FertilityRoll fertility,
             @Nonnull List<BreedingLitterOperation.ChildPlan> children,
             @Nullable ManagedBatchAdmissionRequest admission,
-            @Nonnull Rotation3f rotation
+            @Nonnull Rotation3f rotation,
+            @Nonnull List<BreedingResolvedSpawnRole> resolvedRoles
     ) {
         static Plan empty(
                 BreedingFertilityOffspringService.FertilityRoll fertility
         ) {
             return new Plan(
-                    null, fertility, List.of(), null, new Rotation3f()
+                    null, fertility, List.of(), null, new Rotation3f(), List.of()
             );
         }
 

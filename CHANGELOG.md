@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Restored manual and automatic breeding for ordinary animals, including Cats
+  and Animal Husbandry animals, without requiring managed activity profiles.
 - Recall can restore an eligible missing companion from its exact saved
   checkpoint when Update 6 confirms that no source entity section exists.
 

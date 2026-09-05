@@ -22,7 +22,7 @@ import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
 /**
- * Matches a live pair, freezes one litter, and schedules its durable birth.
+ * Matches a live pair and schedules an ordinary or managed litter.
  */
 final class BreedingHytalePairingService {
     private static final double SPAWN_HEIGHT_OFFSET = 1.0;
@@ -34,6 +34,9 @@ final class BreedingHytalePairingService {
     private final BreedingLitterCommitService litterCommit =
             new BreedingLitterCommitService(litterPlanner);
     private final BreedingClaimLimitPolicyService limitPolicy;
+    private final BreedingOffspringBirthService ordinaryBirth;
+    private final BreedingPairingEffectsService delayedEffects =
+            new BreedingPairingEffectsService(new BreedingParticleOffsetResolver());
 
     BreedingHytalePairingService(
             @Nonnull BreedingPartnerService partnerService,
@@ -43,6 +46,7 @@ final class BreedingHytalePairingService {
         this.partnerService = partnerService;
         this.admissionRegistry = admissionRegistry;
         this.limitPolicy = limitPolicy;
+        this.ordinaryBirth = new BreedingOffspringBirthService(limitPolicy);
     }
 
     boolean tryPassive(
@@ -153,11 +157,40 @@ final class BreedingHytalePairingService {
                     : BreedingInteractionOutcome.unavailable();
         }
         reserveSweepHeadroom(population, pendingClaims, pendingOwners);
+        if (litter.admission() == null) {
+            if (!litterCommit.applyPairEffects(candidate, config, commandBuffer)) {
+                admission.close();
+                return BreedingInteractionOutcome.unavailable();
+            }
+            return scheduleOrdinaryBirth(candidate.world(), context, litter, admission);
+        }
         return litterCommit.prepare(
                 candidate.world().getName(), context, litter, admission,
                 readiness.manualPlayerUuid()
         ) ? BreedingInteractionOutcome.submitted()
                 : BreedingInteractionOutcome.unavailable();
+    }
+
+    private BreedingInteractionOutcome scheduleOrdinaryBirth(
+            World world,
+            BreedingPairContext context,
+            BreedingLitterPlanner.Plan litter,
+            BreedingPairAdmissionRegistry.Lease admission
+    ) {
+        try {
+            delayedEffects.schedule(world, context.parentAUuid(), context.parentBUuid(), () -> {
+                try {
+                    ordinaryBirth.spawn(world, context, litter);
+                } finally {
+                    admission.close();
+                }
+            }, admission::close);
+            return BreedingInteractionOutcome.paired();
+        } catch (RuntimeException | LinkageError failure) {
+            admission.close();
+            logDebug("Breeding delayed pairing could not be scheduled.");
+            return BreedingInteractionOutcome.unavailable();
+        }
     }
 
     @Nullable
