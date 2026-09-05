@@ -6,12 +6,12 @@ import com.hypixel.hytale.server.core.command.system.CommandContext;
 import javax.annotation.Nonnull;
 
 /**
- * Toggles flying companion diagnostics logging on the server.
+ * Toggles avatar-flight debug logging on the server.
  */
-public final class TameworkDebugFlyingCompanionCommand extends AbstractTameworkServerCommand {
+public final class TameworkDebugAvatarFlightCommand extends AbstractTameworkServerCommand {
 
-    public TameworkDebugFlyingCompanionCommand() {
-        super("flight", "Toggle Tamework flying companion diagnostics logging.");
+    public TameworkDebugAvatarFlightCommand() {
+        super("avatar-flight", "Toggle Tamework avatar-flight debug logging.");
         setAllowsExtraArguments(true);
     }
 
@@ -22,18 +22,18 @@ public final class TameworkDebugFlyingCompanionCommand extends AbstractTameworkS
             commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
             return;
         }
-        String raw = getFirstArg(commandContext.getInputString());
+        String raw = getFirstArg(commandContext);
         Boolean explicit = parseBoolean(raw);
         boolean enabled = explicit != null
-                ? plugin.setDebugFlyingCompanionEnabled(explicit)
-                : plugin.toggleDebugFlyingCompanionEnabled();
+                ? plugin.setDebugAvatarFlightEnabled(explicit)
+                : plugin.setDebugAvatarFlightEnabled(!plugin.isDebugAvatarFlightEnabled());
         commandContext.sender().sendMessage(Message.raw(
-                "Tamework flying companion diagnostics logging: " + (enabled ? "enabled" : "disabled")
+                "Tamework avatar-flight debug logging: " + (enabled ? "enabled" : "disabled")
         ));
     }
 
-    static String getFirstArg(String input) {
-        return TameworkCommandInput.firstArgument(input, "flight");
+    private static String getFirstArg(CommandContext commandContext) {
+        return TameworkCommandInput.firstArgument(commandContext.getInputString(), "avatar-flight");
     }
 
     private static Boolean parseBoolean(String raw) {

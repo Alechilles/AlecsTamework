@@ -22,7 +22,7 @@ public final class TameworkDebugDespawnCommand extends AbstractTameworkServerCom
             commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
             return;
         }
-        String[] args = getArgs(commandContext);
+        String[] args = getArgs(commandContext.getInputString());
         String firstArg = args.length > 0 ? args[0] : null;
         String secondArg = args.length > 1 ? args[1] : null;
         Boolean explicit = parseBoolean(firstArg);
@@ -49,18 +49,8 @@ public final class TameworkDebugDespawnCommand extends AbstractTameworkServerCom
         ));
     }
 
-    private static String[] getArgs(CommandContext commandContext) {
-        String input = commandContext.getInputString();
-        if (input == null) {
-            return new String[0];
-        }
-        String[] tokens = input.trim().split("\\s+");
-        if (tokens.length <= 2) {
-            return new String[0];
-        }
-        String[] args = new String[tokens.length - 2];
-        System.arraycopy(tokens, 2, args, 0, args.length);
-        return args;
+    static String[] getArgs(String input) {
+        return TameworkCommandInput.argumentsAfter(input, "despawn");
     }
 
     private static Boolean parseBoolean(String raw) {

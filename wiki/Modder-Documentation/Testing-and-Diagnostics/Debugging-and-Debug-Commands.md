@@ -37,21 +37,47 @@ do not participate in spawning and are removed when tracking ends.
 
 ## Debug toggles
 
-- `/tw debug log hook`
-- `/tw debug log prompt`
-- `/tw debug log spawner`
-- `/tw debug log spawnerlocation`
-- `/tw debug log despawn`
-- `/tw debug log lag`
-- `/tw debug log coop`
-- `/tw debug log needs consume`
-- `/tw debug log needs damage`
-- `/tw debug log needs seek`
-- `/tw debug telemetry needs`
-- `/tw debug log respawntrace`
-- `/tw debug log xpevents`
+All toggles below accept `on` or `off`; omit the argument to toggle the current
+state. They work from the server console and take effect immediately. Commands
+change runtime state only. Restarting the server or loading/removing debug
+config assets reapplies the active `TwDebugConfig` defaults.
 
-`/tw debug log respawntrace` logs the stored and normalized health/needs projection,
+| `DebugCommands` field | Runtime command |
+| --- | --- |
+| `Hook` | `/tw debug log hook [on\|off]` |
+| `Spawner` | `/tw debug log spawner [on\|off]` |
+| `Prompt` | `/tw debug log prompt [on\|off]` |
+| `Ride` | `/tw debug log ride [on\|off]` |
+| `Despawn` | `/tw debug log despawn [on\|off] [RoleName\|all\|clear]` |
+| `DespawnRoleFilter` | `/tw debug log despawn [RoleName\|all\|clear]` |
+| `Lag` | `/tw debug log lag [on\|off]` |
+| `Coop` | `/tw debug log coop [on\|off]` |
+| `Breeding` | `/tw debug log breeding [on\|off]` |
+| `NeedsConsume` | `/tw debug log needs consume [on\|off]` |
+| `NeedsDamage` | `/tw debug log needs damage [on\|off]` |
+| `NeedsSeek` | `/tw debug log needs seek [on\|off]` |
+| `NeedsTelemetry` | `/tw debug telemetry needs [on\|off]` |
+| `Harvest` | `/tw debug log harvest [on\|off]` |
+| `FlyingCompanion` | `/tw debug log companion flight [on\|off]` |
+| `AvatarFlight` | `/tw debug log avatar-flight [on\|off]` |
+| `RespawnTrace` | `/tw debug log respawn-trace [on\|off]` |
+
+`Spawner` also seeds `/tw debug log spawner-location [on|off]`, which can be
+changed independently at runtime. `DespawnRoleFilter` selects a role by name;
+`all` or `clear` removes that filter.
+
+`AvatarFlight` controls diagnostic logging. Controller tick logs also require
+`Debug.LogControllerTicks` in the active avatar-flight config. `NeedsTelemetry`
+still requires Tamework telemetry to be enabled.
+
+Additional runtime diagnostics include:
+
+- `/tw debug log target-hud [on|off]`
+- `/tw debug log xp-events [on|off]`
+- `/tw debug avatar input [on|off|status]`
+- `/tw debug avatar player-model unsafe [ModelId] [scale] | reset | status`
+
+`/tw debug log respawn-trace` logs the stored and normalized health/needs projection,
 the immediate live entity health and death-component state, first damage within
 the trace window, and delayed 250 ms and 1 second probes. It covers Soul
 Collector capture and release, free and paid companion restoration, and bonded
@@ -65,7 +91,7 @@ health, and death-component state, even when the respawn trace is disabled.
 
 Every newly inserted companion projection clears stale fall distance and
 velocity and receives brief spawn-time fall protection. This gameplay guard is
-active even when `/tw debug log respawntrace` is disabled. A cancelled invalid fall
+active even when `/tw debug log respawn-trace` is disabled. A cancelled invalid fall
 can appear under `[tw-respawn-trace]` or `[tw-spawn-protection]`, depending on
 active trace evidence.
 

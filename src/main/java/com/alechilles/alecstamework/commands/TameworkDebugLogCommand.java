@@ -12,6 +12,8 @@ public final class TameworkDebugLogCommand extends AbstractCommandCollection {
         addSubCommand(new TameworkDebugPromptCommand());
         addSubCommand(new TameworkDebugRideCommand());
         addSubCommand(new TameworkDebugCoopCommand());
+        addSubCommand(new TameworkDebugBreedingCommand());
+        addSubCommand(new TameworkDebugAvatarFlightCommand());
         addSubCommand(new TameworkDebugDespawnCommand());
         addSubCommand(new TameworkDebugLagCommand());
         addSubCommand(new TameworkDebugTargetHudCommand());

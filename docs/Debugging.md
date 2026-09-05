@@ -50,7 +50,7 @@ player-scoped. In particular, `/tw config`, `/tw settings`, `/tw news`,
 - If multiple configs apply, set explicit `ConfigId` on `TameworkInteract` for deterministic selection.
 - Confirm role params referenced by `TwGlobalConfig.InteractionDefaults` exist and have expected values.
 - Use `/tw getalarm` for harvest/cooldown alarm state.
-- If prompt behavior is stale/wrong, ensure `TameworkInteractPrompt` is running and use `/tw debugprompt`.
+- If prompt behavior is stale/wrong, ensure `TameworkInteractPrompt` is running and use `/tw debug log prompt`.
 - If custom item checks fail unexpectedly, verify `ItemsInHand.Operator` (`AnyOf` vs `NoneOf`) and quantity requirements.
 - For `NpcHealthPercent` requirements, confirm health scaling assumptions (`0-100`).
 
@@ -141,7 +141,7 @@ player-scoped. In particular, `/tw config`, `/tw settings`, `/tw news`,
 ## Hook and effect troubleshooting
 - `TriggerNpcHook` writes `TameworkHookComponent`; `TameworkHook` consumes it.
 - In instruction nodes, use `Sensor` (singular), not `Sensors`.
-- Use `/tw debughook [on|off]` to inspect hook emit/consume flow.
+- Use `/tw debug log hook [on|off]` to inspect hook emit/consume flow.
 - `TameworkEffectActive` can validate effect-driven branches; verify `EffectId` and optional `MinRemainingSeconds`.
 
 ## Command-item troubleshooting
@@ -155,7 +155,7 @@ player-scoped. In particular, `/tw config`, `/tw settings`, `/tw news`,
 - Spawner failures: check role filters, tame/owner policy, range/cooldown, and captured metadata.
 - A dead-target capture denial writes the player, target, role, item, exact
   health, and death-component state to the server log.
-- `/tw debugrespawntrace` covers normal captured-item releases, restoration,
+- `/tw debug log respawn-trace` covers normal captured-item releases, restoration,
   and bonded roster summons. A bonded summon trace includes its planned
   full-health snapshot, profile/lease/world identity, projection result,
   immediate live health and death state, first damage, and probes after 250 ms
@@ -163,7 +163,7 @@ player-scoped. In particular, `/tw config`, `/tw settings`, `/tw news`,
   recorded. Enable it only for a short reproduction.
 - New companion projections always clear stale fall distance and velocity and
   receive brief spawn-time fall protection. This protection does not depend on
-  `/tw debugrespawntrace`. A cancelled invalid fall can appear under
+  `/tw debug log respawn-trace`. A cancelled invalid fall can appear under
   `[tw-respawn-trace]` or `[tw-spawn-protection]`, depending on active trace
   evidence.
 - Naming failures: confirm naming config binding and policy (`RequireTamed`, `RequireOwner`, rename/replace limits).
@@ -184,42 +184,71 @@ player-scoped. In particular, `/tw config`, `/tw settings`, `/tw news`,
   SimpleClaims.
 
 ## Debug toggles
-- `/tw debughook [on|off]`
-- `/tw debugprompt [on|off]`
-- `/tw debugspawner [on|off]`
-- `/tw debugspawnerlocation [on|off]`
-- `/tw debugdespawn [on|off] [RoleName|all|clear]`
-- `/tw debugplayermodel unsafe [ModelId] [scale] | reset | status`
-- `/tw debugplayerinput [on|off|status]`
-- `/tw debuglag [on|off]`
-- `/tw debugrespawntrace [on|off]`
-- `/tw debugharvest [on|off]`
-- `/tw debugxpevents [on|off]`
 
-`/tw debugplayermodel unsafe` temporarily replaces the executing player's `ModelComponent` for isolated
+All toggles below accept `on` or `off`; omit the argument to toggle the current
+state. They work from the server console and take effect immediately. Commands
+change runtime state only. Restarting the server or loading/removing debug
+config assets reapplies the active `TwDebugConfig` defaults.
+
+| `DebugCommands` field | Runtime command |
+| --- | --- |
+| `Hook` | `/tw debug log hook [on\|off]` |
+| `Spawner` | `/tw debug log spawner [on\|off]` |
+| `Prompt` | `/tw debug log prompt [on\|off]` |
+| `Ride` | `/tw debug log ride [on\|off]` |
+| `Despawn` | `/tw debug log despawn [on\|off] [RoleName\|all\|clear]` |
+| `DespawnRoleFilter` | `/tw debug log despawn [RoleName\|all\|clear]` |
+| `Lag` | `/tw debug log lag [on\|off]` |
+| `Coop` | `/tw debug log coop [on\|off]` |
+| `Breeding` | `/tw debug log breeding [on\|off]` |
+| `NeedsConsume` | `/tw debug log needs consume [on\|off]` |
+| `NeedsDamage` | `/tw debug log needs damage [on\|off]` |
+| `NeedsSeek` | `/tw debug log needs seek [on\|off]` |
+| `NeedsTelemetry` | `/tw debug telemetry needs [on\|off]` |
+| `Harvest` | `/tw debug log harvest [on\|off]` |
+| `FlyingCompanion` | `/tw debug log companion flight [on\|off]` |
+| `AvatarFlight` | `/tw debug log avatar-flight [on\|off]` |
+| `RespawnTrace` | `/tw debug log respawn-trace [on\|off]` |
+
+`Spawner` also seeds `/tw debug log spawner-location [on|off]`, which can be
+changed independently at runtime. `DespawnRoleFilter` selects a role by name;
+`all` or `clear` removes that filter.
+
+`AvatarFlight` controls diagnostic logging. Controller tick logs also require
+`Debug.LogControllerTicks` in the active avatar-flight config. `NeedsTelemetry`
+still requires Tamework telemetry to be enabled.
+
+Additional runtime diagnostics include:
+
+- `/tw debug log target-hud [on|off]`
+- `/tw debug log xp-events [on|off]`
+- `/tw debug avatar input [on|off|status]`
+- `/tw debug avatar player-model unsafe [ModelId] [scale] | reset | status`
+
+`/tw debug avatar player-model unsafe` temporarily replaces the executing player's `ModelComponent` for isolated
 model-swap probes. Non-player models can crash the current client once movement animations update, and
 extreme positive scales can produce unstable visuals or physics, so the unsafe token is required. The
 requested scale is passed through without clamping to the model asset's authored min/max. With no model id
 it tries `Endgame_Pet_Dragon_Frost`; use `reset` to restore the saved player model.
 
-`/tw debugplayerinput` logs movement packets, mouse packets, interaction events, and per-tick player
+`/tw debug avatar input` logs movement packets, mouse packets, interaction events, and per-tick player
 input/state snapshots for the executing player. Use it only during short input experiments; it is intentionally verbose.
 
-`/tw debugrespawntrace` logs capture-time stored health and needs, raw and
+`/tw debug log respawn-trace` logs capture-time stored health and needs, raw and
 normalized return projections, immediate live health and death state, first
 damage, and delayed 250 ms and 1 second probes for captured-item release and
 companion restoration. Enable it only for a short reproduction.
 
-`/tw debugdespawn` notes:
+`/tw debug log despawn` notes:
 - Default (no role filter) tracks all tamed companions.
 - You can target a role by name (for example `Rat` or `Tamed_Rat`).
 - Use `all` or `clear` to remove a role filter without disabling the toggle.
 
-`/tw debugharvest` logs optimized harvest cooldown checks, cooldown writes, harvest execution stages,
+`/tw debug log harvest` logs optimized harvest cooldown checks, cooldown writes, harvest execution stages,
 and container harvest results. It is disabled by default because milk and other harvest interactions
 can produce several lines per player attempt.
 
-`/tw debugxpevents` subscribes through `TameworkApi.events()` and logs each `CompanionXpAwardedEvent`
+`/tw debug log xp-events` subscribes through `TameworkApi.events()` and logs each `CompanionXpAwardedEvent`
 hit, including source, owner UUID, tool ids, XP, and level delta.
 When enabled, it also logs `TameworkHarvestDrop` attempts before the public event exists so rejected harvest
 XP can be diagnosed with a reason such as not tamed or owned, disabled harvest XP, or missing drop output.

@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- Added missing breeding and avatar-flight debug logging commands. Every
+  `TwDebugConfig` debug mode now has a runtime command toggle.
+- Fixed explicit debug toggle arguments for despawn, flying companions, needs
+  telemetry, and respawn tracing after the command reorganization.
 - Fixed manual and automatic breeding failing for ordinary animals, including
   Alec's Cats and Alec's Animal Husbandry animals.
 - Recall can restore an eligible missing companion from its exact saved

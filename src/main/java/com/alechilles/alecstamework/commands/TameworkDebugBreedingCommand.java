@@ -6,12 +6,12 @@ import com.hypixel.hytale.server.core.command.system.CommandContext;
 import javax.annotation.Nonnull;
 
 /**
- * Toggles flying companion diagnostics logging on the server.
+ * Toggles breeding debug logging on the server.
  */
-public final class TameworkDebugFlyingCompanionCommand extends AbstractTameworkServerCommand {
+public final class TameworkDebugBreedingCommand extends AbstractTameworkServerCommand {
 
-    public TameworkDebugFlyingCompanionCommand() {
-        super("flight", "Toggle Tamework flying companion diagnostics logging.");
+    public TameworkDebugBreedingCommand() {
+        super("breeding", "Toggle Tamework breeding debug logging.");
         setAllowsExtraArguments(true);
     }
 
@@ -22,18 +22,18 @@ public final class TameworkDebugFlyingCompanionCommand extends AbstractTameworkS
             commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
             return;
         }
-        String raw = getFirstArg(commandContext.getInputString());
+        String raw = getFirstArg(commandContext);
         Boolean explicit = parseBoolean(raw);
         boolean enabled = explicit != null
-                ? plugin.setDebugFlyingCompanionEnabled(explicit)
-                : plugin.toggleDebugFlyingCompanionEnabled();
+                ? plugin.setDebugBreedingEnabled(explicit)
+                : plugin.toggleDebugBreedingEnabled();
         commandContext.sender().sendMessage(Message.raw(
-                "Tamework flying companion diagnostics logging: " + (enabled ? "enabled" : "disabled")
+                "Tamework breeding debug logging: " + (enabled ? "enabled" : "disabled")
         ));
     }
 
-    static String getFirstArg(String input) {
-        return TameworkCommandInput.firstArgument(input, "flight");
+    private static String getFirstArg(CommandContext commandContext) {
+        return TameworkCommandInput.firstArgument(commandContext.getInputString(), "breeding");
     }
 
     private static Boolean parseBoolean(String raw) {

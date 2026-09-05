@@ -41,23 +41,39 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 - Used to select the active debug config.
 
 ### `DebugCommands`
-- `Hook`: default state for `/tw debughook`
-- `Spawner`: default state for `/tw debugspawner`
-- `Spawner` also seeds `/tw debugspawnerlocation` unless changed at runtime
-- `Prompt`: default state for `/tw debugprompt`
-- `Despawn`: default state for `/tw debugdespawn`
-- `DespawnRoleFilter`: default role filter for despawn diagnostics
-- `Lag`: default state for `/tw debuglag`
-- `Coop`: enables coop-related debug output
-- `Breeding`: enables breeding-related debug output
-- `NeedsConsume`: enables needs-consumption debug output
-- `NeedsDamage`: enables needs-damage diagnostics (`/tw debugneedsdamage`)
-- `NeedsSeek`: enables needs-seek target resolution diagnostics (`/tw debugneedsseek`)
-- `NeedsTelemetry`: enables rate-limited Beacon needs context events (`/tw debugneedstelemetry`); events are still recorded only when Tamework telemetry is enabled
-- `AvatarFlight`: enables transformed-player avatar-flight diagnostics; disabled by default and additionally requires the avatar-flight asset's `Debug.LogControllerTicks` setting
-- `RespawnTrace`: enables capture, captured-item release, revival,
-  lost-recovery, and bonded-summon health-state diagnostics
-  (`/tw debugrespawntrace`)
+
+All toggles below accept `on` or `off`; omit the argument to toggle the current
+state. They work from the server console and take effect immediately. Commands
+change runtime state only. Restarting the server or loading/removing debug
+config assets reapplies the active `TwDebugConfig` defaults.
+
+| `DebugCommands` field | Runtime command |
+| --- | --- |
+| `Hook` | `/tw debug log hook [on\|off]` |
+| `Spawner` | `/tw debug log spawner [on\|off]` |
+| `Prompt` | `/tw debug log prompt [on\|off]` |
+| `Ride` | `/tw debug log ride [on\|off]` |
+| `Despawn` | `/tw debug log despawn [on\|off] [RoleName\|all\|clear]` |
+| `DespawnRoleFilter` | `/tw debug log despawn [RoleName\|all\|clear]` |
+| `Lag` | `/tw debug log lag [on\|off]` |
+| `Coop` | `/tw debug log coop [on\|off]` |
+| `Breeding` | `/tw debug log breeding [on\|off]` |
+| `NeedsConsume` | `/tw debug log needs consume [on\|off]` |
+| `NeedsDamage` | `/tw debug log needs damage [on\|off]` |
+| `NeedsSeek` | `/tw debug log needs seek [on\|off]` |
+| `NeedsTelemetry` | `/tw debug telemetry needs [on\|off]` |
+| `Harvest` | `/tw debug log harvest [on\|off]` |
+| `FlyingCompanion` | `/tw debug log companion flight [on\|off]` |
+| `AvatarFlight` | `/tw debug log avatar-flight [on\|off]` |
+| `RespawnTrace` | `/tw debug log respawn-trace [on\|off]` |
+
+`Spawner` also seeds `/tw debug log spawner-location [on|off]`, which can be
+changed independently at runtime. `DespawnRoleFilter` selects a role by name;
+`all` or `clear` removes that filter.
+
+`AvatarFlight` controls diagnostic logging. Controller tick logs also require
+`Debug.LogControllerTicks` in the active avatar-flight config. `NeedsTelemetry`
+still requires Tamework telemetry to be enabled.
 
 ## Defaults and Usage Notes
 - The bundled default asset in `src/main/resources/Server/Tamework/Debug/TwDebugDefault.json` ships with local log-heavy debug toggles disabled and `NeedsTelemetry` enabled.
