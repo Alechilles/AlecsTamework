@@ -1,11 +1,11 @@
 # Changelog
 
-## Unreleased
+## 3.4.2 - Breeding and Recall Hotfix - 2026-09-05
 
 ### Fixed
 
-- Restored manual and automatic breeding for ordinary animals, including Cats
-  and Animal Husbandry animals, without requiring managed activity profiles.
+- Fixed manual and automatic breeding failing for ordinary animals, including
+  Alec's Cats and Alec's Animal Husbandry animals.
 - Recall can restore an eligible missing companion from its exact saved
   checkpoint when Update 6 confirms that no source entity section exists.
 
