@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 3.4.3 - Beacon Consent Hotfix - 2026-09-05
 
 ### Fixed
 
