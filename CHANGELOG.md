@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Updated embedded Beacon to 2.0.1 to fix consent row toggles and keep the
+  Enabled checkbox synchronized with the selected telemetry types.
+
 ## 3.4.2 - Breeding and Recall Hotfix - 2026-09-05
 
 ### Fixed
