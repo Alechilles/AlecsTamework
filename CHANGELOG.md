@@ -1,12 +1,17 @@
 # Changelog
 
-## 3.4.3 - Beacon Consent Hotfix - 2026-09-05
+## 3.4.4 - Variant Taming Hotfix - 2026-09-06
 
 ### Fixed
 
 - Restored breed-specific taming roles when a variant declares its own
   `TamedRoleId`, preventing bobtail cats from becoming mediumhair cats after
   capture and release.
+
+## 3.4.3 - Beacon Consent Hotfix - 2026-09-05
+
+### Fixed
+
 - Updated embedded Beacon to 2.0.1 to fix consent row toggles and keep the
   Enabled checkbox synchronized with the selected telemetry types.
 
