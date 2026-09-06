@@ -93,7 +93,7 @@ public class ActionTameworkInteract extends TameworkActionBase {
         StdScope sensorSnapshot = null;
         StdScope roleParameterSnapshot = null;
         if (support != null) {
-            roleParameterSnapshot = InteractionRoleParameterScope.snapshot(support);
+            roleParameterSnapshot = InteractionRoleParameterScope.snapshotDeclaredParameters(support);
             Scope globalScope = support.getGlobalScope();
             if (globalScope != null) {
                 globalSnapshot = globalScope instanceof StdScope

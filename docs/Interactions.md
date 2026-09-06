@@ -59,7 +59,7 @@ Common fields:
 - `ItemsInHand`
 - `ItemsParam`
 - `Role`
-- `RoleParam` (overrides `Role` when resolved from the NPC role's authored parameters or exported scopes)
+- `RoleParam` (overrides `Role` when resolved from the NPC role's authored parameters or exported scopes). Parameters declared on the root variant remain available even when the global build scope does not export them; for example, `TamedRoleId` can select a breed-specific pet role.
 
 Behavior:
 - Requires untamed NPC and matching held item.

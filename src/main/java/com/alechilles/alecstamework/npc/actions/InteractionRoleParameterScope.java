@@ -25,6 +25,19 @@ final class InteractionRoleParameterScope {
                         ? StdScope.copyOf((StdScope) globalScope)
                         : new StdScope(globalScope);
             }
+            return snapshotDeclaredParameters(support);
+        } catch (RuntimeException | LinkageError ignored) {
+            return null;
+        }
+    }
+
+    /** Keeps parameters declared only on the root role, such as TamedRoleId, available to interactions. */
+    @Nullable
+    static StdScope snapshotDeclaredParameters(@Nullable BuilderSupport support) {
+        if (support == null) {
+            return null;
+        }
+        try {
             Builder<?> roleBuilder = NpcBuilderAccess.getRoleRoot(support);
             BuilderParameters parameters = roleBuilder != null ? roleBuilder.getBuilderParameters() : null;
             return parameters != null ? parameters.createScope() : null;
