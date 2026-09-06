@@ -46,10 +46,10 @@ configurations {
     }
 }
 
-if (rootProject.findProject(':beacon:runtime') != null) {
+if (rootProject.findProject(':alecstelemetry:runtime') != null) {
     configurations.configureEach {
         resolutionStrategy.dependencySubstitution {
-            substitute module('com.alechilles:beacon-runtime') using project(':beacon:runtime')
+            substitute module('com.alechilles:beacon-runtime') using project(':alecstelemetry:runtime')
         }
     }
 }
@@ -100,8 +100,8 @@ tasks.register('prepareEmbeddedAssetPack', Sync) {
     group = 'hytale'
     dependsOn(tasks.named('createManifestIfMissing'))
     dependsOn(tasks.named('updatePluginManifest'))
-    if (rootProject.findProject(':beacon:runtime') != null) {
-        dependsOn(':beacon:runtime:jar')
+    if (rootProject.findProject(':alecstelemetry:runtime') != null) {
+        dependsOn(':alecstelemetry:runtime:jar')
     }
     from(layout.projectDirectory.dir('src/main/resources')) {
         exclude '**/*.bak'
