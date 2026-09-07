@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Fixed captured companions from older saves failing to release when their
+  saved ownership record has no world name.
+
 ## 3.4.4 - Variant Taming Hotfix - 2026-09-06
 
 ### Fixed

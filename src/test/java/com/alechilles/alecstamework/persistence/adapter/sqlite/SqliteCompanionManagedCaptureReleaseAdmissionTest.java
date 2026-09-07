@@ -60,6 +60,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Focused canonical-authority and single-flight tests for managed release. */
@@ -87,6 +88,8 @@ class SqliteCompanionManagedCaptureReleaseAdmissionTest {
     private SqliteReadExecutor reads;
     private SqliteCompanionCaptureReleaseOperations releases;
     private int admissionCalls;
+    private LifecycleAdmissionRequest lastAdmissionRequest;
+    private boolean unmanagedRole;
     private boolean initializeGroupAssignment;
 
     @BeforeEach
@@ -190,6 +193,43 @@ class SqliteCompanionManagedCaptureReleaseAdmissionTest {
             assertEquals(1, target.committedOwned());
             assertEquals(1, target.committedDeployable());
         }
+    }
+
+    /** Imported captures can retain an owner without a recorded source world. */
+    @Test
+    void unmanagedOwnedCaptureWithoutSourceWorldReleasesIntoDestinationWorld()
+            throws Exception {
+        unmanagedRole = true;
+        try (Connection connection = connections.openWriterConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     UPDATE companion_lifecycle SET owner_world_key = NULL
+                     WHERE profile_id = ?
+                     """)) {
+            statement.setString(1, PROFILE.toString());
+            statement.executeUpdate();
+        }
+        AtomicInteger liveCalls = new AtomicInteger();
+
+        OperationWorkflowResult result = submit(
+                23,
+                ownedSourceRequest(),
+                (request, operation) -> {
+                    liveCalls.incrementAndGet();
+                    return LiveOperationResult.confirmed(
+                            "capture_release_both_receipts_confirmed"
+                    ).completed();
+                }
+        );
+
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED,
+                result.status(), String.valueOf(result.failure()));
+        assertEquals(1, liveCalls.get());
+        assertEquals(OWNER, lastAdmissionRequest.sourceOwner());
+        assertNull(lastAdmissionRequest.sourceWorld());
+        assertNull(lastAdmissionRequest.managedRequest().request().source());
+        assertEquals(LifecycleState.ACTIVE, lifecycle().state());
+        assertEquals(OWNER, lifecycle().ownerId());
+        assertEquals("world-two", lifecycle().ownerWorldKey());
     }
 
     @Test
@@ -341,7 +381,11 @@ class SqliteCompanionManagedCaptureReleaseAdmissionTest {
             LifecycleAdmissionRequest request
     ) {
         admissionCalls++;
+        lastAdmissionRequest = request;
         assertEquals("role", request.targetRoleId());
+        if (unmanagedRole) {
+            return CompletableFuture.completedFuture(LifecycleAdmissionEvidence.unmanaged());
+        }
         return CompletableFuture.completedFuture(
                 managedEvidence(
                         request.operationId(),

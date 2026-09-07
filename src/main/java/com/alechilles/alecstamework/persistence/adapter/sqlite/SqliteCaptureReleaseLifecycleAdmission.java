@@ -208,7 +208,8 @@ final class SqliteCaptureReleaseLifecycleAdmission {
                         source.revision().value(),
                         source.ownerId() == null ? null : source.ownerId().value(),
                         targetOwner == null ? null : targetOwner.value(),
-                        source.ownerId() == null ? null
+                        // Imported captures may have an owner without a source world.
+                        source.ownerId() == null || source.ownerWorldKey() == null ? null
                                 : new PopulationAdmissionLocation(
                                 source.ownerWorldKey(), 0, 0
                         ),
