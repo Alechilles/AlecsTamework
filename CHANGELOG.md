@@ -6,7 +6,7 @@
 
 - Happiness rings in the linked NPC panel and target HUD now show a thin red
   marker at the NPC's configured breeding happiness requirement, with the
-  required percentage in the tooltip.
+  required happiness on the next line of the breeding toggle tooltip.
 
 ### Fixed
 

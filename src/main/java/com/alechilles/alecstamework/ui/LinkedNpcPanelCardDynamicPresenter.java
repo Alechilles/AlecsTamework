@@ -33,6 +33,7 @@ final class LinkedNpcPanelCardDynamicPresenter {
         }
         if (vitalsChanged(previous, current)) {
             LinkedNpcPanelVitalsBinder.bind(commands, selector, current, language);
+            LinkedNpcPanelCardBinder.bindBreedingTooltips(commands, selector, current, language);
         }
         if (previous.recallLostRemainingMs() != current.recallLostRemainingMs()) {
             commands.set(selector + " #RecallCountdown.Text", LocalizedText.format(

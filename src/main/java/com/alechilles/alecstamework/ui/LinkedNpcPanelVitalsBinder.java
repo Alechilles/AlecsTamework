@@ -155,11 +155,7 @@ final class LinkedNpcPanelVitalsBinder {
                     percent(entry.happinessRatio()),
                     entry.targetHappinessPercent()
             );
-            if (shouldShowBreedingThreshold(entry)) {
-                tooltip += "\n" + LocalizedText.format(language,
-                        "tamework.ui.linkedPanel.happiness.breedingThreshold",
-                        percent(entry.breedingHappinessRatio()));
-            }
+
             if (entry.happinessModifierBreakdown() != null && !entry.happinessModifierBreakdown().isBlank()) {
                 tooltip = tooltip + "\n" + entry.happinessModifierBreakdown();
             }

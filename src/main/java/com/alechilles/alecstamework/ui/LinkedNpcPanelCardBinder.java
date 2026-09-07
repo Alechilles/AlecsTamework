@@ -15,6 +15,21 @@ final class LinkedNpcPanelCardBinder {
     private static final int NORMAL_CARD_HEIGHT = 88;
     private static final int ROSTER_CARD_HEIGHT = 126;
 
+    static void bindBreedingTooltips(UICommandBuilder commands, String selector,
+                                     LinkedNpcEntry entry, String language) {
+        String requirement = entry.hasHappiness() && entry.breedingHappinessRatio() > 0.0
+                ? "\n" + LocalizedText.format(language,
+                        "tamework.ui.linkedPanel.card.tooltip.breedingRequirement",
+                        Math.round(entry.breedingHappinessRatio() * entry.maxHappiness()))
+                : "";
+        commands.set(selector + " #BreedingToggleEnabledButton.TooltipText",
+                LocalizedText.resolve(language,
+                        "tamework.ui.linkedPanel.card.tooltip.breedingEnabled") + requirement);
+        commands.set(selector + " #BreedingToggleDisabledButton.TooltipText",
+                LocalizedText.resolve(language,
+                        "tamework.ui.linkedPanel.card.tooltip.breedingDisabled") + requirement);
+    }
+
     private LinkedNpcPanelCardBinder() {
     }
 
@@ -205,6 +220,7 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(activeToggleInactiveSelector + ".Visible", showActiveToggleInactive);
         commandBuilder.set(breedingToggleEnabledSelector + ".Visible", showBreedingToggleEnabled);
         commandBuilder.set(breedingToggleDisabledSelector + ".Visible", showBreedingToggleDisabled);
+        bindBreedingTooltips(commandBuilder, entrySelector, entry, language);
         commandBuilder.set(flightToggleSelector + ".Visible", showFlightToggle);
         commandBuilder.set(flightModeGroundedSelector + ".Visible",
                 showFlightToggle && !entry.flightToggleAirborne());

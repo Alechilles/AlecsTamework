@@ -40,8 +40,10 @@ class LinkedNpcPanelVitalsBinderTest {
         expected.set(MARKER + ".Visible", true);
         Assertions.assertEquals(data(expected, MARKER + ".Anchor"), data(commands, MARKER + ".Anchor"));
         Assertions.assertEquals(data(expected, MARKER + ".Visible"), data(commands, MARKER + ".Visible"));
-        Assertions.assertTrue(data(commands, "#Card #NeedHappiness #NeedTooltip.TooltipText")
-                .contains("Breeding requires " + Math.round(ratio * 100) + "% happiness"));
+        UICommandBuilder tooltip = new UICommandBuilder();
+        tooltip.set("#Card #NeedHappiness #NeedTooltip.TooltipText", "Happiness - 50% -> 50%");
+        Assertions.assertEquals(data(tooltip, "#Card #NeedHappiness #NeedTooltip.TooltipText"),
+                data(commands, "#Card #NeedHappiness #NeedTooltip.TooltipText"));
     }
 
     // A reused card must remove its old tick when the next NPC has no requirement.
@@ -51,6 +53,25 @@ class LinkedNpcPanelVitalsBinderTest {
             assertHidden(entry(true).withBreedingHappinessRatio(ratio));
         }
         assertHidden(entry(false).withBreedingHappinessRatio(0.7));
+    }
+
+    @Test
+    void breedingToggleShowsRequirementOnNextLineAndClearsItWhenDisabled() {
+        LinkedNpcEntry entry = entry(true).withBreedingHappinessRatio(0.7);
+        assertBreedingTooltips(entry, "\nRequires 70 happiness");
+        assertBreedingTooltips(entry.withBreedingHappinessRatio(-1), "");
+    }
+
+    private static void assertBreedingTooltips(LinkedNpcEntry entry, String requirement) {
+        UICommandBuilder commands = new UICommandBuilder();
+        LinkedNpcPanelCardBinder.bindBreedingTooltips(commands, "#Card", entry, "en-US");
+        UICommandBuilder expected = new UICommandBuilder();
+        String enabled = "#Card #BreedingToggleEnabledButton.TooltipText";
+        String disabled = "#Card #BreedingToggleDisabledButton.TooltipText";
+        expected.set(enabled, "Breeding: enabled. Click to disable." + requirement);
+        expected.set(disabled, "Breeding: disabled. Click to enable." + requirement);
+        Assertions.assertEquals(data(expected, enabled), data(commands, enabled));
+        Assertions.assertEquals(data(expected, disabled), data(commands, disabled));
     }
 
     private static void assertHidden(LinkedNpcEntry entry) {
