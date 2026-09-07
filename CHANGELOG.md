@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 3.4.5 - Companion Recovery and Happiness Hotfix - 2026-09-06
 
 ### Fixed
 
