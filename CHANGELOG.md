@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- Timed feeding, petting, and damage happiness effects now remain separate from
+  the animal's underlying mood until they expire. Refreshing does not stack an
+  effect, and expiration no longer deducts a bonus that already faded. Underlying
+  mood is preserved at the happiness limits, through save/reload, and through
+  capture/release with the original effect expiry times. On first
+  update, older saves retain current happiness and clear legacy effect timers.
 - Fixed captured companions from older saves failing to release when their
   saved ownership record has no world name.
 - Fixed older captured items remaining blocked when Tamework starts after the

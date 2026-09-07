@@ -8,7 +8,9 @@ import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.hypixel.hytale.codec.ExtraInfo;
 import javax.annotation.Nullable;
+import org.bson.BsonValue;
 
 /** Maps the progression component groups written by released-public captured items. */
 final class LegacyCapturedArtifactProgressionMapper {
@@ -36,6 +38,18 @@ final class LegacyCapturedArtifactProgressionMapper {
             LegacyCapturedArtifactMetadata metadata,
             long capturedAtMs
     ) {
+        if (metadata.has(TameworkMetadataKeys.HAPPINESS_STATE)) {
+            BsonValue payload = metadata.values().get(TameworkMetadataKeys.HAPPINESS_STATE);
+            if (!payload.isDocument()) {
+                throw new IllegalArgumentException("Captured happiness state must be a document");
+            }
+            LegacyCapturedArtifactMetadata state = new LegacyCapturedArtifactMetadata(payload.asDocument());
+            if (state.finiteDouble("Value") == null || state.integer("LastUpdateMs") == null) {
+                throw new IllegalArgumentException("Captured happiness state is incomplete");
+            }
+            state.finiteDouble("BaseValue");
+            return TameworkHappinessComponent.CODEC.decode(payload.asDocument(), new ExtraInfo());
+        }
         metadata.requireCompleteGroup(
                 "happiness",
                 new String[]{

@@ -55,12 +55,12 @@ This config is especially important when you use:
 
 ### `Equilibrium`
 - `BaseSetpoint`: target value the system naturally drifts toward over time.
-- `ConvergencePerMinute`: how strongly the current happiness moves toward the setpoint each minute.
+- `ConvergencePerMinute`: how many happiness points the underlying mood moves toward its environmental target per real minute. Active timed effects are added separately and do not decay through convergence.
 
 ### `Impulses`
 - `GainOnFeed`: additive happiness gain from feeding interactions.
-- `HandFeedDurationMinutes`: active-duration window for hand-feed impulse display/target behavior.
-- `FeedImpulseDurationMinutes`: active-duration window for consumed-feed impulse display/target behavior.
+- `HandFeedDurationMinutes`: real-minute duration of the separate hand-feeding effect.
+- `FeedImpulseDurationMinutes`: real-minute duration of food-consumption, petting, and damage effects.
 - `GainOnPet`: additive happiness gain from petting or similar positive interactions.
 - `LoseOnDamage`: additive happiness loss from taking damage.
 - `FeedItemImpulses`: per-item consumed-feed impulse map (`ItemId -> delta`).
@@ -98,6 +98,36 @@ Additional field:
 - `OwnerNearbyOffset`: flat bonus applied when the owner is nearby
 
 ## Defaults and Cross-System Notes
+
+### Timed effects (unreleased correction)
+
+Feeding, petting, and damage apply flat, signed effects for their configured
+duration. Displayed happiness is the underlying mood plus the active effects,
+limited by `Values.Min` and `Values.Max`. The underlying mood continues to move
+toward its environmental target, so poor conditions can still reduce happiness
+while a positive effect is active. Breeding uses the resulting displayed value.
+
+Refreshing the same effect key resets its expiration without stacking another
+copy. Different effect keys can coexist; there is no single global care-bonus
+cap. Food profiles may use item-specific keys. Consumed-food effects can also
+come from autonomous feeding, while the hand-feeding effect is separate.
+Disposition scales positive effects and softens negative effects using the
+existing multiplier rules. An effect retains its applied amount until refreshed
+or expired. Expiration removes that contribution, without a second deduction
+from the underlying mood. Happiness limits do not discard the underlying mood.
+
+For example, an underlying mood of 96 with an active +12 effect displays 100.
+If conditions stay unchanged, expiration returns it to 96, not 88. Negative
+effects behave the same way at the lower limit.
+
+The existing happiness component, capture items, and captured snapshots now also
+retain `BaseValue` (the underlying mood). Older saved state without that value keeps its
+current happiness and clears its legacy effect timers on first reconciliation;
+the old, partly decayed contributions cannot be reconstructed reliably. Timers
+use wall-clock deadlines, so saving or capturing does not pause or renew them.
+An explicit happiness set rebases the mood and clears existing timed effects on
+the next reconciliation.
+
 - The bundled default asset in `src/main/resources/Server/Tamework/Happiness/TwHappinessConfig_Default.json` is the shipped baseline.
 - Feed interactions use `Impulses.GainOnFeed` for hand-feed gain and can also be multiplied by traits such as `HappinessGainMultiplier`.
 - Consumed item and feed-family impulses can be authored separately with `FeedItemImpulses` and `FeedParamImpulses`.

@@ -257,9 +257,14 @@ public final class CompanionHappinessService {
         double current = resolveCurrent(happiness, breeding, rules.defaultValue);
         CompanionHappinessModifierService.ModifierSnapshot modifierSnapshot =
                 CompanionHappinessModifierService.resolve(npcRef, store, happinessConfig);
-        double target = clamp(modifierSnapshot.target(), rules.min, rules.max);
         double baseSetpoint = clamp(modifierSnapshot.baseSetpoint(), rules.min, rules.max);
         List<ActiveImpulseSnapshot> activeImpulses = resolveActiveImpulseSnapshots(happiness, System.currentTimeMillis());
+        double activeOffset = 0.0;
+        for (ActiveImpulseSnapshot impulse : activeImpulses) {
+            activeOffset += impulse.value();
+        }
+        double target = clamp(clamp(modifierSnapshot.target(), rules.min, rules.max)
+                + activeOffset, rules.min, rules.max);
         return new HappinessSnapshot(
                 clamp(current, rules.min, rules.max),
                 rules.min,
@@ -349,6 +354,13 @@ public final class CompanionHappinessService {
             }
         }
         double dispositionMultiplier = resolveDispositionMultiplier(npcRef, store);
+        if (happiness.getBaseValue() == null || !Double.isFinite(happiness.getBaseValue())) {
+            // Legacy impulses have already partly decayed into Value; their original base cannot
+            // be recovered. Keep the visible mood and discard those timers once, without a charge.
+            happiness.setBaseValue(clamp(resolveCurrent(happiness, breeding, rules.defaultValue), rules.min, rules.max));
+            happiness.setActiveImpulses(null);
+            happinessChanged = true;
+        }
         if (applyDispositionToImmediateImpulse) {
             immediateImpulseDelta = applyDispositionToImpulse(immediateImpulseDelta, dispositionMultiplier);
         }
@@ -362,7 +374,7 @@ public final class CompanionHappinessService {
             happiness.setActiveImpulses(timedMutation.activeImpulses());
             happinessChanged = true;
         }
-        double impulseDelta = immediateImpulseDelta + timedMutation.delta();
+        double impulseDelta = immediateImpulseDelta;
         double previous = resolveCurrent(happiness, breeding, rules.defaultValue);
         CompanionHappinessModifierService.ModifierSnapshot modifierSnapshot =
                 CompanionHappinessModifierService.resolve(npcRef, store, happinessConfig);
@@ -373,10 +385,17 @@ public final class CompanionHappinessService {
                 : 0L;
         double elapsedMinutes = elapsedMs / (SECONDS_PER_MINUTE * 1000.0);
         double convergenceStep = rules.convergencePerMinute * elapsedMinutes;
-        double converged = moveToward(previous, target, convergenceStep);
-        double next = clamp(converged + impulseDelta, rules.min, rules.max);
-        if (Math.abs(next - previous) > EPSILON) {
+        double previousBase = happiness.getBaseValue();
+        double converged = moveToward(clamp(previousBase, rules.min, rules.max), target, convergenceStep);
+        double nextBase = clamp(converged + impulseDelta, rules.min, rules.max);
+        double activeOffset = 0.0;
+        for (TameworkHappinessComponent.ActiveImpulse impulse : happiness.getActiveImpulses()) {
+            activeOffset += impulse.getValue();
+        }
+        double next = clamp(nextBase + activeOffset, rules.min, rules.max);
+        if (Math.abs(next - previous) > EPSILON || Math.abs(nextBase - previousBase) > EPSILON) {
             happiness.setValue(next);
+            happiness.setBaseValue(nextBase);
             happinessChanged = true;
         }
         if ((happinessChanged || Math.abs(impulseDelta) > EPSILON || elapsedMs > 0L)
@@ -818,7 +837,6 @@ public final class CompanionHappinessService {
                                                                          @Nullable List<TimedImpulseActivation> timedActivations,
                                                                          double dispositionMultiplier) {
         boolean changed = false;
-        double delta = 0.0;
         LinkedHashMap<String, TameworkHappinessComponent.ActiveImpulse> activeByKey = new LinkedHashMap<>();
         for (TameworkHappinessComponent.ActiveImpulse activeImpulse : happiness.getActiveImpulses()) {
             if (activeImpulse == null) {
@@ -833,9 +851,6 @@ public final class CompanionHappinessService {
             double activeValue = activeImpulse.getValue();
             long expiresAtMs = activeImpulse.getExpiresAtMs();
             if (expiresAtMs > 0L && expiresAtMs <= nowMs) {
-                if (Double.isFinite(activeValue) && Math.abs(activeValue) > EPSILON) {
-                    delta -= activeValue;
-                }
                 changed = true;
                 continue;
             }
@@ -876,12 +891,10 @@ public final class CompanionHappinessService {
                     created.setExpiresAtMs(expiresAtMs);
                     created.setItemId(activation.itemId);
                     activeByKey.put(normalizedKey, created);
-                    delta += adjustedValue;
                     changed = true;
                     continue;
                 }
                 if (Math.abs(existing.getValue() - adjustedValue) > EPSILON) {
-                    delta += adjustedValue - existing.getValue();
                     existing.setValue(adjustedValue);
                     changed = true;
                 }
@@ -901,7 +914,7 @@ public final class CompanionHappinessService {
         }
         TameworkHappinessComponent.ActiveImpulse[] activeImpulses =
                 activeByKey.values().toArray(new TameworkHappinessComponent.ActiveImpulse[0]);
-        return new TimedImpulseMutationResult(changed, delta, activeImpulses);
+        return new TimedImpulseMutationResult(changed, activeImpulses);
     }
 
     @Nonnull
@@ -1042,7 +1055,6 @@ public final class CompanionHappinessService {
     }
 
     private record TimedImpulseMutationResult(boolean changed,
-                                              double delta,
                                               TameworkHappinessComponent.ActiveImpulse[] activeImpulses) {
     }
 

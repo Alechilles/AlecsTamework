@@ -8,6 +8,7 @@ import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import javax.annotation.Nullable;
 
 /**
  * Stores shared companion happiness state for systems beyond breeding.
@@ -64,8 +65,14 @@ public final class TameworkHappinessComponent implements Component<EntityStore> 
         .add()
         .append(
             new KeyedCodec<>("Value", Codec.DOUBLE),
-            TameworkHappinessComponent::setValue,
+            (component, value) -> component.value = value,
             TameworkHappinessComponent::getValue
+        )
+        .add()
+        .append(
+            new KeyedCodec<>("BaseValue", Codec.DOUBLE),
+            TameworkHappinessComponent::setBaseValue,
+            TameworkHappinessComponent::getBaseValue
         )
         .add()
         .append(
@@ -84,6 +91,8 @@ public final class TameworkHappinessComponent implements Component<EntityStore> 
 
     private String configId;
     private double value;
+    // Untimed mood, before active effects and display clamping. Null identifies pre-fix saves.
+    private Double baseValue;
     private long lastUpdateMs;
     private ActiveImpulse[] activeImpulses = EMPTY_ACTIVE_IMPULSES;
 
@@ -102,6 +111,7 @@ public final class TameworkHappinessComponent implements Component<EntityStore> 
         this.value = value;
         this.lastUpdateMs = lastUpdateMs;
         setActiveImpulses(activeImpulses);
+        this.baseValue = getActiveImpulses().length == 0 ? value : null;
     }
 
     public static ComponentType<EntityStore, TameworkHappinessComponent> getComponentType() {
@@ -123,6 +133,17 @@ public final class TameworkHappinessComponent implements Component<EntityStore> 
 
     public void setValue(double value) {
         this.value = value;
+        // An explicit set replaces the displayed mood; reconcile rebases it and clears old effects.
+        this.baseValue = null;
+    }
+
+    @Nullable
+    public Double getBaseValue() {
+        return baseValue;
+    }
+
+    public void setBaseValue(@Nullable Double baseValue) {
+        this.baseValue = baseValue;
     }
 
     public long getLastUpdateMs() {
@@ -145,7 +166,9 @@ public final class TameworkHappinessComponent implements Component<EntityStore> 
     public TameworkHappinessComponent clone() {
         ActiveImpulse[] impulses = getActiveImpulses();
         if (impulses.length == 0) {
-            return new TameworkHappinessComponent(configId, value, lastUpdateMs, EMPTY_ACTIVE_IMPULSES);
+            TameworkHappinessComponent copy = new TameworkHappinessComponent(configId, value, lastUpdateMs);
+            copy.baseValue = baseValue;
+            return copy;
         }
         ActiveImpulse[] clonedImpulses = impulses.clone();
         for (int i = 0; i < clonedImpulses.length; i++) {
@@ -153,7 +176,9 @@ public final class TameworkHappinessComponent implements Component<EntityStore> 
                 clonedImpulses[i] = clonedImpulses[i].clone();
             }
         }
-        return new TameworkHappinessComponent(configId, value, lastUpdateMs, clonedImpulses);
+        TameworkHappinessComponent copy = new TameworkHappinessComponent(configId, value, lastUpdateMs, clonedImpulses);
+        copy.baseValue = baseValue;
+        return copy;
     }
 
     public static final class ActiveImpulse {

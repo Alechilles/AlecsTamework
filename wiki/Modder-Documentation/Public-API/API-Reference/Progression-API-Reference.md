@@ -49,9 +49,15 @@ Capabilities: `PROGRESSION`, `PROGRESSION_MUTATIONS`
 Each subview is optional and only present when the target NPC has that system active.
 
 ## Notes
+
 - Reads and mutations target live loaded NPC state.
 - Use `profileId` when you need stable targeting across UUID remaps.
 - Treat `UNSUPPORTED` and `NOT_LOADED` as expected runtime states, not fatal errors.
+- With the unreleased timed-happiness correction, `applyHappinessDelta` changes
+  underlying mood without removing active timed effects. Display limits can hide
+  the change until an effect expires; ordinary environmental convergence still applies.
+- `setHappiness` explicitly rebases happiness and clears existing timed effects
+  on reconciliation. Method signatures, capabilities, and mutation statuses are unchanged.
 
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)

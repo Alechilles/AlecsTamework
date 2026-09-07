@@ -161,6 +161,7 @@ final class SpawnerNpcProgressionMetadataService {
 
     private ItemStack clearHappinessMetadata(@Nullable ItemStack stack) {
         ItemStack updated = clearMetadataKey(stack, TameworkMetadataKeys.HAPPINESS_CONFIG_ID);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.HAPPINESS_STATE);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.HAPPINESS_VALUE);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.HAPPINESS_LAST_UPDATE_MS);
         return updated;
@@ -196,6 +197,9 @@ final class SpawnerNpcProgressionMetadataService {
                 : 0L;
         updated = updated.withMetadata(TameworkMetadataKeys.HAPPINESS_VALUE, Codec.DOUBLE, value);
         updated = updated.withMetadata(TameworkMetadataKeys.HAPPINESS_LAST_UPDATE_MS, Codec.LONG, lastUpdateMs);
+        updated = component != null
+                ? updated.withMetadata(TameworkMetadataKeys.HAPPINESS_STATE, TameworkHappinessComponent.CODEC, component)
+                : clearMetadataKey(updated, TameworkMetadataKeys.HAPPINESS_STATE);
         return updated;
     }
 
@@ -437,6 +441,13 @@ final class SpawnerNpcProgressionMetadataService {
                                            Store<EntityStore> store) {
         ComponentType<EntityStore, TameworkHappinessComponent> type = TameworkHappinessComponent.getComponentType();
         if (type == null) {
+            return;
+        }
+        TameworkHappinessComponent saved = stack.getFromMetadataOrNull(
+                TameworkMetadataKeys.HAPPINESS_STATE, TameworkHappinessComponent.CODEC
+        );
+        if (saved != null) {
+            store.putComponent(npcRef, type, saved);
             return;
         }
         String configId = stack.getFromMetadataOrNull(TameworkMetadataKeys.HAPPINESS_CONFIG_ID, Codec.STRING);
