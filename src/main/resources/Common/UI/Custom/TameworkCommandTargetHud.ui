@@ -102,6 +102,7 @@ Group #Root {
             Group { Anchor: (Top: 3, Left: 3, Width: 18, Height: 18); Background: #081220; }
             Group #NeedIconImage { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Visible: false; }
             Label #NeedIcon { Anchor: (Top: 4, Left: 4, Width: 16, Height: 16); Text: "?"; Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center); }
+            Group #BreedingThresholdMarker { Anchor: (Top: 0, Left: 12, Width: 2, Height: 3); Background: #ff5555; Visible: false; }
             TextButton #NeedTooltip { Anchor: (Top: 0, Left: 0, Width: 24, Height: 24); Style: @HudTooltipButtonStyle; Text: ""; TooltipText: ""; TextTooltipStyle: @HudTooltipStyle; }
         }
 

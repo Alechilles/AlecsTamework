@@ -72,6 +72,7 @@ final class LinkedNpcPanelCardDynamicPresenter {
                 || previous.currentHappiness() != current.currentHappiness()
                 || previous.maxHappiness() != current.maxHappiness()
                 || previous.targetHappinessPercent() != current.targetHappinessPercent()
+                || Double.compare(previous.breedingHappinessRatio(), current.breedingHappinessRatio()) != 0
                 || !Objects.equals(previous.happinessModifierBreakdown(),
                         current.happinessModifierBreakdown())
                 || previous.currentHunger() != current.currentHunger()

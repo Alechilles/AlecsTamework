@@ -111,6 +111,13 @@ final class LinkedNpcPanelVitalsBinder {
                 resolveHappinessNeed(entry, language),
                 shouldShowHappiness(entry)
         );
+        String markerSelector = entrySelector + " #NeedHappiness #BreedingThresholdMarker";
+        boolean showMarker = shouldShowBreedingThreshold(entry);
+        commandBuilder.set(markerSelector + ".Visible", showMarker);
+        if (showMarker) {
+            commandBuilder.setObject(markerSelector + ".Anchor",
+                    LinkedNpcPanelAnchorFactory.buildNeedRingThresholdAnchor(entry.breedingHappinessRatio()));
+        }
         bindNeedRing(
                 commandBuilder,
                 entrySelector + " #NeedHunger",
@@ -135,6 +142,11 @@ final class LinkedNpcPanelVitalsBinder {
         return TameworkRuntimeSettings.needsEnabled(true) && ((entry.hasHunger() && entry.hasThirst()) || !entry.loaded());
     }
 
+    private static boolean shouldShowBreedingThreshold(LinkedNpcEntry entry) {
+        return shouldShowHappiness(entry) && entry.hasHappiness()
+                && entry.breedingHappinessRatio() > 0.0 && entry.breedingHappinessRatio() <= 1.0;
+    }
+
     private static NeedVisual resolveHappinessNeed(LinkedNpcEntry entry, String language) {
         if (entry.hasHappiness()) {
             String tooltip = LocalizedText.format(
@@ -143,6 +155,11 @@ final class LinkedNpcPanelVitalsBinder {
                     percent(entry.happinessRatio()),
                     entry.targetHappinessPercent()
             );
+            if (shouldShowBreedingThreshold(entry)) {
+                tooltip += "\n" + LocalizedText.format(language,
+                        "tamework.ui.linkedPanel.happiness.breedingThreshold",
+                        percent(entry.breedingHappinessRatio()));
+            }
             if (entry.happinessModifierBreakdown() != null && !entry.happinessModifierBreakdown().isBlank()) {
                 tooltip = tooltip + "\n" + entry.happinessModifierBreakdown();
             }

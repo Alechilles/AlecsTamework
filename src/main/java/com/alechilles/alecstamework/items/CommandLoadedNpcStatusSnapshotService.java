@@ -1,15 +1,19 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionFlightToggleSettings;
 import com.alechilles.alecstamework.config.assets.TwCompanionShoulderRideSettings;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkShoulderRideComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
+import com.alechilles.alecstamework.npc.progression.BreedingConfigResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
@@ -18,6 +22,7 @@ import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
 import com.alechilles.alecstamework.npc.movement.MountedNpcSnapshotRoleResolver;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -267,6 +272,8 @@ final class CommandLoadedNpcStatusSnapshotService {
                         .getFlightToggle();
         Optional<Boolean> flightMode = new BondedCompanionFlightModeReader()
                 .read(npc, flightToggle);
+        entry = entry.withBreedingHappinessRatio(
+                resolveBreedingHappinessRatio(npcRef, store, resolvedRoleId, maxHappiness));
         LinkedNpcEntry result = entry.withFlightToggle(flightMode.isPresent(),
                 flightMode.orElse(false));
         TwCompanionShoulderRideSettings shoulderRide =
@@ -396,6 +403,24 @@ final class CommandLoadedNpcStatusSnapshotService {
         int targetPercent = computePercent(snapshot.target(), snapshot.min(), snapshot.max());
         String modifierBreakdown = includeModifierBreakdown ? buildHappinessModifierBreakdown(snapshot, language) : null;
         return new HappinessSnapshot(roundedValue, roundedMax, targetPercent, modifierBreakdown);
+    }
+
+    private double resolveBreedingHappinessRatio(Ref<EntityStore> npcRef,
+                                                Store<EntityStore> store,
+                                                String roleId,
+                                                int maxHappiness) {
+        if (maxHappiness <= 0) {
+            return -1.0;
+        }
+        TameworkBreedingComponent breeding = safeGetComponent(
+                store, npcRef, TameworkBreedingComponent.getComponentType());
+        TwBreedingConfig config = BreedingConfigResolver.resolveConfig(npcRef, store, breeding);
+        if (config == null || !config.isEnabled()) {
+            return -1.0;
+        }
+        double threshold = TameworkRuntimeSettings.breedingHappinessThreshold(
+                config.resolveHappiness(roleId).getThreshold(), TwHappinessConfig.isEnabledForRole(roleId));
+        return Double.isFinite(threshold) && threshold > 0.0 ? threshold / maxHappiness : -1.0;
     }
 
     private String resolveModifierLabel(CompanionHappinessModifierService.ModifierEntry modifier,

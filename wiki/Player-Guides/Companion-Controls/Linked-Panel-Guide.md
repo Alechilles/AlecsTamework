@@ -21,6 +21,7 @@ The linked panel is the side panel that appears with Tamework command tools. It 
 - Group membership when the tool uses groups
 - Trait or progression indicators when the mod exposes them
 - In some mods, happiness details including current and target trend, plus active impulse modifiers
+- A thin red mark on the happiness ring shows the NPC's configured breeding happiness requirement. Hover over the ring to see the required percentage.
 
 The panel derives captured, coop, roster-stored, provisioned-dormant, dead, and
 `LOST` status from one saved companion lifecycle. Item metadata and an expired

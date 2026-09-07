@@ -109,6 +109,24 @@ final class LinkedNpcPanelAnchorFactory {
         return buildAnchor(left, NEED_RING_TOP_Y, clamped, NEED_RING_THICKNESS);
     }
 
+    /** Places a two-pixel tick at the same endpoint used by the happiness fill. */
+    static Anchor buildNeedRingThresholdAnchor(double ratio) {
+        LinkedNpcPanelRingFill.SegmentFill fill = LinkedNpcPanelRingFill.resolve(ratio);
+        if (fill.bar5() > 0) {
+            return buildAnchor(Math.min(22, 24 - fill.bar5()), 0, 2, NEED_RING_THICKNESS);
+        }
+        if (fill.bar4() > 0) {
+            return buildAnchor(21, Math.min(22, 24 - fill.bar4()), NEED_RING_THICKNESS, 2);
+        }
+        if (fill.bar3() > 0) {
+            return buildAnchor(Math.max(0, fill.bar3() - 2), 21, 2, NEED_RING_THICKNESS);
+        }
+        if (fill.bar2() > 0) {
+            return buildAnchor(0, Math.max(0, fill.bar2() - 2), NEED_RING_THICKNESS, 2);
+        }
+        return buildAnchor(12 - fill.bar1(), 0, 2, NEED_RING_THICKNESS);
+    }
+
     private static Anchor buildAnchor(int left, int top, int width, int height) {
         Anchor anchor = new Anchor();
         anchor.setLeft(Value.of(Math.max(0, left)));

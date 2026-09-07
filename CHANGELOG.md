@@ -2,6 +2,12 @@
 
 ## 3.4.5 - Companion Recovery and Happiness Hotfix - 2026-09-06
 
+### Added
+
+- Happiness rings in the linked NPC panel and target HUD now show a thin red
+  marker at the NPC's configured breeding happiness requirement, with the
+  required percentage in the tooltip.
+
 ### Fixed
 
 - Timed feeding, petting, and damage happiness effects now remain separate from

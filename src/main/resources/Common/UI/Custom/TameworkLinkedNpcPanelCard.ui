@@ -668,6 +668,12 @@ Group {
                 Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center);
             }
 
+            Group #BreedingThresholdMarker {
+                Anchor: (Top: 0, Left: 12, Width: 2, Height: 3);
+                Background: #ff5555;
+                Visible: false;
+            }
+
             TextButton #NeedTooltip {
                 Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
                 Style: @TraitTooltipButtonStyle;

@@ -17,6 +17,7 @@ public final class LinkedNpcEntry {
     private final int currentHappiness;
     private final int maxHappiness;
     private final int targetHappinessPercent;
+    private final double breedingHappinessRatio;
     private final String happinessModifierBreakdown;
     private final int currentHunger;
     private final int maxHunger;
@@ -444,6 +445,7 @@ public final class LinkedNpcEntry {
         this.currentHappiness = currentHappiness;
         this.maxHappiness = maxHappiness;
         this.targetHappinessPercent = Math.max(0, Math.min(100, targetHappinessPercent));
+        this.breedingHappinessRatio = -1.0;
         this.happinessModifierBreakdown = happinessModifierBreakdown;
         this.currentHunger = currentHunger;
         this.maxHunger = maxHunger;
@@ -533,6 +535,18 @@ public final class LinkedNpcEntry {
 
     public int targetHappinessPercent() {
         return targetHappinessPercent;
+    }
+
+    /** Required happiness on the meter's scale, or -1 when no marker applies. */
+    public double breedingHappinessRatio() {
+        return breedingHappinessRatio;
+    }
+
+    /** Returns a presentation copy; non-finite or negative ratios hide the marker. */
+    public LinkedNpcEntry withBreedingHappinessRatio(double ratio) {
+        return new LinkedNpcEntry(this, recoveryHeld, recoveryIncidentId,
+                flightToggleAvailable, flightToggleAirborne, shoulderRideAvailable,
+                shoulderRideMounted, Double.isFinite(ratio) && ratio >= 0.0 ? ratio : -1.0);
     }
 
     public String happinessModifierBreakdown() {
@@ -818,6 +832,18 @@ public final class LinkedNpcEntry {
                            boolean flightToggleAirborne,
                            boolean shoulderRideAvailable,
                            boolean shoulderRideMounted) {
+        this(source, recoveryHeld, incidentId, flightToggleAvailable, flightToggleAirborne,
+                shoulderRideAvailable, shoulderRideMounted, source.breedingHappinessRatio);
+    }
+
+    private LinkedNpcEntry(LinkedNpcEntry source,
+                           boolean recoveryHeld,
+                           String incidentId,
+                           boolean flightToggleAvailable,
+                           boolean flightToggleAirborne,
+                           boolean shoulderRideAvailable,
+                           boolean shoulderRideMounted,
+                           double breedingHappinessRatio) {
         this.npcUuid = source.npcUuid;
         this.displayName = source.displayName;
         this.gender = source.gender;
@@ -826,6 +852,7 @@ public final class LinkedNpcEntry {
         this.currentHappiness = source.currentHappiness;
         this.maxHappiness = source.maxHappiness;
         this.targetHappinessPercent = source.targetHappinessPercent;
+        this.breedingHappinessRatio = breedingHappinessRatio;
         this.happinessModifierBreakdown = source.happinessModifierBreakdown;
         this.currentHunger = source.currentHunger;
         this.maxHunger = source.maxHunger;
@@ -921,6 +948,7 @@ public final class LinkedNpcEntry {
                 && currentHappiness == other.currentHappiness
                 && maxHappiness == other.maxHappiness
                 && targetHappinessPercent == other.targetHappinessPercent
+                && Double.compare(breedingHappinessRatio, other.breedingHappinessRatio) == 0
                 && currentHunger == other.currentHunger
                 && maxHunger == other.maxHunger
                 && currentThirst == other.currentThirst
@@ -980,6 +1008,7 @@ public final class LinkedNpcEntry {
                 currentHappiness,
                 maxHappiness,
                 targetHappinessPercent,
+                breedingHappinessRatio,
                 happinessModifierBreakdown,
                 currentHunger,
                 maxHunger,

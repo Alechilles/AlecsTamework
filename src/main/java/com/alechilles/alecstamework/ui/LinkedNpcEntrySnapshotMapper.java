@@ -87,7 +87,8 @@ final class LinkedNpcEntrySnapshotMapper {
                     entry.harvestCooldownKnown(),
                     entry.recallPending(),
                     entry.recallLostRemainingMs()
-            ).withFlightToggle(entry.flightToggleAvailable(),
+            ).withBreedingHappinessRatio(entry.breedingHappinessRatio())
+                    .withFlightToggle(entry.flightToggleAvailable(),
                     entry.flightToggleAirborne())
                     .withShoulderRide(entry.shoulderRideAvailable(),
                             entry.shoulderRideMounted());
