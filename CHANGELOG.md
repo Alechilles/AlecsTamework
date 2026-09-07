@@ -6,6 +6,8 @@
 
 - Fixed captured companions from older saves failing to release when their
   saved ownership record has no world name.
+- Fixed older captured items remaining blocked when Tamework starts after the
+  worlds have loaded and misses the initial loaded-companion identity scan.
 
 ## 3.4.4 - Variant Taming Hotfix - 2026-09-06
 

@@ -78,7 +78,7 @@ import com.alechilles.alecstamework.runtime.activation
 import com.alechilles.alecstamework.runtime.TameworkRuntimeParticipantRegistry;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.logger.HytaleLogger;
-import com.hypixel.hytale.server.core.universe.world.events.AllWorldsLoadedEvent;
+import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.events.StartWorldEvent;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -286,12 +286,14 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                         composition.resumeAfterWorldEvidence();
                     }
                 }, "replacement persistence identity bootstrap");
-        Runnable worldsLoadedRegistration = () -> TameworkEventRegistrationSupport.registerGlobal(
-                plugin, AllWorldsLoadedEvent.class, ignored -> {
+        // The startup event may precede runtime activation. The readiness future
+        // also catches up late subscribers without scanning partially loaded worlds.
+        Runnable worldsLoadedRegistration = () -> Universe.get().getUniverseReady()
+                .thenRun(() -> {
                     startupWorldsLoaded.set(true);
                     identityBootstrap.bootstrapUniverse();
                     composition.resumeAfterWorldEvidence();
-                }, "replacement persistence startup-world seal");
+                });
         if (runtimeParticipants == null) {
             startWorldRegistration.run();
             worldsLoadedRegistration.run();
