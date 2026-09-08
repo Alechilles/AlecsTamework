@@ -96,7 +96,9 @@ public final class HusbandryOutcomeRegistry implements HusbandryOutcomeApi, Auto
                 || !Double.isFinite(modifiers.breedingCooldownMultiplier())
                 || !Double.isFinite(modifiers.happinessHungerBonus())
                 || !Double.isFinite(modifiers.happinessThirstBonus())
-                || !Double.isFinite(modifiers.happinessPopulationBonus())) {
+                || !Double.isFinite(modifiers.happinessPopulationBonus())
+                || !Double.isFinite(modifiers.breedingInheritanceChanceBonus())
+                || !Double.isFinite(modifiers.harmfulMutationRerollChance())) {
             return HusbandryOutcomeModifiers.identity();
         }
         HusbandryOutcomeModifiers identity = HusbandryOutcomeModifiers.identity();
@@ -116,7 +118,11 @@ public final class HusbandryOutcomeRegistry implements HusbandryOutcomeApi, Auto
                 clamp(modifiers.happinessThirstBonus(), 0.0, 100.0,
                         identity.happinessThirstBonus()),
                 clamp(modifiers.happinessPopulationBonus(), 0.0, 100.0,
-                        identity.happinessPopulationBonus())
+                        identity.happinessPopulationBonus()),
+                clamp(modifiers.breedingInheritanceChanceBonus(), 0.0, 1.0,
+                        identity.breedingInheritanceChanceBonus()),
+                clamp(modifiers.harmfulMutationRerollChance(), 0.0, 1.0,
+                        identity.harmfulMutationRerollChance())
         );
     }
 

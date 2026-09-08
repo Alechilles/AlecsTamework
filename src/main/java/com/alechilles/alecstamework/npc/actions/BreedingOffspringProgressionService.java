@@ -22,6 +22,9 @@ import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService
 import com.alechilles.alecstamework.npc.progression.TraitInheritanceService;
 import com.alechilles.alecstamework.npc.progression.TraitModifierService;
 import com.alechilles.alecstamework.npc.progression.TraitRollService;
+import com.alechilles.alecstamework.api.HusbandryOutcomeKind;
+import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
+import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRuntime;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -97,7 +100,17 @@ final class BreedingOffspringProgressionService {
                 breedingConfigId,
                 store
         );
-        applyOffspringTraits(childRef, parentARef, parentBRef, childRoleId, childNpc, breedingConfigId, store);
+        applyOffspringTraits(
+                childRef,
+                parentARef,
+                parentBRef,
+                parentAOwner,
+                parentBOwner,
+                childRoleId,
+                childNpc,
+                breedingConfigId,
+                store
+        );
         CompanionStatModifierService.applyTraitModifiers(childRef, store);
         CompanionLifeStageService.initializeOffspringLifeStage(
                 childRef,
@@ -292,6 +305,8 @@ final class BreedingOffspringProgressionService {
     private void applyOffspringTraits(Ref<EntityStore> childRef,
                                       @Nullable Ref<EntityStore> parentARef,
                                       @Nullable Ref<EntityStore> parentBRef,
+                                      OwnerSnapshot parentAOwner,
+                                      OwnerSnapshot parentBOwner,
                                       String childRoleId,
                                       @Nullable NPCEntity childNpc,
                                       @Nullable String breedingConfigId,
@@ -327,8 +342,30 @@ final class BreedingOffspringProgressionService {
                 store,
                 TRAIT_MUTATION_CHANCE_MULTIPLIER_EFFECT_KEY
         );
+        OwnerSnapshot inheritedOwner = BreedingInheritedOwnerResolver.resolve(
+                breedingConfig, childRoleId, parentAOwner, parentBOwner);
+        Ref<EntityStore> inheritedOwnerParent = inheritedOwner.ownerId() == null ? null
+                : parentAOwner != null && inheritedOwner.ownerId().equals(parentAOwner.ownerId())
+                ? parentARef : parentBRef;
+        HusbandryOutcomeModifiers breedingModifiers = inheritedOwnerParent == null
+                ? HusbandryOutcomeModifiers.identity()
+                : HusbandryOutcomeRuntime.resolve(
+                        HusbandryOutcomeKind.BREEDING_GENETICS,
+                        inheritedOwnerParent,
+                        store,
+                        childRoleId,
+                        null
+                );
         TameworkTraitsComponent.TraitValue[] values = inheritTraits
-                ? TraitInheritanceService.inheritTraits(traitConfig, parentATraits, parentBTraits, seed, mutationChanceMultiplier)
+                ? TraitInheritanceService.inheritTraits(
+                        traitConfig,
+                        parentATraits,
+                        parentBTraits,
+                        seed,
+                        mutationChanceMultiplier,
+                        breedingModifiers.breedingInheritanceChanceBonus(),
+                        breedingModifiers.harmfulMutationRerollChance()
+                )
                 : TraitRollService.rollTraits(traitConfig, seed);
         TameworkTraitsComponent updatedTraits = new TameworkTraitsComponent(traitConfig.getId(), seed, values);
         double nextSizeMultiplier = TraitModifierService.resolveMultiplier(

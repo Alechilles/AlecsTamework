@@ -79,6 +79,10 @@ Fields:
 - `IconPath`: icon asset used by the linked panel and related UI.
 - `Weight`: chance to appear in natural rolls.
 - `InheritanceWeight`: weight when inheritance is selecting among parent traits.
+- `MutationPreference` (development): `HIGHER`, `LOWER`, or `NONE` (default).
+  Defines which mutation value is better for optional husbandry reroll protection.
+  Missing or unrecognized values disable protection for that trait. This does
+  not change mutation frequency or existing saved trait values.
 - `NaturalMin`
 - `NaturalMax`
 - `BreedingMin`
@@ -190,6 +194,10 @@ Authoring guidance:
 
 ## Gotchas
 - `Traits` is an explicit array. Child assets replace the entire parent list when they author it.
+- `MutationPreference` travels with each trait entry when the array is inherited.
+  A provider must also supply a positive `harmfulMutationRerollChance`; preference
+  alone does not change rolls. Protection rerolls once and keeps the better of
+  the two mutation values, which can still be worse than the inherited value.
 - `EffectKey` is runtime-coupled. Built-in keys work automatically, custom keys only do something when a mod registers a matching Trait Effects API handler, and unregistered keys are inert.
 - Broken or missing `IconPath` values do not stop the trait from working, but the UI will fall back instead of showing the intended icon.
 

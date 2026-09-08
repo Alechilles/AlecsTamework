@@ -395,7 +395,7 @@ class ReplacementTameworkApiFactoryTest {
     }
 
     @Test
-    void durableGroupCountIncludesOwnedDormantProfiles() throws Exception {
+    void durableCountsDistinguishWorldAnimalsFromCapturedAndDeadProfiles() throws Exception {
         TameworkEventBus events = new TameworkEventBus(null);
         OwnerId owner = OwnerId.parse(
                 "30000000-0000-0000-0000-000000000099"
@@ -404,12 +404,14 @@ class ReplacementTameworkApiFactoryTest {
                 configuration(events)
         )) {
             assertTrue(persistence.start().toCompletableFuture().join().complete());
-            for (int index = 0; index < 4; index++) {
+            for (int index = 0; index < 6; index++) {
                 LifecycleState state = List.of(
                         LifecycleState.ACTIVE,
                         LifecycleState.UNLOADED,
                         LifecycleState.DEAD_REVIVABLE,
-                        LifecycleState.LOST
+                        LifecycleState.LOST,
+                        LifecycleState.CAPTURED,
+                        LifecycleState.UNRESOLVED
                 ).get(index);
                 var created = persistence.facades().operations().mutateProfile(
                         OperationId.create(),
@@ -456,11 +458,17 @@ class ReplacementTameworkApiFactoryTest {
                         .map(Enum::name)
                         .anyMatch("DURABLE_POPULATION_GROUP_COUNTS"::equals));
                 assertEquals(
-                        OptionalLong.of(4L),
+                        OptionalLong.of(6L),
                         api.populationGroups().getDurableOwnedCount(
                                 owner.value(), Set.of("runeteria:livestock")
                         )
                 );
+                assertEquals(OptionalLong.of(4L),
+                        api.populationGroups().getDurableDeployableCount(
+                                owner.value(), Set.of("runeteria:livestock")));
+                assertEquals(OptionalLong.empty(),
+                        api.populationGroups().getDurableDeployableCount(
+                                owner.value(), Set.of("missing:group")));
             }
         } finally {
             events.close();
@@ -539,9 +547,12 @@ class ReplacementTameworkApiFactoryTest {
                 -200L,
                 0L
         );
-        LifecycleLocation location = state == LifecycleState.ACTIVE
-                ? LifecycleLocation.liveEntity(profileId.toString(), "world")
-                : LifecycleLocation.none();
+        LifecycleLocation location = switch (state) {
+            case ACTIVE -> LifecycleLocation.liveEntity(profileId.toString(), "world");
+            case CAPTURED -> LifecycleLocation.keyed(state.requiredLocation(), "capture-" + index);
+            case UNRESOLVED -> LifecycleLocation.unresolved();
+            default -> LifecycleLocation.none();
+        };
         CompanionLifecycle lifecycle = new CompanionLifecycle(
                 profileId,
                 owner,

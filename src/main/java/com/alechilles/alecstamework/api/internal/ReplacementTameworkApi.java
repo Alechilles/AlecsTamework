@@ -306,6 +306,7 @@ public final class ReplacementTameworkApi
             capabilities.add(
                     TameworkApiCapability.DURABLE_POPULATION_GROUP_COUNTS
             );
+            capabilities.add(TameworkApiCapability.DURABLE_DEPLOYABLE_POPULATION_COUNTS);
             if (populationGroups instanceof ReplacementPopulationGroupApi groups
                     && groups.supportsLoadedOwnedCounts()) {
                 capabilities.add(

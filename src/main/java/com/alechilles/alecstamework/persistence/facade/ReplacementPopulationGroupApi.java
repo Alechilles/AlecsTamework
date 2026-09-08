@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.api.PopulationGroupCountsView;
 import com.alechilles.alecstamework.api.PopulationGroupDefinitionView;
 import com.alechilles.alecstamework.api.PopulationGroupReconciliationView;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
+import com.alechilles.alecstamework.companion.population.domain.PopulationDomainLifecycleClassifier;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupBucket;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupCounts;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupLifecycleClassifier;
@@ -111,6 +112,29 @@ public final class ReplacementPopulationGroupApi
 
     public boolean supportsLoadedOwnedCounts() {
         return liveIndex != null;
+    }
+
+    @Override
+    @Nonnull
+    public OptionalLong getDurableDeployableCount(
+            @Nonnull UUID ownerUuid,
+            @Nonnull Set<String> groupIds
+    ) {
+        Objects.requireNonNull(ownerUuid, "ownerUuid");
+        Objects.requireNonNull(groupIds, "groupIds");
+        if (!projectionReadable()) return OptionalLong.empty();
+        Optional<Set<String>> roles = resolveRoleIds(groupIds);
+        if (roles.isEmpty()) return OptionalLong.empty();
+        Set<String> roleIds = roles.orElseThrow();
+        long count = 0L;
+        for (var profile : queries.projectedProfileSnapshot().values()) {
+            if (profile.ownerId() != null && ownerUuid.equals(profile.ownerId().value())
+                    && profile.roleId() != null && roleIds.contains(profile.roleId())
+                    && PopulationDomainLifecycleClassifier.classify(profile.lifecycleState()).deployable()) {
+                count++;
+            }
+        }
+        return OptionalLong.of(count);
     }
 
     private Optional<Set<String>> resolveRoleIds(Set<String> groupIds) {

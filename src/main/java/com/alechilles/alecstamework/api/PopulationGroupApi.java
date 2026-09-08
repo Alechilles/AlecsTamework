@@ -53,6 +53,21 @@ public interface PopulationGroupApi {
         return OptionalLong.empty();
     }
 
+    /**
+     * Counts durable animals out in the world, including unloaded and unresolved
+     * profiles. Captured, stored, released and dead profiles do not count.
+     * This projected read is a prompt precheck, not a capacity reservation.
+     */
+    @Nonnull
+    default OptionalLong getDurableDeployableCount(
+            @Nonnull UUID ownerUuid,
+            @Nonnull Set<String> groupIds
+    ) {
+        if (ownerUuid == null) throw new NullPointerException("ownerUuid");
+        if (groupIds == null) throw new NullPointerException("groupIds");
+        return OptionalLong.empty();
+    }
+
     @Nonnull
     PopulationGroupReconciliationView getReconciliationStatus();
 

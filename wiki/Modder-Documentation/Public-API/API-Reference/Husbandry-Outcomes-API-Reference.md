@@ -16,6 +16,8 @@ Capability: `HUSBANDRY_OUTCOMES`
 
 Development addition: `HUSBANDRY_CARE_BONUSES` advertises conditional happiness
 bonuses. Check it before requiring the eight-argument outcome contract.
+`HUSBANDRY_BREEDING_GENETICS` is a development addition for the ten-argument
+contract and `BREEDING_GENETICS` outcome.
 
 ## Entry Point
 
@@ -40,7 +42,7 @@ values and does not retain a provider.
 The provider receives an immutable `HusbandryOutcomeContext` with:
 
 - `kind`: `NEEDS_DECAY`, `HAPPINESS_DISPOSITION`, `HAPPINESS_CARE`, `HARVEST_YIELD`,
-  `CULL_YIELD`, or `BREEDING_COOLDOWN`;
+  `CULL_YIELD`, `BREEDING_COOLDOWN`, or `BREEDING_GENETICS`;
 - `ownerId` and `companionId`, when known;
 - `roleId` and `profileId`, when known;
 - a detached `groupIds` set; and
@@ -54,9 +56,10 @@ The provider returns `HusbandryOutcomeModifiers`:
 - `tripleOutputChance`, clamped to `0.0` through `1.0`; and
 - `breedingCooldownMultiplier`, clamped to `0.25` through `1.0`;
 - `happinessHungerBonus`, `happinessThirstBonus`, `happinessPopulationBonus`, each clamped to `0.0..100.0`.
+- `breedingInheritanceChanceBonus` and `harmfulMutationRerollChance`, each clamped to `0.0..1.0`.
 
-The identity result is `(1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)`. The original
-five-argument constructor remains supported, with zero Care bonuses. Tamework uses identity when no
+The identity result is `(1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0)`.
+The five- and eight-argument constructors remain supported, with zero new bonuses. Tamework uses identity when no
 provider is active, the provider returns `null`, the provider throws, or any
 returned field is not finite.
 
@@ -71,6 +74,14 @@ instead of one.
 only to its corresponding selected hunger, thirst or population band when that
 band has `CareBonus: true`. It grants nothing in other bands or with no provider.
 Flat disposition does not consume the legacy happiness-disposition multiplier.
+
+`BREEDING_GENETICS` resolves from the parent supplying the child's inherited
+owner. Unowned offspring receive identity. The inheritance bonus is added to
+the configured base chance before multiplying by each trait's inheritance weight.
+On a harmful mutation, the reroll chance permits one extra mutation roll and
+keeps the better of the two rolls. `TwTraitConfig.Traits[].MutationPreference`
+must define the preferred direction; `NONE` preserves ordinary mutation behavior.
+Zero bonuses preserve the existing seeded roll sequence.
 
 ## Authority Boundary
 

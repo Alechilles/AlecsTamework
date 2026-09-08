@@ -188,6 +188,14 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
         )
         .documentation("Inheritance roll weight for this trait when breeding.")
         .add()
+        .<String>append(
+            new KeyedCodec<>("MutationPreference", Codec.STRING),
+            (definition, value) -> definition.mutationPreference = value,
+            definition -> definition.getMutationPreference().toConfigValue()
+        )
+        .documentation("When a mutation is harmful, controls which reroll result is better: HIGHER, LOWER, or NONE. "
+                + "Invalid or omitted values use NONE.")
+        .add()
         .<Double>append(
             new KeyedCodec<>("NaturalMin", Codec.DOUBLE),
             (definition, value) -> definition.naturalMin = value,
@@ -702,6 +710,7 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
         private String iconPath;
         private double weight = 1.0;
         private double inheritanceWeight = 1.0;
+        private String mutationPreference = "NONE";
         private double naturalMin = 0.9;
         private double naturalMax = 1.1;
         private double breedingMin = 0.0;
@@ -738,6 +747,11 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
             return inheritanceWeight;
         }
 
+        /** Defines whether a larger or smaller breeding value is favorable when rerolling a harmful mutation. */
+        public MutationPreference getMutationPreference() {
+            return MutationPreference.fromConfigValue(mutationPreference);
+        }
+
         public double getNaturalMin() {
             return naturalMin;
         }
@@ -764,6 +778,30 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public String[] getConflictsWith() {
             return conflictsWith == null ? ArrayUtil.EMPTY_STRING_ARRAY : conflictsWith;
+        }
+    }
+
+    /** Defines which breeding mutation value is favorable for an individual trait. */
+    public enum MutationPreference {
+        NONE,
+        HIGHER,
+        LOWER;
+
+        public static MutationPreference fromConfigValue(@Nullable String value) {
+            if (value == null || value.isBlank()) {
+                return NONE;
+            }
+            String normalized = value.trim().toUpperCase(Locale.ROOT);
+            for (MutationPreference preference : values()) {
+                if (preference.name().equals(normalized)) {
+                    return preference;
+                }
+            }
+            return NONE;
+        }
+
+        public String toConfigValue() {
+            return name();
         }
     }
 }

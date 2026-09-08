@@ -7,5 +7,6 @@ public enum HusbandryOutcomeKind {
     HAPPINESS_CARE,
     HARVEST_YIELD,
     CULL_YIELD,
-    BREEDING_COOLDOWN
+    BREEDING_COOLDOWN,
+    BREEDING_GENETICS
 }

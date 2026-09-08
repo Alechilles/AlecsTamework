@@ -15,6 +15,80 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TraitInheritanceServiceTest {
 
     @Test
+    void masteryInheritanceBonusStillRespectsTraitWeight() throws Exception {
+        // Applying the bonus after the weight would yield 50%, rather than 40%.
+        TwTraitConfig config = createConfig(true, 0.6, 0.0, true, 1, 0.0,
+                traitWithRanges("Weighted", "FertilityMultiplier", 0.0, 0.0,
+                        0.0, 1.0, 0.0, 0.5));
+        TameworkTraitsComponent parent = geneticsParent("Weighted", 1.0);
+        int inherited = 0;
+        for (int i = 0; i < 4096; i++) {
+            long seed = i * 0x9E3779B97F4A7C15L;
+            double value = TraitInheritanceService.inheritTraits(
+                    config, parent, parent, seed, 1.0, 0.2, 0.0)[0].getValue();
+            if (value == 1.0) inherited++;
+        }
+        assertTrue(inherited > 1474 && inherited < 1803,
+                "Expected weighted inheritance near 40%, got " + inherited + "/4096");
+    }
+
+    @Test
+    void harmfulMutationProtectionKeepsBetterMutationWithoutGuaranteeingParentValue() throws Exception {
+        for (String preference : new String[] { "HIGHER", "LOWER" }) {
+            TwTraitConfig.TraitDefinition definition = TwTraitConfig.CODEC.decode(
+                    org.bson.BsonDocument.parse("""
+                            {"Traits":[{"Id":"Quality","EffectKey":"FertilityMultiplier",
+                            "NaturalMin":0.0,"NaturalMax":1.0,"BreedingMin":0.0,"BreedingMax":1.0,
+                            "Default":0.5,"MutationPreference":"%s"}]}
+                            """.formatted(preference)), new com.hypixel.hytale.codec.ExtraInfo()).getTraits()[0];
+            TwTraitConfig config = createConfig(true, 1.0, 1.0, true, 1, 0.0, definition);
+            TameworkTraitsComponent parent = geneticsParent("Quality", 0.5);
+            boolean higher = preference.equals("HIGHER");
+            boolean improved = false;
+            boolean remainsHarmful = false;
+            for (int i = 0; i < 256; i++) {
+                long seed = i * 0x9E3779B97F4A7C15L;
+                double original = TraitInheritanceService.inheritTraits(config, parent, parent, seed)[0].getValue();
+                double protectedValue = TraitInheritanceService.inheritTraits(
+                        config, parent, parent, seed, 1.0, 0.0, 1.0)[0].getValue();
+                boolean harmful = higher ? original < 0.5 : original > 0.5;
+                if (!harmful) {
+                    assertEquals(original, protectedValue, "Beneficial mutations must not be rerolled");
+                } else {
+                    assertTrue(higher ? protectedValue >= original : protectedValue <= original);
+                    improved |= protectedValue != original;
+                    remainsHarmful |= higher ? protectedValue < 0.5 : protectedValue > 0.5;
+                }
+            }
+            assertTrue(improved, "Protection should sometimes improve a harmful mutation");
+            assertTrue(remainsHarmful, "Protection must not guarantee the original parent value");
+        }
+    }
+
+    @Test
+    void mutationProtectionIsOptInAndZeroBonusesPreserveSeededOutcomes() throws Exception {
+        TwTraitConfig.TraitDefinition definition = trait("Quality", "FertilityMultiplier", 0.0, 1.0, 0.5);
+        TwTraitConfig config = createConfig(true, 1.0, 1.0, true, 1, 0.0, definition);
+        TameworkTraitsComponent parent = geneticsParent("Quality", 0.5);
+        for (long seed = 0; seed < 64; seed++) {
+            double legacy = TraitInheritanceService.inheritTraits(config, parent, parent, seed)[0].getValue();
+            assertEquals(legacy, TraitInheritanceService.inheritTraits(
+                    config, parent, parent, seed, 1.0, 0.0, 1.0)[0].getValue());
+            setField(definition, "mutationPreference", "HIGHER");
+            assertEquals(legacy, TraitInheritanceService.inheritTraits(
+                    config, parent, parent, seed, 1.0, 0.0, 0.0)[0].getValue());
+            setField(definition, "mutationPreference", "NONE");
+        }
+    }
+
+    private TameworkTraitsComponent geneticsParent(String id, double value) {
+        return new TameworkTraitsComponent("Traits_Test", 1L,
+                new TameworkTraitsComponent.TraitValue[] {
+                        new TameworkTraitsComponent.TraitValue(id, value)
+                });
+    }
+
+    @Test
     void inheritTraitsFallsBackToRollWhenInheritanceDisabled() throws Exception {
         TwTraitConfig config = createConfig(
                 false,

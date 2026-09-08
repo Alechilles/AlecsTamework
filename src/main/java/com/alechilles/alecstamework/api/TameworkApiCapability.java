@@ -27,6 +27,8 @@ public enum TameworkApiCapability {
     LOADED_POPULATION_GROUP_COUNTS,
     /** Durable owned-profile counts filtered by population groups. */
     DURABLE_POPULATION_GROUP_COUNTS,
+    /** Durable world-animal counts, excluding capture items and stored/dead profiles. */
+    DURABLE_DEPLOYABLE_POPULATION_COUNTS,
     COMPANION_PROVISIONING,
     /** Durable command-roster leases, active-cap storage, expiry, and resummon cooldowns. */
     COMMAND_TIMED_SUMMONING,
@@ -67,6 +69,8 @@ public enum TameworkApiCapability {
     /** External husbandry providers can supply bounded action modifiers. */
     HUSBANDRY_OUTCOMES,
     /** External husbandry providers can supply bounded care bonuses for eligible mood bands. */
-    HUSBANDRY_CARE_BONUSES
+    HUSBANDRY_CARE_BONUSES,
+    /** Owner-scoped inheritance bonuses and harmful-mutation reroll chances. */
+    HUSBANDRY_BREEDING_GENETICS
 }
 

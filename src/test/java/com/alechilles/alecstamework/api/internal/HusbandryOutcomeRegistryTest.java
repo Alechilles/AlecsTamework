@@ -40,7 +40,8 @@ class HusbandryOutcomeRegistryTest {
                 HusbandryOutcomeKind.HAPPINESS_CARE,
                 HusbandryOutcomeKind.HARVEST_YIELD,
                 HusbandryOutcomeKind.CULL_YIELD,
-                HusbandryOutcomeKind.BREEDING_COOLDOWN
+                HusbandryOutcomeKind.BREEDING_COOLDOWN,
+                HusbandryOutcomeKind.BREEDING_GENETICS
         );
         EnumSet<HusbandryOutcomeKind> observedKinds = EnumSet.noneOf(HusbandryOutcomeKind.class);
 
@@ -60,6 +61,8 @@ class HusbandryOutcomeRegistryTest {
                             1.0, 1.0, 2.0, -1.0, 1.0);
                     case BREEDING_COOLDOWN -> new HusbandryOutcomeModifiers(
                             1.0, 1.0, 0.0, 0.0, 0.1);
+                    case BREEDING_GENETICS -> new HusbandryOutcomeModifiers(
+                            1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.2, 0.25);
                 };
             });
 
@@ -78,11 +81,12 @@ class HusbandryOutcomeRegistryTest {
     void clampsProviderModifiersToSafeGameplayRanges() throws Exception {
         try (HusbandryOutcomeRegistry registry = new HusbandryOutcomeRegistry()) {
             registry.register(ignored -> new HusbandryOutcomeModifiers(
-                    4.0, -1.0, 3.0, 4.0, 0.1
+                    4.0, -1.0, 3.0, 4.0, 0.1, 0.0, 0.0, 0.0, -0.1, 2.0
             ));
 
             assertEquals(
-                    new HusbandryOutcomeModifiers(1.0, 1.0, 1.0, 1.0, 0.25),
+                    new HusbandryOutcomeModifiers(1.0, 1.0, 1.0, 1.0, 0.25,
+                            0.0, 0.0, 0.0, 0.0, 1.0),
                     registry.resolve(context())
             );
         }
@@ -232,6 +236,8 @@ class HusbandryOutcomeRegistryTest {
             case HARVEST_YIELD -> new HusbandryOutcomeModifiers(1.0, 1.0, 0.0, 1.0, 1.0);
             case CULL_YIELD -> new HusbandryOutcomeModifiers(1.0, 1.0, 1.0, 0.0, 1.0);
             case BREEDING_COOLDOWN -> new HusbandryOutcomeModifiers(1.0, 1.0, 0.0, 0.0, 0.25);
+            case BREEDING_GENETICS -> new HusbandryOutcomeModifiers(
+                    1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.2, 0.25);
         };
     }
 }

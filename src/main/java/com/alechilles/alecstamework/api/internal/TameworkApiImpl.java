@@ -288,7 +288,8 @@ public final class TameworkApiImpl
             TameworkApiCapability.COMMAND_HUD_RENDERERS,
             TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS,
             TameworkApiCapability.HUSBANDRY_OUTCOMES,
-            TameworkApiCapability.HUSBANDRY_CARE_BONUSES
+            TameworkApiCapability.HUSBANDRY_CARE_BONUSES,
+            TameworkApiCapability.HUSBANDRY_BREEDING_GENETICS
     );
     private final Gson gson = new Gson();
     @Nullable
@@ -399,6 +400,7 @@ public final class TameworkApiImpl
             if (!husbandryOutcomeRegistry.available()) {
                 current.remove(TameworkApiCapability.HUSBANDRY_OUTCOMES);
                 current.remove(TameworkApiCapability.HUSBANDRY_CARE_BONUSES);
+                current.remove(TameworkApiCapability.HUSBANDRY_BREEDING_GENETICS);
             }
             return current;
         }
@@ -436,6 +438,7 @@ public final class TameworkApiImpl
                 capabilities.remove(TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS);
                 capabilities.remove(TameworkApiCapability.HUSBANDRY_OUTCOMES);
                 capabilities.remove(TameworkApiCapability.HUSBANDRY_CARE_BONUSES);
+                capabilities.remove(TameworkApiCapability.HUSBANDRY_BREEDING_GENETICS);
             }
         } finally {
             damagePolicy.close();

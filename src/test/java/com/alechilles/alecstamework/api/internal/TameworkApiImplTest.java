@@ -352,7 +352,8 @@ class TameworkApiImplTest {
                 TameworkApiCapability.COMMAND_HUD_RENDERERS,
                 TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS,
                 TameworkApiCapability.HUSBANDRY_OUTCOMES,
-                TameworkApiCapability.HUSBANDRY_CARE_BONUSES
+                TameworkApiCapability.HUSBANDRY_CARE_BONUSES,
+                TameworkApiCapability.HUSBANDRY_BREEDING_GENETICS
         );
     }
 

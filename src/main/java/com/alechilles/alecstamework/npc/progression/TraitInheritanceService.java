@@ -35,6 +35,20 @@ public final class TraitInheritanceService {
                                                                      @Nullable TameworkTraitsComponent parentB,
                                                                      long seed,
                                                                      double mutationChanceMultiplier) {
+        return inheritTraits(config, parentA, parentB, seed, mutationChanceMultiplier, 0.0, 0.0);
+    }
+
+    /**
+     * Builds inherited traits with bounded, owner-scoped breeding bonuses.
+     * The inheritance bonus is applied before each trait's inheritance weight.
+     */
+    public static TameworkTraitsComponent.TraitValue[] inheritTraits(@Nullable TwTraitConfig config,
+                                                                     @Nullable TameworkTraitsComponent parentA,
+                                                                     @Nullable TameworkTraitsComponent parentB,
+                                                                     long seed,
+                                                                     double mutationChanceMultiplier,
+                                                                     double inheritanceChanceBonus,
+                                                                     double harmfulMutationRerollChance) {
         TameworkTraitsComponent.TraitValue[] fallback = TraitRollService.rollTraits(config, seed);
         if (config == null || !config.isEnabled()) {
             return fallback;
@@ -70,7 +84,7 @@ public final class TraitInheritanceService {
             if (selected.size() >= targetCount) {
                 break;
             }
-            double traitInheritanceChance = resolveTraitInheritanceChance(parent, inheritance);
+            double traitInheritanceChance = resolveTraitInheritanceChance(parent, inheritance, inheritanceChanceBonus);
             if (random.nextDouble() > traitInheritanceChance) {
                 continue;
             }
@@ -83,6 +97,7 @@ public final class TraitInheritanceService {
                     definitionById,
                     allowDuplicates,
                     resolveEffectiveMutationChance(inheritance.getMutationChance(), mutationChanceMultiplier),
+                    harmfulMutationRerollChance,
                     random
             );
         }
@@ -94,13 +109,14 @@ public final class TraitInheritanceService {
     }
 
     private static double resolveTraitInheritanceChance(ParentTraitCandidate candidate,
-                                                        TwTraitConfig.InheritanceSettings inheritance) {
+                                                        TwTraitConfig.InheritanceSettings inheritance,
+                                                        double inheritanceChanceBonus) {
         if (candidate == null || inheritance == null) {
             return 0.0;
         }
         TwTraitConfig.TraitDefinition definition = candidate.definition();
         double weight = definition == null ? 1.0 : sanitizeInheritanceWeight(definition.getInheritanceWeight());
-        return clamp01(inheritance.getInheritanceChance() * weight);
+        return clamp01((inheritance.getInheritanceChance() + clamp01(inheritanceChanceBonus)) * weight);
     }
 
     private static double resolveInheritedValue(ParentTraitCandidate candidate,
@@ -194,6 +210,7 @@ public final class TraitInheritanceService {
                     definitionById,
                     allowDuplicates,
                     0.0,
+                    0.0,
                     null
             );
         }
@@ -207,6 +224,7 @@ public final class TraitInheritanceService {
                                         Map<String, TwTraitConfig.TraitDefinition> definitionById,
                                         boolean allowDuplicates,
                                         double mutationChance,
+                                        double harmfulMutationRerollChance,
                                         @Nullable Random random) {
         if (selected == null || selected.size() >= targetCount || id == null || id.isBlank()) {
             return;
@@ -219,7 +237,8 @@ public final class TraitInheritanceService {
         if (!allowDuplicates && existingIndex >= 0) {
             selected.set(existingIndex, new TameworkTraitsComponent.TraitValue(
                     id,
-                    clampToDefinition(applyMutation(rawValue, definition, mutationChance, random), definition)
+                    clampToDefinition(applyMutation(
+                            rawValue, definition, mutationChance, harmfulMutationRerollChance, random), definition)
             ));
             return;
         }
@@ -228,7 +247,8 @@ public final class TraitInheritanceService {
         }
         selected.add(new TameworkTraitsComponent.TraitValue(
                 id,
-                clampToDefinition(applyMutation(rawValue, definition, mutationChance, random), definition)
+                clampToDefinition(applyMutation(
+                        rawValue, definition, mutationChance, harmfulMutationRerollChance, random), definition)
         ));
     }
 
@@ -368,6 +388,7 @@ public final class TraitInheritanceService {
     private static double applyMutation(double value,
                                         @Nullable TwTraitConfig.TraitDefinition definition,
                                         double mutationChance,
+                                        double harmfulMutationRerollChance,
                                         @Nullable Random random) {
         if (definition == null || random == null || mutationChance <= EPSILON) {
             return value;
@@ -385,7 +406,39 @@ public final class TraitInheritanceService {
         if (Math.abs(max - min) <= EPSILON) {
             return min;
         }
-        return min + (random.nextDouble() * (max - min));
+        double mutation = randomBetween(min, max, random);
+        TwTraitConfig.MutationPreference preference = definition.getMutationPreference();
+        if (!isHarmfulMutation(value, mutation, preference)
+                || clamp01(harmfulMutationRerollChance) <= EPSILON
+                || random.nextDouble() > clamp01(harmfulMutationRerollChance)) {
+            return mutation;
+        }
+        double reroll = randomBetween(min, max, random);
+        return preferredMutation(mutation, reroll, preference);
+    }
+
+    private static boolean isHarmfulMutation(double original,
+                                             double mutation,
+                                             @Nullable TwTraitConfig.MutationPreference preference) {
+        if (preference == TwTraitConfig.MutationPreference.HIGHER) {
+            return mutation + EPSILON < original;
+        }
+        if (preference == TwTraitConfig.MutationPreference.LOWER) {
+            return mutation > original + EPSILON;
+        }
+        return false;
+    }
+
+    private static double preferredMutation(double first,
+                                            double reroll,
+                                            @Nullable TwTraitConfig.MutationPreference preference) {
+        if (preference == TwTraitConfig.MutationPreference.HIGHER) {
+            return Math.max(first, reroll);
+        }
+        if (preference == TwTraitConfig.MutationPreference.LOWER) {
+            return Math.min(first, reroll);
+        }
+        return first;
     }
 
     public static double resolveEffectiveMutationChance(double baseChance, double multiplier) {
