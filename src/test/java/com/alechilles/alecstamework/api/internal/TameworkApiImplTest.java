@@ -351,7 +351,8 @@ class TameworkApiImplTest {
                 TameworkApiCapability.COMMAND_UI_CUSTOM_FLOWS,
                 TameworkApiCapability.COMMAND_HUD_RENDERERS,
                 TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS,
-                TameworkApiCapability.HUSBANDRY_OUTCOMES
+                TameworkApiCapability.HUSBANDRY_OUTCOMES,
+                TameworkApiCapability.HUSBANDRY_CARE_BONUSES
         );
     }
 

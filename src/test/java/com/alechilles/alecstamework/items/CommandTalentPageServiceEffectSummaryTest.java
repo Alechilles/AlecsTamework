@@ -55,10 +55,28 @@ class CommandTalentPageServiceEffectSummaryTest {
         );
     }
 
+    @Test
+    void formatsHappinessFlatBonusAsPoints() throws Exception {
+        CommandTalentPageService service = new CommandTalentPageService(null, null, null, null);
+        Method summarizeEffects = CommandTalentPageService.class.getDeclaredMethod(
+                "summarizeEffects", TwTalentConfig.PassiveEffect[].class);
+        summarizeEffects.setAccessible(true);
+
+        String summary = (String) summarizeEffects.invoke(
+                service, (Object) new TwTalentConfig.PassiveEffect[] { effect("HappinessFlatBonus", 1.0, 2.3) });
+
+        assertEquals("Happiness Flat Bonus +2.3 points", summary);
+    }
+
     private static TwTalentConfig.PassiveEffect effect(String effectKey, double multiplier) throws Exception {
+        return effect(effectKey, multiplier, 0.0);
+    }
+
+    private static TwTalentConfig.PassiveEffect effect(String effectKey, double multiplier, double amount) throws Exception {
         TwTalentConfig.PassiveEffect effect = new TwTalentConfig.PassiveEffect();
         setField(effect, "effectKey", effectKey);
         setField(effect, "multiplier", multiplier);
+        setField(effect, "amount", amount);
         return effect;
     }
 

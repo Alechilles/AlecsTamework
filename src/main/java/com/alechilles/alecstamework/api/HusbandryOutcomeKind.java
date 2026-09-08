@@ -4,6 +4,7 @@ package com.alechilles.alecstamework.api;
 public enum HusbandryOutcomeKind {
     NEEDS_DECAY,
     HAPPINESS_DISPOSITION,
+    HAPPINESS_CARE,
     HARVEST_YIELD,
     CULL_YIELD,
     BREEDING_COOLDOWN

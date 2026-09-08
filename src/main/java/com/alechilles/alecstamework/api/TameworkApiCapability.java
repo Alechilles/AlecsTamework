@@ -65,6 +65,8 @@ public enum TameworkApiCapability {
     /** External command HUD contributors can register with the live runtime. */
     COMMAND_HUD_CONTRIBUTORS,
     /** External husbandry providers can supply bounded action modifiers. */
-    HUSBANDRY_OUTCOMES
+    HUSBANDRY_OUTCOMES,
+    /** External husbandry providers can supply bounded care bonuses for eligible mood bands. */
+    HUSBANDRY_CARE_BONUSES
 }
 

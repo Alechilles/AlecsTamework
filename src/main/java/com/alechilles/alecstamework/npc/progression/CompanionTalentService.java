@@ -382,6 +382,47 @@ public final class CompanionTalentService {
         return matched ? multiplier : defaultMultiplier;
     }
 
+    public static double resolvePurchasedEffectAmount(@Nullable Ref<EntityStore> npcRef,
+                                                      @Nullable Store<EntityStore> store,
+                                                      @Nullable String effectKey) {
+        if (npcRef == null || !npcRef.isValid() || store == null || effectKey == null || effectKey.isBlank()) {
+            return 0.0;
+        }
+        if (!CompanionProgressionSettings.isTalentsEnabled()) {
+            return 0.0;
+        }
+        ComponentType<EntityStore, TameworkTalentsComponent> type = TameworkTalentsComponent.getComponentType();
+        TameworkTalentsComponent component = type != null ? store.getComponent(npcRef, type) : null;
+        if (component == null) {
+            return 0.0;
+        }
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        return resolvePurchasedEffectAmount(resolveConfig(component, roleId), component.getPurchasedTalentIds(), effectKey);
+    }
+
+    public static double resolvePurchasedEffectAmount(@Nullable TwTalentConfig config,
+                                                      @Nullable String[] purchasedTalentIds,
+                                                      @Nullable String effectKey) {
+        if (config == null || !config.isEnabled()
+                || purchasedTalentIds == null || purchasedTalentIds.length == 0
+                || effectKey == null || effectKey.isBlank()) {
+            return 0.0;
+        }
+        double amount = 0.0;
+        for (String talentId : purchasedTalentIds) {
+            TwTalentConfig.TalentDefinition talent = config.findTalent(talentId);
+            if (talent == null) {
+                continue;
+            }
+            for (TwTalentConfig.PassiveEffect effect : talent.getEffects()) {
+                if (effect != null && effect.getEffectKey() != null && effect.getEffectKey().equalsIgnoreCase(effectKey)) {
+                    amount += effect.getAmount();
+                }
+            }
+        }
+        return Double.isFinite(amount) ? amount : 0.0;
+    }
+
     @Nullable
     public static TwTalentConfig resolveTalentConfig(@Nullable Ref<EntityStore> npcRef,
                                                      @Nullable Store<EntityStore> store) {

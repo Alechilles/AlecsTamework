@@ -1,11 +1,13 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
+import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierBreakdownService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
+import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
 import com.hypixel.hytale.component.ComponentType;
@@ -154,6 +156,10 @@ final class CommandLinkedPanelProgressionPresentationService {
             return LinkedNpcTraitIndicator.EMPTY;
         }
         ArrayList<LinkedNpcTraitIndicator> indicators = new ArrayList<>(MAX_TRAIT_INDICATORS);
+        TwHappinessConfig happinessConfig = TwHappinessConfig.resolveForRole(
+                CompanionRoleIdResolver.resolveRoleId(npcRef, store));
+        boolean flatDisposition = happinessConfig != null
+                && happinessConfig.getDisposition().getMode() == TwHappinessConfig.DispositionMode.FLAT;
         for (TwTraitConfig.TraitDefinition definition : config.getTraits()) {
             if (definition == null) {
                 continue;
@@ -178,7 +184,11 @@ final class CommandLinkedPanelProgressionPresentationService {
                     resolveIconGlyph(label),
                     resolveIconTexturePath(definition),
                     label,
-                    buildTraitTooltip(label, value, min, defaultValue, max),
+                    buildTraitTooltip(label, value, min, defaultValue, max,
+                            flatDisposition && "HappinessGainMultiplier".equalsIgnoreCase(definition.getEffectKey())
+                                    ? CompanionHappinessModifierService.resolveFlatDispositionOffset(
+                                            value, happinessConfig.getDisposition())
+                                    : null),
                     fillRatio,
                     !belowDefault,
                     belowDefault
@@ -440,7 +450,11 @@ final class CommandLinkedPanelProgressionPresentationService {
                                      double value,
                                      double min,
                                      double defaultValue,
-                                     double max) {
+                                     double max,
+                                     @Nullable Double flatDispositionOffset) {
+        if (flatDispositionOffset != null) {
+            return label + ": " + formatSignedPoints(flatDispositionOffset);
+        }
         double safeMin = Double.isFinite(min) ? min : 0.0;
         double safeMax = Double.isFinite(max) ? max : 0.0;
         if (safeMax < safeMin) {
@@ -466,6 +480,14 @@ final class CommandLinkedPanelProgressionPresentationService {
                 + " ("
                 + formatPercent(normalized, belowDefault)
                 + ")";
+    }
+
+    private String formatSignedPoints(double value) {
+        if (!Double.isFinite(value)) {
+            return "+0 points";
+        }
+        String magnitude = format(Math.abs(value));
+        return (value >= 0.0 ? "+" : "-") + magnitude + " points";
     }
 
     private String format(double value) {

@@ -37,11 +37,12 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 - `PointCost`: talent-point cost to purchase the node
 - `MinLevel`: minimum companion level required
 - `RequiresTalentIds[]`: prerequisite talent IDs that must already be purchased
-- `Effects[]`: passive effect multipliers granted by the node
+- `Effects[]`: passive multipliers or flat amounts granted by the node
 
 ## `Effects[]`
 - `EffectKey`: shared progression effect key like `MaxHealthMultiplier`, `MoveSpeedMultiplier`, or `DamageDealtMultiplier`
 - `Multiplier`: multiplier applied once the node is purchased
+- `Amount`: flat value, default `0`, used by additive effect consumers such as `HappinessFlatBonus` (development addition)
 
 Common runtime effect keys:
 - `MaxHealthMultiplier`
@@ -49,6 +50,7 @@ Common runtime effect keys:
 - `DamageDealtMultiplier`
 - `HarvestDoubleDropChanceMultiplier`
 - `HappinessGainMultiplier`
+- `HappinessFlatBonus`: sums purchased `Amount` values into the happiness mood target, without disposition scaling. Keep talent IDs unchanged when converting existing purchases; change the effect key and replace `Multiplier` with `Amount` in the asset.
 - `BreedCooldownMultiplier`
 - `FertilityMultiplier`
 - `NeedsDecayMultiplier`: multiplies hunger and thirst decay; values below `1.0` slow decay

@@ -327,7 +327,9 @@ final class CommandTalentPageService {
                     language,
                     "tamework.ui.talents.effects.line",
                     formatEffectKey(language, effect.getEffectKey()),
-                    formatMultiplierChange(effect.getMultiplier())
+                    "HappinessFlatBonus".equalsIgnoreCase(effect.getEffectKey())
+                            ? formatPoints(effect.getAmount())
+                            : formatMultiplierChange(effect.getMultiplier())
             ));
         }
         return summaries.isEmpty()
@@ -369,6 +371,15 @@ final class CommandTalentPageService {
             return "+0%";
         }
         return (percent > 0.0 ? "+" : "-") + formatPercentMagnitude(Math.abs(percent)) + "%";
+    }
+
+    @Nonnull
+    private String formatPoints(double amount) {
+        if (!Double.isFinite(amount) || Math.abs(amount) < 0.05) {
+            return "+0 points";
+        }
+        String value = formatPercentMagnitude(Math.abs(amount));
+        return (amount > 0.0 ? "+" : "-") + value + " points";
     }
 
     @Nonnull

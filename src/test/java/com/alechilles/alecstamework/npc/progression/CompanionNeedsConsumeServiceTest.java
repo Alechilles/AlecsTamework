@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
 import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRegistry;
 import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRuntime;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.damage.SimpleClaimsDamageHytaleFixture;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
@@ -178,6 +179,59 @@ class CompanionNeedsConsumeServiceTest {
         }
     }
 
+    @Test
+    void careRequiresSatisfiedNeedsAndDoesNotMultiplyStoredDisposition() throws Exception {
+        try (NeedsFixture fixture = new NeedsFixture()) {
+            TwHappinessConfig config = TwHappinessConfig.CODEC.decode(
+                    org.bson.BsonDocument.parse("""
+                            {
+                              "Enabled": true,
+                              "Disposition": {"Mode": "FLAT", "TraitMin": 0.7},
+                              "Equilibrium": {"BaseSetpoint": 34},
+                              "Modifiers": {
+                                "Hunger": {"Enabled": true, "Bands": [
+                                  {"MinPercent": 80, "MaxPercent": 100, "Offset": 0, "CareBonus": true},
+                                  {"MinPercent": 0, "MaxPercent": 80, "Offset": -15}
+                                ]},
+                                "Thirst": {"Enabled": true, "Bands": [
+                                  {"MinPercent": 80, "MaxPercent": 100, "Offset": 8, "CareBonus": true},
+                                  {"MinPercent": 0, "MaxPercent": 80, "Offset": -18}
+                                ]},
+                                "Population": {"Enabled": false},
+                                "OwnerNearbyOffset": 0
+                              }
+                            }
+                            """), new com.hypixel.hytale.codec.ExtraInfo());
+            HusbandryOutcomeRegistry registry = new HusbandryOutcomeRegistry();
+            registry.register(context -> {
+                assertEquals(HusbandryOutcomeKind.HAPPINESS_CARE, context.kind());
+                return new HusbandryOutcomeModifiers(1, 1, 0, 0, 1, 6, 5, 4);
+            });
+            installRuntime(registry);
+            try {
+                fixture.installDisposition(1.3);
+                fixture.firstNeeds().setHunger(100);
+                fixture.firstNeeds().setThirst(100);
+                assertEquals(63, CompanionHappinessModifierService.resolve(
+                        fixture.firstRef, fixture.store, config).target(), 0.000001);
+                fixture.firstNeeds().setHunger(50);
+                assertEquals(42, CompanionHappinessModifierService.resolve(
+                        fixture.firstRef, fixture.store, config).target(), 0.000001);
+                fixture.firstNeeds().setHunger(100);
+                fixture.firstNeeds().setThirst(50);
+                assertEquals(32, CompanionHappinessModifierService.resolve(
+                        fixture.firstRef, fixture.store, config).target(), 0.000001);
+                fixture.installDisposition(0.7);
+                fixture.firstNeeds().setThirst(100);
+                assertEquals(43, CompanionHappinessModifierService.resolve(
+                        fixture.firstRef, fixture.store, config).target(), 0.000001);
+            } finally {
+                clearRuntime(registry);
+                registry.close();
+            }
+        }
+    }
+
     private static boolean runNeedsUpdate(Ref<EntityStore> npcRef,
                                            TestEntityComponentStore store) {
         return CompanionNeedsService.runNeedsUpdate(
@@ -315,6 +369,23 @@ class CompanionNeedsConsumeServiceTest {
             staticField(TwNeedsConfig.class, "ASSET_STORE").set(null,
                     new TestNeedsAssetStore(new DefaultAssetMap<>(Map.of("care-test", config))));
             TwNeedsConfig.clearRoleCache();
+        }
+
+        private void installDisposition(double score) throws Exception {
+            TwTraitConfig config = TwTraitConfig.CODEC.decode(
+                    org.bson.BsonDocument.parse("""
+                            {"Enabled": true, "Traits": [
+                              {"Id": "Trait_Disposition", "EffectKey": "HappinessGainMultiplier"}
+                            ]}
+                            """), new com.hypixel.hytale.codec.ExtraInfo());
+            setField(config, "id", "trait-test");
+            staticField(TwTraitConfig.class, "ASSET_STORE").set(null,
+                    new TestTraitAssetStore(new DefaultAssetMap<>(Map.of("trait-test", config))));
+            TwTraitConfig.clearRoleCache();
+            store.put(firstRef, traitsType, new TameworkTraitsComponent("trait-test", 1L,
+                    new TameworkTraitsComponent.TraitValue[] {
+                            new TameworkTraitsComponent.TraitValue("Trait_Disposition", score)
+                    }));
         }
 
         private void installTraitConfig() throws Exception {

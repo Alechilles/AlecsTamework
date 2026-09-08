@@ -145,7 +145,10 @@ public final class CompanionHappinessService {
             effectiveConsumedItems = Collections.singletonMap(consumedItemId, 1);
         }
         if (effectiveConsumedItems != null && !effectiveConsumedItems.isEmpty()) {
-            for (Map.Entry<String, Integer> consumedEntry : effectiveConsumedItems.entrySet()) {
+            ArrayList<Map.Entry<String, Integer>> consumedEntries = new ArrayList<>(effectiveConsumedItems.entrySet());
+            consumedEntries.sort((left, right) -> String.CASE_INSENSITIVE_ORDER.compare(
+                    left.getKey() == null ? "" : left.getKey(), right.getKey() == null ? "" : right.getKey()));
+            for (Map.Entry<String, Integer> consumedEntry : consumedEntries) {
                 if (consumedEntry == null || consumedEntry.getValue() == null || consumedEntry.getValue() <= 0) {
                     continue;
                 }
@@ -353,7 +356,7 @@ public final class CompanionHappinessService {
                 happinessChanged = true;
             }
         }
-        double dispositionMultiplier = resolveDispositionMultiplier(npcRef, store);
+        double dispositionMultiplier = resolveDispositionMultiplier(npcRef, store, happinessConfig);
         if (happiness.getBaseValue() == null || !Double.isFinite(happiness.getBaseValue())) {
             // Legacy impulses have already partly decayed into Value; their original base cannot
             // be recovered. Keep the visible mood and discard those timers once, without a charge.
@@ -368,7 +371,8 @@ public final class CompanionHappinessService {
                 happiness,
                 now,
                 timedActivations,
-                dispositionMultiplier
+                dispositionMultiplier,
+                happinessConfig.getImpulses().isSingleFoodEffect()
         );
         if (timedMutation.changed()) {
             happiness.setActiveImpulses(timedMutation.activeImpulses());
@@ -536,7 +540,12 @@ public final class CompanionHappinessService {
     }
 
     private static double resolveDispositionMultiplier(@Nullable Ref<EntityStore> npcRef,
-                                                       @Nullable Store<EntityStore> store) {
+                                                       @Nullable Store<EntityStore> store,
+                                                       @Nullable TwHappinessConfig happinessConfig) {
+        if (happinessConfig != null
+                && happinessConfig.getDisposition().getMode() == TwHappinessConfig.DispositionMode.FLAT) {
+            return 1.0;
+        }
         return CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,
                 store,
@@ -576,7 +585,8 @@ public final class CompanionHappinessService {
                         IMPULSE_LABEL_HAND_FEED,
                         gain,
                         System.currentTimeMillis() + durationMs,
-                        null
+                        null,
+                        false
                 )
         );
     }
@@ -596,7 +606,8 @@ public final class CompanionHappinessService {
                         resolved.label,
                         resolved.rawValue,
                         resolved.expiresAtMs,
-                        resolved.itemId
+                        resolved.itemId,
+                        true
                 )
         );
     }
@@ -620,7 +631,8 @@ public final class CompanionHappinessService {
                         IMPULSE_LABEL_PET,
                         gain,
                         System.currentTimeMillis() + durationMs,
-                        null
+                        null,
+                        false
                 )
         );
     }
@@ -645,7 +657,8 @@ public final class CompanionHappinessService {
                         IMPULSE_LABEL_DAMAGE,
                         loss,
                         System.currentTimeMillis() + durationMs,
-                        null
+                        null,
+                        false
                 )
         );
     }
@@ -674,7 +687,7 @@ public final class CompanionHappinessService {
         Double foodProfileImpulse = resolveFoodProfileImpulse(npcRef, store, normalizedItemId);
         if (foodProfileImpulse != null
                 && Double.isFinite(foodProfileImpulse)
-                && Math.abs(foodProfileImpulse) > EPSILON) {
+                && (impulses.isSingleFoodEffect() || Math.abs(foodProfileImpulse) > EPSILON)) {
             return new ResolvedFeedImpulse(
                     "feed:food:" + normalizedItemId,
                     IMPULSE_LABEL_ATE,
@@ -695,7 +708,13 @@ public final class CompanionHappinessService {
         }
         Map<String, Double> feedParamImpulses = impulses.getFeedParamImpulses();
         if (feedParamImpulses.isEmpty()) {
-            return null;
+            return new ResolvedFeedImpulse(
+                    "feed:food:" + normalizedItemId,
+                    IMPULSE_LABEL_ATE,
+                    0.0,
+                    System.currentTimeMillis() + durationMs,
+                    displayItemId
+            );
         }
         ArrayList<Map.Entry<String, Double>> sortedEntries = new ArrayList<>(feedParamImpulses.entrySet());
         sortedEntries.sort((left, right) -> left.getKey().compareToIgnoreCase(right.getKey()));
@@ -720,7 +739,13 @@ public final class CompanionHappinessService {
                     displayItemId
             );
         }
-        return null;
+        return new ResolvedFeedImpulse(
+                "feed:food:" + normalizedItemId,
+                IMPULSE_LABEL_ATE,
+                0.0,
+                System.currentTimeMillis() + durationMs,
+                displayItemId
+        );
     }
 
     @Nullable
@@ -835,7 +860,8 @@ public final class CompanionHappinessService {
     private static TimedImpulseMutationResult applyTimedImpulseMutations(@Nonnull TameworkHappinessComponent happiness,
                                                                          long nowMs,
                                                                          @Nullable List<TimedImpulseActivation> timedActivations,
-                                                                         double dispositionMultiplier) {
+                                                                         double dispositionMultiplier,
+                                                                         boolean singleFoodEffect) {
         boolean changed = false;
         LinkedHashMap<String, TameworkHappinessComponent.ActiveImpulse> activeByKey = new LinkedHashMap<>();
         for (TameworkHappinessComponent.ActiveImpulse activeImpulse : happiness.getActiveImpulses()) {
@@ -865,6 +891,9 @@ public final class CompanionHappinessService {
             }
             activeByKey.put(normalizedKey, normalized);
         }
+        if (singleFoodEffect && collapseFoodImpulses(activeByKey)) {
+            changed = true;
+        }
         if (timedActivations != null) {
             for (TimedImpulseActivation activation : timedActivations) {
                 if (activation == null) {
@@ -873,6 +902,9 @@ public final class CompanionHappinessService {
                 String normalizedKey = normalizeImpulseKey(activation.key);
                 if (normalizedKey == null) {
                     continue;
+                }
+                if (singleFoodEffect && activation.foodConsumption) {
+                    changed |= removeFoodImpulses(activeByKey);
                 }
                 if (!Double.isFinite(activation.rawValue) || Math.abs(activation.rawValue) <= EPSILON) {
                     continue;
@@ -915,6 +947,42 @@ public final class CompanionHappinessService {
         TameworkHappinessComponent.ActiveImpulse[] activeImpulses =
                 activeByKey.values().toArray(new TameworkHappinessComponent.ActiveImpulse[0]);
         return new TimedImpulseMutationResult(changed, activeImpulses);
+    }
+
+    private static boolean collapseFoodImpulses(@Nonnull LinkedHashMap<String, TameworkHappinessComponent.ActiveImpulse> activeByKey) {
+        TameworkHappinessComponent.ActiveImpulse selected = null;
+        String selectedKey = null;
+        int foodImpulseCount = 0;
+        for (Map.Entry<String, TameworkHappinessComponent.ActiveImpulse> entry : activeByKey.entrySet()) {
+            if (!isFoodImpulseKey(entry.getKey())) {
+                continue;
+            }
+            foodImpulseCount++;
+            TameworkHappinessComponent.ActiveImpulse candidate = entry.getValue();
+            if (selected == null
+                    || candidate.getExpiresAtMs() > selected.getExpiresAtMs()
+                    || (candidate.getExpiresAtMs() == selected.getExpiresAtMs()
+                    && entry.getKey().compareToIgnoreCase(selectedKey) < 0)) {
+                selected = candidate;
+                selectedKey = entry.getKey();
+            }
+        }
+        if (selected == null || foodImpulseCount <= 1) {
+            return false;
+        }
+        boolean changed = removeFoodImpulses(activeByKey);
+        activeByKey.put(selectedKey, selected);
+        return changed;
+    }
+
+    private static boolean removeFoodImpulses(@Nonnull LinkedHashMap<String, TameworkHappinessComponent.ActiveImpulse> activeByKey) {
+        return activeByKey.entrySet().removeIf(entry -> isFoodImpulseKey(entry.getKey()));
+    }
+
+    private static boolean isFoodImpulseKey(@Nullable String key) {
+        return key != null && (key.startsWith("feed:food:")
+                || key.startsWith(IMPULSE_KEY_FEED_ITEM_PREFIX)
+                || key.startsWith(IMPULSE_KEY_FEED_PARAM_PREFIX));
     }
 
     @Nonnull
@@ -1044,7 +1112,8 @@ public final class CompanionHappinessService {
                                           String label,
                                           double rawValue,
                                           long expiresAtMs,
-                                          String itemId) {
+                                          String itemId,
+                                          boolean foodConsumption) {
     }
 
     private record ResolvedFeedImpulse(String key,

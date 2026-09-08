@@ -45,6 +45,13 @@ public final class TwTalentConfig implements JsonAssetWithMap<String, DefaultAss
             )
             .documentation("Multiplier applied when this talent is purchased.")
             .add()
+            .<Double>append(
+                    new KeyedCodec<>("Amount", Codec.DOUBLE),
+                    (effect, value) -> effect.amount = value == null ? 0.0 : value,
+                    effect -> effect.amount
+            )
+            .documentation("Additive amount applied when this talent is purchased. Defaults to zero.")
+            .add()
             .build();
     private static final ArrayCodec<PassiveEffect> PASSIVE_EFFECT_ARRAY_CODEC =
             new ArrayCodec<>(PASSIVE_EFFECT_CODEC, PassiveEffect[]::new);
@@ -386,6 +393,7 @@ public final class TwTalentConfig implements JsonAssetWithMap<String, DefaultAss
     public static final class PassiveEffect {
         private String effectKey;
         private double multiplier = 1.0;
+        private double amount;
 
         @Nullable
         public String getEffectKey() {
@@ -397,6 +405,10 @@ public final class TwTalentConfig implements JsonAssetWithMap<String, DefaultAss
 
         public double getMultiplier() {
             return Double.isFinite(multiplier) && multiplier > 0.0 ? multiplier : 1.0;
+        }
+
+        public double getAmount() {
+            return Double.isFinite(amount) ? amount : 0.0;
         }
     }
 

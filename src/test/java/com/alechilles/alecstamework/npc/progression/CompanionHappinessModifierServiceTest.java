@@ -20,6 +20,8 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.UUID;
+import org.bson.BsonDocument;
+import com.hypixel.hytale.codec.ExtraInfo;
 import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
 
@@ -31,6 +33,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Tests disposition scaling behavior for happiness equilibrium modifiers.
  */
 class CompanionHappinessModifierServiceTest {
+    @Test
+    void flatDispositionMapsStoredScoresWithoutChangingTheirCanonicalValue() {
+        TwHappinessConfig defaultConfig = TwHappinessConfig.CODEC.decode(
+                BsonDocument.parse("{\"Disposition\":{\"Mode\":\"FLAT\"}}"), new ExtraInfo());
+        TwHappinessConfig aahConfig = TwHappinessConfig.CODEC.decode(
+                BsonDocument.parse("{\"Disposition\":{\"Mode\":\"FLAT\",\"TraitMin\":0.7}}"), new ExtraInfo());
+
+        assertEquals(-10.0, CompanionHappinessModifierService.resolveFlatDispositionOffset(
+                0.75, defaultConfig.getDisposition()), 0.000001);
+        assertEquals(-10.0, CompanionHappinessModifierService.resolveFlatDispositionOffset(
+                0.7, aahConfig.getDisposition()), 0.000001);
+        assertEquals(0.0, CompanionHappinessModifierService.resolveFlatDispositionOffset(
+                1.0, aahConfig.getDisposition()), 0.000001);
+        assertEquals(10.0, CompanionHappinessModifierService.resolveFlatDispositionOffset(
+                1.3, aahConfig.getDisposition()), 0.000001);
+    }
+
     @Test
     void applyDispositionToOffsetScalesPositiveGainsDirectly() {
         double adjusted = CompanionHappinessModifierService.applyDispositionToOffset(10.0, 1.2);
@@ -67,8 +86,11 @@ class CompanionHappinessModifierServiceTest {
 
             HusbandryOutcomeRegistry registry = new HusbandryOutcomeRegistry();
             registry.register(context -> {
-                assertEquals(HusbandryOutcomeKind.HAPPINESS_DISPOSITION, context.kind());
-                return new HusbandryOutcomeModifiers(1.0, 1.30, 0.0, 0.0, 1.0);
+                return switch (context.kind()) {
+                    case HAPPINESS_DISPOSITION -> new HusbandryOutcomeModifiers(1.0, 1.30, 0.0, 0.0, 1.0);
+                    case HAPPINESS_CARE -> HusbandryOutcomeModifiers.identity();
+                    default -> HusbandryOutcomeModifiers.identity();
+                };
             });
             installRuntime(registry);
             try {

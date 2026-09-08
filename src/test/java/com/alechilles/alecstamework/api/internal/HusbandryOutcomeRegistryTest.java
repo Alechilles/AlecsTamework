@@ -37,6 +37,7 @@ class HusbandryOutcomeRegistryTest {
         EnumSet<HusbandryOutcomeKind> expectedKinds = EnumSet.of(
                 HusbandryOutcomeKind.NEEDS_DECAY,
                 HusbandryOutcomeKind.HAPPINESS_DISPOSITION,
+                HusbandryOutcomeKind.HAPPINESS_CARE,
                 HusbandryOutcomeKind.HARVEST_YIELD,
                 HusbandryOutcomeKind.CULL_YIELD,
                 HusbandryOutcomeKind.BREEDING_COOLDOWN
@@ -51,6 +52,8 @@ class HusbandryOutcomeRegistryTest {
                             -1.0, 1.0, 0.0, 0.0, 1.0);
                     case HAPPINESS_DISPOSITION -> new HusbandryOutcomeModifiers(
                             1.0, 4.0, 0.0, 0.0, 1.0);
+                    case HAPPINESS_CARE -> new HusbandryOutcomeModifiers(
+                            1.0, 1.0, 0.0, 0.0, 1.0, 6.0, 5.0, 4.0);
                     case HARVEST_YIELD -> new HusbandryOutcomeModifiers(
                             1.0, 1.0, -1.0, 2.0, 1.0);
                     case CULL_YIELD -> new HusbandryOutcomeModifiers(
@@ -224,6 +227,8 @@ class HusbandryOutcomeRegistryTest {
             case NEEDS_DECAY -> new HusbandryOutcomeModifiers(0.25, 1.0, 0.0, 0.0, 1.0);
             case HAPPINESS_DISPOSITION -> new HusbandryOutcomeModifiers(
                     1.0, 2.0, 0.0, 0.0, 1.0);
+            case HAPPINESS_CARE -> new HusbandryOutcomeModifiers(
+                    1.0, 1.0, 0.0, 0.0, 1.0, 6.0, 5.0, 4.0);
             case HARVEST_YIELD -> new HusbandryOutcomeModifiers(1.0, 1.0, 0.0, 1.0, 1.0);
             case CULL_YIELD -> new HusbandryOutcomeModifiers(1.0, 1.0, 1.0, 0.0, 1.0);
             case BREEDING_COOLDOWN -> new HusbandryOutcomeModifiers(1.0, 1.0, 0.0, 0.0, 0.25);

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
+import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.alechilles.alecstamework.damage.SimpleClaimsDamageHytaleFixture;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotCodec;
@@ -19,9 +20,11 @@ import com.hypixel.hytale.event.IEventBus;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Arrays;
 import java.util.Set;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
@@ -150,10 +153,49 @@ class CompanionHappinessTimedEffectsTest {
         }
     }
 
+    @Test
+    void singleFoodEffectReplacesPriorFoodAndNeutralMealClearsIt() throws Exception {
+        try (Fixture f = new Fixture(50, 0)) {
+            f.enableSingleFoodEffect(Map.of("Food_A", 6.0, "Food_B", -4.0));
+            f.feed("Food_A");
+            assertEquals(1, f.foodEffectCount());
+            assertEquals("feed:item:food_a", f.foodEffectKey());
+
+            f.feed("Food_B");
+            assertEquals(1, f.foodEffectCount());
+            assertEquals("feed:item:food_b", f.foodEffectKey());
+
+            f.feed("Food_Neutral");
+            assertEquals(0, f.foodEffectCount());
+        }
+    }
+
+    @Test
+    void singleFoodEffectTreatsExplicitZeroFoodProfileAsNeutralInsteadOfLegacyPenalty() throws Exception {
+        try (Fixture f = new Fixture(50, 0)) {
+            f.installCompatibleZeroFoodProfile();
+            f.enableSingleFoodEffect(Map.of("Legacy_Food", 6.0, "Compatible_Food", -8.0));
+            f.feed("Legacy_Food");
+            assertEquals(1, f.foodEffectCount());
+
+            f.feed("Compatible_Food");
+            assertEquals(0, f.foodEffectCount());
+        }
+
+        try (Fixture f = new Fixture(50, 0)) {
+            f.installCompatibleZeroFoodProfile();
+            f.setFeedItemImpulses(Map.of("Compatible_Food", -8.0));
+            f.feed("Compatible_Food");
+            assertEquals("feed:item:compatible_food", f.foodEffectKey());
+            assertEquals(-8.0, f.foodEffectValue(), 0.000001);
+        }
+    }
+
     private static final class Fixture implements AutoCloseable {
         private final SimpleClaimsDamageHytaleFixture.HytaleModuleScope scope =
                 SimpleClaimsDamageHytaleFixture.HytaleModuleScope.install();
         private final Object previousAssets = field(TwHappinessConfig.class, "ASSET_STORE").get(null);
+        private final Object previousFoodAssets = field(TwFoodConfig.class, "ASSET_STORE").get(null);
         private final Object previousItems = field(Item.class, "ASSET_STORE").get(null);
         private final ComponentType<EntityStore, TameworkHappinessComponent> type = new ComponentType<>();
         private final TestEntityComponentStore store = new TestEntityComponentStore(new EntityStore(null));
@@ -181,6 +223,47 @@ class CompanionHappinessTimedEffectsTest {
         TameworkHappinessComponent state() { return store.getComponent(ref, type); }
         double value() { return state().getValue(); }
         void pet() { CompanionHappinessService.applyPetGain(ref, store); }
+        void feed(String itemId) { CompanionHappinessService.applyFeedGain(ref, store, itemId); }
+        void enableSingleFoodEffect(Map<String, Double> impulses) throws Exception {
+            field(config.getImpulses().getClass(), "singleFoodEffect").set(config.getImpulses(), true);
+            field(config.getImpulses().getClass(), "feedItemImpulses").set(config.getImpulses(), impulses);
+        }
+        void setFeedItemImpulses(Map<String, Double> impulses) throws Exception {
+            field(config.getImpulses().getClass(), "feedItemImpulses").set(config.getImpulses(), impulses);
+        }
+        void installCompatibleZeroFoodProfile() throws Exception {
+            TwFoodConfig foodConfig = TwFoodConfig.CODEC.decode(BsonDocument.parse("""
+                    {"Enabled":true,"RoleIds":["Test_Food_Role"],
+                    "Foods":{"Compatible":["Compatible_Food"]},
+                    "Happiness":{"Compatible":0}}
+                    """), new ExtraInfo());
+            field(TwFoodConfig.class, "id").set(foodConfig, "test-food");
+            field(TwFoodConfig.class, "ASSET_STORE").set(null,
+                    new FoodAssets(new DefaultAssetMap<>(Map.of("test-food", foodConfig))));
+            TwFoodConfig.clearRoleCache();
+            NPCEntity npc = new NPCEntity();
+            npc.setRoleName("Test_Food_Role");
+            store.put(ref, NPCEntity.getComponentType(), npc);
+        }
+        int foodEffectCount() {
+            return (int) Arrays.stream(state().getActiveImpulses())
+                    .filter(effect -> effect.getKey().startsWith("feed:item:") || effect.getKey().startsWith("feed:food:"))
+                    .count();
+        }
+        String foodEffectKey() {
+            return Arrays.stream(state().getActiveImpulses())
+                    .map(TameworkHappinessComponent.ActiveImpulse::getKey)
+                    .filter(key -> key.startsWith("feed:item:") || key.startsWith("feed:food:"))
+                    .findFirst()
+                    .orElse(null);
+        }
+        double foodEffectValue() {
+            return Arrays.stream(state().getActiveImpulses())
+                    .filter(effect -> effect.getKey().startsWith("feed:item:") || effect.getKey().startsWith("feed:food:"))
+                    .mapToDouble(TameworkHappinessComponent.ActiveImpulse::getValue)
+                    .findFirst()
+                    .orElse(0.0);
+        }
         void setTarget(double target) throws Exception {
             field(config.getEquilibrium().getClass(), "baseSetpoint").set(config.getEquilibrium(), target);
         }
@@ -202,9 +285,35 @@ class CompanionHappinessTimedEffectsTest {
         public void close() throws Exception {
             store.close();
             field(TwHappinessConfig.class, "ASSET_STORE").set(null, previousAssets);
+            field(TwFoodConfig.class, "ASSET_STORE").set(null, previousFoodAssets);
             field(Item.class, "ASSET_STORE").set(null, previousItems);
             TwHappinessConfig.clearRoleCache();
+            TwFoodConfig.clearRoleCache();
             scope.close();
+        }
+    }
+
+    private static final class FoodAssets extends AssetStore<String, TwFoodConfig,
+            DefaultAssetMap<String, TwFoodConfig>> {
+        FoodAssets(DefaultAssetMap<String, TwFoodConfig> map) { super(new Builder(map)); }
+        protected IEventBus getEventBus() { return null; }
+        public void addFileMonitor(String pack, Path path) { }
+        public void removeFileMonitor(Path path) { }
+        protected void handleRemoveOrUpdate(Set<String> removed, Map<String, TwFoodConfig> changed,
+                                            AssetUpdateQuery query) { }
+        private static final class Builder extends AssetStore.Builder<String, TwFoodConfig,
+                DefaultAssetMap<String, TwFoodConfig>, Builder> {
+            private final DefaultAssetMap<String, TwFoodConfig> map;
+            Builder(DefaultAssetMap<String, TwFoodConfig> map) {
+                super(String.class, TwFoodConfig.class, map);
+                this.map = map;
+                setPath("Tamework/Food");
+                setCodec(TwFoodConfig.CODEC);
+                setKeyFunction(TwFoodConfig::getId);
+            }
+            public AssetStore<String, TwFoodConfig, DefaultAssetMap<String, TwFoodConfig>> build() {
+                return new FoodAssets(map);
+            }
         }
     }
 

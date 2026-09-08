@@ -37,6 +37,7 @@ This config is especially important when you use:
   "RoleIds": [],
   "Values": { "...": "..." },
   "Equilibrium": { "...": "..." },
+  "Disposition": { "...": "..." },
   "Impulses": { "...": "..." },
   "Modifiers": { "...": "..." }
 }
@@ -57,6 +58,22 @@ This config is especially important when you use:
 - `BaseSetpoint`: target value the system naturally drifts toward over time.
 - `ConvergencePerMinute`: how many happiness points the underlying mood moves toward its environmental target per real minute. Active timed effects are added separately and do not decay through convergence.
 
+### `Disposition` (development addition)
+
+- `Mode`: `MULTIPLIER` by default; `FLAT` opts into a signed mood-target adjustment.
+- `TraitMin`, `TraitNeutral`, `TraitMax`: stored genetic scores mapped to the low, neutral and high points. Defaults are `0.75`, `1.0`, `1.3`.
+- `MinOffset`, `MaxOffset`: flat endpoints, default `-10` and `10`; the neutral score maps to zero.
+
+FLAT uses a clamped piecewise-linear mapping of the disposition trait only.
+Conditions and immediate/timed effects are not scaled. Existing stored trait
+scores remain intact, so capture and saved snapshots need no genetic rewrite.
+For a pack with historical bred scores `0.7..1.3`, set `TraitMin` to `0.7` to
+preserve the whole range. Other packs retain their legacy behavior when they
+omit this section. Partial child objects inherit missing fields normally.
+
+Purchased `HappinessFlatBonus` talent amounts add separately to the mood target.
+They do not multiply the trait, environmental modifiers, or timed effects.
+
 ### `Impulses`
 - `GainOnFeed`: additive happiness gain from feeding interactions.
 - `HandFeedDurationMinutes`: real-minute duration of the separate hand-feeding effect.
@@ -65,6 +82,7 @@ This config is especially important when you use:
 - `LoseOnDamage`: additive happiness loss from taking damage.
 - `FeedItemImpulses`: per-item consumed-feed impulse map (`ItemId -> delta`).
 - `FeedParamImpulses`: per-family consumed-feed impulse map (`ParamKey -> delta`).
+- `SingleFoodEffect`: default `false`. When enabled, each consumed meal replaces the previous food effect, including neutral or negative meals. Hand-feeding and petting remain separate. Legacy food keys are collapsed to one during reconciliation.
 
 ### `Modifiers`
 These modifiers shift the equilibrium result up or down.
@@ -79,6 +97,7 @@ Each `Hunger.Bands` entry supports:
 - `MinPercent`
 - `MaxPercent`
 - `Offset`: happiness adjustment applied while the need value is inside that band
+- `CareBonus`: default `false`; opt this selected band into the matching provider Care bonus. This also works when `Offset` is zero.
 
 Nested `Thirst` uses the same shape as `Hunger`.
 
@@ -93,6 +112,7 @@ Each `Population.Bands` entry supports:
 - `MinCount`
 - `MaxCount`
 - `Offset`
+- `CareBonus`: default `false`; opt this selected band into the population Care bonus
 
 Additional field:
 - `OwnerNearbyOffset`: flat bonus applied when the owner is nearby
@@ -111,8 +131,8 @@ Refreshing the same effect key resets its expiration without stacking another
 copy. Different effect keys can coexist; there is no single global care-bonus
 cap. Food profiles may use item-specific keys. Consumed-food effects can also
 come from autonomous feeding, while the hand-feeding effect is separate.
-Disposition scales positive effects and softens negative effects using the
-existing multiplier rules. An effect retains its applied amount until refreshed
+In default MULTIPLIER mode, disposition scales positive effects and softens
+negative effects. FLAT mode leaves new effects unscaled. An effect retains its applied amount until refreshed
 or expired. Expiration removes that contribution, without a second deduction
 from the underlying mood. Happiness limits do not discard the underlying mood.
 

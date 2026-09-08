@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased development changes
+
+- Added opt-in flat disposition, additive happiness talents, conditional Care
+  happiness providers and single-food-effect replacement. Existing trait scores,
+  talent purchases and effect deadlines are preserved; packs that do not opt in
+  retain multiplier disposition and their existing food stacking policy.
+
 ## 3.4.5 - Companion Recovery and Happiness Hotfix - 2026-09-06
 
 ### Added

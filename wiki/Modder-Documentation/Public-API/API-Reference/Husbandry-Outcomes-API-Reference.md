@@ -14,6 +14,9 @@ Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/a
 
 Capability: `HUSBANDRY_OUTCOMES`
 
+Development addition: `HUSBANDRY_CARE_BONUSES` advertises conditional happiness
+bonuses. Check it before requiring the eight-argument outcome contract.
+
 ## Entry Point
 
 `TameworkApi.husbandryOutcomes() -> HusbandryOutcomeApi`
@@ -36,7 +39,7 @@ values and does not retain a provider.
 
 The provider receives an immutable `HusbandryOutcomeContext` with:
 
-- `kind`: `NEEDS_DECAY`, `HAPPINESS_DISPOSITION`, `HARVEST_YIELD`,
+- `kind`: `NEEDS_DECAY`, `HAPPINESS_DISPOSITION`, `HAPPINESS_CARE`, `HARVEST_YIELD`,
   `CULL_YIELD`, or `BREEDING_COOLDOWN`;
 - `ownerId` and `companionId`, when known;
 - `roleId` and `profileId`, when known;
@@ -49,9 +52,11 @@ The provider returns `HusbandryOutcomeModifiers`:
 - `happinessDispositionMultiplier`, clamped to `1.0` through `2.0`;
 - `bonusOutputChance`, clamped to `0.0` through `1.0`;
 - `tripleOutputChance`, clamped to `0.0` through `1.0`; and
-- `breedingCooldownMultiplier`, clamped to `0.25` through `1.0`.
+- `breedingCooldownMultiplier`, clamped to `0.25` through `1.0`;
+- `happinessHungerBonus`, `happinessThirstBonus`, `happinessPopulationBonus`, each clamped to `0.0..100.0`.
 
-The identity result is `(1.0, 1.0, 0.0, 0.0, 1.0)`. Tamework uses it when no
+The identity result is `(1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)`. The original
+five-argument constructor remains supported, with zero Care bonuses. Tamework uses identity when no
 provider is active, the provider returns `null`, the provider throws, or any
 returned field is not finite.
 
@@ -61,6 +66,11 @@ to harvest and cull results. Tamework applies the breeding multiplier to parent
 cooldowns only. Tamework rolls `tripleOutputChance` only after
 `bonusOutputChance` succeeds. A successful triple roll adds two output batches
 instead of one.
+
+`HAPPINESS_CARE` resolves once per mood calculation. Each returned bonus applies
+only to its corresponding selected hunger, thirst or population band when that
+band has `CareBonus: true`. It grants nothing in other bands or with no provider.
+Flat disposition does not consume the legacy happiness-disposition multiplier.
 
 ## Authority Boundary
 

@@ -44,12 +44,14 @@ public final class CompanionHappinessModifierService {
         double baseSetpoint = happinessConfig.getEquilibrium().getBaseSetpoint();
         ArrayList<ModifierEntry> modifiers = new ArrayList<>();
         double offsetTotal = 0.0;
-        double dispositionMultiplier = resolveDispositionMultiplier(npcRef, store);
+        double dispositionMultiplier = resolveDispositionMultiplier(npcRef, store, happinessConfig);
+        HusbandryOutcomeModifiers careModifiers = HusbandryOutcomeRuntime.resolve(
+                HusbandryOutcomeKind.HAPPINESS_CARE, npcRef, store, (String) null, null);
 
         TameworkNeedsComponent needs = resolveNeedsComponent(npcRef, store);
         TwNeedsConfig needsConfig = NeedsConfigResolver.resolveConfig(npcRef, store, needs);
         if (needs != null && NeedsConfigResolver.isRuntimeEnabled(needsConfig)) {
-            offsetTotal += resolveNeedOffset(
+            BandResolution hunger = resolveNeedOffset(
                     "hunger",
                     "Hunger",
                     happinessConfig.getModifiers().getHunger(),
@@ -59,7 +61,10 @@ public final class CompanionHappinessModifierService {
                     dispositionMultiplier,
                     modifiers
             );
-            offsetTotal += resolveNeedOffset(
+            offsetTotal += hunger.offset();
+            offsetTotal += addCareBonus("hunger_care", "Husbandry Care: Hunger", hunger.careBonus(),
+                    careModifiers.happinessHungerBonus(), modifiers);
+            BandResolution thirst = resolveNeedOffset(
                     "thirst",
                     "Thirst",
                     happinessConfig.getModifiers().getThirst(),
@@ -69,8 +74,14 @@ public final class CompanionHappinessModifierService {
                     dispositionMultiplier,
                     modifiers
             );
+            offsetTotal += thirst.offset();
+            offsetTotal += addCareBonus("thirst_care", "Husbandry Care: Thirst", thirst.careBonus(),
+                    careModifiers.happinessThirstBonus(), modifiers);
         }
-        offsetTotal += resolvePopulationOffset(npcRef, store, happinessConfig, dispositionMultiplier, modifiers);
+        BandResolution population = resolvePopulationOffset(npcRef, store, happinessConfig, dispositionMultiplier, modifiers);
+        offsetTotal += population.offset();
+        offsetTotal += addCareBonus("population_care", "Husbandry Care: Population", population.careBonus(),
+                careModifiers.happinessPopulationBonus(), modifiers);
 
         double ownerNearbyOffset = happinessConfig.getModifiers().getOwnerNearbyOffset();
         if (Math.abs(ownerNearbyOffset) > PERCENT_EPSILON) {
@@ -79,6 +90,19 @@ public final class CompanionHappinessModifierService {
                 modifiers.add(new ModifierEntry("owner_nearby", "Owner Nearby", adjustedOwnerNearbyOffset));
                 offsetTotal += adjustedOwnerNearbyOffset;
             }
+        }
+
+        if (happinessConfig.getDisposition().getMode() == TwHappinessConfig.DispositionMode.FLAT) {
+            double dispositionOffset = resolveFlatDispositionOffset(npcRef, store, happinessConfig.getDisposition());
+            modifiers.add(new ModifierEntry("disposition", "Disposition", dispositionOffset));
+            offsetTotal += dispositionOffset;
+        }
+
+        double talentBonus = CompanionTalentService.resolvePurchasedEffectAmount(
+                npcRef, store, "HappinessFlatBonus");
+        if (Double.isFinite(talentBonus) && Math.abs(talentBonus) > PERCENT_EPSILON) {
+            modifiers.add(new ModifierEntry("talents", "Talents", talentBonus));
+            offsetTotal += talentBonus;
         }
 
         double target = baseSetpoint + offsetTotal;
@@ -98,44 +122,44 @@ public final class CompanionHappinessModifierService {
         return store.getComponent(npcRef, needsType);
     }
 
-    private static double resolvePopulationOffset(@Nullable Ref<EntityStore> npcRef,
-                                                  @Nullable Store<EntityStore> store,
-                                                  @Nonnull TwHappinessConfig happinessConfig,
-                                                  double dispositionMultiplier,
-                                                  @Nonnull List<ModifierEntry> outModifiers) {
+    private static BandResolution resolvePopulationOffset(@Nullable Ref<EntityStore> npcRef,
+                                                          @Nullable Store<EntityStore> store,
+                                                          @Nonnull TwHappinessConfig happinessConfig,
+                                                          double dispositionMultiplier,
+                                                          @Nonnull List<ModifierEntry> outModifiers) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
-            return 0.0;
+            return BandResolution.none();
         }
         TwHappinessConfig.PopulationModifierSettings settings = happinessConfig.getModifiers().getPopulation();
         if (!settings.isEnabled()) {
-            return 0.0;
+            return BandResolution.none();
         }
         double radius = settings.getRadius();
         if (radius <= 0.0) {
-            return 0.0;
+            return BandResolution.none();
         }
         TwHappinessConfig.PopulationBandSettings[] bands = settings.getBands();
         if (bands.length == 0) {
-            return 0.0;
+            return BandResolution.none();
         }
         ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
         ComponentType<EntityStore, TransformComponent> transformType = TransformComponent.getComponentType();
         if (npcType == null || transformType == null) {
-            return 0.0;
+            return BandResolution.none();
         }
         NPCEntity sourceNpc = store.getComponent(npcRef, npcType);
         TransformComponent sourceTransform = store.getComponent(npcRef, transformType);
         if (sourceNpc == null || sourceTransform == null) {
-            return 0.0;
+            return BandResolution.none();
         }
         String sourceRoleId = resolveRoleId(sourceNpc);
         if (sourceRoleId == null || sourceRoleId.isBlank()) {
-            return 0.0;
+            return BandResolution.none();
         }
         TwBreedingConfig breedingConfig = TwBreedingConfig.resolveForRole(sourceRoleId);
         String sourceTypeKey = resolvePopulationTypeKey(sourceRoleId, breedingConfig);
         if (sourceTypeKey == null || sourceTypeKey.isBlank()) {
-            return 0.0;
+            return BandResolution.none();
         }
         int nearbyCount = resolveNearbyPopulationCount(
                 store,
@@ -147,15 +171,15 @@ public final class CompanionHappinessModifierService {
         );
         TwHappinessConfig.PopulationBandSettings band = findPopulationBand(settings, nearbyCount);
         if (band == null) {
-            return 0.0;
+            return BandResolution.none();
         }
         double offset = band.getOffset();
         if (!Double.isFinite(offset) || Math.abs(offset) <= PERCENT_EPSILON) {
-            return 0.0;
+            return new BandResolution(0.0, band.hasCareBonus());
         }
         double adjustedOffset = applyDispositionToOffset(offset, dispositionMultiplier);
         if (Math.abs(adjustedOffset) <= PERCENT_EPSILON) {
-            return 0.0;
+            return new BandResolution(0.0, band.hasCareBonus());
         }
         String suffix = band.getLabel();
         if (suffix == null || suffix.isBlank()) {
@@ -167,7 +191,7 @@ public final class CompanionHappinessModifierService {
         String entryId = "population_" + normalizeToken(suffix);
         String entryLabel = "Population: " + suffix;
         outModifiers.add(new ModifierEntry(entryId, entryLabel, adjustedOffset));
-        return adjustedOffset;
+        return new BandResolution(adjustedOffset, band.hasCareBonus());
     }
 
     private static int resolveNearbyPopulationCount(@Nonnull Store<EntityStore> store,
@@ -186,36 +210,36 @@ public final class CompanionHappinessModifierService {
         );
     }
 
-    private static double resolveNeedOffset(@Nonnull String idPrefix,
-                                            @Nonnull String labelPrefix,
-                                            @Nonnull TwHappinessConfig.NeedModifierSettings modifierSettings,
-                                            double currentValue,
-                                            double minValue,
-                                            double maxValue,
-                                            double dispositionMultiplier,
-                                            @Nonnull List<ModifierEntry> outModifiers) {
+    private static BandResolution resolveNeedOffset(@Nonnull String idPrefix,
+                                                    @Nonnull String labelPrefix,
+                                                    @Nonnull TwHappinessConfig.NeedModifierSettings modifierSettings,
+                                                    double currentValue,
+                                                    double minValue,
+                                                    double maxValue,
+                                                    double dispositionMultiplier,
+                                                    @Nonnull List<ModifierEntry> outModifiers) {
         if (!modifierSettings.isEnabled()) {
-            return 0.0;
+            return BandResolution.none();
         }
         if (!Double.isFinite(currentValue) || !Double.isFinite(minValue) || !Double.isFinite(maxValue)) {
-            return 0.0;
+            return BandResolution.none();
         }
         double span = maxValue - minValue;
         if (span <= 0.0) {
-            return 0.0;
+            return BandResolution.none();
         }
         double percent = clamp(((currentValue - minValue) / span) * 100.0, 0.0, 100.0);
         TwHappinessConfig.NeedBandSettings band = findBand(modifierSettings, percent);
         if (band == null) {
-            return 0.0;
+            return BandResolution.none();
         }
         double offset = band.getOffset();
         if (!Double.isFinite(offset) || Math.abs(offset) <= PERCENT_EPSILON) {
-            return 0.0;
+            return new BandResolution(0.0, band.hasCareBonus());
         }
         double adjustedOffset = applyDispositionToOffset(offset, dispositionMultiplier);
         if (Math.abs(adjustedOffset) <= PERCENT_EPSILON) {
-            return 0.0;
+            return new BandResolution(0.0, band.hasCareBonus());
         }
         String suffix = band.getLabel();
         if (suffix == null || suffix.isBlank()) {
@@ -227,11 +251,15 @@ public final class CompanionHappinessModifierService {
         String entryId = idPrefix + "_" + normalizeToken(suffix);
         String entryLabel = labelPrefix + ": " + suffix;
         outModifiers.add(new ModifierEntry(entryId, entryLabel, adjustedOffset));
-        return adjustedOffset;
+        return new BandResolution(adjustedOffset, band.hasCareBonus());
     }
 
     private static double resolveDispositionMultiplier(@Nullable Ref<EntityStore> npcRef,
-                                                       @Nullable Store<EntityStore> store) {
+                                                       @Nullable Store<EntityStore> store,
+                                                       @Nonnull TwHappinessConfig happinessConfig) {
+        if (happinessConfig.getDisposition().getMode() == TwHappinessConfig.DispositionMode.FLAT) {
+            return 1.0;
+        }
         double traitMultiplier = CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,
                 store,
@@ -247,6 +275,52 @@ public final class CompanionHappinessModifierService {
         );
         double multiplier = traitMultiplier * husbandryModifiers.happinessDispositionMultiplier();
         return sanitizeDispositionMultiplier(multiplier);
+    }
+
+    public static double resolveFlatDispositionOffset(@Nullable Ref<EntityStore> npcRef,
+                                                      @Nullable Store<EntityStore> store,
+                                                      @Nonnull TwHappinessConfig.DispositionSettings settings) {
+        double traitScore = TraitModifierService.resolveMultiplier(npcRef, store, "HappinessGainMultiplier", 1.0);
+        return resolveFlatDispositionOffset(traitScore, settings);
+    }
+
+    public static double resolveFlatDispositionOffset(double traitScore,
+                                                      @Nonnull TwHappinessConfig.DispositionSettings settings) {
+        if (!Double.isFinite(traitScore)) {
+            traitScore = settings.getTraitNeutral();
+        }
+        double traitMin = settings.getTraitMin();
+        double neutral = settings.getTraitNeutral();
+        double traitMax = settings.getTraitMax();
+        if (traitScore <= traitMin) {
+            return settings.getMinOffset();
+        }
+        if (traitScore >= traitMax) {
+            return settings.getMaxOffset();
+        }
+        if (traitScore <= neutral) {
+            return interpolate(traitScore, traitMin, neutral, settings.getMinOffset(), 0.0);
+        }
+        return interpolate(traitScore, neutral, traitMax, 0.0, settings.getMaxOffset());
+    }
+
+    private static double interpolate(double value, double min, double max, double minValue, double maxValue) {
+        if (max <= min) {
+            return minValue;
+        }
+        return minValue + (value - min) / (max - min) * (maxValue - minValue);
+    }
+
+    private static double addCareBonus(@Nonnull String id,
+                                       @Nonnull String label,
+                                       boolean eligible,
+                                       double bonus,
+                                       @Nonnull List<ModifierEntry> outModifiers) {
+        if (!eligible || !Double.isFinite(bonus) || Math.abs(bonus) <= PERCENT_EPSILON) {
+            return 0.0;
+        }
+        outModifiers.add(new ModifierEntry(id, label, bonus));
+        return bonus;
     }
 
     static double applyDispositionToOffset(double offset, double dispositionMultiplier) {
@@ -398,6 +472,12 @@ public final class CompanionHappinessModifierService {
      * Effective base/target snapshot used by happiness updates and UI presentation.
      */
     public record ModifierSnapshot(double baseSetpoint, double target, List<ModifierEntry> modifiers) {
+    }
+
+    private record BandResolution(double offset, boolean careBonus) {
+        private static BandResolution none() {
+            return new BandResolution(0.0, false);
+        }
     }
 
 }

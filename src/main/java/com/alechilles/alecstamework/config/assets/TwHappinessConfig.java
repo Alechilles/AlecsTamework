@@ -134,6 +134,52 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
                 + "Each param should resolve to item IDs. Inheritance: explicit map replaces parent map (no merge); "
                 + "omitted map inherits parent map.")
         .add()
+        .<Boolean>append(
+            new KeyedCodec<>("SingleFoodEffect", Codec.BOOLEAN),
+            (settings, value) -> settings.singleFoodEffect = value != null && value,
+            settings -> settings.singleFoodEffect
+        )
+        .documentation("When true, each newly consumed food replaces the active food-consumption happiness effect. "
+                + "Hand-feeding, petting, and damage effects remain independent.")
+        .add()
+        .build();
+
+    private static final BuilderCodec<DispositionSettings> DISPOSITION_CODEC = BuilderCodec.builder(
+            DispositionSettings.class,
+            DispositionSettings::new
+    )
+        .<String>append(
+            new KeyedCodec<>("Mode", Codec.STRING),
+            (settings, value) -> settings.mode = value,
+            settings -> settings.mode
+        )
+        .documentation("MULTIPLIER preserves legacy trait scaling. FLAT maps the trait score to a fixed mood-target offset.")
+        .add()
+        .<Double>append(new KeyedCodec<>("TraitMin", Codec.DOUBLE),
+            (settings, value) -> settings.traitMin = value,
+            settings -> settings.traitMin)
+        .documentation("Trait score that maps to MinOffset in FLAT mode.")
+        .add()
+        .<Double>append(new KeyedCodec<>("TraitNeutral", Codec.DOUBLE),
+            (settings, value) -> settings.traitNeutral = value,
+            settings -> settings.traitNeutral)
+        .documentation("Trait score that maps to zero in FLAT mode.")
+        .add()
+        .<Double>append(new KeyedCodec<>("TraitMax", Codec.DOUBLE),
+            (settings, value) -> settings.traitMax = value,
+            settings -> settings.traitMax)
+        .documentation("Trait score that maps to MaxOffset in FLAT mode.")
+        .add()
+        .<Double>append(new KeyedCodec<>("MinOffset", Codec.DOUBLE),
+            (settings, value) -> settings.minOffset = value,
+            settings -> settings.minOffset)
+        .documentation("Mood-target offset at or below TraitMin in FLAT mode.")
+        .add()
+        .<Double>append(new KeyedCodec<>("MaxOffset", Codec.DOUBLE),
+            (settings, value) -> settings.maxOffset = value,
+            settings -> settings.maxOffset)
+        .documentation("Mood-target offset at or above TraitMax in FLAT mode.")
+        .add()
         .build();
 
     private static final BuilderCodec<NeedBandSettings> NEED_BAND_CODEC = BuilderCodec.builder(
@@ -174,6 +220,13 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             settings -> settings.offset
         )
         .documentation("Value offset contributed by this entry.")
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("CareBonus", Codec.BOOLEAN),
+            (settings, value) -> settings.careBonus = value != null && value,
+            settings -> settings.careBonus
+        )
+        .documentation("Allows the matching husbandry care bonus even when this band's offset is zero.")
         .add()
         .build();
 
@@ -238,6 +291,13 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             settings -> settings.offset
         )
         .documentation("Value offset contributed by this entry.")
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("CareBonus", Codec.BOOLEAN),
+            (settings, value) -> settings.careBonus = value != null && value,
+            settings -> settings.careBonus
+        )
+        .documentation("Allows the matching husbandry care bonus even when this band's offset is zero.")
         .add()
         .build();
 
@@ -353,6 +413,14 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
         .documentation("Equilibrium convergence settings. Inheritance: omitted section inherits from parent; when "
                 + "present, only explicitly defined nested fields override parent.")
         .add()
+        .<DispositionSettings>append(
+            new KeyedCodec<>("Disposition", DISPOSITION_CODEC),
+            (asset, value) -> asset.disposition = value == null ? new DispositionSettings() : value,
+            asset -> asset.disposition
+        )
+        .documentation("Trait disposition policy. Inheritance: omitted section inherits from parent; when present, "
+                + "only explicitly defined nested fields override parent.")
+        .add()
         .<ImpulseSettings>append(
             new KeyedCodec<>("Impulses", IMPULSE_CODEC),
             (asset, value) -> asset.impulses = value == null ? new ImpulseSettings() : value,
@@ -385,6 +453,7 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
     private String[] roleIds = ArrayUtil.EMPTY_STRING_ARRAY;
     private ValueSettings values = new ValueSettings();
     private EquilibriumSettings equilibrium = new EquilibriumSettings();
+    private DispositionSettings disposition = new DispositionSettings();
     private ImpulseSettings impulses = new ImpulseSettings();
     private ModifierSettings modifiers = new ModifierSettings();
 
@@ -598,6 +667,11 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
         } else {
             inheritEquilibriumSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Equilibrium"));
         }
+        if (!explicitTopLevelKeys.contains("Disposition")) {
+            disposition = parent.disposition;
+        } else {
+            inheritDispositionSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Disposition"));
+        }
         if (!explicitTopLevelKeys.contains("Impulses")) {
             impulses = parent.impulses;
         } else {
@@ -671,6 +745,28 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
         if (!nestedExplicitKeys.contains("FeedParamImpulses")) {
             impulses.feedParamImpulses = parent.impulses.feedParamImpulses;
         }
+        if (!nestedExplicitKeys.contains("SingleFoodEffect")) {
+            impulses.singleFoodEffect = parent.impulses.singleFoodEffect;
+        }
+    }
+
+    private void inheritDispositionSection(@Nonnull TwHappinessConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (disposition == null) {
+            disposition = parent.disposition;
+            return;
+        }
+        if (parent.disposition == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("Mode")) disposition.mode = parent.disposition.mode;
+        if (!nestedExplicitKeys.contains("TraitMin")) disposition.traitMin = parent.disposition.traitMin;
+        if (!nestedExplicitKeys.contains("TraitNeutral")) disposition.traitNeutral = parent.disposition.traitNeutral;
+        if (!nestedExplicitKeys.contains("TraitMax")) disposition.traitMax = parent.disposition.traitMax;
+        if (!nestedExplicitKeys.contains("MinOffset")) disposition.minOffset = parent.disposition.minOffset;
+        if (!nestedExplicitKeys.contains("MaxOffset")) disposition.maxOffset = parent.disposition.maxOffset;
     }
 
     private void inheritModifiersSection(@Nonnull TwHappinessConfig parent, @Nullable Set<String> nestedExplicitKeys) {
@@ -793,6 +889,10 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
         return equilibrium == null ? new EquilibriumSettings() : equilibrium;
     }
 
+    public DispositionSettings getDisposition() {
+        return disposition == null ? new DispositionSettings() : disposition;
+    }
+
     public ImpulseSettings getImpulses() {
         return impulses == null ? new ImpulseSettings() : impulses;
     }
@@ -859,6 +959,7 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
         private double loseOnDamage = 10.0;
         private Map<String, Double> feedItemImpulses = Map.of();
         private Map<String, Double> feedParamImpulses = Map.of();
+        private boolean singleFoodEffect;
 
         public double getGainOnFeed() {
             if (!Double.isFinite(gainOnFeed)) {
@@ -905,6 +1006,10 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             return normalizeImpulseMap(feedParamImpulses, false);
         }
 
+        public boolean isSingleFoodEffect() {
+            return singleFoodEffect;
+        }
+
         @Nonnull
         private static Map<String, Double> normalizeImpulseMap(@Nullable Map<String, Double> rawValues,
                                                                boolean lowercaseKeys) {
@@ -930,6 +1035,55 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             }
             return normalized;
         }
+    }
+
+    /** Trait disposition policy for legacy multiplier and opt-in flat target behavior. */
+    public static final class DispositionSettings {
+        private static final double DEFAULT_TRAIT_MIN = 0.75;
+        private static final double DEFAULT_TRAIT_NEUTRAL = 1.0;
+        private static final double DEFAULT_TRAIT_MAX = 1.3;
+        private static final double DEFAULT_MIN_OFFSET = -10.0;
+        private static final double DEFAULT_MAX_OFFSET = 10.0;
+        private String mode = "MULTIPLIER";
+        private double traitMin = DEFAULT_TRAIT_MIN;
+        private double traitNeutral = DEFAULT_TRAIT_NEUTRAL;
+        private double traitMax = DEFAULT_TRAIT_MAX;
+        private double minOffset = DEFAULT_MIN_OFFSET;
+        private double maxOffset = DEFAULT_MAX_OFFSET;
+
+        public DispositionMode getMode() {
+            return "FLAT".equalsIgnoreCase(mode) ? DispositionMode.FLAT : DispositionMode.MULTIPLIER;
+        }
+
+        public double getTraitMin() {
+            return validRange() ? traitMin : DEFAULT_TRAIT_MIN;
+        }
+
+        public double getTraitNeutral() {
+            return validRange() ? traitNeutral : DEFAULT_TRAIT_NEUTRAL;
+        }
+
+        public double getTraitMax() {
+            return validRange() ? traitMax : DEFAULT_TRAIT_MAX;
+        }
+
+        public double getMinOffset() {
+            return Double.isFinite(minOffset) ? minOffset : DEFAULT_MIN_OFFSET;
+        }
+
+        public double getMaxOffset() {
+            return Double.isFinite(maxOffset) ? maxOffset : DEFAULT_MAX_OFFSET;
+        }
+
+        private boolean validRange() {
+            return Double.isFinite(traitMin) && Double.isFinite(traitNeutral) && Double.isFinite(traitMax)
+                    && traitMin < traitNeutral && traitNeutral < traitMax;
+        }
+    }
+
+    public enum DispositionMode {
+        MULTIPLIER,
+        FLAT
     }
 
     /** Active modifier groups that offset equilibrium target happiness. */
@@ -1002,6 +1156,7 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
         private int minCount;
         private int maxCount = -1;
         private double offset;
+        private boolean careBonus;
 
         public String getId() {
             return id;
@@ -1028,6 +1183,10 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             }
             return offset;
         }
+
+        public boolean hasCareBonus() {
+            return careBonus;
+        }
     }
 
     /** One percentage band contributing an offset to equilibrium target. */
@@ -1037,6 +1196,7 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
         private double minPercent;
         private double maxPercent = 100.0;
         private double offset;
+        private boolean careBonus;
 
         public String getId() {
             return id;
@@ -1065,6 +1225,10 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
                 return 0.0;
             }
             return offset;
+        }
+
+        public boolean hasCareBonus() {
+            return careBonus;
         }
     }
 
