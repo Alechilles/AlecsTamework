@@ -205,8 +205,8 @@ final class LinkedNpcPanelProgressionBinder {
                     TraitModifierService.resolveMultiplier(traits, traitConfig, "HappinessGainMultiplier", 1.0),
                     happiness.getDisposition()) : 0.0;
             lines.add(String.format(Locale.ROOT,
-                    "Happiness: %+.1f points (Attitude: %+.1f points; Talents: %+.1f points)",
-                    attitude + happinessTalents, attitude, happinessTalents));
+                    "Happiness: %+d - [+0 / %+d / %+d]",
+                    Math.round(attitude + happinessTalents), Math.round(happinessTalents), Math.round(attitude)));
         }
         return String.join("\n", lines);
     }

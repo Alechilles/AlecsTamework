@@ -17,10 +17,10 @@ class CommandLinkedPanelProgressionPresentationServiceTest {
                                 "HappinessGainMultiplier", 1.3, 1.0, 1.0, 1.3),
                         new CompanionProgressionModifierBreakdownService.ModifierBreakdown(
                                 "HappinessFlatBonus", 4.0, 1.0, 4.0, 1.0)),
-                0.0, 0.0, "en-US", 8.0, 3.0);
+                0.0, 0.0, "en-US", 8.2, 3.1);
 
         assertEquals("Modifiers: Total - [Level - Talents - Traits]\n"
-                + "Happiness: +11.00 points (Attitude: +8.00 points; Talents: +3.00 points)", tooltip);
+                + "Happiness: +11 - [+0 / +3 / +8]", tooltip);
     }
 
     @Test

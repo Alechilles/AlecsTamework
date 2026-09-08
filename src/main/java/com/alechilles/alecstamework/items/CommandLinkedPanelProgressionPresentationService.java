@@ -139,9 +139,9 @@ final class CommandLinkedPanelProgressionPresentationService {
         }
         if (attitude != null || Math.abs(happinessTalents) > EPSILON) {
             double traitBonus = attitude == null ? 0.0 : attitude;
-            lines.add("Happiness: " + formatSignedPoints(traitBonus + happinessTalents)
-                    + " (Attitude: " + formatSignedPoints(traitBonus)
-                    + "; Talents: " + formatSignedPoints(happinessTalents) + ")");
+            lines.add(String.format(Locale.ROOT, "Happiness: %+d - [+0 / %+d / %+d]",
+                    Math.round(traitBonus + happinessTalents),
+                    Math.round(happinessTalents), Math.round(traitBonus)));
         }
         return lines.size() == 1 ? null : String.join("\n", lines);
     }
