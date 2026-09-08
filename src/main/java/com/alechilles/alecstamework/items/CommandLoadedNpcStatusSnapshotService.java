@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
@@ -129,6 +130,7 @@ final class CommandLoadedNpcStatusSnapshotService {
                 npcRef,
                 store,
                 language,
+                resolvedRoleId,
                 resolvedOptions.includeHappinessBreakdown()
         );
         if (happinessSnapshot != null) {
@@ -311,6 +313,13 @@ final class CommandLoadedNpcStatusSnapshotService {
     @Nullable
     String buildHappinessModifierBreakdown(CompanionHappinessService.HappinessSnapshot snapshot,
                                            @Nullable String language) {
+        return buildHappinessModifierBreakdown(snapshot, language, null);
+    }
+
+    @Nullable
+    String buildHappinessModifierBreakdown(CompanionHappinessService.HappinessSnapshot snapshot,
+                                           @Nullable String language,
+                                           @Nullable TwFoodConfig.ResolvedFoodProfile foodProfile) {
         if (snapshot == null) {
             return null;
         }
@@ -344,7 +353,7 @@ final class CommandLoadedNpcStatusSnapshotService {
             if (Math.abs(activeImpulse.value()) <= 0.000001) {
                 continue;
             }
-            String label = resolveImpulseLabel(activeImpulse, language);
+            String label = resolveImpulseLabel(activeImpulse, language, foodProfile);
             impulseLines.add(label + ": " + formatSigned(activeImpulse.value()));
         }
 
@@ -398,6 +407,7 @@ final class CommandLoadedNpcStatusSnapshotService {
     private HappinessSnapshot readNpcHappinessSnapshot(Ref<EntityStore> npcRef,
                                                        Store<EntityStore> store,
                                                        @Nullable String language,
+                                                       @Nullable String roleId,
                                                        boolean includeModifierBreakdown) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return null;
@@ -411,7 +421,8 @@ final class CommandLoadedNpcStatusSnapshotService {
         int roundedMax = Math.max(1, Math.round((float) max));
         int roundedValue = Math.max(0, Math.min(roundedMax, Math.round((float) value)));
         int targetPercent = computePercent(snapshot.target(), snapshot.min(), snapshot.max());
-        String modifierBreakdown = includeModifierBreakdown ? buildHappinessModifierBreakdown(snapshot, language) : null;
+        String modifierBreakdown = includeModifierBreakdown
+                ? buildHappinessModifierBreakdown(snapshot, language, TwFoodConfig.resolveProfileForRole(roleId)) : null;
         return new HappinessSnapshot(roundedValue, roundedMax, targetPercent, modifierBreakdown);
     }
 
@@ -451,18 +462,34 @@ final class CommandLoadedNpcStatusSnapshotService {
     }
 
     private String resolveImpulseLabel(CompanionHappinessService.ActiveImpulseSnapshot activeImpulse,
-                                       @Nullable String language) {
+                                       @Nullable String language,
+                                       @Nullable TwFoodConfig.ResolvedFoodProfile foodProfile) {
         String key = normalize(activeImpulse.key());
         if ("feed:hand".equals(key)) {
             return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.impulse.handFed");
         }
         if (key != null && key.startsWith("feed:")) {
-            String itemName = resolveItemDisplayName(language, activeImpulse.itemId());
-            return LocalizedText.format(
-                    language,
-                    "tamework.ui.linkedPanel.happiness.impulse.ate",
-                    itemName
-            );
+            String category = switch (key) {
+                case "feed:param:foodpremium" -> "premiumFeed";
+                case "feed:param:foodfavorite", "feed:param:foodpreferred" -> "favoriteFood";
+                case "feed:param:foodgeneric" -> "genericFeed";
+                case "feed:param:fooddisliked" -> "dislikedFood";
+                default -> "food";
+            };
+            if (foodProfile != null && activeImpulse.itemId() != null) {
+                for (TwFoodConfig.FoodEntry entry : foodProfile.displayEntries(true)) {
+                    if (entry.itemId().equalsIgnoreCase(activeImpulse.itemId().trim())) {
+                        category = switch (entry.category()) {
+                            case Premium -> "premiumFeed";
+                            case Preferred -> "favoriteFood";
+                            case Compatible -> "genericFeed";
+                            case Disliked -> "dislikedFood";
+                        };
+                        break;
+                    }
+                }
+            }
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.impulse." + category);
         }
         if ("pet".equals(key)) {
             return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.impulse.petted");
