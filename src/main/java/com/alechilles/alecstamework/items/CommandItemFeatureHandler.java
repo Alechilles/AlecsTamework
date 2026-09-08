@@ -354,7 +354,8 @@ public final class CommandItemFeatureHandler {
                 registry,
                 linkMutationService,
                 feedbackService,
-                npcNameResolver
+                npcNameResolver,
+                persistence
         );
         this.menuMoveService = new CommandMenuMoveService(
                 resolutionService,
@@ -780,6 +781,14 @@ public final class CommandItemFeatureHandler {
         ownerReleaseService.release(
                 player, toolId, config, presentationUuid
         );
+    }
+
+    /** Routes item culling through the same durable release path as command culling. */
+    public boolean cullFromItemInteraction(Player player, Ref<EntityStore> target,
+                                          Store<EntityStore> store,
+                                          boolean requireOwner, boolean requireTamed) {
+        return ownerCullService.cullFromItemInteraction(
+                player, target, store, requireOwner, requireTamed);
     }
 
     private void applyMenuCull(Player player,

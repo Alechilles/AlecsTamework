@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Fixed culling leaving saved animals counted against population limits. Owned
+  animals are permanently released from saved population tracking before
+  slaughter completes, without creating a revivable companion.
 - Added opt-in flat disposition, additive happiness talents, conditional Care
   happiness providers and single-food-effect replacement. Existing trait scores,
   talent purchases and effect deadlines are preserved; packs that do not opt in

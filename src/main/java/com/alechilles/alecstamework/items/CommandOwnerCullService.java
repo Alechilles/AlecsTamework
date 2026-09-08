@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
+import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -26,13 +27,33 @@ final class CommandOwnerCullService {
                             CommandLinkMutationService linkMutationService,
                             CommandFeedbackService feedbackService,
                             CommandNpcNameResolver npcNameResolver) {
+        this(linkPolicyService, registry, linkMutationService, feedbackService,
+                npcNameResolver, null);
+    }
+
+    CommandOwnerCullService(CommandLinkPolicyService linkPolicyService,
+                            CommandItemRegistry registry,
+                            CommandLinkMutationService linkMutationService,
+                            CommandFeedbackService feedbackService,
+                            CommandNpcNameResolver npcNameResolver,
+                            @Nullable PersistenceDomainFacades persistence) {
         this.cullService = new TameworkNpcCullService(
                 new TameworkCullEligibility(linkPolicyService),
                 registry,
-                linkMutationService
+                linkMutationService,
+                persistence
         );
         this.feedbackService = feedbackService;
         this.npcNameResolver = npcNameResolver;
+    }
+
+    boolean cullFromItemInteraction(Player player, Ref<EntityStore> target,
+                                   Store<EntityStore> store,
+                                   boolean requireOwner, boolean requireTamed) {
+        TameworkNpcCullService.Outcome outcome = cullService.cullWithManagedRewards(
+                player, target, store, requireOwner, requireTamed);
+        return outcome == TameworkNpcCullService.Outcome.CULLED
+                || outcome == TameworkNpcCullService.Outcome.QUEUED;
     }
 
     void cull(@Nullable Player player,
@@ -57,8 +78,10 @@ final class CommandOwnerCullService {
             warn(player, "tamework.ui.notifications.command.cull.ownedNearbyOnly");
             return;
         }
-        if (outcome != TameworkNpcCullService.Outcome.CULLED
-                && outcome != TameworkNpcCullService.Outcome.QUEUED) {
+        if (outcome == TameworkNpcCullService.Outcome.QUEUED) {
+            return;
+        }
+        if (outcome != TameworkNpcCullService.Outcome.CULLED) {
             warn(player, "tamework.ui.notifications.command.cull.unavailable");
             return;
         }

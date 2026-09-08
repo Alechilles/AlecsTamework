@@ -42,6 +42,8 @@ import com.hypixel.hytale.protocol.io.ChannelConnection;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -261,7 +263,11 @@ class CommandGenericTargetAuthorityTest {
                     new TameworkCullEligibility(new CommandLinkPolicyService()),
                     new CommandItemRegistry(),
                     new CommandLinkMutationService(null,
-                            new CommandLinkPolicyService(), null, null));
+                            new CommandLinkPolicyService(), null, null),
+                    null,
+                    (ownerUuid, npcUuid) -> CompletableFuture.completedFuture(
+                            CullTerminalOwnerReleaseService.Outcome.RELEASED
+                    ));
 
             assertEquals(TameworkNpcCullService.Outcome.DENIED,
                     service.cull(target.player, target.reference, scope.store,
@@ -295,6 +301,15 @@ class CommandGenericTargetAuthorityTest {
     @Test
     void reusableCullUnlinksTargetBeforeDeathCanPersistIt()
             throws Exception {
+        for (var terminalOutcome : new CullTerminalOwnerReleaseService.Outcome[] {
+                CullTerminalOwnerReleaseService.Outcome.RELEASED,
+                CullTerminalOwnerReleaseService.Outcome.NOT_TRACKED}) {
+            assertCullUnlinksBeforeDeath(terminalOutcome);
+        }
+    }
+
+    private void assertCullUnlinksBeforeDeath(
+            CullTerminalOwnerReleaseService.Outcome terminalOutcome) throws Exception {
         try (ProjectionScope scope = ProjectionScope.install()) {
             LiveTarget target = scope.liveOrdinaryTarget(true);
             scope.store.removeComponent(target.reference, scope.markerType);
@@ -304,22 +319,55 @@ class CommandGenericTargetAuthorityTest {
                     new TameworkCullEligibility(new CommandLinkPolicyService()),
                     new CommandItemRegistry(),
                     new CommandLinkMutationService(null,
-                            new CommandLinkPolicyService(), null, null));
+                            new CommandLinkPolicyService(), null, null),
+                    null,
+                    (ownerUuid, npcUuid) -> CompletableFuture.completedFuture(
+                            terminalOutcome
+                    ));
 
             try {
-                try {
-                    service.cull(target.player, target.reference, scope.store,
-                            true, true);
-                } catch (NullPointerException fixtureOnlyDamageCauseFailure) {
-                    // The bare ECS fixture has no DamageCause asset store.
-                    assertTrue(fixtureOnlyDamageCauseFailure.getStackTrace()[0]
-                            .getClassName().equals(DamageCause.class.getName()));
-                }
+                assertEquals(TameworkNpcCullService.Outcome.QUEUED,
+                        service.cull(target.player, target.reference,
+                                scope.store, true, true));
                 assertEquals(null, scope.store.getComponent(target.reference,
                         scope.linksType));
             } finally {
                 DamageCause.COMMAND = previousCommandCause;
             }
+        }
+    }
+
+    /**
+     * Regression: an owned cull must not remove the live persistence marker
+     * until the terminal owner clear has durably released its capacity slot.
+     */
+    @Test
+    void ownedCullLeavesTargetUntouchedWhenTerminalReleaseIsUnavailable()
+            throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            LiveTarget target = scope.liveOrdinaryTarget(true);
+            scope.store.removeComponent(target.reference, scope.markerType);
+            AtomicBoolean releaseAttempted = new AtomicBoolean();
+            TameworkNpcCullService service = new TameworkNpcCullService(
+                    new TameworkCullEligibility(new CommandLinkPolicyService()),
+                    new CommandItemRegistry(),
+                    new CommandLinkMutationService(null,
+                            new CommandLinkPolicyService(), null, null),
+                    null,
+                    (ownerUuid, npcUuid) -> {
+                        releaseAttempted.set(true);
+                        return CompletableFuture.completedFuture(
+                                CullTerminalOwnerReleaseService.Outcome.UNAVAILABLE
+                        );
+                    }
+            );
+
+            assertEquals(TameworkNpcCullService.Outcome.QUEUED,
+                    service.cull(target.player, target.reference, scope.store,
+                            true, true));
+            assertTrue(releaseAttempted.get());
+            assertTrue(scope.store.getComponent(target.reference,
+                    scope.linksType).containsToolId("generic-tool"));
         }
     }
 
@@ -1098,6 +1146,16 @@ class CommandGenericTargetAuthorityTest {
         @Override
         public EntityStore getEntityStore() {
             return entityStore;
+        }
+
+        @Override
+        public boolean isAlive() {
+            return true;
+        }
+
+        @Override
+        public void execute(Runnable task) {
+            task.run();
         }
 
         @Override
