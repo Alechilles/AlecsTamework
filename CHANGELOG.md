@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Command HUD, companion-card and settings tooltips use the game's default
+  tooltip style. The command HUD uses the native panel frame, and happiness
+  tooltips combine active Care bonuses into one Caretaking total.
 - Renamed the visible Disposition trait to Attitude. Level tooltips now show
   flat happiness contributions in points instead of percentages, including
   separate Attitude and talent amounts. Saved trait IDs remain unchanged.

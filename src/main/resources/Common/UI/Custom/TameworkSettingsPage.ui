@@ -1,11 +1,6 @@
 $C = "Common.ui";
 
-@SettingsLabelTooltipStyle = TextTooltipStyle(
-  Background: #0f1e30(0.96),
-  MaxWidth: 280,
-  LabelStyle: (Wrap: true, FontSize: 13, TextColor: #eef4fb),
-  Padding: 12
-);
+@SettingsLabelTooltipStyle = $C.@DefaultTextTooltipStyle;
 
 @SettingsLabelTooltipButtonStyle = TextButtonStyle(
   Default: (Background: (Color: #00000000), LabelStyle: (FontSize: 1, TextColor: #00000000)),

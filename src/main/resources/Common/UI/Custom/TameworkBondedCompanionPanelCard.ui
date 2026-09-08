@@ -8,7 +8,7 @@ $C = "Common.ui";
 @BondedCardDangerButtonStyle = TextButtonStyle(Default: (Background: (Color: #7a2d36), LabelStyle: @BondedCardButtonLabel), Hovered: (Background: (Color: #9b3c46), LabelStyle: @BondedCardButtonLabel), Pressed: (Background: (Color: #5d2028), LabelStyle: @BondedCardButtonLabel), Disabled: (Background: (Color: #7a2d36), LabelStyle: @BondedCardButtonLabel), Sounds: $C.@ButtonSounds);
 @BondedCardDangerIconLabel = LabelStyle(FontSize: 16, RenderBold: true, TextColor: #dc727a, HorizontalAlignment: Center, VerticalAlignment: Center);
 @BondedCardDangerIconStyle = TextButtonStyle(Default: (Background: (Color: #000000(0.0)), LabelStyle: @BondedCardDangerIconLabel), Hovered: (Background: (Color: #702b34(0.42)), LabelStyle: @BondedCardDangerIconLabel), Pressed: (Background: (Color: #9b3c46(0.58)), LabelStyle: @BondedCardDangerIconLabel), Disabled: (Background: (Color: #000000(0.0)), LabelStyle: @BondedCardDangerIconLabel), Sounds: $C.@ButtonSounds);
-@BondedCardTextTooltipStyle = TextTooltipStyle(Background: #0f1e30(0.96), MaxWidth: 280, LabelStyle: (Wrap: true, FontSize: 14, TextColor: #eef4fb), Padding: 12);
+@BondedCardTextTooltipStyle = $C.@DefaultTextTooltipStyle;
 @BondedTransparentButtonLabel = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
 @BondedTransparentButton = TextButtonStyle(Default: (Background: (Color: #000000(0.0)), LabelStyle: @BondedTransparentButtonLabel), Hovered: (Background: (Color: #ffffff(0.06)), LabelStyle: @BondedTransparentButtonLabel), Pressed: (Background: (Color: #ffffff(0.12)), LabelStyle: @BondedTransparentButtonLabel), Disabled: (Background: (Color: #000000(0.0)), LabelStyle: @BondedTransparentButtonLabel), Sounds: $C.@ButtonSounds);
 

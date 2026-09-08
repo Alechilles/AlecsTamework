@@ -357,6 +357,7 @@ tamework.talents.bountiful.description=Improves harvest bonus chances.
 
 # ===== Tamework Config Text: Traits =====
 tamework.traits.disposition.name=Attitude
+tamework.ui.linkedPanel.happiness.modifier.caretaking=Caretaking
 tamework.traits.fertility.name=Fertility
 tamework.traits.health.name=Health
 tamework.traits.size.name=Size

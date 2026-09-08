@@ -2,13 +2,12 @@ $C = "Common.ui";
 
 @HudTooltipLabelStyle = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
 @HudTooltipButtonStyle = TextButtonStyle(Default: (Background: (Color: #000000(0.0)), LabelStyle: @HudTooltipLabelStyle), Hovered: (Background: (Color: #000000(0.0)), LabelStyle: @HudTooltipLabelStyle), Pressed: (Background: (Color: #000000(0.0)), LabelStyle: @HudTooltipLabelStyle), Disabled: (Background: (Color: #000000(0.0)), LabelStyle: @HudTooltipLabelStyle), Sounds: $C.@ButtonSounds);
-@HudTooltipStyle = TextTooltipStyle(Background: #0f1e30(0.96), MaxWidth: 300, LabelStyle: (Wrap: true, FontSize: 13, TextColor: #eef4fb), Padding: 10);
+@HudTooltipStyle = $C.@DefaultTextTooltipStyle;
 @FoodItemGridStyle = ItemGridStyle(SlotSize: 28, SlotSpacing: 0, SlotIconSize: 28);
 @CompatibleFoodItemGridStyle = ItemGridStyle(SlotSize: 28, SlotSpacing: 0, SlotIconSize: 28);
 
-Group #Root {
+$C.@Panel #Root {
     Anchor: (Top: 218, Right: 26, Width: 252, Height: 294);
-    Background: #081220(0.82);
     Padding: (Left: 10, Right: 10, Top: 10, Bottom: 10);
     Visible: false;
 

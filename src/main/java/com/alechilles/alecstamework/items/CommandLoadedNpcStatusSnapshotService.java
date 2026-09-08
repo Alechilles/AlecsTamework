@@ -315,6 +315,7 @@ final class CommandLoadedNpcStatusSnapshotService {
             return null;
         }
         ArrayList<String> modifierLines = new ArrayList<>();
+        double caretaking = 0.0;
         for (CompanionHappinessModifierService.ModifierEntry modifier : snapshot.modifiers()) {
             if (modifier == null || !Double.isFinite(modifier.value())) {
                 continue;
@@ -322,8 +323,17 @@ final class CommandLoadedNpcStatusSnapshotService {
             if (Math.abs(modifier.value()) <= 0.000001) {
                 continue;
             }
+            if ("hunger_care".equals(modifier.id()) || "thirst_care".equals(modifier.id())
+                    || "population_care".equals(modifier.id())) {
+                caretaking += modifier.value();
+                continue;
+            }
             String label = resolveModifierLabel(modifier, language);
             modifierLines.add(label + ": " + formatSigned(modifier.value()));
+        }
+        if (Math.abs(caretaking) > 0.000001) {
+            modifierLines.add(LocalizedText.resolve(language,
+                    "tamework.ui.linkedPanel.happiness.modifier.caretaking") + ": " + formatSigned(caretaking));
         }
 
         ArrayList<String> impulseLines = new ArrayList<>();
