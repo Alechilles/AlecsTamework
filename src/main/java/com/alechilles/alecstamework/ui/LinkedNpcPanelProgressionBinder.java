@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
+import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
+import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
@@ -163,7 +165,16 @@ final class LinkedNpcPanelProgressionBinder {
         }
         List<CompanionProgressionModifierBreakdownService.ModifierBreakdown> breakdowns =
                 new ArrayList<>();
+        TwHappinessConfig happiness = TwHappinessConfig.resolveForRole(roleId);
+        boolean flatAttitude = happiness != null
+                && happiness.getDisposition().getMode() == TwHappinessConfig.DispositionMode.FLAT;
+        double happinessTalents = CompanionTalentService.resolvePurchasedEffectAmount(
+                talentConfig, talentIds, "HappinessFlatBonus");
         for (String effectKey : effectKeys) {
+            if ("HappinessFlatBonus".equalsIgnoreCase(effectKey)
+                    || (flatAttitude && "HappinessGainMultiplier".equalsIgnoreCase(effectKey))) {
+                continue;
+            }
             double levelMultiplier = resolveLevelMultiplier(config, level, effectKey);
             double talentMultiplier = CompanionTalentService.resolvePurchasedEffectMultiplier(
                     talentConfig, talentIds, effectKey, 1.0);
@@ -178,7 +189,7 @@ final class LinkedNpcPanelProgressionBinder {
                     effectKey, totalMultiplier, levelMultiplier,
                     talentMultiplier, traitMultiplier));
         }
-        if (breakdowns.isEmpty()) {
+        if (breakdowns.isEmpty() && !flatAttitude && Math.abs(happinessTalents) <= EPSILON) {
             return null;
         }
         String headerKey = "tamework.ui.linkedPanel.progression.modifiersBreakdown";
@@ -188,6 +199,14 @@ final class LinkedNpcPanelProgressionBinder {
                 ? "Modifiers: Total - [Level - Talents - Traits]" : header);
         for (CompanionProgressionModifierBreakdownService.ModifierBreakdown breakdown : breakdowns) {
             lines.add(formatModifierLine(breakdown, currentMaxHealth, language));
+        }
+        if (flatAttitude || Math.abs(happinessTalents) > EPSILON) {
+            double attitude = flatAttitude ? CompanionHappinessModifierService.resolveFlatDispositionOffset(
+                    TraitModifierService.resolveMultiplier(traits, traitConfig, "HappinessGainMultiplier", 1.0),
+                    happiness.getDisposition()) : 0.0;
+            lines.add(String.format(Locale.ROOT,
+                    "Happiness: %+.1f points (Attitude: %+.1f points; Talents: %+.1f points)",
+                    attitude + happinessTalents, attitude, happinessTalents));
         }
         return String.join("\n", lines);
     }

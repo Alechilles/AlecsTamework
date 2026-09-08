@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
+import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierBreakdownService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
@@ -86,14 +87,19 @@ final class CommandLinkedPanelProgressionPresentationService {
                         store,
                         CompanionRoleIdResolver.resolveRoleId(npcRef, store)
                 );
-        if (breakdowns.isEmpty()) {
-            return null;
-        }
+        TwHappinessConfig happiness = TwHappinessConfig.resolveForRole(
+                CompanionRoleIdResolver.resolveRoleId(npcRef, store));
+        Double attitude = happiness != null
+                && happiness.getDisposition().getMode() == TwHappinessConfig.DispositionMode.FLAT
+                ? CompanionHappinessModifierService.resolveFlatDispositionOffset(
+                        npcRef, store, happiness.getDisposition()) : null;
         return buildModifierTooltip(
                 breakdowns,
                 resolveBaseHealth(npc),
                 resolveBaseSpeed(npc),
-                language
+                language,
+                attitude,
+                CompanionTalentService.resolvePurchasedEffectAmount(npcRef, store, "HappinessFlatBonus")
         );
     }
 
@@ -111,16 +117,31 @@ final class CommandLinkedPanelProgressionPresentationService {
             double baseHealth,
             double baseSpeed,
             @Nullable String language) {
-        if (breakdowns.isEmpty()) {
-            return null;
-        }
+        return buildModifierTooltip(breakdowns, baseHealth, baseSpeed, language, null, 0.0);
+    }
+
+    @Nullable
+    static String buildModifierTooltip(
+            List<CompanionProgressionModifierBreakdownService.ModifierBreakdown> breakdowns,
+            double baseHealth, double baseSpeed, @Nullable String language,
+            @Nullable Double attitude, double happinessTalents) {
         ArrayList<String> lines = new ArrayList<>(breakdowns.size() + 1);
         lines.add(LocalizedText.resolve(language, "tamework.ui.linkedPanel.progression.modifiersBreakdown"));
         for (CompanionProgressionModifierBreakdownService.ModifierBreakdown breakdown : breakdowns) {
             if (breakdown == null) {
                 continue;
             }
+            if ("HappinessFlatBonus".equalsIgnoreCase(breakdown.effectKey())
+                    || (attitude != null && "HappinessGainMultiplier".equalsIgnoreCase(breakdown.effectKey()))) {
+                continue;
+            }
             lines.add(formatModifierLine(breakdown, baseHealth, baseSpeed, language));
+        }
+        if (attitude != null || Math.abs(happinessTalents) > EPSILON) {
+            double traitBonus = attitude == null ? 0.0 : attitude;
+            lines.add("Happiness: " + formatSignedPoints(traitBonus + happinessTalents)
+                    + " (Attitude: " + formatSignedPoints(traitBonus)
+                    + "; Talents: " + formatSignedPoints(happinessTalents) + ")");
         }
         return lines.size() == 1 ? null : String.join("\n", lines);
     }
@@ -482,7 +503,7 @@ final class CommandLinkedPanelProgressionPresentationService {
                 + ")";
     }
 
-    private String formatSignedPoints(double value) {
+    private static String formatSignedPoints(double value) {
         if (!Double.isFinite(value)) {
             return "+0 points";
         }
@@ -490,7 +511,7 @@ final class CommandLinkedPanelProgressionPresentationService {
         return (value >= 0.0 ? "+" : "-") + magnitude + " points";
     }
 
-    private String format(double value) {
+    private static String format(double value) {
         if (!Double.isFinite(value)) {
             return "0.00";
         }

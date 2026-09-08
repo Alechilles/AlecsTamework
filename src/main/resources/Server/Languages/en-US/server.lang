@@ -356,7 +356,7 @@ tamework.talents.bountiful.name=Bountiful
 tamework.talents.bountiful.description=Improves harvest bonus chances.
 
 # ===== Tamework Config Text: Traits =====
-tamework.traits.disposition.name=Disposition
+tamework.traits.disposition.name=Attitude
 tamework.traits.fertility.name=Fertility
 tamework.traits.health.name=Health
 tamework.traits.size.name=Size
@@ -876,4 +876,3 @@ tamework.ui.linkedPanel.action.unavailable.validation=That companion action coul
 tamework.ui.linkedPanel.action.unavailable.generic=The companion action could not be completed.
 tamework.ui.linkedPanel.bonded.loading=Loading companion information...
 tamework.ui.linkedPanel.bonded.unavailable=Companion information is temporarily unavailable. Try again in a moment.
-

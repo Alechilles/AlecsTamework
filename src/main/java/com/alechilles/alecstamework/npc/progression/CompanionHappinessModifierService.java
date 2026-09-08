@@ -94,7 +94,7 @@ public final class CompanionHappinessModifierService {
 
         if (happinessConfig.getDisposition().getMode() == TwHappinessConfig.DispositionMode.FLAT) {
             double dispositionOffset = resolveFlatDispositionOffset(npcRef, store, happinessConfig.getDisposition());
-            modifiers.add(new ModifierEntry("disposition", "Disposition", dispositionOffset));
+            modifiers.add(new ModifierEntry("disposition", "Attitude", dispositionOffset));
             offsetTotal += dispositionOffset;
         }
 

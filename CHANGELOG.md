@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Renamed the visible Disposition trait to Attitude. Level tooltips now show
+  flat happiness contributions in points instead of percentages, including
+  separate Attitude and talent amounts. Saved trait IDs remain unchanged.
 - Fixed culling leaving saved animals counted against population limits. Owned
   animals are permanently released from saved population tracking before
   slaughter completes, without creating a revivable companion.
