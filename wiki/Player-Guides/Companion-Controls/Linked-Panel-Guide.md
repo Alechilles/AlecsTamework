@@ -124,6 +124,6 @@ dead companions continue to show their saved progression snapshot.
 
 
 
-Cards use separate areas for passive traits and available actions. The level sits
+Compact cards use separate areas for passive traits and captioned actions. The level sits
 above the health bar. Happiness, hunger, thirst, and applicable breeding and harvest
 cooldowns share a flat status row; unknown off-screen cooldowns are not shown.

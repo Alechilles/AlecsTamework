@@ -33,7 +33,7 @@ final class BondedCompanionCardPresenter {
     private static final int HEALTH_FILL_WIDTH = 448;
     private static final int XP_FILL_WIDTH = 448;
     private static final int METRIC_LEFT = 24;
-    private static final int METRIC_WIDTH = 108;
+    private static final int METRIC_WIDTH = 132;
     private static final int METRIC_GAP = 8;
 
     private BondedCompanionCardPresenter() {
@@ -305,9 +305,9 @@ final class BondedCompanionCardPresenter {
             CardLayout layout
     ) {
         commands.setObject(entrySelector + " #BondedStateDetail.Anchor",
-                fixedWidthAnchor(24, layout.detailTop(), 450, 14));
+                fixedWidthAnchor(510, layout.detailTop(), 350, 16));
         commands.setObject(entrySelector + " #BondedStateDetailValue.Anchor",
-                fixedWidthAnchor(24, layout.detailTop() + 14, 450, 24));
+                fixedWidthAnchor(510, layout.detailTop() + 16, 350, 42));
         Anchor action = rightAnchor(layout.actionTop(), 14, 112, 32);
         commands.setObject(entrySelector + " #BondedPrimaryAction.Anchor", action);
         commands.setObject(entrySelector + " #BondedPrimaryActionNoTooltip.Anchor",
@@ -359,7 +359,7 @@ final class BondedCompanionCardPresenter {
         int value = metricPercent(rawValue);
         int left = METRIC_LEFT + visibleIndex * (METRIC_WIDTH + METRIC_GAP);
         commands.setObject(selector + ".Anchor", fillAnchor(left, top,
-                METRIC_WIDTH, 18));
+                METRIC_WIDTH, 30));
         commands.set(selector + " #MetricValue.Text", value + "%");
         commands.set(selector + " #MetricLabel.Text", LocalizedText.resolve(
                 language, "tamework.ui.linkedPanel.bonded.metric."
@@ -693,9 +693,9 @@ final class BondedCompanionCardPresenter {
     }
 
     private static CardLayout layout() {
-        int metricTop = 204;
-        int detailTop = 136;
-        int actionTop = 140;
+        int metricTop = 126;
+        int detailTop = 40;
+        int actionTop = 124;
         return new CardLayout(metricTop, detailTop, actionTop);
     }
 
@@ -945,10 +945,10 @@ final class BondedCompanionCardPresenter {
 
     }
 
-    /** Stable allocation for the larger card, including a bottom status row. */
+    /** Stable compact allocation for the bonded roster card. */
     private record CardLayout(int metricTop, int detailTop, int actionTop) {
         private int baseHeight() {
-            return 240;
+            return 184;
         }
 
         private Anchor cardAnchor() {

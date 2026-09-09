@@ -324,6 +324,8 @@ final class LinkedNpcPanelVitalsBinder {
             commandBuilder.set(slotSelector + " #NeedIcon.Text", icon.fallbackText());
         }
         commandBuilder.set(slotSelector + " #NeedTooltip.TooltipText", visual.tooltipText());
+        commandBuilder.set(slotSelector + " #NeedValueText.Text",
+                visual.available() ? percent(visual.fillRatio()) + "%" : "—");
         commandBuilder.setObject(
                 slotSelector + " #MeterFill.Anchor",
                 LinkedNpcPanelStatusMeter.buildFillAnchor(visual.available() ? visual.fillRatio() : 0.0)

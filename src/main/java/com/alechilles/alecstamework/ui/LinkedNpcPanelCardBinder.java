@@ -12,8 +12,8 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
  * Binds one linked-panel NPC card including visual state and per-row interaction handlers.
  */
 final class LinkedNpcPanelCardBinder {
-    private static final int NORMAL_CARD_HEIGHT = 252;
-    private static final int ROSTER_CARD_HEIGHT = 282;
+    private static final int NORMAL_CARD_HEIGHT = 164;
+    private static final int ROSTER_CARD_HEIGHT = 194;
 
     static void bindBreedingTooltips(UICommandBuilder commands, String selector,
                                      LinkedNpcEntry entry, String language) {
@@ -294,20 +294,26 @@ final class LinkedNpcPanelCardBinder {
                 language
         );
         LinkedNpcPanelIconStyles.apply(commandBuilder, entrySelector, entry);
-        int behaviorRight = 386;
-        if (showShoulderRide) {
-            LinkedNpcPanelIconStyles.placeBehavior(commandBuilder, shoulderRideSelector, behaviorRight);
-            behaviorRight -= 76;
+        int actionRight = 424;
+        String[] actionSelectors = {shoulderRideSelector, flightToggleSelector,
+                showBreedingToggleEnabled ? breedingToggleEnabledSelector : breedingToggleDisabledSelector,
+                respawnSelector, locateSelector, recallSelector, setHomeSelector,
+                returnHomeSelector};
+        boolean[] actionVisible = {showShoulderRide, showFlightToggle,
+                showBreedingToggleEnabled || showBreedingToggleDisabled,
+                showRespawn, showLocate, showRecall, showSetHome, showReturnHome};
+        for (int actionIndex = 0; actionIndex < actionSelectors.length; actionIndex++) {
+            if (actionVisible[actionIndex]) {
+                LinkedNpcPanelIconStyles.placeAction(commandBuilder, actionSelectors[actionIndex], actionRight);
+                actionRight -= 66;
+            }
         }
-        if (showFlightToggle) {
-            LinkedNpcPanelIconStyles.placeBehavior(commandBuilder, flightToggleSelector, behaviorRight);
-            behaviorRight -= 76;
-        }
-        if (showBreedingToggleEnabled || showBreedingToggleDisabled) {
-            LinkedNpcPanelIconStyles.placeBehavior(commandBuilder,
-                    showBreedingToggleEnabled ? breedingToggleEnabledSelector : breedingToggleDisabledSelector,
-                    behaviorRight);
-        }
+        commandBuilder.set(flightToggleSelector + "Caption.Text", LocalizedText.resolve(language,
+                "tamework.ui.linkedPanel.action." + (entry.flightToggleAirborne() ? "flightAirborne" : "flightGrounded")));
+        commandBuilder.set(shoulderRideSelector + "Caption.Text", LocalizedText.resolve(language,
+                "tamework.ui.linkedPanel.action." + (entry.shoulderRideMounted() ? "shoulderOff" : "shoulderOn")));
+        commandBuilder.set(respawnSelector + "Caption.Text", LocalizedText.resolve(language,
+                "tamework.ui.linkedPanel.action." + (entry.lost() ? "recover" : "revive")));
         LinkedNpcPanelIconStyles.visible(commandBuilder, locateSelector, showLocate);
         LinkedNpcPanelIconStyles.visible(commandBuilder, recallSelector, showRecall);
         LinkedNpcPanelIconStyles.visible(commandBuilder, setHomeSelector, showSetHome);

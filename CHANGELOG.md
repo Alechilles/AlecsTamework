@@ -3,8 +3,9 @@
 ## Unreleased development changes
 
 - Replaced the command wheel with a compact LMB/Q/E/R assignment bar and a wider
-  companion panel. Larger cards separate traits from actions and show flat needs
-  meters, applicable cooldown timers, and level above the health bar.
+  companion panel. Compact cards separate traits from captioned actions and show
+  flat needs meters with values, applicable cooldown timers, and level above
+  the health bar. Panel controls share the action buttons’ navy styling.
 - Action buttons now reuse two frame textures and sixteen glyphs, replacing the
   separate baked state images to reduce UI texture use.
 

@@ -16,9 +16,12 @@ class LinkedNpcPanelVitalsBinderTest {
     void rendersNeedAsHorizontalMeterWithClampedFill() {
         UICommandBuilder commands = bind(entry(true));
         UICommandBuilder expected = new UICommandBuilder();
+        expected.set("#Card #NeedHappiness #NeedValueText.Text", "50%");
+        Assertions.assertEquals(data(expected, "#Card #NeedHappiness #NeedValueText.Text"),
+                data(commands, "#Card #NeedHappiness #NeedValueText.Text"));
         Anchor anchor = new Anchor();
-        anchor.setLeft(Value.of(46));
-        anchor.setTop(Value.of(16));
+        anchor.setLeft(Value.of(34));
+        anchor.setTop(Value.of(14));
         anchor.setWidth(Value.of(65));
         anchor.setHeight(Value.of(6));
         expected.setObject("#Card #NeedHappiness #MeterFill.Anchor", anchor);
@@ -40,12 +43,12 @@ class LinkedNpcPanelVitalsBinderTest {
     // including threshold data lost while normalizing or copying the panel entry.
     @Test
     void rendersBreedingThresholdAtItsHappinessFillPosition() {
-        assertMarker(0.10, 59, 14, 2, 10);
-        assertMarker(0.25, 78, 14, 2, 10);
-        assertMarker(0.50, 110, 14, 2, 10);
-        assertMarker(0.70, 136, 14, 2, 10);
-        assertMarker(0.95, 168, 14, 2, 10);
-        assertMarker(1.0, 174, 14, 2, 10);
+        assertMarker(0.10, 47, 12, 2, 10);
+        assertMarker(0.25, 66, 12, 2, 10);
+        assertMarker(0.50, 98, 12, 2, 10);
+        assertMarker(0.70, 124, 12, 2, 10);
+        assertMarker(0.95, 156, 12, 2, 10);
+        assertMarker(1.0, 162, 12, 2, 10);
     }
 
     private static void assertMarker(

@@ -27,6 +27,9 @@ final class LinkedNpcPanelIconStyles {
     static void visible(UICommandBuilder commands, String selector, boolean visible) {
         commands.set(selector + ".Visible", visible);
         commands.set(selector + "Glyph.Visible", visible);
+        if (!selector.contains("#Bonded") && !selector.endsWith("#RemoveButton")) {
+            commands.set(selector + "Caption.Visible", visible);
+        }
     }
 
     static void anchor(UICommandBuilder commands, String selector, Anchor anchor) {
@@ -34,12 +37,18 @@ final class LinkedNpcPanelIconStyles {
         commands.setObject(selector + "Glyph.Anchor", anchor);
     }
 
-    static void placeBehavior(UICommandBuilder commands, String selector, int right) {
+    static void placeAction(UICommandBuilder commands, String selector, int right) {
         Anchor position = new Anchor();
-        position.setTop(Value.of(52));
+        position.setTop(Value.of(36));
         position.setRight(Value.of(right));
-        position.setWidth(Value.of(54));
-        position.setHeight(Value.of(54));
+        position.setWidth(Value.of(42));
+        position.setHeight(Value.of(42));
         anchor(commands, selector, position);
+        Anchor caption = new Anchor();
+        caption.setTop(Value.of(80));
+        caption.setRight(Value.of(right - 11));
+        caption.setWidth(Value.of(64));
+        caption.setHeight(Value.of(16));
+        commands.setObject(selector + "Caption.Anchor", caption);
     }
 }

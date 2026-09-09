@@ -34,3 +34,21 @@ $C = "Common.ui";
 @ReviveDisabled = @ActionDisabled;
 @Recover = @Action;
 @RecoverDisabled = @ActionDisabled;
+
+// Panel controls share the same two atlas textures as the action buttons.
+@PanelDropdown = DropdownBoxStyle(
+ ...$C.@DefaultDropdownBoxStyle,
+ DefaultBackground: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 8, Color: #8bb3cf),
+ HoveredBackground: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 8),
+ PressedBackground: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 8),
+ PanelBackground: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 8),
+ ArrowWidth: 10, ArrowHeight: 14
+);
+
+@PanelButtonLabel = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #dbeaf4, Alignment: Center);
+@PanelButton = TextButtonStyle(
+ Default: (Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 8), LabelStyle: @PanelButtonLabel),
+ Hovered: (Background: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 8), LabelStyle: @PanelButtonLabel),
+ Pressed: (Background: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 8), LabelStyle: @PanelButtonLabel),
+ Sounds: $C.@ButtonSounds
+);

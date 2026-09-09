@@ -127,26 +127,6 @@ class BondedCompanionCardPresenterTest {
     }
 
     @Test
-    void largerCardKeepsXpAndHealthTogetherAboveTheBottomStatusRow() throws Exception {
-        String asset = Files.readString(Path.of("src", "main", "resources",
-                "Common", "UI", "Custom",
-                "TameworkBondedCompanionPanelCard.ui"), StandardCharsets.UTF_8);
-
-        assertTrue(asset.contains("Anchor: (Top: 3, Left: 0, Right: 0, Height: 240)"));
-        assertTrue(selectorBlock(asset, "#BondedXpFrame")
-                        .contains("Anchor: (Top: 94, Left: 24, Width: 450, Height: 3)"),
-                "The thin XP strip should sit directly above the health frame.");
-        assertTrue(selectorBlock(asset, "#BondedXpFill")
-                        .contains("Anchor: (Top: 0, Left: 0, Width: 448, Height: 3)"));
-        assertTrue(selectorBlock(asset, "#BondedHealthFrame")
-                        .contains("Anchor: (Top: 100, Left: 24, Width: 450, Height: 18)"));
-        assertTrue(selectorBlock(asset, "#BondedMetricHappiness")
-                        .contains("Anchor: (Top: 204, Left: 24, Width: 108, Height: 24)"));
-        assertTrue(selectorBlock(asset, "#BondedPrimaryAction")
-                        .contains("Anchor: (Top: 140, Right: 14, Width: 112, Height: 32)"));
-    }
-
-    @Test
     void xpStripSharesTheTalentShortcutTooltipAndDetailedModifierBreakdown()
             throws Exception {
         String asset = Files.readString(Path.of("src", "main", "resources",
@@ -335,9 +315,7 @@ class BondedCompanionCardPresenterTest {
 
         assertCommandSelector(commands, "#Card.Anchor");
         assertCommandSelector(commands, "#Card #BondedStateDetail.Anchor");
-        assertCommand(commands, "#Card.Anchor", "240");
-        assertCommand(commands, "#Card #BondedStateDetail.Anchor", "24");
-        assertCommand(commands, "#Card #BondedStateDetailValue.Anchor", "24");
+        assertCommand(commands, "#Card.Anchor", "184");
         assertCommandSelector(commands, "#Card #BondedPrimaryAction.Anchor");
         assertCommand(commands, "#Card #BondedPrimaryAction.Visible", "false");
         assertCommand(commands, "#Card #BondedPrimaryActionNoTooltip.Visible", "true");
