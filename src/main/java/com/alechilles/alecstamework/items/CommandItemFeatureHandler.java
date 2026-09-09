@@ -265,7 +265,8 @@ public final class CommandItemFeatureHandler {
                 featurePresentations,
                 BondedCompanionPanelEntrySourceService.production(bondedCompanions),
                 persistence == null ? null : new CommandOwnedPanelRecordSource(
-                        persistence.queries()::projectedProfileSnapshot)
+                        persistence.queries()::projectedProfileSnapshot,
+                        () -> persistence.queries().projectedCommandRosterActions().keySet())
         );
         this.bondedPanelLifecycle = new BondedCompanionPanelLifecycle(
                 registry, panelEntrySourceService.bondedReadModel());

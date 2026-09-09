@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
+import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -14,10 +15,36 @@ import java.util.function.Supplier;
 /** Reads owned companions across worlds from the existing immutable profile projection. */
 final class CommandOwnedPanelRecordSource {
     private final Supplier<Map<ProfileId, CompanionProfileProjectionState>> profiles;
+    private final Supplier<java.util.Set<ProfileId>> managedProfiles;
 
     CommandOwnedPanelRecordSource(
             Supplier<Map<ProfileId, CompanionProfileProjectionState>> profiles) {
+        this(profiles, java.util.Set::of);
+    }
+
+    CommandOwnedPanelRecordSource(
+            Supplier<Map<ProfileId, CompanionProfileProjectionState>> profiles,
+            Supplier<java.util.Set<ProfileId>> managedProfiles) {
         this.profiles = profiles;
+        this.managedProfiles = managedProfiles;
+    }
+
+    Map<UUID, CommandPanelFeaturePresentation> managedFeatures(UUID ownerUuid, List<LinkedNpcRecord> linkedRecords) {
+        var managed = managedProfiles.get();
+        Map<UUID, CommandPanelFeaturePresentation> result = new HashMap<>();
+        for (var profile : profiles.get().values()) {
+            if (profile.ownerId() == null || !profile.ownerId().value().equals(ownerUuid)) continue;
+            if (!managed.contains(profile.profileId())
+                    && profile.lifecycleState() != LifecycleState.ROSTER_STORED
+                    && profile.lifecycleState() != LifecycleState.PROVISIONED_DORMANT) continue;
+            var feature = CommandPanelFeaturePresentation.readOnlyManaged();
+            result.put(CommandRosterPanelRecordSource.presentationUuid(profile.profileId()), feature);
+            if (profile.currentAlias() != null) result.put(profile.currentAlias().value(), feature);
+            for (var linked : linkedRecords) {
+                if (profile.profileId().toString().equals(linked.profileId)) result.put(linked.npcUuid, feature);
+            }
+        }
+        return Map.copyOf(result);
     }
 
     /** Resolves a server-generated Owned row without treating its UUID as ownership authority. */

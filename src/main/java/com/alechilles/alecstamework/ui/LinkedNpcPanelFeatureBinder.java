@@ -30,7 +30,7 @@ final class LinkedNpcPanelFeatureBinder {
         String summonSelector = entrySelector + " #RosterSummonButton";
         String dismissSelector =
                 entrySelector + " #RosterDismissButton";
-        boolean visible = row != null;
+        boolean visible = row != null && (row.roster() != null || row.bonded() != null);
         builder.set(stateSelector + ".Visible", visible);
         builder.set(timerSelector + ".Visible", visible);
         builder.set(capacitySelector + ".Visible", visible);

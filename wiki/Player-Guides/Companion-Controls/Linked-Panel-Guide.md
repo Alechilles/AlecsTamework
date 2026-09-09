@@ -43,6 +43,7 @@ dead companions continue to show their saved progression snapshot.
   status. Use their removal controls and confirm **Abandon** to permanently clear
   ownership and free ownership-limit slots, even in another world or unloaded chunk.
   Captured animals and coop occupants must be released from storage first.
+  Managed roster companions use their roster's removal controls.
   Linking and culling require the animal to be loaded in your world. Recall, home,
   and other link-specific actions still require a link to this tool.
   Bonded-companion tools keep their separate roster controls.

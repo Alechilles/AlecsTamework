@@ -147,7 +147,8 @@ final class CommandPanelEntrySourceService {
         );
         if (rosterSnapshot == null || featurePresentations == null
                 || player == null || config == null) {
-            return new CommandPanelSnapshot(entries, Map.of());
+            return new CommandPanelSnapshot(entries, ownedRecordSource == null || player == null
+                    ? Map.of() : ownedRecordSource.managedFeatures(player.getUuid(), linkedRecordStore.read(stack)));
         }
         String worldName = player.getWorld() == null
                 ? null

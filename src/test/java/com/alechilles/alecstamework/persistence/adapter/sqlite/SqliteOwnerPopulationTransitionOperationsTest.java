@@ -451,6 +451,35 @@ class SqliteOwnerPopulationTransitionOperationsTest {
         }
     }
 
+    /** Roster enrollment after the UI read must block release even without a lifecycle revision change. */
+    @Test
+    void terminalReleaseRejectsRosterMembershipAddedAfterItsSourceRead() throws Exception {
+        createOwnedProfile();
+        var release = new OwnerPopulationTransitionRequest(PROFILE_C, LifecycleRevision.INITIAL,
+                OWNER, "world-a", null, null, 0, 0, -3_000);
+        var membership = new com.alechilles.alecstamework.companion.command.CommandRosterMembershipRequest(
+                com.alechilles.alecstamework.companion.command.CommandRosterMembershipRequest.Action.UPSERT,
+                PROFILE_C, new com.alechilles.alecstamework.companion.command.CommandFamilyKey(OWNER, "test"),
+                new com.alechilles.alecstamework.companion.command.CommandRosterSlotId(java.util.UUID.randomUUID()),
+                0, null, 0, "Tamed_Cow", LifecycleRevision.INITIAL, "world-a", null, true, null, -3_500);
+        var enrolled = adapter.commandRosterOperations().submit(operationId(60),
+                new IdempotencyKey("roster:before-release"), membership)
+                .completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, enrolled.status(),
+                () -> String.valueOf(enrolled.failure()));
+        var result = adapter.ownerPopulationOperations().submit(operationId(61),
+                new IdempotencyKey("population:managed-release"), release)
+                .completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        assertEquals(OperationWorkflowResult.Status.PREPARE_FAILED, result.status());
+        try (var connection = connections.openReadConnection()) {
+            var transaction = new SqlitePersistenceTransactionContext(connection);
+            var lifecycle = transaction.lifecycles().findByProfile(PROFILE_C).orElseThrow();
+            assertEquals(OWNER, lifecycle.ownerId());
+            assertEquals(LifecycleState.ACTIVE, lifecycle.state());
+            assertTrue(transaction.commandRosters().findByProfile(PROFILE_C).isPresent());
+        }
+    }
+
     private PopulationDomainAdmissionOperation.Payload managedPayload(
             OperationId operationId
     ) {

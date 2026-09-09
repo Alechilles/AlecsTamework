@@ -89,6 +89,21 @@ class CommandOwnedPanelRecordSourceTest {
         assertTrue(source.profileForRow(owner, UUID.randomUUID()).isEmpty());
     }
 
+    /** A generic Owned list keeps managed animals visible while withholding destructive actions. */
+    @Test
+    void marksManagedProfilesReadOnlyEvenWhenActiveAndUnlinked() {
+        UUID owner = UUID.randomUUID();
+        var managed = profile(owner, LifecycleState.ACTIVE, UUID.randomUUID(), Set.of());
+        var ordinary = profile(owner, LifecycleState.UNLOADED, UUID.randomUUID(), Set.of());
+        var source = new CommandOwnedPanelRecordSource(
+                () -> Map.of(managed.profileId(), managed, ordinary.profileId(), ordinary),
+                () -> Set.of(managed.profileId()));
+        assertEquals(2, source.recordsFor(owner).size());
+        var features = source.managedFeatures(owner, java.util.List.of());
+        assertTrue(features.get(managed.currentAlias().value()).managesRosterRow());
+        assertFalse(features.containsKey(ordinary.currentAlias().value()));
+    }
+
     private static CompanionProfileProjectionState profile(UUID owner, LifecycleState state,
             UUID alias, Set<UUID> links) {
         return new CompanionProfileProjectionState(new ProfileId(UUID.randomUUID()),

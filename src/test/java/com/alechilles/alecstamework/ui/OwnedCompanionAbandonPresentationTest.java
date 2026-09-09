@@ -28,6 +28,18 @@ class OwnedCompanionAbandonPresentationTest {
         assertValue(render(entry(true), true), "ReleaseButton.Visible", "false");
     }
 
+    /** Generic items must not release a companion governed by a managed roster. */
+    @Test
+    void managedAnimalDoesNotOfferGenericAbandon() {
+        UICommandBuilder commands = new UICommandBuilder();
+        LinkedNpcPanelCardBinder.bind(commands, new UIEventBuilder(), 0, entry(false),
+                false, true, LinkedNpcPanelCardBindingFactory.create(true, false), "en-US",
+                CommandPanelFeaturePresentation.readOnlyManaged());
+        assertValue(commands, "RemoveButton.Visible", "false");
+        assertValue(commands, "ReleaseButton.Visible", "false");
+        assertValue(commands, "RosterSummonButton.Visible", "false");
+    }
+
     private static LinkedNpcEntry entry(boolean captured) {
         return new LinkedNpcEntry(UUID.randomUUID(), "Cow", 0, 0, 0, 0, 0, null,
                 0, 0, 0, 0, false, false, false, captured, false, false, 0L,

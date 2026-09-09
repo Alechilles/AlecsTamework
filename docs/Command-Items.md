@@ -203,9 +203,11 @@ rows offer confirmed Abandon through the existing permanent owner-population
 transition. This clears saved ownership, domain reservations, and command links;
 loaded source-world cleanup also clears the live owner-cap entry on its world
 thread. Captured and cooped animals must leave their storage lifecycle first.
+Managed command-roster companions remain read-only through generic command items;
+their roster controls own removal.
 
 Owned discovery runs inside the existing open-panel refresh on the owning world
-thread. Each pass reads one immutable profile map and scans the current world's
+thread. Each pass reads immutable profile data and scans the current world's
 loaded NPCs once; it does not load other worlds or chunks. It uses the existing
 mutation/progression refresh signals and 30-second safety refresh, which covers
 ownership and load changes without a dedicated discovery event. There is no new

@@ -11,6 +11,19 @@ public final class CommandPanelFeaturePresentation {
     @Nullable private final CommandRosterStatusPresentation roster;
     @Nullable private final CommandReviveCostPresentation revival;
     @Nullable private final BondedCompanionPanelPresentation bonded;
+    private final boolean readOnly;
+
+    /** A managed companion shown through a generic item has no generic mutation actions. */
+    public static CommandPanelFeaturePresentation readOnlyManaged() {
+        return new CommandPanelFeaturePresentation();
+    }
+
+    private CommandPanelFeaturePresentation() {
+        roster = null;
+        revival = null;
+        bonded = null;
+        readOnly = true;
+    }
 
     public CommandPanelFeaturePresentation(
             @Nonnull CommandRosterStatusPresentation roster,
@@ -20,6 +33,7 @@ public final class CommandPanelFeaturePresentation {
                 roster, "Roster presentation is required.");
         this.revival = revival;
         this.bonded = null;
+        this.readOnly = false;
     }
 
     private CommandPanelFeaturePresentation(
@@ -28,6 +42,7 @@ public final class CommandPanelFeaturePresentation {
         this.roster = null;
         this.bonded = java.util.Objects.requireNonNull(bonded, "bonded");
         this.revival = bondedRevival(bonded);
+        this.readOnly = false;
     }
 
     public static CommandPanelFeaturePresentation bonded(
@@ -40,7 +55,7 @@ public final class CommandPanelFeaturePresentation {
     @Nullable public CommandReviveCostPresentation revival() { return revival; }
     @Nullable public BondedCompanionPanelPresentation bonded() { return bonded; }
 
-    public boolean managesRosterRow() { return roster != null || bonded != null; }
+    public boolean managesRosterRow() { return readOnly || roster != null || bonded != null; }
 
     public boolean managesPaidRevival() {
         return bonded != null
@@ -78,12 +93,12 @@ public final class CommandPanelFeaturePresentation {
     @Override public boolean equals(Object other) {
         if (this == other) return true;
         if (!(other instanceof CommandPanelFeaturePresentation that)) return false;
-        return java.util.Objects.equals(roster, that.roster)
+        return readOnly == that.readOnly && java.util.Objects.equals(roster, that.roster)
                 && java.util.Objects.equals(revival, that.revival)
                 && java.util.Objects.equals(bonded, that.bonded);
     }
 
     @Override public int hashCode() {
-        return java.util.Objects.hash(roster, revival, bonded);
+        return java.util.Objects.hash(roster, revival, bonded, readOnly);
     }
 }

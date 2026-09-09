@@ -392,6 +392,12 @@ public final class SqliteOwnerPopulationTransitionOperations {
                 .orElseThrow(() -> new IllegalStateException(
                         "owner_population_profile_lifecycle_missing"
                 ));
+        // Membership updates need not change lifecycle revision. Check inside the
+        // transaction so a concurrent roster enrollment cannot survive terminal release.
+        if (request.targetOwnerId() == null
+                && transaction.commandRosters().findByProfile(request.profileId()).isPresent()) {
+            throw new IllegalStateException("owner_population_release_managed_roster");
+        }
         if (!source.revision().equals(request.expectedLifecycleRevision())
                 || !java.util.Objects.equals(
                 source.ownerId(),
