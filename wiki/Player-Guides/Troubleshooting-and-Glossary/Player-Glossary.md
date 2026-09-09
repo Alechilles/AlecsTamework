@@ -15,6 +15,7 @@ Parent: [Troubleshooting and Glossary](/mod/alecs-tamework/troubleshooting-and-g
 - `Active` (tool): linked and included in normal bulk command dispatch.
 - `Inactive` (tool): linked but excluded from bulk command dispatch until toggled back on.
 - `NearbyMode`: panel mode that shows nearby eligible companions rather than only linked ones.
+- `OwnedMode`: panel mode that shows all your owned animals across worlds and unloaded chunks, regardless of item links.
 - `LinkedMode`: panel mode that shows companions linked to the current tool.
 - `Set Home`: stores a home position for that companion.
 - `Return Home`: sends the companion back to its stored home position.

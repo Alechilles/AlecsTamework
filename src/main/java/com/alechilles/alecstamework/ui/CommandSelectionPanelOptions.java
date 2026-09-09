@@ -29,6 +29,10 @@ final class CommandSelectionPanelOptions {
                 new DropdownEntryInfo(
                         LocalizableString.fromString(LocalizedText.resolve(language, "tamework.ui.linkedPanel.mode.nearby")),
                         TameworkCommandSelectionPage.PANEL_MODE_NEARBY
+                ),
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(LocalizedText.resolve(language, "tamework.ui.linkedPanel.mode.owned")),
+                        TameworkCommandSelectionPage.PANEL_MODE_OWNED
                 )
         ));
     }

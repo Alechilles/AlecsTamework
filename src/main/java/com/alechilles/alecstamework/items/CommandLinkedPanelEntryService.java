@@ -102,6 +102,18 @@ final class CommandLinkedPanelEntryService {
                                               ItemStack stack,
                                               String toolId,
                                               List<LinkedNpcRecord> records) {
+        return resolveEntriesFromRecords(player, store, stack, toolId, records, null);
+    }
+
+    ResolvedEntries resolveOwnedEntriesFromRecords(Player player, Store<EntityStore> store,
+            ItemStack stack, String toolId, List<LinkedNpcRecord> records,
+            java.util.Set<UUID> linkedIds) {
+        return resolveEntriesFromRecords(player, store, stack, toolId, records, linkedIds);
+    }
+
+    private ResolvedEntries resolveEntriesFromRecords(Player player, Store<EntityStore> store,
+            ItemStack stack, String toolId, List<LinkedNpcRecord> records,
+            @Nullable java.util.Set<UUID> ownedViewLinkedIds) {
         if (player == null || store == null || stack == null || stack.isEmpty()) {
             return ResolvedEntries.empty();
         }
@@ -115,6 +127,14 @@ final class CommandLinkedPanelEntryService {
         for (LinkedNpcRecord record : records) {
             if (record == null || record.npcUuid == null) {
                 continue;
+            }
+            boolean linked = ownedViewLinkedIds == null || ownedViewLinkedIds.contains(record.npcUuid);
+            if (ownedViewLinkedIds != null && world != null) {
+                Ref<EntityStore> liveRef = world.getEntityRef(record.npcUuid);
+                if (liveRef != null && liveRef.isValid()
+                        && (!CommandGenericTargetAuthority.allowsNearbyPresentation(liveRef, store)
+                        || !linkPolicyService.passesOwnerAndTamed(true, false,
+                                liveRef, player.getUuid(), store))) continue;
             }
             boolean loaded = false;
             boolean dead = false;
@@ -217,13 +237,13 @@ final class CommandLinkedPanelEntryService {
             }
             if (!dead && !captured && !inCoop && world != null) {
                 LinkedNpcEntry loadedEntry = buildLoadedEntry(
-                        player, world, store, record, displayName, active, hasHome,
+                        player, world, store, record, displayName, linked, ownedViewLinkedIds != null, active, hasHome,
                         breedingEnabled, groupId, groupName, groupColor
                 );
                 if (loadedEntry == null && liveTargetResolver != null) {
                     LinkedNpcRecord redirected = liveTargetResolver.resolveRedirect(record);
                     loadedEntry = buildLoadedEntry(
-                            player, world, store, redirected, displayName, active, hasHome,
+                            player, world, store, redirected, displayName, linked, ownedViewLinkedIds != null, active, hasHome,
                             breedingEnabled, groupId, groupName, groupColor
                     );
                 }
@@ -271,7 +291,7 @@ final class CommandLinkedPanelEntryService {
                     false,
                     talentsActionVisible,
                     talentsActionEnabled,
-                    true,
+                    linked,
                     active,
                     speciesId,
                     speciesLabel,
@@ -326,6 +346,8 @@ final class CommandLinkedPanelEntryService {
                                             Store<EntityStore> store,
                                             @Nullable LinkedNpcRecord record,
                                             String displayName,
+                                            boolean linked,
+                                            boolean requireOwnedTarget,
                                             boolean active,
                                             boolean hasHome,
                                             boolean breedingEnabled,
@@ -340,6 +362,12 @@ final class CommandLinkedPanelEntryService {
                 || safeGetComponent(store, npcRef, NPCEntity.getComponentType()) == null) {
             return null;
         }
+        if (requireOwnedTarget
+                && (!CommandGenericTargetAuthority.allowsNearbyPresentation(npcRef, store)
+                || !linkPolicyService.passesOwnerAndTamed(true, false,
+                        npcRef, player.getUuid(), store))) {
+            return null;
+        }
         return loadedSnapshotService.buildLoadedEntry(
                 player,
                 npcRef,
@@ -347,7 +375,7 @@ final class CommandLinkedPanelEntryService {
                 new CommandLoadedNpcStatusSnapshotService.NpcStatusContext(
                         record.npcUuid,
                         displayName,
-                        true,
+                        linked,
                         active,
                         hasHome,
                         breedingEnabled,

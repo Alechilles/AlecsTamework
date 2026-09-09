@@ -528,6 +528,7 @@ tamework.ui.linkedPanel.hunger.unavailable.unloaded=Fome indisponível (não car
 tamework.ui.linkedPanel.manageGroups=Grupos
 tamework.ui.linkedPanel.mode.linked=Vinculados
 tamework.ui.linkedPanel.mode.nearby=Próximos
+tamework.ui.linkedPanel.mode.owned=Seus
 tamework.ui.linkedPanel.mode.noModes=Nenhum modo
 tamework.ui.linkedPanel.needIcons.happiness=Necessidade_Felicidade
 tamework.ui.linkedPanel.needIcons.hunger=Necessidade_Fome
@@ -573,6 +574,7 @@ tamework.ui.linkedPanel.thirst.unavailable.lost=Sede indisponível (perdido)
 tamework.ui.linkedPanel.thirst.unavailable.unloaded=Sede indisponível (não carregado)
 tamework.ui.linkedPanel.title.linked=NPCs Vinculados
 tamework.ui.linkedPanel.title.nearby=NPCs Próximos
+tamework.ui.linkedPanel.title.owned=Seus NPCs
 
 # ===== Tamework UI: Name Input =====
 tamework.ui.nameInput.defaultNpcName=Companheiro

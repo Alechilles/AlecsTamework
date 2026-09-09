@@ -534,6 +534,7 @@ tamework.ui.linkedPanel.hunger.unavailable.unloaded=Hunger unavailable (unloaded
 tamework.ui.linkedPanel.manageGroups=Groups
 tamework.ui.linkedPanel.mode.linked=Linked
 tamework.ui.linkedPanel.mode.nearby=Nearby
+tamework.ui.linkedPanel.mode.owned=Owned
 tamework.ui.linkedPanel.mode.noModes=No modes
 tamework.ui.linkedPanel.needIcons.happiness=Need_Happiness
 tamework.ui.linkedPanel.needIcons.hunger=Need_Hunger
@@ -579,6 +580,7 @@ tamework.ui.linkedPanel.thirst.unavailable.lost=Thirst unavailable (lost)
 tamework.ui.linkedPanel.thirst.unavailable.unloaded=Thirst unavailable (unloaded)
 tamework.ui.linkedPanel.title.linked=Linked NPCs
 tamework.ui.linkedPanel.title.nearby=Nearby NPCs
+tamework.ui.linkedPanel.title.owned=Owned NPCs
 
 # ===== Tamework UI: Name Input =====
 tamework.ui.nameInput.defaultNpcName=Companion

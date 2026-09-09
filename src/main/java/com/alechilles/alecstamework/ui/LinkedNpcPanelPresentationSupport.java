@@ -36,7 +36,12 @@ final class LinkedNpcPanelPresentationSupport {
         return value == null || value.isBlank() ? LocalizedText.format(language, "tamework.ui.linkedPanel.radius.value", 24) : value;
     }
     static String title(Supplier<String> mode, LinkedNpcEntry[] entries, String language) {
-        String key = nearby(mode) ? "tamework.ui.linkedPanel.title.nearby" : "tamework.ui.linkedPanel.title.linked";
+        String currentMode = mode(mode);
+        String key = TameworkCommandSelectionPage.PANEL_MODE_NEARBY.equalsIgnoreCase(currentMode)
+                ? "tamework.ui.linkedPanel.title.nearby"
+                : TameworkCommandSelectionPage.PANEL_MODE_OWNED.equalsIgnoreCase(currentMode)
+                ? "tamework.ui.linkedPanel.title.owned"
+                : "tamework.ui.linkedPanel.title.linked";
         return LocalizedText.resolve(language, key) + " (" + (entries == null ? 0 : entries.length) + ")";
     }
     static String empty(Supplier<String> supplier, String language) {

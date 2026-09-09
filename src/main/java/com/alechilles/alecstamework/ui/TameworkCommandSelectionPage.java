@@ -43,6 +43,7 @@ public final class TameworkCommandSelectionPage
     public static final String LINKED_PANEL_CARD_UI_PATH = "TameworkLinkedNpcPanelCard.ui";
     public static final String PANEL_MODE_LINKED = "LinkedMode";
     static final String PANEL_MODE_NEARBY = "NearbyMode";
+    static final String PANEL_MODE_OWNED = "OwnedMode";
     static final String PANEL_SORT_DEFAULT = "Default";
     static final String PANEL_FILTER_NONE = "None";
     private static final int MAX_COMMAND_BUTTONS = 8;

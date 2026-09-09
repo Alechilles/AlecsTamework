@@ -469,6 +469,30 @@ class CommandGenericTargetAuthorityTest {
         }
     }
 
+    /** Owned commands reach unlinked animals outside Nearby's radius but never another owner or bonded lease. */
+    @Test
+    void ownedRecipientsIgnoreLinksAndRadiusWhileRecheckingOwner() throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            scope.liveBondedTarget(false);
+            LiveTarget ordinary = scope.liveOrdinaryTarget(false);
+            scope.store.getComponent(ordinary.reference, scope.transformType)
+                    .getPosition().set(1000, 0, 0);
+            Ref<EntityStore> playerRef = scope.store.createReference();
+            scope.store.put(playerRef, scope.transformType, new TransformComponent());
+            CommandPanelPreferenceService preferences = new CommandPanelPreferenceService();
+            ItemStack stack = preferences.setPanelMode(metadataStack("test:generic-whistle"),
+                    CommandPanelPreferenceService.PanelMode.OwnedMode);
+            Context context = new Context(ordinary.player, playerRef, scope.store, genericConfig(),
+                    null, "test:generic-whistle", "generic-tool", null, null, stack, false,
+                    false, 0D, 0D, 0L, 0D, 0D);
+            CommandRecipientService service = new CommandRecipientService(null, null, preferences);
+            assertEquals(List.of(ordinary.uuid), service.queryRecipients(context).stream()
+                    .map(candidate -> candidate.npc.getUuid()).toList());
+            scope.store.getComponent(ordinary.reference, scope.ownerType).setOwnerId(UUID.randomUUID());
+            assertTrue(service.queryRecipients(context).isEmpty());
+        }
+    }
+
     @Test
     void genericPositionRefreshNeverWritesBondedProjectionRecord()
             throws Exception {

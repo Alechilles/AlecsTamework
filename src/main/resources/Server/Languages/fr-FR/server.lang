@@ -528,6 +528,7 @@ tamework.ui.linkedPanel.hunger.unavailable.unloaded=Faim indisponible (non charg
 tamework.ui.linkedPanel.manageGroups=Groupes
 tamework.ui.linkedPanel.mode.linked=Liés
 tamework.ui.linkedPanel.mode.nearby=Proches
+tamework.ui.linkedPanel.mode.owned=À vous
 tamework.ui.linkedPanel.mode.noModes=Aucun mode
 tamework.ui.linkedPanel.needIcons.happiness=Besoin_Bonheur
 tamework.ui.linkedPanel.needIcons.hunger=Besoin_Faim
@@ -573,6 +574,7 @@ tamework.ui.linkedPanel.thirst.unavailable.lost=Soif indisponible (perdu)
 tamework.ui.linkedPanel.thirst.unavailable.unloaded=Soif indisponible (non chargé)
 tamework.ui.linkedPanel.title.linked=PNJ liés
 tamework.ui.linkedPanel.title.nearby=PNJ proches
+tamework.ui.linkedPanel.title.owned=Vos PNJ
 
 # ===== Tamework UI: Name Input =====
 tamework.ui.nameInput.defaultNpcName=Compagnon

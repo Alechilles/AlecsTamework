@@ -713,6 +713,9 @@ final class CommandSelectionPageService {
             addPanel(catalog, "MODE_NEARBY", "Show nearby companions",
                     "NearbyMode", context.preferenceAuthority(),
                     () -> panel.setMode().accept("NearbyMode"));
+            addPanel(catalog, "MODE_OWNED", "Show owned companions",
+                    "OwnedMode", context.preferenceAuthority(),
+                    () -> panel.setMode().accept("OwnedMode"));
             addPanel(catalog, "TOGGLE_AUTO_LINK", "Toggle automatic linking",
                     Boolean.toString(!toolInventoryService
                             .resolvePanelAutoLinkEnabledForTool(
@@ -857,7 +860,7 @@ final class CommandSelectionPageService {
         boolean releasable = !linked && !managed && entry.loaded()
                 && !entry.dead() && !entry.captured() && !entry.inCoop()
                 && !entry.lost();
-        if (!linked && !managed) addGenericRow(catalog, rowId, "LINK", "Link",
+        if (releasable) addGenericRow(catalog, rowId, "LINK", "Link",
                 npcId, null, npc.link(), context.genericAuthority(), false);
         if (linked) addGenericRow(catalog, rowId, "UNLINK", "Unlink",
                 npcId, null, npc.unlink(), context.genericAuthority(),

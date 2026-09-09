@@ -189,6 +189,25 @@ commits, including when capture clears live ownership. Releasing the companion
 restores its command links and remaps the panel record to the new live entity
 UUID without changing the stable profile.
 
+### Owned panel mode
+
+The selector offers Linked, Nearby, and Owned for generic command items.
+Owned reads the existing profile projection by owner and supplements it with
+loaded owned NPCs, including animals with no item links. It does not apply the
+tool's species filter or a radius limit. Saved unloaded and other-world animals
+remain visible. This view creates no command links and does not change bonded
+roster authority. Bulk live commands use owner scope in the current world;
+existing target limits and inactive-link choices still apply. Off-screen
+link-specific actions retain their existing link requirement.
+
+Owned discovery runs inside the existing open-panel refresh on the owning world
+thread. Each pass reads one immutable profile map and scans the current world's
+loaded NPCs once; it does not load other worlds or chunks. It uses the existing
+mutation/progression refresh signals and 30-second safety refresh, which covers
+ownership and load changes without a dedicated discovery event. There is no new
+scheduler, background world access, or persistent cache; closing the page ends
+its refresh lifecycle.
+
 ## Command list and steps
 Each `CommandList` entry supports:
 - `Id`

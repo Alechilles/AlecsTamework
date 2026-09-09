@@ -20,7 +20,8 @@ final class CommandPanelPreferenceService {
 
     enum PanelMode {
         LinkedMode,
-        NearbyMode;
+        NearbyMode,
+        OwnedMode;
 
         static PanelMode fromMetadata(String raw) {
             if (raw == null || raw.isBlank()) {
@@ -101,7 +102,7 @@ final class CommandPanelPreferenceService {
 
     MembershipMode resolveRecipientMembershipMode(@Nullable ItemStack stack, @Nullable TwCommandItemConfig config) {
         PanelMode override = readPanelModeOverride(stack);
-        if (override == PanelMode.NearbyMode) {
+        if (override == PanelMode.NearbyMode || override == PanelMode.OwnedMode) {
             return MembershipMode.OwnerScope;
         }
         if (override == PanelMode.LinkedMode) {
@@ -156,7 +157,11 @@ final class CommandPanelPreferenceService {
             return stack;
         }
         PanelMode current = resolveEffectivePanelMode(stack, config);
-        PanelMode next = current == PanelMode.LinkedMode ? PanelMode.NearbyMode : PanelMode.LinkedMode;
+        PanelMode next = switch (current) {
+            case LinkedMode -> PanelMode.NearbyMode;
+            case NearbyMode -> PanelMode.OwnedMode;
+            case OwnedMode -> PanelMode.LinkedMode;
+        };
         return setPanelMode(stack, next);
     }
 
@@ -199,7 +204,11 @@ final class CommandPanelPreferenceService {
 
     String resolveModeLabel(@Nullable ItemStack stack, @Nullable TwCommandItemConfig config) {
         PanelMode mode = resolveEffectivePanelMode(stack, config);
-        return mode == PanelMode.NearbyMode ? "Mode: Nearby" : "Mode: Linked";
+        return switch (mode) {
+            case LinkedMode -> "Mode: Linked";
+            case NearbyMode -> "Mode: Nearby";
+            case OwnedMode -> "Mode: Owned";
+        };
     }
 
     String resolveModeValue(@Nullable ItemStack stack, @Nullable TwCommandItemConfig config) {

@@ -41,6 +41,9 @@ final class CommandPanelEntrySourceService {
     private final CommandPanelFeaturePresentationSource featurePresentations;
     @Nullable
     private final BondedCompanionPanelEntrySourceService bondedEntrySource;
+    @Nullable
+    private final CommandOwnedPanelRecordSource ownedRecordSource;
+    private final CommandLinkedNpcRecordStore linkedRecordStore = new CommandLinkedNpcRecordStore();
 
     CommandPanelEntrySourceService(CommandLinkedPanelEntryService linkedPanelEntryService,
                                    CommandPanelPreferenceService panelPreferenceService,
@@ -75,6 +78,19 @@ final class CommandPanelEntrySourceService {
                                    @Nullable CommandRosterPanelRecordSource rosterRecordSource,
                                    @Nullable CommandPanelFeaturePresentationSource featurePresentations,
                                    @Nullable BondedCompanionPanelEntrySourceService bondedEntrySource) {
+        this(linkedPanelEntryService, panelPreferenceService, linkPolicyService,
+                npcNameResolver, rosterRecordSource, featurePresentations, bondedEntrySource, null);
+    }
+
+    CommandPanelEntrySourceService(CommandLinkedPanelEntryService linkedPanelEntryService,
+                                   CommandPanelPreferenceService panelPreferenceService,
+                                   CommandLinkPolicyService linkPolicyService,
+                                   CommandNpcNameResolver npcNameResolver,
+                                   @Nullable CommandRosterPanelRecordSource rosterRecordSource,
+                                   @Nullable CommandPanelFeaturePresentationSource featurePresentations,
+                                   @Nullable BondedCompanionPanelEntrySourceService bondedEntrySource,
+                                   @Nullable CommandOwnedPanelRecordSource ownedRecordSource) {
+        this.ownedRecordSource = ownedRecordSource;
         this.linkedPanelEntryService = linkedPanelEntryService;
         this.panelPreferenceService = panelPreferenceService != null
                 ? panelPreferenceService
@@ -175,7 +191,22 @@ final class CommandPanelEntrySourceService {
                 );
         CommandPanelPreferenceService.PanelMode panelMode =
                 panelPreferenceService.resolveEffectivePanelMode(stack, config);
-        if (panelMode != CommandPanelPreferenceService.PanelMode.NearbyMode) {
+        boolean ownedMode = panelMode == CommandPanelPreferenceService.PanelMode.OwnedMode;
+        if (ownedMode) {
+            Map<UUID, LinkedNpcEntry> linkedById = new java.util.HashMap<>();
+            for (LinkedNpcEntry entry : linkedEntries) linkedById.put(entry.npcUuid(), entry);
+            List<LinkedNpcRecord> linkedRecords = rosterSnapshot == null
+                    ? linkedRecordStore.read(stack) : rosterSnapshot.records();
+            List<LinkedNpcRecord> ownedRecords = ownedRecordSource == null || player == null
+                    ? List.of() : ownedRecordSource.recordsFor(player.getUuid(), linkedRecords);
+            List<LinkedNpcEntry> ownedEntries = linkedPanelEntryService.resolveOwnedEntriesFromRecords(
+                    player, store, stack, toolId, ownedRecords, linkedById.keySet()).entries();
+            linkedEntries = new ArrayList<>(ownedEntries.size());
+            for (LinkedNpcEntry entry : ownedEntries) {
+                linkedEntries.add(linkedById.getOrDefault(entry.npcUuid(), entry));
+            }
+        }
+        if (!ownedMode && panelMode != CommandPanelPreferenceService.PanelMode.NearbyMode) {
             return applyFiltersAndSort(linkedEntries, stack);
         }
         if (player == null || store == null) {
@@ -187,14 +218,14 @@ final class CommandPanelEntrySourceService {
             return applyFiltersAndSort(linkedEntries, stack);
         }
         TransformComponent playerTransform = store.getComponent(playerRef, TransformComponent.getComponentType());
-        if (playerTransform == null) {
+        if (!ownedMode && playerTransform == null) {
             return applyFiltersAndSort(linkedEntries, stack);
         }
         double radius = panelPreferenceService.resolveNearbyRadius(stack, config);
         if (!Double.isFinite(radius) || radius <= 0.0) {
             return applyFiltersAndSort(linkedEntries, stack);
         }
-        double radiusSq = radius * radius;
+        double radiusSq = ownedMode ? Double.POSITIVE_INFINITY : radius * radius;
 
         ArrayList<LinkedNpcEntry> out = new ArrayList<>(linkedEntries.size() + 16);
         Set<UUID> seen = new HashSet<>();
@@ -206,8 +237,8 @@ final class CommandPanelEntrySourceService {
             seen.add(entry.npcUuid());
         }
 
-        Vector3d playerPos = new Vector3d(playerTransform.getPosition());
-        boolean requireOwner = resolveLinkingRequireOwner();
+        Vector3d playerPos = playerTransform == null ? new Vector3d() : new Vector3d(playerTransform.getPosition());
+        boolean requireOwner = ownedMode || resolveLinkingRequireOwner();
         store.forEachChunk(Query.any(), (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) -> {
             for (int i = 0; i < chunk.size(); i++) {
                 NPCEntity npc = chunk.getComponent(i, NPCEntity.getComponentType());
@@ -225,14 +256,14 @@ final class CommandPanelEntrySourceService {
                 }
                 if (!linkPolicyService.passesOwnerAndTamed(
                         requireOwner,
-                        config != null && config.isRequireTamed(),
+                        !ownedMode && config != null && config.isRequireTamed(),
                         npcRef,
                         playerUuid,
                         store
                 )) {
                     continue;
                 }
-                if (!linkPolicyService.isRoleAllowed(linkPolicyService.resolveRoleId(npc), config)) {
+                if (!ownedMode && !linkPolicyService.isRoleAllowed(linkPolicyService.resolveRoleId(npc), config)) {
                     continue;
                 }
                 TransformComponent npcTransform = chunk.getComponent(i, TransformComponent.getComponentType());

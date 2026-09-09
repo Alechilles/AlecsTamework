@@ -165,7 +165,8 @@ final class LinkedNpcPanelCardBinder {
         boolean canOpenReleaseActions =
                 !legacyLinked && !managedRoster
                         && entry.loaded() && !entry.dead() && !entry.captured() && !entry.inCoop() && !entry.lost();
-        boolean showLink = !legacyLinked && !managedRoster && !pendingUnlink;
+        boolean showLink = !legacyLinked && !managedRoster && entry.loaded()
+                && !entry.dead() && !entry.captured() && !entry.inCoop() && !entry.lost() && !pendingUnlink;
         boolean showUnlink = legacyLinked || canOpenReleaseActions;
         boolean showRelease = pendingUnlink && (canOpenReleaseActions
                 || legacyLinked && !entry.captured() && !entry.inCoop());

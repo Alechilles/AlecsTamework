@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Added Owned to the command-item mode selector. It shows owned animals regardless
+  of item links, including saved animals in other worlds and unloaded chunks.
+
 - Husbandry providers can supply an unconditional `happinessFlatBonus` for
   `HAPPINESS_CARE` with capability `HUSBANDRY_FLAT_CARE_BONUS`. It adds 0-100
   happiness points without condition or disposition scaling. Existing provider

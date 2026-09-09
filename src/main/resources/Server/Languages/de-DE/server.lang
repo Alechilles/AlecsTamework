@@ -528,6 +528,7 @@ tamework.ui.linkedPanel.hunger.unavailable.unloaded=Hunger nicht verfügbar (nic
 tamework.ui.linkedPanel.manageGroups=Gruppen
 tamework.ui.linkedPanel.mode.linked=Verknüpft
 tamework.ui.linkedPanel.mode.nearby=In der Nähe
+tamework.ui.linkedPanel.mode.owned=Eigene
 tamework.ui.linkedPanel.mode.noModes=Keine Modi
 tamework.ui.linkedPanel.needIcons.happiness=Bedürfnis_Glücklichkeit
 tamework.ui.linkedPanel.needIcons.hunger=Bedürfnis_Hunger
@@ -573,6 +574,7 @@ tamework.ui.linkedPanel.thirst.unavailable.lost=Durst nicht verfügbar (verloren
 tamework.ui.linkedPanel.thirst.unavailable.unloaded=Durst nicht verfügbar (nicht geladen)
 tamework.ui.linkedPanel.title.linked=Verknüpfte NPCs
 tamework.ui.linkedPanel.title.nearby=NPCs in der Nähe
+tamework.ui.linkedPanel.title.owned=Eigene NPCs
 
 # ===== Tamework UI: Namenseingabe =====
 tamework.ui.nameInput.defaultNpcName=Begleiter

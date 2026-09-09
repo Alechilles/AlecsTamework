@@ -77,7 +77,8 @@ final class CommandRecipientService {
                 context.workingItem,
                 context.config
         );
-        double effectiveRadius = context.config.getRadius();
+        boolean ownedMode = panelModeOverride == CommandPanelPreferenceService.PanelMode.OwnedMode;
+        double effectiveRadius = ownedMode ? -1 : context.config.getRadius();
         if (panelModeOverride == CommandPanelPreferenceService.PanelMode.NearbyMode) {
             effectiveRadius = panelPreferenceService.resolveNearbyRadius(context.workingItem, context.config);
         }
@@ -85,7 +86,7 @@ final class CommandRecipientService {
         int maxTargets = Math.max(1, context.config.getMaxTargets());
         int maxActive = Math.max(0, context.config.getMaxActive());
         UUID playerUuid = context.player.getUuid();
-        boolean requireOwner = resolveLinkingRequireOwner();
+        boolean requireOwner = ownedMode || resolveLinkingRequireOwner();
         List<LinkedNpcRecord> linkedRecords = linkedNpcRecordStore.read(context.workingItem);
         Map<UUID, LinkedNpcRecord> linkedRecordByUuid = mapLinkedRecordsByUuid(linkedRecords);
         Set<UUID> cappedActiveLinkedNpcUuids = resolveCappedActiveLinkedNpcUuids(linkedRecords, maxActive);
@@ -119,14 +120,14 @@ final class CommandRecipientService {
                 }
                 if (!linkPolicyService.passesOwnerAndTamed(
                         requireOwner,
-                        context.config.isRequireTamed(),
+                        !ownedMode && context.config.isRequireTamed(),
                         npcRef,
                         playerUuid,
                         context.store
                 )) {
                     continue;
                 }
-                if (!linkPolicyService.isRoleAllowed(linkPolicyService.resolveRoleId(npc), context.config)) {
+                if (!ownedMode && !linkPolicyService.isRoleAllowed(linkPolicyService.resolveRoleId(npc), context.config)) {
                     continue;
                 }
                 if (isInactiveLinkedRecord(linkedRecordByUuid, npcUuid)) {

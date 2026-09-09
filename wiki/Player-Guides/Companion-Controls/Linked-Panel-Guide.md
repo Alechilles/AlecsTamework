@@ -37,6 +37,12 @@ dead companions continue to show their saved progression snapshot.
 ## Panel modes
 - `LinkedMode` shows companions linked to the current tool.
 - `NearbyMode` shows nearby eligible companions, usually for quick local management.
+- `OwnedMode` shows all your owned animals, including saved animals in unloaded chunks
+  and other worlds, regardless of item links or the current tool's species filter.
+  It has no radius limit. Unlinked animals that are off-screen show their saved
+  status; linking and local management require the animal to be loaded in your world.
+  Recall, home, and other link-specific actions still require a link to this tool.
+  Bonded-companion tools keep their separate roster controls.
 
 ## Sorting and filtering
 - Sort modes can include default order, name, species, or group.
