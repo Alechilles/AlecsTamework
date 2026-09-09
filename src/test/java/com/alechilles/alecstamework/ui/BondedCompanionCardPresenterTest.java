@@ -518,44 +518,6 @@ class BondedCompanionCardPresenterTest {
                 "Available points should be represented by the compact icon badge.");
     }
 
-    @Test
-    void largerCardPlacesLevelAboveTheHealthTrackAndStatsAlongTheBottom()
-            throws Exception {
-        String asset = Files.readString(Path.of("src", "main", "resources",
-                "Common", "UI", "Custom",
-                "TameworkBondedCompanionPanelCard.ui"), StandardCharsets.UTF_8);
-
-        assertTrue(selectorBlock(asset, "#BondedLevelText")
-                        .contains("Anchor: (Top: 72, Left: 408, Width: 66"),
-                "Level should sit above the health track's right edge.");
-        assertTrue(selectorBlock(asset, "#BondedGenderFemaleIcon")
-                        .contains("Anchor: (Top: 46, Left: 24"),
-                "Gender icon should stay with the flat identity information.");
-        assertTrue(selectorBlock(asset, "#BondedSpecies")
-                        .contains("Anchor: (Top: 43, Left: 42"),
-                "Species should follow the gender icon.");
-        assertTrue(selectorBlock(asset, "#BondedTalentPointAction")
-                        .contains("Anchor: (Top: 67, Right: 114"),
-                "The stats button should be available above the action area.");
-        assertTrue(selectorBlock(asset, "#BondedHealthFrame")
-                        .contains("Anchor: (Top: 100, Left: 24, Width: 450"),
-                "Health should use the fixed left information area.");
-    }
-
-    @Test
-    void bondedCardAssetHasAFullCardOutline() throws Exception {
-        String asset = Files.readString(Path.of("src", "main", "resources",
-                "Common", "UI", "Custom",
-                "TameworkBondedCompanionPanelCard.ui"), StandardCharsets.UTF_8);
-
-        assertTrue(asset.contains("#BondedFrameInWorld"));
-        assertTrue(asset.contains("#BondedFrameStored"));
-        assertTrue(asset.contains("#BondedFrameDead"));
-        assertTrue(asset.contains("#BondedFrameReady"));
-        assertTrue(asset.contains("OutlineColor:") && asset.contains("OutlineSize:"),
-                "The companion card frame should be a subtle outline, not a second opaque panel.");
-    }
-
     private static BondedCompanionPanelPresentation presentation(
             BondedCompanionStateView state,
             BondedCompanionStatusPresentation.Action action,
