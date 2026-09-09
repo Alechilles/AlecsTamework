@@ -2,6 +2,10 @@
 
 ## Unreleased development changes
 
+- Fixed managed admin spawns without a held command item failing to save their
+  profiles. Recovery now isolates uncertain single-animal admissions while keeping
+  their capacity reserved, and safely narrows matching older owner-wide locks.
+
 - Added missing happiness food and caretaking labels in German, French, Canadian
   French, and Brazilian Portuguese.
 

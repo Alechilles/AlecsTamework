@@ -59,12 +59,21 @@ final class SqliteOperationContainmentEngine {
                         operation.operationId(),
                         operation.kind(),
                         TransactionReplayPolicy.SAFE_DATABASE_ONLY,
-                        connection -> write(
+                        connection -> {
+                            if (SqlitePopulationAdmissionContainmentRepair.REASON.equals(code)
+                                    && com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation
+                                    .supportsNarrowContainment(operation)
+                                    && !SqlitePopulationAdmissionContainmentRepair.intactReservations(
+                                    new SqlitePersistenceTransactionContext(connection), operation)) {
+                                throw new IllegalStateException("population_admission_containment_reservations_missing");
+                            }
+                            return write(
                                 new SqliteIncidentStore(connection),
                                 incident,
                                 exactScopes,
                                 containedAtMs
-                        )
+                            );
+                        }
                 );
         return units.execute(new SqliteUnitOfWork<>(
                 command,

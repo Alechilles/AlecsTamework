@@ -65,7 +65,13 @@ final class SqliteUnknownOperationContainmentRecovery {
             );
         }
         for (ScopeQuarantine quarantine : quarantines) {
-            if (quarantine.state() != QuarantineState.ACTIVE
+            boolean narrowedAdmissionFence = quarantine.state() == QuarantineState.RELEASED
+                    && SqlitePopulationAdmissionContainmentRepair.REASON.equals(incident.failureCode())
+                    && com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation
+                    .supportsNarrowContainment(operation)
+                    && (quarantine.scope().type() == com.alechilles.alecstamework.persistence.operation.OperationScopeType.OWNER
+                    || quarantine.scope().type() == com.alechilles.alecstamework.persistence.operation.OperationScopeType.FEATURE);
+            if ((!narrowedAdmissionFence && quarantine.state() != QuarantineState.ACTIVE)
                     || !allowed.contains(quarantine.scope())
                     || !incident.failureCode().equals(
                     quarantine.reasonCode()
@@ -74,6 +80,7 @@ final class SqliteUnknownOperationContainmentRecovery {
                         "unknown_recovery_quarantine_mismatch"
                 );
             }
+            if (narrowedAdmissionFence) continue;
             requireApplied(
                     transaction.incidents().release(
                             quarantine.scope(),

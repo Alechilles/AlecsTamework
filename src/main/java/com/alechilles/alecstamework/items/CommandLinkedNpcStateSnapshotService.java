@@ -264,20 +264,34 @@ public final class CommandLinkedNpcStateSnapshotService {
             Ref<EntityStore> reference,
             Store<EntityStore> store
     ) {
-        return refreshFromEntityStage(reference, store, true);
+        if (reference == null || !reference.isValid() || store == null) {
+            return failedRequiredAdminCapture("missing entity reference or store");
+        }
+        NPCEntity npc = store.getComponent(reference, NPCEntity.getComponentType());
+        UUID npcUuid = npc == null ? null : npc.getUuid();
+        if (npcUuid == null) {
+            return failedRequiredAdminCapture("missing NPC or NPC UUID");
+        }
+        LiveLinkedNpcSnapshot snapshot = snapshotFactory.captureAdminSpawn(
+                reference, store, npc, snapshotsByNpc.get(npcUuid)
+        );
+        if (snapshot == null) {
+            return failedRequiredAdminCapture("NPC snapshot could not be captured");
+        }
+        String worldKey = worldKey(store);
+        if (worldKey == null) {
+            return failedRequiredAdminCapture("missing world key");
+        }
+        snapshotsByNpc.put(npcUuid, snapshot);
+        CompletionStage<Void> publication = profileSnapshots.publish(snapshot, worldKey);
+        return publication == null
+                ? failedRequiredAdminCapture("profile sink returned no publication stage")
+                : publication;
     }
 
     private CompletionStage<Void> refreshFromEntityStage(
             Ref<EntityStore> reference,
             Store<EntityStore> store
-    ) {
-        return refreshFromEntityStage(reference, store, false);
-    }
-
-    private CompletionStage<Void> refreshFromEntityStage(
-            Ref<EntityStore> reference,
-            Store<EntityStore> store,
-            boolean publishProjection
     ) {
         if (reference == null || !reference.isValid() || store == null) {
             return CompletableFuture.completedFuture(null);
@@ -295,10 +309,17 @@ public final class CommandLinkedNpcStateSnapshotService {
             return CompletableFuture.completedFuture(null);
         }
         snapshotsByNpc.put(npcUuid, snapshot);
-        if (publishProjection || !hasProjectionIdentity(reference, store)) {
+        if (!hasProjectionIdentity(reference, store)) {
             return upsertProfile(snapshot, worldKey(store));
         }
         return CompletableFuture.completedFuture(null);
+    }
+
+    @Nonnull
+    private CompletionStage<Void> failedRequiredAdminCapture(@Nonnull String reason) {
+        return CompletableFuture.failedFuture(new IllegalStateException(
+                "Required admin spawn profile capture failed: " + reason
+        ));
     }
 
     @Nullable

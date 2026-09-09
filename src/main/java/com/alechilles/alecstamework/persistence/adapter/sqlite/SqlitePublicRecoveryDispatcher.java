@@ -366,6 +366,11 @@ final class SqlitePublicRecoveryDispatcher {
     private List<OperationScope> containmentScopes(
             OperationRecoveryClaim claim
     ) {
+        if (com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation
+                .supportsNarrowContainment(claim.operation())) {
+            return com.alechilles.alecstamework.companion.population.domain.PopulationDomainAdmissionOperation
+                    .containmentScopes(claim.operation());
+        }
         var descriptor = features.requireOperation(
                 claim.operation().kind()
         );

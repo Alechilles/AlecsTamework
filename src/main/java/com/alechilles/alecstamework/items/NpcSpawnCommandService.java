@@ -521,7 +521,8 @@ public final class NpcSpawnCommandService {
                             npcUuid,
                             tracker,
                             "Managed population admission did not commit.",
-                            commitFailure
+                            commitFailure != null ? commitFailure : new IllegalStateException(
+                                    decision == null ? "population_admission_result_missing" : decision.reason())
                     );
                     return;
                 }

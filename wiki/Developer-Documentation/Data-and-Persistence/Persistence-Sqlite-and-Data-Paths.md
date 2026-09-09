@@ -153,6 +153,13 @@ directly.
 
 ## Operator diagnostics
 
+An uncertain new single-animal population admission keeps its capacity reserved
+and blocks its exact operation and profile. It does not block unrelated animals
+owned by the same player. At startup, matching older owner-wide admission locks
+are narrowed only after the saved reservation and remaining locks are verified.
+The incident stays open; this repair does not assume the animal was created or
+cancel the reservation. Incomplete evidence remains protected.
+
 `/tw debug persistence status` and `health` print the same bounded
 replacement status: engine lineage, storage mode, target origin, schema
 version, startup state, operation counters, schema validation, and checkpoint

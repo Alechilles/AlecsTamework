@@ -78,7 +78,7 @@ final class PopulationDomainAdmissionRecovery {
                     operation,
                     "domain_admission_live_effect_unknown",
                     "Managed admission live effect requires positive child readback",
-                    operation.participants(),
+                    PopulationDomainAdmissionOperation.containmentScopes(operation),
                     clock.getAsLong()
             ).completion().handle((containment, failure) -> containmentResult(
                     operation, containment, failure

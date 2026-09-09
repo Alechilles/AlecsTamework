@@ -14,6 +14,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
+import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
@@ -29,6 +30,32 @@ import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 public final class PopulationDomainAdmissionOperation {
+    /** New single-profile admissions retain positive capacity while their live outcome is unknown. */
+    public static boolean supportsNarrowContainment(OperationEnvelope operation) {
+        if (!PopulationDomainAdmissionDefinition.KIND.equals(operation.kind())) return false;
+        try {
+            Payload payload = PopulationDomainAdmissionDefinition.INSTANCE.decode(operation.payloadJson());
+            return payload.ownerId() != null
+                    && operation.participants().contains(OperationScope.profile(payload.profileId()))
+                    && operation.participants().contains(OperationScope.operation(operation.operationId()))
+                    && payload.sourceLifecycle() == null && payload.sourceOwnerId() == null
+                    && payload.expectedLifecycleRevision() == null && payload.requestedCount() == 1
+                    && payload.provisionalChildIds().isEmpty() && !payload.domains().isEmpty()
+                    && payload.domains().stream().allMatch(domain ->
+                    domain.ownedDelta() >= 0 && domain.deployableDelta() >= 0);
+        } catch (RuntimeException malformed) {
+            return false;
+        }
+    }
+
+    /** Keeps uncertain new animals isolated without blocking unrelated work by the owner. */
+    public static List<OperationScope> containmentScopes(OperationEnvelope operation) {
+        if (!supportsNarrowContainment(operation)) return operation.participants();
+        return operation.participants().stream().filter(scope ->
+                scope.type() == com.alechilles.alecstamework.persistence.operation.OperationScopeType.PROFILE
+                        || scope.type() == com.alechilles.alecstamework.persistence.operation.OperationScopeType.OPERATION)
+                .toList();
+    }
     public static final String FEATURE_SCOPE = "population_domains";
     public static final ProjectionEventType EVENT_TYPE =
             new ProjectionEventType("population_domain_admission_committed");

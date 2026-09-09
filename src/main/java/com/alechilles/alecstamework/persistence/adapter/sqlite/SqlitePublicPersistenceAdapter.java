@@ -55,6 +55,7 @@ public final class SqlitePublicPersistenceAdapter {
     private final SqliteOperationReader operationReader;
     private final SqliteContainmentReader containmentReader;
     private final LongSupplier clock;
+    private final SqlitePopulationAdmissionContainmentRepair admissionContainmentRepair;
     private final PersistenceFeatureRegistry registry;
 
     public SqlitePublicPersistenceAdapter(
@@ -154,6 +155,7 @@ public final class SqlitePublicPersistenceAdapter {
                 kernel.units()
         );
         startup = new SqlitePublicStartupGateway(kernel.reads());
+        admissionContainmentRepair = new SqlitePopulationAdmissionContainmentRepair(kernel.units());
         control = new SqlitePublicControlGateway(
                 registry, kernel.units(), clock
         );
@@ -430,7 +432,7 @@ public final class SqlitePublicPersistenceAdapter {
     @Nonnull
     public CompletionStage<PersistenceReadResult<SqlitePublicCanonicalSnapshot>>
     loadCanonical() {
-        return startup.loadCanonical();
+        return admissionContainmentRepair.repair(clock.getAsLong()).thenCompose(ignored -> startup.loadCanonical());
     }
 
     /** Synchronizes circuits with the exact descriptor set and returns them. */

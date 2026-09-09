@@ -34,6 +34,34 @@ final class CommandLiveNpcSnapshotFactory {
             NPCEntity npc,
             @Nullable CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot previous
     ) {
+        return capture(npcRef, store, npc, previous, false);
+    }
+
+    /**
+     * Captures the required profile observation for an admitted admin spawn.
+     *
+     * <p>Admin-owned companions do not need a command-item link. Ordinary
+     * command refreshes still require one or more links so they do not begin
+     * publishing unrelated NPCs.</p>
+     */
+    @Nullable
+    CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot captureAdminSpawn(
+            Ref<EntityStore> npcRef,
+            Store<EntityStore> store,
+            NPCEntity npc,
+            @Nullable CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot previous
+    ) {
+        return capture(npcRef, store, npc, previous, true);
+    }
+
+    @Nullable
+    private CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot capture(
+            Ref<EntityStore> npcRef,
+            Store<EntityStore> store,
+            NPCEntity npc,
+            @Nullable CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot previous,
+            boolean allowUnlinked
+    ) {
         if (npcRef == null || !npcRef.isValid() || store == null
                 || npc == null || npc.getUuid() == null) {
             return null;
@@ -43,7 +71,7 @@ final class CommandLiveNpcSnapshotFactory {
         );
         String[] toolIds = links == null
                 ? new String[0] : sanitizeToolIds(links.getToolIds());
-        if (toolIds.length == 0) {
+        if (!allowUnlinked && toolIds.length == 0) {
             return null;
         }
 
@@ -51,7 +79,7 @@ final class CommandLiveNpcSnapshotFactory {
                 npcRef, store, TameworkOwnerComponent.getComponentType()
         );
         UUID ownerId = owner != null && owner.getOwnerId() != null
-                ? owner.getOwnerId() : links.getOwnerId();
+                ? owner.getOwnerId() : links == null ? null : links.getOwnerId();
         String ownerName = owner == null ? null : owner.getOwnerName();
 
         MountedNpcSnapshotRoleResolver.Resolution roleResolution =
@@ -76,7 +104,8 @@ final class CommandLiveNpcSnapshotFactory {
                                 npcRef, store, npc, roleId, customName
                         ),
                         position(npcRef, store),
-                        links.hasHome() ? links.getHomePosition() : null
+                        links != null && links.hasHome()
+                                ? links.getHomePosition() : null
                 );
         return roleResolution.temporarilyParked()
                 ? preserveParkedPresentation(captured, previous)
