@@ -50,4 +50,3 @@ class CommandOwnedActionServiceTest {
                 List.of(), List.of(), null);
     }
 }
-
