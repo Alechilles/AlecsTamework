@@ -463,9 +463,10 @@ Group {
     }
 
     Group #XpProgressRing {
-        Label { Anchor: (Top: 3, Left: 0, Width: 34, Height: 22); Text: "Lv."; Style: (FontSize: 14, TextColor: #9db9d3); }
         Anchor: (Top: 108, Left: 376, Width: 74, Height: 26);
         Visible: false;
+
+        Label { Anchor: (Top: 3, Left: 0, Width: 34, Height: 22); Text: "Lv."; Style: (FontSize: 14, TextColor: #9db9d3); }
 
         Group #RingTrackTopLeft { Visible: false;
             Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
