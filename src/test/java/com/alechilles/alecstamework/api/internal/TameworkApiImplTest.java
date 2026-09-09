@@ -83,7 +83,8 @@ class TameworkApiImplTest {
                     new SimpleClaimsTamedDamagePolicy()
             )) {
                 assertEquals("2.0.0", api.getApiVersion());
-                assertEquals(expectedCapabilities(), api.getCapabilities());
+                assertTrue(api.getCapabilities().containsAll(requiredCapabilities()),
+                        "Released capabilities must remain available; additive capabilities are compatible.");
 
                 assertEquals(
                         PROFILE_ID.toString(),
@@ -330,7 +331,7 @@ class TameworkApiImplTest {
         );
     }
 
-    private EnumSet<TameworkApiCapability> expectedCapabilities() {
+    private EnumSet<TameworkApiCapability> requiredCapabilities() {
         return EnumSet.of(
                 TameworkApiCapability.PROFILES,
                 TameworkApiCapability.COMMAND_LINKS,
@@ -353,6 +354,7 @@ class TameworkApiImplTest {
                 TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS,
                 TameworkApiCapability.HUSBANDRY_OUTCOMES,
                 TameworkApiCapability.HUSBANDRY_CARE_BONUSES,
+                TameworkApiCapability.HUSBANDRY_FLAT_CARE_BONUS,
                 TameworkApiCapability.HUSBANDRY_BREEDING_GENETICS
         );
     }

@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Added missing happiness food and caretaking labels in German, French, Canadian
+  French, and Brazilian Portuguese.
+
 - Fixed Abandon, Release, and Cull being blocked by another animal's owner-level
   recovery quarantine. Protected animals remain blocked, and failed removals show feedback.
 

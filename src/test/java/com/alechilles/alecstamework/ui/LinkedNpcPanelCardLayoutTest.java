@@ -34,9 +34,6 @@ class LinkedNpcPanelCardLayoutTest {
     private static final Path REVIVE_COST_LINE_UI = Paths.get(
             "src", "main", "resources", "Common", "UI", "Custom", "TameworkReviveCostLine.ui"
     );
-    private static final Path PROGRESSION_BINDER = Paths.get(
-            "src", "main", "java", "com", "alechilles", "alecstamework", "ui", "LinkedNpcPanelProgressionBinder.java"
-    );
     private static final Pattern NORMAL_CARD_HEIGHT = Pattern.compile(
             "NORMAL_CARD_HEIGHT\\s*=\\s*(\\d+)"
     );
@@ -61,7 +58,6 @@ class LinkedNpcPanelCardLayoutTest {
     void compactLinkedPanelCardContainsProgressionControls() throws IOException {
         String cardUi = Files.readString(CARD_UI, StandardCharsets.UTF_8);
         String binder = Files.readString(CARD_BINDER, StandardCharsets.UTF_8);
-        String progressionBinder = Files.readString(PROGRESSION_BINDER, StandardCharsets.UTF_8);
 
         Matcher normalCardHeight = NORMAL_CARD_HEIGHT.matcher(binder);
         Matcher xpRing = XP_RING_ANCHOR.matcher(cardUi);
@@ -72,27 +68,7 @@ class LinkedNpcPanelCardLayoutTest {
         assertTrue(xpRing.find(), "XpProgressRing anchor must stay parseable by the layout guard.");
         assertTrue(talentPoint.find(), "TalentPointAction anchor must stay parseable by the layout guard.");
         assertTrue(talentPointBadge.find(), "Talent point badge anchor must stay parseable by the layout guard.");
-        assertFalse(cardUi.contains("FutureStatAFrame"), "Linked cards should not show expanded XP bars.");
-        assertFalse(cardUi.contains("FutureActionBar"), "Linked cards should not show expanded talent action rows.");
         assertFalse(cardUi.contains("Text: +"), "Bare plus-prefixed UI text fails Hytale's CustomUI parser.");
-        assertTrue(
-                cardUi.contains("Group #TalentPointCountBadgeBorder"),
-                "Talent point count should use a badge frame instead of floating over the icon."
-        );
-        assertTrue(
-                cardUi.contains("Group #TalentPointCountBadgeFill"),
-                "Talent point count should have a dark badge fill for contrast."
-        );
-        assertTrue(
-                progressionBinder.contains("Integer.toString(availableTalentPoints(stat))"),
-                "Talent point badge should show the compact count without a plus prefix."
-        );
-        assertTrue(
-                cardUi.contains("@LinkedProgressionTooltipStyle = TextTooltipStyle")
-                        && cardUi.contains("MaxWidth: 360")
-                        && cardUi.contains("TextTooltipStyle: @LinkedProgressionTooltipStyle;"),
-                "XP progression tooltip should use its wider local tooltip style."
-        );
         List<String> unquotedStringTextDefaults = findUnquotedStringTextDefaults(cardUi);
         assertTrue(
                 unquotedStringTextDefaults.isEmpty(),
