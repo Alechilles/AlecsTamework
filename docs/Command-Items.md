@@ -198,7 +198,11 @@ tool's species filter or a radius limit. Saved unloaded and other-world animals
 remain visible. This view creates no command links and does not change bonded
 roster authority. Bulk live commands use owner scope in the current world;
 existing target limits and inactive-link choices still apply. Off-screen
-link-specific actions retain their existing link requirement.
+link-specific actions retain their existing link requirement. Unlinked off-screen
+rows offer confirmed Abandon through the existing permanent owner-population
+transition. This clears saved ownership, domain reservations, and command links;
+loaded source-world cleanup also clears the live owner-cap entry on its world
+thread. Captured and cooped animals must leave their storage lifecycle first.
 
 Owned discovery runs inside the existing open-panel refresh on the owning world
 thread. Each pass reads one immutable profile map and scans the current world's

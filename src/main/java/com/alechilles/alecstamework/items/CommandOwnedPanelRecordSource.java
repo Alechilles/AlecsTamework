@@ -20,6 +20,18 @@ final class CommandOwnedPanelRecordSource {
         this.profiles = profiles;
     }
 
+    /** Resolves a server-generated Owned row without treating its UUID as ownership authority. */
+    java.util.Optional<ProfileId> profileForRow(UUID ownerUuid, UUID rowUuid) {
+        if (ownerUuid == null || rowUuid == null) return java.util.Optional.empty();
+        return profiles.get().values().stream()
+                .filter(profile -> profile.ownerId() != null
+                        && ownerUuid.equals(profile.ownerId().value())
+                        && profile.lifecycleState() != LifecycleState.RELEASED)
+                .filter(profile -> rowUuid.equals(CommandRosterPanelRecordSource.presentationUuid(profile.profileId()))
+                        || profile.currentAlias() != null && rowUuid.equals(profile.currentAlias().value()))
+                .map(CompanionProfileProjectionState::profileId).findFirst();
+    }
+
     List<LinkedNpcRecord> recordsFor(UUID ownerUuid) {
         return recordsFor(ownerUuid, List.of());
     }

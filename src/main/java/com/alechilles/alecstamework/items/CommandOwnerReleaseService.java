@@ -23,6 +23,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.nio.charset.StandardCharsets;
@@ -87,8 +88,12 @@ final class CommandOwnerReleaseService {
             releaseLive(player, config, npcUuid);
             return;
         }
-        findProfile(npcUuid)
-                .whenComplete((read, failure) -> completeRead(
+        var ownedProfile = new CommandOwnedPanelRecordSource(
+                persistence.queries()::projectedProfileSnapshot).profileForRow(ownerUuid, npcUuid);
+        // The row lookup is presentation data; completeRead rechecks the durable owner and revision.
+        var profileRead = ownedProfile.isPresent()
+                ? persistence.queries().findProfile(ownedProfile.get()) : findProfile(npcUuid);
+        profileRead.whenComplete((read, failure) -> completeRead(
                         ownerUuid, npcUuid, read, failure
                 ));
     }
@@ -156,8 +161,15 @@ final class CommandOwnerReleaseService {
                 warnUnavailable(ownerUuid);
                 return;
             }
+            String sourceWorldName = lifecycle.location().worldKey();
+            if (sourceWorldName != null && Universe.get() != null) {
+                World sourceWorld = Universe.get().getWorld(sourceWorldName);
+                if (sourceWorld != null) {
+                    sourceWorld.execute(() -> releaseLiveEntity(sourceWorld, ownerUuid, liveAlias));
+                }
+            }
             dispatch(ownerUuid, current -> {
-                releaseLiveEntity(current, liveAlias);
+                releaseLiveEntity(current.getWorld(), ownerUuid, liveAlias);
                 if (inventoryRepair != null) {
                     inventoryRepair.canonicalize(current);
                 }
@@ -234,15 +246,15 @@ final class CommandOwnerReleaseService {
         );
     }
 
-    private void releaseLiveEntity(Player player, UUID npcUuid) {
-        World world = player.getWorld();
+    private void releaseLiveEntity(World world, UUID ownerUuid, UUID npcUuid) {
         Store<EntityStore> store = world == null || world.getEntityStore() == null
                 ? null : world.getEntityStore().getStore();
         Ref<EntityStore> npcRef = store == null ? null : world.getEntityRef(npcUuid);
         NPCEntity npc = npcRef == null || !npcRef.isValid() ? null
                 : store.getComponent(npcRef, NPCEntity.getComponentType());
         if (npc == null || !CommandGenericTargetAuthority
-                .allowsGenericTargetMutation(npcRef, store)) {
+                .allowsGenericTargetMutation(npcRef, store)
+                || !linkPolicyService.passesOwnerAndTamed(true, false, npcRef, ownerUuid, store)) {
             return;
         }
         clearOwner(npcRef, store);

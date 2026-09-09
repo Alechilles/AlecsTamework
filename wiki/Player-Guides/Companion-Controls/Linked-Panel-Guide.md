@@ -40,8 +40,11 @@ dead companions continue to show their saved progression snapshot.
 - `OwnedMode` shows all your owned animals, including saved animals in unloaded chunks
   and other worlds, regardless of item links or the current tool's species filter.
   It has no radius limit. Unlinked animals that are off-screen show their saved
-  status; linking and local management require the animal to be loaded in your world.
-  Recall, home, and other link-specific actions still require a link to this tool.
+  status. Use their removal controls and confirm **Abandon** to permanently clear
+  ownership and free ownership-limit slots, even in another world or unloaded chunk.
+  Captured animals and coop occupants must be released from storage first.
+  Linking and culling require the animal to be loaded in your world. Recall, home,
+  and other link-specific actions still require a link to this tool.
   Bonded-companion tools keep their separate roster controls.
 
 ## Sorting and filtering

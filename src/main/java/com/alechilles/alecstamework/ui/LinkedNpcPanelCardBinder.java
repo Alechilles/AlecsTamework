@@ -167,9 +167,9 @@ final class LinkedNpcPanelCardBinder {
                         && entry.loaded() && !entry.dead() && !entry.captured() && !entry.inCoop() && !entry.lost();
         boolean showLink = !legacyLinked && !managedRoster && entry.loaded()
                 && !entry.dead() && !entry.captured() && !entry.inCoop() && !entry.lost() && !pendingUnlink;
-        boolean showUnlink = legacyLinked || canOpenReleaseActions;
-        boolean showRelease = pendingUnlink && (canOpenReleaseActions
-                || legacyLinked && !entry.captured() && !entry.inCoop());
+        boolean canAbandon = !managedRoster && !entry.captured() && !entry.inCoop();
+        boolean showUnlink = legacyLinked || canOpenReleaseActions || canAbandon;
+        boolean showRelease = pendingUnlink && canAbandon;
         boolean showCull = pendingUnlink && canOpenReleaseActions;
         boolean showActiveToggleActive = legacyLinked && entry.active() && !pendingUnlink;
         boolean showActiveToggleInactive = legacyLinked && !entry.active() && !pendingUnlink;
@@ -211,7 +211,7 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(statusConfirmSelector + ".Visible", pendingUnlink);
         commandBuilder.set(
                 statusConfirmSelector + ".Text",
-                legacyLinked
+                legacyLinked || !canOpenReleaseActions
                         ? LocalizedText.resolve(language, "tamework.ui.linkedPanel.card.confirmRemove")
                         : LocalizedText.resolve(language, "tamework.ui.linkedPanel.card.releaseOrCull")
         );
@@ -289,7 +289,7 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(setHomeSelector + ".Visible", showSetHome);
         commandBuilder.set(returnHomeSelector + ".Visible", showReturnHome);
         commandBuilder.set(releaseSelector + ".Visible", showRelease);
-        commandBuilder.set(releaseSelector + ".Text", legacyLinked
+        commandBuilder.set(releaseSelector + ".Text", legacyLinked || !canOpenReleaseActions
                 ? LocalizedText.resolve(language,
                 "tamework.ui.linkedPanel.card.button.abandon")
                 : LocalizedText.resolve(language,

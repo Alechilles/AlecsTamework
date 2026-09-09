@@ -77,6 +77,18 @@ class CommandOwnedPanelRecordSourceTest {
         }
     }
 
+    /** An unaliased Owned card can be abandoned only through its owner's stable profile. */
+    @Test
+    void resolvesUnaliasedRowForItsOwnerAndRejectsForgedOwner() {
+        UUID owner = UUID.randomUUID();
+        var profile = profile(owner, LifecycleState.LOST, null, Set.of());
+        var source = new CommandOwnedPanelRecordSource(() -> Map.of(profile.profileId(), profile));
+        UUID row = source.recordsFor(owner).getFirst().npcUuid;
+        assertEquals(profile.profileId(), source.profileForRow(owner, row).orElseThrow());
+        assertTrue(source.profileForRow(UUID.randomUUID(), row).isEmpty());
+        assertTrue(source.profileForRow(owner, UUID.randomUUID()).isEmpty());
+    }
+
     private static CompanionProfileProjectionState profile(UUID owner, LifecycleState state,
             UUID alias, Set<UUID> links) {
         return new CompanionProfileProjectionState(new ProfileId(UUID.randomUUID()),
