@@ -34,6 +34,42 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class CompanionHappinessModifierServiceTest {
     @Test
+    void disabledNeedsKeepFullBandAndCareHappinessWithoutChangingStoredNeeds() {
+        var config = TwHappinessConfig.CODEC.decode(BsonDocument.parse("""
+                {"Modifiers":{
+                  "Hunger":{"Enabled":true,"Bands":[
+                    {"Id":"hungry","MinPercent":0,"MaxPercent":99,"Offset":-10},
+                    {"Id":"full","MinPercent":99,"MaxPercent":100,"Offset":20,"CareBonus":true}]},
+                  "Thirst":{"Enabled":true,"Bands":[
+                    {"Id":"thirsty","MinPercent":0,"MaxPercent":99,"Offset":-5},
+                    {"Id":"full","MinPercent":99,"MaxPercent":100,"Offset":10,"CareBonus":true}]}
+                }}
+                """), new ExtraInfo());
+        var needsConfig = com.alechilles.alecstamework.config.assets.TwNeedsConfig.CODEC.decode(
+                BsonDocument.parse("{}"), new ExtraInfo());
+        var needs = new com.alechilles.alecstamework.npc.components.TameworkNeedsComponent();
+        needs.setHunger(0);
+        needs.setThirst(0);
+        var care = new HusbandryOutcomeModifiers(1, 1, 0, 0, 1, 3, 4, 0);
+        var modifiers = new java.util.ArrayList<CompanionHappinessModifierService.ModifierEntry>();
+
+        assertEquals(37, CompanionHappinessModifierService.resolveNeedsModifiers(
+                needs, needsConfig, config, false, 1, care, modifiers), 0.000001);
+        assertTrue(modifiers.stream().anyMatch(entry -> entry.label().contains("needs disabled")));
+        assertEquals(0, needs.getHunger());
+        assertEquals(0, needs.getThirst());
+        modifiers.clear();
+        assertEquals(37, CompanionHappinessModifierService.resolveNeedsModifiers(
+                null, needsConfig, config, false, 1, care, modifiers), 0.000001);
+        modifiers.clear();
+        assertEquals(-15, CompanionHappinessModifierService.resolveNeedsModifiers(
+                needs, needsConfig, config, true, 1, care, modifiers), 0.000001);
+        modifiers.clear();
+        assertEquals(0, CompanionHappinessModifierService.resolveNeedsModifiers(
+                null, null, config, false, 1, care, modifiers), 0.000001);
+    }
+
+    @Test
     void flatDispositionMapsStoredScoresWithoutChangingTheirCanonicalValue() {
         TwHappinessConfig defaultConfig = TwHappinessConfig.CODEC.decode(
                 BsonDocument.parse("{\"Disposition\":{\"Mode\":\"FLAT\"}}"), new ExtraInfo());

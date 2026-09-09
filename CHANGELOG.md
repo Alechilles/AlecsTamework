@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Disabled needs now count as full hunger and thirst for happiness, including
+  eligible husbandry care bonuses, so breeding remains reachable.
+
 - Companion action icons now share matching normal and hovered button frames.
   The red X opens Release and Unlink in every generic panel mode, plus Cull for
   loaded living animals. Release replaces Abandon, including off-screen cleanup.

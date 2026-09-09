@@ -52,34 +52,8 @@ public final class CompanionHappinessModifierService {
 
         TameworkNeedsComponent needs = resolveNeedsComponent(npcRef, store);
         TwNeedsConfig needsConfig = NeedsConfigResolver.resolveConfig(npcRef, store, needs);
-        if (needs != null && NeedsConfigResolver.isRuntimeEnabled(needsConfig)) {
-            BandResolution hunger = resolveNeedOffset(
-                    "hunger",
-                    "Hunger",
-                    happinessConfig.getModifiers().getHunger(),
-                    needs.getHunger(),
-                    needsConfig.getValues().getHungerMin(),
-                    needsConfig.getValues().getHungerMax(),
-                    dispositionMultiplier,
-                    modifiers
-            );
-            offsetTotal += hunger.offset();
-            offsetTotal += addCareBonus("hunger_care", "Husbandry Care: Hunger", hunger.careBonus(),
-                    careModifiers.happinessHungerBonus(), modifiers);
-            BandResolution thirst = resolveNeedOffset(
-                    "thirst",
-                    "Thirst",
-                    happinessConfig.getModifiers().getThirst(),
-                    needs.getThirst(),
-                    needsConfig.getValues().getThirstMin(),
-                    needsConfig.getValues().getThirstMax(),
-                    dispositionMultiplier,
-                    modifiers
-            );
-            offsetTotal += thirst.offset();
-            offsetTotal += addCareBonus("thirst_care", "Husbandry Care: Thirst", thirst.careBonus(),
-                    careModifiers.happinessThirstBonus(), modifiers);
-        }
+        offsetTotal += resolveNeedsModifiers(needs, needsConfig, happinessConfig,
+                NeedsConfigResolver.isRuntimeEnabled(needsConfig), dispositionMultiplier, careModifiers, modifiers);
         BandResolution population = resolvePopulationOffset(npcRef, store, happinessConfig, dispositionMultiplier, modifiers);
         offsetTotal += population.offset();
         offsetTotal += addCareBonus("population_care", "Husbandry Care: Population", population.careBonus(),
@@ -109,6 +83,46 @@ public final class CompanionHappinessModifierService {
 
         double target = baseSetpoint + offsetTotal;
         return new ModifierSnapshot(baseSetpoint, target, List.copyOf(modifiers));
+    }
+
+    // Disabled needs count as satisfied without modifying stored hunger or thirst.
+    static double resolveNeedsModifiers(@Nullable TameworkNeedsComponent needs,
+                                        @Nullable TwNeedsConfig needsConfig,
+                                        @Nonnull TwHappinessConfig happinessConfig,
+                                        boolean needsEnabled,
+                                        double dispositionMultiplier,
+                                        @Nonnull HusbandryOutcomeModifiers careModifiers,
+                                        @Nonnull List<ModifierEntry> modifiers) {
+        double offsetTotal = 0.0;
+        if (needsConfig != null && (!needsEnabled || needs != null)) {
+            BandResolution hunger = resolveNeedOffset(
+                    "hunger",
+                    needsEnabled ? "Hunger" : "Hunger (needs disabled)",
+                    happinessConfig.getModifiers().getHunger(),
+                    needsEnabled ? needs.getHunger() : needsConfig.getValues().getHungerMax(),
+                    needsConfig.getValues().getHungerMin(),
+                    needsConfig.getValues().getHungerMax(),
+                    dispositionMultiplier,
+                    modifiers
+            );
+            offsetTotal += hunger.offset();
+            offsetTotal += addCareBonus("hunger_care", "Husbandry Care: Hunger", hunger.careBonus(),
+                    careModifiers.happinessHungerBonus(), modifiers);
+            BandResolution thirst = resolveNeedOffset(
+                    "thirst",
+                    needsEnabled ? "Thirst" : "Thirst (needs disabled)",
+                    happinessConfig.getModifiers().getThirst(),
+                    needsEnabled ? needs.getThirst() : needsConfig.getValues().getThirstMax(),
+                    needsConfig.getValues().getThirstMin(),
+                    needsConfig.getValues().getThirstMax(),
+                    dispositionMultiplier,
+                    modifiers
+            );
+            offsetTotal += thirst.offset();
+            offsetTotal += addCareBonus("thirst_care", "Husbandry Care: Thirst", thirst.careBonus(),
+                    careModifiers.happinessThirstBonus(), modifiers);
+        }
+        return offsetTotal;
     }
 
     @Nullable

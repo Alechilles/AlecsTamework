@@ -18,6 +18,9 @@ Many Tamework-powered mods share a cluster of long-term progression systems. The
 - Some mods also show short-lived active happiness impulses (for example recent feed, pet, or damage effects)
 
 ## Needs
+- When needs are disabled, happiness treats hunger and thirst as full, including
+  eligible care bonuses. Breeding still requires happiness, and other happiness
+  factors still apply. This does not refill saved hunger or thirst.
 - Hunger and thirst are the most common needs
 - Needs can decay over time and may refill from manual feeding, passive sources, or resource-seeking behavior
 - Poor needs often reduce happiness or block other behaviors
