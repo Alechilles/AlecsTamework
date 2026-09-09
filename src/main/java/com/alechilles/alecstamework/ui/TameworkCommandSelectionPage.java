@@ -81,6 +81,7 @@ public final class TameworkCommandSelectionPage
     final LinkedNpcPanelCardRenderState cardRenderState;
     final LinkedNpcPanelRefreshTransaction refreshTransaction = new LinkedNpcPanelRefreshTransaction();
     UUID pendingUnlinkNpcUuid;
+    final LinkedNpcPanelPendingRemovals pendingRemovals = new LinkedNpcPanelPendingRemovals();
     private final String selectedCommandId;
     private final Consumer<String> selectionCallback;
     private final CommandSelectionHotswapController hotswapController;
@@ -712,6 +713,7 @@ public final class TameworkCommandSelectionPage
             UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, RELEASE_COMMAND_PREFIX);
             if (npcUuid != null) {
                 releaseCallback.accept(npcUuid);
+                pendingRemovals.hide(npcUuid);
                 pendingUnlinkNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
@@ -725,6 +727,7 @@ public final class TameworkCommandSelectionPage
             UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, CULL_COMMAND_PREFIX);
             if (npcUuid != null) {
                 cullCallback.accept(npcUuid);
+                pendingRemovals.hide(npcUuid);
                 pendingUnlinkNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
@@ -892,6 +895,7 @@ public final class TameworkCommandSelectionPage
             return true;
         }
         rosterAbandonCallback.accept(decision.npcUuid(), ref, store);
+        pendingRemovals.hide(decision.npcUuid());
         pendingUnlinkNpcUuid = null;
         refreshLinkedNpcEntries();
         sendCardRefreshUpdate();

@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Abandon, Release, and Cull hide the clicked companion card immediately while
+  the saved state updates. Unconfirmed removals return after five seconds.
+
 - Fixed managed admin spawns without a held command item failing to save their
   profiles. Recovery now isolates uncertain single-animal admissions while keeping
   their capacity reserved, and safely narrows matching older owner-wide locks.

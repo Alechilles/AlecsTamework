@@ -244,8 +244,12 @@ final class CommandSelectionLinkedPanelRuntime {
     }
 
     long shortestCountdown() {
-        return LinkedNpcPanelCountdowns.shortest(
+        long removal = page.pendingRemovals.remainingMillis();
+        long visible = LinkedNpcPanelCountdowns.shortest(
                 page.featureController.presentations(), page.linkedNpcEntries);
+        if (removal == Long.MAX_VALUE) return visible;
+        return visible == LinkedPanelRefreshCoordinator.NO_COUNTDOWN_REMAINING_MS
+                ? removal : Math.min(removal, visible);
     }
 
     void seedRefreshValues() {
@@ -322,7 +326,7 @@ final class CommandSelectionLinkedPanelRuntime {
 
     void applyLocalFilter() {
         page.linkedNpcEntries = LinkedNpcPanelPresentationSupport.filter(
-                page.baseLinkedNpcEntries,
+                page.pendingRemovals.filter(page.baseLinkedNpcEntries),
                 LinkedNpcPanelPresentationSupport.filterMode(
                         page.panelFilterModeValueSupplier),
                 LinkedNpcPanelPresentationSupport.input(
