@@ -427,7 +427,7 @@ Group {
     }
 
     Label #StatusConfirm {
-        Anchor: (Top: 30, Right: 18, Width: 118, Height: 18);
+        Anchor: (Top: 8, Right: 18, Width: 118, Height: 18);
         Text: %server.tamework.ui.linkedPanel.card.confirmRemove;
         Style: (FontSize: 10, RenderBold: true, TextColor: #ffd3d3, HorizontalAlignment: Center, VerticalAlignment: Center);
         Visible: false;
@@ -441,7 +441,7 @@ Group {
     }
 
     TextButton #LinkButton {
-        Anchor: (Top: 56, Right: 0, Width: 64, Height: 22);
+        Anchor: (Top: 30, Right: 0, Width: 64, Height: 22);
         Style: (...$C.@SmallSecondaryTextButtonStyle, Sounds: $C.@ButtonSounds);
         Padding: (Horizontal: 8);
         Text: %server.tamework.ui.linkedPanel.card.button.link;
@@ -451,7 +451,7 @@ Group {
     }
 
     TextButton #ReleaseButton {
-        Anchor: (Top: 56, Right: 66, Width: 72, Height: 22);
+        Anchor: (Top: 30, Right: 66, Width: 72, Height: 22);
         Style: (...$C.@SmallSecondaryTextButtonStyle, Sounds: $C.@ButtonSounds);
         Padding: (Horizontal: 4);
         Text: %server.tamework.ui.linkedPanel.card.button.release;
@@ -461,7 +461,7 @@ Group {
     }
 
     TextButton #CullButton {
-        Anchor: (Top: 56, Right: 0, Width: 62, Height: 22);
+        Anchor: (Top: 30, Right: 0, Width: 62, Height: 22);
         Style: (...$C.@SmallSecondaryTextButtonStyle, Sounds: $C.@ButtonSounds);
         Padding: (Horizontal: 4);
         Text: %server.tamework.ui.linkedPanel.card.button.cull;
