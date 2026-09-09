@@ -12,16 +12,40 @@ import org.junit.jupiter.api.Test;
 class LinkedNpcPanelVitalsBinderTest {
     private static final String MARKER = "#Card #NeedHappiness #BreedingThresholdMarker";
 
+    @Test
+    void rendersNeedAsHorizontalMeterWithClampedFill() {
+        UICommandBuilder commands = bind(entry(true));
+        UICommandBuilder expected = new UICommandBuilder();
+        Anchor anchor = new Anchor();
+        anchor.setLeft(Value.of(46));
+        anchor.setTop(Value.of(16));
+        anchor.setWidth(Value.of(65));
+        anchor.setHeight(Value.of(6));
+        expected.setObject("#Card #NeedHappiness #MeterFill.Anchor", anchor);
+        Assertions.assertEquals(
+                data(expected, "#Card #NeedHappiness #MeterFill.Anchor"),
+                data(commands, "#Card #NeedHappiness #MeterFill.Anchor")
+        );
+    }
+
+    @Test
+    void formatsCooldownClockAsMinutesAndSeconds() {
+        Assertions.assertEquals("0:01", LinkedNpcPanelStatusMeter.formatRemainingClock(1L));
+        Assertions.assertEquals("1:05", LinkedNpcPanelStatusMeter.formatRemainingClock(65_000L));
+        Assertions.assertEquals("60:00", LinkedNpcPanelStatusMeter.formatRemainingClock(3_600_000L));
+        Assertions.assertEquals("0:00", LinkedNpcPanelStatusMeter.formatRemainingClock(-1L));
+    }
+
     // Catches a tick placed on the wrong side/direction of the segmented meter,
     // including threshold data lost while normalizing or copying the panel entry.
     @Test
     void rendersBreedingThresholdAtItsHappinessFillPosition() {
-        assertMarker(0.10, 3, 0, 2, 3);
-        assertMarker(0.25, 0, 10, 3, 2);
-        assertMarker(0.50, 10, 21, 2, 3);
-        assertMarker(0.70, 21, 17, 3, 2);
-        assertMarker(0.95, 17, 0, 2, 3);
-        assertMarker(1.0, 12, 0, 2, 3);
+        assertMarker(0.10, 59, 14, 2, 10);
+        assertMarker(0.25, 78, 14, 2, 10);
+        assertMarker(0.50, 110, 14, 2, 10);
+        assertMarker(0.70, 136, 14, 2, 10);
+        assertMarker(0.95, 168, 14, 2, 10);
+        assertMarker(1.0, 174, 14, 2, 10);
     }
 
     private static void assertMarker(

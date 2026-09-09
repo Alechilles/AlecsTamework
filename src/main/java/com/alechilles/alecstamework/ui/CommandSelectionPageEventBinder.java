@@ -10,6 +10,7 @@ import javax.annotation.Nonnull;
  */
 final class CommandSelectionPageEventBinder {
     static final String EVENT_COMMAND_ID = "CommandId";
+    static final String KEY_PRIMARY_VALUE = "@PrimaryCommandValue";
     static final String KEY_PANEL_MODE_VALUE = "@PanelModeValue";
     static final String KEY_PANEL_AUTO_LINK_ENABLED =
             "@PanelAutoLinkEnabled";
@@ -165,6 +166,7 @@ final class CommandSelectionPageEventBinder {
     }
 
     static void bindClose(@Nonnull UIEventBuilder events) {
+        bindValue(events, "#TameworkCommandPrimary", KEY_PRIMARY_VALUE);
         bindAction(
                 events, "#CommandMenuCloseButton", CLOSE_COMMAND_ID
         );

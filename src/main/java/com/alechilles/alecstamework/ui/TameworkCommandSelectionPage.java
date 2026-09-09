@@ -82,7 +82,7 @@ public final class TameworkCommandSelectionPage
     final LinkedNpcPanelRefreshTransaction refreshTransaction = new LinkedNpcPanelRefreshTransaction();
     UUID pendingUnlinkNpcUuid;
     final LinkedNpcPanelPendingRemovals pendingRemovals = new LinkedNpcPanelPendingRemovals();
-    private final String selectedCommandId;
+    private String selectedCommandId;
     private final Consumer<String> selectionCallback;
     private final CommandSelectionHotswapController hotswapController;
     private final Consumer<UUID> linkCallback;
@@ -385,7 +385,7 @@ public final class TameworkCommandSelectionPage
         try {
             refreshLinkedNpcEntries();
             commandBuilder.append(UI_PATH);
-            commandBuilder.append(LINKED_PANEL_UI_PATH);
+            commandBuilder.append("#TameworkCommandMenuWheel", LINKED_PANEL_UI_PATH);
             BondedCompanionPanelChrome.bind(commandBuilder, rosterEventBoundary.bondedRoster());
             commandBuilder.set("#TameworkCommandMenuWheel.Visible", true);
             commandBuilder.set("#TameworkCommandMenuTitle.Text", LocalizedText.resolve(playerRef, "tamework.ui.commandMenu.title"));
@@ -396,7 +396,7 @@ public final class TameworkCommandSelectionPage
                             options, selectedCommandId, resolveLanguage()
                     )
             );
-            hotswapController.build(commandBuilder);
+            hotswapController.build(commandBuilder, options, selectedCommandId);
             commandBuilder.set("#TameworkLinkedPanelRoot.Visible", true);
             commandBuilder.set("#TameworkLinkedPanelTitle.Text", LinkedNpcPanelPresentationSupport.title(panelModeValueSupplier, linkedNpcEntries, resolveLanguage()));
             commandBuilder.set("#TameworkLinkedPanelGroupSelectorDropdown.Entries", LinkedNpcPanelPresentationSupport.entries(panelGroupActivationEntriesSupplier));
@@ -451,6 +451,13 @@ public final class TameworkCommandSelectionPage
     public void handleDataEvent(@Nonnull Ref<EntityStore> ref,
                                 @Nonnull Store<EntityStore> store,
                                 @Nonnull CommandSelectionEventData data) {
+        if (data.primaryCommandValue != null) {
+            if (!dismissed && !navigationPending && CommandSelectionOptionSource.contains(options, data.primaryCommandValue)) {
+                selectionCallback.accept(data.primaryCommandValue);
+                selectedCommandId = data.primaryCommandValue;
+            }
+            return;
+        }
         if (data.hotswapQValue != null) {
             hotswapController.apply(Slot.Q, data.hotswapQValue);
             return;

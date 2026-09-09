@@ -34,7 +34,21 @@ final class CommandSelectionHotswapController {
         this.assignmentCallback = assignmentCallback;
     }
 
-    void build(@Nonnull UICommandBuilder commands) {
+    void build(@Nonnull UICommandBuilder commands,
+               @Nonnull CommandSelectionOptionSource.Option[] primaryOptions,
+               String selectedCommandId) {
+        List<DropdownEntryInfo> primaryEntries = new ArrayList<>();
+        for (CommandSelectionOptionSource.Option option : primaryOptions) {
+            if (option != null) {
+                primaryEntries.add(new DropdownEntryInfo(
+                        LocalizableString.fromString(option.label()), option.id()
+                ));
+            }
+        }
+        commands.set("#TameworkCommandPrimary.Entries", primaryEntries);
+        commands.set("#TameworkCommandPrimary.Value",
+                selectedCommandId == null ? "" : selectedCommandId);
+
         List<DropdownEntryInfo> entries = new ArrayList<>();
         entries.add(new DropdownEntryInfo(LocalizableString.fromString("Unassigned"), ""));
         if (!config.usesBondedCompanionRoster()) {

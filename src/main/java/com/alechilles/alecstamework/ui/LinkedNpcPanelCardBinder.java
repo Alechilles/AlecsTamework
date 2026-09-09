@@ -12,8 +12,8 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
  * Binds one linked-panel NPC card including visual state and per-row interaction handlers.
  */
 final class LinkedNpcPanelCardBinder {
-    private static final int NORMAL_CARD_HEIGHT = 88;
-    private static final int ROSTER_CARD_HEIGHT = 126;
+    private static final int NORMAL_CARD_HEIGHT = 252;
+    private static final int ROSTER_CARD_HEIGHT = 282;
 
     static void bindBreedingTooltips(UICommandBuilder commands, String selector,
                                      LinkedNpcEntry entry, String language) {
@@ -223,15 +223,15 @@ final class LinkedNpcPanelCardBinder {
                 LocalizedText.resolve(language, "tamework.ui.linkedPanel.card.releaseOrCull")
         );
         commandBuilder.set(linkSelector + ".Visible", showLink);
-        commandBuilder.set(removeSelector + ".Visible", removalMenuAvailable);
-        commandBuilder.set(unlinkSelector + ".Visible", showUnlink);
-        commandBuilder.set(unlinkDisabledSelector + ".Visible", showUnlinkDisabled);
+        LinkedNpcPanelIconStyles.visible(commandBuilder, removeSelector, removalMenuAvailable);
+        LinkedNpcPanelIconStyles.visible(commandBuilder, unlinkSelector, showUnlink);
+        LinkedNpcPanelIconStyles.visible(commandBuilder, unlinkDisabledSelector, showUnlinkDisabled);
         commandBuilder.set(activeToggleActiveSelector + ".Visible", showActiveToggleActive);
         commandBuilder.set(activeToggleInactiveSelector + ".Visible", showActiveToggleInactive);
-        commandBuilder.set(breedingToggleEnabledSelector + ".Visible", showBreedingToggleEnabled);
-        commandBuilder.set(breedingToggleDisabledSelector + ".Visible", showBreedingToggleDisabled);
+        LinkedNpcPanelIconStyles.visible(commandBuilder, breedingToggleEnabledSelector, showBreedingToggleEnabled);
+        LinkedNpcPanelIconStyles.visible(commandBuilder, breedingToggleDisabledSelector, showBreedingToggleDisabled);
         bindBreedingTooltips(commandBuilder, entrySelector, entry, language);
-        commandBuilder.set(flightToggleSelector + ".Visible", showFlightToggle);
+        LinkedNpcPanelIconStyles.visible(commandBuilder, flightToggleSelector, showFlightToggle);
         commandBuilder.set(flightModeGroundedSelector + ".Visible",
                 showFlightToggle && !entry.flightToggleAirborne());
         commandBuilder.set(flightModeAirborneSelector + ".Visible",
@@ -241,7 +241,7 @@ final class LinkedNpcPanelCardBinder {
                         ? "tamework.ui.linkedPanel.bonded.flight.switchToGround"
                         : "tamework.ui.linkedPanel.bonded.flight.switchToFlight")
                 : "");
-        commandBuilder.set(shoulderRideSelector + ".Visible", showShoulderRide);
+        LinkedNpcPanelIconStyles.visible(commandBuilder, shoulderRideSelector, showShoulderRide);
         commandBuilder.set(shoulderRideIconSelector + ".Visible", showShoulderRide);
         commandBuilder.set(shoulderRideSelector + ".Text", "");
         commandBuilder.set(shoulderRideSelector + ".TooltipText", showShoulderRide
@@ -283,7 +283,7 @@ final class LinkedNpcPanelCardBinder {
                 entry.futureStatB(),
                 showTalentPointAction
         );
-        commandBuilder.set(respawnSelector + ".Visible", showRespawn);
+        LinkedNpcPanelIconStyles.visible(commandBuilder, respawnSelector, showRespawn);
         LinkedNpcPanelFeatureBinder.bind(
                 commandBuilder,
                 eventBuilder,
@@ -294,15 +294,29 @@ final class LinkedNpcPanelCardBinder {
                 language
         );
         LinkedNpcPanelIconStyles.apply(commandBuilder, entrySelector, entry);
-        commandBuilder.set(locateSelector + ".Visible", showLocate);
-        commandBuilder.set(recallSelector + ".Visible", showRecall);
-        commandBuilder.set(setHomeSelector + ".Visible", showSetHome);
-        commandBuilder.set(returnHomeSelector + ".Visible", showReturnHome);
-        commandBuilder.set(releaseSelector + ".Visible", showRelease);
-        commandBuilder.set(releaseDisabledSelector + ".Visible", showReleaseDisabled);
+        int behaviorRight = 386;
+        if (showShoulderRide) {
+            LinkedNpcPanelIconStyles.placeBehavior(commandBuilder, shoulderRideSelector, behaviorRight);
+            behaviorRight -= 76;
+        }
+        if (showFlightToggle) {
+            LinkedNpcPanelIconStyles.placeBehavior(commandBuilder, flightToggleSelector, behaviorRight);
+            behaviorRight -= 76;
+        }
+        if (showBreedingToggleEnabled || showBreedingToggleDisabled) {
+            LinkedNpcPanelIconStyles.placeBehavior(commandBuilder,
+                    showBreedingToggleEnabled ? breedingToggleEnabledSelector : breedingToggleDisabledSelector,
+                    behaviorRight);
+        }
+        LinkedNpcPanelIconStyles.visible(commandBuilder, locateSelector, showLocate);
+        LinkedNpcPanelIconStyles.visible(commandBuilder, recallSelector, showRecall);
+        LinkedNpcPanelIconStyles.visible(commandBuilder, setHomeSelector, showSetHome);
+        LinkedNpcPanelIconStyles.visible(commandBuilder, returnHomeSelector, showReturnHome);
+        LinkedNpcPanelIconStyles.visible(commandBuilder, releaseSelector, showRelease);
+        LinkedNpcPanelIconStyles.visible(commandBuilder, releaseDisabledSelector, showReleaseDisabled);
         commandBuilder.set(releaseSelector + ".Text", LocalizedText.resolve(language,
                 "tamework.ui.linkedPanel.card.button.release"));
-        commandBuilder.set(cullSelector + ".Visible", showCull);
+        LinkedNpcPanelIconStyles.visible(commandBuilder, cullSelector, showCull);
         LinkedNpcTraitIndicatorBinder.bind(commandBuilder, entrySelector, entry.traitIndicators());
 
         if (showLink) {

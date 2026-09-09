@@ -42,7 +42,7 @@ class BondedCompanionCardPresenterTest {
                 "Lifecycle state is informational text, not a button-like badge.");
         assertTrue(asset.contains("#BondedHealthFrame"));
         assertTrue(asset.contains("#BondedHealthFill")
-                        && asset.contains("Top: 1, Left: 1, Width: 358, Height: 16"),
+                        && asset.contains("Top: 1, Left: 1, Width: 448, Height: 16"),
                 "The static health fill begins inside the track; runtime sizing preserves its right inset.");
         assertTrue(asset.contains("Height: 18") && asset.contains("FontSize: 11"),
                 "Health treatment should be easier to read than the compact original.");
@@ -127,23 +127,23 @@ class BondedCompanionCardPresenterTest {
     }
 
     @Test
-    void xpStripFitsAboveHealthWithoutMovingTheExistingCardLayout() throws Exception {
+    void largerCardKeepsXpAndHealthTogetherAboveTheBottomStatusRow() throws Exception {
         String asset = Files.readString(Path.of("src", "main", "resources",
                 "Common", "UI", "Custom",
                 "TameworkBondedCompanionPanelCard.ui"), StandardCharsets.UTF_8);
 
-        assertTrue(asset.contains("Anchor: (Top: 3, Left: 0, Right: 0, Height: 118)"));
+        assertTrue(asset.contains("Anchor: (Top: 3, Left: 0, Right: 0, Height: 240)"));
         assertTrue(selectorBlock(asset, "#BondedXpFrame")
-                        .contains("Anchor: (Top: 52, Left: 20, Right: 25, Height: 3)"),
-                "The thin XP strip must use the existing gap above the health frame.");
+                        .contains("Anchor: (Top: 94, Left: 24, Width: 450, Height: 3)"),
+                "The thin XP strip should sit directly above the health frame.");
         assertTrue(selectorBlock(asset, "#BondedXpFill")
-                        .contains("Anchor: (Top: 0, Left: 0, Width: 358, Height: 3)"));
+                        .contains("Anchor: (Top: 0, Left: 0, Width: 448, Height: 3)"));
         assertTrue(selectorBlock(asset, "#BondedHealthFrame")
-                        .contains("Anchor: (Top: 56, Left: 20, Right: 25, Height: 18)"));
+                        .contains("Anchor: (Top: 100, Left: 24, Width: 450, Height: 18)"));
         assertTrue(selectorBlock(asset, "#BondedMetricHappiness")
-                        .contains("Anchor: (Top: 82, Left: 14, Width: 66, Height: 18)"));
+                        .contains("Anchor: (Top: 204, Left: 24, Width: 108, Height: 24)"));
         assertTrue(selectorBlock(asset, "#BondedPrimaryAction")
-                        .contains("Anchor: (Top: 82, Right: 14, Width: 94, Height: 28)"));
+                        .contains("Anchor: (Top: 140, Right: 14, Width: 112, Height: 32)"));
     }
 
     @Test
@@ -335,8 +335,9 @@ class BondedCompanionCardPresenterTest {
 
         assertCommandSelector(commands, "#Card.Anchor");
         assertCommandSelector(commands, "#Card #BondedStateDetail.Anchor");
-        assertCommand(commands, "#Card #BondedStateDetail.Anchor", "20");
-        assertCommand(commands, "#Card #BondedStateDetailValue.Anchor", "20");
+        assertCommand(commands, "#Card.Anchor", "240");
+        assertCommand(commands, "#Card #BondedStateDetail.Anchor", "24");
+        assertCommand(commands, "#Card #BondedStateDetailValue.Anchor", "24");
         assertCommandSelector(commands, "#Card #BondedPrimaryAction.Anchor");
         assertCommand(commands, "#Card #BondedPrimaryAction.Visible", "false");
         assertCommand(commands, "#Card #BondedPrimaryActionNoTooltip.Visible", "true");
@@ -455,7 +456,7 @@ class BondedCompanionCardPresenterTest {
         BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
                 "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
 
-        assertCommand(commands, "#Card #BondedHealthFill.Anchor", "358");
+        assertCommand(commands, "#Card #BondedHealthFill.Anchor", "448");
     }
 
     @Test
@@ -472,7 +473,7 @@ class BondedCompanionCardPresenterTest {
                 "en-US");
 
         assertCommand(commands, "#Card #BondedHealthText.Text", "125 / 250");
-        assertCommand(commands, "#Card #BondedHealthFill.Anchor", "179");
+        assertCommand(commands, "#Card #BondedHealthFill.Anchor", "224");
     }
 
     @Test
@@ -540,27 +541,27 @@ class BondedCompanionCardPresenterTest {
     }
 
     @Test
-    void finalCardPlacesLevelInTheIdentityRowAndStatsBesideTheAction()
+    void largerCardPlacesLevelAboveTheHealthTrackAndStatsAlongTheBottom()
             throws Exception {
         String asset = Files.readString(Path.of("src", "main", "resources",
                 "Common", "UI", "Custom",
                 "TameworkBondedCompanionPanelCard.ui"), StandardCharsets.UTF_8);
 
         assertTrue(selectorBlock(asset, "#BondedLevelText")
-                        .contains("Anchor: (Top: 30, Left: 22, Width: 42"),
-                "Level should lead the compact identity row.");
+                        .contains("Anchor: (Top: 72, Left: 408, Width: 66"),
+                "Level should sit above the health track's right edge.");
         assertTrue(selectorBlock(asset, "#BondedGenderFemaleIcon")
-                        .contains("Anchor: (Top: 33, Left: 68"),
-                "Gender icon should follow the level text.");
+                        .contains("Anchor: (Top: 46, Left: 24"),
+                "Gender icon should stay with the flat identity information.");
         assertTrue(selectorBlock(asset, "#BondedSpecies")
-                        .contains("Anchor: (Top: 30, Left: 86"),
+                        .contains("Anchor: (Top: 43, Left: 42"),
                 "Species should follow the gender icon.");
         assertTrue(selectorBlock(asset, "#BondedTalentPointAction")
-                        .contains("Anchor: (Top: 82, Right: 118"),
-                "The stats button belongs beside the primary bottom-right action.");
+                        .contains("Anchor: (Top: 67, Right: 114"),
+                "The stats button should be available above the action area.");
         assertTrue(selectorBlock(asset, "#BondedHealthFrame")
-                        .contains("Anchor: (Top: 56, Left: 20, Right: 25"),
-                "Health should align to the primary action's right edge.");
+                        .contains("Anchor: (Top: 100, Left: 24, Width: 450"),
+                "Health should use the fixed left information area.");
     }
 
     @Test

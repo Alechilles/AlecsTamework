@@ -8,7 +8,7 @@ import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
  * Applies linked companion vitals to UI card controls.
  */
 final class LinkedNpcPanelVitalsBinder {
-    private static final int VITAL_FILL_MAX_WIDTH = 204;
+    private static final int CARD_HEALTH_FILL_MAX_WIDTH = 448;
     private static final String ICON_NEED_HAPPINESS = "Tamework/LinkedPanelIcons/Need_Happiness.png";
     private static final String ICON_NEED_HUNGER = "Tamework/LinkedPanelIcons/Need_Hunger.png";
     private static final String ICON_NEED_THIRST = "Tamework/LinkedPanelIcons/Need_Thirst.png";
@@ -21,7 +21,10 @@ final class LinkedNpcPanelVitalsBinder {
     }
 
     static void bind(UICommandBuilder commandBuilder, String entrySelector, LinkedNpcEntry entry, String language) {
-        bind(commandBuilder, entrySelector, entry, language, VITAL_FILL_MAX_WIDTH);
+        bindHealth(commandBuilder, entrySelector, entry, language, CARD_HEALTH_FILL_MAX_WIDTH);
+        bindNeedMeters(commandBuilder, entrySelector, entry, language);
+        bindBreedingCooldownMeter(commandBuilder, entrySelector, entry, language);
+        bindHarvestCooldownMeter(commandBuilder, entrySelector, entry, language);
     }
 
     static void bind(UICommandBuilder commandBuilder,
@@ -126,6 +129,40 @@ final class LinkedNpcPanelVitalsBinder {
                 shouldShowNeeds(entry)
         );
         bindNeedRing(
+                commandBuilder,
+                entrySelector + " #NeedThirst",
+                new NeedIcon(LocalizedText.resolve(language, "tamework.ui.linkedPanel.needIcons.thirst"), ICON_NEED_THIRST),
+                resolveThirstNeed(entry, language),
+                shouldShowNeeds(entry)
+        );
+    }
+
+    private static void bindNeedMeters(UICommandBuilder commandBuilder,
+                                       String entrySelector,
+                                       LinkedNpcEntry entry,
+                                       String language) {
+        bindNeedMeter(
+                commandBuilder,
+                entrySelector + " #NeedHappiness",
+                new NeedIcon(LocalizedText.resolve(language, "tamework.ui.linkedPanel.needIcons.happiness"), ICON_NEED_HAPPINESS),
+                resolveHappinessNeed(entry, language),
+                shouldShowHappiness(entry)
+        );
+        String markerSelector = entrySelector + " #NeedHappiness #BreedingThresholdMarker";
+        boolean showMarker = shouldShowBreedingThreshold(entry);
+        commandBuilder.set(markerSelector + ".Visible", showMarker);
+        if (showMarker) {
+            commandBuilder.setObject(markerSelector + ".Anchor",
+                    LinkedNpcPanelStatusMeter.buildThresholdAnchor(entry.breedingHappinessRatio()));
+        }
+        bindNeedMeter(
+                commandBuilder,
+                entrySelector + " #NeedHunger",
+                new NeedIcon(LocalizedText.resolve(language, "tamework.ui.linkedPanel.needIcons.hunger"), ICON_NEED_HUNGER),
+                resolveHungerNeed(entry, language),
+                shouldShowNeeds(entry)
+        );
+        bindNeedMeter(
                 commandBuilder,
                 entrySelector + " #NeedThirst",
                 new NeedIcon(LocalizedText.resolve(language, "tamework.ui.linkedPanel.needIcons.thirst"), ICON_NEED_THIRST),
@@ -268,6 +305,31 @@ final class LinkedNpcPanelVitalsBinder {
         commandBuilder.setObject(slotSelector + " #RingFillBar5.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar5Anchor(fill.bar5()));
     }
 
+    private static void bindNeedMeter(UICommandBuilder commandBuilder,
+                                      String slotSelector,
+                                      NeedIcon icon,
+                                      NeedVisual visual,
+                                      boolean visible) {
+        commandBuilder.set(slotSelector + ".Visible", visible);
+        if (!visible) {
+            return;
+        }
+        if (icon.hasTexturePath()) {
+            commandBuilder.set(slotSelector + " #NeedIcon.Visible", false);
+            commandBuilder.set(slotSelector + " #NeedIconImage.Visible", true);
+            commandBuilder.set(slotSelector + " #NeedIconImage.Background", icon.texturePath());
+        } else {
+            commandBuilder.set(slotSelector + " #NeedIconImage.Visible", false);
+            commandBuilder.set(slotSelector + " #NeedIcon.Visible", true);
+            commandBuilder.set(slotSelector + " #NeedIcon.Text", icon.fallbackText());
+        }
+        commandBuilder.set(slotSelector + " #NeedTooltip.TooltipText", visual.tooltipText());
+        commandBuilder.setObject(
+                slotSelector + " #MeterFill.Anchor",
+                LinkedNpcPanelStatusMeter.buildFillAnchor(visual.available() ? visual.fillRatio() : 0.0)
+        );
+    }
+
     private static void bindBreedingCooldown(UICommandBuilder commandBuilder,
                                              String entrySelector,
                                              LinkedNpcEntry entry,
@@ -310,6 +372,59 @@ final class LinkedNpcPanelVitalsBinder {
         commandBuilder.setObject(slotSelector + " #RingFillBar3.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar3Anchor(fill.bar3()));
         commandBuilder.setObject(slotSelector + " #RingFillBar4.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar4Anchor(fill.bar4()));
         commandBuilder.setObject(slotSelector + " #RingFillBar5.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar5Anchor(fill.bar5()));
+    }
+
+    private static void bindBreedingCooldownMeter(UICommandBuilder commandBuilder,
+                                                  String entrySelector,
+                                                  LinkedNpcEntry entry,
+                                                  String language) {
+        bindCooldownMeter(
+                commandBuilder,
+                entrySelector + " #BreedingCooldown",
+                entry.breedingCooldownKnown() && entry.breedingCooldownActive(),
+                entry.breedingCooldownRatio(),
+                entry.breedingCooldownRemainingMs(),
+                LinkedNpcPanelStatusTextService.resolveBreedingCooldownTooltip(entry, language),
+                "#BreedingCooldownTooltip"
+        );
+    }
+
+    private static void bindHarvestCooldownMeter(UICommandBuilder commandBuilder,
+                                                 String entrySelector,
+                                                 LinkedNpcEntry entry,
+                                                 String language) {
+        bindCooldownMeter(
+                commandBuilder,
+                entrySelector + " #HarvestCooldown",
+                entry.harvestCooldownKnown() && entry.harvestCooldownActive(),
+                entry.harvestCooldownRatio(),
+                entry.harvestCooldownRemainingMs(),
+                LinkedNpcPanelStatusTextService.resolveHarvestCooldownTooltip(entry, language),
+                "#HarvestCooldownTooltip"
+        );
+    }
+
+    private static void bindCooldownMeter(UICommandBuilder commandBuilder,
+                                          String slotSelector,
+                                          boolean active,
+                                          double ratio,
+                                          long remainingMs,
+                                          String tooltip,
+                                          String tooltipSelector) {
+        commandBuilder.set(slotSelector + ".Visible", active);
+        commandBuilder.set(slotSelector + " #CooldownText.Visible", active);
+        if (!active) {
+            commandBuilder.set(slotSelector + " #CooldownText.Text", "");
+            commandBuilder.set(slotSelector + " " + tooltipSelector + ".TooltipText", "");
+            return;
+        }
+        commandBuilder.set(slotSelector + " #CooldownText.Text",
+                LinkedNpcPanelStatusMeter.formatRemainingClock(remainingMs));
+        commandBuilder.set(slotSelector + " " + tooltipSelector + ".TooltipText", tooltip);
+        commandBuilder.setObject(
+                slotSelector + " #MeterFill.Anchor",
+                LinkedNpcPanelStatusMeter.buildFillAnchor(ratio)
+        );
     }
 
     private static int percent(double ratio) {

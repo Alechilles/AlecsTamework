@@ -30,11 +30,11 @@ import javax.annotation.Nullable;
  */
 final class BondedCompanionCardPresenter {
     static final String CARD_UI_PATH = "TameworkBondedCompanionPanelCard.ui";
-    private static final int HEALTH_FILL_WIDTH = 358;
-    private static final int XP_FILL_WIDTH = 358;
-    private static final int METRIC_LEFT = 14;
-    private static final int METRIC_WIDTH = 66;
-    private static final int METRIC_GAP = 6;
+    private static final int HEALTH_FILL_WIDTH = 448;
+    private static final int XP_FILL_WIDTH = 448;
+    private static final int METRIC_LEFT = 24;
+    private static final int METRIC_WIDTH = 108;
+    private static final int METRIC_GAP = 8;
 
     private BondedCompanionCardPresenter() {
     }
@@ -52,7 +52,7 @@ final class BondedCompanionCardPresenter {
         BondedCompanionStatusPresentation status = row.status();
         ProgressionSummary progression = progressionSummary(row.attributes(),
                 row.roleId());
-        CardLayout layout = layout(row.attributes());
+        CardLayout layout = layout();
         commands.setObject(entrySelector + ".Anchor", layout.cardAnchor());
         bindIdentity(commands, entrySelector, row, progression, language);
         bindState(commands, entrySelector, row, language);
@@ -141,7 +141,7 @@ final class BondedCompanionCardPresenter {
             LinkedNpcPanelCardBinder.CardBindingConfig config,
             @Nullable String language
     ) {
-        commands.set(entrySelector + " #BondedUnlinkButton.Visible",
+        LinkedNpcPanelIconStyles.visible(commands, entrySelector + " #BondedUnlinkButton",
                 !pendingUnlink);
         commands.set(entrySelector + " #BondedUnlinkConfirmButton.Visible",
                 pendingUnlink);
@@ -305,24 +305,24 @@ final class BondedCompanionCardPresenter {
             CardLayout layout
     ) {
         commands.setObject(entrySelector + " #BondedStateDetail.Anchor",
-                horizontalAnchor(20, layout.detailTop(), 150, 14));
+                fixedWidthAnchor(24, layout.detailTop(), 450, 14));
         commands.setObject(entrySelector + " #BondedStateDetailValue.Anchor",
-                horizontalAnchor(20, layout.detailTop() + 14, 150, 18));
-        Anchor action = rightAnchor(layout.actionTop(), 14, 94, 28);
+                fixedWidthAnchor(24, layout.detailTop() + 14, 450, 24));
+        Anchor action = rightAnchor(layout.actionTop(), 14, 112, 32);
         commands.setObject(entrySelector + " #BondedPrimaryAction.Anchor", action);
         commands.setObject(entrySelector + " #BondedPrimaryActionNoTooltip.Anchor",
-                rightAnchor(layout.actionTop(), 14, 94, 28));
+                rightAnchor(layout.actionTop(), 14, 112, 32));
         commands.setObject(entrySelector + " #BondedPrimaryActionDisabled.Anchor",
-                rightAnchor(layout.actionTop(), 14, 94, 28));
+                rightAnchor(layout.actionTop(), 14, 112, 32));
         commands.setObject(entrySelector
                         + " #BondedPrimaryActionDisabledNoTooltip.Anchor",
-                rightAnchor(layout.actionTop(), 14, 94, 28));
-        commands.setObject(entrySelector + " #BondedReviveAction.Anchor",
-                rightAnchor(layout.actionTop(), 14, 28, 28));
-        commands.setObject(entrySelector + " #BondedReviveActionNoTooltip.Anchor",
-                rightAnchor(layout.actionTop(), 14, 28, 28));
+                rightAnchor(layout.actionTop(), 14, 112, 32));
+        LinkedNpcPanelIconStyles.anchor(commands, entrySelector + " #BondedReviveAction",
+                rightAnchor(layout.actionTop(), 14, 32, 32));
+        LinkedNpcPanelIconStyles.anchor(commands, entrySelector + " #BondedReviveActionNoTooltip",
+                rightAnchor(layout.actionTop(), 14, 32, 32));
         commands.setObject(entrySelector + " #BondedUnlinkConfirmButton.Anchor",
-                rightAnchor(layout.actionTop(), 14, 94, 28));
+                rightAnchor(layout.actionTop(), 14, 112, 32));
     }
 
     private static void bindMetrics(
@@ -461,13 +461,13 @@ final class BondedCompanionCardPresenter {
                 visible && !enabled && !pendingUnlink && !tooltipVisible);
         commands.set(entrySelector + " #BondedPrimaryActionDisabledNoTooltip.Text",
                 label);
-        commands.set(entrySelector + " #BondedReviveAction.Visible",
+        LinkedNpcPanelIconStyles.visible(commands, entrySelector + " #BondedReviveAction",
                 enabled && revive && tooltipVisible);
         commands.set(entrySelector + " #BondedReviveAction.Text", label);
         if (tooltipVisible) {
             commands.set(entrySelector + " #BondedReviveAction.TooltipText", tooltip);
         }
-        commands.set(entrySelector + " #BondedReviveActionNoTooltip.Visible",
+        LinkedNpcPanelIconStyles.visible(commands, entrySelector + " #BondedReviveActionNoTooltip",
                 enabled && revive && !tooltipVisible);
         commands.set(entrySelector + " #BondedReviveActionNoTooltip.Text", label);
         bindPrimaryActionEvents(events, entrySelector, cardUuid, row,
@@ -532,7 +532,7 @@ final class BondedCompanionCardPresenter {
         boolean visible = flightToggleVisible(row);
         boolean airborne = Boolean.parseBoolean(row.attributes().get(
                 BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE));
-        commands.set(entrySelector + " #BondedFlightToggleButton.Visible", visible);
+        LinkedNpcPanelIconStyles.visible(commands, entrySelector + " #BondedFlightToggleButton", visible);
         LinkedNpcPanelIconStyles.style(commands, entrySelector + " #BondedFlightToggleButton", airborne ? "FlightAirborne" : "FlightGrounded");
         commands.set(entrySelector + " #BondedFlightModeGroundedIcon.Visible",
                 false);
@@ -692,20 +692,11 @@ final class BondedCompanionCardPresenter {
         return new ProgressionSummary(true, talentsConfigured, level, available);
     }
 
-    private static CardLayout layout(Map<String, String> attributes) {
-        boolean metrics = hasMetric(attributes, "happiness")
-                || hasMetric(attributes, "hunger")
-                || hasMetric(attributes, "thirst");
-        int metricTop = 86;
-        int detailTop = metrics ? 110 : 82;
-        int actionTop = detailTop + 3;
+    private static CardLayout layout() {
+        int metricTop = 204;
+        int detailTop = 136;
+        int actionTop = 140;
         return new CardLayout(metricTop, detailTop, actionTop);
-    }
-
-    private static boolean hasMetric(Map<String, String> attributes,
-                                     String key) {
-        String value = attributes.get(key);
-        return value != null && !value.isBlank();
     }
 
     private static Anchor fillAnchor(int left, int top, int width, int height) {
@@ -726,17 +717,6 @@ final class BondedCompanionCardPresenter {
         anchor.setTop(Value.of(top));
         anchor.setLeft(Value.of(left));
         anchor.setWidth(Value.of(Math.max(0, width)));
-        anchor.setHeight(Value.of(height));
-        return anchor;
-    }
-
-    private static Anchor horizontalAnchor(
-            int left, int top, int right, int height
-    ) {
-        Anchor anchor = new Anchor();
-        anchor.setTop(Value.of(top));
-        anchor.setLeft(Value.of(left));
-        anchor.setRight(Value.of(right));
         anchor.setHeight(Value.of(height));
         return anchor;
     }
@@ -875,7 +855,7 @@ final class BondedCompanionCardPresenter {
         boolean visible = shoulderRideVisible(row);
         boolean mounted = Boolean.parseBoolean(row.attributes().get(
                 BondedCompanionPresentationAttributes.SHOULDER_RIDE_MOUNTED));
-        commands.set(entrySelector + " #BondedShoulderRideButton.Visible", visible);
+        LinkedNpcPanelIconStyles.visible(commands, entrySelector + " #BondedShoulderRideButton", visible);
         commands.set(entrySelector + " #BondedShoulderRideIcon.Visible", false);
         LinkedNpcPanelIconStyles.style(commands, entrySelector + " #BondedShoulderRideButton", mounted ? "ShoulderOn" : "ShoulderOff");
         commands.set(entrySelector + " #BondedShoulderRideButton.Text", "");
@@ -965,10 +945,10 @@ final class BondedCompanionCardPresenter {
 
     }
 
-    /** Compact vertical allocation that omits absent metrics. */
+    /** Stable allocation for the larger card, including a bottom status row. */
     private record CardLayout(int metricTop, int detailTop, int actionTop) {
         private int baseHeight() {
-            return actionTop + 36;
+            return 240;
         }
 
         private Anchor cardAnchor() {

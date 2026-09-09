@@ -21,7 +21,7 @@ The linked panel is the side panel that appears with Tamework command tools. It 
 - Group membership when the tool uses groups
 - Trait or progression indicators when the mod exposes them
 - In some mods, happiness details including current and target trend, plus active impulse modifiers
-- A thin red mark on the happiness ring shows the NPC's configured breeding happiness requirement. Hover over the breeding toggle to see the required happiness on the next line.
+- A thin red mark on the happiness meter shows the NPC's configured breeding happiness requirement. Hover over the breeding toggle to see the required happiness on the next line.
 
 The panel derives captured, coop, roster-stored, provisioned-dormant, dead, and
 `LOST` status from one saved companion lifecycle. Item metadata and an expired
@@ -123,3 +123,7 @@ dead companions continue to show their saved progression snapshot.
 > coop, roster-stored, provisioned-dormant, dead, and Lost rows]
 
 
+
+Cards use separate areas for passive traits and available actions. The level sits
+above the health bar. Happiness, hunger, thirst, and applicable breeding and harvest
+cooldowns share a flat status row; unknown off-screen cooldowns are not shown.

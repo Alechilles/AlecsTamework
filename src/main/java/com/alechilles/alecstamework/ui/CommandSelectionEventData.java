@@ -70,6 +70,9 @@ public final class CommandSelectionEventData {
             .add()
             .append(new KeyedCodec<>(KEY_HOTSWAP_Q_VALUE, Codec.STRING),
                     (event, value) -> event.hotswapQValue = value, event -> event.hotswapQValue).add()
+            .append(new KeyedCodec<>(CommandSelectionPageEventBinder.KEY_PRIMARY_VALUE, Codec.STRING),
+                    (event, value) -> event.primaryCommandValue = value,
+                    event -> event.primaryCommandValue).add()
             .append(new KeyedCodec<>(KEY_HOTSWAP_E_VALUE, Codec.STRING),
                     (event, value) -> event.hotswapEValue = value, event -> event.hotswapEValue).add()
             .append(new KeyedCodec<>(KEY_HOTSWAP_R_VALUE, Codec.STRING),
@@ -77,6 +80,7 @@ public final class CommandSelectionEventData {
             .build();
 
     String commandId;
+    String primaryCommandValue;
     String panelModeValue;
     Boolean panelAutoLinkEnabled;
     Boolean panelActiveHighlightEnabled;

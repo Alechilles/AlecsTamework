@@ -886,3 +886,11 @@ tamework.ui.linkedPanel.bonded.loading=Loading companion information...
 tamework.ui.linkedPanel.bonded.unavailable=Companion information is temporarily unavailable. Try again in a moment.
 
 tamework.ui.linkedPanel.card.tooltip.removalMenu=Removal options
+
+tamework.ui.linkedPanel.meter.happiness=Happiness
+tamework.ui.linkedPanel.meter.hunger=Hunger
+tamework.ui.linkedPanel.meter.thirst=Thirst
+tamework.ui.linkedPanel.meter.breeding=Breeding
+tamework.ui.linkedPanel.meter.harvest=Harvest
+tamework.ui.linkedPanel.section.traits=Traits
+tamework.ui.linkedPanel.section.actions=Actions

@@ -31,6 +31,27 @@ class TameworkCommandSelectionPageRefreshTest {
     private static final LinkedNpcEntry ENTRY = new LinkedNpcEntry(CARD, "Nimbus", 10, 10, 0, 0, null, 0, 0, 0, 0, true, true, false, false, false, false, 0L, new LinkedNpcTraitIndicator[0]);
 
     @Test
+    void primaryAssignmentsReuseSelectionWithoutClosingOrAcceptingHiddenCommands() throws Exception {
+        for (String roster : List.of("", "\"RosterStorage\":\"OwnerCommandFamily\",\"CommandFamilyId\":\"test:family\",")) {
+            TwCommandItemConfig config = TwCommandItemConfig.CODEC.decode(BsonDocument.parse(
+                    "{" + roster + "\"CommandList\":[{\"Id\":\"Follow\",\"ShowInRadial\":true},"
+                            + "{\"Id\":\"Stay\",\"ShowInRadial\":true},{\"Id\":\"Hidden\",\"ShowInRadial\":false}]}"),
+                    new com.hypixel.hytale.codec.ExtraInfo());
+            NavigationFixture fixture = new NavigationFixture();
+            TameworkCommandSelectionPage page = page(new CapturedPackets(),
+                    new AtomicReference<>(), fixture, config);
+            for (String value : List.of("Follow", "forged", "Hidden", "Stay")) {
+                CommandSelectionEventData data = new CommandSelectionEventData();
+                data.primaryCommandValue = value;
+                page.handleDataEvent(null, null, data);
+            }
+            assertEquals(List.of("Follow", "Stay"), fixture.selections);
+            assertEquals(0, fixture.source.closes);
+            page.onDismiss(null, null);
+        }
+    }
+
+    @Test
     void initialBuildSeedsDedupAndUnchangedSafetyRefreshSendsNothing() throws Exception {
         CapturedPackets packets = new CapturedPackets();
         AtomicReference<CommandPanelFeaturePresentation> feature = new AtomicReference<>(feature(4, false));
@@ -369,7 +390,7 @@ class TameworkCommandSelectionPageRefreshTest {
                     () -> List.of(ENTRY), () -> List.of(ENTRY), () -> feature.get() == null
                             ? Map.of() : Map.of(CARD, feature.get()), () -> null,
                     () -> "LinkedMode", () -> false, () -> "16", () -> "Default", () -> "None", () -> "", activationEntries, () -> "", List::of, value -> true, true,
-                    noUuid, noUuid, noUuid, noUuid, noUuid, noUuid, noUuid, (a,b,c)->{}, (a,b,c)->{}, (a,b,c)->{}, (a,b,c)->{}, (a,b,c)->{}, noUuid, noUuid, noUuid, noUuid, fixture::talent, noString, value->{}, ()->{}, ()->{}, fixture::groups, noString, noString, noString, ()->{}, noString, noGroup, noString, fixture.source);
+                    noUuid, noUuid, noUuid, noUuid, noUuid, noUuid, noUuid, (a,b,c)->{}, (a,b,c)->{}, (a,b,c)->{}, (a,b,c)->{}, (a,b,c)->{}, noUuid, noUuid, noUuid, noUuid, fixture::talent, noString, value->{}, ()->{}, ()->{}, fixture::groups, noString, noString, noString, ()->{}, noString, noGroup, fixture.selections::add, fixture.source);
         }
     }
     @SuppressWarnings("unchecked")
@@ -485,7 +506,7 @@ class TameworkCommandSelectionPageRefreshTest {
     private static void put(Object target, String name, Object value) throws Exception { Field field = PlayerRef.class.getDeclaredField(name); field.setAccessible(true); unsafe().putObject(target, unsafe().objectFieldOffset(field), value); }
     private static Unsafe unsafe() throws Exception { Field field = Unsafe.class.getDeclaredField("theUnsafe"); field.setAccessible(true); return (Unsafe) field.get(null); }
     private static final class CapturedPackets { private final List<CapturedUpdate> updates = new ArrayList<>(); private boolean fail; private int attempts; private void capture(UICommandBuilder commands, UIEventBuilder events) { attempts++; if (fail) throw new IllegalStateException("synthetic send failure"); updates.add(new CapturedUpdate(commands, events)); } }
-    private static final class NavigationFixture { private final SignalSource source = new SignalSource(); private Runnable deferred; private int talents; private int groups; private void defer(PlayerRef player, Runnable action) { deferred = action; } private void talent(UUID ignored) { talents++; } private void groups() { groups++; } private void run() { deferred.run(); } }
+    private static final class NavigationFixture { private final List<String> selections = new ArrayList<>(); private final SignalSource source = new SignalSource(); private Runnable deferred; private int talents; private int groups; private void defer(PlayerRef player, Runnable action) { deferred = action; } private void talent(UUID ignored) { talents++; } private void groups() { groups++; } private void run() { deferred.run(); } }
     private static final class SignalSource implements LinkedPanelRefreshSignalSource { private int closes; @Override public AutoCloseable subscribe(Consumer<LinkedPanelRefreshSignal> listener) { return () -> closes++; } }
     private static final class RecordingScheduler
             implements LinkedPanelRefreshCoordinator.DelayedScheduler {

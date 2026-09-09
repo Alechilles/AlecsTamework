@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
 import com.hypixel.hytale.server.core.ui.Value;
+import com.hypixel.hytale.server.core.ui.Anchor;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 
 /** Uses the same authored button styles for generic and bonded card states. */
@@ -20,5 +21,25 @@ final class LinkedNpcPanelIconStyles {
 
     static void style(UICommandBuilder commands, String selector, String name) {
         commands.set(selector + ".Style", Value.ref("TameworkPanelActionStyles.ui", name));
+        commands.set(selector + "Glyph.Background", "Tamework/PanelActions/" + name + "_Glyph_Default.png");
+    }
+
+    static void visible(UICommandBuilder commands, String selector, boolean visible) {
+        commands.set(selector + ".Visible", visible);
+        commands.set(selector + "Glyph.Visible", visible);
+    }
+
+    static void anchor(UICommandBuilder commands, String selector, Anchor anchor) {
+        commands.setObject(selector + ".Anchor", anchor);
+        commands.setObject(selector + "Glyph.Anchor", anchor);
+    }
+
+    static void placeBehavior(UICommandBuilder commands, String selector, int right) {
+        Anchor position = new Anchor();
+        position.setTop(Value.of(52));
+        position.setRight(Value.of(right));
+        position.setWidth(Value.of(54));
+        position.setHeight(Value.of(54));
+        anchor(commands, selector, position);
     }
 }

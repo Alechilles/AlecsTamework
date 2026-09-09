@@ -55,112 +55,18 @@ class LinkedNpcPanelCardLayoutTest {
     private static final Path REVIVE_HEARTBEAT_ICON = LINKED_PANEL_ICONS.resolve("Revive_Heartbeat.png");
 
     @Test
-    void compactLinkedPanelCardContainsProgressionControls() throws IOException {
+    void cardTextDefaultsUseClientSupportedSyntax() throws IOException {
         String cardUi = Files.readString(CARD_UI, StandardCharsets.UTF_8);
-        String binder = Files.readString(CARD_BINDER, StandardCharsets.UTF_8);
-
-        Matcher normalCardHeight = NORMAL_CARD_HEIGHT.matcher(binder);
-        Matcher xpRing = XP_RING_ANCHOR.matcher(cardUi);
-        Matcher talentPoint = TALENT_POINT_ANCHOR.matcher(cardUi);
-        Matcher talentPointBadge = TALENT_POINT_BADGE_BORDER_ANCHOR.matcher(cardUi);
-
-        assertTrue(normalCardHeight.find(), "LinkedNpcPanelCardBinder must define its normal card height.");
-        assertTrue(xpRing.find(), "XpProgressRing anchor must stay parseable by the layout guard.");
-        assertTrue(talentPoint.find(), "TalentPointAction anchor must stay parseable by the layout guard.");
-        assertTrue(talentPointBadge.find(), "Talent point badge anchor must stay parseable by the layout guard.");
-        assertFalse(cardUi.contains("Text: +"), "Bare plus-prefixed UI text fails Hytale's CustomUI parser.");
-        List<String> unquotedStringTextDefaults = findUnquotedStringTextDefaults(cardUi);
-        assertTrue(
-                unquotedStringTextDefaults.isEmpty(),
-                () -> "Text or TooltipText defaults must be quoted or localized for Hytale's CustomUI parser: "
-                        + unquotedStringTextDefaults
-        );
-        assertFalse(binder.contains("EXPANDED_CARD_HEIGHT"), "Progression controls should fit inside the compact card.");
-        assertTrue(
-                binder.contains("NORMAL_CARD_HEIGHT = 88")
-                        && binder.contains("ROSTER_CARD_HEIGHT = 126"),
-                "Normal cards should stay compact while roster rows reserve their status lane."
-        );
-
-        int parsedNormalCardHeight = Integer.parseInt(normalCardHeight.group(1));
-        int xpRingLeft = Integer.parseInt(xpRing.group(2));
-        int xpRingBottom = Integer.parseInt(xpRing.group(1)) + Integer.parseInt(xpRing.group(4));
-        int talentPointRight = Integer.parseInt(talentPoint.group(2)) + Integer.parseInt(talentPoint.group(3));
-        int talentPointBottom = Integer.parseInt(talentPoint.group(1)) + Integer.parseInt(talentPoint.group(4));
-        int talentPointWidth = Integer.parseInt(talentPoint.group(3));
-        int badgeTop = Integer.parseInt(talentPointBadge.group(1));
-        int badgeLeft = Integer.parseInt(talentPointBadge.group(2));
-        int badgeWidth = Integer.parseInt(talentPointBadge.group(3));
-        int badgeHeight = Integer.parseInt(talentPointBadge.group(4));
-        int badgeRight = badgeLeft + badgeWidth;
-
-        assertTrue(
-                parsedNormalCardHeight >= xpRingBottom,
-                () -> "Normal linked-panel card height " + parsedNormalCardHeight
-                        + " clips XP ring ending at " + xpRingBottom + "."
-        );
-        assertTrue(
-                talentPointRight < xpRingLeft,
-                () -> "Talent point action should remain left of XP ring; talent right "
-                        + talentPointRight + ", XP left " + xpRingLeft + "."
-        );
-        assertTrue(
-                parsedNormalCardHeight >= talentPointBottom,
-                () -> "Normal linked-panel card height " + parsedNormalCardHeight
-                        + " clips talent point action ending at " + talentPointBottom + "."
-        );
-        assertTrue(
-                badgeTop <= 2,
-                () -> "Talent point badge should stay near the top of the button; top was " + badgeTop + "."
-        );
-        assertTrue(
-                badgeRight >= talentPointWidth,
-                () -> "Talent point badge should align to the right edge of the button; right was " + badgeRight + "."
-        );
-        assertTrue(
-                badgeWidth <= 14,
-                () -> "Talent point badge should stay compact; width was " + badgeWidth + "."
-        );
-        assertTrue(
-                badgeHeight >= 12,
-                () -> "Talent point badge should preserve the original text height; height was " + badgeHeight + "."
-        );
-        assertTrue(
-                cardUi.contains("FontSize: 8"),
-                "Talent point count should preserve the original readable text size."
-        );
+        assertFalse(cardUi.contains("Text: +"), "Bare plus-prefixed text disconnects the CustomUI client.");
+        assertTrue(findUnquotedStringTextDefaults(cardUi).isEmpty(),
+                "CustomUI text must be quoted or localized.");
     }
 
     @Test
-    void deadCompanionCardShowsFreeHeartbeatRespawnWithoutCostPresentation() throws IOException {
-        String cardUi = Files.readString(CARD_UI, StandardCharsets.UTF_8);
+    void freeRespawnDoesNotBindUnsupportedEnabledProperty() throws IOException {
         String binder = Files.readString(CARD_BINDER, StandardCharsets.UTF_8);
-        BufferedImage heartbeat = ImageIO.read(REVIVE_HEARTBEAT_ICON.toFile());
-
-        assertNotNull(heartbeat, "Revive heartbeat icon must be a readable PNG.");
-        assertEquals(41, heartbeat.getWidth(), "Revive heartbeat should retain the supplied 41px width.");
-        assertEquals(41, heartbeat.getHeight(), "Revive heartbeat should retain the supplied 41px height.");
-        assertTrue(
-                cardUi.contains("Anchor: (Top: 26, Right: 118, Width: 34, Height: 34);"),
-                "The dead-card revive action should use the in-game-scaled heartbeat control from the mockup."
-        );
-        assertFalse(cardUi.contains("ReviveCost"),
-                "Free respawn cards must not retain paid item-cost controls.");
-        assertFalse(binder.contains("CommandReviveCostPresentation")
-                        || binder.contains("bindReviveCosts"),
-                "The card binder must not project paid revival quote state.");
-        assertTrue(
-                binder.contains("!showRespawn") && binder.contains("!entry.dead() && !entry.lost()"),
-                "The visible heartbeat action should replace the inactive badge and locate action instead of overlapping them."
-        );
-        assertFalse(
-                binder.contains("respawnSelector + \".Enabled\""),
-                "TextButton has no runtime-settable Enabled markup property; binding it disconnects the client."
-        );
-        assertTrue(
-                binder.contains("respawnSelector + \".Visible\", showRespawn"),
-                "A ready free-respawn action should be shown without an unsupported Enabled binding."
-        );
+        assertFalse(binder.contains("respawnSelector + \".Enabled\""),
+                "TextButton.Enabled is unsupported and disconnects the CustomUI client.");
     }
 
     @Test
@@ -255,22 +161,7 @@ class LinkedNpcPanelCardLayoutTest {
         assertTrue(bindingBlock.contains("config.openTalentsCommandPrefix() + entry.npcUuid()"), "Level-indicator action should open the same talent page.");
     }
 
-    @Test
-    void cooldownRingsUsePackagedTextureIcons() throws IOException {
-        String cardUi = Files.readString(CARD_UI, StandardCharsets.UTF_8);
 
-        assertTrue(
-                cardUi.contains("TexturePath: \"Tamework/LinkedPanelIcons/Trait_Fertility.png\""),
-                "Breeding cooldown should reuse the fertility trait icon texture."
-        );
-        assertTrue(
-                cardUi.contains("TexturePath: \"Tamework/LinkedPanelIcons/Harvest_Cooldown.png\""),
-                "Harvest cooldown should use the packaged harvest cooldown texture."
-        );
-
-        assertLinkedPanelIconSize("Trait_Fertility.png");
-        assertLinkedPanelIconSize("Harvest_Cooldown.png");
-    }
 
     @Test
     void recoveredBreedingToggleUsesBreedingAvailabilityNotCooldownState() throws IOException {

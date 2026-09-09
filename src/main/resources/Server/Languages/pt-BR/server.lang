@@ -885,3 +885,11 @@ tamework.ui.linkedPanel.bonded.loading=Carregando informações do companheiro..
 tamework.ui.linkedPanel.bonded.unavailable=As informações do companheiro estão temporariamente indisponíveis. Tente novamente em instantes.
 
 tamework.ui.linkedPanel.card.tooltip.removalMenu=Opções de remoção
+
+tamework.ui.linkedPanel.meter.happiness=Felicidade
+tamework.ui.linkedPanel.meter.hunger=Fome
+tamework.ui.linkedPanel.meter.thirst=Sede
+tamework.ui.linkedPanel.meter.breeding=Reprodução
+tamework.ui.linkedPanel.meter.harvest=Coleta
+tamework.ui.linkedPanel.section.traits=Traços
+tamework.ui.linkedPanel.section.actions=Ações

@@ -1,313 +1,163 @@
 $C = "Common.ui";
 
-@SliceLabelStyle = LabelStyle(
-  FontSize: 15,
+@CommandAssignmentKeyStyle = LabelStyle(
+  FontSize: 12,
   RenderBold: true,
-  TextColor: #d6e0ec,
+  TextColor: #dce8f6,
   HorizontalAlignment: Center,
   VerticalAlignment: Center,
-  OutlineColor: #000000(0.7),
-  Wrap: true,
-  ShrinkTextToFit: true,
-  MinShrinkTextToFitFontSize: 11
+  OutlineColor: #000000(0.55)
 );
 
-@SliceButtonLabelStyle = LabelStyle(
-  FontSize: 14,
-  RenderBold: true,
-  RenderUppercase: true,
-  TextColor: #00000000,
-  HorizontalAlignment: Center,
-  VerticalAlignment: Center
-);
-
-@SliceButtonDisabledLabelStyle = LabelStyle(
-  ...@SliceButtonLabelStyle
-);
-
-@Slice0ButtonStyle = TextButtonStyle(
-  Default: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice6_Default.png"), LabelStyle: @SliceButtonLabelStyle),
-  Hovered: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice6_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
-  Pressed: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice6_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice6_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle),
-  Sounds: $C.@ButtonSounds
-);
-
-@Slice1ButtonStyle = TextButtonStyle(
-  Default: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice7_Default.png"), LabelStyle: @SliceButtonLabelStyle),
-  Hovered: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice7_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
-  Pressed: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice7_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice7_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle),
-  Sounds: $C.@ButtonSounds
-);
-
-@Slice2ButtonStyle = TextButtonStyle(
-  Default: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice0_Default.png"), LabelStyle: @SliceButtonLabelStyle),
-  Hovered: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice0_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
-  Pressed: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice0_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice0_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle),
-  Sounds: $C.@ButtonSounds
-);
-
-@Slice3ButtonStyle = TextButtonStyle(
-  Default: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice1_Default.png"), LabelStyle: @SliceButtonLabelStyle),
-  Hovered: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice1_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
-  Pressed: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice1_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice1_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle),
-  Sounds: $C.@ButtonSounds
-);
-
-@Slice4ButtonStyle = TextButtonStyle(
-  Default: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice2_Default.png"), LabelStyle: @SliceButtonLabelStyle),
-  Hovered: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice2_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
-  Pressed: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice2_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice2_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle),
-  Sounds: $C.@ButtonSounds
-);
-
-@Slice5ButtonStyle = TextButtonStyle(
-  Default: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice3_Default.png"), LabelStyle: @SliceButtonLabelStyle),
-  Hovered: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice3_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
-  Pressed: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice3_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice3_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle),
-  Sounds: $C.@ButtonSounds
-);
-
-@Slice6ButtonStyle = TextButtonStyle(
-  Default: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice4_Default.png"), LabelStyle: @SliceButtonLabelStyle),
-  Hovered: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice4_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
-  Pressed: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice4_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice4_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle),
-  Sounds: $C.@ButtonSounds
-);
-
-@Slice7ButtonStyle = TextButtonStyle(
-  Default: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice5_Default.png"), LabelStyle: @SliceButtonLabelStyle),
-  Hovered: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice5_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
-  Pressed: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice5_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/RadialMenu/Default/Cropped/CommandWheelSlice5_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle),
-  Sounds: $C.@ButtonSounds
+@CommandAssignmentDropdownStyle = (
+  ...$C.@DefaultDropdownBoxStyle,
+  HorizontalPadding: 8,
+  LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, RenderUppercase: false, FontSize: 12),
+  EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, RenderUppercase: false, FontSize: 12),
+  SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, RenderUppercase: false, RenderBold: true, FontSize: 12)
 );
 
 $C.@PageOverlay {
   LayoutMode: Middle;
 
   Group #TameworkCommandMenuWheel {
-    Anchor: (Width: 1100, Height: 832);
+    Anchor: (Width: 1120, Height: 820);
     Visible: false;
 
+    Group #TameworkCommandMenuSurface {
+      Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+      Background: #0a121d(0.96);
+    }
+
     Group #TameworkCommandMenuContent {
-      Anchor: (Top: 36, Left: 90, Width: 1010, Height: 760);
+      Anchor: (Top: 0, Left: 0, Right: 0, Height: 108);
 
-    Label #TameworkCommandMenuTitle {
-      Anchor: (Top: 18, Width: 620, Height: 42, Left: 150);
-      Text: "";
-      Style: (
-        FontSize: 38,
-        RenderBold: true,
-        TextColor: #ffffff,
-        HorizontalAlignment: Center,
-        VerticalAlignment: Center
-      );
-    }
+      Group #TameworkCommandMenuHeader {
+        Anchor: (Top: 0, Left: 0, Right: 0, Height: 48);
+        Background: #1d3652;
 
-    Label #TameworkCommandMenuSubtitle {
-      Anchor: (Top: 62, Width: 620, Height: 26, Left: 150);
-      Text: "";
-      Style: (
-        FontSize: 16,
-        TextColor: #dbe4e7,
-        HorizontalAlignment: Center,
-        VerticalAlignment: Center
-      );
-    }
+        Label #TameworkCommandMenuTitle {
+          Anchor: (Left: 16, Width: 230, Height: 48);
+          Text: "";
+          Style: (FontSize: 22, RenderBold: true, TextColor: #e6eff9, HorizontalAlignment: Start, VerticalAlignment: Center);
+        }
 
-    Group #CommandWheelOuterRing {
-      Anchor: (Top: 100, Left: 140, Width: 640, Height: 640);
-      Background: (TexturePath: "Tamework/CommandWheelRingOuter.png");
-      Visible: false;
-    }
+        Label #TameworkCommandMenuSubtitle {
+          Anchor: (Left: 252, Width: 500, Height: 48);
+          Text: "";
+          Style: (FontSize: 13, TextColor: #b7cae0, HorizontalAlignment: Start, VerticalAlignment: Center);
+        }
 
-    Group #CommandWheelInnerRing {
-      Anchor: (Top: 100, Left: 140, Width: 640, Height: 640);
-      Background: (TexturePath: "Tamework/CommandWheelRingInner.png");
-      Visible: false;
-    }
-
-    Group #CommandWheelCenterPanel {
-      Anchor: (Top: 270, Left: 310, Width: 300, Height: 300);
-      Background: (TexturePath: "Tamework/RadialMenu/Default/CommandWheelCenterPanel.png");
-    }
-
-    Label #TameworkCommandMenuCurrent {
-      Anchor: (Top: 355, Width: 260, Height: 130, Left: 330);
-      Text: "";
-      Style: (
-        FontSize: 22,
-        RenderBold: true,
-        TextColor: #ffffff,
-        HorizontalAlignment: Center,
-        VerticalAlignment: Center,
-        Wrap: true,
-        OutlineColor: #000000(0.7)
-      );
-    }
-
-    Group #TameworkCommandHotswapColumn {
-      Anchor: (Top: 210, Left: 820, Width: 190, Height: 250);
-      LayoutMode: Top;
-
-      Label {
-        Anchor: (Height: 28);
-        Text: "Hotswaps";
-        Style: (FontSize: 17, RenderBold: true, TextColor: #d6e0ec, HorizontalAlignment: Center, VerticalAlignment: Center);
+        $C.@SmallSecondaryTextButton #CommandMenuCloseButton {
+          @Sounds = $C.@ButtonSounds;
+          @Anchor = (Top: 12, Right: 16, Width: 80, Height: 24);
+          @Text = %server.tamework.ui.shared.button.close;
+        }
       }
 
-      Label { Anchor: (Top: 6, Height: 20); Text: "Q"; Style: (FontSize: 15, RenderBold: true, TextColor: #d6e0ec); }
-      DropdownBox #TameworkCommandHotswapQ {
-        Anchor: (Top: 2, Left: 0, Width: 190, Height: 28);
-        Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
-        HitTestVisible: true;
-        MaxSelection: 1;
-        NoItemsText: "No commands";
+      Group #TameworkCommandAssignments {
+        Anchor: (Top: 54, Left: 16, Width: 1088, Height: 52);
+        Background: #13243a;
+
+        Group #TameworkCommandPrimaryAssignment {
+          Anchor: (Top: 10, Left: 10, Width: 260, Height: 30);
+
+          Label {
+            Anchor: (Width: 34, Height: 28);
+            Text: "LMB";
+            Style: @CommandAssignmentKeyStyle;
+          }
+
+          DropdownBox #TameworkCommandPrimary {
+            Anchor: (Left: 38, Width: 212, Height: 28);
+            Style: @CommandAssignmentDropdownStyle;
+            HitTestVisible: true;
+            MaxSelection: 1;
+            NoItemsText: "No commands";
+          }
+        }
+
+        Group #TameworkCommandHotswapQAssignment {
+          Anchor: (Top: 10, Left: 280, Width: 260, Height: 30);
+
+          Label {
+            Anchor: (Width: 34, Height: 28);
+            Text: "Q";
+            Style: @CommandAssignmentKeyStyle;
+          }
+
+          DropdownBox #TameworkCommandHotswapQ {
+            Anchor: (Left: 38, Width: 212, Height: 28);
+            Style: @CommandAssignmentDropdownStyle;
+            HitTestVisible: true;
+            MaxSelection: 1;
+            NoItemsText: "No commands";
+          }
+        }
+
+        Group #TameworkCommandHotswapEAssignment {
+          Anchor: (Top: 10, Left: 550, Width: 260, Height: 30);
+
+          Label {
+            Anchor: (Width: 34, Height: 28);
+            Text: "E";
+            Style: @CommandAssignmentKeyStyle;
+          }
+
+          DropdownBox #TameworkCommandHotswapE {
+            Anchor: (Left: 38, Width: 212, Height: 28);
+            Style: @CommandAssignmentDropdownStyle;
+            HitTestVisible: true;
+            MaxSelection: 1;
+            NoItemsText: "No commands";
+          }
+        }
+
+        Group #TameworkCommandHotswapRAssignment {
+          Anchor: (Top: 10, Left: 820, Width: 260, Height: 30);
+
+          Label {
+            Anchor: (Width: 34, Height: 28);
+            Text: "R";
+            Style: @CommandAssignmentKeyStyle;
+          }
+
+          DropdownBox #TameworkCommandHotswapR {
+            Anchor: (Left: 38, Width: 212, Height: 28);
+            Style: @CommandAssignmentDropdownStyle;
+            HitTestVisible: true;
+            MaxSelection: 1;
+            NoItemsText: "No commands";
+          }
+        }
       }
-      Label { Anchor: (Top: 8, Height: 20); Text: "E"; Style: (FontSize: 15, RenderBold: true, TextColor: #d6e0ec); }
-      DropdownBox #TameworkCommandHotswapE {
-        Anchor: (Top: 2, Left: 0, Width: 190, Height: 28);
-        Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
-        HitTestVisible: true;
-        MaxSelection: 1;
-        NoItemsText: "No commands";
-      }
-      Label { Anchor: (Top: 8, Height: 20); Text: "R"; Style: (FontSize: 15, RenderBold: true, TextColor: #d6e0ec); }
-      DropdownBox #TameworkCommandHotswapR {
-        Anchor: (Top: 2, Left: 0, Width: 190, Height: 28);
-        Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
-        HitTestVisible: true;
-        MaxSelection: 1;
-        NoItemsText: "No commands";
-      }
     }
 
-    TextButton #CommandButton0 {
-      Anchor: (Top: 100, Left: 461, Width: 224, Height: 207);
-      Style: @Slice0ButtonStyle;
-      Text: "";
+    // Legacy wheel selectors stay mounted for existing page bindings, but the
+    // compact assignment bar is the only visible command-selection surface.
+    Group #TameworkCommandLegacyWheel {
+      Anchor: (Top: 0, Left: 0, Width: 1, Height: 1);
       Visible: false;
-    }
 
-    TextButton #CommandButton1 {
-      Anchor: (Top: 195, Left: 573, Width: 207, Height: 224);
-      Style: @Slice1ButtonStyle;
-      Text: "";
-      Visible: false;
-    }
+      Label #TameworkCommandMenuCurrent { Text: ""; }
 
-    TextButton #CommandButton2 {
-      Anchor: (Top: 421, Left: 573, Width: 207, Height: 224);
-      Style: @Slice2ButtonStyle;
-      Text: "";
-      Visible: false;
-    }
+      TextButton #CommandButton0 { Text: ""; }
+      TextButton #CommandButton1 { Text: ""; }
+      TextButton #CommandButton2 { Text: ""; }
+      TextButton #CommandButton3 { Text: ""; }
+      TextButton #CommandButton4 { Text: ""; }
+      TextButton #CommandButton5 { Text: ""; }
+      TextButton #CommandButton6 { Text: ""; }
+      TextButton #CommandButton7 { Text: ""; }
 
-    TextButton #CommandButton3 {
-      Anchor: (Top: 533, Left: 461, Width: 224, Height: 207);
-      Style: @Slice3ButtonStyle;
-      Text: "";
-      Visible: false;
-    }
-
-    TextButton #CommandButton4 {
-      Anchor: (Top: 533, Left: 235, Width: 224, Height: 207);
-      Style: @Slice4ButtonStyle;
-      Text: "";
-      Visible: false;
-    }
-
-    TextButton #CommandButton5 {
-      Anchor: (Top: 421, Left: 140, Width: 207, Height: 224);
-      Style: @Slice5ButtonStyle;
-      Text: "";
-      Visible: false;
-    }
-
-    TextButton #CommandButton6 {
-      Anchor: (Top: 195, Left: 140, Width: 207, Height: 224);
-      Style: @Slice6ButtonStyle;
-      Text: "";
-      Visible: false;
-    }
-
-    TextButton #CommandButton7 {
-      Anchor: (Top: 100, Left: 235, Width: 224, Height: 207);
-      Style: @Slice7ButtonStyle;
-      Text: "";
-      Visible: false;
-    }
-
-    Label #CommandLabel0 {
-      Anchor: (Top: 182, Left: 466, Width: 168, Height: 44);
-      Text: "";
-      Style: @SliceLabelStyle;
-      Visible: false;
-    }
-
-    Label #CommandLabel1 {
-      Anchor: (Top: 308, Left: 591, Width: 170, Height: 44);
-      Text: "";
-      Style: @SliceLabelStyle;
-      Visible: false;
-    }
-
-    Label #CommandLabel2 {
-      Anchor: (Top: 488, Left: 591, Width: 170, Height: 44);
-      Text: "";
-      Style: @SliceLabelStyle;
-      Visible: false;
-    }
-
-    Label #CommandLabel3 {
-      Anchor: (Top: 614, Left: 465, Width: 170, Height: 44);
-      Text: "";
-      Style: @SliceLabelStyle;
-      Visible: false;
-    }
-
-    Label #CommandLabel4 {
-      Anchor: (Top: 614, Left: 286, Width: 168, Height: 44);
-      Text: "";
-      Style: @SliceLabelStyle;
-      Visible: false;
-    }
-
-    Label #CommandLabel5 {
-      Anchor: (Top: 488, Left: 159, Width: 170, Height: 44);
-      Text: "";
-      Style: @SliceLabelStyle;
-      Visible: false;
-    }
-
-    Label #CommandLabel6 {
-      Anchor: (Top: 308, Left: 159, Width: 170, Height: 44);
-      Text: "";
-      Style: @SliceLabelStyle;
-      Visible: false;
-    }
-
-    Label #CommandLabel7 {
-      Anchor: (Top: 182, Left: 285, Width: 170, Height: 44);
-      Text: "";
-      Style: @SliceLabelStyle;
-      Visible: false;
-    }
-
-    }
-
-    TextButton #CommandMenuCloseButton {
-      Anchor: (Bottom: 0, Width: 180, Height: 44, Left: 460);
-      Style: $C.@SecondaryTextButtonStyle;
-      Text: %server.tamework.ui.shared.button.close;
+      Label #CommandLabel0 { Text: ""; }
+      Label #CommandLabel1 { Text: ""; }
+      Label #CommandLabel2 { Text: ""; }
+      Label #CommandLabel3 { Text: ""; }
+      Label #CommandLabel4 { Text: ""; }
+      Label #CommandLabel5 { Text: ""; }
+      Label #CommandLabel6 { Text: ""; }
+      Label #CommandLabel7 { Text: ""; }
     }
   }
 }
-

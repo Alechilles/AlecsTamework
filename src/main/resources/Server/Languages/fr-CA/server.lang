@@ -885,3 +885,11 @@ tamework.ui.linkedPanel.bonded.loading=Chargement des informations du compagnon.
 tamework.ui.linkedPanel.bonded.unavailable=Les informations du compagnon sont temporairement indisponibles. Réessayez dans un moment.
 
 tamework.ui.linkedPanel.card.tooltip.removalMenu=Options de retrait
+
+tamework.ui.linkedPanel.meter.happiness=Bonheur
+tamework.ui.linkedPanel.meter.hunger=Faim
+tamework.ui.linkedPanel.meter.thirst=Soif
+tamework.ui.linkedPanel.meter.breeding=Reproduction
+tamework.ui.linkedPanel.meter.harvest=Récolte
+tamework.ui.linkedPanel.section.traits=Traits
+tamework.ui.linkedPanel.section.actions=Actions

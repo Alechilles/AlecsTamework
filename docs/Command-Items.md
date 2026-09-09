@@ -74,8 +74,12 @@ Q/E/R slot is hidden. Set a command entry's optional `Icon` to a texture path
 when it needs custom HUD artwork. Standard command IDs use Tamework's bundled
 command glyphs when `Icon` is omitted.
 
+The standard menu presents LMB, Q, E, and R assignments in one compact bar above
+the companion list. Changing LMB updates the selected primary command and keeps
+the menu open. The original primary-command eligibility rules still apply.
+
 Set `ShowInRadial: false` on a command entry to offer it through the hotswap
-selectors without consuming one of the radial menu's eight slots.
+selectors without consuming one of the primary selector's eight slots.
 
 Generic command rosters also offer a `Cycle Group` hotswap action. Assign it to
 Q, E, or R to cycle `All Companions`, then each non-empty named group in its
@@ -347,7 +351,7 @@ Linked panel supports:
   the latest custom display name from the live snapshot or durable profile,
   including across restart
 - Per-row actions: `Locate`, `Recall`, `Set Home`, `Return Home`, and `Revive`/`Recover` (when enabled/ready). In Linked, Nearby, and Owned modes, the red X opens compact `Release` and `Unlink` buttons, plus `Cull` for a loaded, living animal. Unlink is disabled when no item link exists. Release replaces Abandon and permanently clears ownership; captured and cooped animals must leave storage first.
-- Action icons share one normal/hover button base. Flight, shoulder, and breeding toggles show their current state.
+- Action icons reuse two normal/hover frame textures and sixteen separate glyphs. Flight, shoulder, and breeding toggles show their current state. Larger cards keep passive traits separate and display needs plus applicable cooldowns as horizontal meters.
 - Loaded normal linked rows whose role enables `FlightToggle` show the same
   ground/flight icon button as bonded roster cards. The action is available
   only while the live controller is recognized and the row remains linked to

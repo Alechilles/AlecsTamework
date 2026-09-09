@@ -12,8 +12,12 @@ Tamework command tools usually use a two-part control scheme: one input for usin
 
 ## Default input pattern
 - Left-click or primary input uses the currently selected command.
-- Right-click or secondary input opens the command radial or selection menu.
+- Right-click or secondary input opens the command menu.
 - Some mods also let the same tool link or unlink companions with its primary input.
+
+The standard menu now uses one compact LMB/Q/E/R assignment bar above the larger
+companion panel. Choose the command for each input from its dropdown. Changing
+the left-click assignment keeps the menu open; it does not issue the command.
 
 ## Typical command types
 - Follow
@@ -58,7 +62,7 @@ The exact list depends on the command item config and on the mod using Tamework.
 - [Ownership, Taming, and Interaction Basics](/mod/alecs-tamework/ownership-taming-and-interaction-basics)
 - [Coops, Feed Troughs, and Shared Systems](/mod/alecs-tamework/coops-feed-troughs-and-shared-systems)
 
-> [Screenshot Placeholder: Command radial menu with one command highlighted]
+> [Screenshot Placeholder: Unified command assignments above the companion panel]
 
 
 
