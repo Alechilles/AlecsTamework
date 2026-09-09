@@ -859,21 +859,19 @@ final class CommandSelectionPageService {
         boolean linked = entry.linked() && !managed;
         boolean genericLinkedOrOwned = !managed
                 && (linked || entry.ownedActions());
-        boolean releasable = !linked && !managed && entry.loaded()
+        boolean releasable = !managed && entry.loaded()
                 && !entry.dead() && !entry.captured() && !entry.inCoop()
                 && !entry.lost();
-        if (releasable) addGenericRow(catalog, rowId, "LINK", "Link",
+        if (!linked && releasable) addGenericRow(catalog, rowId, "LINK", "Link",
                 npcId, null, npc.link(), context.genericAuthority(), false);
         if (linked) addGenericRow(catalog, rowId, "UNLINK", "Unlink",
                 npcId, null, npc.unlink(), context.genericAuthority(),
-                context.requireUnlinkConfirm());
-        if (!managed && !entry.captured() && !entry.inCoop() && !releasable) {
-            addGenericRow(catalog, rowId, "ABANDON", "Abandon permanently",
-                    npcId, null, npc.release(), context.genericAuthority(), true);
-        }
-        if (releasable) {
+                false);
+        if (!managed && !entry.captured() && !entry.inCoop()) {
             addGenericRow(catalog, rowId, "RELEASE", "Release", npcId, null,
                     npc.release(), context.genericAuthority(), true);
+        }
+        if (releasable) {
             addGenericRow(catalog, rowId, "CULL", "Cull", npcId, null,
                     npc.cull(), context.genericAuthority(), true);
         }

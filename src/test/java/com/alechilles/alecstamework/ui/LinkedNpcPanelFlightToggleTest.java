@@ -6,9 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -26,7 +23,7 @@ class LinkedNpcPanelFlightToggleTest {
                 bindingConfig(), "en-US");
 
         assertCommand(commands, "#TameworkLinkedPanelList[0] #ShoulderRideButton.Visible", "true");
-        assertCommand(commands, "#TameworkLinkedPanelList[0] #ShoulderRideIcon.Visible", "true");
+        assertCommand(commands, "#TameworkLinkedPanelList[0] #ShoulderRideButton.Style", "ShoulderOff");
         assertCommand(commands, "#TameworkLinkedPanelList[0] #ShoulderRideButton.Text", "");
         assertTrue(Arrays.stream(events.getEvents()).anyMatch(event ->
                 event.type == CustomUIEventBindingType.Activating
@@ -45,7 +42,7 @@ class LinkedNpcPanelFlightToggleTest {
                 bindingConfig(), "en-US");
 
         assertCommand(commands, "#TameworkLinkedPanelList[0] #FlightToggleButton.Visible", "true");
-        assertCommand(commands, "#TameworkLinkedPanelList[0] #FlightModeGroundedIcon.Visible", "true");
+        assertCommand(commands, "#TameworkLinkedPanelList[0] #FlightToggleButton.Style", "FlightGrounded");
         assertCommand(commands, "#TameworkLinkedPanelList[0] #FlightModeAirborneIcon.Visible", "false");
         assertCommand(commands, "#TameworkLinkedPanelList[0] #FlightToggleButton.TooltipText", "Switch to flight");
         assertTrue(Arrays.stream(events.getEvents()).anyMatch(event ->
@@ -71,28 +68,18 @@ class LinkedNpcPanelFlightToggleTest {
     }
 
     @Test
-    void cardAssetIncludesTheSharedFlightIcons() throws Exception {
-        String asset = Files.readString(Path.of("src", "main", "resources", "Common",
-                "UI", "Custom", "TameworkLinkedNpcPanelCard.ui"), StandardCharsets.UTF_8);
-        assertTrue(asset.contains("#FlightToggleButton"));
-        assertTrue(asset.contains("#FlightModeGroundedIcon"));
-        assertTrue(asset.contains("#FlightModeAirborneIcon"));
-        assertTrue(asset.contains("Tamework/LinkedPanelIcons/FlightMode_Grounded.png"));
-        assertTrue(asset.contains("Tamework/LinkedPanelIcons/FlightMode_Airborne.png"));
-    }
-
-    @Test
-    void normalCardsStayCompactWhileOwnerRosterCardsKeepTheirDetailsLane() {
-        UICommandBuilder normalCommands = new UICommandBuilder();
-        LinkedNpcPanelCardBinder.bind(normalCommands, new UIEventBuilder(), 0,
-                entry(UUID.randomUUID()), false, false, bindingConfig(), "en-US");
-
-        UICommandBuilder rosterCommands = new UICommandBuilder();
-        LinkedNpcPanelCardBinder.bind(rosterCommands, new UIEventBuilder(), 0,
-                entry(UUID.randomUUID()), false, false, rosterBindingConfig(), "en-US");
-
-        assertCommand(normalCommands, "#TameworkLinkedPanelList[0].Anchor", "88");
-        assertCommand(rosterCommands, "#TameworkLinkedPanelList[0].Anchor", "126");
+    void flightStateRefreshChangesTheButtonGlyphWithoutLegacyOverlays() {
+        UUID id = UUID.randomUUID();
+        LinkedNpcEntry previous = entry(id).withFlightToggle(true, false);
+        LinkedNpcEntry current = entry(id).withFlightToggle(true, true);
+        UICommandBuilder commands = new UICommandBuilder();
+        LinkedNpcPanelCardDynamicPresenter.refresh(commands, new UIEventBuilder(),
+                "#Card", id, previous, current, null, null, false,
+                bindingConfig(), "en-US");
+        assertCommand(commands, "#Card #FlightToggleButton.Style", "FlightAirborne");
+        assertCommand(commands, "#Card #FlightModeGroundedIcon.Visible", "false");
+        assertCommand(commands, "#Card #FlightModeAirborneIcon.Visible", "false");
+        assertCommand(commands, "#Card #FlightToggleButton.TooltipText", "Switch to ground");
     }
 
     private static LinkedNpcEntry entry(UUID npcUuid) {

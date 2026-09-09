@@ -40,11 +40,11 @@ dead companions continue to show their saved progression snapshot.
 - `OwnedMode` shows all your owned animals, including saved animals in unloaded chunks
   and other worlds, regardless of item links or the current tool's species filter.
   It has no radius limit. Unlinked animals that are off-screen show their saved
-  status. Use their removal controls and confirm **Abandon** to permanently clear
+  status. Use their removal controls and choose **Release** to permanently clear
   ownership and free ownership-limit slots, even in another world or unloaded chunk.
   Captured animals and coop occupants must be released from storage first.
   Managed roster companions use their roster's removal controls.
-  Animals awaiting recovery stay protected, but do not prevent abandoning your other animals.
+  Animals awaiting recovery stay protected, but do not prevent releasing your other animals.
   Linking and culling require the animal to be loaded in your world. Recall,
   Locate, and Revive/Recover do not require an item link in Owned mode; the animal's
   state, cooldowns, and recovery rules still apply. Home and link settings require a link.
@@ -75,7 +75,9 @@ dead companions continue to show their saved progression snapshot.
   companion policy and death cooldown allow it. Roster-backed companions can
   show a confirmation with exact item costs; legacy item-linked flows may be
   free.
-- Nearby-only `Release` and `Cull` when the mod exposes those actions
+- The red X opens `Release` and `Unlink` in Linked, Nearby, and Owned modes. `Cull` also appears for loaded, living animals. Unlink is dimmed when the animal has no item link.
+- `Release` replaces Abandon and permanently frees the ownership slot, including when the animal is off-screen. Captured animals and coop occupants must leave storage first.
+- Action buttons share normal and hovered frames. Flight, shoulder, and breeding icons show the current mode.
 
 ## Special statuses
 - `Unloaded` means the companion is not currently loaded near you, but the tool still knows about it.

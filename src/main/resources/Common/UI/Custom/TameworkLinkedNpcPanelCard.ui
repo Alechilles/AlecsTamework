@@ -1,3 +1,4 @@
+$A = "TameworkPanelActionStyles.ui";
 $C = "Common.ui";
 
 @RemoveIconButtonLabelStyle = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
@@ -450,21 +451,48 @@ Group {
         Visible: false;
     }
 
+    TextButton #UnlinkButton {
+        Anchor: (Top: 28, Right: 28, Width: 24, Height: 24);
+        Style: $A.@Unlink;
+        Text: "";
+        TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.unlink;
+        TextTooltipStyle: @LinkedActionTooltipStyle;
+        Visible: false;
+    }
+
+    TextButton #UnlinkButtonDisabled {
+        Anchor: (Top: 28, Right: 28, Width: 24, Height: 24);
+        Style: $A.@UnlinkDisabled;
+        Text: "";
+        TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.unlink;
+        TextTooltipStyle: @LinkedActionTooltipStyle;
+        Visible: false;
+    }
+
+    TextButton #ReleaseButtonDisabled {
+        Anchor: (Top: 28, Right: 56, Width: 24, Height: 24);
+        Style: $A.@ReleaseDisabled;
+        Text: "";
+        TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.release;
+        TextTooltipStyle: @LinkedActionTooltipStyle;
+        Visible: false;
+    }
+
     TextButton #ReleaseButton {
-        Anchor: (Top: 30, Right: 66, Width: 72, Height: 22);
-        Style: (...$C.@SmallSecondaryTextButtonStyle, Sounds: $C.@ButtonSounds);
+        Anchor: (Top: 28, Right: 56, Width: 24, Height: 24);
+        Style: $A.@Release;
         Padding: (Horizontal: 4);
-        Text: %server.tamework.ui.linkedPanel.card.button.release;
+        Text: "";
         TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.release;
         TextTooltipStyle: @LinkedActionTooltipStyle;
         Visible: false;
     }
 
     TextButton #CullButton {
-        Anchor: (Top: 30, Right: 0, Width: 62, Height: 22);
-        Style: (...$C.@SmallSecondaryTextButtonStyle, Sounds: $C.@ButtonSounds);
+        Anchor: (Top: 28, Right: 0, Width: 24, Height: 24);
+        Style: $A.@Cull;
         Padding: (Horizontal: 4);
-        Text: %server.tamework.ui.linkedPanel.card.button.cull;
+        Text: "";
         TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.cull;
         TextTooltipStyle: @LinkedActionTooltipStyle;
         Visible: false;
@@ -489,8 +517,8 @@ Group {
     }
 
     TextButton #BreedingToggleEnabledButton {
-        Anchor: (Top: 30, Left: 210, Width: 14, Height: 14);
-        Style: @LinkedBreedingStateOnButtonStyle;
+        Anchor: (Top: 30, Left: 210, Width: 22, Height: 22);
+        Style: $A.@BreedingOn;
         Text: "";
         TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.breedingEnabled;
         TextTooltipStyle: @LinkedActionTooltipStyle;
@@ -498,8 +526,8 @@ Group {
     }
 
     TextButton #BreedingToggleDisabledButton {
-        Anchor: (Top: 30, Left: 210, Width: 14, Height: 14);
-        Style: @LinkedBreedingStateOffButtonStyle;
+        Anchor: (Top: 30, Left: 210, Width: 22, Height: 22);
+        Style: $A.@BreedingOff;
         Text: "";
         TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.breedingDisabled;
         TextTooltipStyle: @LinkedActionTooltipStyle;
@@ -508,7 +536,7 @@ Group {
 
     TextButton #RespawnButton {
         Anchor: (Top: 26, Right: 118, Width: 34, Height: 34);
-        Style: @LinkedActionRespawnButtonStyle;
+        Style: $A.@Revive;
         Text: "";
         TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.respawn;
         TextTooltipStyle: @LinkedActionTooltipStyle;
@@ -517,7 +545,7 @@ Group {
 
     TextButton #LocateButton {
         Anchor: (Top: 56, Right: 84, Width: 24, Height: 24);
-        Style: @LinkedActionLocateButtonStyle;
+        Style: $A.@Locate;
         Text: "";
         TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.locate;
         TextTooltipStyle: @LinkedActionTooltipStyle;
@@ -526,7 +554,7 @@ Group {
 
     TextButton #RecallButton {
         Anchor: (Top: 56, Right: 56, Width: 24, Height: 24);
-        Style: @LinkedActionRecallButtonStyle;
+        Style: $A.@Recall;
         Text: "";
         TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.recall;
         TextTooltipStyle: @LinkedActionTooltipStyle;
@@ -535,7 +563,7 @@ Group {
 
     TextButton #SetHomeButton {
         Anchor: (Top: 56, Right: 0, Width: 24, Height: 24);
-        Style: @LinkedActionSetHomeButtonStyle;
+        Style: $A.@SetHome;
         Text: "";
         TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.setHome;
         TextTooltipStyle: @LinkedActionTooltipStyle;
@@ -544,7 +572,7 @@ Group {
 
     TextButton #ReturnHomeButton {
         Anchor: (Top: 56, Right: 28, Width: 24, Height: 24);
-        Style: @LinkedActionReturnHomeButtonStyle;
+        Style: $A.@ReturnHome;
         Text: "";
         TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.returnHome;
         TextTooltipStyle: @LinkedActionTooltipStyle;
@@ -552,10 +580,10 @@ Group {
     }
 
     TextButton #RemoveButton {
-        Anchor: (Top: 1, Right: 0, Width: 14, Height: 14);
-        Style: @RemoveIconButtonStyle;
+        Anchor: (Top: 1, Right: 0, Width: 22, Height: 22);
+        Style: $A.@Remove;
         Text: "";
-        TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.unlink;
+        TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.removalMenu;
         TextTooltipStyle: @LinkedActionTooltipStyle;
     }
 
@@ -1038,7 +1066,7 @@ Group {
 
     TextButton #FlightToggleButton {
         Anchor: (Top: 0, Right: 24, Width: 24, Height: 24);
-        Style: @TraitTooltipButtonStyle;
+        Style: $A.@FlightGrounded;
         Text: "";
         TooltipText: "";
         TextTooltipStyle: @LinkedActionTooltipStyle;
@@ -1053,7 +1081,7 @@ Group {
 
     TextButton #ShoulderRideButton {
         Anchor: (Top: 0, Right: 52, Width: 24, Height: 24);
-        Style: @TraitTooltipButtonStyle;
+        Style: $A.@ShoulderOff;
         Text: "";
         TooltipText: %server.tamework.ui.linkedPanel.bonded.shoulder.toMe.tooltip;
         TextTooltipStyle: @LinkedActionTooltipStyle;

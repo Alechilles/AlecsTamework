@@ -318,9 +318,9 @@ final class BondedCompanionCardPresenter {
                         + " #BondedPrimaryActionDisabledNoTooltip.Anchor",
                 rightAnchor(layout.actionTop(), 14, 94, 28));
         commands.setObject(entrySelector + " #BondedReviveAction.Anchor",
-                rightAnchor(layout.actionTop(), 14, 94, 28));
+                rightAnchor(layout.actionTop(), 14, 28, 28));
         commands.setObject(entrySelector + " #BondedReviveActionNoTooltip.Anchor",
-                rightAnchor(layout.actionTop(), 14, 94, 28));
+                rightAnchor(layout.actionTop(), 14, 28, 28));
         commands.setObject(entrySelector + " #BondedUnlinkConfirmButton.Anchor",
                 rightAnchor(layout.actionTop(), 14, 94, 28));
     }
@@ -533,10 +533,11 @@ final class BondedCompanionCardPresenter {
         boolean airborne = Boolean.parseBoolean(row.attributes().get(
                 BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE));
         commands.set(entrySelector + " #BondedFlightToggleButton.Visible", visible);
+        LinkedNpcPanelIconStyles.style(commands, entrySelector + " #BondedFlightToggleButton", airborne ? "FlightAirborne" : "FlightGrounded");
         commands.set(entrySelector + " #BondedFlightModeGroundedIcon.Visible",
-                visible && !airborne);
+                false);
         commands.set(entrySelector + " #BondedFlightModeAirborneIcon.Visible",
-                visible && airborne);
+                false);
         commands.set(entrySelector + " #BondedFlightToggleButton.TooltipText",
                 visible ? LocalizedText.resolve(language, airborne
                         ? "tamework.ui.linkedPanel.bonded.flight.switchToGround"
@@ -875,7 +876,8 @@ final class BondedCompanionCardPresenter {
         boolean mounted = Boolean.parseBoolean(row.attributes().get(
                 BondedCompanionPresentationAttributes.SHOULDER_RIDE_MOUNTED));
         commands.set(entrySelector + " #BondedShoulderRideButton.Visible", visible);
-        commands.set(entrySelector + " #BondedShoulderRideIcon.Visible", visible);
+        commands.set(entrySelector + " #BondedShoulderRideIcon.Visible", false);
+        LinkedNpcPanelIconStyles.style(commands, entrySelector + " #BondedShoulderRideButton", mounted ? "ShoulderOn" : "ShoulderOff");
         commands.set(entrySelector + " #BondedShoulderRideButton.Text", "");
         commands.set(entrySelector + " #BondedShoulderRideButton.TooltipText",
                 visible ? LocalizedText.resolve(language, mounted

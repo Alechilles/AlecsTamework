@@ -201,7 +201,7 @@ existing target limits and inactive-link choices still apply. Recall, Locate, an
 Revive/Recover also work for unlinked generic profiles after a fresh ownership
 read, with the existing lifecycle and recovery rules. Home and item-link settings
 still require a link. Unlinked off-screen
-rows offer confirmed Abandon through the existing permanent owner-population
+rows offer Release through the existing permanent owner-population
 transition. This clears saved ownership, domain reservations, and command links;
 loaded source-world cleanup also clears the live owner-cap entry on its world
 thread. Captured and cooped animals must leave their storage lifecycle first.
@@ -346,7 +346,8 @@ Linked panel supports:
   provisioned-dormant, dead, and Lost companions; ordinary unloaded rows keep
   the latest custom display name from the live snapshot or durable profile,
   including across restart
-- Per-row actions: `Locate`, `Recall`, `Set Home`, `Return Home`, `Unlink`, `Revive` (when enabled/ready), plus nearby-only `Release`/`Cull` behind confirm flow
+- Per-row actions: `Locate`, `Recall`, `Set Home`, `Return Home`, and `Revive`/`Recover` (when enabled/ready). In Linked, Nearby, and Owned modes, the red X opens compact `Release` and `Unlink` buttons, plus `Cull` for a loaded, living animal. Unlink is disabled when no item link exists. Release replaces Abandon and permanently clears ownership; captured and cooped animals must leave storage first.
+- Action icons share one normal/hover button base. Flight, shoulder, and breeding toggles show their current state.
 - Loaded normal linked rows whose role enables `FlightToggle` show the same
   ground/flight icon button as bonded roster cards. The action is available
   only while the live controller is recognized and the row remains linked to

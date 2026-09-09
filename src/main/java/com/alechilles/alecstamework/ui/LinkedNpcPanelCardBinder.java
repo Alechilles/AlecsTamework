@@ -101,6 +101,8 @@ final class LinkedNpcPanelCardBinder {
         String talentPointButtonSelector = talentPointActionSelector + " #TalentPointButton";
         String linkSelector = entrySelector + " #LinkButton";
         String removeSelector = entrySelector + " #RemoveButton";
+        String unlinkSelector = entrySelector + " #UnlinkButton";
+        String unlinkDisabledSelector = entrySelector + " #UnlinkButtonDisabled";
         String activeToggleActiveSelector = entrySelector + " #ActiveToggleActiveButton";
         String activeToggleInactiveSelector = entrySelector + " #ActiveToggleInactiveButton";
         String breedingToggleEnabledSelector = entrySelector + " #BreedingToggleEnabledButton";
@@ -119,6 +121,7 @@ final class LinkedNpcPanelCardBinder {
         String flightModeGroundedSelector = entrySelector + " #FlightModeGroundedIcon";
         String flightModeAirborneSelector = entrySelector + " #FlightModeAirborneIcon";
         String releaseSelector = entrySelector + " #ReleaseButton";
+        String releaseDisabledSelector = entrySelector + " #ReleaseButtonDisabled";
         String cullSelector = entrySelector + " #CullButton";
 
         if (appendCard) {
@@ -166,15 +169,17 @@ final class LinkedNpcPanelCardBinder {
                         && !entry.lost()
                         && entry.hasHome()
                         && !pendingUnlink;
-        boolean canOpenReleaseActions =
-                !legacyLinked && !managedRoster
-                        && entry.loaded() && !entry.dead() && !entry.captured() && !entry.inCoop() && !entry.lost();
+        boolean removalMenuAvailable = !managedRoster;
+        boolean canRelease = removalMenuAvailable && !entry.captured() && !entry.inCoop();
+        boolean canCull = canRelease && entry.loaded() && !entry.dead() && !entry.lost();
         boolean showLink = !legacyLinked && !managedRoster && entry.loaded()
                 && !entry.dead() && !entry.captured() && !entry.inCoop() && !entry.lost() && !pendingUnlink;
-        boolean canAbandon = !managedRoster && !entry.captured() && !entry.inCoop();
-        boolean showUnlink = legacyLinked || canOpenReleaseActions || canAbandon;
-        boolean showRelease = pendingUnlink && canAbandon;
-        boolean showCull = pendingUnlink && canOpenReleaseActions;
+        boolean showRemovalMenu = removalMenuAvailable && pendingUnlink;
+        boolean showUnlink = showRemovalMenu && legacyLinked;
+        boolean showUnlinkDisabled = showRemovalMenu && !legacyLinked;
+        boolean showRelease = showRemovalMenu && canRelease;
+        boolean showReleaseDisabled = showRemovalMenu && !canRelease;
+        boolean showCull = showRemovalMenu && canCull;
         boolean showActiveToggleActive = legacyLinked && entry.active() && !pendingUnlink;
         boolean showActiveToggleInactive = legacyLinked && !entry.active() && !pendingUnlink;
         boolean showBreedingToggleEnabled =
@@ -215,12 +220,12 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(statusConfirmSelector + ".Visible", pendingUnlink);
         commandBuilder.set(
                 statusConfirmSelector + ".Text",
-                legacyLinked || !canOpenReleaseActions
-                        ? LocalizedText.resolve(language, "tamework.ui.linkedPanel.card.confirmRemove")
-                        : LocalizedText.resolve(language, "tamework.ui.linkedPanel.card.releaseOrCull")
+                LocalizedText.resolve(language, "tamework.ui.linkedPanel.card.releaseOrCull")
         );
         commandBuilder.set(linkSelector + ".Visible", showLink);
-        commandBuilder.set(removeSelector + ".Visible", showUnlink);
+        commandBuilder.set(removeSelector + ".Visible", removalMenuAvailable);
+        commandBuilder.set(unlinkSelector + ".Visible", showUnlink);
+        commandBuilder.set(unlinkDisabledSelector + ".Visible", showUnlinkDisabled);
         commandBuilder.set(activeToggleActiveSelector + ".Visible", showActiveToggleActive);
         commandBuilder.set(activeToggleInactiveSelector + ".Visible", showActiveToggleInactive);
         commandBuilder.set(breedingToggleEnabledSelector + ".Visible", showBreedingToggleEnabled);
@@ -288,15 +293,14 @@ final class LinkedNpcPanelCardBinder {
                 config,
                 language
         );
+        LinkedNpcPanelIconStyles.apply(commandBuilder, entrySelector, entry);
         commandBuilder.set(locateSelector + ".Visible", showLocate);
         commandBuilder.set(recallSelector + ".Visible", showRecall);
         commandBuilder.set(setHomeSelector + ".Visible", showSetHome);
         commandBuilder.set(returnHomeSelector + ".Visible", showReturnHome);
         commandBuilder.set(releaseSelector + ".Visible", showRelease);
-        commandBuilder.set(releaseSelector + ".Text", legacyLinked || !canOpenReleaseActions
-                ? LocalizedText.resolve(language,
-                "tamework.ui.linkedPanel.card.button.abandon")
-                : LocalizedText.resolve(language,
+        commandBuilder.set(releaseDisabledSelector + ".Visible", showReleaseDisabled);
+        commandBuilder.set(releaseSelector + ".Text", LocalizedText.resolve(language,
                 "tamework.ui.linkedPanel.card.button.release"));
         commandBuilder.set(cullSelector + ".Visible", showCull);
         LinkedNpcTraitIndicatorBinder.bind(commandBuilder, entrySelector, entry.traitIndicators());
@@ -309,11 +313,19 @@ final class LinkedNpcPanelCardBinder {
                     false
             );
         }
-        if (showUnlink) {
+        if (removalMenuAvailable) {
             commandBuilder.set(removeSelector + ".Text", "");
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
                     removeSelector,
+                    EventData.of(config.eventCommandId(), config.removalMenuCommandPrefix() + entry.npcUuid()),
+                    false
+            );
+        }
+        if (showUnlink) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    unlinkSelector,
                     EventData.of(config.eventCommandId(), config.unlinkCommandPrefix() + entry.npcUuid()),
                     false
             );
@@ -465,10 +477,11 @@ final class LinkedNpcPanelCardBinder {
     }
 
     record CardBindingConfig(String linkedPanelCardUiPath,
-                             String eventCommandId,
-                             String linkCommandPrefix,
-                             String unlinkCommandPrefix,
-                             String openGroupPickerCommandPrefix,
+                              String eventCommandId,
+                              String linkCommandPrefix,
+                              String unlinkCommandPrefix,
+                              String removalMenuCommandPrefix,
+                              String openGroupPickerCommandPrefix,
                              String toggleActiveCommandPrefix,
                              String toggleBreedingCommandPrefix,
                              String releaseCommandPrefix,
@@ -485,9 +498,9 @@ final class LinkedNpcPanelCardBinder {
                              boolean recallActionEnabled,
                              boolean ownerCommandFamilyRoster) {
         CardBindingConfig(String linkedPanelCardUiPath,
-                          String eventCommandId,
-                          String linkCommandPrefix,
-                          String unlinkCommandPrefix,
+                           String eventCommandId,
+                           String linkCommandPrefix,
+                           String unlinkCommandPrefix,
                           String openGroupPickerCommandPrefix,
                           String toggleActiveCommandPrefix,
                           String toggleBreedingCommandPrefix,
@@ -504,7 +517,9 @@ final class LinkedNpcPanelCardBinder {
                           boolean recallActionEnabled,
                           boolean ownerCommandFamilyRoster) {
             this(linkedPanelCardUiPath, eventCommandId, linkCommandPrefix,
-                    unlinkCommandPrefix, openGroupPickerCommandPrefix,
+                    unlinkCommandPrefix,
+                    CommandSelectionPageEventBinder.OPEN_REMOVAL_MENU_COMMAND_PREFIX,
+                    openGroupPickerCommandPrefix,
                     toggleActiveCommandPrefix, toggleBreedingCommandPrefix,
                     releaseCommandPrefix, cullCommandPrefix, respawnCommandPrefix,
                     summonCommandPrefix, dismissCommandPrefix, locateCommandPrefix,

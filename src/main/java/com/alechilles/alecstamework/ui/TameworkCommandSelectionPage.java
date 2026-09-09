@@ -681,28 +681,27 @@ public final class TameworkCommandSelectionPage
             }
             return;
         }
+        if (commandId.startsWith(OPEN_REMOVAL_MENU_COMMAND_PREFIX)) {
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId,
+                    OPEN_REMOVAL_MENU_COMMAND_PREFIX);
+            if (genericRemovalMenuAvailable(npcUuid)) {
+                pendingUnlinkNpcUuid = isPendingUnlink(npcUuid) ? null : npcUuid;
+                sendCardRefreshUpdate();
+            }
+            return;
+        }
         if (commandId.startsWith(UNLINK_COMMAND_PREFIX)) {
             if (unlinkCallback == null) {
                 return;
             }
             UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, UNLINK_COMMAND_PREFIX);
             if (npcUuid != null) {
-                LinkedNpcEntry entry = resolveLinkedNpcEntry(npcUuid);
-                boolean linkedEntry = entry != null && entry.linked();
-                if (!linkedEntry) {
-                    pendingUnlinkNpcUuid = npcUuid;
+                if (isPendingUnlink(npcUuid) && genericUnlinkAvailable(npcUuid)) {
+                    unlinkCallback.accept(npcUuid);
+                    pendingUnlinkNpcUuid = null;
+                    refreshLinkedNpcEntries();
                     sendCardRefreshUpdate();
-                    return;
                 }
-                if (requireUnlinkConfirm && !isPendingUnlink(npcUuid)) {
-                    pendingUnlinkNpcUuid = npcUuid;
-                    sendCardRefreshUpdate();
-                    return;
-                }
-                unlinkCallback.accept(npcUuid);
-                pendingUnlinkNpcUuid = null;
-                refreshLinkedNpcEntries();
-                sendCardRefreshUpdate();
             }
             return;
         }
@@ -711,7 +710,7 @@ public final class TameworkCommandSelectionPage
                 return;
             }
             UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, RELEASE_COMMAND_PREFIX);
-            if (npcUuid != null) {
+            if (isPendingUnlink(npcUuid) && genericReleaseAvailable(npcUuid)) {
                 releaseCallback.accept(npcUuid);
                 pendingRemovals.hide(npcUuid);
                 pendingUnlinkNpcUuid = null;
@@ -725,7 +724,7 @@ public final class TameworkCommandSelectionPage
                 return;
             }
             UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, CULL_COMMAND_PREFIX);
-            if (npcUuid != null) {
+            if (isPendingUnlink(npcUuid) && genericCullAvailable(npcUuid)) {
                 cullCallback.accept(npcUuid);
                 pendingRemovals.hide(npcUuid);
                 pendingUnlinkNpcUuid = null;
@@ -900,6 +899,38 @@ public final class TameworkCommandSelectionPage
         refreshLinkedNpcEntries();
         sendCardRefreshUpdate();
         return true;
+    }
+
+    private boolean genericRemovalMenuAvailable(@Nullable UUID npcUuid) {
+        return genericRemovalEntry(npcUuid) != null;
+    }
+
+    private boolean genericUnlinkAvailable(@Nullable UUID npcUuid) {
+        LinkedNpcEntry entry = genericRemovalEntry(npcUuid);
+        return entry != null && entry.linked();
+    }
+
+    private boolean genericReleaseAvailable(@Nullable UUID npcUuid) {
+        LinkedNpcEntry entry = genericRemovalEntry(npcUuid);
+        return entry != null && !entry.captured() && !entry.inCoop();
+    }
+
+    private boolean genericCullAvailable(@Nullable UUID npcUuid) {
+        LinkedNpcEntry entry = genericRemovalEntry(npcUuid);
+        return entry != null && entry.loaded() && !entry.dead() && !entry.lost()
+                && !entry.captured() && !entry.inCoop();
+    }
+
+    @Nullable
+    private LinkedNpcEntry genericRemovalEntry(@Nullable UUID npcUuid) {
+        if (npcUuid == null || config.usesOwnerCommandFamilyRoster()) {
+            return null;
+        }
+        CommandPanelFeaturePresentation feature = featureController.presentation(npcUuid);
+        if (feature != null && feature.managesRosterRow()) {
+            return null;
+        }
+        return resolveLinkedNpcEntry(npcUuid);
     }
 
     @Override

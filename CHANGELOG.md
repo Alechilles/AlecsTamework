@@ -2,10 +2,14 @@
 
 ## Unreleased development changes
 
+- Companion action icons now share matching normal and hovered button frames.
+  The red X opens Release and Unlink in every generic panel mode, plus Cull for
+  loaded living animals. Release replaces Abandon, including off-screen cleanup.
+
 - Owned mode now offers Recall, Locate, and Revive/Recover for unlinked generic
   companions, using verified ownership and the existing recovery rules.
 
-- Abandon, Release, and Cull hide the clicked companion card immediately while
+- Release and Cull hide the clicked companion card immediately while
   the saved state updates. Unconfirmed removals return after five seconds.
 
 - Fixed managed admin spawns without a held command item failing to save their
@@ -15,7 +19,7 @@
 - Added missing happiness food and caretaking labels in German, French, Canadian
   French, and Brazilian Portuguese.
 
-- Fixed Abandon, Release, and Cull being blocked by another animal's owner-level
+- Fixed Release and Cull being blocked by another animal's owner-level
   recovery quarantine. Protected animals remain blocked, and failed removals show feedback.
 
 - Fixed startup failing when uncertain population operations were already safely
@@ -23,7 +27,7 @@
 
 - Added Owned to the command-item mode selector. It shows owned animals regardless
   of item links, including saved animals in other worlds and unloaded chunks.
-  Unlinked off-screen animals can be abandoned to free ownership-limit slots.
+  Unlinked off-screen animals can be released to free ownership-limit slots.
 
 - Husbandry providers can supply an unconditional `happinessFlatBonus` for
   `HAPPINESS_CARE` with capability `HUSBANDRY_FLAT_CARE_BONUS`. It adds 0-100

@@ -30,6 +30,8 @@ final class CommandSelectionPageEventBinder {
     static final String CLOSE_COMMAND_ID = "__close__";
     static final String LINK_COMMAND_PREFIX = "__link__:";
     static final String UNLINK_COMMAND_PREFIX = "__unlink__:";
+    static final String OPEN_REMOVAL_MENU_COMMAND_PREFIX =
+            "__removal_menu__:";
     static final String OPEN_GROUP_PICKER_COMMAND_PREFIX =
             "__opengroup__:";
     static final String TOGGLE_ACTIVE_COMMAND_PREFIX = "__active__:";

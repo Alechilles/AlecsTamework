@@ -51,6 +51,25 @@ class TameworkCommandSelectionPageRefreshTest {
     }
 
     @Test
+    void removalMenuMustOpenBeforeItRoutesTheUnlinkAction() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        AtomicInteger unlinks = new AtomicInteger();
+        TameworkCommandSelectionPage page = removalPage(packets, unlinks);
+        build(page);
+
+        event(page, "__unlink__:" + CARD);
+        assertEquals(0, unlinks.get());
+
+        event(page, "__removal_menu__:" + CARD);
+        assertTrue(page.isPendingUnlink(CARD));
+        assertEquals(0, unlinks.get());
+
+        event(page, "__unlink__:" + CARD);
+        assertEquals(1, unlinks.get());
+        assertTrue(!page.isPendingUnlink(CARD));
+    }
+
+    @Test
     void unsupportedActiveHighlightsAreHiddenFromTheGenericPanel() throws Exception {
         TameworkCommandSelectionPage page = page(
                 new CapturedPackets(),
@@ -388,6 +407,21 @@ class TameworkCommandSelectionPageRefreshTest {
     }
     private static void event(TameworkCommandSelectionPage page, String command) throws Exception {
         CommandSelectionEventData data = new CommandSelectionEventData(); Field field = CommandSelectionEventData.class.getDeclaredField("commandId"); field.setAccessible(true); unsafe().putObject(data, unsafe().objectFieldOffset(field), command); page.handleDataEvent(null, null, data);
+    }
+    private static TameworkCommandSelectionPage removalPage(
+            CapturedPackets packets, AtomicInteger unlinks) throws Exception {
+        try (AutoCloseable ignored = LinkedNpcPanelRefreshTestSeam.installPacketSender(packets::capture);
+             AutoCloseable ignoredNavigator = LinkedNpcPanelRefreshTestSeam.installDeferredNavigator((player, action) -> { })) {
+            PlayerRef player = (PlayerRef) unsafe().allocateInstance(PlayerRef.class);
+            put(player, "uuid", OWNER); put(player, "username", "PageRefreshTester"); put(player, "language", "en-US");
+            Consumer<UUID> noUuid = value -> { }; Consumer<String> noString = value -> { };
+            BiConsumer<UUID, String> noGroup = (a, b) -> { };
+            return new TameworkCommandSelectionPage(player, legacyConfig(), null, true,
+                    () -> List.of(ENTRY), () -> List.of(ENTRY), Map::of, () -> null,
+                    () -> "LinkedMode", () -> false, () -> "16", () -> "Default", () -> "None", () -> "", List::of, () -> "", List::of, value -> true, true,
+                    noUuid, ignoredNpc -> unlinks.incrementAndGet(), noUuid, noUuid, noUuid,
+                    noUuid, noUuid, (a,b,c)->{}, (a,b,c)->{}, (a,b,c)->{}, (a,b,c)->{}, (a,b,c)->{}, noUuid, noUuid, noUuid, noUuid, noUuid, noString, value->{}, ()->{}, ()->{}, ()->{}, noString, noString, noString, ()->{}, noString, noGroup, noString, LinkedPanelRefreshSignalSource.none());
+        }
     }
     private static void replaceRefreshLifecycle(TameworkCommandSelectionPage page,
                                                 LinkedNpcPanelRefreshLifecycle lifecycle)

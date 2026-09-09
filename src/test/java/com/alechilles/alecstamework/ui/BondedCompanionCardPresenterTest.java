@@ -183,7 +183,7 @@ class BondedCompanionCardPresenterTest {
                 "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
 
         assertCommand(commands, "#Card #BondedFlightToggleButton.Visible", "true");
-        assertCommand(commands, "#Card #BondedFlightModeGroundedIcon.Visible", "true");
+        assertCommand(commands, "#Card #BondedFlightToggleButton.Style", "FlightGrounded");
         assertCommand(commands, "#Card #BondedFlightModeAirborneIcon.Visible", "false");
         assertCommand(commands, "#Card #BondedFlightToggleButton.TooltipText",
                 "Switch to flight");
@@ -205,7 +205,7 @@ class BondedCompanionCardPresenterTest {
 
         assertCommand(commands, "#Card #BondedFlightToggleButton.Visible", "true");
         assertCommand(commands, "#Card #BondedFlightModeGroundedIcon.Visible", "false");
-        assertCommand(commands, "#Card #BondedFlightModeAirborneIcon.Visible", "true");
+        assertCommand(commands, "#Card #BondedFlightToggleButton.Style", "FlightAirborne");
         assertCommand(commands, "#Card #BondedFlightToggleButton.TooltipText",
                 "Switch to ground");
     }
@@ -244,65 +244,9 @@ class BondedCompanionCardPresenterTest {
                         BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE, "true"), null), "en-US");
 
         assertCommand(commands, "#Card #BondedFlightModeGroundedIcon.Visible", "false");
-        assertCommand(commands, "#Card #BondedFlightModeAirborneIcon.Visible", "true");
+        assertCommand(commands, "#Card #BondedFlightToggleButton.Style", "FlightAirborne");
         assertCommand(commands, "#Card #BondedFlightToggleButton.TooltipText",
                 "Switch to ground");
-    }
-
-    @Test
-    void flightToggleAssetAndIconsHaveTheFinalSelectorsTexturesAndTransparency()
-            throws Exception {
-        String asset = Files.readString(Path.of("src", "main", "resources", "Common",
-                "UI", "Custom", "TameworkBondedCompanionPanelCard.ui"), StandardCharsets.UTF_8);
-        String name = selectorBlock(asset, "#BondedName");
-        String grounded = selectorBlock(asset, "#BondedFlightModeGroundedIcon");
-        String airborne = selectorBlock(asset, "#BondedFlightModeAirborneIcon");
-        String button = selectorBlock(asset, "#BondedFlightToggleButton");
-        assertTrue(name.contains("Right: 142"));
-        assertTrue(grounded.contains("Top: 5, Right: 108, Width: 24, Height: 24")
-                && grounded.contains("Tamework/LinkedPanelIcons/FlightMode_Grounded.png")
-                && grounded.contains("Visible: false"));
-        assertTrue(airborne.contains("Top: 5, Right: 108, Width: 24, Height: 24")
-                && airborne.contains("Tamework/LinkedPanelIcons/FlightMode_Airborne.png")
-                && airborne.contains("Visible: false"));
-        assertTrue(button.contains("Top: 5, Right: 108, Width: 24, Height: 24")
-                && button.contains("Style: @BondedTransparentButton")
-                && button.contains("Text: \"\"")
-                && button.contains("TooltipText: \"\"")
-                && button.contains("TextTooltipStyle: @BondedCardTextTooltipStyle")
-                && button.contains("Visible: false"));
-        assertTrue(asset.indexOf("#BondedFlightModeGroundedIcon")
-                        < asset.indexOf("#BondedFlightModeAirborneIcon")
-                        && asset.indexOf("#BondedFlightModeAirborneIcon")
-                        < asset.indexOf("#BondedFlightToggleButton"),
-                "The transparent click target must be declared over both icons.");
-        assertIconIs32RgbaWithTransparency("FlightMode_Grounded.png");
-        assertIconIs32RgbaWithTransparency("FlightMode_Airborne.png");
-    }
-
-    private static void assertIconIs32RgbaWithTransparency(String fileName) throws Exception {
-        BufferedImage image = javax.imageio.ImageIO.read(new File("src/main/resources/Common/UI/Custom/Tamework/LinkedPanelIcons", fileName));
-        assertTrue(image != null && image.getWidth() == 32 && image.getHeight() == 32);
-        assertTrue(image.getColorModel().hasAlpha());
-        boolean transparent = false;
-        boolean visible = false;
-        for (int y = 0; y < image.getHeight(); y++) {
-            for (int x = 0; x < image.getWidth(); x++) {
-                int alpha = image.getRGB(x, y) >>> 24;
-                transparent |= alpha < 255;
-                visible |= alpha > 0;
-            }
-        }
-        assertTrue(transparent && visible, "Icon must have transparent padding and visible art.");
-    }
-
-    @Test
-    void flightToggleUsesTheProfileScopedCommandPrefix() throws Exception {
-        String presenter = Files.readString(Path.of("src", "main", "java",
-                "com", "alechilles", "alecstamework", "ui",
-                "BondedCompanionCardPresenter.java"), StandardCharsets.UTF_8);
-        assertTrue(presenter.contains("config.bondedFlightToggleCommandPrefix() + cardUuid"));
-        assertTrue(presenter.contains("if (flightToggleVisible(row))"));
     }
 
     @Test
@@ -711,7 +655,7 @@ class BondedCompanionCardPresenterTest {
                 false, bindingConfig(), "en-US");
 
         assertCommand(commands, "#Card #BondedShoulderRideButton.Visible", "true");
-        assertCommand(commands, "#Card #BondedShoulderRideIcon.Visible", "true");
+        assertCommand(commands, "#Card #BondedShoulderRideButton.Style", "Shoulder");
         assertCommand(commands, "#Card #BondedShoulderRideButton.Text", "");
         assertCommand(commands, "#Card #BondedShoulderRideButton.TooltipText",
                 "Bring this companion to your shoulder");

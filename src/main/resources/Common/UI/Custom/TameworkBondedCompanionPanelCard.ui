@@ -1,3 +1,4 @@
+$A = "TameworkPanelActionStyles.ui";
 $C = "Common.ui";
 
 @BondedCardButtonLabel = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #eaf4ff, HorizontalAlignment: Center, VerticalAlignment: Center);
@@ -190,7 +191,7 @@ Group {
 
     TextButton #BondedFlightToggleButton {
         Anchor: (Top: 5, Right: 108, Width: 24, Height: 24);
-        Style: @BondedTransparentButton;
+        Style: $A.@FlightGrounded;
         Text: "";
         TooltipText: "";
         TextTooltipStyle: @BondedCardTextTooltipStyle;
@@ -199,7 +200,7 @@ Group {
 
     TextButton #BondedUnlinkButton {
         Anchor: (Top: 7, Right: 12, Width: 20, Height: 22);
-        Style: @BondedCardDangerIconStyle;
+        Style: $A.@Remove;
         Text: "X";
         TooltipText: %server.tamework.ui.linkedPanel.bonded.unlink.tooltip;
         TextTooltipStyle: @BondedCardTextTooltipStyle;
@@ -214,7 +215,7 @@ Group {
 
     TextButton #BondedShoulderRideButton {
         Anchor: (Top: 5, Right: 140, Width: 24, Height: 24);
-        Style: @BondedTransparentButton;
+        Style: $A.@ShoulderOff;
         Text: "";
         TooltipText: %server.tamework.ui.linkedPanel.bonded.shoulder.toMe.tooltip;
         TextTooltipStyle: @BondedCardTextTooltipStyle;
@@ -344,8 +345,8 @@ Group {
     }
 
     TextButton #BondedReviveAction {
-        Anchor: (Top: 82, Right: 14, Width: 94, Height: 28);
-        Style: @BondedReviveButtonStyle;
+        Anchor: (Top: 82, Right: 14, Width: 28, Height: 28);
+        Style: $A.@Revive;
         Text: "";
         TooltipText: "";
         TextTooltipStyle: @BondedCardTextTooltipStyle;
@@ -353,8 +354,8 @@ Group {
     }
 
     TextButton #BondedReviveActionNoTooltip {
-        Anchor: (Top: 82, Right: 14, Width: 94, Height: 28);
-        Style: @BondedReviveButtonStyle;
+        Anchor: (Top: 82, Right: 14, Width: 28, Height: 28);
+        Style: $A.@Revive;
         Text: "";
         Visible: false;
     }

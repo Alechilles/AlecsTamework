@@ -9,7 +9,8 @@ final class LinkedNpcPanelCardBindingFactory {
     static LinkedNpcPanelCardBinder.CardBindingConfig create(boolean recall, boolean ownerRoster) {
         return new LinkedNpcPanelCardBinder.CardBindingConfig(
                 TameworkCommandSelectionPage.LINKED_PANEL_CARD_UI_PATH, EVENT_COMMAND_ID,
-                LINK_COMMAND_PREFIX, UNLINK_COMMAND_PREFIX, OPEN_GROUP_PICKER_COMMAND_PREFIX,
+                LINK_COMMAND_PREFIX, UNLINK_COMMAND_PREFIX, OPEN_REMOVAL_MENU_COMMAND_PREFIX,
+                OPEN_GROUP_PICKER_COMMAND_PREFIX,
                 TOGGLE_ACTIVE_COMMAND_PREFIX, TOGGLE_BREEDING_COMMAND_PREFIX, RELEASE_COMMAND_PREFIX,
                 CULL_COMMAND_PREFIX, RESPAWN_COMMAND_PREFIX, LinkedNpcPanelFeatureController.SUMMON_COMMAND_PREFIX,
                 LinkedNpcPanelFeatureController.DISMISS_COMMAND_PREFIX, LOCATE_COMMAND_PREFIX,

@@ -34,24 +34,29 @@ class OwnedCompanionAbandonPresentationTest {
                 CommandPanelFeaturePresentation.readOnlyManaged());
         assertValue(commands, "RespawnButton.Visible", "false");
     }
-    /** Off-screen unlinked animals must offer confirmed abandonment without live-only actions. */
+    /** The removal menu exposes ownership-safe actions without inventing a link. */
     @Test
-    void unloadedUnlinkedAnimalOffersAbandonAfterOpeningRemovalControls() {
+    void unloadedUnlinkedAnimalShowsReleaseAndDisabledUnlinkAfterOpeningRemovalMenu() {
         var entry = entry(false);
         var initial = render(entry, false);
         assertValue(initial, "RemoveButton.Visible", "true");
         assertValue(initial, "ReleaseButton.Visible", "false");
-        var confirmation = render(entry, true);
-        assertValue(confirmation, "ReleaseButton.Visible", "true");
-        assertValue(confirmation, "ReleaseButton.Text", "Abandon");
-        assertValue(confirmation, "CullButton.Visible", "false");
-        assertValue(confirmation, "LinkButton.Visible", "false");
+        var menu = render(entry, true);
+        assertValue(menu, "ReleaseButton.Visible", "true");
+        assertValue(menu, "ReleaseButton.Text", "Release");
+        assertValue(menu, "ReleaseButtonDisabled.Visible", "false");
+        assertValue(menu, "UnlinkButton.Visible", "false");
+        assertValue(menu, "UnlinkButtonDisabled.Visible", "true");
+        assertValue(menu, "CullButton.Visible", "false");
+        assertValue(menu, "LinkButton.Visible", "false");
     }
 
-    /** Capture storage must be released through its own lifecycle before abandonment. */
+    /** Capture storage must be released through its own lifecycle before owner release. */
     @Test
-    void capturedUnlinkedAnimalDoesNotOfferAbandon() {
-        assertValue(render(entry(true), true), "ReleaseButton.Visible", "false");
+    void capturedUnlinkedAnimalShowsDisabledRelease() {
+        UICommandBuilder commands = render(entry(true), true);
+        assertValue(commands, "ReleaseButton.Visible", "false");
+        assertValue(commands, "ReleaseButtonDisabled.Visible", "true");
     }
 
     /** Generic items must not release a companion governed by a managed roster. */
@@ -64,6 +69,28 @@ class OwnedCompanionAbandonPresentationTest {
         assertValue(commands, "RemoveButton.Visible", "false");
         assertValue(commands, "ReleaseButton.Visible", "false");
         assertValue(commands, "RosterSummonButton.Visible", "false");
+    }
+
+    @Test
+    void loadedLinkedAnimalOffersEveryEligibleRemovalActionFromTheMenu() {
+        LinkedNpcEntry entry = new LinkedNpcEntry(UUID.randomUUID(), "Cow", 0, 0,
+                0, 0, null, 0, 0, 0, 0, true, false, false, false, false,
+                false, 0L, LinkedNpcTraitIndicator.EMPTY);
+        UICommandBuilder commands = new UICommandBuilder();
+        UIEventBuilder events = new UIEventBuilder();
+
+        LinkedNpcPanelCardBinder.bind(commands, events, 0, entry, false, true,
+                LinkedNpcPanelCardBindingFactory.create(true, false), "en-US");
+
+        assertValue(commands, "ReleaseButton.Visible", "true");
+        assertValue(commands, "UnlinkButton.Visible", "true");
+        assertValue(commands, "CullButton.Visible", "true");
+        assertTrue(Arrays.stream(events.getEvents()).anyMatch(event ->
+                "#TameworkLinkedPanelList[0] #RemoveButton".equals(event.selector)
+                        && event.data.contains("__removal_menu__:" + entry.npcUuid())));
+        assertTrue(Arrays.stream(events.getEvents()).noneMatch(event ->
+                "#TameworkLinkedPanelList[0] #RemoveButton".equals(event.selector)
+                        && event.data.contains("__unlink__:")));
     }
 
     private static LinkedNpcEntry entry(boolean captured) {
