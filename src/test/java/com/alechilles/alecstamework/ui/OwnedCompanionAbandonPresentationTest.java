@@ -8,6 +8,32 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OwnedCompanionAbandonPresentationTest {
+    /** Owned unlinked cards expose offscreen actions without pretending to be linked. */
+    @Test void ownedUnloadedAnimalOffersRecallAndLocateWithoutLinkControls() {
+        var owned = entry(false).withOwnedActions();
+        var commands = render(owned, false);
+        assertValue(commands, "RecallButton.Visible", "true");
+        assertValue(commands, "LocateButton.Visible", "true");
+        assertValue(commands, "SetHomeButton.Visible", "false");
+        assertValue(render(entry(false), false), "RecallButton.Visible", "false");
+        assertValue(render(entry(true).withOwnedActions(), false), "RecallButton.Visible", "false");
+        assertValue(render(entry(true).withOwnedActions(), false), "LocateButton.Visible", "false");
+    }
+
+    @Test void ownedRevivalAndRecoveryRespectCooldownAndManagedAuthority() {
+        assertValue(render(entry(false, true, false, 0).withOwnedActions(), false),
+                "RespawnButton.Visible", "true");
+        assertValue(render(entry(false, false, true, 0).withOwnedActions(), false),
+                "RespawnButton.Visible", "true");
+        assertValue(render(entry(false, true, false, 1000).withOwnedActions(), false),
+                "RespawnButton.Visible", "false");
+        UICommandBuilder commands = new UICommandBuilder();
+        LinkedNpcPanelCardBinder.bind(commands, new UIEventBuilder(), 0,
+                entry(false, true, false, 0).withOwnedActions(), false, false,
+                LinkedNpcPanelCardBindingFactory.create(true, false), "en-US",
+                CommandPanelFeaturePresentation.readOnlyManaged());
+        assertValue(commands, "RespawnButton.Visible", "false");
+    }
     /** Off-screen unlinked animals must offer confirmed abandonment without live-only actions. */
     @Test
     void unloadedUnlinkedAnimalOffersAbandonAfterOpeningRemovalControls() {
@@ -41,8 +67,12 @@ class OwnedCompanionAbandonPresentationTest {
     }
 
     private static LinkedNpcEntry entry(boolean captured) {
+        return entry(captured, false, false, 0L);
+    }
+
+    private static LinkedNpcEntry entry(boolean captured, boolean dead, boolean lost, long cooldown) {
         return new LinkedNpcEntry(UUID.randomUUID(), "Cow", 0, 0, 0, 0, 0, null,
-                0, 0, 0, 0, false, false, false, captured, false, false, 0L,
+                0, 0, 0, 0, false, false, dead, captured, false, lost, cooldown,
                 null, null, null, LinkedNpcTraitIndicator.EMPTY,
                 false, false, false, false, false, true,
                 "Cow", "Cow", null, null, null, false, false, 0L, 0.0, false);

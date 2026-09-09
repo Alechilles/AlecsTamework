@@ -45,8 +45,9 @@ dead companions continue to show their saved progression snapshot.
   Captured animals and coop occupants must be released from storage first.
   Managed roster companions use their roster's removal controls.
   Animals awaiting recovery stay protected, but do not prevent abandoning your other animals.
-  Linking and culling require the animal to be loaded in your world. Recall, home,
-  and other link-specific actions still require a link to this tool.
+  Linking and culling require the animal to be loaded in your world. Recall,
+  Locate, and Revive/Recover do not require an item link in Owned mode; the animal's
+  state, cooldowns, and recovery rules still apply. Home and link settings require a link.
   Bonded-companion tools keep their separate roster controls.
 
 ## Sorting and filtering

@@ -197,8 +197,10 @@ loaded owned NPCs, including animals with no item links. It does not apply the
 tool's species filter or a radius limit. Saved unloaded and other-world animals
 remain visible. This view creates no command links and does not change bonded
 roster authority. Bulk live commands use owner scope in the current world;
-existing target limits and inactive-link choices still apply. Off-screen
-link-specific actions retain their existing link requirement. Unlinked off-screen
+existing target limits and inactive-link choices still apply. Recall, Locate, and
+Revive/Recover also work for unlinked generic profiles after a fresh ownership
+read, with the existing lifecycle and recovery rules. Home and item-link settings
+still require a link. Unlinked off-screen
 rows offer confirmed Abandon through the existing permanent owner-population
 transition. This clears saved ownership, domain reservations, and command links;
 loaded source-world cleanup also clears the live owner-cap entry on its world

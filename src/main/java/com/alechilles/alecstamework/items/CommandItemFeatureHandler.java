@@ -100,6 +100,7 @@ public final class CommandItemFeatureHandler {
     private final CommandOwnerCullService ownerCullService;
     private final CommandMenuMoveService menuMoveService;
     private final CommandLinkedNpcLocateService locateService;
+    private final CommandOwnedActionService ownedActions;
     private final CommandPanelPreferenceService panelPreferenceService;
     private final CommandPanelActionService panelActionService;
     private final CommandGroupManagerPageService groupManagerPageService;
@@ -266,7 +267,12 @@ public final class CommandItemFeatureHandler {
                 BondedCompanionPanelEntrySourceService.production(bondedCompanions),
                 persistence == null ? null : new CommandOwnedPanelRecordSource(
                         persistence.queries()::projectedProfileSnapshot,
-                        () -> persistence.queries().projectedCommandRosterActions().keySet())
+                        () -> {
+                            var managed = new java.util.HashSet<>(
+                                    persistence.queries().projectedCommandRosterActions().keySet());
+                            managed.addAll(persistence.queries().projectedLaggingCommandRosterProfiles());
+                            return managed;
+                        })
         );
         this.bondedPanelLifecycle = new BondedCompanionPanelLifecycle(
                 registry, panelEntrySourceService.bondedReadModel());
@@ -336,6 +342,8 @@ public final class CommandItemFeatureHandler {
                         restorationAuthor
                 )
                 : null;
+        this.ownedActions = new CommandOwnedActionService(persistence, toolInventoryService,
+                panelPreferenceService, feedbackService, linkMutationService);
         this.freeRestorationActions =
                 new CommandFreeRestorationActionService(
                         restorationService,
@@ -813,7 +821,11 @@ public final class CommandItemFeatureHandler {
         if (!callbackAuthority.allowsGeneric(player, toolId, config)) {
             return;
         }
-        freeRestorationActions.request(player, toolId, npcUuid);
+        if (!ownedActions.request(player, toolId, npcUuid,
+                current -> callbackAuthority.allowsGeneric(current, toolId, config),
+                (current, record) -> freeRestorationActions.request(current, toolId, record.npcUuid, record))) {
+            freeRestorationActions.request(player, toolId, npcUuid);
+        }
     }
 
     void canonicalizePlayerCommandInventory(@Nullable Holder<EntityStore> holder) {
@@ -928,7 +940,11 @@ public final class CommandItemFeatureHandler {
         if (!callbackAuthority.allowsGeneric(player, toolId, config)) {
             return;
         }
-        locateService.locate(player, toolId, npcUuid);
+        if (!ownedActions.request(player, toolId, npcUuid,
+                current -> callbackAuthority.allowsGeneric(current, toolId, config),
+                (current, record) -> locateService.locate(current, toolId, record.npcUuid, record))) {
+            locateService.locate(player, toolId, npcUuid);
+        }
     }
 
     private void applyMenuReturnHome(Player player,
@@ -946,6 +962,11 @@ public final class CommandItemFeatureHandler {
         if (!callbackAuthority.allowsGeneric(player, toolId, config)) {
             return;
         }
+        if (!returnHome && ownedActions.request(player, toolId, npcUuid,
+                current -> callbackAuthority.allowsGeneric(current, toolId, config),
+                (current, record) -> menuMoveService.applyMenuMoveCommand(
+                        current, toolId, record.npcUuid, false,
+                        command -> resolveCommandLabel(current, command), record))) return;
         menuMoveService.applyMenuMoveCommand(
                 player,
                 toolId,

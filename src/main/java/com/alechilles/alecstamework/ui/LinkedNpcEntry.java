@@ -25,6 +25,7 @@ public final class LinkedNpcEntry {
     private final int maxThirst;
     private final boolean loaded;
     private final boolean linked;
+    private final boolean ownedActions;
     private final boolean active;
     private final boolean dead;
     private final boolean captured;
@@ -453,6 +454,7 @@ public final class LinkedNpcEntry {
         this.maxThirst = maxThirst;
         this.loaded = loaded;
         this.linked = linked;
+        this.ownedActions = false;
         this.active = active;
         this.hasHome = hasHome;
         this.dead = dead;
@@ -546,7 +548,8 @@ public final class LinkedNpcEntry {
     public LinkedNpcEntry withBreedingHappinessRatio(double ratio) {
         return new LinkedNpcEntry(this, recoveryHeld, recoveryIncidentId,
                 flightToggleAvailable, flightToggleAirborne, shoulderRideAvailable,
-                shoulderRideMounted, Double.isFinite(ratio) && ratio >= 0.0 ? ratio : -1.0);
+                shoulderRideMounted, Double.isFinite(ratio) && ratio >= 0.0 ? ratio : -1.0,
+                ownedActions);
     }
 
     public String happinessModifierBreakdown() {
@@ -575,6 +578,11 @@ public final class LinkedNpcEntry {
 
     public boolean linked() {
         return linked;
+    }
+
+    /** Whether this Owned-mode presentation may use generic ownership actions. */
+    public boolean ownedActions() {
+        return ownedActions;
     }
 
     public boolean active() {
@@ -708,6 +716,11 @@ public final class LinkedNpcEntry {
         return new LinkedNpcEntry(this, true, incidentId);
     }
 
+    /** Returns an immutable Owned-mode presentation copy with generic ownership actions. */
+    public LinkedNpcEntry withOwnedActions() {
+        return ownedActions ? this : new LinkedNpcEntry(this, true);
+    }
+
     /** Returns an immutable presentation copy with its live flight-toggle state. */
     public LinkedNpcEntry withFlightToggle(boolean available, boolean airborne) {
         return new LinkedNpcEntry(this, recoveryHeld, recoveryIncidentId,
@@ -825,6 +838,13 @@ public final class LinkedNpcEntry {
                 source.shoulderRideMounted);
     }
 
+    private LinkedNpcEntry(LinkedNpcEntry source, boolean ownedActions) {
+        this(source, source.recoveryHeld, source.recoveryIncidentId,
+                source.flightToggleAvailable, source.flightToggleAirborne,
+                source.shoulderRideAvailable, source.shoulderRideMounted,
+                source.breedingHappinessRatio, ownedActions);
+    }
+
     private LinkedNpcEntry(LinkedNpcEntry source,
                            boolean recoveryHeld,
                            String incidentId,
@@ -833,7 +853,8 @@ public final class LinkedNpcEntry {
                            boolean shoulderRideAvailable,
                            boolean shoulderRideMounted) {
         this(source, recoveryHeld, incidentId, flightToggleAvailable, flightToggleAirborne,
-                shoulderRideAvailable, shoulderRideMounted, source.breedingHappinessRatio);
+                shoulderRideAvailable, shoulderRideMounted, source.breedingHappinessRatio,
+                source.ownedActions);
     }
 
     private LinkedNpcEntry(LinkedNpcEntry source,
@@ -843,7 +864,8 @@ public final class LinkedNpcEntry {
                            boolean flightToggleAirborne,
                            boolean shoulderRideAvailable,
                            boolean shoulderRideMounted,
-                           double breedingHappinessRatio) {
+                           double breedingHappinessRatio,
+                           boolean ownedActions) {
         this.npcUuid = source.npcUuid;
         this.displayName = source.displayName;
         this.gender = source.gender;
@@ -860,6 +882,7 @@ public final class LinkedNpcEntry {
         this.maxThirst = source.maxThirst;
         this.loaded = source.loaded;
         this.linked = source.linked;
+        this.ownedActions = ownedActions;
         this.active = source.active;
         this.dead = source.dead;
         this.captured = source.captured;
@@ -955,6 +978,7 @@ public final class LinkedNpcEntry {
                 && maxThirst == other.maxThirst
                 && loaded == other.loaded
                 && linked == other.linked
+                && ownedActions == other.ownedActions
                 && active == other.active
                 && dead == other.dead
                 && captured == other.captured
@@ -1016,6 +1040,7 @@ public final class LinkedNpcEntry {
                 maxThirst,
                 loaded,
                 linked,
+                ownedActions,
                 active,
                 dead,
                 captured,

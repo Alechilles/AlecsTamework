@@ -857,6 +857,8 @@ final class CommandSelectionPageService {
         boolean managed = context.config().usesOwnerCommandFamilyRoster()
                 || feature != null && feature.managesRosterRow();
         boolean linked = entry.linked() && !managed;
+        boolean genericLinkedOrOwned = !managed
+                && (linked || entry.ownedActions());
         boolean releasable = !linked && !managed && entry.loaded()
                 && !entry.dead() && !entry.captured() && !entry.inCoop()
                 && !entry.lost();
@@ -883,16 +885,17 @@ final class CommandSelectionPageService {
                     entry.breedingEnabled() ? "Disable breeding" : "Enable breeding",
                     npcId, null, npc.toggleBreeding(), context.genericAuthority(), false);
         }
-        boolean revive = linked && (entry.dead() || entry.lost())
+        boolean revive = genericLinkedOrOwned && (entry.dead() || entry.lost())
                 && entry.deadRespawnRemainingMs() == 0L
                 && (feature == null || !feature.managesPaidRevival());
         if (revive) addGenericRow(catalog, rowId, "RESPAWN", "Respawn",
                 npcId, null, npc.respawn(), context.genericAuthority(), false);
-        if (linked && !entry.dead() && !entry.lost()) {
+        if (genericLinkedOrOwned && !entry.dead() && !entry.lost()
+                && (linked || !entry.captured() && !entry.inCoop())) {
             addGenericRow(catalog, rowId, "LOCATE", "Locate", npcId, null,
                     npc.locate(), context.genericAuthority(), false);
         }
-        if (linked && context.recallTeleportingEnabled() && !entry.dead()
+        if (genericLinkedOrOwned && context.recallTeleportingEnabled() && !entry.dead()
                 && !entry.captured() && !entry.inCoop() && !entry.lost()) {
             addGenericRow(catalog, rowId, "RECALL", "Recall", npcId, null,
                     npc.recall(), context.genericAuthority(), false);

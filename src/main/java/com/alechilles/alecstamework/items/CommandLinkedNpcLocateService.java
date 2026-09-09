@@ -16,6 +16,7 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.UUID;
+import javax.annotation.Nullable;
 
 /**
  * Resolves and reports the current or last recorded position for a linked companion.
@@ -40,6 +41,14 @@ final class CommandLinkedNpcLocateService {
     }
 
     void locate(Player player, String toolId, UUID npcUuid) {
+        locate(player, toolId, npcUuid, null);
+    }
+
+    /**
+     * Locates an already-authorized owned record without requiring an item-metadata link.
+     */
+    void locate(Player player, String toolId, UUID npcUuid,
+                @Nullable LinkedNpcRecord ownedRecord) {
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
         }
@@ -48,15 +57,25 @@ final class CommandLinkedNpcLocateService {
             feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.itemNotFound");
             return;
         }
-        LinkedNpcRecord record = linkMutationService.findLinkedNpcRecord(
-                linkMutationService.readLinkedNpcRecords(stack),
-                npcUuid
-        );
+        LinkedNpcRecord record = ownedRecord != null
+                ? ownedRecord
+                : linkMutationService.findLinkedNpcRecord(
+                        linkMutationService.readLinkedNpcRecords(stack),
+                        npcUuid
+                );
         if (record == null) {
             feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.notLinkedToTool");
             return;
         }
-        LocationReport report = resolveLocation(player, npcUuid, record);
+        if (record.npcUuid == null) {
+            feedbackService.showWarningKey(
+                    player,
+                    "tamework.ui.notifications.command.locate.noLocation",
+                    npcNameResolver.resolveCachedUnloadedDisplayName(record)
+            );
+            return;
+        }
+        LocationReport report = resolveLocation(player, record.npcUuid, record);
         if (report.position == null) {
             feedbackService.showWarningKey(
                     player,

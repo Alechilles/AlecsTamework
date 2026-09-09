@@ -133,14 +133,18 @@ final class LinkedNpcPanelCardBinder {
         boolean managedRoster = config.ownerCommandFamilyRoster()
                 || feature != null && feature.managesRosterRow();
         boolean legacyLinked = isLinked && !managedRoster;
+        boolean genericLinkedOrOwned = !managedRoster
+                && (legacyLinked || entry.ownedActions());
         boolean paidRevivalManaged = feature != null
                 && feature.managesPaidRevival();
-        boolean showReviveAction = !paidRevivalManaged && legacyLinked
+        boolean showReviveAction = !paidRevivalManaged && genericLinkedOrOwned
                 && (entry.dead() || entry.lost())
                 && entry.deadRespawnRemainingMs() == 0L
                 && !pendingUnlink;
-        boolean showLocate = legacyLinked && !entry.dead() && !entry.lost() && !pendingUnlink;
-        boolean showRecall = legacyLinked
+        boolean showLocate = genericLinkedOrOwned
+                && !entry.dead() && !entry.lost() && !pendingUnlink
+                && (legacyLinked || !entry.captured() && !entry.inCoop());
+        boolean showRecall = genericLinkedOrOwned
                 && config.recallActionEnabled()
                 && !entry.dead()
                 && !entry.captured()

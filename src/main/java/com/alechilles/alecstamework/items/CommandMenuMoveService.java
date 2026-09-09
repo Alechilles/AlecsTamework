@@ -45,6 +45,7 @@ final class CommandMenuMoveService {
     private final double defaultRecallForceRelocateDistance;
     private final CommandCanonicalRecordCommitGate canonicalRecordCommitGate;
     private final LinkedNpcRecordCollection linkedRecordCollection;
+    private final CommandLinkPolicyService linkPolicyService;
     @Nullable
     private final CommandNpcProfileActionResolver profileActionResolver;
 
@@ -96,6 +97,7 @@ final class CommandMenuMoveService {
         this.defaultRecallForceRelocateDistance = defaultRecallForceRelocateDistance;
         this.canonicalRecordCommitGate = new CommandCanonicalRecordCommitGate();
         this.linkedRecordCollection = new LinkedNpcRecordCollection();
+        this.linkPolicyService = new CommandLinkPolicyService();
         this.profileActionResolver = profileActionResolver;
     }
 
@@ -104,6 +106,20 @@ final class CommandMenuMoveService {
                               UUID npcUuid,
                               boolean returnHome,
                               Function<CommandEntry, String> labelResolver) {
+        applyMenuMoveCommand(
+                player, toolId, npcUuid, returnHome, labelResolver, null
+        );
+    }
+
+    /**
+     * Executes an already-authorized Owned-mode action without creating or repairing an item link.
+     */
+    void applyMenuMoveCommand(Player player,
+                              String toolId,
+                              UUID npcUuid,
+                              boolean returnHome,
+                              Function<CommandEntry, String> labelResolver,
+                              @Nullable LinkedNpcRecord ownedRecord) {
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
         }
@@ -147,8 +163,12 @@ final class CommandMenuMoveService {
             if (stackToolId == null || !stackToolId.equals(toolId)) {
                 continue;
             }
-            List<LinkedNpcRecord> linkedRecords = linkMutationService.readLinkedNpcRecords(stack);
-            LinkedNpcRecord record = linkMutationService.findLinkedNpcRecord(linkedRecords, npcUuid);
+            List<LinkedNpcRecord> linkedRecords = ownedRecord == null
+                    ? linkMutationService.readLinkedNpcRecords(stack)
+                    : List.of();
+            LinkedNpcRecord record = ownedRecord != null
+                    ? ownedRecord
+                    : linkMutationService.findLinkedNpcRecord(linkedRecords, npcUuid);
             if (record == null) {
                 feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.notLinkedToTool");
                 return;
@@ -171,7 +191,7 @@ final class CommandMenuMoveService {
             }
             record = relocationTarget.resolvedRecord();
             npcUuid = record.npcUuid;
-            if (profileActionResolver != null
+            if (ownedRecord == null && profileActionResolver != null
                     && (relocationTarget.redirected()
                     || !java.util.Objects.equals(record.profileId, selectedProfileId))) {
                 List<LinkedNpcRecord> repairedRecords = linkedRecordCollection.replaceResolvedSelection(
@@ -217,6 +237,17 @@ final class CommandMenuMoveService {
             NPCEntity npc = (npcRef != null && npcRef.isValid())
                     ? store.getComponent(npcRef, NPCEntity.getComponentType())
                     : null;
+            if (ownedRecord != null && npc != null
+                    && (!CommandGenericTargetAuthority.allowsGenericTargetMutation(npcRef, store)
+                    || !linkPolicyService.passesOwnerAndTamed(
+                            true, false, npcRef, player.getUuid(), store))) {
+                feedbackService.showWarningKey(
+                        player,
+                        "tamework.ui.notifications.command.move.unavailable",
+                        actionLabel
+                );
+                return;
+            }
             String roleId = null;
             if (npcRef != null && npcRef.isValid()) {
                 roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
@@ -273,7 +304,7 @@ final class CommandMenuMoveService {
                     toolId,
                     commandTarget,
                     raycastPosition,
-                    stack,
+                    ownedRecord == null ? stack : null,
                     TameworkRuntimeSettings.blockAllPlayerDamageIfOwned(settings.isBlockAllPlayerDamageIfOwned()),
                     TameworkRuntimeSettings.invulnerableIfOwned(settings.isInvulnerableIfOwned()),
                     returnHomeTeleportDistance,
@@ -321,15 +352,17 @@ final class CommandMenuMoveService {
                     break;
                 }
             }
-            ItemStack refreshedLinks = linkMutationService.refreshLinkedNpcPositions(
-                    context.workingItem,
-                    loadedRecipients,
-                    store,
-                    appliedCommandStates
-            );
-            if (refreshedLinks != context.workingItem) {
-                context.workingItem = refreshedLinks;
-                context.itemChanged = true;
+            if (ownedRecord == null) {
+                ItemStack refreshedLinks = linkMutationService.refreshLinkedNpcPositions(
+                        context.workingItem,
+                        loadedRecipients,
+                        store,
+                        appliedCommandStates
+                );
+                if (refreshedLinks != context.workingItem) {
+                    context.workingItem = refreshedLinks;
+                    context.itemChanged = true;
+                }
             }
             CommandRelocationDispatchService.QueueResult relocationResult =
                     relocationDispatchService.queueRelocationsForUnloaded(context, unloadedRecipients);

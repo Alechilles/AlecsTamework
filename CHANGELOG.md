@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Owned mode now offers Recall, Locate, and Revive/Recover for unlinked generic
+  companions, using verified ownership and the existing recovery rules.
+
 - Abandon, Release, and Cull hide the clicked companion card immediately while
   the saved state updates. Unconfirmed removals return after five seconds.
 

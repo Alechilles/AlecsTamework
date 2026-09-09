@@ -22,6 +22,7 @@ final class LinkedNpcPanelCardDynamicState {
                 && Objects.equals(previous.gender(), current.gender())
                 && previous.loaded() == current.loaded()
                 && previous.linked() == current.linked()
+                && previous.ownedActions() == current.ownedActions()
                 && previous.active() == current.active()
                 && previous.dead() == current.dead()
                 && previous.captured() == current.captured()

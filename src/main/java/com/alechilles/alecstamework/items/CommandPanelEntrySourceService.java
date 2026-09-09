@@ -204,7 +204,8 @@ final class CommandPanelEntrySourceService {
                     player, store, stack, toolId, ownedRecords, linkedById.keySet()).entries();
             linkedEntries = new ArrayList<>(ownedEntries.size());
             for (LinkedNpcEntry entry : ownedEntries) {
-                linkedEntries.add(linkedById.getOrDefault(entry.npcUuid(), entry));
+                linkedEntries.add(linkedById.getOrDefault(entry.npcUuid(), entry)
+                        .withOwnedActions());
             }
         }
         if (!ownedMode && panelMode != CommandPanelPreferenceService.PanelMode.NearbyMode) {
@@ -305,7 +306,7 @@ final class CommandPanelEntrySourceService {
                         )
                 );
                 if (loadedEntry != null) {
-                    out.add(loadedEntry);
+                    out.add(ownedMode ? loadedEntry.withOwnedActions() : loadedEntry);
                     seen.add(npc.getUuid());
                 }
             }

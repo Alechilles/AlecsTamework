@@ -43,6 +43,18 @@ final class CommandFreeRestorationActionService {
             @Nullable String toolId,
             @Nullable UUID npcUuid
     ) {
+        request(player, toolId, npcUuid, null);
+    }
+
+    /**
+     * Restores an already-authorized owned record without requiring an item-metadata link.
+     */
+    void request(
+            @Nullable Player player,
+            @Nullable String toolId,
+            @Nullable UUID npcUuid,
+            @Nullable LinkedNpcRecord ownedRecord
+    ) {
         if (player == null || toolId == null || toolId.isBlank()
                 || npcUuid == null) {
             return;
@@ -62,7 +74,7 @@ final class CommandFreeRestorationActionService {
             );
             return;
         }
-        restore(player, toolId, npcUuid, context);
+        restore(player, toolId, npcUuid, ownedRecord, context);
     }
 
     @Nullable
@@ -87,6 +99,7 @@ final class CommandFreeRestorationActionService {
             Player player,
             String toolId,
             UUID npcUuid,
+            @Nullable LinkedNpcRecord ownedRecord,
             Context context
     ) {
         for (short slot = 0; slot < context.hotbar().getCapacity(); slot++) {
@@ -94,9 +107,11 @@ final class CommandFreeRestorationActionService {
             if (!matchesTool(stack, toolId)) {
                 continue;
             }
-            LinkedNpcRecord record = links.findLinkedNpcRecord(
-                    links.readLinkedNpcRecords(stack), npcUuid
-            );
+            LinkedNpcRecord record = ownedRecord != null
+                    ? ownedRecord
+                    : links.findLinkedNpcRecord(
+                            links.readLinkedNpcRecords(stack), npcUuid
+                    );
             if (record == null) {
                 feedback.showWarningKey(
                         player,
