@@ -80,7 +80,8 @@ class OwnedCompanionAbandonPresentationTest {
 
     private static UICommandBuilder render(LinkedNpcEntry entry, boolean confirm) {
         UICommandBuilder commands = new UICommandBuilder();
-        LinkedNpcPanelCardBinder.bind(commands, new UIEventBuilder(), 0, entry,
+        var snapshot = LinkedNpcEntrySnapshotMapper.build(java.util.List.of(entry))[0];
+        LinkedNpcPanelCardBinder.bind(commands, new UIEventBuilder(), 0, snapshot,
                 false, confirm, LinkedNpcPanelCardBindingFactory.create(true, false), "en-US");
         return commands;
     }

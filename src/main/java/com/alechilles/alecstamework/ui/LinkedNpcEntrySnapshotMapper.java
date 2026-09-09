@@ -95,6 +95,9 @@ final class LinkedNpcEntrySnapshotMapper {
             if (entry.recoveryHeld()) {
                 snapshot = snapshot.withRecoveryHold(entry.recoveryIncidentId());
             }
+            if (entry.ownedActions()) {
+                snapshot = snapshot.withOwnedActions();
+            }
             out.add(snapshot);
         }
         return out.toArray(new LinkedNpcEntry[0]);
