@@ -93,7 +93,13 @@ final class CommandOwnerReleaseService {
         // The row lookup is presentation data; completeRead rechecks the durable owner and revision.
         var profileRead = ownedProfile.isPresent()
                 ? persistence.queries().findProfile(ownedProfile.get()) : findProfile(npcUuid);
-        profileRead.whenComplete((read, failure) -> completeRead(ownerUuid, npcUuid, read, failure));
+        profileRead.whenComplete((read, failure) -> {
+            try {
+                completeRead(ownerUuid, npcUuid, read, failure);
+            } catch (RuntimeException failureToSubmit) {
+                warnUnavailable(ownerUuid);
+            }
+        });
     }
 
     private CompletionStage<PersistenceReadResult<CompanionProfileReadModel>>

@@ -205,6 +205,10 @@ loaded source-world cleanup also clears the live owner-cap entry on its world
 thread. Captured and cooped animals must leave their storage lifecycle first.
 Managed command-roster companions remain read-only through generic command items;
 their roster controls own removal.
+Terminal removal checks the target profile's authority and pending claims rather
+than requesting owner capacity. An owner-level quarantine caused by another animal
+does not block this cleanup; the target's own quarantine or unfinished operation
+still does. Existing saved owner-scoped removals retain their original scopes on replay.
 
 Owned discovery runs inside the existing open-panel refresh on the owning world
 thread. Each pass reads immutable profile data and scans the current world's

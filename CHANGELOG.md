@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Fixed Abandon, Release, and Cull being blocked by another animal's owner-level
+  recovery quarantine. Protected animals remain blocked, and failed removals show feedback.
+
 - Fixed startup failing when uncertain population operations were already safely
   quarantined. Recovery preserves those records and allows unrelated work to load.
 

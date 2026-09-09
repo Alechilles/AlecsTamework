@@ -270,6 +270,13 @@ public final class TameworkNpcCullService {
                 LeaseBoundWorldDispatcher.execute(world, () -> applyDeferredCull(
                         world, actorUuid, targetUuid, managedRewards
                 ));
+            } else {
+                CommandUiCurrentWorldDispatcher.production().dispatch(actorUuid, (playerRef, store) -> {
+                    Player current = store.getComponent(playerRef, Player.getComponentType());
+                    if (current != null) new com.alechilles.alecstamework.ui.TameworkUiMessageService()
+                            .showKey(current, com.hypixel.hytale.protocol.packets.interface_.NotificationStyle.Warning,
+                                    "tamework.ui.notifications.command.cull.unavailable");
+                });
             }
         });
         return Outcome.QUEUED;

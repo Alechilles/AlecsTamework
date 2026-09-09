@@ -22,6 +22,9 @@ import com.alechilles.alecstamework.companion.population.domain.PopulationDomain
 import com.alechilles.alecstamework.companion.population.domain.PopulationDomainScope;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.persistence.control.PersistenceOperationAdmissionGate;
+import com.alechilles.alecstamework.persistence.control.PersistenceStartupCoordinator;
+import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
+import com.alechilles.alecstamework.persistence.control.PersistenceStartupAction;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
@@ -43,6 +46,11 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import com.alechilles.alecstamework.persistence.incidents.IncidentId;
+import com.alechilles.alecstamework.persistence.incidents.IncidentRecord;
+import com.alechilles.alecstamework.persistence.incidents.IncidentState;
+import com.alechilles.alecstamework.persistence.incidents.QuarantineState;
+import com.alechilles.alecstamework.persistence.incidents.ScopeQuarantine;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -67,6 +75,7 @@ class SqliteOwnerPopulationTransitionOperationsTest {
     private SqliteConnectionFactory connections;
     private SqlitePersistenceKernel kernel;
     private SqlitePublicPersistenceAdapter adapter;
+    private PersistenceStartupCoordinator startupGate;
     private final AtomicReference<PersistenceLifecycleAdmissionGateway>
             lifecycleAdmission = new AtomicReference<>();
 
@@ -77,10 +86,16 @@ class SqliteOwnerPopulationTransitionOperationsTest {
         );
         new SqliteSchemaV2Manager(connections, () -> -10_000).initialize();
         kernel = new SqlitePersistenceKernel(connections);
+        var startupActions = new java.util.EnumMap<PersistenceStartupNode, PersistenceStartupAction>(PersistenceStartupNode.class);
+        for (var node : PersistenceStartupNode.values()) {
+            startupActions.put(node, () -> CompletableFuture.completedFuture(PersistenceStartupAction.Result.COMPLETE));
+        }
+        startupGate = new PersistenceStartupCoordinator(PublicPersistenceFeatureRegistry.create(), startupActions);
+        assertTrue(startupGate.advance().toCompletableFuture().join().complete());
         adapter = new SqlitePublicPersistenceAdapter(
                 PublicPersistenceFeatureRegistry.create(),
                 kernel,
-                PersistenceOperationAdmissionGate.allowAll(),
+                startupGate,
                 () -> -5_000,
                 (claim, operation) ->
                         com.alechilles.alecstamework.persistence.operation
@@ -478,6 +493,74 @@ class SqliteOwnerPopulationTransitionOperationsTest {
             assertEquals(LifecycleState.ACTIVE, lifecycle.state());
             assertTrue(transaction.commandRosters().findByProfile(PROFILE_C).isPresent());
         }
+    }
+
+    /** Unrelated uncertain animals must not prevent cleanup, but this animal's fence must remain effective. */
+    @Test
+    void terminalCleanupDoesNotRequireOwnerAdmission() throws Exception {
+        checkTerminalCleanupQuarantine(false);
+    }
+
+    @Test
+    void terminalCleanupStillRespectsProfileQuarantine() throws Exception {
+        checkTerminalCleanupQuarantine(true);
+    }
+
+    private void checkTerminalCleanupQuarantine(boolean profileFence)
+            throws Exception {
+        createOwnedProfile();
+        var scope = profileFence ? OperationScope.profile(PROFILE_C) : OperationScope.owner(OWNER);
+        startupGate.quarantine(scope, "test_unknown");
+        try (var connection = connections.openWriterConnection()) {
+            connection.setAutoCommit(false);
+            var incidents = new SqliteIncidentStore(connection);
+            var incident = new IncidentId(java.util.UUID.randomUUID());
+            assertTrue(incidents.createIncident(new IncidentRecord(incident, "LIVE_OUTCOME_UNKNOWN",
+                    "test_unknown", IncidentState.OPEN, "uncertain operation", "{}", -3_500, null)).applied());
+            assertTrue(incidents.quarantine(new ScopeQuarantine(scope, incident, QuarantineState.ACTIVE,
+                    "test_unknown", -3_500, null)).applied());
+            connection.commit();
+        }
+        var release = new OwnerPopulationTransitionRequest(PROFILE_C, LifecycleRevision.INITIAL,
+                OWNER, "world-a", null, null, 0, 0, -3_000);
+        var result = adapter.ownerPopulationOperations().submit(operationId(70),
+                new IdempotencyKey("population:quarantined-cleanup"), release)
+                .completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        assertEquals(!profileFence, result.status() == OperationWorkflowResult.Status.PUBLISHED,
+                () -> String.valueOf(result.failure()));
+        try (var connection = connections.openReadConnection()) {
+            var transaction = new SqlitePersistenceTransactionContext(connection);
+            assertEquals(profileFence ? OWNER : null,
+                    transaction.lifecycles().findByProfile(PROFILE_C).orElseThrow().ownerId());
+            assertEquals(QuarantineState.ACTIVE,
+                    transaction.incidents().findQuarantine(scope).orElseThrow().state());
+        }
+        if (!profileFence) {
+            var acquisition = adapter.ownerPopulationOperations().submit(operationId(71),
+                    new IdempotencyKey("population:blocked-acquisition"), transition(PROFILE_A, 10, -2_900))
+                    .completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+            assertTrue(acquisition.status() != OperationWorkflowResult.Status.PUBLISHED);
+        }
+    }
+
+    /** Existing saved owner-scoped releases must still resume after cleanup scopes become narrower. */
+    @Test
+    void resumesLegacyPreparedTerminalRelease() throws Exception {
+        createOwnedProfile();
+        var release = new OwnerPopulationTransitionRequest(PROFILE_C, LifecycleRevision.INITIAL,
+                OWNER, "world-a", null, null, 0, 0, -3_000);
+        var id = operationId(72);
+        var key = new IdempotencyKey("population:legacy-release");
+        var prepared = adapter.publicOperations().engine().prepare(OwnerPopulationTransitionDefinition.INSTANCE,
+                new OperationRequest<>(id, key, release, SqliteOwnerPopulationTransitionOperations.FEATURE_SCOPE,
+                        LifecycleRevision.INITIAL, List.of(OperationScope.profile(PROFILE_C), OperationScope.owner(OWNER)),
+                        -3_000)).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        assertInstanceOf(com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult.Committed.class,
+                prepared);
+        var result = adapter.ownerPopulationOperations().submit(id, key, release)
+                .completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status(), () -> String.valueOf(result.failure()));
+        assertNull(adapter.profileIndex().find(PROFILE_C).orElseThrow().ownerId());
     }
 
     private PopulationDomainAdmissionOperation.Payload managedPayload(

@@ -184,10 +184,9 @@ public final class PublicPersistenceFeatureRegistry {
                 ),
                 PublicPersistenceFeatureDescriptorFactory.scopes(
                         OwnerPopulationTransitionDefinition.INSTANCE,
-                        Set.of(
-                                OperationScopeType.PROFILE,
-                                OperationScopeType.OWNER
-                        ),
+                        PublicPersistenceFeatureDescriptorFactory.policy(
+                                Set.of(OperationScopeType.PROFILE),
+                                Set.of(OperationScopeType.OWNER)),
                         OwnerPopulationReconciliationDefinition.INSTANCE,
                         Set.of(OperationScopeType.PROFILE,
                                 OperationScopeType.OWNER)

@@ -18,6 +18,7 @@ import com.alechilles.alecstamework.companion.population.domain.PopulationDomain
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChange;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.operation.DurableOperationWork;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
@@ -25,6 +26,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
+import com.alechilles.alecstamework.persistence.operation.OperationScopeType;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.operation.PreparedOperationDetail;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
@@ -47,6 +49,7 @@ public final class SqliteOwnerPopulationTransitionOperations {
             new ProjectionEventType("owner_population_transition_committed");
 
     private final SqliteDatabaseOperationCoordinator coordinator;
+    @Nullable private final SqliteOperationReader reader;
     @Nullable
     private final SqliteManagedOwnerPopulationAdmission admission;
     private final SqliteLifecycleAdmissionSingleFlight singleFlight =
@@ -73,6 +76,7 @@ public final class SqliteOwnerPopulationTransitionOperations {
             );
         }
         this.coordinator = coordinator;
+        this.reader = reader;
         admission = reader == null || lifecycleAdmission == null
                 || sourceReader == null
                 ? null
@@ -102,7 +106,7 @@ public final class SqliteOwnerPopulationTransitionOperations {
             );
         }
         if (!positiveTarget(transition)) {
-            return execute(operationId, idempotencyKey, transition);
+            return release(operationId, idempotencyKey, transition);
         }
         if (admission == null) {
             return rejected("owner_population_lifecycle_admission_unbound");
@@ -145,6 +149,57 @@ public final class SqliteOwnerPopulationTransitionOperations {
             IdempotencyKey idempotencyKey,
             OwnerPopulationTransitionRequest transition
     ) {
+        return execute(operationId, idempotencyKey, transition, participants(transition));
+    }
+
+    private SqliteDatabaseOperationCoordinator.Submission release(
+            OperationId operationId, IdempotencyKey key, OwnerPopulationTransitionRequest transition
+    ) {
+        if (reader == null) return execute(operationId, key, transition);
+        // Older saved releases include OWNER. Preserve their exact envelope on replay.
+        var completion = reader.findByIdempotency(OwnerPopulationTransitionDefinition.KIND, key)
+                .thenCompose(read -> {
+                    if (read instanceof PersistenceReadResult.Found<
+                            SqliteOperationReader.OperationReadModel> found) {
+                        var saved = found.value().operation();
+                        if (!saved.operationId().equals(operationId)
+                                || !saved.kind().equals(OwnerPopulationTransitionDefinition.KIND)
+                                || !saved.idempotencyKey().equals(key)
+                                || !saved.featureScope().equals(FEATURE_SCOPE)
+                                || saved.payloadVersion() != OwnerPopulationTransitionDefinition.INSTANCE.payloadVersion()
+                                || !OwnerPopulationTransitionDefinition.INSTANCE.decode(saved.payloadJson()).equals(transition)) {
+                            return rejected("owner_population_release_replay_conflict").completion();
+                        }
+                        var semanticScopes = saved.participants().stream()
+                                .filter(scope -> scope.type() != OperationScopeType.OPERATION
+                                        && scope.type() != OperationScopeType.FEATURE).toList();
+                        var expectedScopes = new TreeSet<>(participants(transition));
+                        if (semanticScopes.stream().anyMatch(scope -> scope.type() == OperationScopeType.OWNER)) {
+                            addOwner(expectedScopes, transition.expectedOwnerId());
+                        }
+                        if (!semanticScopes.equals(List.copyOf(expectedScopes))) {
+                            return rejected("owner_population_release_replay_scopes_conflict").completion();
+                        }
+                        return execute(operationId, key, transition,
+                                semanticScopes).completion();
+                    }
+                    if (read instanceof PersistenceReadResult.Absent<?>) {
+                        return execute(operationId, key, transition).completion();
+                    }
+                    return rejected("owner_population_release_read_failed").completion();
+                });
+        return new SqliteDatabaseOperationCoordinator.Submission(
+                SqliteSingleWriter.WriteAcceptance.ACCEPTED,
+                completion.exceptionally(failure -> SqliteOperationResults.failed(
+                        OperationWorkflowResult.Status.PREPARE_FAILED, null, List.of(), failure)));
+    }
+
+    private SqliteDatabaseOperationCoordinator.Submission execute(
+            OperationId operationId,
+            IdempotencyKey idempotencyKey,
+            OwnerPopulationTransitionRequest transition,
+            List<OperationScope> scopes
+    ) {
         Optional<OwnerPopulationAdmissionPlan> plan =
                 OwnerPopulationAdmissionPlanner.plan(transition);
         SqliteOwnerPopulationParticipant population = needsExternalOwner(
@@ -182,7 +237,7 @@ public final class SqliteOwnerPopulationTransitionOperations {
         }
         return coordinator.execute(
                 OwnerPopulationTransitionDefinition.INSTANCE,
-                request(operationId, idempotencyKey, transition),
+                request(operationId, idempotencyKey, transition, scopes),
                 detail,
                 work,
                 requiredConsumers
@@ -222,7 +277,8 @@ public final class SqliteOwnerPopulationTransitionOperations {
     private OperationRequest<OwnerPopulationTransitionRequest> request(
             OperationId operationId,
             IdempotencyKey idempotencyKey,
-            OwnerPopulationTransitionRequest transition
+            OwnerPopulationTransitionRequest transition,
+            List<OperationScope> scopes
     ) {
         return new OperationRequest<>(
                 operationId,
@@ -230,7 +286,7 @@ public final class SqliteOwnerPopulationTransitionOperations {
                 transition,
                 FEATURE_SCOPE,
                 transition.expectedLifecycleRevision(),
-                participants(transition),
+                scopes,
                 transition.requestedAtMs()
         );
     }
@@ -240,8 +296,12 @@ public final class SqliteOwnerPopulationTransitionOperations {
     ) {
         TreeSet<OperationScope> scopes = new TreeSet<>();
         scopes.add(OperationScope.profile(transition.profileId()));
-        addOwner(scopes, transition.expectedOwnerId());
-        addOwner(scopes, transition.targetOwnerId());
+        // Terminal cleanup only decreases capacity for this profile. Its exact
+        // lifecycle and pending-domain checks still protect uncertain profiles.
+        if (positiveTarget(transition)) {
+            addOwner(scopes, transition.expectedOwnerId());
+            addOwner(scopes, transition.targetOwnerId());
+        }
         return List.copyOf(scopes);
     }
 
