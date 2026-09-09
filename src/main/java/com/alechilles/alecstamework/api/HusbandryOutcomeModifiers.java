@@ -1,6 +1,12 @@
 package com.alechilles.alecstamework.api;
 
-/** Bounded outcome modifiers returned by a husbandry outcome provider. */
+/**
+ * Bounded outcome modifiers returned by a husbandry outcome provider.
+ * For HAPPINESS_CARE, happinessFlatBonus adds 0-100 points independently of
+ * condition bands and disposition scaling. Providers must check
+ * HUSBANDRY_FLAT_CARE_BONUS before relying on it. Supply zero conditional bonuses
+ * when the flat bonus replaces them; nonzero values are additive.
+ */
 public record HusbandryOutcomeModifiers(
         double needsDecayMultiplier,
         double happinessDispositionMultiplier,
@@ -11,8 +17,18 @@ public record HusbandryOutcomeModifiers(
         double happinessThirstBonus,
         double happinessPopulationBonus,
         double breedingInheritanceChanceBonus,
-        double harmfulMutationRerollChance
+        double harmfulMutationRerollChance,
+        double happinessFlatBonus
 ) {
+    /** Compatibility constructor: existing providers keep their conditional Care bonuses. */
+    public HusbandryOutcomeModifiers(double needsDecayMultiplier, double happinessDispositionMultiplier,
+            double bonusOutputChance, double tripleOutputChance, double breedingCooldownMultiplier,
+            double happinessHungerBonus, double happinessThirstBonus, double happinessPopulationBonus,
+            double breedingInheritanceChanceBonus, double harmfulMutationRerollChance) {
+        this(needsDecayMultiplier, happinessDispositionMultiplier, bonusOutputChance, tripleOutputChance,
+                breedingCooldownMultiplier, happinessHungerBonus, happinessThirstBonus, happinessPopulationBonus,
+                breedingInheritanceChanceBonus, harmfulMutationRerollChance, 0.0);
+    }
     /** Compatibility constructor for providers compiled against the original five modifiers. */
     public HusbandryOutcomeModifiers(double needsDecayMultiplier,
                                     double happinessDispositionMultiplier,

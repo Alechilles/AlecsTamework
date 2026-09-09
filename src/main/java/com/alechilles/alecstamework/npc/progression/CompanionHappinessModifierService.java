@@ -47,6 +47,8 @@ public final class CompanionHappinessModifierService {
         double dispositionMultiplier = resolveDispositionMultiplier(npcRef, store, happinessConfig);
         HusbandryOutcomeModifiers careModifiers = HusbandryOutcomeRuntime.resolve(
                 HusbandryOutcomeKind.HAPPINESS_CARE, npcRef, store, (String) null, null);
+        offsetTotal += addCareBonus("flat_care", "Caretaking", true,
+                careModifiers.happinessFlatBonus(), modifiers);
 
         TameworkNeedsComponent needs = resolveNeedsComponent(npcRef, store);
         TwNeedsConfig needsConfig = NeedsConfigResolver.resolveConfig(npcRef, store, needs);

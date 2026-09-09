@@ -199,6 +199,34 @@ class CompanionHappinessModifierServiceTest {
         return config;
     }
 
+    @Test
+    void flatCareAppliesWithoutGoodConditionBandsAndIsNotDispositionScaled() throws Exception {
+        try (HytaleModuleScope ignored = HytaleModuleScope.install();
+             TestEntityComponentStore store = new TestEntityComponentStore(new EntityStore(null));
+             HusbandryOutcomeRegistry registry = new HusbandryOutcomeRegistry()) {
+            Ref<EntityStore> npcRef = store.createReference();
+            NPCEntity npc = new NPCEntity();
+            npc.setLegacyUUID(UUID.randomUUID());
+            npc.setRoleName("RoleWithoutHappinessConfig");
+            store.put(npcRef, NPCEntity.getComponentType(), npc);
+            registry.register(context -> context.kind() == HusbandryOutcomeKind.HAPPINESS_CARE
+                    ? new HusbandryOutcomeModifiers(1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 15)
+                    : new HusbandryOutcomeModifiers(1, 1.3, 0, 0, 1));
+            TwHappinessConfig config = happinessConfig(true);
+            var baseline = CompanionHappinessModifierService.resolve(npcRef, store, config);
+            installRuntime(registry);
+            try {
+                var result = CompanionHappinessModifierService.resolve(npcRef, store, config);
+                assertEquals(baseline.target() + 15, result.target(), 0.000001);
+                assertEquals(15, result.modifiers().stream()
+                        .filter(entry -> entry.id().equals("flat_care"))
+                        .mapToDouble(CompanionHappinessModifierService.ModifierEntry::value).sum(), 0.000001);
+            } finally {
+                clearRuntime(registry);
+            }
+        }
+    }
+
     private static void setOwnerNearbyOffset(TwHappinessConfig config, double offset) throws Exception {
         setField(config.getModifiers(), "ownerNearbyOffset", offset);
     }

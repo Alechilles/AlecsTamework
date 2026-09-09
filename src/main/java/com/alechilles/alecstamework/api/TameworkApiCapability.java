@@ -70,6 +70,8 @@ public enum TameworkApiCapability {
     HUSBANDRY_OUTCOMES,
     /** External husbandry providers can supply bounded care bonuses for eligible mood bands. */
     HUSBANDRY_CARE_BONUSES,
+    /** Unconditional, unscaled happiness bonus supplied by husbandry outcome providers. */
+    HUSBANDRY_FLAT_CARE_BONUS,
     /** Owner-scoped inheritance bonuses and harmful-mutation reroll chances. */
     HUSBANDRY_BREEDING_GENETICS
 }

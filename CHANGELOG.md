@@ -2,6 +2,11 @@
 
 ## Unreleased development changes
 
+- Husbandry providers can supply an unconditional `happinessFlatBonus` for
+  `HAPPINESS_CARE` with capability `HUSBANDRY_FLAT_CARE_BONUS`. It adds 0-100
+  happiness points without condition or disposition scaling. Existing provider
+  constructors retain their conditional bonuses and default the flat bonus to zero.
+
 - Command HUD, companion-card and settings tooltips use the game's default
   tooltip style. The command HUD uses the native panel frame, and happiness
   tooltips combine active Care bonuses into one Caretaking total.

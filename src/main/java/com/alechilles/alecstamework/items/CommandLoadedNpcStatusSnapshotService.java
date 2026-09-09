@@ -333,7 +333,7 @@ final class CommandLoadedNpcStatusSnapshotService {
                 continue;
             }
             if ("hunger_care".equals(modifier.id()) || "thirst_care".equals(modifier.id())
-                    || "population_care".equals(modifier.id())) {
+                    || "population_care".equals(modifier.id()) || "flat_care".equals(modifier.id())) {
                 caretaking += modifier.value();
                 continue;
             }
