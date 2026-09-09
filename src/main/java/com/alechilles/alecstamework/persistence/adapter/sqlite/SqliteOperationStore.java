@@ -240,9 +240,15 @@ public final class SqliteOperationStore implements OperationStore {
                    AND NOT EXISTS (
                        SELECT 1
                        FROM persistence_quarantine quarantine
-                       WHERE quarantine.scope_type = 'OPERATION'
-                         AND quarantine.scope_key = operation_envelope.operation_id
-                         AND quarantine.state = 'ACTIVE'
+                       WHERE quarantine.state = 'ACTIVE'
+                         AND ((quarantine.scope_type = 'OPERATION'
+                               AND quarantine.scope_key = operation_envelope.operation_id)
+                              OR EXISTS (
+                                  SELECT 1 FROM operation_participant participant
+                                  WHERE participant.operation_id = operation_envelope.operation_id
+                                    AND participant.scope_type = quarantine.scope_type
+                                    AND participant.scope_key = quarantine.scope_key
+                              ))
                    )
                  ORDER BY created_at_ms, operation_id
                  LIMIT ?

@@ -1,7 +1,12 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.persistence.incidents.QuarantineState;
+import com.alechilles.alecstamework.persistence.incidents.IncidentId;
+import com.alechilles.alecstamework.persistence.incidents.IncidentRecord;
+import com.alechilles.alecstamework.persistence.incidents.IncidentState;
+import com.alechilles.alecstamework.persistence.incidents.ScopeQuarantine;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceKernelMetrics;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinition;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinitionRegistry;
@@ -22,6 +27,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterEach;
@@ -30,6 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Integration tests for bounded decode-first operation recovery and scoped containment. */
@@ -43,6 +50,9 @@ class SqliteOperationRecoveryCoordinatorTest {
             OperationId.parse("40000000-0000-0000-0000-000000000003");
     private static final OperationId UNKNOWN =
             OperationId.parse("40000000-0000-0000-0000-000000000004");
+    private static final IncidentId CONTAINMENT_INCIDENT = new IncidentId(
+            UUID.fromString("50000000-0000-0000-0000-000000000001")
+    );
 
     @TempDir
     Path tempDir;
@@ -203,6 +213,63 @@ class SqliteOperationRecoveryCoordinatorTest {
                             .orElseThrow().attemptCount()
             );
         }
+    }
+
+    @Test
+    void containmentReadbackRequiresEveryFenceToRemainActive()
+            throws Exception {
+        List<OperationScope> required = List.of(
+                OperationScope.operation(UNKNOWN),
+                OperationScope.tool("recovery-containment-test")
+        );
+
+        assertInstanceOf(
+                PersistenceReadResult.Absent.class,
+                recovery.findActiveContainment(required)
+                        .toCompletableFuture().get(10, TimeUnit.SECONDS)
+        );
+        try (Connection connection = transaction()) {
+            SqliteIncidentStore incidents = new SqliteIncidentStore(connection);
+            assertTrue(incidents.createIncident(new IncidentRecord(
+                    CONTAINMENT_INCIDENT,
+                    "LIVE_OUTCOME_UNKNOWN",
+                    "recovery_test",
+                    IncidentState.OPEN,
+                    "test containment",
+                    "{}",
+                    -9_000,
+                    null
+            )).applied());
+            for (OperationScope scope : required) {
+                assertTrue(incidents.quarantine(new ScopeQuarantine(
+                        scope,
+                        CONTAINMENT_INCIDENT,
+                        QuarantineState.ACTIVE,
+                        "recovery_test",
+                        -9_000,
+                        null
+                )).applied());
+            }
+            connection.commit();
+        }
+        assertInstanceOf(
+                PersistenceReadResult.Found.class,
+                recovery.findActiveContainment(required)
+                        .toCompletableFuture().get(10, TimeUnit.SECONDS)
+        );
+        try (Connection connection = transaction()) {
+            assertTrue(new SqliteIncidentStore(connection).release(
+                    required.getLast(),
+                    CONTAINMENT_INCIDENT,
+                    -8_000
+            ).applied());
+            connection.commit();
+        }
+        assertInstanceOf(
+                PersistenceReadResult.Absent.class,
+                recovery.findActiveContainment(required)
+                        .toCompletableFuture().get(10, TimeUnit.SECONDS)
+        );
     }
 
     private void createPhaseFixtures() throws Exception {

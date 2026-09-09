@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Fixed startup failing when uncertain population operations were already safely
+  quarantined. Recovery preserves those records and allows unrelated work to load.
+
 - Added Owned to the command-item mode selector. It shows owned animals regardless
   of item links, including saved animals in other worlds and unloaded chunks.
   Unlinked off-screen animals can be abandoned to free ownership-limit slots.

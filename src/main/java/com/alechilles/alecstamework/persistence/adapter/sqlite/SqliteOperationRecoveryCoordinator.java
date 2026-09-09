@@ -131,6 +131,34 @@ public final class SqliteOperationRecoveryCoordinator {
         });
     }
 
+    /** Verifies every required fence from one snapshot before startup proceeds. */
+    CompletionStage<PersistenceReadResult<List<OperationScope>>> findActiveContainment(
+            List<OperationScope> requiredScopes
+    ) {
+        List<OperationScope> required = List.copyOf(new java.util.TreeSet<>(requiredScopes));
+        if (required.isEmpty() || required.stream()
+                .noneMatch(scope -> scope.type() == OperationScopeType.OPERATION)) {
+            throw new IllegalArgumentException("Recovery containment requires an operation scope");
+        }
+        return reads.execute(new SqliteReadCommand<>(
+                CONTAINMENT_READBACK,
+                PersistenceReadPriority.GAMEPLAY_CRITICAL,
+                connection -> {
+                    connection.setAutoCommit(false);
+                    try {
+                        List<OperationScope> active = new SqliteIncidentStore(connection)
+                                .findActiveQuarantines(required).stream()
+                                .map(ScopeQuarantine::scope).toList();
+                        return active.containsAll(required)
+                                ? PersistenceReadResult.found(active, 0)
+                                : PersistenceReadResult.absent();
+                    } finally {
+                        connection.rollback();
+                    }
+                }
+        ));
+    }
+
     private List<OperationEnvelope> recoverableIncludingAllowedQuarantines(
             SqlitePersistenceTransactionContext transaction,
             long nowMs,

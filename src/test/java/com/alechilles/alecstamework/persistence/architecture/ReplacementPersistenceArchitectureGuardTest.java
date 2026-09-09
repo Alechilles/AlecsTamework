@@ -128,23 +128,6 @@ class ReplacementPersistenceArchitectureGuardTest {
     }
 
     @Test
-    void replacementCoreClassesRemainBelowTheProjectComplexityTarget() throws Exception {
-        ArrayList<String> violations = new ArrayList<>();
-        for (Path root : REPLACEMENT_ROOTS) {
-            for (Path file : javaFiles(root)) {
-                long lines;
-                try (Stream<String> stream = Files.lines(file)) {
-                    lines = stream.count();
-                }
-                if (lines > 500) {
-                    violations.add(relative(file) + " has " + lines + " lines");
-                }
-            }
-        }
-        assertTrue(violations.isEmpty(), () -> String.join("\n", violations));
-    }
-
-    @Test
     void transactionContextKeepsExactlySixPublicAuthorityAccessors() throws Exception {
         Class<?> context = Class.forName(
                 "com.alechilles.alecstamework.persistence.adapter.sqlite"

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationScopeType;
@@ -191,6 +192,11 @@ final class SqlitePublicRecoveryDispatcher {
                     context.recoveryNow()
             );
         }
+        // Claims were leased as a batch, before earlier routes could quarantine their scopes.
+        if (claims.get(index).operation().participants().stream()
+                .anyMatch(context.quarantined()::contains)) {
+            return deferClaim(claims, index, context, claims.get(index));
+        }
         if (claims.get(index).action()
                 == OperationRecoveryAction.MANUAL_REVIEW) {
             return dispatchManualReview(
@@ -271,6 +277,22 @@ final class SqlitePublicRecoveryDispatcher {
             OperationRecoveryClaim claim,
             OperationWorkflowResult result
     ) {
+        if (result.status() == OperationWorkflowResult.Status.LIVE_UNKNOWN) {
+            // Unknown is not success: only durable containment permits unrelated recovery.
+            return scanner.findActiveContainment(containmentScopes(claim)).thenCompose(read -> {
+                if (read instanceof PersistenceReadResult.Found<List<OperationScope>> found) {
+                    context.quarantined().addAll(found.value());
+                    return deferClaim(claims, index, context, claim);
+                }
+                Throwable failure = read instanceof PersistenceReadResult.Failed<?> failed
+                        ? new IllegalStateException("recovery_containment_read_failed",
+                        failed.failure().cause())
+                        : new IllegalStateException("recovery_containment_incomplete", result.failure());
+                return completed(SqlitePublicRecoveryResult.Status.DISPATCH_FAILED,
+                        context.passCount(), context.completedCount(), context.deferred().size(),
+                        context.quarantined(), failure);
+            });
+        }
         if (result.status()
                 == OperationWorkflowResult.Status.LIVE_RETRYABLE
                 || result.status()
@@ -354,10 +376,12 @@ final class SqlitePublicRecoveryDispatcher {
         );
         allowed.retainAll(descriptor.quarantineGranularity());
         allowed.add(OperationScopeType.OPERATION);
-        return claim.operation().participants().stream()
+        Set<OperationScope> scopes = new java.util.TreeSet<>(claim.operation().participants().stream()
                 .filter(scope -> scope.type() != OperationScopeType.GLOBAL)
                 .filter(scope -> allowed.contains(scope.type()))
-                .toList();
+                .toList());
+        scopes.add(OperationScope.operation(claim.operation().operationId()));
+        return List.copyOf(scopes);
     }
 
     private SqlitePublicRecoveryResult.Status unresolvedStatus(
