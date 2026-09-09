@@ -35,13 +35,13 @@ $C = "Common.ui";
 @Recover = @Action;
 @RecoverDisabled = @ActionDisabled;
 
-// Panel controls share the same two atlas textures as the action buttons.
+// Quiet panel fields use flat fills; raised frames identify action buttons.
 @PanelDropdown = DropdownBoxStyle(
  ...$C.@DefaultDropdownBoxStyle,
- DefaultBackground: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 8, Color: #8bb3cf),
- HoveredBackground: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 8),
- PressedBackground: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 8),
- PanelBackground: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 8),
+ DefaultBackground: (Color: #183247),
+ HoveredBackground: (Color: #23475f),
+ PressedBackground: (Color: #1b3c52),
+ PanelBackground: (Color: #102738),
  ArrowWidth: 10, ArrowHeight: 14
 );
 

@@ -255,8 +255,8 @@ final class LinkedNpcPanelCardBinder {
                 entry,
                 pendingUnlink
         );
-        commandBuilder.setObject(entrySelector + ".Anchor",
-                buildCardAnchor(managedRoster));
+        bindCardLayout(commandBuilder, entrySelector, entry, managedRoster,
+                showActiveToggleActive || showActiveToggleInactive);
         LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry, language);
         LinkedNpcPanelProgressionBinder.bindXpProgressRing(
                 commandBuilder,
@@ -486,13 +486,42 @@ final class LinkedNpcPanelCardBinder {
         }
     }
 
-    private static Anchor buildCardAnchor(boolean managedRoster) {
+    /** Keep unavailable cards concise and reset geometry when a reused row becomes live again. */
+    static void bindCardLayout(UICommandBuilder commands, String card, LinkedNpcEntry entry,
+                               boolean managedRoster, boolean showActiveToggle) {
+        boolean compact = !managedRoster && !entry.hasHealth();
+        commands.setObject(card + ".Anchor", buildCardAnchor(managedRoster, compact));
+        commands.set(card + " #NeedRingRow.Visible", !compact);
+        commands.set(card + " #TraitStrip.Visible", !compact);
+        commands.set(card + " #StatusDivider.Visible", !compact);
+        commands.setObject(card + " #GroupTab.Anchor", fixedAnchor(8, -10, 5, compact ? 80 : 112));
+        commands.setObject(card + " #GroupTabButton.Anchor", fixedAnchor(0, 0, 5, compact ? 80 : 112));
+        commands.setObject(card + " #HealthFrame.Anchor", fixedAnchor(compact ? 54 : 90, 0, 450, 14));
+        commands.setObject(card + " #XpProgressRing.Anchor", fixedAnchor(compact ? 30 : 68, 376, 74, 22));
+        commands.setObject(card + " #TalentPointAction.Anchor", fixedAnchor(compact ? 30 : 68, 340, 24, 24));
+        int genderLeft = showActiveToggle ? 34 : 0;
+        int nameLeft = genderLeft + (entry.isMale() || entry.isFemale() ? 30 : 0);
+        commands.setObject(card + " #GenderMaleIcon.Anchor", fixedAnchor(1, genderLeft, 22, 22));
+        commands.setObject(card + " #GenderFemaleIcon.Anchor", fixedAnchor(1, genderLeft, 22, 22));
+        commands.setObject(card + " #Name.Anchor", fixedAnchor(0, nameLeft, 450 - nameLeft, 26));
+    }
+
+    private static Anchor fixedAnchor(int top, int left, int width, int height) {
+        Anchor anchor = new Anchor();
+        anchor.setTop(Value.of(top));
+        anchor.setLeft(Value.of(left));
+        anchor.setWidth(Value.of(width));
+        anchor.setHeight(Value.of(height));
+        return anchor;
+    }
+
+    private static Anchor buildCardAnchor(boolean managedRoster, boolean compact) {
         Anchor anchor = new Anchor();
         anchor.setTop(Value.of(3));
         anchor.setLeft(Value.of(0));
         anchor.setRight(Value.of(0));
         anchor.setHeight(Value.of(managedRoster
-                ? ROSTER_CARD_HEIGHT : NORMAL_CARD_HEIGHT));
+                ? ROSTER_CARD_HEIGHT : compact ? 112 : NORMAL_CARD_HEIGHT));
         return anchor;
     }
 

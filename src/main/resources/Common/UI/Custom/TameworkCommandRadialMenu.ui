@@ -26,7 +26,9 @@ $C.@PageOverlay {
 
     Group #TameworkCommandMenuSurface {
       Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
-      Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 10, Color: #648399);
+      Background: #081724;
+      OutlineColor: #35556e;
+      OutlineSize: 1;
     }
 
     Group #TameworkCommandMenuContent {
@@ -72,6 +74,8 @@ $C.@PageOverlay {
 
           DropdownBox #TameworkCommandPrimary {
             Anchor: (Top: 0, Left: 42, Width: 208, Height: 28);
+            OutlineColor: #34526b;
+            OutlineSize: 1;
             Style: @CommandAssignmentDropdownStyle;
             HitTestVisible: true;
             MaxSelection: 1;
@@ -91,6 +95,8 @@ $C.@PageOverlay {
 
           DropdownBox #TameworkCommandHotswapQ {
             Anchor: (Top: 0, Left: 42, Width: 208, Height: 28);
+            OutlineColor: #34526b;
+            OutlineSize: 1;
             Style: @CommandAssignmentDropdownStyle;
             HitTestVisible: true;
             MaxSelection: 1;
@@ -110,6 +116,8 @@ $C.@PageOverlay {
 
           DropdownBox #TameworkCommandHotswapE {
             Anchor: (Top: 0, Left: 42, Width: 208, Height: 28);
+            OutlineColor: #34526b;
+            OutlineSize: 1;
             Style: @CommandAssignmentDropdownStyle;
             HitTestVisible: true;
             MaxSelection: 1;
@@ -129,6 +137,8 @@ $C.@PageOverlay {
 
           DropdownBox #TameworkCommandHotswapR {
             Anchor: (Top: 0, Left: 42, Width: 208, Height: 28);
+            OutlineColor: #34526b;
+            OutlineSize: 1;
             Style: @CommandAssignmentDropdownStyle;
             HitTestVisible: true;
             MaxSelection: 1;
