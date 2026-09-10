@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Named NPCs show their role beneath their HUD name. Food preferences have a
+  heading and appear before appearance attributes; level text fits its digits.
+
 - Command HUDs retry their join-time activation after the client finishes loading,
   so an already-equipped flute does not need to be put away and reselected.
 

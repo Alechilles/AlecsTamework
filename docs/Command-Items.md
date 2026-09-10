@@ -408,7 +408,7 @@ Linked panel supports:
 - Attempting-recall countdown text for unloaded companions while relocation is still retrying
 
 Command target HUD:
-- Matches the charcoal command menu with percentage meters for happiness, hunger, and thirst, and time/readiness bars for breeding and harvesting. Only applicable sections appear. Appearance attributes remain text pairs such as `Coat: Brown`, above the food rows.
+- Matches the charcoal command menu with percentage meters for happiness, hunger, and thirst, and time/readiness bars for breeding and harvesting. Only applicable sections appear. Appearance attributes remain text pairs such as `Coat: Brown`, below the food rows.
 - Appears while the player holds any registered command item and looks directly at a supported NPC within 6 units.
 - Uses the same loaded-NPC status snapshot as the linked panel for display name, health, happiness, hunger, thirst, level, traits, harvest cooldown, and breeding cooldown.
 - Adds compact target-only rows for favorite food, other compatible foods on tamed NPCs, attachment selections, and required tranquilizer stacks for tame interactions that require tranquilizer setup.

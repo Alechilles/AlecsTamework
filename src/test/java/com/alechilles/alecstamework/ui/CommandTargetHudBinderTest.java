@@ -47,8 +47,10 @@ class CommandTargetHudBinderTest {
     void rendersAppearancePairsAndClearsOldRowsWhenTargetChanges() {
         var appearance = List.of(new CommandTargetHudViewModel.AttachmentRow("Coat", "Brown"),
                 new CommandTargetHudViewModel.AttachmentRow("Eyes", "Red"));
-        UICommandBuilder commands = bind(model(loadedNeedsStatus("Duck"), appearance));
+        UICommandBuilder commands = bind(model(loadedNeedsStatus("Scrouge").withRoleSubtitle("Duck"), appearance));
         UICommandBuilder expected = new UICommandBuilder();
+        expected.set("#RoleSubtitle.Text", "Duck");
+        expected.set("#RoleSubtitle.Visible", true);
         expected.set("#AttachmentRow0 #Text.Text", "Coat: Brown");
         expected.set("#AttachmentRow1 #Text.Text", "Eyes: Red");
         assertCommands(expected, commands);
@@ -57,11 +59,12 @@ class CommandTargetHudBinderTest {
         expected.set("#AttachmentRow0.Visible", false);
         expected.set("#AttachmentRow1.Visible", false);
         expected.set("#AppearanceDivider.Visible", false);
+        expected.set("#RoleSubtitle.Visible", false);
         assertCommands(expected, commands);
     }
 
     @Test
-    void optionalSectionsCollapseAndAppearancePrecedesFoodAndOwner() {
+    void optionalSectionsCollapseAndFoodPrecedesAppearanceAndOwner() {
         var food = new CommandTargetHudViewModel.FoodRow("Food_Corn", "Corn", null, 5.0);
         var detailed = new CommandTargetHudViewModel(loadedNeedsStatus("Duck"), food, List.of(food),
                 List.of(new CommandTargetHudViewModel.AttachmentRow("Coat", "Brown")),
@@ -69,7 +72,8 @@ class CommandTargetHudBinderTest {
         var layout = CommandTargetHudBinder.resolveLayout(detailed);
         Assertions.assertTrue(layout.foodTameVisible());
         Assertions.assertTrue(layout.ownerVisible());
-        Assertions.assertTrue(layout.firstAttachmentTop() < layout.foodTameTop());
+        Assertions.assertTrue(layout.foodTameTop() + layout.foodTameHeight() <= layout.firstAttachmentTop());
+        Assertions.assertTrue(layout.firstAttachmentTop() < layout.ownerTop());
         Assertions.assertTrue(layout.foodTameTop() + layout.foodTameHeight() <= layout.ownerTop());
         Assertions.assertTrue(layout.ownerTop() < layout.rootHeight());
         var minimal = CommandTargetHudBinder.resolveLayout(model(unloadedStatus("Duck"), List.of()));

@@ -51,6 +51,7 @@ Group #Root {
    }
   }
  }
+ Label #RoleSubtitle { Anchor: (Top: 26, Left: 24, Right: 126, Height: 16); Text: ""; Visible: false; Style: (FontSize: 11, TextColor: #b9beb8, VerticalAlignment: Center); }
  Group #ProgressionRow { Anchor: (Top: 26, Right: 0, Width: 110, Height: 18); Visible: false;
   Group #TalentPointAction { Anchor: (Top: 0, Left: 0, Width: 36, Height: 18); Visible: false;
    Group #TalentPointIcon { Anchor: (Top: 2, Left: 0, Width: 14, Height: 14); Background: (TexturePath: "Tamework/PanelControls/TalentPoints.png"); }
@@ -58,8 +59,7 @@ Group #Root {
    Label #TalentPointCount { Anchor: (Left: 17, Width: 18, Height: 18); Text: ""; Style: (FontSize: 12, TextColor: #f7ecd0, VerticalAlignment: Center); }
   }
   Group #XpProgressRing { Anchor: (Right: 0, Width: 70, Height: 18); Visible: false;
-   Label { Anchor: (Left: 0, Width: 28, Height: 18); Text: "Lv."; Style: (FontSize: 11, TextColor: #b9beb8, VerticalAlignment: Center); }
-   Label #XpLevelText { Anchor: (Left: 30, Right: 0, Height: 18); Text: ""; Style: (FontSize: 13, RenderBold: true, TextColor: #f7ecd0, HorizontalAlignment: End, VerticalAlignment: Center); }
+   Label #XpLevelText { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 13, RenderBold: true, TextColor: #f7ecd0, HorizontalAlignment: End, VerticalAlignment: Center); }
    TextButton #XpTooltip { Anchor: (Full: 0); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
   }
  }
@@ -130,6 +130,7 @@ Group #Root {
             Anchor: (Top: 0, Left: 0, Width: 112, Height: 58);
             Visible: false;
 
+            Label #FoodHeading { Anchor: (Top: 0, Left: 0, Right: 0, Height: 16); Text: ""; Style: (FontSize: 11, TextColor: #b9beb8); }
             Group #FavoriteFoodBlock {
                 Anchor: (Top: 0, Left: 0, Width: 112, Height: 36);
                 Visible: false;
