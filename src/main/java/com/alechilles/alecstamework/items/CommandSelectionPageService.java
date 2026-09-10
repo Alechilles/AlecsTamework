@@ -1282,6 +1282,10 @@ final class CommandSelectionPageService {
                 panelCallbacks.assignGroup(), npcCallbacks.selectCommand(),
                 context.refreshSignals()
         );
+        if (context.genericRosterActions()) {
+            page.configureGroupColors(() -> groupAssignPageService.resolveGroupColors(
+                    resolveCurrentPlayer(context.ownerUuid()), context.toolId()));
+        }
         page.configureActiveHighlight(new CommandActiveHighlightBinding(
                 context.genericRosterActions() && HytaleApiLevel.isUpdate6OrLater(),
                 context.genericRosterActions()

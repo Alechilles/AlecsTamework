@@ -18,6 +18,27 @@ class CommandGroupActivationServiceTest {
             new CommandGroupActivationService(null, null);
 
     @Test
+    void groupColorsIncludeEmptyGroupsAndFollowRecoloring() throws Exception {
+        var storeField = com.hypixel.hytale.server.core.asset.type.item.config.Item.class.getDeclaredField("ASSET_STORE");
+        storeField.setAccessible(true);
+        Object previousStore = storeField.get(null);
+        try {
+            storeField.set(null, new com.hypixel.hytale.assetstore.TestItemAssetStore(
+                    new com.hypixel.hytale.assetstore.map.DefaultAssetMap<>(java.util.Map.of(
+                            "TestTool", new com.hypixel.hytale.server.core.asset.type.item.config.Item("TestTool")))));
+            CommandGroupService groups = new CommandGroupService();
+            var stack = groups.createGroup(
+                    new com.hypixel.hytale.server.core.inventory.ItemStack("TestTool", 1), "Blue", "#112233");
+            String groupId = groups.readGroups(stack).getFirst().groupId;
+            assertEquals("#112233", activationService.resolveGroupColors(stack).get(groupId));
+            stack = groups.recolorGroup(stack, groupId, "#445566");
+            assertEquals("#445566", activationService.resolveGroupColors(stack).get(groupId));
+        } finally {
+            storeField.set(null, previousStore);
+        }
+    }
+
+    @Test
     void groupSelectionActivatesMembersAndDeactivatesOthers() {
         UUID blueNpc = UUID.randomUUID();
         UUID redNpc = UUID.randomUUID();

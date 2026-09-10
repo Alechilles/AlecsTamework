@@ -504,8 +504,8 @@ final class LinkedNpcPanelCardBinder {
         commands.setObject(card + " #HealthTooltip.Anchor", fixedAnchor(0, 0, compact ? 278 : 234, 22));
         // Keep the talent-point control first, then right-align the level control
         // so its width can shrink and grow with the displayed level digits.
-        commands.setObject(card + " #XpProgressRing.Anchor", fixedAnchor(24, 358, 48, 24));
-        commands.setObject(card + " #TalentPointAction.Anchor", fixedAnchor(24, 304, 34, 24));
+        commands.setObject(card + " #XpProgressRing.Anchor", fixedAnchor(18, 358, 48, 24));
+        commands.setObject(card + " #TalentPointAction.Anchor", fixedAnchor(18, 304, 34, 24));
         int activeTop = compact ? 48 : 78;
         commands.setObject(card + " #ActiveToggleActiveButton.Anchor", fixedAnchor(activeTop, 0, 40, 20));
         commands.setObject(card + " #ActiveToggleInactiveButton.Anchor", fixedAnchor(activeTop, 0, 40, 20));

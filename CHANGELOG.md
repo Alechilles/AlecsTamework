@@ -8,6 +8,8 @@
   Refined level/talent controls and command/group selector alignment; level
   buttons fit their digit count and talent buttons retain a distinct hover state.
   Dropdown popups reuse the shared frame to stand apart from underlying cards.
+  Panel controls share one header row, group editing and color-coded shortcuts
+  live in the sidebar, and traits/progression sit slightly above the health bar.
 
 - Existing NPCs now fill missing random attachment sets when they load, using
   the model's normal weights. Saved choices and explicit attachment migrations

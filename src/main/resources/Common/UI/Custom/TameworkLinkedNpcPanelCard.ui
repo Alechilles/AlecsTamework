@@ -36,7 +36,7 @@ Group {
     DropdownBox #GroupSelector { Anchor: (Top: 102, Left: 0, Width: 144, Height: 26); Style: $A.@PanelDropdown; OutlineColor: #454e48; OutlineSize: 2; MaxSelection: 1; NoItemsText: %server.tamework.ui.linkedPanel.groupAssign.none; Visible: false; }
     Group #TraitStrip {
         // Traits share the progression row immediately above the health bar.
-        Anchor: (Top: 20, Left: 172, Width: 128, Height: 30);
+        Anchor: (Top: 14, Left: 172, Width: 128, Height: 30);
         LayoutMode: Left;
         Group #TraitSlot0 {
             Anchor: (Width: 32, Height: 30); Visible: false;
@@ -140,7 +140,7 @@ Group {
         TextButton #HealthTooltip { Anchor: (Top: 0, Left: 0, Width: 234, Height: 22); Style: @TraitTooltipButtonStyle; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.health.notAvailable; TextTooltipStyle: @LinkedActionTooltipStyle; }
     }
     Group #TalentPointAction {
-        Anchor: (Top: 24, Left: 304, Width: 34, Height: 24);
+        Anchor: (Top: 18, Left: 304, Width: 34, Height: 24);
         Visible: false;
         TextButton #TalentPointButton { Anchor: (Top: 0, Left: 0, Width: 34, Height: 24); Style: $A.@PanelButton; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.futureAction.talents; TextTooltipStyle: @LinkedActionTooltipStyle; }
         Group #TalentPointIcon { Anchor: (Top: 5, Left: 3, Width: 14, Height: 14); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelControls/TalentPoints.png"); }
@@ -148,7 +148,7 @@ Group {
         Label #TalentPointCount { Anchor: (Top: 0, Left: 17, Width: 15, Height: 24); Text: "1"; HitTestVisible: false; Style: (FontSize: 11, RenderBold: true, TextColor: #f5ebce, HorizontalAlignment: Center, VerticalAlignment: Center); }
     }
     Group #XpProgressRing {
-        Anchor: (Top: 24, Left: 358, Width: 48, Height: 24);
+        Anchor: (Top: 18, Left: 358, Width: 48, Height: 24);
         Visible: false;
         TextButton #XpTooltip { Anchor: (Top: 0, Left: 0, Width: 48, Height: 24); Style: $A.@PanelButton; Text: ""; TooltipText: "0/0 XP"; TextTooltipStyle: @LinkedProgressionTooltipStyle; }
         Label { Anchor: (Top: 2, Left: 7, Width: 23, Height: 20); HitTestVisible: false; Text: "Lv."; Style: (FontSize: 12, TextColor: #afb6b0, VerticalAlignment: Center); }

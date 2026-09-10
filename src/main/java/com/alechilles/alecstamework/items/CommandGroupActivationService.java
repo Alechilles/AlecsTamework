@@ -56,6 +56,14 @@ final class CommandGroupActivationService {
         return entries;
     }
 
+    java.util.Map<String, String> resolveGroupColors(@Nullable ItemStack stack) {
+        java.util.Map<String, String> colors = new java.util.HashMap<>();
+        for (CommandGroupService.GroupRecord group : groupService.readGroups(stack)) {
+            colors.put(group.groupId, group.colorHex);
+        }
+        return colors;
+    }
+
     String resolveSelectionValue(@Nullable ItemStack stack) {
         return resolveSelectionValue(linkedNpcRecordStore.read(stack), groupService.readGroups(stack));
     }

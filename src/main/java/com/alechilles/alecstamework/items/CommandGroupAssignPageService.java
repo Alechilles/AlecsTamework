@@ -38,6 +38,11 @@ final class CommandGroupAssignPageService {
         return groupActivationService.resolveDropdownEntries(stack, resolveLanguage(player));
     }
 
+    java.util.Map<String, String> resolveGroupColors(Player player, String toolId) {
+        ItemStack stack = toolInventoryService != null ? toolInventoryService.findToolStack(player, toolId) : null;
+        return groupActivationService.resolveGroupColors(stack);
+    }
+
     String resolveGroupActivationValue(Player player, String toolId) {
         ItemStack stack = toolInventoryService != null ? toolInventoryService.findToolStack(player, toolId) : null;
         return groupActivationService.resolveSelectionValue(stack);

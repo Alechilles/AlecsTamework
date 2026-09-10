@@ -70,6 +70,13 @@ public final class TameworkCommandSelectionPage
     final Supplier<String> panelSortValueSupplier;
     final Supplier<String> panelFilterModeValueSupplier;
     final Supplier<String> panelFilterInputValueSupplier;
+    Supplier<java.util.Map<String, String>> panelGroupColorsSupplier = java.util.Map::of;
+
+    /** Supplies current tool-group colors on the page's owning world thread, including empty groups. */
+    public void configureGroupColors(@Nonnull Supplier<java.util.Map<String, String>> supplier) {
+        panelGroupColorsSupplier = Objects.requireNonNull(supplier, "supplier");
+    }
+
     final Supplier<List<DropdownEntryInfo>> panelGroupActivationEntriesSupplier;
     final Supplier<String> panelGroupActivationValueSupplier;
     final Supplier<List<DropdownEntryInfo>> panelGroupAssignEntriesSupplier;

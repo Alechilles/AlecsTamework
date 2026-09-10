@@ -300,7 +300,8 @@ final class CommandSelectionLinkedPanelRuntime {
         CommandGroupQuickSelectBinder.bind(commands, events, values,
                 LinkedNpcPanelPresentationSupport.entries(page.panelGroupActivationEntriesSupplier),
                 LinkedNpcPanelPresentationSupport.value(page.panelGroupActivationValueSupplier, ""),
-                !page.config.usesBondedCompanionRoster() && !page.cardBindingConfig.ownerCommandFamilyRoster(), initial);
+                !page.config.usesBondedCompanionRoster() && !page.cardBindingConfig.ownerCommandFamilyRoster(), initial,
+                page.panelGroupColorsSupplier.get());
     }
 
     private boolean canAssignGroup(LinkedNpcEntry entry, CommandPanelFeaturePresentation presentation) {
