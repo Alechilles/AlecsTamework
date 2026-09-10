@@ -1,5 +1,10 @@
 package com.alechilles.alecstamework.metrics;
 
+import com.alechilles.beacon.reports.TelemetryReportOpenRequest;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.alechilles.beacon.api.TelemetryEventContext;
 import com.alechilles.beacon.api.TelemetryBreadcrumbContext;
 import com.alechilles.beacon.api.TelemetryDiagnosticBundle;
@@ -561,7 +566,19 @@ public final class CrashTelemetryService {
         });
     }
 
+    /** Opens the manual feedback form on the player's owning world thread; does not submit a report. */
+    public boolean openFeedbackPage(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
+                                    @Nonnull PlayerRef playerRef) {
+        return telemetry.openReportPage(TAMEWORK_PROJECT_ID, ref, store, playerRef,
+                new TelemetryReportOpenRequest("issue", null, null));
+    }
+
     interface EmbeddedRuntime {
+        default boolean openReportPage(String projectId, Ref<EntityStore> ref, Store<EntityStore> store,
+                                       PlayerRef playerRef, TelemetryReportOpenRequest request) {
+            return false;
+        }
+
         boolean isEnabled();
 
         @Nullable
@@ -610,6 +627,12 @@ public final class CrashTelemetryService {
     }
 
     private record EmbeddedServiceRuntime(@Nonnull EmbeddedTelemetryService service) implements EmbeddedRuntime {
+        @Override
+        public boolean openReportPage(String projectId, Ref<EntityStore> ref, Store<EntityStore> store,
+                                      PlayerRef playerRef, TelemetryReportOpenRequest request) {
+            return service.openReportPage(projectId, ref, store, playerRef, request);
+        }
+
         @Override
         public boolean isEnabled() {
             return service.isEnabled();

@@ -919,3 +919,7 @@ tamework.ui.linkedPanel.cached.unknown=Unbekannt
 tamework.ui.linkedPanel.cached.timerUnknown=Der gespeicherte Zustand enthält nicht genügend Zeitinformationen. Wird aktualisiert, wenn der Begleiter geladen ist.
 
 tamework.ui.commandTargetHud.foodPreferences=Futtervorlieben
+
+tamework.ui.commandMenu.feedback = Feedback
+tamework.ui.commandMenu.feedbackTooltip = Melde ein Problem oder schlage eine Verbesserung vor.
+tamework.ui.commandMenu.feedbackUnavailable = Das Feedbackformular ist derzeit nicht verfügbar.

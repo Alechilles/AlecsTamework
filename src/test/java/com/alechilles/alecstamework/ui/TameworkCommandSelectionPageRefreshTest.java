@@ -438,6 +438,27 @@ class TameworkCommandSelectionPageRefreshTest {
     }
 
     @Test
+    void feedbackClickDrainsRefreshAndIgnoresDuplicateNavigation() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        NavigationFixture fixture = new NavigationFixture();
+        TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(feature(4, false)), fixture);
+        UIEventBuilder events = new UIEventBuilder();
+        page.build(null, new UICommandBuilder(), events, null);
+        var binding = java.util.Arrays.stream(events.getEvents())
+                .filter(value -> value.selector.equals("#CommandMenuFeedbackButton")).findFirst().orElseThrow();
+        var data = CommandSelectionEventData.CODEC.decode(BsonDocument.parse(binding.data),
+                new com.hypixel.hytale.codec.ExtraInfo());
+        page.handleDataEvent(null, null, data);
+        Runnable firstNavigation = fixture.deferred;
+        assertTrue(firstNavigation != null);
+        page.handleDataEvent(null, null, data);
+        acceptedRefresh(page, 17L);
+        assertEquals(firstNavigation, fixture.deferred);
+        assertEquals(1, fixture.source.closes);
+        assertEquals(0, packets.updates.size());
+    }
+
+    @Test
     void settingsWithoutAuthorizedPlayerKeepsCommandMenuOpen() throws Exception {
         CapturedPackets packets = new CapturedPackets();
         NavigationFixture fixture = new NavigationFixture();

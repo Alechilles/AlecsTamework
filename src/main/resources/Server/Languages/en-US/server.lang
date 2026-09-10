@@ -920,3 +920,7 @@ tamework.ui.linkedPanel.cached.unknown=Unknown
 tamework.ui.linkedPanel.cached.timerUnknown=The saved state does not include enough timing information. Refreshes when the companion is loaded.
 
 tamework.ui.commandTargetHud.foodPreferences=Food preferences
+
+tamework.ui.commandMenu.feedback = Feedback
+tamework.ui.commandMenu.feedbackTooltip = Report an issue or suggest an improvement.
+tamework.ui.commandMenu.feedbackUnavailable = The feedback form is currently unavailable.

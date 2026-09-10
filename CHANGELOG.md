@@ -2,6 +2,8 @@
 
 ## Unreleased development changes
 
+- The command menu has a Feedback button that opens Beacon’s issue and suggestion form.
+
 - Capturing and releasing a companion preserves its harvest cooldown instead of
   making it harvestable immediately.
 

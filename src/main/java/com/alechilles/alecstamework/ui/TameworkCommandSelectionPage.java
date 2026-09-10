@@ -489,6 +489,25 @@ public final class TameworkCommandSelectionPage
             return;
         }
         String commandId = receivedCommandId;
+        if (CommandSelectionPageEventBinder.FEEDBACK_COMMAND_ID.equals(commandId)) {
+            if (!beginPageNavigation()) return;
+            navigateAfterUiDrain(() -> {
+                try {
+                    Ref<EntityStore> currentRef = playerRef.getReference();
+                    if (currentRef == null || !currentRef.isValid()) return;
+                    var plugin = com.alechilles.alecstamework.Tamework.getInstance();
+                    var telemetry = plugin == null ? null : plugin.getCrashTelemetryService();
+                    if (telemetry == null || !telemetry.openFeedbackPage(currentRef, currentRef.getStore(), playerRef)) {
+                        playerRef.sendMessage(com.hypixel.hytale.server.core.Message.raw(
+                                LocalizedText.resolve(playerRef, "tamework.ui.commandMenu.feedbackUnavailable")));
+                        close();
+                    }
+                } finally {
+                    navigationPending = false;
+                }
+            });
+            return;
+        }
         if (CommandSelectionPageEventBinder.SETTINGS_COMMAND_ID.equals(commandId)) {
             if (!canOpenSettings(ref, store) || !beginPageNavigation()) return;
             navigateAfterUiDrain(() -> {
