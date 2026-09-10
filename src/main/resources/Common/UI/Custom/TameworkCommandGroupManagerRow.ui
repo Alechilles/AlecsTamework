@@ -1,8 +1,9 @@
+$A = "TameworkPanelActionStyles.ui";
 $C = "Common.ui";
 
 Group {
   Anchor: (Top: 0, Left: 0, Right: 0, Height: 32);
-  Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
+  Background: #252b27;
   Padding: (Left: 6, Right: 6, Top: 4, Bottom: 4);
 
   Group #GroupColorSwatch {
@@ -22,7 +23,7 @@ Group {
     Style: (
       FontSize: 14,
       RenderBold: true,
-      TextColor: #eff4fa,
+      TextColor: #f0eee7,
       HorizontalAlignment: Start,
       VerticalAlignment: Center
     );
@@ -31,7 +32,7 @@ Group {
   TextField #GroupNameInput {
     Style: $C.@DefaultInputFieldStyle;
     PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
-    Background: $C.@InputBoxBackground;
+    Background: #181e1a;
     Anchor: (Top: 1, Left: 24, Right: 114, Height: 22);
     Padding: (Horizontal: 6);
     PlaceholderText: %server.tamework.ui.shared.placeholder.groupName;
@@ -42,26 +43,20 @@ Group {
   TextButton #EditButton {
     Anchor: (Top: 1, Right: 62, Width: 48, Height: 24);
     Text: %server.tamework.ui.shared.button.edit;
-    Style: (
-      ...$C.@SmallSecondaryTextButtonStyle
-    );
+    Style: $A.@PanelButton;
   }
 
   TextButton #CompleteButton {
     Anchor: (Top: 1, Right: 62, Width: 48, Height: 24);
     Text: %server.tamework.ui.shared.button.done;
-    Style: (
-      ...$C.@SmallSecondaryTextButtonStyle
-    );
+    Style: $A.@PanelButton;
     Visible: false;
   }
 
   TextButton #DeleteButton {
     Anchor: (Top: 1, Right: 0, Width: 58, Height: 24);
     Text: %server.tamework.ui.shared.button.delete;
-    Style: (
-      ...$C.@SmallSecondaryTextButtonStyle
-    );
+    Style: $A.@PanelButton;
   }
 }
 

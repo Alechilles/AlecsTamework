@@ -12,7 +12,7 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
  * Binds one linked-panel NPC card including visual state and per-row interaction handlers.
  */
 final class LinkedNpcPanelCardBinder {
-    private static final int NORMAL_CARD_HEIGHT = 164;
+    private static final int NORMAL_CARD_HEIGHT = 154;
     private static final int ROSTER_CARD_HEIGHT = 194;
 
     static void bindBreedingTooltips(UICommandBuilder commands, String selector,
@@ -205,7 +205,7 @@ final class LinkedNpcPanelCardBinder {
                 && !pendingUnlink;
         commandBuilder.set(
                 statusUnloadedSelector + ".Visible",
-                !entry.loaded() && !pendingUnlink && !showRespawn
+                false // The unavailable status is shown beside its action in the health/status area.
         );
         commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry, language));
         commandBuilder.set(recallCountdownSelector + ".Visible", showRecallCountdown);
@@ -257,6 +257,10 @@ final class LinkedNpcPanelCardBinder {
         );
         bindCardLayout(commandBuilder, entrySelector, entry, managedRoster,
                 showActiveToggleActive || showActiveToggleInactive);
+        commandBuilder.set(groupTabButtonSelector + ".Text", entry.groupName() == null || entry.groupName().isBlank()
+                ? LocalizedText.resolve(language, "tamework.ui.linkedPanel.groupAssign.title") : entry.groupName());
+        commandBuilder.set(groupTabButtonSelector + ".Visible", !pendingUnlink);
+        commandBuilder.set(entrySelector + " #CooldownRow.Visible", !pendingUnlink && entry.hasHealth());
         LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry, language);
         LinkedNpcPanelProgressionBinder.bindXpProgressRing(
                 commandBuilder,
@@ -294,19 +298,30 @@ final class LinkedNpcPanelCardBinder {
                 language
         );
         LinkedNpcPanelIconStyles.apply(commandBuilder, entrySelector, entry);
-        int actionRight = 424;
+        int actionLeft = 432;
         String[] actionSelectors = {shoulderRideSelector, flightToggleSelector,
                 showBreedingToggleEnabled ? breedingToggleEnabledSelector : breedingToggleDisabledSelector,
                 respawnSelector, locateSelector, recallSelector, setHomeSelector,
-                returnHomeSelector};
+                returnHomeSelector, releaseSelector, releaseDisabledSelector,
+                unlinkSelector, unlinkDisabledSelector, cullSelector};
         boolean[] actionVisible = {showShoulderRide, showFlightToggle,
                 showBreedingToggleEnabled || showBreedingToggleDisabled,
-                showRespawn, showLocate, showRecall, showSetHome, showReturnHome};
+                showRespawn, showLocate, showRecall, showSetHome, showReturnHome,
+                showRelease, showReleaseDisabled, showUnlink, showUnlinkDisabled, showCull};
         for (int actionIndex = 0; actionIndex < actionSelectors.length; actionIndex++) {
             if (actionVisible[actionIndex]) {
-                LinkedNpcPanelIconStyles.placeAction(commandBuilder, actionSelectors[actionIndex], actionRight);
-                actionRight -= 66;
+                LinkedNpcPanelIconStyles.placeAction(commandBuilder, actionSelectors[actionIndex], actionLeft);
+                actionLeft += 60;
             }
+        }
+        if (!entry.hasHealth() && !managedRoster) {
+            int statusLeft = Math.max(568, actionLeft + 6);
+            int statusWidth = 846 - statusLeft;
+            commandBuilder.setObject(entrySelector + " #HealthFrame.Anchor", fixedAnchor(50, statusLeft, statusWidth, 14));
+            commandBuilder.setObject(entrySelector + " #HealthText.Anchor", fixedAnchor(0, 0, statusWidth - 2, 14));
+            commandBuilder.setObject(entrySelector + " #HealthTextShadow.Anchor", fixedAnchor(0, 1, statusWidth - 2, 14));
+            commandBuilder.setObject(entrySelector + " #HealthTooltip.Anchor", fixedAnchor(0, 0, statusWidth, 14));
+            commandBuilder.setObject(entrySelector + " #RecallCountdown.Anchor", fixedAnchor(72, statusLeft, statusWidth, 20));
         }
         commandBuilder.set(flightToggleSelector + "Caption.Text", LocalizedText.resolve(language,
                 "tamework.ui.linkedPanel.action." + (entry.flightToggleAirborne() ? "flightAirborne" : "flightGrounded")));
@@ -493,17 +508,20 @@ final class LinkedNpcPanelCardBinder {
         commands.setObject(card + ".Anchor", buildCardAnchor(managedRoster, compact));
         commands.set(card + " #NeedRingRow.Visible", !compact);
         commands.set(card + " #TraitStrip.Visible", !compact);
-        commands.set(card + " #StatusDivider.Visible", !compact);
+        commands.set(card + " #StatusDivider.Visible", true);
         commands.setObject(card + " #GroupTab.Anchor", fixedAnchor(8, -10, 5, compact ? 80 : 112));
-        commands.setObject(card + " #GroupTabButton.Anchor", fixedAnchor(0, 0, 5, compact ? 80 : 112));
-        commands.setObject(card + " #HealthFrame.Anchor", fixedAnchor(compact ? 54 : 90, 0, 450, 14));
-        commands.setObject(card + " #XpProgressRing.Anchor", fixedAnchor(compact ? 30 : 68, 376, 74, 22));
-        commands.setObject(card + " #TalentPointAction.Anchor", fixedAnchor(compact ? 30 : 68, 340, 24, 24));
-        int genderLeft = showActiveToggle ? 34 : 0;
-        int nameLeft = genderLeft + (entry.isMale() || entry.isFemale() ? 30 : 0);
-        commands.setObject(card + " #GenderMaleIcon.Anchor", fixedAnchor(1, genderLeft, 22, 22));
-        commands.setObject(card + " #GenderFemaleIcon.Anchor", fixedAnchor(1, genderLeft, 22, 22));
-        commands.setObject(card + " #Name.Anchor", fixedAnchor(0, nameLeft, 450 - nameLeft, 26));
+        commands.setObject(card + " #GroupTabButton.Anchor", fixedAnchor(compact ? 72 : 102, 0, 144, 26));
+        commands.setObject(card + " #HealthFrame.Anchor", fixedAnchor(50, compact ? 568 : 172, compact ? 278 : 234, 14));
+        commands.set(card + " #HealthFrame.Background", compact ? "#000000(0.0)" : "#151916");
+        commands.setObject(card + " #HealthText.Anchor", fixedAnchor(0, 0, compact ? 276 : 232, 14));
+        commands.setObject(card + " #HealthTextShadow.Anchor", fixedAnchor(0, 1, compact ? 276 : 232, 14));
+        commands.setObject(card + " #HealthTooltip.Anchor", fixedAnchor(0, 0, compact ? 278 : 234, 14));
+        commands.setObject(card + " #XpProgressRing.Anchor", fixedAnchor(28, 332, 74, 22));
+        commands.setObject(card + " #TalentPointAction.Anchor", fixedAnchor(28, 300, 24, 24));
+        int nameLeft = entry.isMale() || entry.isFemale() ? 28 : 0;
+        commands.setObject(card + " #GenderMaleIcon.Anchor", fixedAnchor(1, 0, 22, 22));
+        commands.setObject(card + " #GenderFemaleIcon.Anchor", fixedAnchor(1, 0, 22, 22));
+        commands.setObject(card + " #Name.Anchor", fixedAnchor(0, nameLeft, 150 - nameLeft, 30));
     }
 
     private static Anchor fixedAnchor(int top, int left, int width, int height) {

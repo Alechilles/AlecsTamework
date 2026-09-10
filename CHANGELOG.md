@@ -2,11 +2,11 @@
 
 ## Unreleased development changes
 
-- Replaced the command wheel with a compact LMB/Q/E/R assignment bar and a wider
-  companion panel. Compact cards separate traits from captioned actions and show
-  flat needs meters with values, applicable cooldown timers, and level above
-  the health bar. Quiet navy fields and card headers separate information from
-  raised action buttons, while unavailable companions use shorter cards.
+- Replaced the command wheel with a compact LMB/Q/E/R assignment sidebar and
+  Linked, Nearby, and Owned tabs. The charcoal companion panel separates
+  identity, traits and stacked meters, and captioned actions into fixed columns.
+  Unavailable companions put their status beside the relevant action, and
+  disabled needs remain hidden.
 - Action buttons now reuse two frame textures and sixteen glyphs, replacing the
   separate baked state images to reduce UI texture use.
 

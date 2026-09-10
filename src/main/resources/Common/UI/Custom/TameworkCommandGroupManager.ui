@@ -1,18 +1,25 @@
+$A = "TameworkPanelActionStyles.ui";
 $C = "Common.ui";
 
 $C.@PageOverlay {
   LayoutMode: Middle;
 
-  $C.@DecoratedContainer #TameworkGroupManagerRoot {
+  Group #TameworkGroupManagerRoot {
     Anchor: (Width: 320, Height: 420);
+    Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
 
-    #Title {
-      $C.@Title #TameworkGroupManagerTitle {
-        @Text = %server.tamework.ui.groupManager.title;
+    Group #Title {
+      Anchor: (Top: 4, Left: 4, Right: 4, Height: 40);
+      Background: #252b27;
+      Label #TameworkGroupManagerTitle {
+        Anchor: (Left: 12, Right: 12, Height: 40);
+        Text: %server.tamework.ui.groupManager.title;
+        Style: (FontSize: 18, RenderBold: true, TextColor: #e8e4da, VerticalAlignment: Center);
       }
     }
 
-    #Content {
+    Group #Content {
+      Anchor: (Top: 46, Left: 4, Right: 4, Bottom: 8);
       LayoutMode: Top;
       Padding: (Left: 0, Right: 0, Top: 0, Bottom: 8);
 
@@ -21,7 +28,7 @@ $C.@PageOverlay {
         Text: %server.tamework.ui.groupManager.subtitle.default;
         Style: (
           FontSize: 13,
-          TextColor: #bfd0e5,
+          TextColor: #b9beb8,
           HorizontalAlignment: Start,
           VerticalAlignment: Center
         );
@@ -34,7 +41,7 @@ $C.@PageOverlay {
         TextField #TameworkGroupNameInput {
           Style: $C.@DefaultInputFieldStyle;
           PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
-          Background: $C.@InputBoxBackground;
+          Background: #181e1a;
           Anchor: (Width: 186, Height: 24);
           Padding: (Horizontal: 8);
           PlaceholderText: %server.tamework.ui.shared.placeholder.groupName;
@@ -53,9 +60,7 @@ $C.@PageOverlay {
         TextButton #TameworkGroupCreateButton {
           Anchor: (Width: 72, Height: 24);
           Text: %server.tamework.ui.shared.button.create;
-          Style: (
-            ...$C.@SmallSecondaryTextButtonStyle
-          );
+          Style: $A.@PanelButton;
         }
       }
 
@@ -81,7 +86,7 @@ $C.@PageOverlay {
           Text: %server.tamework.ui.groupManager.emptyState;
           Style: (
             FontSize: 13,
-            TextColor: #b2c3d6,
+            TextColor: #afb6b0,
             HorizontalAlignment: Start,
             VerticalAlignment: Center
           );
@@ -95,17 +100,13 @@ $C.@PageOverlay {
         TextButton #TameworkGroupBackButton {
           Anchor: (Left: 0, Width: 100, Height: 24);
           Text: %server.tamework.ui.shared.button.back;
-          Style: (
-            ...$C.@SmallSecondaryTextButtonStyle
-          );
+          Style: $A.@PanelButton;
         }
 
         TextButton #TameworkGroupCloseButton {
           Anchor: (Right: 0, Width: 100, Height: 24);
           Text: %server.tamework.ui.shared.button.close;
-          Style: (
-            ...$C.@SmallSecondaryTextButtonStyle
-          );
+          Style: $A.@PanelButton;
         }
       }
     }

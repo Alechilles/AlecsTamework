@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
+import com.hypixel.hytale.server.core.ui.Value;
+import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -24,6 +26,26 @@ final class LinkedNpcPanelPresentationSupport {
     }
 
     static String mode(Supplier<String> supplier) { return value(supplier, TameworkCommandSelectionPage.PANEL_MODE_LINKED); }
+    static void bindModeTabs(UICommandBuilder commands, Supplier<String> supplier) {
+        bindModeTabs(commands, supplier, null);
+    }
+    static void bindModeTabs(UICommandBuilder commands, Supplier<String> supplier, LinkedNpcPanelRefreshValues values) {
+        String selected = mode(supplier);
+        for (String tab : List.of("Linked", "Nearby", "Owned")) {
+            String style = modeTabStyle(tab, selected);
+            String selector = "#TameworkMode" + tab + ".Style";
+            if (values == null) commands.set(selector, Value.ref("TameworkPanelActionStyles.ui", style));
+            else values.setStyle(commands, selector, style);
+        }
+    }
+    static String modeTabStyle(String tab, String selected) {
+        String mode = switch (tab) {
+            case "Nearby" -> TameworkCommandSelectionPage.PANEL_MODE_NEARBY;
+            case "Owned" -> TameworkCommandSelectionPage.PANEL_MODE_OWNED;
+            default -> TameworkCommandSelectionPage.PANEL_MODE_LINKED;
+        };
+        return mode.equalsIgnoreCase(selected) ? "PanelButtonSelected" : "PanelButton";
+    }
     static String sort(Supplier<String> supplier) { return value(supplier, TameworkCommandSelectionPage.PANEL_SORT_DEFAULT); }
     static String filterMode(Supplier<String> supplier) { return value(supplier, TameworkCommandSelectionPage.PANEL_FILTER_NONE); }
     static boolean autoLink(Supplier<Boolean> supplier) { return supplier == null || !Boolean.FALSE.equals(supplier.get()); }

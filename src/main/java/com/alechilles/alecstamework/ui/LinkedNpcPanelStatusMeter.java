@@ -19,6 +19,21 @@ final class LinkedNpcPanelStatusMeter {
     private LinkedNpcPanelStatusMeter() {
     }
 
+    static Anchor buildNeedFillAnchor(double ratio) {
+        Anchor anchor = buildFillAnchor(ratio);
+        anchor.setLeft(Value.of(92));
+        anchor.setTop(Value.of(8));
+        anchor.setWidth(Value.of((int) Math.round(clamp(ratio) * 92)));
+        return anchor;
+    }
+
+    static Anchor buildNeedThresholdAnchor(double ratio) {
+        Anchor anchor = buildThresholdAnchor(ratio);
+        anchor.setLeft(Value.of(92 + (int) Math.round(clamp(ratio) * 90)));
+        anchor.setTop(Value.of(6));
+        return anchor;
+    }
+
     static Anchor buildFillAnchor(double ratio) {
         Anchor anchor = new Anchor();
         anchor.setLeft(Value.of(FILL_LEFT));

@@ -37,17 +37,17 @@ final class LinkedNpcPanelIconStyles {
         commands.setObject(selector + "Glyph.Anchor", anchor);
     }
 
-    static void placeAction(UICommandBuilder commands, String selector, int right) {
+    static void placeAction(UICommandBuilder commands, String selector, int left) {
         Anchor position = new Anchor();
-        position.setTop(Value.of(36));
-        position.setRight(Value.of(right));
-        position.setWidth(Value.of(42));
-        position.setHeight(Value.of(42));
+        position.setTop(Value.of(30));
+        position.setLeft(Value.of(left));
+        position.setWidth(Value.of(48));
+        position.setHeight(Value.of(48));
         anchor(commands, selector, position);
         Anchor caption = new Anchor();
         caption.setTop(Value.of(80));
-        caption.setRight(Value.of(right - 11));
-        caption.setWidth(Value.of(64));
+        caption.setLeft(Value.of(left - 6));
+        caption.setWidth(Value.of(60));
         caption.setHeight(Value.of(16));
         commands.setObject(selector + "Caption.Anchor", caption);
     }

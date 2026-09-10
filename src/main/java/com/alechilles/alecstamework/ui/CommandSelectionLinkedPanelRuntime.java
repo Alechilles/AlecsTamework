@@ -152,6 +152,7 @@ final class CommandSelectionLinkedPanelRuntime {
                 CommandSelectionPanelOptions.resolveModeDropdownEntries(language));
         values.set(commands, "#TameworkLinkedPanelModeDropdown.Value",
                 LinkedNpcPanelPresentationSupport.mode(page.panelModeValueSupplier));
+        LinkedNpcPanelPresentationSupport.bindModeTabs(commands, page.panelModeValueSupplier, values);
         values.set(commands, "#TameworkLinkedPanelAutoLinkCheck.Value",
                 LinkedNpcPanelPresentationSupport.autoLink(
                         page.panelAutoLinkEnabledSupplier));

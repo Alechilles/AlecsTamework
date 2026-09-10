@@ -74,9 +74,10 @@ Q/E/R slot is hidden. Set a command entry's optional `Icon` to a texture path
 when it needs custom HUD artwork. Standard command IDs use Tamework's bundled
 command glyphs when `Icon` is omitted.
 
-The standard menu presents LMB, Q, E, and R assignments in one compact bar above
-the companion list. Changing LMB updates the selected primary command and keeps
-the menu open. The original primary-command eligibility rules still apply.
+The standard menu presents LMB, Q, E, and R assignments in a compact sidebar beside
+the companion list. Linked, Nearby, and Owned tabs switch the list source.
+Changing LMB updates the selected primary command and keeps the menu open.
+The original primary-command eligibility rules still apply.
 
 Set `ShowInRadial: false` on a command entry to offer it through the hotswap
 selectors without consuming one of the primary selector's eight slots.

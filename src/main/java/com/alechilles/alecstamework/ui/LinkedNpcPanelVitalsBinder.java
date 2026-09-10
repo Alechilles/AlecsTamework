@@ -8,7 +8,7 @@ import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
  * Applies linked companion vitals to UI card controls.
  */
 final class LinkedNpcPanelVitalsBinder {
-    private static final int CARD_HEALTH_FILL_MAX_WIDTH = 448;
+    private static final int CARD_HEALTH_FILL_MAX_WIDTH = 232;
     private static final String ICON_NEED_HAPPINESS = "Tamework/LinkedPanelIcons/Need_Happiness.png";
     private static final String ICON_NEED_HUNGER = "Tamework/LinkedPanelIcons/Need_Hunger.png";
     private static final String ICON_NEED_THIRST = "Tamework/LinkedPanelIcons/Need_Thirst.png";
@@ -153,7 +153,7 @@ final class LinkedNpcPanelVitalsBinder {
         commandBuilder.set(markerSelector + ".Visible", showMarker);
         if (showMarker) {
             commandBuilder.setObject(markerSelector + ".Anchor",
-                    LinkedNpcPanelStatusMeter.buildThresholdAnchor(entry.breedingHappinessRatio()));
+                    LinkedNpcPanelStatusMeter.buildNeedThresholdAnchor(entry.breedingHappinessRatio()));
         }
         bindNeedMeter(
                 commandBuilder,
@@ -328,7 +328,7 @@ final class LinkedNpcPanelVitalsBinder {
                 visual.available() ? percent(visual.fillRatio()) + "%" : "—");
         commandBuilder.setObject(
                 slotSelector + " #MeterFill.Anchor",
-                LinkedNpcPanelStatusMeter.buildFillAnchor(visual.available() ? visual.fillRatio() : 0.0)
+                LinkedNpcPanelStatusMeter.buildNeedFillAnchor(visual.available() ? visual.fillRatio() : 0.0)
         );
     }
 

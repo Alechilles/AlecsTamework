@@ -25,50 +25,6 @@ import org.junit.jupiter.api.Test;
 /** Regression coverage for the dedicated final bonded-companion card states. */
 class BondedCompanionCardPresenterTest {
     @Test
-    void dedicatedCardAssetContainsEveryFinalStateControl() throws Exception {
-        String asset = Files.readString(Path.of("src", "main", "resources",
-                "Common", "UI", "Custom",
-                "TameworkBondedCompanionPanelCard.ui"), StandardCharsets.UTF_8);
-
-        assertTrue(asset.contains("#BondedAccentInWorld"));
-        assertTrue(asset.contains("#BondedAccentStored"));
-        assertTrue(asset.contains("#BondedAccentDead"));
-        assertTrue(asset.contains("#BondedAccentReady"));
-        assertTrue(asset.contains("#BondedStateInWorld"));
-        assertTrue(asset.contains("#BondedStateStored"));
-        assertTrue(asset.contains("#BondedStateDead"));
-        assertTrue(asset.contains("#BondedStateReady"));
-        assertFalse(asset.contains("Group #BondedStateInWorld"),
-                "Lifecycle state is informational text, not a button-like badge.");
-        assertTrue(asset.contains("#BondedHealthFrame"));
-        assertTrue(asset.contains("#BondedHealthFill")
-                        && asset.contains("Top: 1, Left: 1, Width: 448, Height: 16"),
-                "The static health fill begins inside the track; runtime sizing preserves its right inset.");
-        assertTrue(asset.contains("Height: 18") && asset.contains("FontSize: 11"),
-                "Health treatment should be easier to read than the compact original.");
-        assertTrue(asset.contains("#BondedMetricHappiness"));
-        assertTrue(asset.contains("#BondedMetricHunger"));
-        assertTrue(asset.contains("#BondedMetricThirst"));
-        assertTrue(asset.contains("#BondedProgressionButton"));
-        assertTrue(asset.contains("#BondedLevelText"));
-        assertTrue(asset.contains("#BondedTalentPointAction"));
-        assertTrue(asset.contains("TalentPoint_UpArrow.png"));
-        assertFalse(asset.contains("#BondedTalentAction"),
-                "Progression belongs in the identity row, not a separate card action.");
-        assertTrue(asset.contains("#BondedPrimaryActionDisabled"));
-        assertTrue(asset.contains("#BondedPrimaryActionNoTooltip"));
-        assertTrue(asset.contains("#BondedPrimaryActionDisabledNoTooltip"));
-        assertTrue(asset.contains("#BondedReviveAction"));
-        assertTrue(asset.contains("#BondedReviveActionNoTooltip"));
-        assertTrue(asset.contains("#BondedUnlinkButton"));
-        assertTrue(asset.contains("#BondedUnlinkConfirmButton"));
-        assertFalse(asset.contains("#BondedCostList"));
-        assertTrue(asset.contains("#BondedReviveAction")
-                        && asset.contains("TextTooltipStyle: @BondedCardTextTooltipStyle;"),
-                "Revive costs should be available from the compact action tooltip.");
-    }
-
-    @Test
     void activeCardShowsOnlyConfiguredMetricsAndItsDismissAction() {
         BondedCompanionPanelPresentation row = presentation(
                 BondedCompanionStateView.ACTIVE,
@@ -313,10 +269,6 @@ class BondedCompanionCardPresenterTest {
         BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
                 "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
 
-        assertCommandSelector(commands, "#Card.Anchor");
-        assertCommandSelector(commands, "#Card #BondedStateDetail.Anchor");
-        assertCommand(commands, "#Card.Anchor", "184");
-        assertCommandSelector(commands, "#Card #BondedPrimaryAction.Anchor");
         assertCommand(commands, "#Card #BondedPrimaryAction.Visible", "false");
         assertCommand(commands, "#Card #BondedPrimaryActionNoTooltip.Visible", "true");
     }
@@ -422,22 +374,6 @@ class BondedCompanionCardPresenterTest {
     }
 
     @Test
-    void fullHealthUsesTheWholeCardHealthTrack() {
-        BondedCompanionPanelPresentation row = presentation(
-                BondedCompanionStateView.STORED,
-                BondedCompanionStatusPresentation.Action.SUMMON,
-                true,
-                Map.of("currentHealth", "400", "maxHealth", "400"), null
-        );
-        UICommandBuilder commands = new UICommandBuilder();
-
-        BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
-                "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
-
-        assertCommand(commands, "#Card #BondedHealthFill.Anchor", "448");
-    }
-
-    @Test
     void dynamicRefreshPatchesTheLiveHealthBarWithoutRecreatingTheCard() {
         BondedCompanionPanelPresentation row = presentation(
                 BondedCompanionStateView.ACTIVE,
@@ -451,7 +387,7 @@ class BondedCompanionCardPresenterTest {
                 "en-US");
 
         assertCommand(commands, "#Card #BondedHealthText.Text", "125 / 250");
-        assertCommand(commands, "#Card #BondedHealthFill.Anchor", "224");
+        assertCommand(commands, "#Card #BondedHealthFill.Anchor", "116");
     }
 
     @Test

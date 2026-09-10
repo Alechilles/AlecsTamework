@@ -1,155 +1,56 @@
 $A = "TameworkPanelActionStyles.ui";
 $C = "Common.ui";
-
-@CommandAssignmentKeyStyle = LabelStyle(
-  FontSize: 12,
-  RenderBold: true,
-  TextColor: #dce8f6,
-  FontName: "Secondary",
-  Alignment: Center
-);
-
-@CommandAssignmentDropdownStyle = (
-  ...$A.@PanelDropdown,
-  HorizontalPadding: 8,
-  LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, RenderUppercase: false, FontSize: 12),
-  EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, RenderUppercase: false, FontSize: 12),
-  SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, RenderUppercase: false, RenderBold: true, FontSize: 12)
-);
-
+@CommandAssignmentKeyStyle = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #c4dbc9, Alignment: Center);
+@CommandAssignmentDropdownStyle = (...$A.@PanelDropdown, HorizontalPadding: 8, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, TextColor: #e8e4da, RenderUppercase: false, FontSize: 12), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #e8e4da, RenderUppercase: false, FontSize: 12));
 $C.@PageOverlay {
-  LayoutMode: Middle;
-
-  Group #TameworkCommandMenuWheel {
-    Anchor: (Width: 1120, Height: 820);
-    Visible: false;
-
-    Group #TameworkCommandMenuSurface {
-      Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
-      Background: #081724;
-      OutlineColor: #35556e;
-      OutlineSize: 1;
+ LayoutMode: Middle;
+ Group #TameworkCommandMenuWheel {
+  Anchor: (Width: 1120, Height: 820);
+  Visible: false;
+  Group #TameworkCommandMenuSurface {
+   Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+   Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
+  }
+  Group #TameworkCommandMenuContent {
+   Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+   Group #TameworkCommandMenuHeader {
+    Anchor: (Top: 3, Left: 3, Right: 3, Height: 42);
+    Background: #252b27;
+    Label #TameworkCommandMenuTitle { Anchor: (Left: 18, Width: 300, Height: 42); Text: ""; Style: (FontSize: 23, RenderBold: true, TextColor: #f0eee7, VerticalAlignment: Center); }
+    Label #TameworkCommandMenuSubtitle { Anchor: (Left: 330, Width: 500, Height: 42); Text: ""; Visible: false; Style: (FontSize: 12, TextColor: #afb6b0); }
+    TextButton #CommandMenuCloseButton { Anchor: (Top: 8, Right: 14, Width: 78, Height: 26); Text: %server.tamework.ui.shared.button.close; Style: $A.@PanelButton; }
+   }
+   Group #TameworkCommandAssignments {
+    Anchor: (Top: 54, Left: 12, Width: 152, Bottom: 16);
+    Background: #1a201c;
+    Group #TameworkCommandPrimaryAssignment {
+     Anchor: (Top: 0, Left: 0, Width: 152, Height: 80);
+     Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
+     Label { Anchor: (Top: 10, Left: 12, Width: 36, Height: 22); Text: "LMB"; Style: @CommandAssignmentKeyStyle; }
+     DropdownBox #TameworkCommandPrimary { Anchor: (Top: 40, Left: 8, Width: 136, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: "No commands"; }
     }
-
-    Group #TameworkCommandMenuContent {
-      Anchor: (Top: 0, Left: 0, Right: 0, Height: 94);
-
-      Group #TameworkCommandMenuHeader {
-        Anchor: (Top: 0, Left: 0, Right: 0, Height: 42);
-        Background: #10263a(0.92);
-
-        Label #TameworkCommandMenuTitle {
-          Anchor: (Left: 16, Width: 230, Height: 42);
-          Text: "";
-          Style: (FontSize: 22, RenderBold: true, TextColor: #e6eff9, HorizontalAlignment: Start, VerticalAlignment: Center);
-        }
-
-        Label #TameworkCommandMenuSubtitle {
-          Anchor: (Left: 252, Width: 500, Height: 42);
-          Text: "";
-          Style: (FontSize: 13, TextColor: #b7cae0, HorizontalAlignment: Start, VerticalAlignment: Center);
-        }
-
-        $C.@SmallSecondaryTextButton #CommandMenuCloseButton {
-          @Sounds = $C.@ButtonSounds;
-          @Anchor = (Top: 9, Right: 16, Width: 80, Height: 24);
-          @Text = %server.tamework.ui.shared.button.close;
-          Style: $A.@PanelButton;
-        }
-      }
-
-      Group #TameworkCommandAssignments {
-        Anchor: (Top: 48, Left: 16, Width: 1088, Height: 44);
-        Background: #0b1b2a(0.9);
-
-        Group #TameworkCommandPrimaryAssignment {
-          Anchor: (Top: 8, Left: 10, Width: 260, Height: 30);
-
-          Label {
-            Anchor: (Top: 0, Left: 0, Width: 34, Height: 28);
-            Background: (TexturePath: "Tamework/AvatarFlightControls/InputBadge.png", Border: 8);
-            Text: "LMB";
-            Style: @CommandAssignmentKeyStyle;
-          }
-
-          DropdownBox #TameworkCommandPrimary {
-            Anchor: (Top: 0, Left: 42, Width: 208, Height: 28);
-            OutlineColor: #34526b;
-            OutlineSize: 1;
-            Style: @CommandAssignmentDropdownStyle;
-            HitTestVisible: true;
-            MaxSelection: 1;
-            NoItemsText: "No commands";
-          }
-        }
-
-        Group #TameworkCommandHotswapQAssignment {
-          Anchor: (Top: 8, Left: 280, Width: 260, Height: 30);
-
-          Label {
-            Anchor: (Top: 0, Left: 0, Width: 34, Height: 28);
-            Background: (TexturePath: "Tamework/AvatarFlightControls/InputBadge.png", Border: 8);
-            Text: "Q";
-            Style: @CommandAssignmentKeyStyle;
-          }
-
-          DropdownBox #TameworkCommandHotswapQ {
-            Anchor: (Top: 0, Left: 42, Width: 208, Height: 28);
-            OutlineColor: #34526b;
-            OutlineSize: 1;
-            Style: @CommandAssignmentDropdownStyle;
-            HitTestVisible: true;
-            MaxSelection: 1;
-            NoItemsText: "No commands";
-          }
-        }
-
-        Group #TameworkCommandHotswapEAssignment {
-          Anchor: (Top: 8, Left: 550, Width: 260, Height: 30);
-
-          Label {
-            Anchor: (Top: 0, Left: 0, Width: 34, Height: 28);
-            Background: (TexturePath: "Tamework/AvatarFlightControls/InputBadge.png", Border: 8);
-            Text: "E";
-            Style: @CommandAssignmentKeyStyle;
-          }
-
-          DropdownBox #TameworkCommandHotswapE {
-            Anchor: (Top: 0, Left: 42, Width: 208, Height: 28);
-            OutlineColor: #34526b;
-            OutlineSize: 1;
-            Style: @CommandAssignmentDropdownStyle;
-            HitTestVisible: true;
-            MaxSelection: 1;
-            NoItemsText: "No commands";
-          }
-        }
-
-        Group #TameworkCommandHotswapRAssignment {
-          Anchor: (Top: 8, Left: 820, Width: 260, Height: 30);
-
-          Label {
-            Anchor: (Top: 0, Left: 0, Width: 34, Height: 28);
-            Background: (TexturePath: "Tamework/AvatarFlightControls/InputBadge.png", Border: 8);
-            Text: "R";
-            Style: @CommandAssignmentKeyStyle;
-          }
-
-          DropdownBox #TameworkCommandHotswapR {
-            Anchor: (Top: 0, Left: 42, Width: 208, Height: 28);
-            OutlineColor: #34526b;
-            OutlineSize: 1;
-            Style: @CommandAssignmentDropdownStyle;
-            HitTestVisible: true;
-            MaxSelection: 1;
-            NoItemsText: "No commands";
-          }
-        }
-      }
+    Group #TameworkCommandHotswapQAssignment {
+     Anchor: (Top: 92, Left: 0, Width: 152, Height: 80);
+     Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
+     Label { Anchor: (Top: 10, Left: 12, Width: 36, Height: 22); Text: "Q"; Style: @CommandAssignmentKeyStyle; }
+     DropdownBox #TameworkCommandHotswapQ { Anchor: (Top: 40, Left: 8, Width: 136, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: "No commands"; }
     }
-
+    Group #TameworkCommandHotswapEAssignment {
+     Anchor: (Top: 184, Left: 0, Width: 152, Height: 80);
+     Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
+     Label { Anchor: (Top: 10, Left: 12, Width: 36, Height: 22); Text: "E"; Style: @CommandAssignmentKeyStyle; }
+     DropdownBox #TameworkCommandHotswapE { Anchor: (Top: 40, Left: 8, Width: 136, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: "No commands"; }
+    }
+    Group #TameworkCommandHotswapRAssignment {
+     Anchor: (Top: 276, Left: 0, Width: 152, Height: 80);
+     Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
+     Label { Anchor: (Top: 10, Left: 12, Width: 36, Height: 22); Text: "R"; Style: @CommandAssignmentKeyStyle; }
+     DropdownBox #TameworkCommandHotswapR { Anchor: (Top: 40, Left: 8, Width: 136, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: "No commands"; }
+    }
+   }
+  }
     // Legacy wheel selectors stay mounted for existing page bindings, but the
-    // compact assignment bar is the only visible command-selection surface.
+    // command sidebar is the only visible command-selection surface.
     Group #TameworkCommandLegacyWheel {
       Anchor: (Top: 0, Left: 0, Width: 1, Height: 1);
       Visible: false;

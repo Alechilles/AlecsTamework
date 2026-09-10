@@ -13,6 +13,10 @@ final class LinkedNpcPanelRefreshValueSeeder {
                      Supplier<String> radius, Supplier<String> sort,
                      Supplier<String> filter, Supplier<String> input,
                      Supplier<List<DropdownEntryInfo>> groupEntries, Supplier<String> groupValue) {
+        for (String tab : List.of("Linked", "Nearby", "Owned")) {
+            values.remember("#TameworkMode" + tab + ".Style",
+                    LinkedNpcPanelPresentationSupport.modeTabStyle(tab, LinkedNpcPanelPresentationSupport.mode(mode)));
+        }
         values.remember("#TameworkLinkedPanelTitle.Text", LinkedNpcPanelPresentationSupport.title(mode, entries, language)); values.remember("#TameworkLinkedPanelGroupSelectorDropdown.Entries", LinkedNpcPanelPresentationSupport.entries(groupEntries));
         values.remember("#TameworkLinkedPanelGroupSelectorDropdown.Value", LinkedNpcPanelPresentationSupport.value(groupValue, "")); values.remember("#TameworkLinkedPanelModeDropdown.Entries", CommandSelectionPanelOptions.resolveModeDropdownEntries(language));
         values.remember("#TameworkLinkedPanelModeDropdown.Value", LinkedNpcPanelPresentationSupport.mode(mode)); values.remember("#TameworkLinkedPanelAutoLinkCheck.Value", LinkedNpcPanelPresentationSupport.autoLink(autoLink));

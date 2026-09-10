@@ -20,9 +20,9 @@ class LinkedNpcPanelVitalsBinderTest {
         Assertions.assertEquals(data(expected, "#Card #NeedHappiness #NeedValueText.Text"),
                 data(commands, "#Card #NeedHappiness #NeedValueText.Text"));
         Anchor anchor = new Anchor();
-        anchor.setLeft(Value.of(34));
-        anchor.setTop(Value.of(14));
-        anchor.setWidth(Value.of(65));
+        anchor.setLeft(Value.of(92));
+        anchor.setTop(Value.of(8));
+        anchor.setWidth(Value.of(46));
         anchor.setHeight(Value.of(6));
         expected.setObject("#Card #NeedHappiness #MeterFill.Anchor", anchor);
         Assertions.assertEquals(
@@ -39,16 +39,16 @@ class LinkedNpcPanelVitalsBinderTest {
         Assertions.assertEquals("0:00", LinkedNpcPanelStatusMeter.formatRemainingClock(-1L));
     }
 
-    // Catches a tick placed on the wrong side/direction of the segmented meter,
+    // Catches a tick placed on the wrong side of the meter,
     // including threshold data lost while normalizing or copying the panel entry.
     @Test
     void rendersBreedingThresholdAtItsHappinessFillPosition() {
-        assertMarker(0.10, 47, 12, 2, 10);
-        assertMarker(0.25, 66, 12, 2, 10);
-        assertMarker(0.50, 98, 12, 2, 10);
-        assertMarker(0.70, 124, 12, 2, 10);
-        assertMarker(0.95, 156, 12, 2, 10);
-        assertMarker(1.0, 162, 12, 2, 10);
+        assertMarker(0.10, 101, 6, 2, 10);
+        assertMarker(0.25, 115, 6, 2, 10);
+        assertMarker(0.50, 137, 6, 2, 10);
+        assertMarker(0.70, 155, 6, 2, 10);
+        assertMarker(0.95, 178, 6, 2, 10);
+        assertMarker(1.0, 182, 6, 2, 10);
     }
 
     private static void assertMarker(

@@ -30,11 +30,12 @@ import javax.annotation.Nullable;
  */
 final class BondedCompanionCardPresenter {
     static final String CARD_UI_PATH = "TameworkBondedCompanionPanelCard.ui";
-    private static final int HEALTH_FILL_WIDTH = 448;
-    private static final int XP_FILL_WIDTH = 448;
-    private static final int METRIC_LEFT = 24;
-    private static final int METRIC_WIDTH = 132;
-    private static final int METRIC_GAP = 8;
+    private static final int HEALTH_FILL_WIDTH = 232;
+    private static final int XP_FILL_WIDTH = 232;
+    private static final int METRIC_LEFT = 172;
+    private static final int METRIC_WIDTH = 234;
+    private static final int METRIC_HEIGHT = 22;
+    private static final int METRIC_GAP = 4;
 
     private BondedCompanionCardPresenter() {
     }
@@ -305,24 +306,24 @@ final class BondedCompanionCardPresenter {
             CardLayout layout
     ) {
         commands.setObject(entrySelector + " #BondedStateDetail.Anchor",
-                fixedWidthAnchor(510, layout.detailTop(), 350, 16));
+                fixedWidthAnchor(432, layout.detailTop(), 300, 16));
         commands.setObject(entrySelector + " #BondedStateDetailValue.Anchor",
-                fixedWidthAnchor(510, layout.detailTop() + 16, 350, 42));
-        Anchor action = rightAnchor(layout.actionTop(), 14, 112, 32);
+                fixedWidthAnchor(432, layout.detailTop() + 16, 300, 42));
+        Anchor action = fixedWidthAnchor(738, layout.actionTop(), 112, 32);
         commands.setObject(entrySelector + " #BondedPrimaryAction.Anchor", action);
         commands.setObject(entrySelector + " #BondedPrimaryActionNoTooltip.Anchor",
-                rightAnchor(layout.actionTop(), 14, 112, 32));
+                fixedWidthAnchor(738, layout.actionTop(), 112, 32));
         commands.setObject(entrySelector + " #BondedPrimaryActionDisabled.Anchor",
-                rightAnchor(layout.actionTop(), 14, 112, 32));
+                fixedWidthAnchor(738, layout.actionTop(), 112, 32));
         commands.setObject(entrySelector
                         + " #BondedPrimaryActionDisabledNoTooltip.Anchor",
-                rightAnchor(layout.actionTop(), 14, 112, 32));
+                fixedWidthAnchor(738, layout.actionTop(), 112, 32));
         LinkedNpcPanelIconStyles.anchor(commands, entrySelector + " #BondedReviveAction",
-                rightAnchor(layout.actionTop(), 14, 32, 32));
+                fixedWidthAnchor(818, layout.actionTop(), 32, 32));
         LinkedNpcPanelIconStyles.anchor(commands, entrySelector + " #BondedReviveActionNoTooltip",
-                rightAnchor(layout.actionTop(), 14, 32, 32));
+                fixedWidthAnchor(818, layout.actionTop(), 32, 32));
         commands.setObject(entrySelector + " #BondedUnlinkConfirmButton.Anchor",
-                rightAnchor(layout.actionTop(), 14, 112, 32));
+                fixedWidthAnchor(738, layout.actionTop(), 112, 32));
     }
 
     private static void bindMetrics(
@@ -357,9 +358,9 @@ final class BondedCompanionCardPresenter {
             return visibleIndex;
         }
         int value = metricPercent(rawValue);
-        int left = METRIC_LEFT + visibleIndex * (METRIC_WIDTH + METRIC_GAP);
-        commands.setObject(selector + ".Anchor", fillAnchor(left, top,
-                METRIC_WIDTH, 30));
+        int metricTop = top + visibleIndex * (METRIC_HEIGHT + METRIC_GAP);
+        commands.setObject(selector + ".Anchor", fillAnchor(METRIC_LEFT, metricTop,
+                METRIC_WIDTH, METRIC_HEIGHT));
         commands.set(selector + " #MetricValue.Text", value + "%");
         commands.set(selector + " #MetricLabel.Text", LocalizedText.resolve(
                 language, "tamework.ui.linkedPanel.bonded.metric."
@@ -693,9 +694,9 @@ final class BondedCompanionCardPresenter {
     }
 
     private static CardLayout layout() {
-        int metricTop = 126;
-        int detailTop = 40;
-        int actionTop = 124;
+        int metricTop = 54;
+        int detailTop = 46;
+        int actionTop = 126;
         return new CardLayout(metricTop, detailTop, actionTop);
     }
 
@@ -717,17 +718,6 @@ final class BondedCompanionCardPresenter {
         anchor.setTop(Value.of(top));
         anchor.setLeft(Value.of(left));
         anchor.setWidth(Value.of(Math.max(0, width)));
-        anchor.setHeight(Value.of(height));
-        return anchor;
-    }
-
-    private static Anchor rightAnchor(
-            int top, int right, int width, int height
-    ) {
-        Anchor anchor = new Anchor();
-        anchor.setTop(Value.of(top));
-        anchor.setRight(Value.of(right));
-        anchor.setWidth(Value.of(width));
         anchor.setHeight(Value.of(height));
         return anchor;
     }
@@ -948,7 +938,7 @@ final class BondedCompanionCardPresenter {
     /** Stable compact allocation for the bonded roster card. */
     private record CardLayout(int metricTop, int detailTop, int actionTop) {
         private int baseHeight() {
-            return 184;
+            return 176;
         }
 
         private Anchor cardAnchor() {

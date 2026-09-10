@@ -90,6 +90,12 @@ final class CommandSelectionPageEventBinder {
             @Nonnull UIEventBuilder events,
             @Nonnull LinkedNpcPanelFeatureController featureController
     ) {
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#TameworkModeLinked",
+                EventData.of(KEY_PANEL_MODE_VALUE, TameworkCommandSelectionPage.PANEL_MODE_LINKED), false);
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#TameworkModeNearby",
+                EventData.of(KEY_PANEL_MODE_VALUE, TameworkCommandSelectionPage.PANEL_MODE_NEARBY), false);
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#TameworkModeOwned",
+                EventData.of(KEY_PANEL_MODE_VALUE, TameworkCommandSelectionPage.PANEL_MODE_OWNED), false);
         bindValue(
                 events,
                 "#TameworkLinkedPanelAutoLinkCheck",

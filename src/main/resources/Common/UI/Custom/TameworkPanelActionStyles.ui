@@ -1,7 +1,7 @@
 $C = "Common.ui";
 @IconLabel = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
-@Action = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 8), LabelStyle: @IconLabel), Hovered: (Background: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 8), LabelStyle: @IconLabel), Pressed: (Background: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 8), LabelStyle: @IconLabel), Sounds: $C.@ButtonSounds);
-@ActionDisabled = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 8, Color: #ffffff(0.45)), LabelStyle: @IconLabel));
+@Action = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3), LabelStyle: @IconLabel), Hovered: (Background: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 3), LabelStyle: @IconLabel), Pressed: (Background: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 3), LabelStyle: @IconLabel), Sounds: $C.@ButtonSounds);
+@ActionDisabled = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3, Color: #ffffff(0.45)), LabelStyle: @IconLabel));
 @Release = @Action;
 @ReleaseDisabled = @ActionDisabled;
 @Unlink = @Action;
@@ -38,17 +38,22 @@ $C = "Common.ui";
 // Quiet panel fields use flat fills; raised frames identify action buttons.
 @PanelDropdown = DropdownBoxStyle(
  ...$C.@DefaultDropdownBoxStyle,
- DefaultBackground: (Color: #183247),
- HoveredBackground: (Color: #23475f),
- PressedBackground: (Color: #1b3c52),
- PanelBackground: (Color: #102738),
+ DefaultBackground: (Color: #252c27),
+ HoveredBackground: (Color: #35423a),
+ PressedBackground: (Color: #2d3831),
+ PanelBackground: (Color: #1d241f),
+ LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, TextColor: #d6d9d0),
+ EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #d6d9d0),
+ SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #f0eee7),
  ArrowWidth: 10, ArrowHeight: 14
 );
 
-@PanelButtonLabel = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #dbeaf4, Alignment: Center);
+@PanelButtonLabel = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #e8e4da, Alignment: Center);
 @PanelButton = TextButtonStyle(
- Default: (Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 8), LabelStyle: @PanelButtonLabel),
- Hovered: (Background: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 8), LabelStyle: @PanelButtonLabel),
- Pressed: (Background: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 8), LabelStyle: @PanelButtonLabel),
+ Default: (Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3), LabelStyle: @PanelButtonLabel),
+ Hovered: (Background: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 3), LabelStyle: @PanelButtonLabel),
+ Pressed: (Background: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 3), LabelStyle: @PanelButtonLabel),
  Sounds: $C.@ButtonSounds
 );
+
+@PanelButtonSelected = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 3), LabelStyle: @PanelButtonLabel), Hovered: (Background: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 3), LabelStyle: @PanelButtonLabel), Sounds: $C.@ButtonSounds);

@@ -403,6 +403,7 @@ public final class TameworkCommandSelectionPage
             commandBuilder.set("#TameworkLinkedPanelGroupSelectorDropdown.Value", LinkedNpcPanelPresentationSupport.value(panelGroupActivationValueSupplier, ""));
             commandBuilder.set("#TameworkLinkedPanelModeDropdown.Entries", CommandSelectionPanelOptions.resolveModeDropdownEntries(resolveLanguage()));
             commandBuilder.set("#TameworkLinkedPanelModeDropdown.Value", LinkedNpcPanelPresentationSupport.mode(panelModeValueSupplier));
+            LinkedNpcPanelPresentationSupport.bindModeTabs(commandBuilder, panelModeValueSupplier);
             commandBuilder.set("#TameworkLinkedPanelAutoLinkCheck.Value", LinkedNpcPanelPresentationSupport.autoLink(panelAutoLinkEnabledSupplier));
             commandBuilder.set("#TameworkLinkedPanelActiveHighlightControls.Visible",
                     activeHighlightBinding.supported());

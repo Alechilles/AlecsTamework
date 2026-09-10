@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
+import com.hypixel.hytale.server.core.ui.Value;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +25,11 @@ final class LinkedNpcPanelRefreshValues {
 
     void remember(@Nonnull String selector, Object value) {
         previousValues.put(selector, value);
+    }
+
+    void setStyle(UICommandBuilder commands, String selector, String style) {
+        if (!changed(selector, style)) return;
+        commands.set(selector, Value.ref("TameworkPanelActionStyles.ui", style));
     }
 
     void set(@Nonnull UICommandBuilder commands, @Nonnull String selector,
