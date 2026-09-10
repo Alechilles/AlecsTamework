@@ -70,7 +70,10 @@ at shutdown. Saved card values never authorize a live action or mutate persisten
   evidence can author that lifecycle.
 - Active-NPC indicators are sent only to the controlling player. Each loaded
   target gets one invisible, non-persistent helper entity mounted above its
-  model bounds. The helper receives one persistent particle emission. A roster,
+  model bounds. Its mount component is added after spawning so Hytale registers
+  it as a passenger and detaches it immediately when the parent is removed;
+  this safety cleanup does not wait for the roster sweep. The helper receives
+  one persistent particle emission. A roster,
   color, setting, equipped-tool, player, or NPC lifecycle change removes the
   helper and its particle before a replacement is created. A rider mount also
   removes the helper before Hytale changes the NPC mount graph. Reconciliation

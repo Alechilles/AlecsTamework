@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Fixed active-highlight helpers retaining an invalid mount after their NPC is
+  removed, which could crash the world while preparing mount updates.
+
 - Added Happiness, Hunger, and Thirst sorting, with the lowest known care
   percentage first and unknown values last, including inactive companions.
 

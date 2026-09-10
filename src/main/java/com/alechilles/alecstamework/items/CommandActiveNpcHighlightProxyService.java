@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.compat.HytaleMountedComponentAccess;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.AddReason;
+import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.NonSerialized;
 import com.hypixel.hytale.component.Ref;
@@ -68,8 +69,9 @@ final class CommandActiveNpcHighlightProxyService {
                 ModelComponent.getComponentType(),
                 new ModelComponent(Model.createUnitScaleModel(modelAsset))
         );
-        holder.addComponent(
-                MountedComponent.getComponentType(),
+        holder.ensureComponent(EntityTrackerSystems.Visible.getComponentType());
+        Ref<EntityStore> proxyRef = spawnMountedProxy(
+                store, holder, MountedComponent.getComponentType(),
                 HytaleMountedComponentAccess.createEntityMount(
                         parentNpcRef,
                         attachmentOffset.x,
@@ -78,9 +80,30 @@ final class CommandActiveNpcHighlightProxyService {
                         MountController.Minecart
                 )
         );
-        holder.ensureComponent(EntityTrackerSystems.Visible.getComponentType());
-        Ref<EntityStore> proxyRef = store.addEntity(holder, AddReason.SPAWN);
         return proxyRef != null && proxyRef.isValid() ? proxyUuid : null;
+    }
+
+    @Nullable
+    static Ref<EntityStore> spawnMountedProxy(
+            @Nonnull Store<EntityStore> store,
+            @Nonnull Holder<EntityStore> holder,
+            @Nonnull ComponentType<EntityStore, MountedComponent> mountedType,
+            @Nonnull MountedComponent mounted) {
+        Ref<EntityStore> proxyRef = store.addEntity(holder, AddReason.SPAWN);
+        if (proxyRef == null || !proxyRef.isValid()) {
+            return null;
+        }
+        try {
+            // Adding the mount to a live entity runs TrackedMounted. A holder component
+            // skips that hook, leaving parent removal unable to detach this passenger.
+            store.putComponent(proxyRef, mountedType, mounted);
+            return proxyRef;
+        } catch (RuntimeException failure) {
+            if (proxyRef.isValid()) {
+                store.removeEntity(proxyRef, RemoveReason.REMOVE);
+            }
+            throw failure;
+        }
     }
 
     void removeAll(@Nonnull Store<EntityStore> store,
