@@ -1,32 +1,38 @@
+$A = "TameworkPanelActionStyles.ui";
 $C = "Common.ui";
 
 $C.@PageOverlay {
   LayoutMode: Middle;
 
-  $C.@DecoratedContainer #TwSettingsAnnouncementRoot {
+  Group #TwSettingsAnnouncementRoot {
     Anchor: (Width: 620, Height: 440);
+    Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
 
-    #Title {
-      $C.@Title #TwSettingsAnnouncementTitle {
-        @Alignment = Start;
-        @Text = "Important Alec's Tamework Update";
+    Group #Title {
+      Anchor: (Top: 3, Left: 3, Right: 3, Height: 44);
+      Background: #252b27;
+      Label #TwSettingsAnnouncementTitle {
+        Anchor: (Left: 14, Right: 14, Height: 44);
+        Style: (FontSize: 20, RenderBold: true, TextColor: #f0eee7, VerticalAlignment: Center);
+        Text: "Important Alec's Tamework Update";
       }
     }
 
-    #Content {
+    Group #Content {
+      Anchor: (Top: 54, Left: 14, Right: 14, Bottom: 14);
       LayoutMode: Top;
       Padding: (Left: 10, Right: 10, Top: 6, Bottom: 8);
 
       Label #TwSettingsAnnouncementSubtitle {
         Anchor: (Height: 44);
         Text: "New features, settings, or updates have been added to Tamework that require your attention.";
-        Style: (FontSize: 13, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+        Style: (FontSize: 13, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
       }
 
       Group {
         Anchor: (Top: 6);
         FlexWeight: 1;
-        Background: #13243a;
+        Background: #181c1a;
         Padding: (Left: 8, Right: 8, Top: 8, Bottom: 8);
 
         Group #TwSettingsAnnouncementViewport {
@@ -43,7 +49,7 @@ $C.@PageOverlay {
             Label #TwSettingsAnnouncementBody {
               Anchor: (Height: 720);
               Text: "";
-              Style: (FontSize: 13, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
+              Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
             }
           }
         }
@@ -54,7 +60,9 @@ $C.@PageOverlay {
 
         CheckBox #TwSettingsAnnouncementOptOutCheck {
           Anchor: (Top: 4, Left: 0, Width: 22, Height: 22);
-          Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+          Background: (Color: #252c27);
+          OutlineColor: #4a5a50;
+          OutlineSize: 1;
           Padding: (Full: 4);
           Style: $C.@DefaultCheckBoxStyle;
         }
@@ -62,27 +70,27 @@ $C.@PageOverlay {
         Label #TwSettingsAnnouncementOptOutLabel {
           Anchor: (Left: 30, Right: 0, Height: 30);
           Text: "Don't show again until next announcement";
-          Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+          Style: (FontSize: 12, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
         }
       }
 
       Group {
         LayoutMode: Right;
 
-        $C.@SmallSecondaryTextButton #TwSettingsAnnouncementLaterButton {
-          @Sounds = $C.@ButtonSounds;
-          @Text = "Later";
-          @Anchor = (MinWidth: 128);
+        TextButton #TwSettingsAnnouncementLaterButton {
+          Style: $A.@PanelButton;
+          Text: "Later";
+          Anchor: (Width: 128, Height: 30);
         }
 
         Group {
           Anchor: (Width: 12);
         }
 
-        $C.@SmallSecondaryTextButton #TwSettingsAnnouncementReviewButton {
-          @Sounds = $C.@ButtonSounds;
-          @Text = "Review Settings";
-          @Anchor = (Right: 10, MinWidth: 170);
+        TextButton #TwSettingsAnnouncementReviewButton {
+          Style: $A.@PanelButton;
+          Text: "Review Settings";
+          Anchor: (Width: 170, Height: 30);
         }
       }
     }

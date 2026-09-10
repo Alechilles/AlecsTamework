@@ -5,12 +5,12 @@ Group {
 
   Group #AssetRowBackground {
     Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
-    Background: #152a44;
+    Background: #202723;
   }
 
   Group #AssetRowSelectedBar {
     Anchor: (Top: 0, Left: 0, Width: 3, Bottom: 0);
-    Background: #6fb7ff;
+    Background: #8bbd9a;
     Visible: false;
   }
 
@@ -18,8 +18,8 @@ Group {
     Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
     Style: ButtonStyle(
       Default: (Background: (Color: #00000000)),
-      Hovered: (Background: (Color: #ffffff12)),
-      Pressed: (Background: (Color: #ffffff08))
+      Hovered: (Background: (Color: #35423a)),
+      Pressed: (Background: (Color: #2d3831))
     );
 
     Label #AssetRowLabel {
@@ -27,7 +27,7 @@ Group {
       Text: "";
       Style: (
         FontSize: 12,
-        TextColor: #c8d7ea,
+        TextColor: #e8e4da,
         HorizontalAlignment: Start,
         VerticalAlignment: Center,
         Wrap: false

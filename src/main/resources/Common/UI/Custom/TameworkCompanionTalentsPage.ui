@@ -1,127 +1,126 @@
+$A = "TameworkPanelActionStyles.ui";
 $C = "Common.ui";
 
 $C.@PageOverlay {
   LayoutMode: Middle;
 
-  $C.@DecoratedContainer #TameworkCompanionTalentsRoot {
+  Group #TameworkCompanionTalentsRoot {
     Anchor: (Width: 1120, Height: 720);
+    Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
 
-    #Title {
-      $C.@Title #TameworkCompanionTalentsTitle {
-        @Text = %server.tamework.ui.talents.title;
+    Group #Title {
+      Anchor: (Top: 3, Left: 3, Right: 3, Height: 48);
+      Background: #252b27;
+
+      Label #TameworkCompanionTalentsTitle {
+        Anchor: (Left: 18, Right: 330, Height: 48);
+        Text: %server.tamework.ui.talents.title;
+        Style: (FontSize: 23, RenderBold: true, TextColor: #f0eee7, HorizontalAlignment: Start, VerticalAlignment: Center);
+      }
+
+      Group #TameworkCompanionTalentsButtons {
+        Anchor: (Top: 9, Right: 14, Width: 288, Height: 30);
+        LayoutMode: Right;
+
+        TextButton #TameworkCompanionTalentsBackButton {
+          Anchor: (Width: 128, Height: 30);
+          Text: %server.tamework.ui.talents.button.back;
+          Style: $A.@PanelButton;
+        }
+
+        Group { Anchor: (Width: 8); }
+
+        TextButton #TameworkCompanionTalentsResetButton {
+          Anchor: (Width: 132, Height: 30);
+          Text: %server.tamework.ui.talents.button.reset;
+          Style: $A.@PanelButton;
+          Visible: false;
+        }
       }
     }
 
-    #Content {
-      LayoutMode: Top;
+    Group #Content {
+      Anchor: (Top: 56, Left: 12, Right: 12, Bottom: 12);
 
       Group #TameworkCompanionTalentsHeader {
-        Anchor: (Height: 78, Bottom: 10);
+        Anchor: (Top: 0, Left: 0, Right: 0, Height: 78);
+        Background: #202723;
+        Padding: (Left: 14, Right: 14, Top: 6, Bottom: 6);
 
         Label #TameworkCompanionTalentsLevelSummary {
           Anchor: (Top: 0, Left: 0, Width: 340, Height: 24);
           Text: "Level 1";
-          Style: (FontSize: 16, TextColor: #dbe7f7, HorizontalAlignment: Start, VerticalAlignment: Center);
+          Style: (FontSize: 16, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
         }
 
         Label #TameworkCompanionTalentsPointsSummary {
-          Anchor: (Top: 26, Left: 0, Width: 340, Height: 22);
+          Anchor: (Top: 24, Left: 0, Width: 340, Height: 22);
           Text: "Talent Points: 0 available";
-          Style: (FontSize: 14, TextColor: #9fc2dd, HorizontalAlignment: Start, VerticalAlignment: Center);
+          Style: (FontSize: 14, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
         }
 
         Label #TameworkCompanionTalentsStatus {
-          Anchor: (Top: 50, Left: 0, Width: 340, Height: 22);
+          Anchor: (Top: 46, Left: 0, Width: 480, Height: 22);
           Text: "";
-          Style: (FontSize: 13, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+          Style: (FontSize: 13, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Center);
         }
 
         Group #TalentTreePanControls {
-          Anchor: (Top: 48, Left: 374, Width: 112, Height: 28);
+          Anchor: (Top: 38, Left: 500, Width: 112, Height: 28);
           LayoutMode: Left;
           Visible: false;
 
-          $C.@SmallSecondaryTextButton #TalentTreePanLeftButton {
-            @Sounds = $C.@ButtonSounds;
-            @Text = "<";
-            @Anchor = (Width: 32, Height: 26);
+          TextButton #TalentTreePanLeftButton {
+            Anchor: (Width: 30, Height: 28);
+            Text: "<";
+            Style: $A.@PanelButton;
             Visible: false;
           }
 
           Label #TalentTreePanLabel {
-            Anchor: (Width: 48, Height: 26);
+            Anchor: (Width: 52, Height: 28);
             Text: "Pan";
-            Style: (FontSize: 12, RenderBold: true, TextColor: #bfd0e5, HorizontalAlignment: Center, VerticalAlignment: Center);
+            Style: (FontSize: 12, RenderBold: true, TextColor: #afb6b0, HorizontalAlignment: Center, VerticalAlignment: Center);
           }
 
-          $C.@SmallSecondaryTextButton #TalentTreePanRightButton {
-            @Sounds = $C.@ButtonSounds;
-            @Text = ">";
-            @Anchor = (Width: 32, Height: 26);
-            Visible: false;
-          }
-        }
-
-        Group #TameworkCompanionTalentsButtons {
-          Anchor: (Top: 8, Right: 0, Width: 288, Height: 32);
-          LayoutMode: Right;
-
-          $C.@SmallSecondaryTextButton #TameworkCompanionTalentsBackButton {
-            @Sounds = $C.@ButtonSounds;
-            @Text = %server.tamework.ui.talents.button.back;
-            @Anchor = (MinWidth: 128);
-          }
-
-          Group {
-            Anchor: (Width: 12);
-          }
-
-          $C.@SmallSecondaryTextButton #TameworkCompanionTalentsResetButton {
-            @Sounds = $C.@ButtonSounds;
-            @Text = %server.tamework.ui.talents.button.reset;
-            @Anchor = (MinWidth: 132);
+          TextButton #TalentTreePanRightButton {
+            Anchor: (Width: 30, Height: 28);
+            Text: ">";
+            Style: $A.@PanelButton;
             Visible: false;
           }
         }
       }
 
       Group #TameworkCompanionTalentsBody {
-        Anchor: (Height: 580);
+        Anchor: (Top: 88, Left: 0, Right: 0, Bottom: 0);
 
         Group #TalentTreeViewport {
-          Anchor: (Top: 0, Left: 0, Width: 820, Height: 560);
-          Background: #07111c(0.72);
+          Anchor: (Top: 0, Left: 0, Width: 820, Bottom: 0);
+          Background: #181c1a;
           KeepScrollPosition: true;
           ScrollbarStyle: $C.@DefaultScrollbarStyle;
-          Padding: (Left: 0, Right: 4, Top: 0, Bottom: 4);
+          Padding: (Left: 8, Right: 8, Top: 8, Bottom: 8);
           LayoutMode: TopScrolling;
 
           Group #TalentTreeCanvas {
             Anchor: (Width: 820, Height: 560);
 
-            Group #TalentConnectorLayer {
-              Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
-            }
-
-            Group #TalentBranchLayer {
-              Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
-            }
-
-            Group #TalentNodeLayer {
-              Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
-            }
+            Group #TalentConnectorLayer { Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0); }
+            Group #TalentBranchLayer { Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0); }
+            Group #TalentNodeLayer { Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0); }
           }
         }
 
         Group #TalentDetailPanel {
-          Anchor: (Top: 0, Right: 0, Width: 260, Height: 560);
-          Background: #0a121b(0.96);
+          Anchor: (Top: 0, Right: 0, Width: 260, Bottom: 0);
+          Background: #202723;
           Padding: 14;
 
           Label #TalentDetailEmpty {
             Anchor: (Top: 18, Left: 12, Right: 12, Height: 64);
             Text: "Choose a talent node.";
-            Style: (FontSize: 15, TextColor: #bfd0e5, HorizontalAlignment: Center, VerticalAlignment: Center, Wrap: true);
+            Style: (FontSize: 15, TextColor: #afb6b0, HorizontalAlignment: Center, VerticalAlignment: Center, Wrap: true);
           }
 
           Group #TalentDetailContent {
@@ -131,55 +130,55 @@ $C.@PageOverlay {
             Label #TalentDetailName {
               Anchor: (Top: 2, Left: 0, Right: 0, Height: 48);
               Text: "Talent";
-              Style: (FontSize: 18, RenderBold: true, TextColor: #f0f6ff, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
+              Style: (FontSize: 18, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
             }
 
             Label #TalentDetailBranch {
               Anchor: (Top: 54, Left: 0, Right: 0, Height: 20);
               Text: "Branch - Tier 1";
-              Style: (FontSize: 12, TextColor: #9fc2dd, HorizontalAlignment: Start, VerticalAlignment: Center);
+              Style: (FontSize: 12, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
             }
 
             Label #TalentDetailStatus {
               Anchor: (Top: 80, Left: 0, Right: 0, Height: 36);
               Text: "Locked";
-              Style: (FontSize: 13, TextColor: #e4efff, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
+              Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
             }
 
             Label #TalentDetailDescription {
               Anchor: (Top: 126, Left: 0, Right: 0, Height: 96);
               Text: "Description";
-              Style: (FontSize: 13, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
+              Style: (FontSize: 13, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
             }
 
             Label #TalentDetailRequirementsLabel {
               Anchor: (Top: 238, Left: 0, Right: 0, Height: 18);
               Text: "Requirements";
-              Style: (FontSize: 12, RenderBold: true, TextColor: #dbe7f7, HorizontalAlignment: Start, VerticalAlignment: Center);
+              Style: (FontSize: 12, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
             }
 
             Label #TalentDetailRequirements {
               Anchor: (Top: 260, Left: 0, Right: 0, Height: 42);
               Text: "Level 1";
-              Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
+              Style: (FontSize: 12, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
             }
 
             Label #TalentDetailEffectsLabel {
               Anchor: (Top: 318, Left: 0, Right: 0, Height: 18);
               Text: "Effects";
-              Style: (FontSize: 12, RenderBold: true, TextColor: #dbe7f7, HorizontalAlignment: Start, VerticalAlignment: Center);
+              Style: (FontSize: 12, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
             }
 
             Label #TalentDetailEffects {
               Anchor: (Top: 340, Left: 0, Right: 0, Height: 116);
               Text: "No passive effects";
-              Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
+              Style: (FontSize: 12, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
             }
 
-            $C.@SmallSecondaryTextButton #TalentDetailUnlockButton {
-              @Sounds = $C.@ButtonSounds;
-              @Text = %server.tamework.ui.talents.button.unlock;
-              @Anchor = (Left: 0, Right: 0, Bottom: 8, Height: 34);
+            TextButton #TalentDetailUnlockButton {
+              Anchor: (Left: 0, Right: 0, Bottom: 8, Height: 34);
+              Text: %server.tamework.ui.talents.button.unlock;
+              Style: $A.@PanelButtonSelected;
               Visible: false;
             }
           }

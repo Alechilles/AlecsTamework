@@ -9,7 +9,7 @@ Group #TameworkMessageRoot {
       VerticalAlignment: Center,
       RenderBold: true,
       FontSize: 28,
-      TextColor: #ffffff,
+      TextColor: #f0eee7,
       OutlineColor: #000000(0.6)
     );
     Text: "";
@@ -23,7 +23,7 @@ Group #TameworkMessageRoot {
       VerticalAlignment: Center,
       RenderBold: true,
       FontSize: 28,
-      TextColor: #ffffff(0.85),
+      TextColor: #f0eee7(0.85),
       OutlineColor: #000000(0.6)
     );
     Text: "";
@@ -37,7 +37,7 @@ Group #TameworkMessageRoot {
       VerticalAlignment: Center,
       RenderBold: true,
       FontSize: 28,
-      TextColor: #ffffff(0.7),
+      TextColor: #f0eee7(0.7),
       OutlineColor: #000000(0.6)
     );
     Text: "";
@@ -51,7 +51,7 @@ Group #TameworkMessageRoot {
       VerticalAlignment: Center,
       RenderBold: true,
       FontSize: 28,
-      TextColor: #ffffff(0.55),
+      TextColor: #f0eee7(0.55),
       OutlineColor: #000000(0.6)
     );
     Text: "";
@@ -65,7 +65,7 @@ Group #TameworkMessageRoot {
       VerticalAlignment: Center,
       RenderBold: true,
       FontSize: 28,
-      TextColor: #ffffff(0.4),
+      TextColor: #f0eee7(0.4),
       OutlineColor: #000000(0.6)
     );
     Text: "";
@@ -79,7 +79,7 @@ Group #TameworkMessageRoot {
       VerticalAlignment: Center,
       RenderBold: true,
       FontSize: 28,
-      TextColor: #ffffff(0.25),
+      TextColor: #f0eee7(0.25),
       OutlineColor: #000000(0.6)
     );
     Text: "";

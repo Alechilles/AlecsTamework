@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Matched the remaining Tamework dialogs, config editor, talent tree, bonded cards,
+  and flight/control HUD frames to the shared charcoal style without adding textures.
+
 - Restyled the settings menu to match the charcoal command panel, with clearer
   sections, roomier controls, and shared textures.
 

@@ -5,14 +5,19 @@ $C.@PageOverlay {
   LayoutMode: Middle;
 
   Group #TameworkGroupManagerRoot {
-    Anchor: (Width: 320, Height: 420);
+    Anchor: (Width: 380, Height: 440);
     Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
 
     Group #Title {
       Anchor: (Top: 4, Left: 4, Right: 4, Height: 40);
       Background: #252b27;
+      Group {
+        Anchor: (Top: 7, Right: 10, Width: 28, Height: 28);
+        TextButton #TameworkGroupCloseButton { Anchor: (Full: 0); Text: ""; TooltipText: %server.tamework.ui.shared.button.close; Style: $A.@Remove; }
+        Group { Anchor: (Top: 2, Left: 2, Width: 24, Height: 24); HitTestVisible: false; Background: "Tamework/PanelActions/Remove_Glyph_Default.png"; }
+      }
       Label #TameworkGroupManagerTitle {
-        Anchor: (Left: 12, Right: 12, Height: 40);
+        Anchor: (Left: 12, Right: 50, Height: 40);
         Text: %server.tamework.ui.groupManager.title;
         Style: (FontSize: 18, RenderBold: true, TextColor: #e8e4da, VerticalAlignment: Center);
       }
@@ -39,10 +44,10 @@ $C.@PageOverlay {
         LayoutMode: Left;
 
         TextField #TameworkGroupNameInput {
-          Style: $C.@DefaultInputFieldStyle;
-          PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
+          Style: $A.@PanelInputFieldStyle;
+          PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
           Background: #181e1a;
-          Anchor: (Width: 186, Height: 24);
+          Anchor: (Width: 238, Height: 24);
           Padding: (Horizontal: 8);
           PlaceholderText: %server.tamework.ui.shared.placeholder.groupName;
           MaxLength: 24;
@@ -51,7 +56,7 @@ $C.@PageOverlay {
         Group { Anchor: (Width: 6); }
 
         ColorPickerDropdownBox #TameworkGroupColorInput {
-          Style: $C.@DefaultColorPickerDropdownBoxStyle;
+          Style: $A.@PanelColorPicker;
           Anchor: (Width: 24, Height: 24);
         }
 
@@ -103,11 +108,6 @@ $C.@PageOverlay {
           Style: $A.@PanelButton;
         }
 
-        TextButton #TameworkGroupCloseButton {
-          Anchor: (Right: 0, Width: 100, Height: 24);
-          Text: %server.tamework.ui.shared.button.close;
-          Style: $A.@PanelButton;
-        }
       }
     }
   }

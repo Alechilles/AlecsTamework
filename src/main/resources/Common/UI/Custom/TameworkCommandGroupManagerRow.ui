@@ -12,7 +12,7 @@ Group {
   }
 
   ColorPickerDropdownBox #GroupColorPicker {
-    Style: $C.@DefaultColorPickerDropdownBoxStyle;
+    Style: $A.@PanelColorPicker;
     Anchor: (Top: 2, Left: 0, Width: 18, Height: 18);
     Visible: false;
   }
@@ -30,8 +30,8 @@ Group {
   }
 
   TextField #GroupNameInput {
-    Style: $C.@DefaultInputFieldStyle;
-    PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
+    Style: $A.@PanelInputFieldStyle;
+    PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
     Background: #181e1a;
     Anchor: (Top: 1, Left: 24, Right: 114, Height: 22);
     Padding: (Horizontal: 6);

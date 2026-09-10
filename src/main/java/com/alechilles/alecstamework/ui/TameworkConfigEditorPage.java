@@ -753,7 +753,7 @@ public final class TameworkConfigEditorPage
             String label = assetDisplayLabel(descriptor);
 
             commandBuilder.append("#TwConfigAssetListRows", UI_ASSET_ROW);
-            commandBuilder.set(root + " #AssetRowBackground.Background", selected ? "#284767" : "#152a44");
+            commandBuilder.set(root + " #AssetRowBackground.Background", selected ? "#35423a" : "#202723");
             commandBuilder.set(root + " #AssetRowSelectedBar.Visible", selected);
             commandBuilder.set(root + " #AssetRowLabel.Text", label);
 
@@ -2154,18 +2154,18 @@ public final class TameworkConfigEditorPage
     @Nonnull
     private static String sectionBackgroundColor(int depth) {
         return switch (depthBucket(depth)) {
-            case 0 -> "#1a2b40";
-            case 1 -> "#20354a";
-            default -> "#26405a";
+            case 0 -> "#252b27";
+            case 1 -> "#2c352e";
+            default -> "#35423a";
         };
     }
 
     @Nonnull
     private static String fieldBackgroundColor(int depth) {
         return switch (depthBucket(depth)) {
-            case 0 -> "#22364a";
-            case 1 -> "#274056";
-            default -> "#2c4860";
+            case 0 -> "#202723";
+            case 1 -> "#252c27";
+            default -> "#2c352e";
         };
     }
 

@@ -10,7 +10,7 @@ Group #Root {
 
         Group #LaunchChargeTrack {
             Anchor: (Top: 0, Left: 12, Width: 154, Height: 10);
-            Background: #203044(0.92);
+            Background: #252c27(0.92);
 
             Group #LaunchChargeFill {
                 Anchor: (Top: 1, Left: 1, Width: 0, Height: 8);
@@ -28,13 +28,13 @@ Group #Root {
     Label #PitchLabel {
         Anchor: (Top: 18, Left: 0, Width: 178, Height: 12);
         Text: "0°";
-        Style: (FontSize: 11, RenderBold: true, TextColor: #f2f6fb, HorizontalAlignment: Center, VerticalAlignment: Center);
+        Style: (FontSize: 11, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Center, VerticalAlignment: Center);
         Visible: false;
     }
 
     Group #SpeedTrack {
         Anchor: (Top: 34, Left: 12, Width: 154, Height: 8);
-        Background: #203044(0.92);
+        Background: #252c27(0.92);
 
         Group #SpeedFill {
             Anchor: (Top: 1, Left: 1, Width: 0, Height: 6);
@@ -54,37 +54,37 @@ Group #Root {
 
         Group #VigourPip0 {
             Anchor: (Width: 20, Height: 10);
-            Background: #203044(0.92);
+            Background: #252c27(0.92);
             Group #Fill { Anchor: (Top: 1, Left: 1, Width: 0, Height: 8); Background: #f1d36a; }
         }
         Group { Anchor: (Width: 5); }
         Group #VigourPip1 {
             Anchor: (Width: 20, Height: 10);
-            Background: #203044(0.92);
+            Background: #252c27(0.92);
             Group #Fill { Anchor: (Top: 1, Left: 1, Width: 0, Height: 8); Background: #f1d36a; }
         }
         Group { Anchor: (Width: 5); }
         Group #VigourPip2 {
             Anchor: (Width: 20, Height: 10);
-            Background: #203044(0.92);
+            Background: #252c27(0.92);
             Group #Fill { Anchor: (Top: 1, Left: 1, Width: 0, Height: 8); Background: #f1d36a; }
         }
         Group { Anchor: (Width: 5); }
         Group #VigourPip3 {
             Anchor: (Width: 20, Height: 10);
-            Background: #203044(0.92);
+            Background: #252c27(0.92);
             Group #Fill { Anchor: (Top: 1, Left: 1, Width: 0, Height: 8); Background: #f1d36a; }
         }
         Group { Anchor: (Width: 5); }
         Group #VigourPip4 {
             Anchor: (Width: 20, Height: 10);
-            Background: #203044(0.92);
+            Background: #252c27(0.92);
             Group #Fill { Anchor: (Top: 1, Left: 1, Width: 0, Height: 8); Background: #f1d36a; }
         }
         Group { Anchor: (Width: 5); }
         Group #VigourPip5 {
             Anchor: (Width: 20, Height: 10);
-            Background: #203044(0.92);
+            Background: #252c27(0.92);
             Group #Fill { Anchor: (Top: 1, Left: 1, Width: 0, Height: 8); Background: #f1d36a; }
         }
     }

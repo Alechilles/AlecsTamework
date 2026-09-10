@@ -4,18 +4,18 @@
     FontName: "Secondary",
     FontSize: 10,
     RenderBold: true,
-    TextColor: #eaf7fb,
+    TextColor: #e8e4da,
     Alignment: Center
 );
 @FlightControlBindingBackground = PatchStyle(
-    TexturePath: "../Tamework/AvatarFlightControls/InputBadge.png",
-    Border: 8
+    TexturePath: "../Tamework/PanelActions/Base_Default.png",
+    Border: 3
 );
 @FlightControlCooldownStyle = (
     FontName: "Secondary",
     FontSize: 20,
     RenderBold: true,
-    TextColor: #f1f5f9,
+    TextColor: #f0eee7,
     Alignment: Center
 );
 
@@ -32,7 +32,7 @@ Group #TameworkAvatarFlightControls {
 
         Group #Ability2Frame {
             Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
-            Background: "../Tamework/AvatarFlightControls/ControlFrame.png";
+            Background: (TexturePath: "../Tamework/PanelActions/Base_Default.png", Border: 3);
 
             Group #Ability2Glyph {
                 Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
@@ -74,7 +74,7 @@ Group #TameworkAvatarFlightControls {
 
         Group #Ability3Frame {
             Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
-            Background: "../Tamework/AvatarFlightControls/ControlFrame.png";
+            Background: (TexturePath: "../Tamework/PanelActions/Base_Default.png", Border: 3);
 
             Group #Ability3Glyph {
                 Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
@@ -115,7 +115,7 @@ Group #TameworkAvatarFlightControls {
 
         Group #LaunchFrame {
             Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
-            Background: "../Tamework/AvatarFlightControls/ControlFrame.png";
+            Background: (TexturePath: "../Tamework/PanelActions/Base_Default.png", Border: 3);
 
             Group #LaunchIcon {
                 Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
@@ -136,7 +136,7 @@ Group #TameworkAvatarFlightControls {
 
         Group #ForwardBoostFrame {
             Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
-            Background: "../Tamework/AvatarFlightControls/ControlFrame.png";
+            Background: (TexturePath: "../Tamework/PanelActions/Base_Default.png", Border: 3);
 
             Group #ForwardBoostIcon {
                 Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
@@ -157,7 +157,7 @@ Group #TameworkAvatarFlightControls {
 
         Group #UpwardFlapFrame {
             Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
-            Background: "../Tamework/AvatarFlightControls/ControlFrame.png";
+            Background: (TexturePath: "../Tamework/PanelActions/Base_Default.png", Border: 3);
 
             Group #UpwardFlapIcon {
                 Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
@@ -178,7 +178,7 @@ Group #TameworkAvatarFlightControls {
 
         Group #AirbrakeFrame {
             Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
-            Background: "../Tamework/AvatarFlightControls/ControlFrame.png";
+            Background: (TexturePath: "../Tamework/PanelActions/Base_Default.png", Border: 3);
 
             Group #AirbrakeIcon {
                 Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);

@@ -5,18 +5,18 @@ Group {
 
   Group #SectionRowBackground {
     Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
-    Background: #1a2b40;
+    Background: #252b27;
   }
 
   Group #SectionGuideDepth1 {
     Anchor: (Top: 0, Left: 14, Width: 2, Bottom: 0);
-    Background: #3b5673;
+    Background: #526a57;
     Visible: false;
   }
 
   Group #SectionGuideDepth2 {
     Anchor: (Top: 0, Left: 36, Width: 2, Bottom: 0);
-    Background: #3b5673;
+    Background: #526a57;
     Visible: false;
   }
 
@@ -25,8 +25,8 @@ Group {
     LayoutMode: Left;
     Style: ButtonStyle(
       Default: (Background: (Color: #00000000)),
-      Hovered: (Background: (Color: #ffffff12)),
-      Pressed: (Background: (Color: #ffffff0a))
+      Hovered: (Background: (Color: #35423a)),
+      Pressed: (Background: (Color: #2d3831))
     );
 
     Group #SectionToggleTopIconContainer {
@@ -53,7 +53,7 @@ Group {
       Style: (
         FontSize: 13,
         RenderBold: true,
-        TextColor: #eff4fa,
+        TextColor: #c4dbc9,
         HorizontalAlignment: Start,
         VerticalAlignment: Center,
         RenderUppercase: true,
@@ -104,7 +104,7 @@ Group {
         Text: %server.tamework.ui.configEditor.section.fieldCount.initial;
         Style: (
           FontSize: 11,
-          TextColor: #a9bfd7,
+          TextColor: #afb6b0,
           HorizontalAlignment: End,
           VerticalAlignment: Center
         );
@@ -140,8 +140,8 @@ Group {
     LayoutMode: Left;
     Style: ButtonStyle(
       Default: (Background: (Color: #00000000)),
-      Hovered: (Background: (Color: #ffffff12)),
-      Pressed: (Background: (Color: #ffffff0a))
+      Hovered: (Background: (Color: #35423a)),
+      Pressed: (Background: (Color: #2d3831))
     );
     Visible: false;
 
@@ -169,7 +169,7 @@ Group {
       Style: (
         FontSize: 13,
         RenderBold: true,
-        TextColor: #e6f0fa,
+        TextColor: #c4dbc9,
         HorizontalAlignment: Start,
         VerticalAlignment: Center,
         RenderUppercase: true,
@@ -220,7 +220,7 @@ Group {
         Text: %server.tamework.ui.configEditor.section.fieldCount.initial;
         Style: (
           FontSize: 11,
-          TextColor: #a9bfd7,
+          TextColor: #afb6b0,
           HorizontalAlignment: End,
           VerticalAlignment: Center
         );
@@ -256,8 +256,8 @@ Group {
     LayoutMode: Left;
     Style: ButtonStyle(
       Default: (Background: (Color: #00000000)),
-      Hovered: (Background: (Color: #ffffff12)),
-      Pressed: (Background: (Color: #ffffff0a))
+      Hovered: (Background: (Color: #35423a)),
+      Pressed: (Background: (Color: #2d3831))
     );
     Visible: false;
 
@@ -285,7 +285,7 @@ Group {
       Style: (
         FontSize: 13,
         RenderBold: true,
-        TextColor: #dbe9f7,
+        TextColor: #c4dbc9,
         HorizontalAlignment: Start,
         VerticalAlignment: Center,
         RenderUppercase: true,
@@ -336,7 +336,7 @@ Group {
         Text: %server.tamework.ui.configEditor.section.fieldCount.initial;
         Style: (
           FontSize: 11,
-          TextColor: #a9bfd7,
+          TextColor: #afb6b0,
           HorizontalAlignment: End,
           VerticalAlignment: Center
         );

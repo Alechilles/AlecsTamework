@@ -1,18 +1,25 @@
+$A = "TameworkPanelActionStyles.ui";
 $C = "Common.ui";
 
 $C.@PageOverlay {
   LayoutMode: Middle;
 
-  $C.@DecoratedContainer #TameworkNameInputRoot {
-    Anchor: (Width: 470, Height: 220);
+  Group #TameworkNameInputRoot {
+    Anchor: (Width: 500, Height: 240);
+    Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
 
-    #Title {
-      $C.@Title #TameworkNameInputTitle {
-        @Text = %server.tamework.ui.nameInput.title.default;
+    Group #Title {
+      Anchor: (Top: 3, Left: 3, Right: 3, Height: 44);
+      Background: #252b27;
+      Label #TameworkNameInputTitle {
+        Anchor: (Left: 14, Right: 14, Height: 44);
+        Style: (FontSize: 20, RenderBold: true, TextColor: #f0eee7, VerticalAlignment: Center);
+        Text: %server.tamework.ui.nameInput.title.default;
       }
     }
 
-    #Content {
+    Group #Content {
+      Anchor: (Top: 54, Left: 14, Right: 14, Bottom: 14);
       LayoutMode: Top;
 
       Label #TameworkNameInputSubtitle {
@@ -20,16 +27,18 @@ $C.@PageOverlay {
         Text: %server.tamework.ui.nameInput.subtitle;
         Style: (
           FontSize: 16,
-          TextColor: #bfd0e5,
+          TextColor: #afb6b0,
           HorizontalAlignment: Center,
           VerticalAlignment: Center
         );
       }
 
       TextField #TameworkNameInputField {
-        Style: $C.@DefaultInputFieldStyle;
-        PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
-        Background: $C.@InputBoxBackground;
+        Style: $A.@PanelInputFieldStyle;
+        PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
+        Background: #252c27;
+        OutlineColor: #4a5a50;
+        OutlineSize: 1;
         Anchor: (Height: 44, Bottom: 20);
         Padding: (Horizontal: 10);
         PlaceholderText: %server.tamework.ui.nameInput.placeholder;
@@ -39,20 +48,20 @@ $C.@PageOverlay {
       Group {
         LayoutMode: Right;
 
-        $C.@SmallSecondaryTextButton #TameworkNameCancelButton {
-          @Sounds = $C.@ButtonSounds;
-          @Text = %server.tamework.ui.shared.button.cancel;
-          @Anchor = (MinWidth: 128);
+        TextButton #TameworkNameCancelButton {
+          Style: $A.@PanelButton;
+          Text: %server.tamework.ui.shared.button.cancel;
+          Anchor: (Width: 128, Height: 30);
         }
 
         Group #TameworkNameButtonSpacerBeforeRandom {
           Anchor: (Width: 12);
         }
 
-        $C.@SmallSecondaryTextButton #TameworkNameRandomButton {
-          @Sounds = $C.@ButtonSounds;
-          @Text = %server.tamework.ui.shared.button.random;
-          @Anchor = (MinWidth: 128);
+        TextButton #TameworkNameRandomButton {
+          Style: $A.@PanelButton;
+          Text: %server.tamework.ui.shared.button.random;
+          Anchor: (Width: 128, Height: 30);
           Visible: false;
         }
 
@@ -61,10 +70,10 @@ $C.@PageOverlay {
           Visible: false;
         }
 
-        $C.@SmallSecondaryTextButton #TameworkNameApplyButton {
-          @Sounds = $C.@ButtonSounds;
-          @Text = %server.tamework.ui.shared.button.apply;
-          @Anchor = (Right: 10, MinWidth: 140);
+        TextButton #TameworkNameApplyButton {
+          Style: $A.@PanelButton;
+          Text: %server.tamework.ui.shared.button.apply;
+          Anchor: (Width: 140, Height: 30);
         }
       }
     }

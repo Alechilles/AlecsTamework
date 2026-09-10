@@ -2,11 +2,13 @@ $C = "Common.ui";
 
 Group {
   Anchor: (Width: 117, Height: 22);
-  Background: #101f32(0.92);
+  Background: #252b27;
+  OutlineColor: #465149;
+  OutlineSize: 1;
 
   Label #TalentBranchName {
     Anchor: (Top: 0, Left: 6, Right: 6, Bottom: 0);
     Text: "Branch";
-    Style: (FontSize: 11, RenderBold: true, TextColor: #cfe4ff, HorizontalAlignment: Center, VerticalAlignment: Center);
+    Style: (FontSize: 11, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Center, VerticalAlignment: Center);
   }
 }

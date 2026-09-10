@@ -221,7 +221,7 @@ Group #TameworkLinkedPanelListViewport {
 
             Group #TameworkLinkedPanelGroupAssignModal {
                 Anchor: (Top: 190, Left: 285, Width: 358, Height: 176);
-                Background: #252b27;
+                Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
 
                 Label #TameworkLinkedPanelGroupAssignTitle {
                     Anchor: (Top: 10, Left: 14, Width: 330, Height: 24);
@@ -252,20 +252,20 @@ Group #TameworkLinkedPanelListViewport {
                         Anchor: (Width: 0);
                     }
 
-                    $C.@SmallSecondaryTextButton #TameworkLinkedPanelGroupAssignCancelButton {
-                        @Sounds = $C.@ButtonSounds;
-                        @Anchor = (Width: 161, Height: 28);
-                        @Text = %server.tamework.ui.shared.button.cancel;
+                    TextButton #TameworkLinkedPanelGroupAssignCancelButton {
+                        Style: $A.@PanelButton;
+                        Anchor: (Width: 161, Height: 28);
+                        Text: %server.tamework.ui.shared.button.cancel;
                     }
 
                     Group {
                         Anchor: (Width: 8);
                     }
 
-                    $C.@SmallSecondaryTextButton #TameworkLinkedPanelGroupAssignApplyButton {
-                        @Sounds = $C.@ButtonSounds;
-                        @Anchor = (Width: 161, Height: 28);
-                        @Text = %server.tamework.ui.shared.button.apply;
+                    TextButton #TameworkLinkedPanelGroupAssignApplyButton {
+                        Style: $A.@PanelButton;
+                        Anchor: (Width: 161, Height: 28);
+                        Text: %server.tamework.ui.shared.button.apply;
                     }
                 }
             }
@@ -278,7 +278,7 @@ Group #TameworkLinkedPanelListViewport {
 
             Group #TameworkLinkedPanelReviveModal {
                 Anchor: (Top: 230, Left: 273, Width: 382, Height: 180);
-                Background: #252b27;
+                Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
 
                 Label #TameworkLinkedPanelReviveTitle {
                     Anchor: (Top: 10, Left: 14, Width: 354, Height: 24);
@@ -304,25 +304,25 @@ Group #TameworkLinkedPanelListViewport {
 
                     Group { Anchor: (Width: 158); }
 
-                    $C.@SmallSecondaryTextButton #TameworkLinkedPanelReviveCancelButton {
-                        @Sounds = $C.@ButtonSounds;
-                        @Anchor = (Width: 88, Height: 24);
-                        @Text = %server.tamework.ui.shared.button.cancel;
+                    TextButton #TameworkLinkedPanelReviveCancelButton {
+                        Style: $A.@PanelButton;
+                        Anchor: (Width: 88, Height: 24);
+                        Text: %server.tamework.ui.shared.button.cancel;
                     }
 
                     Group { Anchor: (Width: 8); }
 
-                    $C.@SmallSecondaryTextButton #TameworkLinkedPanelReviveConfirmButton {
-                        @Sounds = $C.@ButtonSounds;
-                        @Anchor = (Width: 100, Height: 24);
-                        @Text = %server.tamework.ui.linkedPanel.revive.confirm;
+                    TextButton #TameworkLinkedPanelReviveConfirmButton {
+                        Style: $A.@PanelButton;
+                        Anchor: (Width: 100, Height: 24);
+                        Text: %server.tamework.ui.linkedPanel.revive.confirm;
                         Visible: false;
                     }
 
                     Label #TameworkLinkedPanelReviveBlockedButton {
                         Anchor: (Width: 100, Height: 24);
                         Text: %server.tamework.ui.linkedPanel.revive.confirm;
-                        Style: (FontSize: 13, RenderBold: true, TextColor: #74869a, HorizontalAlignment: Center, VerticalAlignment: Center);
+                        Style: (FontSize: 13, RenderBold: true, TextColor: #7d877f, HorizontalAlignment: Center, VerticalAlignment: Center);
                         Visible: false;
                     }
                 }

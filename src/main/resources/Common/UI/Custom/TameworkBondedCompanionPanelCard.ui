@@ -12,13 +12,16 @@ $C = "Common.ui";
 
 Group {
     Anchor: (Top: 3, Left: 0, Right: 0, Height: 176);
-    Background: #202423;
-    OutlineColor: #414845;
-    OutlineSize: 1;
+    Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
     Padding: (Left: 0, Right: 0, Top: 0, Bottom: 0);
 
+    Group {
+        Anchor: (Top: 3, Left: 3, Right: 3, Height: 34);
+        Background: #252b27;
+    }
+
     Group #BondedFrameInWorld {
-        Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+        Anchor: (Top: 1, Left: 1, Right: 1, Bottom: 1);
         Background: #000000(0.0);
         OutlineColor: #85b99a;
         OutlineSize: 1;
@@ -26,7 +29,7 @@ Group {
     }
 
     Group #BondedFrameStored {
-        Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+        Anchor: (Top: 1, Left: 1, Right: 1, Bottom: 1);
         Background: #000000(0.0);
         OutlineColor: #afb6b0;
         OutlineSize: 1;
@@ -34,7 +37,7 @@ Group {
     }
 
     Group #BondedFrameDead {
-        Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+        Anchor: (Top: 1, Left: 1, Right: 1, Bottom: 1);
         Background: #000000(0.0);
         OutlineColor: #df8177;
         OutlineSize: 1;
@@ -42,7 +45,7 @@ Group {
     }
 
     Group #BondedFrameReady {
-        Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+        Anchor: (Top: 1, Left: 1, Right: 1, Bottom: 1);
         Background: #000000(0.0);
         OutlineColor: #85b99a;
         OutlineSize: 1;
@@ -75,12 +78,12 @@ Group {
 
     Group #BondedIdentityDivider {
         Anchor: (Top: 12, Left: 156, Width: 1, Height: 152);
-        Background: #414845;
+        Background: #465149;
     }
 
     Group #BondedTraitsDivider {
         Anchor: (Top: 12, Left: 418, Width: 1, Height: 152);
-        Background: #414845;
+        Background: #465149;
     }
 
     Label #BondedName {
@@ -130,7 +133,7 @@ Group {
 
         Group #BondedTalentPointCountBadgeFill {
             Anchor: (Top: 1, Left: 11, Width: 12, Height: 10);
-            Background: #202423;
+            Background: #202723;
             Visible: false;
         }
 
