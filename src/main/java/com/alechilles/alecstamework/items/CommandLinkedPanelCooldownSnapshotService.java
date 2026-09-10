@@ -19,6 +19,9 @@ import com.hypixel.hytale.server.npc.asset.builder.Builder;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderParameters;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.builders.BuilderRoleVariant;
+import com.hypixel.hytale.server.npc.util.expression.ExecutionContext;
+import com.hypixel.hytale.server.npc.util.expression.Scope;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import javax.annotation.Nullable;
 
@@ -112,6 +115,16 @@ final class CommandLinkedPanelCooldownSnapshotService {
         }
         int roleIndex = plugin.getIndex(roleId);
         Builder<Role> builder = roleIndex >= 0 ? plugin.tryGetCachedValidRole(roleIndex) : null;
+        return resolveRoleParameterScope(builder);
+    }
+
+    @Nullable
+    static StdScope resolveRoleParameterScope(@Nullable Builder<Role> builder) {
+        // Variant Modify values live in the modifier scope, not its declared parameters.
+        if (builder instanceof BuilderRoleVariant variant) {
+            Scope scope = variant.createModifierScope(new ExecutionContext());
+            return scope instanceof StdScope standard ? standard : scope != null ? new StdScope(scope) : null;
+        }
         BuilderParameters parameters = builder != null ? builder.getBuilderParameters() : null;
         return parameters != null ? parameters.createScope() : null;
     }
