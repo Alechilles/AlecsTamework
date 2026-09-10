@@ -279,8 +279,7 @@ final class CommandSelectionLinkedPanelRuntime {
                 page.resolveLanguage(), presentation);
         if (presentation != null && presentation.bonded() != null) return;
         String selector = "#TameworkLinkedPanelList[" + index + "] #GroupSelector";
-        boolean available = canAssignGroup(entry, presentation)
-                && !page.isPendingUnlink(entry.npcUuid());
+        boolean available = canAssignGroup(entry, presentation);
         commands.set(selector + ".Visible", available);
         if (!available) return;
         List<DropdownEntryInfo> entries = resolveGroupEntries();
@@ -288,7 +287,7 @@ final class CommandSelectionLinkedPanelRuntime {
                 ? LinkedNpcPanelGroupAssignOverlayState.fallbackEntries(page.resolveLanguage()) : entries);
         commands.set(selector + ".Value",
                 LinkedNpcPanelGroupAssignOverlayState.normalizeDropdownValue(entry.groupId()));
-        LinkedNpcPanelGroupTabBinder.bind(commands, selector, entry, false);
+        LinkedNpcPanelGroupTabBinder.bind(commands, selector, entry);
         events.addEventBinding(CustomUIEventBindingType.ValueChanged, selector,
                 EventData.of(CommandSelectionPageEventBinder.EVENT_COMMAND_ID,
                         CommandSelectionPageEventBinder.ASSIGN_GROUP_COMMAND_PREFIX + entry.npcUuid())

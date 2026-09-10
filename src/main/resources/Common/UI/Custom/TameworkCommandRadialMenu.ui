@@ -17,21 +17,25 @@ $C.@PageOverlay {
     Anchor: (Top: 3, Left: 3, Right: 3, Height: 42);
     Background: #252b27;
     Group #TameworkCommandMenuLogo { Anchor: (Top: 4, Left: 12, Width: 34, Height: 34); Background: "Tamework/Telemetry/TameworkConsentIcon.png"; }
-    Label #TameworkCommandMenuTitle { Anchor: (Left: 56, Right: 240, Height: 42); Text: ""; Style: (FontSize: 23, RenderBold: true, TextColor: #f0eee7, VerticalAlignment: Center); }
+    Label #TameworkCommandMenuTitle { Anchor: (Left: 56, Right: 190, Height: 42); Text: ""; Style: (FontSize: 23, RenderBold: true, TextColor: #f0eee7, VerticalAlignment: Center); }
     Label #TameworkCommandMenuSubtitle { Anchor: (Left: 330, Width: 500, Height: 42); Text: ""; Visible: false; Style: (FontSize: 12, TextColor: #afb6b0); }
     TextButton #CommandMenuFeedbackButton {
-      Anchor: (Top: 8, Right: 136, Width: 92, Height: 26);
+      Anchor: (Top: 8, Right: 86, Width: 92, Height: 26);
       Text: %server.tamework.ui.commandMenu.feedback;
       TooltipText: %server.tamework.ui.commandMenu.feedbackTooltip;
       Style: $A.@PanelButton;
     }
     Group #CommandMenuSettings {
-     Anchor: (Top: 8, Right: 100, Width: 28, Height: 26);
+     Anchor: (Top: 8, Right: 50, Width: 28, Height: 26);
      Visible: false;
      TextButton #CommandMenuSettingsButton { Anchor: (Full: 0); Text: ""; Style: $A.@PanelButton; TooltipText: %server.tamework.ui.settings.title; }
      Group { Anchor: (Top: 1, Left: 2, Width: 24, Height: 24); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelActions/Settings_Glyph_Default.png"); }
     }
-    TextButton #CommandMenuCloseButton { Anchor: (Top: 8, Right: 14, Width: 78, Height: 26); Text: %server.tamework.ui.shared.button.close; Style: $A.@PanelButton; }
+    Group #CommandMenuClose {
+     Anchor: (Top: 8, Right: 14, Width: 28, Height: 26);
+     TextButton #CommandMenuCloseButton { Anchor: (Full: 0); Text: ""; TooltipText: %server.tamework.ui.shared.button.close; Style: $A.@Remove; }
+     Group { Anchor: (Top: 1, Left: 2, Width: 24, Height: 24); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png"); }
+    }
    }
    Group #TameworkCommandAssignments {
      Anchor: (Top: 54, Left: 12, Width: 160, Bottom: 16);

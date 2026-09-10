@@ -14,14 +14,8 @@ final class LinkedNpcPanelGroupTabBinder {
 
     static void bind(UICommandBuilder commandBuilder,
                      String tabSelector,
-                     LinkedNpcEntry entry,
-                     boolean pendingUnlink) {
+                     LinkedNpcEntry entry) {
         if (commandBuilder == null || tabSelector == null || entry == null) {
-            return;
-        }
-        boolean show = !pendingUnlink;
-        commandBuilder.set(tabSelector + ".Visible", show);
-        if (!show) {
             return;
         }
         String color = normalizeColor(entry.groupColorHex());

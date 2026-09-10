@@ -13,6 +13,35 @@ class LinkedNpcPanelVitalsBinderTest {
     private static final String MARKER = "#Card #NeedHappiness #BreedingThresholdMarker";
 
     @Test
+    void legacyDeadHealthKeepsAnEmptyBarWithoutInventingAMaximum() {
+        LinkedNpcEntry dead = new LinkedNpcEntry(UUID.randomUUID(), "Duck", 0, 0,
+                0, 0, "", 0, 0, 0, 0, false, false, true,
+                false, false, false, 0L, LinkedNpcTraitIndicator.EMPTY);
+        UICommandBuilder commands = bind(dead);
+        UICommandBuilder expected = new UICommandBuilder();
+        expected.set("#Card #HealthText.Text", "0/?");
+        expected.set("#Card #HealthFill.Visible", true);
+        for (var command : expected.getCommands()) {
+            Assertions.assertEquals(command.data, data(commands, command.selector));
+        }
+    }
+
+    @Test
+    void deadHealthUsesZeroEvenWhenLastSavedHealthWasPositive() {
+        LinkedNpcEntry dead = new LinkedNpcEntry(UUID.randomUUID(), "Duck", 25, 25,
+                50, 100, "", 60, 100, 70, 100, false, false, true,
+                false, false, false, 0L, LinkedNpcTraitIndicator.EMPTY);
+        UICommandBuilder commands = bind(dead);
+        UICommandBuilder expected = new UICommandBuilder();
+        expected.set("#Card #HealthText.Text", "0/25");
+        var fill = LinkedNpcPanelAnchorFactory.buildHealthFillAnchor(0.0, 232);
+        fill.setHeight(Value.of(20));
+        expected.setObject("#Card #HealthFill.Anchor", fill);
+        Assertions.assertEquals(data(expected, "#Card #HealthText.Text"), data(commands, "#Card #HealthText.Text"));
+        Assertions.assertEquals(data(expected, "#Card #HealthFill.Anchor"), data(commands, "#Card #HealthFill.Anchor"));
+    }
+
+    @Test
     void rendersNeedAsHorizontalMeterWithClampedFill() {
         UICommandBuilder commands = bind(entry(true));
         UICommandBuilder expected = new UICommandBuilder();

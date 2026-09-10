@@ -42,7 +42,7 @@ final class LinkedNpcPanelCardDynamicPresenter {
                     (current.recallLostRemainingMs() + 999L) / 1_000L
             ));
         }
-        refreshProgression(commands, selector, previous, current, pendingUnlink);
+        refreshProgression(commands, selector, previous, current);
         if (previous.flightToggleAirborne() != current.flightToggleAirborne()) {
             refreshFlightMode(commands, selector, current, language);
         }
@@ -95,8 +95,7 @@ final class LinkedNpcPanelCardDynamicPresenter {
             UICommandBuilder commands,
             String selector,
             LinkedNpcEntry previous,
-            LinkedNpcEntry current,
-            boolean pendingUnlink
+            LinkedNpcEntry current
     ) {
         if (!Objects.equals(previous.futureStatA(), current.futureStatA())) {
             String ring = selector + " #XpProgressRing";
@@ -111,10 +110,8 @@ final class LinkedNpcPanelCardDynamicPresenter {
                     commands, action, action + " #TalentPointCount",
                     action + " #TalentPointCountShadow", current.futureStatB(),
                     current.isTalentsActionVisible()
-                            && current.isTalentsActionEnabled()
                             && LinkedNpcPanelProgressionBinder.availableTalentPoints(
                                     current.futureStatB()) > 0
-                            && !pendingUnlink
             );
         }
     }

@@ -2,6 +2,10 @@
 
 ## Unreleased development changes
 
+- Removal mode preserves group, active, talent, and cooldown controls. Dead cards
+  retain talent indicators and an empty health bar, with saved maximum health
+  when available. The command menu uses the shared X icon to close.
+
 - Trait icons match the charcoal HUD and command panel; removed unused custom UI
   textures to reduce their shared texture-atlas footprint.
 

@@ -180,8 +180,8 @@ final class LinkedNpcPanelCardBinder {
         boolean showRelease = showRemovalMenu && canRelease;
         boolean showReleaseDisabled = showRemovalMenu && !canRelease;
         boolean showCull = showRemovalMenu && canCull;
-        boolean showActiveToggleActive = legacyLinked && entry.active() && !pendingUnlink;
-        boolean showActiveToggleInactive = legacyLinked && !entry.active() && !pendingUnlink;
+        boolean showActiveToggleActive = legacyLinked && entry.active();
+        boolean showActiveToggleInactive = legacyLinked && !entry.active();
         boolean showBreedingToggleEnabled =
                 legacyLinked && entry.loaded() && entry.breedingAvailable() && entry.breedingEnabled() && !pendingUnlink;
         boolean showBreedingToggleDisabled =
@@ -252,7 +252,7 @@ final class LinkedNpcPanelCardBinder {
         bindCardLayout(commandBuilder, entrySelector, entry, managedRoster,
                 showActiveToggleActive || showActiveToggleInactive);
         commandBuilder.set(entrySelector + " #CooldownRow.Visible",
-                !pendingUnlink && entry.hasKnownCooldowns());
+                entry.hasKnownCooldowns());
         LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry, language);
         LinkedNpcPanelProgressionBinder.bindXpProgressRing(
                 commandBuilder,
@@ -264,15 +264,14 @@ final class LinkedNpcPanelCardBinder {
         boolean canOpenTalentsFromLevelIndicator =
                 entry.isTalentsActionVisible()
                         && entry.isTalentsActionEnabled()
-                        && entry.futureStatA() != null
-                        && !pendingUnlink;
+                        && entry.futureStatA() != null;
         commandBuilder.set(xpTooltipSelector + ".Disabled", !canOpenTalentsFromLevelIndicator);
         commandBuilder.set(xpProgressRingSelector + " #TalentsArrow.Visible", canOpenTalentsFromLevelIndicator);
         boolean showTalentPointAction =
                 entry.isTalentsActionVisible()
-                        && entry.isTalentsActionEnabled()
-                        && LinkedNpcPanelProgressionBinder.availableTalentPoints(entry.futureStatB()) > 0
-                        && !pendingUnlink;
+                        && LinkedNpcPanelProgressionBinder.availableTalentPoints(entry.futureStatB()) > 0;
+        boolean canOpenTalentPoints = showTalentPointAction && entry.isTalentsActionEnabled();
+        commandBuilder.set(talentPointButtonSelector + ".Disabled", !canOpenTalentPoints);
         LinkedNpcPanelProgressionBinder.bindTalentPointIndicator(
                 commandBuilder,
                 talentPointActionSelector,
@@ -308,7 +307,7 @@ final class LinkedNpcPanelCardBinder {
                 actionLeft += 60;
             }
         }
-        if (!entry.hasHealth() && !managedRoster) {
+        if (!entry.hasHealth() && !entry.dead() && !managedRoster) {
             int statusLeft = Math.max(568, actionLeft + 6);
             int statusWidth = 846 - statusLeft;
             commandBuilder.setObject(entrySelector + " #HealthFrame.Anchor", fixedAnchor(50, statusLeft, statusWidth, 22));
@@ -477,7 +476,7 @@ final class LinkedNpcPanelCardBinder {
                     false
             );
         }
-        if (showTalentPointAction) {
+        if (canOpenTalentPoints) {
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
                     talentPointButtonSelector,
@@ -494,15 +493,16 @@ final class LinkedNpcPanelCardBinder {
         commands.setObject(card + ".Anchor", buildCardAnchor(managedRoster, compact));
         commands.set(card + " #NeedRingRow.Visible", !compact);
         commands.set(card + " #TraitStrip.Visible", !compact);
-        commands.set(card + " #HealthTextShadow.Visible", entry.hasHealth());
+        commands.set(card + " #HealthTextShadow.Visible", entry.hasHealth() || entry.dead());
         commands.set(card + " #StatusDivider.Visible", true);
         commands.setObject(card + " #StatusUnloaded.Anchor",
                 fixedAnchor(compact ? 48 : 74, compact ? 568 : 432, compact ? 278 : 270, 20));
         commands.setObject(card + " #GroupSelector.Anchor", fixedAnchor(compact ? 72 : 102, 0, 144, 26));
-        commands.setObject(card + " #HealthFrame.Anchor", fixedAnchor(50, compact ? 568 : 172, compact ? 278 : 234, 22));
+        commands.setObject(card + " #HealthFrame.Anchor", fixedAnchor(50, compact && !entry.dead() ? 568 : 172, compact ? 278 : 234, 22));
         // Runtime string patches accept opaque hex colors; alpha syntax is parsed as a texture path.
         commands.set(card + " #HealthFrame.Background",
-                !entry.loaded() && entry.hasKnownCardDetails() ? "#202423"
+                entry.dead() ? "#151916"
+                        : !entry.loaded() && entry.hasKnownCardDetails() ? "#202423"
                         : compact ? "#202423" : "#151916");
         commands.setObject(card + " #HealthText.Anchor", fixedAnchor(0, 0, compact ? 276 : 232, 20));
         commands.setObject(card + " #HealthTextShadow.Anchor", fixedAnchor(1, 1, compact ? 276 : 232, 20));

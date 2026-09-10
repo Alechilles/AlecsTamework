@@ -401,7 +401,55 @@ class TameworkCommandSelectionPageRefreshTest {
     }
 
     @Test
-    void dynamicTalentRefreshKeepsUnlinkConfirmationHidden() throws Exception {
+    void deadCardRetainsSavedTalentPointsWithoutOfferingLiveOnlyEditing() throws Exception {
+        LinkedNpcEntry dead = new LinkedNpcEntry(CARD, "Nimbus", 0, 100, 50, 100, "",
+                50, 100, 50, 100, false, false, true, false, false, false,
+                0L, null, new LinkedNpcEntry.FutureStat("Talent Points", 2, 99),
+                LinkedNpcTraitIndicator.EMPTY, false, false, true, false);
+        TameworkCommandSelectionPage page = page(new CapturedPackets(), new AtomicReference<>(),
+                new NavigationFixture(), legacyConfig(), OWNER, List::of, dead);
+        UICommandBuilder commands = new UICommandBuilder();
+        UIEventBuilder events = new UIEventBuilder();
+        page.build(null, commands, events, null);
+        CapturedUpdate update = new CapturedUpdate(commands, events);
+        String action = "#TameworkLinkedPanelList[0] #TalentPointAction";
+        assertCommand(update, action + ".Visible", "true");
+        assertCommand(update, action + " #TalentPointButton.Disabled", "true");
+        assertTrue(java.util.Arrays.stream(events.getEvents()).noneMatch(binding ->
+                binding.selector.equals(action + " #TalentPointButton")));
+        assertCommand(update, "#TameworkLinkedPanelList[0] #HealthText.Text", "0/100");
+        page.onDismiss(null, null);
+    }
+
+    @Test
+    void removalMenuKeepsProgressionGroupActiveAndCooldownControls() throws Exception {
+        LinkedNpcEntry removalEntry = new LinkedNpcEntry(CARD, "Nimbus", null,
+                100, 100, 50, 100, 50, null, 60, 100, 70, 100,
+                true, false, false, false, false, false, 0L, null, null,
+                new LinkedNpcEntry.FutureStat("Talent Points", 2, 99), LinkedNpcTraitIndicator.EMPTY,
+                false, false, true, true, true, false, null, null, null, null, null,
+                true, true, true, 65_000L, 0.5, true, true, 125_000L, 0.25, true, false, 0L);
+        TameworkCommandSelectionPage page = page(new CapturedPackets(), new AtomicReference<>(),
+                new NavigationFixture(), legacyConfig(), OWNER, List::of, removalEntry);
+        replaceField(page, "panelAssignGroupCallback", (BiConsumer<UUID, String>) (id, group) -> {});
+        replaceField(page, "pendingUnlinkNpcUuid", CARD);
+        UICommandBuilder commands = new UICommandBuilder();
+        UIEventBuilder events = new UIEventBuilder();
+        page.build(null, commands, events, null);
+        CapturedUpdate update = new CapturedUpdate(commands, events);
+        String card = "#TameworkLinkedPanelList[0]";
+        for (String control : List.of("TalentPointAction", "GroupSelector", "ActiveToggleInactiveButton", "CooldownRow")) {
+            assertCommand(update, card + " #" + control + ".Visible", "true");
+        }
+        assertTrue(java.util.Arrays.stream(events.getEvents()).anyMatch(binding ->
+                binding.selector.equals(card + " #TalentPointAction #TalentPointButton")));
+        assertTrue(java.util.Arrays.stream(events.getEvents()).anyMatch(binding ->
+                binding.selector.equals(card + " #GroupSelector")));
+        page.onDismiss(null, null);
+    }
+
+    @Test
+    void dynamicTalentRefreshKeepsTalentsVisibleDuringRemoval() throws Exception {
         CapturedPackets packets = new CapturedPackets();
         AtomicReference<List<LinkedNpcEntry>> entries =
                 new AtomicReference<>(List.of(talentEntry(1)));
@@ -417,7 +465,7 @@ class TameworkCommandSelectionPageRefreshTest {
 
         CapturedUpdate update = packets.updates.getFirst();
         assertCommand(update, "#TameworkLinkedPanelList[0] #TalentPointAction.Visible",
-                "false");
+                "true");
         assertEquals(0, update.events.getEvents().length);
     }
 

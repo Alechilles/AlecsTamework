@@ -82,7 +82,7 @@ final class LinkedNpcPanelVitalsBinder {
         String healthFillSelector = entrySelector + " #HealthFill";
         String healthTooltipSelector = entrySelector + " #HealthTooltip";
         if (entry.hasHealth()) {
-            String healthText = entry.currentHealth() + "/" + entry.maxHealth();
+            String healthText = (entry.dead() ? 0 : entry.currentHealth()) + "/" + entry.maxHealth();
             boolean muted = !entry.loaded();
             commandBuilder.set(healthTextSelector + ".Text", healthText);
             commandBuilder.set(healthTextShadowSelector + ".Text", healthText);
@@ -97,16 +97,20 @@ final class LinkedNpcPanelVitalsBinder {
             commandBuilder.set(healthTooltipSelector + ".TooltipText",
                     LinkedNpcPanelStatusTextService.appendLastKnownTooltip(healthText, entry, language));
             Anchor healthFill = LinkedNpcPanelAnchorFactory.buildHealthFillAnchor(
-                    entry.healthRatio(), healthFillMaxWidth);
+                    entry.dead() ? 0.0 : entry.healthRatio(), healthFillMaxWidth);
             healthFill.setHeight(Value.of(healthFillHeight));
             commandBuilder.setObject(healthFillSelector + ".Anchor", healthFill);
             return;
         }
         if (entry.dead()) {
-            String deadText = LinkedNpcPanelStatusTextService.resolveDeadHealthText(entry, language);
+            // Legacy death records may not contain a saved maximum. Keep the empty bar honest.
+            String deadText = "0/?";
             commandBuilder.set(healthTextSelector + ".Text", deadText);
             commandBuilder.set(healthTextShadowSelector + ".Text", deadText);
-            commandBuilder.set(healthFillSelector + ".Visible", false);
+            commandBuilder.set(healthFillSelector + ".Visible", true);
+            Anchor emptyFill = LinkedNpcPanelAnchorFactory.buildHealthFillAnchor(0.0, healthFillMaxWidth);
+            emptyFill.setHeight(Value.of(healthFillHeight));
+            commandBuilder.setObject(healthFillSelector + ".Anchor", emptyFill);
             commandBuilder.set(
                     healthTooltipSelector + ".TooltipText",
                     LinkedNpcPanelStatusTextService.appendLastKnownTooltip(
