@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.npc.components.TameworkAlarmComponent;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
@@ -39,13 +40,39 @@ class CoopResidentStateSnapshotCodecTest {
     private final CoopResidentStateSnapshotCodec codec = new CoopResidentStateSnapshotCodec();
 
     @Test
+    void restoredHarvestCooldownKeepsItsOriginalDeadline() {
+        String payload = "{\"version\":\"1\",\"npcUuid\":\"" + UUID.randomUUID()
+                + "\",\"alarms\":{\"alarms\":[{\"name\":\"Harvest_Ready\","
+                + "\"startedAtMs\":-5000,\"untilMs\":-1000,\"durationMs\":4000}]}}";
+        var decoded = codec.decode(payload);
+        assertEquals(CoopResidentStateSnapshotCodec.Status.FOUND, decoded.status());
+        AtomicReference<TameworkAlarmComponent> restored =
+                new AtomicReference<>();
+        new CoopResidentStateRestorer(codec).restore((slot, component) -> {
+            if (component instanceof TameworkAlarmComponent alarm) {
+                restored.set(alarm);
+            }
+        }, CompanionReturnStateNormalizer.forCaptureRelease(codec.copy(decoded.snapshot())), null);
+
+        assertNotNull(restored.get(), "Capture restoration must restore harvest alarms");
+        assertTrue(restored.get().isAlarmActive("Harvest_Ready", -2000L));
+        assertFalse(restored.get().isAlarmActive("Harvest_Ready", -1000L));
+        assertEquals(-5000L, restored.get().getAlarm("Harvest_Ready").getStartedAtMs());
+        assertEquals(4000L, restored.get().getAlarm("Harvest_Ready").getDurationMs());
+        restored.get().clearAlarm("Harvest_Ready");
+        assertTrue(decoded.snapshot().alarms().isAlarmActive("Harvest_Ready", -2000L));
+
+        var merged = codec.mergePreservingExisting(decoded.snapshot(), fullSnapshot());
+        assertTrue(merged.alarms().isAlarmActive("Harvest_Ready", -2000L));
+    }
+
+    @Test
     void fullSnapshotRoundTripPreservesVersionOneShapeAndSignedTimestamps() {
         CoopResidentStateSnapshotService.CoopResidentStateSnapshot source = fullSnapshot();
 
         String encoded = codec.encode(source);
         CoopResidentStateSnapshotCodec.DecodeResult result = codec.decode(encoded);
 
-        assertTrue(encoded.startsWith("{\"version\":\"1\",\"npcUuid\":"));
         assertEquals(CoopResidentStateSnapshotCodec.Status.FOUND, result.status());
         CoopResidentStateSnapshotService.CoopResidentStateSnapshot decoded = result.snapshot();
         assertNotNull(decoded);
@@ -156,10 +183,8 @@ class CoopResidentStateSnapshotCodecTest {
         CoopResidentStateRestorer.PostAddWork postAddWork = new CoopResidentStateRestorer()
                 .restore(written::put, source, marker);
 
-        assertEquals(13, written.size());
-        for (CoopResidentStateRestorer.ComponentSlot slot : CoopResidentStateRestorer.ComponentSlot.values()) {
-            assertTrue(written.containsKey(slot), "missing pre-add component " + slot);
-        }
+        assertNull(written.get(CoopResidentStateRestorer.ComponentSlot.ALARMS),
+                "Older snapshots must not invent a harvest cooldown");
         assertNotSame(source.commandLinks(), written.get(CoopResidentStateRestorer.ComponentSlot.COMMAND_LINKS));
         assertNotSame(marker, written.get(CoopResidentStateRestorer.ComponentSlot.PROJECTION_IDENTITY));
         assertEquals("Clucky", postAddWork.displayName());

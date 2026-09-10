@@ -104,7 +104,7 @@ public final class BondedCompanionSnapshot {
                 fullState.talents(), fullState.lifeStage(),
                 fullState.attachments(), exactMaximum ? maximum : null,
                 exactMaximum ? maximum : null, restoredPercent,
-                fullState.capturedAtMs());
+                fullState.capturedAtMs(), fullState.alarms());
         return new BondedCompanionSnapshot(restored, extensionData);
     }
 
@@ -122,7 +122,7 @@ public final class BondedCompanionSnapshot {
                 state.traits(), talents, state.lifeStage(),
                 state.attachments(), state.currentHealth(),
                 state.maximumHealth(), state.healthPercent(),
-                state.capturedAtMs());
+                state.capturedAtMs(), state.alarms());
         return new BondedCompanionSnapshot(updated, extensionData);
     }
 
@@ -138,7 +138,7 @@ public final class BondedCompanionSnapshot {
                 state.breeding(), state.leveling(), state.traits(),
                 state.talents(), state.lifeStage(), state.attachments(),
                 state.currentHealth(), state.maximumHealth(),
-                state.healthPercent(), state.capturedAtMs()
+                state.healthPercent(), state.capturedAtMs(), state.alarms()
         );
         return new BondedCompanionSnapshot(updated, extensionData);
     }

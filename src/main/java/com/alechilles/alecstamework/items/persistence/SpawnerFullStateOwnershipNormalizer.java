@@ -54,8 +54,8 @@ final class SpawnerFullStateOwnershipNormalizer {
                 source.talents(),
                 source.lifeStage(),
                 source.attachments(),
-                source.healthPercent(),
-                source.capturedAtMs()
+                null, null, source.healthPercent(),
+                source.capturedAtMs(), source.alarms()
         );
     }
 

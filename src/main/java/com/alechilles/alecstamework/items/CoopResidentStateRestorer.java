@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.npc.components.TameworkAlarmComponent;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
@@ -86,6 +87,7 @@ public final class CoopResidentStateRestorer {
         write(writer, ComponentSlot.TALENTS, copy.talents());
         write(writer, ComponentSlot.LIFE_STAGE, copy.lifeStage());
         write(writer, ComponentSlot.ATTACHMENTS, copy.attachments());
+        write(writer, ComponentSlot.ALARMS, copy.alarms());
         if (projectionMarker != null) {
             writer.put(ComponentSlot.PROJECTION_IDENTITY, projectionMarker.clone());
         }
@@ -136,6 +138,7 @@ public final class CoopResidentStateRestorer {
             case TALENTS -> TameworkTalentsComponent.getComponentType();
             case LIFE_STAGE -> TameworkLifeStageComponent.getComponentType();
             case ATTACHMENTS -> TameworkAttachmentsComponent.getComponentType();
+            case ALARMS -> TameworkAlarmComponent.getComponentType();
             case PROJECTION_IDENTITY -> TameworkProjectionIdentityComponent.getComponentType();
         };
         if (type == null) {
@@ -178,7 +181,8 @@ public final class CoopResidentStateRestorer {
         TALENTS,
         LIFE_STAGE,
         ATTACHMENTS,
-        PROJECTION_IDENTITY
+        PROJECTION_IDENTITY,
+        ALARMS
     }
 
     /** Injectable sink that keeps holder construction out of unit tests. */

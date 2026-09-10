@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.npc.components.TameworkAlarmComponent;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
@@ -67,6 +68,7 @@ public final class CoopResidentStateSnapshotCodec {
         putComponent(payload, "talents", snapshot.talents(), TameworkTalentsComponent.class);
         putComponent(payload, "lifeStage", snapshot.lifeStage(), TameworkLifeStageComponent.class);
         putComponent(payload, "attachments", snapshot.attachments(), TameworkAttachmentsComponent.class);
+        putComponent(payload, "alarms", snapshot.alarms(), TameworkAlarmComponent.class);
         validateHealthPair(snapshot.currentHealth(), snapshot.maximumHealth());
         if (snapshot.currentHealth() != null) {
             payload.addProperty("currentHealth", snapshot.currentHealth());
@@ -155,7 +157,8 @@ public final class CoopResidentStateSnapshotCodec {
                     currentHealth,
                     maximumHealth,
                     healthPercent,
-                    capturedAtMs
+                    capturedAtMs,
+                    component(payload, "alarms", TameworkAlarmComponent.class)
             ));
         } catch (DecodeFailure ex) {
             return DecodeResult.failed(ex.failure, ex.field, ex.getMessage());
@@ -209,7 +212,8 @@ public final class CoopResidentStateSnapshotCodec {
                         preferredCurrentHealth(existing, captured),
                         preferredMaximumHealth(existing, captured),
                         prefer(captured.healthPercent(), existing.healthPercent()),
-                        captured.capturedAtMs()
+                        captured.capturedAtMs(),
+                        prefer(captured.alarms(), existing.alarms())
                 );
         return copy(merged);
     }

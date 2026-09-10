@@ -281,7 +281,7 @@ public final class TameworkRestorationSnapshotResolver {
                 state.currentHealth(),
                 state.maximumHealth(),
                 state.healthPercent(),
-                state.capturedAtMs()
+                state.capturedAtMs(), state.alarms()
         );
     }
 

@@ -93,6 +93,8 @@ Common fields:
 
 Behavior:
 - Uses role params named by `TwGlobalConfig.InteractionDefaults` for harvestability/context.
+- Capture and release preserve recorded harvest cooldown deadlines. Older snapshots
+  without alarm data retain their previous behavior.
 - Uses the durable `TameworkAlarm` component for optimized harvest cooldowns. The alarm name comes from `TwGlobalConfig.InteractionDefaults.HarvestAlarmName` (default `Harvest_Ready`), but readiness no longer depends on the base-game `Alarm` store.
 - Scales the harvest alarm duration with the progression effect key from `TwGlobalConfig.InteractionDefaults.HarvestCooldownMultiplierEffectKey` (default `HarvestCooldownMultiplier`), so packs can decide which trait/talent/level effect modifies harvest timing.
 - Runs `$Harvest` state when valid.

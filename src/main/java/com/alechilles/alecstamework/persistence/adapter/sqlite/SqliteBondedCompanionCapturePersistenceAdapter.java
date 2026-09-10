@@ -379,7 +379,7 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter
                 source.leveling(), source.traits(), source.talents(),
                 source.lifeStage(), source.attachments(), source.currentHealth(),
                 source.maximumHealth(), source.healthPercent(),
-                source.capturedAtMs()
+                source.capturedAtMs(), source.alarms()
         );
         return BondedCompanionSnapshot.of(
                 claimed, intent.snapshot().extensionData()

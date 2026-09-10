@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Capturing and releasing a companion preserves its harvest cooldown instead of
+  making it harvestable immediately.
+
 - Named NPCs show their role beneath their HUD name. Food preferences have a
   heading and appear before appearance attributes; level text fits its digits.
 

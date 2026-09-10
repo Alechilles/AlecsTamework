@@ -85,7 +85,7 @@ public final class CompanionReturnStateNormalizer {
                 currentHealth,
                 maximumHealth,
                 healthPercent,
-                source.capturedAtMs()
+                source.capturedAtMs(), source.alarms()
         );
     }
 }

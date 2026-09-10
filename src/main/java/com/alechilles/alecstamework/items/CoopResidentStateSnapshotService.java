@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.npc.components.TameworkAlarmComponent;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
@@ -158,7 +159,8 @@ public final class CoopResidentStateSnapshotService {
                 sourceSnapshot.currentHealth(),
                 sourceSnapshot.maximumHealth(),
                 sourceSnapshot.healthPercent(),
-                System.currentTimeMillis()
+                System.currentTimeMillis(),
+                sourceSnapshot.alarms()
         ));
         snapshotsByNpc.put(currentNpcUuid, remapped);
         debugCoop(
@@ -370,7 +372,8 @@ public final class CoopResidentStateSnapshotService {
                 health == null ? null : health.currentHealth(),
                 health == null ? null : health.maximumHealth(),
                 health == null ? null : health.healthPercent(),
-                System.currentTimeMillis()
+                System.currentTimeMillis(),
+                store.getComponent(reference, TameworkAlarmComponent.getComponentType())
         ));
     }
 
@@ -415,6 +418,10 @@ public final class CoopResidentStateSnapshotService {
         return new TameworkAttachmentsComponent(configId, modelAttachments);
     }
 
+    /**
+     * Durable state shared by capture and companion restoration. Alarms retain world-time
+     * deadlines; a null alarm component means the older snapshot did not record alarms.
+     */
     public record CoopResidentStateSnapshot(UUID npcUuid,
                                             @Nullable String coopId,
                                             int residentSlot,
@@ -434,7 +441,35 @@ public final class CoopResidentStateSnapshotService {
                                             @Nullable Double currentHealth,
                                             @Nullable Double maximumHealth,
                                             @Nullable Double healthPercent,
+                                            long capturedAtMs,
+                                            @Nullable TameworkAlarmComponent alarms) {
+        /** Preserves snapshots created before durable alarms were included. */
+        public CoopResidentStateSnapshot(UUID npcUuid,
+                                            @Nullable String coopId,
+                                            int residentSlot,
+                                            @Nullable String roleId,
+                                            @Nullable TameworkCommandLinksComponent commandLinks,
+                                            @Nullable TameworkOwnerComponent owner,
+                                            @Nullable TameworkTamedComponent tamed,
+                                            @Nullable TameworkNpcNameComponent npcName,
+                                            @Nullable TameworkHappinessComponent happiness,
+                                            @Nullable TameworkNeedsComponent needs,
+                                            @Nullable TameworkBreedingComponent breeding,
+                                            @Nullable TameworkLevelingComponent leveling,
+                                            @Nullable TameworkTraitsComponent traits,
+                                            @Nullable TameworkTalentsComponent talents,
+                                            @Nullable TameworkLifeStageComponent lifeStage,
+                                            @Nullable TameworkAttachmentsComponent attachments,
+                                            @Nullable Double currentHealth,
+                                            @Nullable Double maximumHealth,
+                                            @Nullable Double healthPercent,
                                             long capturedAtMs) {
+            this(npcUuid, coopId, residentSlot, roleId, commandLinks, owner,
+                    tamed, npcName, happiness, needs, breeding, leveling, traits,
+                    talents, lifeStage, attachments, currentHealth, maximumHealth,
+                    healthPercent, capturedAtMs, null);
+        }
+
         /** Preserves the original percentage-only snapshot contract. */
         public CoopResidentStateSnapshot(UUID npcUuid, @Nullable String coopId,
                                          int residentSlot, @Nullable String roleId,

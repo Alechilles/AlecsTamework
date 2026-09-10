@@ -298,8 +298,8 @@ final class HytaleTimedWorldEvidenceReader {
                 source.talents(),
                 source.lifeStage(),
                 source.attachments(),
-                source.healthPercent(),
-                observedAtMs
+                null, null, source.healthPercent(),
+                observedAtMs, source.alarms()
         );
     }
 
@@ -327,7 +327,7 @@ final class HytaleTimedWorldEvidenceReader {
                 source.currentHealth(),
                 source.maximumHealth(),
                 source.healthPercent(),
-                source.capturedAtMs()
+                source.capturedAtMs(), source.alarms()
         );
     }
 

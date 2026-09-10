@@ -158,7 +158,7 @@ final class CommandSavedNpcPanelSnapshot {
     private static CommandSavedNpcPanelSnapshot fromState(CoopResidentStateSnapshot state, long observedAtMs) {
         return new CommandSavedNpcPanelSnapshot(observedAtMs, state.roleId(), Facts.from(
                 state.currentHealth() == null || state.maximumHealth() == null ? null : new Health(state.currentHealth(), state.maximumHealth()),
-                state.happiness(), state.needs(), state.breeding(), state.leveling(), state.traits(), state.talents(), null), false);
+                state.happiness(), state.needs(), state.breeding(), state.leveling(), state.traits(), state.talents(), harvest(state.alarms())), false);
     }
 
     @Nullable
