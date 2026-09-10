@@ -1,6 +1,6 @@
 $A = "TameworkPanelActionStyles.ui";
 Group {
- Anchor: (Height: 38);
+ Anchor: (Left: 0, Right: 0, Height: 38);
  Padding: (Bottom: 4);
  TextButton #QuickGroupButton { Anchor: (Top: 0, Left: 0, Right: 0, Height: 34); Text: ""; Style: $A.@PanelButton; Padding: (Horizontal: 6); }
 }

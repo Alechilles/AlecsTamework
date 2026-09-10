@@ -10,6 +10,10 @@ $C = "Common.ui";
 @TraitTooltipButtonStyle = TextButtonStyle(Default: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Hovered: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Pressed: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Disabled: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle));
 @ActionCaptionStyle = LabelStyle(FontSize: 10, TextColor: #c8ccc5, HorizontalAlignment: Center, VerticalAlignment: Center);
 
+@CooldownTextNormal = LabelStyle(FontSize: 9, TextColor: #d3d7cf);
+@CooldownLabelNormal = LabelStyle(FontSize: 9, TextColor: #b9beb8);
+@CooldownTextMuted = LabelStyle(FontSize: 9, TextColor: #858b85);
+
 Group {
     Anchor: (Top: 3, Left: 0, Right: 0, Height: 158);
     Background: #202423;
@@ -136,21 +140,18 @@ Group {
         TextButton #HealthTooltip { Anchor: (Top: 0, Left: 0, Width: 234, Height: 22); Style: @TraitTooltipButtonStyle; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.health.notAvailable; TextTooltipStyle: @LinkedActionTooltipStyle; }
     }
     Group #TalentPointAction {
-        Anchor: (Top: 26, Left: 304, Width: 24, Height: 24);
+        Anchor: (Top: 24, Left: 372, Width: 34, Height: 24);
         Visible: false;
-        TextButton #TalentPointButton { Anchor: (Top: 0, Left: 0, Width: 24, Height: 24); Style: $A.@PanelButton; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.futureAction.talents; TextTooltipStyle: @LinkedActionTooltipStyle; }
-        Group #TalentPointIcon { Anchor: (Top: 3, Left: 3, Width: 18, Height: 18); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelControls/TalentPoints.png"); }
-        Group #TalentPointCountBadgeBorder { HitTestVisible: false; Anchor: (Top: 0, Left: 10, Width: 14, Height: 12); Background: #7e9686; }
-        Group #TalentPointCountBadgeFill { HitTestVisible: false; Anchor: (Top: 1, Left: 11, Width: 12, Height: 10); Background: #131713; }
-        Label #TalentPointCountShadow { HitTestVisible: false; Anchor: (Top: 1, Left: 12, Width: 12, Height: 10); Text: "1"; Style: (FontSize: 8, RenderBold: true, TextColor: #000000, HorizontalAlignment: Center, VerticalAlignment: Center); }
-        Label #TalentPointCount { HitTestVisible: false; Anchor: (Top: 0, Left: 11, Width: 12, Height: 10); Text: "1"; Style: (FontSize: 8, RenderBold: true, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center); }
-
+        TextButton #TalentPointButton { Anchor: (Top: 0, Left: 0, Width: 34, Height: 24); Style: $A.@PanelButtonSelected; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.futureAction.talents; TextTooltipStyle: @LinkedActionTooltipStyle; }
+        Group #TalentPointIcon { Anchor: (Top: 5, Left: 3, Width: 14, Height: 14); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelControls/TalentPoints.png"); }
+        Label #TalentPointCountShadow { Anchor: (Top: 0, Left: 17, Width: 15, Height: 24); Text: ""; Visible: false; }
+        Label #TalentPointCount { Anchor: (Top: 0, Left: 17, Width: 15, Height: 24); Text: "1"; HitTestVisible: false; Style: (FontSize: 11, RenderBold: true, TextColor: #f5ebce, HorizontalAlignment: Center, VerticalAlignment: Center); }
     }
     Group #XpProgressRing {
         Anchor: (Top: 26, Left: 332, Width: 74, Height: 22);
         Visible: false;
-        TextButton #XpTooltip { Anchor: (Top: 0, Left: 0, Width: 74, Height: 24); Style: $A.@PanelButton; Text: ""; TooltipText: "0/0 XP"; TextTooltipStyle: @LinkedProgressionTooltipStyle; }
-        Label { Anchor: (Top: 2, Left: 7, Width: 24, Height: 20); HitTestVisible: false; Text: "Lv."; Style: (FontSize: 12, TextColor: #afb6b0, VerticalAlignment: Center); }
+        TextButton #XpTooltip { Anchor: (Top: 0, Left: 0, Width: 64, Height: 24); Style: $A.@PanelButton; Text: ""; TooltipText: "0/0 XP"; TextTooltipStyle: @LinkedProgressionTooltipStyle; }
+        Label { Anchor: (Top: 2, Left: 7, Width: 23, Height: 20); HitTestVisible: false; Text: "Lv."; Style: (FontSize: 12, TextColor: #afb6b0, VerticalAlignment: Center); }
         Group #RingTrackTopLeft { Anchor: (Top: 0, Left: 0, Width: 12, Height: 3); Background: #353c36; Visible: false; }
         Group #RingTrackTopRight { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #353c36; Visible: false; }
         Group #RingTrackLeft { Anchor: (Top: 0, Left: 0, Width: 3, Height: 20); Background: #353c36; Visible: false; }
@@ -162,8 +163,8 @@ Group {
         Group #RingFillBar4 { Anchor: (Top: 0, Left: 21, Width: 3, Height: 20); Background: #7cc6f2; Visible: false; }
         Group #RingFillBar5 { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #7cc6f2; Visible: false; }
         Group #CornerMaskOverlay { Anchor: (Top: 0, Left: 0, Width: 24, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/Corner_Mask_24.png"); Visible: false; }
-        Label #TalentsArrow { Anchor: (Top: 2, Right: 4, Width: 10, Height: 20); Text: ">"; HitTestVisible: false; Style: (FontSize: 12, RenderBold: true, TextColor: #c6d9c9, Alignment: Center); }
-        Label #XpLevelText { Anchor: (Top: 2, Right: 15, Width: 26, Height: 20); HitTestVisible: false; Text: "1"; Style: (FontSize: 14, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Center, VerticalAlignment: Center); }
+        Label #TalentsArrow { Anchor: (Top: 2, Right: 4, Width: 1, Height: 1); Text: ""; HitTestVisible: false; Style: (FontSize: 12, RenderBold: true, TextColor: #c6d9c9, Alignment: Center); }
+        Label #XpLevelText { Anchor: (Top: 2, Left: 30, Width: 29, Height: 20); HitTestVisible: false; Text: "1"; Style: (FontSize: 14, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Center, VerticalAlignment: Center); }
 
     }
 
@@ -201,11 +202,12 @@ Group {
     }
     Group #CooldownRow { Anchor: (Top: 103, Left: 432, Right: 0, Height: 34); LayoutMode: Left;
         Group #BreedingCooldown { Anchor: (Width: 196, Height: 34); Visible: false;
-            Group #BreedingCooldownIconImage { Anchor: (Top: 6, Left: 0, Width: 20, Height: 20); Background: "Tamework/LinkedPanelIcons/Trait_Fertility.png"; }
+            Group #BreedingCooldownIconMuted { Anchor: (Top: 6, Left: 0, Width: 20, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/Trait_Fertility.png", Color: #777777); Visible: false; }
+        Group #BreedingCooldownIconImage { Anchor: (Top: 6, Left: 0, Width: 20, Height: 20); Background: "Tamework/LinkedPanelIcons/Trait_Fertility.png"; }
             Label #CooldownText { Anchor: (Top: 0, Left: 34, Width: 130, Height: 12); Text: ""; Style: (FontSize: 9, TextColor: #d3d7cf); }
             Group { Anchor: (Top: 14, Left: 34, Width: 130, Height: 6); Background: #3c443e; }
             Group #MeterFill { Anchor: (Top: 14, Left: 34, Width: 0, Height: 6); Background: #bb959e; }
-            Label { Anchor: (Top: 22, Left: 34, Width: 150, Height: 12); Text: %server.tamework.ui.linkedPanel.meter.breeding; Style: (FontSize: 9, TextColor: #b9beb8); }
+            Label #CooldownLabel { Anchor: (Top: 22, Left: 34, Width: 150, Height: 12); Text: %server.tamework.ui.linkedPanel.meter.breeding; Style: (FontSize: 9, TextColor: #b9beb8); }
             TextButton #BreedingCooldownTooltip { Anchor: (Top: 0, Left: 0, Width: 196, Height: 34); Style: @TraitTooltipButtonStyle; Text: ""; TextTooltipStyle: @LinkedActionTooltipStyle; }
         }
         Group #HarvestCooldown { Anchor: (Width: 196, Height: 34); Visible: false;
@@ -213,7 +215,7 @@ Group {
             Label #CooldownText { Anchor: (Top: 0, Left: 34, Width: 130, Height: 12); Text: ""; Style: (FontSize: 9, TextColor: #d3d7cf); }
             Group { Anchor: (Top: 14, Left: 34, Width: 130, Height: 6); Background: #3c443e; }
             Group #MeterFill { Anchor: (Top: 14, Left: 34, Width: 0, Height: 6); Background: #cbbb88; }
-            Label { Anchor: (Top: 22, Left: 34, Width: 150, Height: 12); Text: %server.tamework.ui.linkedPanel.meter.harvest; Style: (FontSize: 9, TextColor: #b9beb8); }
+            Label #CooldownLabel { Anchor: (Top: 22, Left: 34, Width: 150, Height: 12); Text: %server.tamework.ui.linkedPanel.meter.harvest; Style: (FontSize: 9, TextColor: #b9beb8); }
             TextButton #HarvestCooldownTooltip { Anchor: (Top: 0, Left: 0, Width: 196, Height: 34); Style: @TraitTooltipButtonStyle; Text: ""; TextTooltipStyle: @LinkedActionTooltipStyle; }
         }
     }

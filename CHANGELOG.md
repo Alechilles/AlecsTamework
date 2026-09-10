@@ -2,6 +2,10 @@
 
 ## Unreleased development changes
 
+- Companion cards keep breeding and harvest readiness visible after cooldowns.
+  Breeding indicators dim and explain low happiness or disabled breeding.
+  Refined level/talent controls and command/group selector alignment.
+
 - Existing NPCs now fill missing random attachment sets when they load, using
   the model's normal weights. Saved choices and explicit attachment migrations
   take priority, including intentional invisible options such as `None`.

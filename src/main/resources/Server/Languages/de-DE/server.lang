@@ -909,3 +909,6 @@ tamework.ui.linkedPanel.action.flightAirborne=Fliegend
 tamework.ui.linkedPanel.action.flightGrounded=Am Boden
 tamework.ui.linkedPanel.action.breedingOn=Zucht an
 tamework.ui.linkedPanel.action.breedingOff=Zucht aus
+
+tamework.ui.linkedPanel.breedingCooldown.unhappy=Zu unglücklich zum Züchten. Erhöhe die Zufriedenheit bis zur Zuchtschwelle.
+tamework.ui.linkedPanel.breedingCooldown.off=Die Zucht ist für dieses Tier ausgeschaltet.

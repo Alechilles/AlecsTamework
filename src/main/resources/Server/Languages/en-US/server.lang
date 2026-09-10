@@ -910,3 +910,6 @@ tamework.ui.linkedPanel.action.flightAirborne=Flying
 tamework.ui.linkedPanel.action.flightGrounded=Grounded
 tamework.ui.linkedPanel.action.breedingOn=Breeding On
 tamework.ui.linkedPanel.action.breedingOff=Breeding Off
+
+tamework.ui.linkedPanel.breedingCooldown.unhappy=Too unhappy to breed. Raise happiness to the breeding threshold.
+tamework.ui.linkedPanel.breedingCooldown.off=Breeding is off for this animal.

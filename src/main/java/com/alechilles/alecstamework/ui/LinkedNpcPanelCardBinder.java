@@ -502,8 +502,8 @@ final class LinkedNpcPanelCardBinder {
         commands.setObject(card + " #HealthText.Anchor", fixedAnchor(0, 0, compact ? 276 : 232, 20));
         commands.setObject(card + " #HealthTextShadow.Anchor", fixedAnchor(1, 1, compact ? 276 : 232, 20));
         commands.setObject(card + " #HealthTooltip.Anchor", fixedAnchor(0, 0, compact ? 278 : 234, 22));
-        commands.setObject(card + " #XpProgressRing.Anchor", fixedAnchor(24, 332, 74, 24));
-        commands.setObject(card + " #TalentPointAction.Anchor", fixedAnchor(24, 304, 24, 24));
+        commands.setObject(card + " #XpProgressRing.Anchor", fixedAnchor(24, 304, 64, 24));
+        commands.setObject(card + " #TalentPointAction.Anchor", fixedAnchor(24, 372, 34, 24));
         int activeTop = compact ? 48 : 78;
         commands.setObject(card + " #ActiveToggleActiveButton.Anchor", fixedAnchor(activeTop, 0, 40, 20));
         commands.setObject(card + " #ActiveToggleInactiveButton.Anchor", fixedAnchor(activeTop, 0, 40, 20));

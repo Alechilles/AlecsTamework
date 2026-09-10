@@ -123,12 +123,24 @@ final class LinkedNpcPanelStatusTextService {
         return resolveBreedingCooldownTooltip(entry, null);
     }
 
+    static boolean breedingBlockedByHappiness(LinkedNpcEntry entry) {
+        return entry != null && entry.hasHappiness() && entry.breedingCooldownKnown()
+                && !entry.breedingCooldownActive()
+                && entry.happinessRatio() < entry.breedingHappinessRatio();
+    }
+
     static String resolveBreedingCooldownTooltip(LinkedNpcEntry entry, String language) {
         if (entry == null || !entry.loaded()) {
             return LocalizedText.resolve(language, "tamework.ui.linkedPanel.breedingCooldown.unavailable");
         }
         if (!entry.breedingCooldownKnown()) {
             return LocalizedText.resolve(language, "tamework.ui.linkedPanel.breedingCooldown.unavailable");
+        }
+        if (!entry.breedingEnabled()) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.breedingCooldown.off");
+        }
+        if (breedingBlockedByHappiness(entry)) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.breedingCooldown.unhappy");
         }
         if (!entry.breedingCooldownActive()) {
             return LocalizedText.resolve(language, "tamework.ui.linkedPanel.breedingCooldown.ready");

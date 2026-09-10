@@ -2,14 +2,20 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.npc.alarms.TameworkAlarmService;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.params.StdScopeLookupCache;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import javax.annotation.Nullable;
 
 /**
@@ -17,6 +23,7 @@ import javax.annotation.Nullable;
  */
 final class CommandLinkedPanelCooldownSnapshotService {
     private static final String DEFAULT_HARVEST_ALARM_NAME = "Harvest_Ready";
+    private final StdScopeLookupCache scopeLookupCache = new StdScopeLookupCache();
 
     @Nullable
     CooldownSnapshot readBreedingCooldownSnapshot(@Nullable Ref<EntityStore> npcRef,
@@ -52,8 +59,63 @@ final class CommandLinkedPanelCooldownSnapshotService {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return null;
         }
+        if (!hasEnabledHarvestCapability(npcRef, store)) {
+            return new CooldownSnapshot(false, false, false, false, 0L, 0.0);
+        }
         TameworkAlarmService.Snapshot snapshot = TameworkAlarmService.snapshot(npcRef, store, resolveHarvestAlarmName());
         return fromAlarmSnapshot(snapshot, store);
+    }
+
+    /**
+     * An absent alarm means a supported animal is ready; it must not make every companion
+     * advertise harvest readiness. This matches the interaction route's role config and
+     * harvestability parameter before consulting the shared alarm.
+     */
+    private boolean hasEnabledHarvestCapability(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+        if (npc == null) {
+            return false;
+        }
+        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
+        if (globalConfig == null) {
+            globalConfig = TwGlobalConfig.defaultConfig();
+        }
+        StdScope roleScope = NpcSupportAccess.sensorScope(npc.getRole(), npcRef, store);
+        Boolean isHarvestable = scopeLookupCache.getBoolean(roleScope, globalConfig.getIsHarvestableParam());
+        return hasEnabledHarvestInteraction(
+                resolveInteractionConfig(npcRef, store, globalConfig, roleScope),
+                Boolean.TRUE.equals(isHarvestable)
+        );
+    }
+
+    @Nullable
+    private TwInteractionConfig resolveInteractionConfig(Ref<EntityStore> npcRef,
+                                                         Store<EntityStore> store,
+                                                         TwGlobalConfig globalConfig,
+                                                         @Nullable StdScope roleScope) {
+        String configuredId = scopeLookupCache.getString(roleScope, globalConfig.getInteractionConfigParam());
+        if (configuredId != null && !configuredId.isBlank()) {
+            DefaultAssetMap<String, TwInteractionConfig> assetMap = TwInteractionConfig.getAssetMap();
+            return assetMap != null ? assetMap.getAssetMap().get(configuredId) : null;
+        }
+        return TwInteractionConfig.resolveForRole(CompanionRoleIdResolver.resolveRoleId(npcRef, store));
+    }
+
+    static boolean hasEnabledHarvestInteraction(@Nullable TwInteractionConfig config,
+                                                boolean isHarvestable) {
+        if (config == null || !config.isEnabled()) {
+            return false;
+        }
+        for (TwInteractionConfig.InteractionEntry entry : config.getInteractions()) {
+            if (!(entry instanceof TwInteractionConfig.HarvestInteraction harvest) || !entry.isEnabled()) {
+                continue;
+            }
+            Boolean requiresHarvestable = harvest.getRequireHarvestable();
+            if (Boolean.FALSE.equals(requiresHarvestable) || isHarvestable) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static CooldownSnapshot fromAlarmWindow(boolean known,

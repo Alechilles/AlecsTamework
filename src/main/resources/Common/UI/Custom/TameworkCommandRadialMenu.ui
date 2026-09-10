@@ -1,7 +1,7 @@
 $A = "TameworkPanelActionStyles.ui";
 $C = "Common.ui";
 @CommandAssignmentKeyStyle = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #c4dbc9, Alignment: Center);
-@CommandAssignmentDropdownStyle = (...$A.@PanelDropdown, HorizontalPadding: 8, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, TextColor: #e8e4da, RenderUppercase: false, FontSize: 12), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #e8e4da, RenderUppercase: false, FontSize: 12));
+@CommandAssignmentDropdownStyle = (...$A.@PanelDropdown, HorizontalPadding: 4, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, TextColor: #e8e4da, RenderUppercase: false, FontSize: 11), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #e8e4da, RenderUppercase: false, FontSize: 11), SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #f0eee7, RenderUppercase: false, FontSize: 11));
 $C.@PageOverlay {
  LayoutMode: Middle;
  Group #TameworkCommandMenuWheel {
@@ -22,12 +22,12 @@ $C.@PageOverlay {
     TextButton #CommandMenuCloseButton { Anchor: (Top: 8, Right: 14, Width: 78, Height: 26); Text: %server.tamework.ui.shared.button.close; Style: $A.@PanelButton; }
    }
    Group #TameworkCommandAssignments {
-     Anchor: (Top: 54, Left: 12, Width: 152, Bottom: 16);
+     Anchor: (Top: 54, Left: 12, Width: 160, Bottom: 16);
     Background: #171d19;
     OutlineColor: #414845;
     OutlineSize: 1;
     Group #TameworkCommandPrimaryAssignment {
-     Anchor: (Top: 8, Left: 8, Width: 136, Height: 70);
+     Anchor: (Top: 8, Left: 8, Right: 8, Height: 70);
      Background: #202923;
      OutlineColor: #414845;
      OutlineSize: 1;
@@ -36,7 +36,7 @@ $C.@PageOverlay {
      DropdownBox #TameworkCommandPrimary { Anchor: (Top: 34, Left: 8, Right: 8, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: "No commands"; }
     }
     Group #TameworkCommandHotswapQAssignment {
-     Anchor: (Top: 86, Left: 8, Width: 136, Height: 70);
+     Anchor: (Top: 86, Left: 8, Right: 8, Height: 70);
      Background: #202923;
      OutlineColor: #414845;
      OutlineSize: 1;
@@ -45,7 +45,7 @@ $C.@PageOverlay {
      DropdownBox #TameworkCommandHotswapQ { Anchor: (Top: 34, Left: 8, Right: 8, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: "No commands"; }
     }
     Group #TameworkCommandHotswapEAssignment {
-     Anchor: (Top: 164, Left: 8, Width: 136, Height: 70);
+     Anchor: (Top: 164, Left: 8, Right: 8, Height: 70);
      Background: #202923;
      OutlineColor: #414845;
      OutlineSize: 1;
@@ -54,7 +54,7 @@ $C.@PageOverlay {
      DropdownBox #TameworkCommandHotswapE { Anchor: (Top: 34, Left: 8, Right: 8, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: "No commands"; }
     }
     Group #TameworkCommandHotswapRAssignment {
-     Anchor: (Top: 242, Left: 8, Width: 136, Height: 70);
+     Anchor: (Top: 242, Left: 8, Right: 8, Height: 70);
      Background: #202923;
      OutlineColor: #414845;
      OutlineSize: 1;
@@ -69,8 +69,8 @@ $C.@PageOverlay {
      OutlineColor: #414845;
      OutlineSize: 1;
      Label { Anchor: (Top: 4, Left: 8, Right: 8, Height: 22); Text: %server.tamework.ui.linkedPanel.manageGroups; Style: (FontSize: 13, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Center, VerticalAlignment: Center); }
-     Group { Anchor: (Top: 28, Left: 8, Right: 8, Bottom: 0); LayoutMode: TopScrolling; KeepScrollPosition: true; ScrollbarStyle: $C.@DefaultScrollbarStyle; Padding: (Right: 6, Top: 4, Bottom: 4);
-      Group #TameworkGroupQuickSelectList { LayoutMode: Top; }
+     Group { Anchor: (Top: 28, Left: 8, Right: 8, Bottom: 0); LayoutMode: TopScrolling; KeepScrollPosition: true; ScrollbarStyle: $C.@DefaultScrollbarStyle; Padding: (Left: 12, Right: 0, Top: 4, Bottom: 4);
+      Group #TameworkGroupQuickSelectList { Anchor: (Left: 0, Right: 0); LayoutMode: Top; }
      }
     }
    }

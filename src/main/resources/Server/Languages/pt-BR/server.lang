@@ -909,3 +909,6 @@ tamework.ui.linkedPanel.action.flightAirborne=Voando
 tamework.ui.linkedPanel.action.flightGrounded=No chão
 tamework.ui.linkedPanel.action.breedingOn=Reprodução sim
 tamework.ui.linkedPanel.action.breedingOff=Reprodução não
+
+tamework.ui.linkedPanel.breedingCooldown.unhappy=Infeliz demais para procriar. Aumente a felicidade até o limite necessário.
+tamework.ui.linkedPanel.breedingCooldown.off=A procriação está desativada para este animal.

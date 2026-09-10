@@ -380,57 +380,46 @@ final class LinkedNpcPanelVitalsBinder {
         commandBuilder.setObject(slotSelector + " #RingFillBar5.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar5Anchor(fill.bar5()));
     }
 
-    private static void bindBreedingCooldownMeter(UICommandBuilder commandBuilder,
-                                                  String entrySelector,
-                                                  LinkedNpcEntry entry,
-                                                  String language) {
-        bindCooldownMeter(
-                commandBuilder,
-                entrySelector + " #BreedingCooldown",
-                entry.breedingCooldownKnown() && entry.breedingCooldownActive(),
-                entry.breedingCooldownRatio(),
-                entry.breedingCooldownRemainingMs(),
+    private static void bindBreedingCooldownMeter(UICommandBuilder commands, String card,
+                                                  LinkedNpcEntry entry, String language) {
+        boolean muted = !entry.breedingEnabled() || LinkedNpcPanelStatusTextService.breedingBlockedByHappiness(entry);
+        bindCooldownMeter(commands, card + " #BreedingCooldown",
+                entry.loaded() && entry.breedingCooldownKnown(), entry.breedingCooldownActive(),
+                entry.breedingCooldownRatio(), entry.breedingCooldownRemainingMs(),
+                LocalizedText.resolve(language, entry.breedingEnabled()
+                        ? "tamework.ui.linkedPanel.breedingCooldown.ready"
+                        : "tamework.ui.linkedPanel.action.breedingOff"),
                 LinkedNpcPanelStatusTextService.resolveBreedingCooldownTooltip(entry, language),
-                "#BreedingCooldownTooltip"
-        );
+                "#BreedingCooldownTooltip", muted, "#bb959e");
+        commands.set(card + " #BreedingCooldownIconImage.Visible", !muted);
+        commands.set(card + " #BreedingCooldownIconMuted.Visible", muted);
     }
 
-    private static void bindHarvestCooldownMeter(UICommandBuilder commandBuilder,
-                                                 String entrySelector,
-                                                 LinkedNpcEntry entry,
-                                                 String language) {
-        bindCooldownMeter(
-                commandBuilder,
-                entrySelector + " #HarvestCooldown",
-                entry.harvestCooldownKnown() && entry.harvestCooldownActive(),
-                entry.harvestCooldownRatio(),
-                entry.harvestCooldownRemainingMs(),
+    private static void bindHarvestCooldownMeter(UICommandBuilder commands, String card,
+                                                 LinkedNpcEntry entry, String language) {
+        bindCooldownMeter(commands, card + " #HarvestCooldown",
+                entry.loaded() && entry.harvestCooldownKnown(), entry.harvestCooldownActive(),
+                entry.harvestCooldownRatio(), entry.harvestCooldownRemainingMs(),
+                LocalizedText.resolve(language, "tamework.ui.linkedPanel.harvestCooldown.ready"),
                 LinkedNpcPanelStatusTextService.resolveHarvestCooldownTooltip(entry, language),
-                "#HarvestCooldownTooltip"
-        );
+                "#HarvestCooldownTooltip", false, "#cbbb88");
     }
 
-    private static void bindCooldownMeter(UICommandBuilder commandBuilder,
-                                          String slotSelector,
-                                          boolean active,
-                                          double ratio,
-                                          long remainingMs,
-                                          String tooltip,
-                                          String tooltipSelector) {
-        commandBuilder.set(slotSelector + ".Visible", active);
-        commandBuilder.set(slotSelector + " #CooldownText.Visible", active);
-        if (!active) {
-            commandBuilder.set(slotSelector + " #CooldownText.Text", "");
-            commandBuilder.set(slotSelector + " " + tooltipSelector + ".TooltipText", "");
-            return;
-        }
-        commandBuilder.set(slotSelector + " #CooldownText.Text",
-                LinkedNpcPanelStatusMeter.formatRemainingClock(remainingMs));
-        commandBuilder.set(slotSelector + " " + tooltipSelector + ".TooltipText", tooltip);
-        commandBuilder.setObject(
-                slotSelector + " #MeterFill.Anchor",
-                LinkedNpcPanelStatusMeter.buildFillAnchor(ratio)
-        );
+    private static void bindCooldownMeter(UICommandBuilder commands, String slot, boolean visible,
+                                          boolean active, double ratio, long remainingMs,
+                                          String readyText, String tooltip, String tooltipSelector,
+                                          boolean muted, String fillColor) {
+        commands.set(slot + ".Visible", visible);
+        commands.set(slot + " #CooldownText.Text", active
+                ? LinkedNpcPanelStatusMeter.formatRemainingClock(remainingMs) : readyText);
+        commands.set(slot + " " + tooltipSelector + ".TooltipText", tooltip);
+        commands.set(slot + " #CooldownText.Style", Value.ref("TameworkLinkedNpcPanelCard.ui",
+                muted ? "CooldownTextMuted" : "CooldownTextNormal"));
+        commands.set(slot + " #CooldownLabel.Style", Value.ref("TameworkLinkedNpcPanelCard.ui",
+                muted ? "CooldownTextMuted" : "CooldownLabelNormal"));
+        commands.set(slot + " #MeterFill.Background", muted ? "#727772" : fillColor);
+        commands.setObject(slot + " #MeterFill.Anchor",
+                LinkedNpcPanelStatusMeter.buildFillAnchor(active ? ratio : 1.0));
     }
 
     private static int percent(double ratio) {
