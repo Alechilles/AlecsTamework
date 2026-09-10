@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Capturing companions preserves exact health values for their saved gray health bars.
+- Fixed the Feedback button crashing the world when another mod embeds Beacon.
+
 - Companion cards use compact status emblems for dead, lost, unloaded, captured,
   and coop states, keeping saved details and action controls visible.
 

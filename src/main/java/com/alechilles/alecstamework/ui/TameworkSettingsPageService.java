@@ -125,28 +125,31 @@ public final class TameworkSettingsPageService {
         try {
             TameworkSettingsPage page = new TameworkSettingsPage(uiPlayerRef, plugin, world);
             player.getPageManager().openCustomPage(ref, store, page);
+        } catch (Throwable failure) {
+            plugin.getLogger().at(java.util.logging.Level.WARNING).withCause(failure)
+                    .log("Failed to open Tamework settings page from %s.", entryPoint);
+            try {
+                plugin.getTelemetryEvents().recordError("ui_page_open_failed", failure,
+                        TameworkTelemetryContext.uiPage("TameworkSettingsPage", telemetrySource,
+                                "open", "Failed to open Tamework settings page.").build());
+            } catch (RuntimeException | LinkageError telemetryFailure) {
+                // The local warning already preserves the original page failure.
+            }
+            return "Unable to open settings right now.";
+        }
+        try {
             plugin.getTelemetryEvents().recordUsage(
                     "settings_page_opened",
                     TameworkTelemetryEvents.featureContext("settings", "settings_page", entryPoint)
                             .operation("open")
                             .detail("Opened Tamework settings page.")
                             .detail("source", telemetrySource)
-                            .build()
-            );
-            return null;
-        } catch (Throwable throwable) {
-            plugin.getTelemetryEvents().recordError(
-                    "ui_page_open_failed",
-                    throwable,
-                    TameworkTelemetryContext.uiPage(
-                            "TameworkSettingsPage",
-                            telemetrySource,
-                            "open",
-                            "Failed to open Tamework settings page."
-                    ).build()
-            );
-            return "Unable to open settings right now.";
+                            .build());
+        } catch (RuntimeException | LinkageError failure) {
+            plugin.getLogger().at(java.util.logging.Level.WARNING).withCause(failure)
+                    .log("Settings opened, but its telemetry event could not be recorded.");
         }
+        return null;
     }
 
     private static boolean isLocalSingleplayerOwner(@Nullable PlayerRef playerRef) {

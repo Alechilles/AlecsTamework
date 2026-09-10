@@ -113,16 +113,16 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
             bindStaticEvents(eventBuilder);
             render(commandBuilder);
         } catch (Throwable throwable) {
-            plugin.getTelemetryEvents().recordError(
-                    "ui_page_build_failed",
-                    throwable,
-                    TameworkTelemetryContext.uiPage(
-                            "TameworkSettingsPage",
-                            "settings_ui",
-                            "build",
-                            "Failed to build Tamework settings page."
-                    ).build()
-            );
+            plugin.getLogger().at(Level.WARNING).withCause(throwable)
+                    .log("Failed to build Tamework settings page.");
+            try {
+                plugin.getTelemetryEvents().recordError(
+                        "ui_page_build_failed", throwable,
+                        TameworkTelemetryContext.uiPage("TameworkSettingsPage", "settings_ui", "build",
+                                "Failed to build Tamework settings page.").build());
+            } catch (RuntimeException | LinkageError telemetryFailure) {
+                // Preserve the page failure even when optional telemetry is unavailable.
+            }
             throw throwable;
         }
     }

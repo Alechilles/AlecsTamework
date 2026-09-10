@@ -52,6 +52,20 @@ class SpawnerFullStateOwnershipNormalizerTest {
     }
 
     @Test
+    void captureOwnershipNormalizationRetainsExactHealthThroughSnapshotEncoding() {
+        CoopResidentStateSnapshot source = new CoopResidentStateSnapshot(
+                NPC, null, -1, "Test_Role", null, sourceOwner(),
+                null, null, null, null, null, null, null, null, null, null,
+                60.0, 81.0, 100.0 * 60.0 / 81.0, -500L);
+        CoopResidentStateSnapshot normalized = normalizer.normalize(source, new OwnerId(SOURCE_OWNER), "Owner");
+        var codec = new com.alechilles.alecstamework.items.CoopResidentStateSnapshotCodec();
+        CoopResidentStateSnapshot decoded = codec.decode(codec.encode(normalized)).snapshot();
+        assertEquals(60.0, decoded.currentHealth());
+        assertEquals(81.0, decoded.maximumHealth());
+        assertEquals(source.healthPercent(), decoded.healthPercent());
+    }
+
+    @Test
     void sameOwnerIsPreservedInFreshComponentsWithoutMutatingSource() {
         TameworkOwnerComponent sourceOwner = sourceOwner();
         TameworkCommandLinksComponent sourceLinks = sourceLinks();

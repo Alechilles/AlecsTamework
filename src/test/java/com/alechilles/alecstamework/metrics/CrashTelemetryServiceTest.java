@@ -226,6 +226,15 @@ class CrashTelemetryServiceTest {
     }
 
     @Test
+    void feedbackPageFailureIsNonFatal() {
+        FakeEmbeddedRuntime runtime = new FakeEmbeddedRuntime();
+        runtime.feedbackPageFailure = new LinkageError("incompatible embedded runtime");
+        CrashTelemetryService service = createService(true, true, runtime);
+
+        assertFalse(service.openFeedbackPage(null, null, null));
+    }
+
+    @Test
     void typedContextDropsNullableDetailValuesBeforeCopying() {
         TelemetryEventContext context = TelemetryEventContext.usage()
                 .detail("kept", 42)
@@ -368,6 +377,7 @@ class CrashTelemetryServiceTest {
         private boolean flushInProgress;
         private String lastFlushResult = "No flush attempts yet.";
         private boolean requestFlushResult = true;
+        private Error feedbackPageFailure;
 
         private int startCalls;
         private int shutdownCalls;
@@ -394,6 +404,18 @@ class CrashTelemetryServiceTest {
         @Override
         public boolean isEnabled() {
             return enabled;
+        }
+
+        @Override
+        public boolean openReportPage(String projectId,
+                                      com.hypixel.hytale.component.Ref<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> ref,
+                                      com.hypixel.hytale.component.Store<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> store,
+                                      com.hypixel.hytale.server.core.universe.PlayerRef playerRef,
+                                      com.alechilles.beacon.reports.TelemetryReportOpenRequest request) {
+            if (feedbackPageFailure != null) {
+                throw feedbackPageFailure;
+            }
+            return false;
         }
 
         @Nullable

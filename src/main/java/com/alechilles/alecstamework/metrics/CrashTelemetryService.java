@@ -569,8 +569,14 @@ public final class CrashTelemetryService {
     /** Opens the manual feedback form on the player's owning world thread; does not submit a report. */
     public boolean openFeedbackPage(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store,
                                     @Nonnull PlayerRef playerRef) {
-        return telemetry.openReportPage(TAMEWORK_PROJECT_ID, ref, store, playerRef,
-                new TelemetryReportOpenRequest("issue", null, null));
+        try {
+            return telemetry.openReportPage(TAMEWORK_PROJECT_ID, ref, store, playerRef,
+                    new TelemetryReportOpenRequest("issue", null, null));
+        } catch (RuntimeException | LinkageError failure) {
+            HytaleLogger.forEnclosingClass().at(Level.WARNING).withCause(failure)
+                    .log("Unable to open Tamework feedback form.");
+            return false;
+        }
     }
 
     interface EmbeddedRuntime {

@@ -21,6 +21,9 @@ art graph.
   the same runtime transitively for its contributed project. The release line
   is Patchwork `1.4.1` with Beacon `2.0.1`; Gradle dependency convergence must
   select `2.0.1` for both edges.
+- Beacon implementation classes are isolated in Tamework’s shaded namespace to
+  prevent mixed class loading when other mods embed Beacon. Its process-wide
+  registry keys stay unchanged so the embedded copies still coordinate.
 - The two telemetry projects are independent: Tamework uses its conventional
   project and the embedded Patchwork runtime contributes a hosted-only
   `patchwork` project. They share one host-local Telemetry provider and one

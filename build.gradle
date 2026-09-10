@@ -149,6 +149,13 @@ tasks.named('jar') {
 tasks.named('shadowJar', ShadowJar) {
     archiveFileName = "Alec's Tamework! v${project.version}.jar"
     archiveClassifier = ''
+    // Beacon is embedded implementation detail. Keep its runtime classes private to Tamework so
+    // another mod's Beacon copy cannot supply an incompatible nested command-runtime class.
+    // Registry property keys remain literal strings so isolated copies still coordinate through
+    // the JVM-wide JDK map.
+    relocate('com.alechilles.beacon', 'com.alechilles.alecstamework.shadow.beacon') {
+        skipStringConstants = true
+    }
     relocate 'org.slf4j', 'com.alechilles.alecstamework.shadow.slf4j'
     manifest {
         attributes(
