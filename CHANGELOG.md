@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Restyled the settings menu to match the charcoal command panel, with clearer
+  sections, roomier controls, and shared textures.
+
 - Capturing companions preserves exact health values for their saved gray health bars.
 - Fixed the Feedback button crashing the world when another mod embeds Beacon.
 

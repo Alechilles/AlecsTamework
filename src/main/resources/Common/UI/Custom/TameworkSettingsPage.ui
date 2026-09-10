@@ -1,3 +1,4 @@
+$A = "TameworkPanelActionStyles.ui";
 $C = "Common.ui";
 
 @SettingsLabelTooltipStyle = $C.@DefaultTextTooltipStyle;
@@ -12,52 +13,56 @@ $C = "Common.ui";
 $C.@PageOverlay {
   LayoutMode: Middle;
 
-  $C.@DecoratedContainer #TwSettingsRoot {
-    Anchor: (Width: 590, Height: 700);
+  Group #TwSettingsRoot {
+    Anchor: (Width: 740, Height: 760);
+    Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
 
-    #Title {
-      $C.@Title #TwSettingsTitle {
-        @Alignment = Start;
-        @Text = "Tamework Settings";
+    Group #Title {
+      Anchor: (Top: 3, Left: 3, Right: 3, Height: 48);
+      Background: #252b27;
+      Group { Anchor: (Top: 7, Left: 12, Width: 34, Height: 34); Background: "Tamework/Telemetry/TameworkConsentIcon.png"; }
+      Label #TwSettingsTitle {
+        Anchor: (Left: 56, Right: 278, Height: 48);
+        Text: "Tamework Settings";
+        Style: (FontSize: 23, RenderBold: true, TextColor: #f0eee7, VerticalAlignment: Center);
       }
-
+      TextButton #TwSettingsRefreshButton {
+        Anchor: (Top: 9, Right: 164, Width: 96, Height: 30);
+        Text: "Refresh";
+        Style: $A.@PanelButton;
+      }
+      TextButton #TwSettingsApplyButton {
+        Anchor: (Top: 9, Right: 58, Width: 96, Height: 30);
+        Text: "Apply";
+        Style: $A.@PanelButtonSelected;
+      }
       Group {
-        Anchor: (Top: 5, Right: 10, Width: 304, Height: 24);
-
-        TextButton #TwSettingsRefreshButton {
-          Anchor: (Left: 0, Width: 94, Height: 24);
-          Text: "Refresh";
-          Style: (...$C.@SmallSecondaryTextButtonStyle);
-        }
-
-        TextButton #TwSettingsApplyButton {
-          Anchor: (Left: 102, Width: 94, Height: 24);
-          Text: "Apply";
-          Style: (...$C.@SmallSecondaryTextButtonStyle);
-        }
-
+        Anchor: (Top: 9, Right: 14, Width: 30, Height: 30);
         TextButton #TwSettingsCloseButton {
-          Anchor: (Right: 0, Width: 94, Height: 24);
-          Text: "Close";
-          Style: (...$C.@SmallSecondaryTextButtonStyle);
+          Anchor: (Full: 0);
+          Text: "";
+          TooltipText: %server.tamework.ui.shared.button.close;
+          Style: $A.@Remove;
         }
+        Group { Anchor: (Top: 3, Left: 3, Width: 24, Height: 28); HitTestVisible: false; Background: "Tamework/PanelActions/Remove_Glyph_Default.png"; }
       }
     }
 
-    #Content {
+    Group #Content {
+      Anchor: (Top: 56, Left: 10, Right: 10, Bottom: 12);
       LayoutMode: Top;
       Padding: (Left: 10, Right: 10, Top: 6, Bottom: 8);
 
       Label #TwSettingsStatusLine {
         Anchor: (Top: 0, Height: 20);
         Text: "";
-        Style: (FontSize: 12, TextColor: #c6d7ea, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+        Style: (FontSize: 12, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
       }
 
       Group {
         Anchor: (Top: 6);
         FlexWeight: 1;
-        Background: #13243a;
+        Background: #181c1a;
         Padding: (Left: 8, Right: 8, Top: 8, Bottom: 8);
 
         Group #TwSettingsViewport {
@@ -72,16 +77,18 @@ $C.@PageOverlay {
             Anchor: (Left: 0, Right: 0, Bottom: 0);
 
             Group {
-              Anchor: (Height: 24);
+              Anchor: (Height: 34);
+              Background: #252c27;
+              Padding: (Left: 8, Right: 8);
 
               Label #TwSettingsExperiencePresetsLabel {
-                Anchor: (Left: 0, Right: 0, Height: 24);
+                Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "Experience Presets";
-                Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsExperiencePresetsTooltip {
-                Anchor: (Left: 0, Right: 0, Height: 24);
+                Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "";
                 TooltipText: "Loads bundled presets for the major companion experience toggles below without changing the rest of the settings page.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -90,16 +97,16 @@ $C.@PageOverlay {
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsLoadPresetLabel {
-                Anchor: (Left: 0, Width: 120, Height: 24);
+                Anchor: (Left: 0, Width: 120, Height: 28);
                 Text: "Load Preset";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsLoadPresetTooltip {
-                Anchor: (Left: 0, Width: 120, Height: 24);
+                Anchor: (Left: 0, Width: 120, Height: 28);
                 Text: "";
                 TooltipText: "Choose a preset to change the companion experience toggles below. Review the rest of the page before applying.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -107,16 +114,16 @@ $C.@PageOverlay {
               }
 
               DropdownBox #TwSettingsPresetDropdown {
-                Anchor: (Left: 126, Width: 220, Height: 24);
-                Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
+                Anchor: (Left: 126, Width: 220, Height: 28);
+                Style: (...$A.@PanelDropdown, HorizontalPadding: 8);
                 MaxSelection: 1;
                 NoItemsText: "No preset";
               }
 
               TextButton #TwSettingsLoadPresetButton {
-                Anchor: (Left: 354, Width: 110, Height: 24);
+                Anchor: (Left: 354, Width: 110, Height: 28);
                 Text: "Load Preset";
-                Style: (...$C.@SmallSecondaryTextButtonStyle);
+                Style: $A.@PanelButton;
               }
             }
 
@@ -126,7 +133,7 @@ $C.@PageOverlay {
               Label #TwSettingsPresetNoteLabel {
                 Anchor: (Left: 0, Right: 0, Height: 18);
                 Text: "Presets only change the experience toggles below. Review everything else before applying.";
-                Style: (FontSize: 11, TextColor: #9fb5ce, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+                Style: (FontSize: 11, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
               }
 
               TextButton #TwSettingsPresetNoteTooltip {
@@ -141,16 +148,18 @@ $C.@PageOverlay {
             Group { Anchor: (Height: 8); }
 
             Group {
-              Anchor: (Height: 24);
+              Anchor: (Height: 34);
+              Background: #252c27;
+              Padding: (Left: 8, Right: 8);
 
               Label #TwSettingsRecallSectionLabel {
-                Anchor: (Left: 0, Right: 0, Height: 24);
+                Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "Recall / Return Home";
-                Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsRecallSectionTooltip {
-                Anchor: (Left: 0, Right: 0, Height: 24);
+                Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "";
                 TooltipText: "Controls whether recall and return-home commands may teleport companions when normal movement cannot reach them.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -159,16 +168,16 @@ $C.@PageOverlay {
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsRecallTeleportingLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Enable Recall Teleporting";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsRecallTeleportingTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "When disabled, recall and return-home commands will not teleport unloaded or distant companions. Use Locate to see their last recorded location.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -176,8 +185,10 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsRecallTeleportingEnabledCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -186,16 +197,18 @@ $C.@PageOverlay {
             Group { Anchor: (Height: 8); }
 
             Group {
-              Anchor: (Height: 24);
+              Anchor: (Height: 34);
+              Background: #252c27;
+              Padding: (Left: 8, Right: 8);
 
               Label #TwSettingsCompanionSystemsLabel {
-                Anchor: (Left: 0, Right: 0, Height: 24);
+                Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "Companion Systems";
-                Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsCompanionSystemsTooltip {
-                Anchor: (Left: 0, Right: 0, Height: 24);
+                Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "";
                 TooltipText: "High-level toggles for the main companion gameplay systems that Tamework can run.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -204,16 +217,16 @@ $C.@PageOverlay {
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsNeedsEnabledLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Enable Needs System";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsEnabledTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Turns hunger and thirst simulation on or off for companions.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -221,24 +234,26 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsNeedsEnabledCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsHappinessEnabledLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Enable Happiness System";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsHappinessEnabledTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Turns happiness tracking on or off for companions.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -246,24 +261,26 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsHappinessEnabledCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsPassiveBreedingEnabledLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Enable Passive Breeding";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsPassiveBreedingTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Allows companions to breed on their own when breeding conditions are met.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -271,24 +288,26 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsPassiveBreedingEnabledCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsBreedingRequiresHappinessLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Breeding Requires Happiness";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsBreedingRequiresHappinessTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Requires companions to satisfy happiness rules before passive breeding can happen.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -296,24 +315,26 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsBreedingRequiresHappinessCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsLevelingEnabledLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Enable Leveling System";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsLevelingEnabledTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Allows companions to gain XP, level up, and apply level-based stat growth.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -321,24 +342,26 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsLevelingEnabledCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsTalentsEnabledLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Enable Talents System";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsTalentsEnabledTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Allows companion talent points, talent spending, and purchased passive talent effects.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -346,24 +369,26 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsTalentsEnabledCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsBreedingGenderEnabledLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Enable Breeding Genders";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsBreedingGenderTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Turns companion gender assignment and gender-aware breeding checks on or off.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -371,24 +396,26 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsBreedingGenderEnabledCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsTraitsEnabledLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Enable Traits System";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsTraitsEnabledTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Turns trait generation and trait-based companion effects on or off.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -396,8 +423,10 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsTraitsEnabledCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -406,16 +435,18 @@ $C.@PageOverlay {
             Group { Anchor: (Height: 8); }
 
             Group {
-              Anchor: (Height: 24);
+              Anchor: (Height: 34);
+              Background: #252c27;
+              Padding: (Left: 8, Right: 8);
 
               Label #TwSettingsNeedsSectionLabel {
-                Anchor: (Left: 0, Right: 0, Height: 24);
+                Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "Needs (Hunger/Thirst)";
-                Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsSectionTooltip {
-                Anchor: (Left: 0, Right: 0, Height: 24);
+                Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "";
                 TooltipText: "Controls hunger and thirst damage, offline decay behavior, and how needs-based damage is calculated.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -424,16 +455,16 @@ $C.@PageOverlay {
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsNeedsResourceModeLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Needs Resource Mode";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsResourceModeTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Controls how hungry or thirsty companions reach food and water.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -441,24 +472,24 @@ $C.@PageOverlay {
               }
 
               DropdownBox #TwSettingsNeedsResourceModeDropdown {
-                Anchor: (Left: 256, Width: 250, Height: 24);
-                Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
+                Anchor: (Left: 356, Width: 290, Height: 28);
+                Style: (...$A.@PanelDropdown, HorizontalPadding: 8);
                 MaxSelection: 1;
                 NoItemsText: "No resource modes";
               }
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsNeedsDamageEnabledLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Enable Hunger/Thirst Damage";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsDamageEnabledTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Applies damage when hunger or thirst reaches the configured minimum threshold.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -466,24 +497,26 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsNeedsDamageEnabledCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsNeedsTickPolicyModeLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Needs Tick Policy";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsTickPolicyTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Chooses when needs are allowed to tick, such as after an owner's offline grace period or whenever any player keeps the area loaded.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -491,24 +524,24 @@ $C.@PageOverlay {
               }
 
               DropdownBox #TwSettingsNeedsTickPolicyModeDropdown {
-                Anchor: (Left: 256, Width: 250, Height: 24);
-                Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
+                Anchor: (Left: 356, Width: 290, Height: 28);
+                Style: (...$A.@PanelDropdown, HorizontalPadding: 8);
                 MaxSelection: 1;
                 NoItemsText: "No policy";
               }
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsNeedsOwnerOfflineGraceHoursLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Owner Offline Grace Hours";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsOfflineGraceTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "How many hours an owner can stay offline before needs begin decaying under the owner-online grace policy.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -516,10 +549,12 @@ $C.@PageOverlay {
               }
 
               TextField #TwSettingsNeedsOwnerOfflineGraceHoursInput {
-                Anchor: (Left: 256, Width: 250, Height: 24);
-                Style: $C.@DefaultInputFieldStyle;
-                PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
-                Background: $C.@InputBoxBackground;
+                Anchor: (Left: 356, Width: 290, Height: 28);
+                Style: $A.@PanelInputFieldStyle;
+                PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
+                Background: #252c27;
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Horizontal: 8);
                 PlaceholderText: "72";
                 MaxLength: 12;
@@ -527,16 +562,16 @@ $C.@PageOverlay {
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsNeedsOwnerOfflineDecayMultiplierLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Owner Offline Decay Multiplier";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsOfflineDecayMultiplierTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Multiplier applied to needs decay after the owner has been offline longer than the grace period.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -544,10 +579,12 @@ $C.@PageOverlay {
               }
 
               TextField #TwSettingsNeedsOwnerOfflineDecayMultiplierInput {
-                Anchor: (Left: 256, Width: 250, Height: 24);
-                Style: $C.@DefaultInputFieldStyle;
-                PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
-                Background: $C.@InputBoxBackground;
+                Anchor: (Left: 356, Width: 290, Height: 28);
+                Style: $A.@PanelInputFieldStyle;
+                PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
+                Background: #252c27;
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Horizontal: 8);
                 PlaceholderText: "1";
                 MaxLength: 12;
@@ -555,16 +592,16 @@ $C.@PageOverlay {
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsNeedsDamageModelLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Needs Damage Model";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsDamageModelTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Chooses how starvation or dehydration damage is calculated once a need bottoms out.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -572,24 +609,24 @@ $C.@PageOverlay {
               }
 
               DropdownBox #TwSettingsNeedsDamageModelDropdown {
-                Anchor: (Left: 256, Width: 250, Height: 24);
-                Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
+                Anchor: (Left: 356, Width: 290, Height: 28);
+                Style: (...$A.@PanelDropdown, HorizontalPadding: 8);
                 MaxSelection: 1;
                 NoItemsText: "No model";
               }
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsNeedsDamageDualNeedRuleLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Dual Need Rule";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsDualNeedRuleTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Chooses whether low hunger and low thirst use only the higher damage amount or add both together.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -597,24 +634,24 @@ $C.@PageOverlay {
               }
 
               DropdownBox #TwSettingsNeedsDamageDualNeedRuleDropdown {
-                Anchor: (Left: 256, Width: 250, Height: 24);
-                Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
+                Anchor: (Left: 356, Width: 290, Height: 28);
+                Style: (...$A.@PanelDropdown, HorizontalPadding: 8);
                 MaxSelection: 1;
                 NoItemsText: "No rule";
               }
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsNeedsStarvationDamagePerMinuteLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Starvation Damage Per Minute";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsStarvationDamageTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Damage applied per minute when hunger is depleted and the current damage model uses starvation damage.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -622,10 +659,12 @@ $C.@PageOverlay {
               }
 
               TextField #TwSettingsNeedsStarvationDamagePerMinuteInput {
-                Anchor: (Left: 256, Width: 250, Height: 24);
-                Style: $C.@DefaultInputFieldStyle;
-                PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
-                Background: $C.@InputBoxBackground;
+                Anchor: (Left: 356, Width: 290, Height: 28);
+                Style: $A.@PanelInputFieldStyle;
+                PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
+                Background: #252c27;
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Horizontal: 8);
                 PlaceholderText: "2";
                 MaxLength: 12;
@@ -633,16 +672,16 @@ $C.@PageOverlay {
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsNeedsDehydrationDamagePerMinuteLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Dehydration Damage Per Minute";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsDehydrationDamageTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Damage applied per minute when thirst is depleted and the current damage model uses dehydration damage.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -650,10 +689,12 @@ $C.@PageOverlay {
               }
 
               TextField #TwSettingsNeedsDehydrationDamagePerMinuteInput {
-                Anchor: (Left: 256, Width: 250, Height: 24);
-                Style: $C.@DefaultInputFieldStyle;
-                PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
-                Background: $C.@InputBoxBackground;
+                Anchor: (Left: 356, Width: 290, Height: 28);
+                Style: $A.@PanelInputFieldStyle;
+                PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
+                Background: #252c27;
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Horizontal: 8);
                 PlaceholderText: "3";
                 MaxLength: 12;
@@ -661,16 +702,16 @@ $C.@PageOverlay {
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsNeedsDamageLethalLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Needs Damage Is Lethal";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsDamageLethalTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "When enabled, needs damage can kill companions. When disabled, it stops at 1 health.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -678,8 +719,10 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsNeedsDamageLethalCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -688,16 +731,18 @@ $C.@PageOverlay {
             Group { Anchor: (Height: 8); }
 
             Group {
-              Anchor: (Height: 24);
+              Anchor: (Height: 34);
+              Background: #252c27;
+              Padding: (Left: 8, Right: 8);
 
               Label #TwSettingsOwnershipSectionLabel {
-                Anchor: (Left: 0, Right: 0, Height: 24);
+                Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "Ownership";
-                Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsOwnershipSectionTooltip {
-                Anchor: (Left: 0, Right: 0, Height: 24);
+                Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "";
                 TooltipText: "Controls owner-only protections, capture behavior, and general ownership checks for companions.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -711,7 +756,7 @@ $C.@PageOverlay {
               Label #TwSettingsDamageProtectionSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 18);
                 Text: "Damage Protection";
-                Style: (FontSize: 12, RenderBold: true, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 12, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsOwnershipDamageProtectionTooltip {
@@ -724,16 +769,16 @@ $C.@PageOverlay {
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsBlockOwnerDamageLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Block Owner Damage";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsBlockOwnerDamageTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Prevents the owner from damaging their own owned companions.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -741,24 +786,26 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsBlockOwnerDamageCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsBlockAllDamageIfOwnedLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Block All Player Damage If Owned";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsBlockAllPlayerDamageTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Prevents all player-sourced damage against owned companions.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -766,24 +813,26 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsBlockAllDamageIfOwnedCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsInvulnerableIfOwnedLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Invulnerable If Owned";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsInvulnerableIfOwnedTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Makes owned companions ignore all damage, not just player damage.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -791,8 +840,10 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsInvulnerableIfOwnedCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -804,7 +855,7 @@ $C.@PageOverlay {
               Label #TwSettingsCaptureSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 18);
                 Text: "Capture";
-                Style: (FontSize: 12, RenderBold: true, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 12, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsOwnershipCaptureTooltip {
@@ -817,16 +868,16 @@ $C.@PageOverlay {
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsCaptureRequiresOwnerLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Capture Requires Owner";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsCaptureRequiresOwnerTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Requires a companion to already have an owner before it can be captured with supported Tamework items.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -834,24 +885,26 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsCaptureRequiresOwnerCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsSpawnRequiresOwnerLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Spawn Requires Owner";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsSpawnRequiresOwnerTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Requires an owner assignment before a companion can be spawned from supported Tamework items.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -859,24 +912,26 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsSpawnRequiresOwnerCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsCaptureClearsOwnerLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Capture Clears Owner";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsCaptureClearsOwnerTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Removes ownership when a companion is captured.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -884,24 +939,26 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsCaptureClearsOwnerCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsSpawnSetsOwnerLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Spawn Sets Owner";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsSpawnSetsOwnerTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Assigns the spawning player as owner when the companion is spawned.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -909,8 +966,10 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsSpawnSetsOwnerCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -922,7 +981,7 @@ $C.@PageOverlay {
               Label #TwSettingsCaptureTradeNoteLabel {
                 Anchor: (Left: 0, Right: 0, Height: 18);
                 Text: "Note: Enabling both allows trading captured mobs between players.";
-                Style: (FontSize: 11, TextColor: #9fb5ce, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 11, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsOwnershipTradingNoteTooltip {
@@ -940,7 +999,7 @@ $C.@PageOverlay {
               Label #TwSettingsGeneralSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 18);
                 Text: "General";
-                Style: (FontSize: 12, RenderBold: true, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 12, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsOwnershipGeneralTooltip {
@@ -953,16 +1012,16 @@ $C.@PageOverlay {
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsInteractionRequiresOwnerLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Interaction Requires Owner";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsInteractionRequiresOwnerTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Restricts supported companion interactions so only the owner can use them.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -970,24 +1029,26 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsInteractionRequiresOwnerCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsLinkingRequiresOwnerLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Linking Requires Owner";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsLinkingRequiresOwnerTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Restricts command-item linking so only the owner can link a companion.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -995,8 +1056,10 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsLinkingRequiresOwnerCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -1005,16 +1068,18 @@ $C.@PageOverlay {
             Group { Anchor: (Height: 8); }
 
             Group {
-              Anchor: (Height: 24);
+              Anchor: (Height: 34);
+              Background: #252c27;
+              Padding: (Left: 8, Right: 8);
 
               Label #TwSettingsReviveSectionLabel {
-                Anchor: (Left: 0, Right: 0, Height: 24);
+                Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "Revive System";
-                Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsReviveSectionTooltip {
-                Anchor: (Left: 0, Right: 0, Height: 24);
+                Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "";
                 TooltipText: "Controls whether dead owned companions can use Tamework's revive flow.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -1023,16 +1088,16 @@ $C.@PageOverlay {
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsReviveSystemEnabledLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Enable Revive System";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsReviveEnabledTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Allows supported Tamework revive and respawn behavior for owned companions.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -1040,8 +1105,10 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsReviveSystemEnabledCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -1050,16 +1117,18 @@ $C.@PageOverlay {
             Group { Anchor: (Height: 8); }
 
             Group {
-              Anchor: (Height: 24);
+              Anchor: (Height: 34);
+              Background: #252c27;
+              Padding: (Left: 8, Right: 8);
 
               Label #TwSettingsPopulationSectionLabel {
-                Anchor: (Left: 0, Right: 0, Height: 24);
+                Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "Population";
-                Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsPopulationSectionTooltip {
-                Anchor: (Left: 0, Right: 0, Height: 24);
+                Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "";
                 TooltipText: "Controls the per-player owned companion cap used by Tamework.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -1068,16 +1137,16 @@ $C.@PageOverlay {
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsPopulationLimitLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Limit Per Player Owned Total";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsPopulationLimitTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Maximum number of owned companions a player can have before Tamework blocks additional ownership or acquisition.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -1085,10 +1154,12 @@ $C.@PageOverlay {
               }
 
               TextField #TwSettingsPopulationLimitInput {
-                Anchor: (Left: 256, Width: 250, Height: 24);
-                Style: $C.@DefaultInputFieldStyle;
-                PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
-                Background: $C.@InputBoxBackground;
+                Anchor: (Left: 356, Width: 290, Height: 28);
+                Style: $A.@PanelInputFieldStyle;
+                PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
+                Background: #252c27;
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Horizontal: 8);
                 PlaceholderText: "0";
                 MaxLength: 8;
@@ -1096,16 +1167,16 @@ $C.@PageOverlay {
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsPopulationScopeLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Per Player Limit Scope";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsPopulationScopeTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Chooses whether the population limit is counted separately per world or across the entire universe.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -1113,8 +1184,8 @@ $C.@PageOverlay {
               }
 
               DropdownBox #TwSettingsPopulationScopeDropdown {
-                Anchor: (Left: 256, Width: 250, Height: 24);
-                Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
+                Anchor: (Left: 356, Width: 290, Height: 28);
+                Style: (...$A.@PanelDropdown, HorizontalPadding: 8);
                 MaxSelection: 1;
                 NoItemsText: "No scope";
               }
@@ -1123,16 +1194,18 @@ $C.@PageOverlay {
             Group { Anchor: (Height: 8); }
 
             Group {
-              Anchor: (Height: 24);
+              Anchor: (Height: 34);
+              Background: #252c27;
+              Padding: (Left: 8, Right: 8);
 
               Label #TwSettingsSimpleClaimsSectionLabel {
-                Anchor: (Left: 0, Right: 0, Height: 24);
+                Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "Simple Claims";
-                Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsSimpleClaimsSectionTooltip {
-                Anchor: (Left: 0, Right: 0, Height: 24);
+                Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "";
                 TooltipText: "Controls Tamework's integration with Simple Claims for breeding and protection rules.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -1141,16 +1214,16 @@ $C.@PageOverlay {
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsSimpleClaimsEnabledLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Enable Simple Claims Integration";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsSimpleClaimsEnabledTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Turns Simple Claims integration on or off for claim-aware breeding and protection checks.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -1158,24 +1231,26 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsSimpleClaimsEnabledCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsClaimLimitChunkLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Breeding Limit Per Claim Chunk";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsClaimLimitChunkTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Maximum number of bred companions allowed in a single claim chunk.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -1183,10 +1258,12 @@ $C.@PageOverlay {
               }
 
               TextField #TwSettingsClaimLimitChunkInput {
-                Anchor: (Left: 256, Width: 250, Height: 24);
-                Style: $C.@DefaultInputFieldStyle;
-                PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
-                Background: $C.@InputBoxBackground;
+                Anchor: (Left: 356, Width: 290, Height: 28);
+                Style: $A.@PanelInputFieldStyle;
+                PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
+                Background: #252c27;
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Horizontal: 8);
                 PlaceholderText: "0";
                 MaxLength: 8;
@@ -1194,16 +1271,16 @@ $C.@PageOverlay {
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsClaimLimitTotalLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Breeding Limit Per Claim Total";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsClaimLimitTotalTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Maximum number of bred companions allowed across the entire claim.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -1211,10 +1288,12 @@ $C.@PageOverlay {
               }
 
               TextField #TwSettingsClaimLimitTotalInput {
-                Anchor: (Left: 256, Width: 250, Height: 24);
-                Style: $C.@DefaultInputFieldStyle;
-                PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
-                Background: $C.@InputBoxBackground;
+                Anchor: (Left: 356, Width: 290, Height: 28);
+                Style: $A.@PanelInputFieldStyle;
+                PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
+                Background: #252c27;
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Horizontal: 8);
                 PlaceholderText: "0";
                 MaxLength: 8;
@@ -1222,16 +1301,16 @@ $C.@PageOverlay {
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsBreedingRequiresClaimLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Breeding Requires Claim";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsBreedingRequiresClaimTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Requires breeding to happen inside a Simple Claims claim.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -1239,24 +1318,26 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsBreedingRequiresClaimCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 34);
 
               Label #TwSettingsSimpleClaimsProtectLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "Protect Tamed From Non-Members";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsSimpleClaimsProtectTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
+                Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
                 TooltipText: "Prevents non-members of a claim from harming or interfering with owned companions inside that claim.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -1264,8 +1345,10 @@ $C.@PageOverlay {
               }
 
               CheckBox #TwSettingsSimpleClaimsProtectCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Anchor: (Top: 3, Left: 356, Width: 22, Height: 22);
+                Background: (Color: #252c27);
+                OutlineColor: #4a5a50;
+                OutlineSize: 1;
                 Padding: (Full: 4);
                 Style: $C.@DefaultCheckBoxStyle;
               }
@@ -1274,16 +1357,18 @@ $C.@PageOverlay {
             Group { Anchor: (Height: 8); }
 
             Group {
-              Anchor: (Height: 24);
+              Anchor: (Height: 34);
+              Background: #252c27;
+              Padding: (Left: 8, Right: 8);
 
               Label #TwSettingsTelemetrySectionLabel {
-                Anchor: (Left: 0, Right: 0, Height: 24);
+                Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "Beacon Consent";
-                Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
+                Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsCrashTelemetrySectionTooltip {
-                Anchor: (Left: 0, Right: 0, Height: 24);
+                Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "";
                 TooltipText: "Telemetry consent is managed by the shared Beacon command.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
@@ -1297,7 +1382,7 @@ $C.@PageOverlay {
               Label #TwSettingsTelemetryConsentInstructionLabel {
                 Anchor: (Left: 0, Right: 16, Height: 42);
                 Text: "Use /beacon consent to review or change Tamework telemetry consent. This settings page no longer edits telemetry.";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+                Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
               }
             }
           }
