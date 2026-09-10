@@ -2,7 +2,10 @@
 
 ## Unreleased development changes
 
-- The command menu has a Feedback button that opens Beacon’s issue and suggestion form.
+- Trait icons match the charcoal HUD and command panel; removed unused custom UI
+  textures to reduce their shared texture-atlas footprint.
+
+- The command menu has a Feedback button that opens Beaconâ€™s issue and suggestion form.
 
 - Capturing and releasing a companion preserves its harvest cooldown instead of
   making it harvestable immediately.
