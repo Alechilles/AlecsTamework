@@ -10,6 +10,18 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 
 `TwAttachmentMigrationConfig` backfills missing model attachment slots from already-stored attachment selections. Use it when a mod splits an existing appearance choice into a new random attachment set and existing NPCs need a deterministic upgrade path.
 
+Tamework also repairs missing random attachment sets automatically when existing
+NPCs load, including wild NPCs without a migration config. After preserving valid
+saved selections and applying any explicit migration rules, it fills remaining
+sets using the current model's normal `RandomAttachmentSets` weights. The choices
+are saved and reused on later loads. A valid invisible option such as `None`
+counts as a selection and is preserved.
+
+This covers installing a texture or model mod mid-playthrough: existing animals
+receive the newly split parts as their chunks load. It does not scan unloaded
+chunks or reroll existing choices. Fresh spawns keep the game's normal selection
+behavior; an asset hot reload requires an NPC reload before this repair runs.
+
 ## Path
 `Server/Tamework/AttachmentMigrations/*.json`
 

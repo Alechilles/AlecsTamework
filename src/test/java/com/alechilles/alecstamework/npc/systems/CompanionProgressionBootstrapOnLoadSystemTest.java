@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
-import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.hypixel.hytale.component.AddReason;
 import java.lang.reflect.Field;
 import org.junit.jupiter.api.Test;
@@ -31,7 +30,7 @@ class CompanionProgressionBootstrapOnLoadSystemTest {
     void queuesAttachmentRepairForLoadedUntamedNpcWithMigrationConfig() {
         assertTrue(CompanionProgressionBootstrapOnLoadSystem.shouldRunAttachmentLoadBootstrap(
                 AddReason.LOAD,
-                null,
+                false,
                 false,
                 true
         ));
@@ -41,7 +40,7 @@ class CompanionProgressionBootstrapOnLoadSystemTest {
     void queuesAttachmentRepairForLoadedUntamedNpcWithStoredAttachments() {
         assertTrue(CompanionProgressionBootstrapOnLoadSystem.shouldRunAttachmentLoadBootstrap(
                 AddReason.LOAD,
-                null,
+                false,
                 true,
                 false
         ));
@@ -51,10 +50,20 @@ class CompanionProgressionBootstrapOnLoadSystemTest {
     void doesNotQueueAttachmentRepairForFreshSpawnWithoutStoredOrMigrationState() {
         assertFalse(CompanionProgressionBootstrapOnLoadSystem.shouldRunAttachmentLoadBootstrap(
                 AddReason.SPAWN,
-                new TameworkTamedComponent(true),
+                true,
                 false,
                 true
         ));
+    }
+
+    @Test
+    void queuesMissingAttachmentRepairWithoutStoredStateOrMigrationConfigOnlyOnLoad() {
+        assertTrue(CompanionProgressionBootstrapOnLoadSystem.shouldRunAttachmentLoadBootstrap(
+                AddReason.LOAD, true, false, false));
+        assertFalse(CompanionProgressionBootstrapOnLoadSystem.shouldRunAttachmentLoadBootstrap(
+                AddReason.LOAD, false, false, false));
+        assertFalse(CompanionProgressionBootstrapOnLoadSystem.shouldRunAttachmentLoadBootstrap(
+                AddReason.SPAWN, true, false, false));
     }
 
     @Test

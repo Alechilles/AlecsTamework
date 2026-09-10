@@ -12,6 +12,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Behavior coverage for immutable runtime activation planning and topology checks. */
 class TameworkRuntimeActivationPlannerTest {
     @Test
+    void randomModelAttachmentsActivateOnlyLoadBootstrap() {
+        TameworkRuntimeActivationPlan plan = new TameworkRuntimeActivationPlanner(
+                TameworkRuntimeModuleCatalog.standard()
+        ).plan(TameworkActivationEvidence.builder()
+                .content(TameworkRuntimeModule.NPC_LOAD_BOOTSTRAP, "Model/RandomAttachmentSets")
+                .build());
+
+        assertEquals(Set.of(TameworkRuntimeModule.NPC_LOAD_BOOTSTRAP), plan.activeModules());
+    }
+
+    @Test
     void emptyEvidenceLeavesEveryStandardModuleDormant() {
         TameworkRuntimeModuleCatalog catalog = TameworkRuntimeModuleCatalog.standard();
         TameworkRuntimeActivationPlan plan = new TameworkRuntimeActivationPlanner(catalog)

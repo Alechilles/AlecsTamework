@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
 import com.alechilles.alecstamework.npc.progression.CompanionAttachmentStateService;
+import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.AddReason;
@@ -119,7 +120,7 @@ public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<E
         boolean tamedNpc = isTamed(tamed);
         boolean progressionRepair = tamedNpc
                 && requiresNonTraitProgressionBootstrap(reference, store, roleId, traitPlan);
-        boolean attachmentRepair = isAttachmentBootstrapRequired(reference, store, roleId, reason, tamed);
+        boolean attachmentRepair = isAttachmentBootstrapRequired(reference, store, roleId, reason);
         return LoadDecision.classify(tamedNpc, traitPlan, progressionRepair, attachmentRepair);
     }
 
@@ -257,8 +258,7 @@ public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<E
     private boolean isAttachmentBootstrapRequired(@Nonnull Ref<EntityStore> reference,
                                                   @Nonnull Store<EntityStore> store,
                                                   @Nonnull String roleId,
-                                                  @Nonnull AddReason reason,
-                                                  @Nullable TameworkTamedComponent tamed) {
+                                                  @Nonnull AddReason reason) {
         var attachmentsType = TameworkAttachmentsComponent.getComponentType();
         if (attachmentsType == null) {
             return false;
@@ -268,14 +268,18 @@ public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<E
                 && attachments.getAttachmentIds() != null
                 && !attachments.getAttachmentIds().isEmpty();
         boolean hasMigrationConfig = TwAttachmentMigrationConfig.resolveForRole(roleId) != null;
-        return shouldRunAttachmentLoadBootstrap(reason, tamed, hasStoredAttachments, hasMigrationConfig);
+        boolean missingSelections = reason == AddReason.LOAD
+                && !CompanionModelAttachmentService.resolveCurrentAttachments(reference, store).keySet().containsAll(
+                        CompanionModelAttachmentService.resolveAttachmentOptionIds(
+                                CompanionModelAttachmentService.resolveModelAsset(reference, store)).keySet());
+        return shouldRunAttachmentLoadBootstrap(reason, missingSelections, hasStoredAttachments, hasMigrationConfig);
     }
 
     static boolean shouldRunAttachmentLoadBootstrap(@Nonnull AddReason reason,
-                                                    @Nullable TameworkTamedComponent tamed,
+                                                    boolean missingSelections,
                                                     boolean hasStoredAttachments,
                                                     boolean hasMigrationConfig) {
-        return reason == AddReason.LOAD && (hasStoredAttachments || hasMigrationConfig);
+        return reason == AddReason.LOAD && (missingSelections || hasStoredAttachments || hasMigrationConfig);
     }
 
     static boolean isJuvenileLifecycleRole(@Nullable String roleId,

@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeModule;
 import com.hypixel.hytale.assetstore.JsonAsset;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
+import com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -30,6 +31,9 @@ public final class TameworkRuntimeActivationEvidenceSource {
     /** Collects current effective assets without starting runtime work. */
     public static List<TameworkEffectiveAssetFact> collect() {
         List<TameworkEffectiveAssetFact> facts = new ArrayList<>();
+        addEnabledFact(facts, TameworkRuntimeModule.NPC_LOAD_BOOTSTRAP,
+                "Model/RandomAttachmentSets", ModelAsset.getAssetMap(), ignored -> true,
+                model -> model.getRandomAttachmentSets() != null && !model.getRandomAttachmentSets().isEmpty());
         addRoleFact(facts, TameworkRuntimeModule.CORE_OWNERSHIP,
                 "Tamework/Companion", TwCompanionConfig.getAssetMap(),
                 TwCompanionConfig::isEnabled, config -> Arrays.asList(config.getRoleIds()));

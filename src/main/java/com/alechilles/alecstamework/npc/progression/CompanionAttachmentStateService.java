@@ -5,9 +5,11 @@ import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -40,6 +42,22 @@ public final class CompanionAttachmentStateService {
             return;
         }
         TameworkAttachmentsComponent persisted = store.getComponent(npcRef, type);
+        if (forceApplyPersistedSelections) {
+            Map<String, String> current = CompanionModelAttachmentService.resolveCurrentAttachments(npcRef, store);
+            ModelAsset modelAsset = CompanionModelAttachmentService.resolveModelAsset(npcRef, store);
+            Map<String, String> expected = resolveLoadSelections(modelAsset,
+                    persisted != null ? persisted.getAttachmentIds() : null, current,
+                    TwAttachmentMigrationConfig.resolveForRole(CompanionRoleIdResolver.resolveRoleId(npcRef, store)));
+            if (expected.isEmpty()) {
+                return;
+            }
+            if (persisted == null || !expected.equals(persisted.getAttachmentIds())) {
+                persistAttachments(npcRef, store, type, persisted != null ? persisted.getConfigId() : null, expected);
+            }
+            // A loaded model can have matching IDs but stale rendered attachments.
+            applyResolvedSelections(npcRef, store, expected);
+            return;
+        }
         if (persisted != null && !persisted.getAttachmentIds().isEmpty()) {
             Map<String, String> expected = resolveSupportedSelections(npcRef, store, persisted.getAttachmentIds());
             if (expected.isEmpty()) {
@@ -50,8 +68,7 @@ public final class CompanionAttachmentStateService {
                 persistAttachments(npcRef, store, type, persisted.getConfigId(), expected);
             }
             Map<String, String> current = CompanionModelAttachmentService.resolveCurrentAttachments(npcRef, store);
-            if (forceApplyPersistedSelections
-                    || shouldApplyResolvedSelections(persistedChanged, expected, current)) {
+            if (shouldApplyResolvedSelections(persistedChanged, expected, current)) {
                 applyResolvedSelections(npcRef, store, expected);
             }
             return;
@@ -66,6 +83,26 @@ public final class CompanionAttachmentStateService {
         if (!current.equals(rawCurrent)) {
             applyResolvedSelections(npcRef, store, current);
         }
+    }
+
+    /** Resolves a loaded appearance: saved choices win, then migrations, then normal model weights. */
+    @Nonnull
+    static Map<String, String> resolveLoadSelections(@Nullable ModelAsset modelAsset,
+                                                    @Nullable Map<String, String> stored,
+                                                    @Nullable Map<String, String> current,
+                                                    @Nullable TwAttachmentMigrationConfig migrationConfig) {
+        Map<String, Set<String>> options = CompanionModelAttachmentService.resolveAttachmentOptionIds(modelAsset);
+        HashMap<String, String> selections = new HashMap<>(
+                CompanionModelAttachmentService.filterAttachmentSelections(current, options));
+        selections.putAll(CompanionModelAttachmentService.filterAttachmentSelections(stored, options));
+        selections.putAll(CompanionAttachmentMigrationService.applyConfiguredMigrations(
+                migrationConfig, selections, options));
+        if (modelAsset != null && !selections.keySet().containsAll(options.keySet())) {
+            Map<String, String> rolled = CompanionModelAttachmentService.filterAttachmentSelections(
+                    modelAsset.generateRandomAttachmentIds(), options);
+            rolled.forEach(selections::putIfAbsent);
+        }
+        return Map.copyOf(selections);
     }
 
     public static void replaceStoredAttachmentsWithCurrent(@Nullable Ref<EntityStore> npcRef,

@@ -66,9 +66,7 @@ public final class CompanionModelAttachmentService {
                 if (valueId == null || valueId.isBlank() || attachment == null) {
                     continue;
                 }
-                if (attachment.getModel() == null || attachment.getTexture() == null) {
-                    continue;
-                }
+                // An option without geometry is a valid weighted "None" choice.
                 validValueIds.add(valueId);
             }
             if (!validValueIds.isEmpty()) {

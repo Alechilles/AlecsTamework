@@ -17,6 +17,11 @@ Tamework uses these evidence sources:
 - Public capability requests made before the startup plan is published.
 - Read-only evidence of generic or bonded durable work.
 - Dependencies of a directly required module.
+- Effective models with random attachment sets activate `npc-load-bootstrap`.
+  This module owns only the existing NPC add/load hook. It repairs missing
+  attachment choices without activating ownership, attachment polling, or
+  persistence workers. `core-ownership` depends on this hook for its normal
+  progression bootstrap.
 
 Disabled configs, empty target lists, missing target assets, debug defaults,
 and an installed but unused optional integration do not activate a module.

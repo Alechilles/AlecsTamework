@@ -2,6 +2,10 @@
 
 ## Unreleased development changes
 
+- Existing NPCs now fill missing random attachment sets when they load, using
+  the model's normal weights. Saved choices and explicit attachment migrations
+  take priority, including intentional invisible options such as `None`.
+
 - Replaced the command wheel with a compact LMB/Q/E/R assignment sidebar and
   Linked, Nearby, and Owned tabs. The charcoal companion panel separates
   identity, traits and stacked meters, and captioned actions into fixed columns.

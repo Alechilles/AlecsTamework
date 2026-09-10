@@ -61,7 +61,8 @@ public final class TameworkRuntimeModuleCatalog {
         TameworkRuntimeModule leveling = TameworkRuntimeModule.LEVELING;
 
         return new TameworkRuntimeModuleCatalog(List.of(
-                TameworkRuntimeModuleDescriptor.of(core),
+                TameworkRuntimeModuleDescriptor.of(TameworkRuntimeModule.NPC_LOAD_BOOTSTRAP),
+                TameworkRuntimeModuleDescriptor.of(core, TameworkRuntimeModule.NPC_LOAD_BOOTSTRAP),
                 TameworkRuntimeModuleDescriptor.of(interactions, core, persistence),
                 TameworkRuntimeModuleDescriptor.of(
                         TameworkRuntimeModule.CAPTURE,

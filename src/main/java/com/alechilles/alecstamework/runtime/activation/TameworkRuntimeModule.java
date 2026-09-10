@@ -10,6 +10,7 @@ import java.util.List;
  * worker is constructed.</p>
  */
 public final class TameworkRuntimeModule implements Comparable<TameworkRuntimeModule> {
+    public static final TameworkRuntimeModule NPC_LOAD_BOOTSTRAP = of("npc-load-bootstrap");
     public static final TameworkRuntimeModule CORE_OWNERSHIP = of("core-ownership");
     public static final TameworkRuntimeModule INTERACTIONS = of("interactions");
     public static final TameworkRuntimeModule CAPTURE = of("capture");
@@ -37,6 +38,7 @@ public final class TameworkRuntimeModule implements Comparable<TameworkRuntimeMo
     public static final TameworkRuntimeModule DEBUG_SELF_TEST = of("debug-self-test");
 
     private static final List<TameworkRuntimeModule> STANDARD_MODULES = List.of(
+            NPC_LOAD_BOOTSTRAP,
             CORE_OWNERSHIP,
             INTERACTIONS,
             CAPTURE,

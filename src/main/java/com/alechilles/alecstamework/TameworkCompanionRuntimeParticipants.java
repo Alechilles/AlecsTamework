@@ -206,7 +206,7 @@ public final class TameworkCompanionRuntimeParticipants {
         participants.entitySystem(TameworkRuntimeModule.CAPTURE, "companiontranquilizerpeaksystem",
                 () -> new CompanionTranquilizerPeakSystem(NPCEntity.getComponentType(),
                         EffectControllerComponent.getComponentType(), plugin.getTranquilizerPeakComponentType()));
-        participants.entitySystem(TameworkRuntimeModule.CORE_OWNERSHIP, "companionprogressionbootstraponloadsystem",
+        participants.entitySystem(TameworkRuntimeModule.NPC_LOAD_BOOTSTRAP, "companionprogressionbootstraponloadsystem",
                 () -> new CompanionProgressionBootstrapOnLoadSystem(NPCEntity.getComponentType(),
                         plugin.getTamedComponentType()));
         participants.entitySystem(TameworkRuntimeModule.CORE_OWNERSHIP, "companionspawnauthoritycleanupsystems-npc",
