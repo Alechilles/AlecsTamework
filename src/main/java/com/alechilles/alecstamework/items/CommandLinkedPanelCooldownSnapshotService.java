@@ -14,7 +14,11 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.NPCPlugin;
+import com.hypixel.hytale.server.npc.asset.builder.Builder;
+import com.hypixel.hytale.server.npc.asset.builder.BuilderParameters;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import javax.annotation.Nullable;
 
@@ -81,24 +85,51 @@ final class CommandLinkedPanelCooldownSnapshotService {
             globalConfig = TwGlobalConfig.defaultConfig();
         }
         StdScope roleScope = NpcSupportAccess.sensorScope(npc.getRole(), npcRef, store);
-        Boolean isHarvestable = scopeLookupCache.getBoolean(roleScope, globalConfig.getIsHarvestableParam());
-        return hasEnabledHarvestInteraction(
-                resolveInteractionConfig(npcRef, store, globalConfig, roleScope),
-                Boolean.TRUE.equals(isHarvestable)
-        );
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        // Root role parameters are not necessarily exported to the live sensor scope.
+        StdScope parameters = resolveRoleParameterScope(roleId);
+        return hasEnabledHarvestCapability(
+                resolveInteractionConfig(roleId, globalConfig, roleScope, parameters),
+                roleScope, parameters, globalConfig.getIsHarvestableParam());
+    }
+
+    boolean hasEnabledHarvestCapability(@Nullable TwInteractionConfig config,
+                                        @Nullable StdScope sensorScope,
+                                        @Nullable StdScope parameters,
+                                        String harvestableParam) {
+        Boolean harvestable = scopeLookupCache.getBoolean(sensorScope, harvestableParam);
+        if (harvestable == null) {
+            harvestable = scopeLookupCache.getBoolean(parameters, harvestableParam);
+        }
+        return hasEnabledHarvestInteraction(config, Boolean.TRUE.equals(harvestable));
     }
 
     @Nullable
-    private TwInteractionConfig resolveInteractionConfig(Ref<EntityStore> npcRef,
-                                                         Store<EntityStore> store,
+    private static StdScope resolveRoleParameterScope(@Nullable String roleId) {
+        NPCPlugin plugin = NPCPlugin.get();
+        if (plugin == null || roleId == null || roleId.isBlank()) {
+            return null;
+        }
+        int roleIndex = plugin.getIndex(roleId);
+        Builder<Role> builder = roleIndex >= 0 ? plugin.tryGetCachedValidRole(roleIndex) : null;
+        BuilderParameters parameters = builder != null ? builder.getBuilderParameters() : null;
+        return parameters != null ? parameters.createScope() : null;
+    }
+
+    @Nullable
+    private TwInteractionConfig resolveInteractionConfig(@Nullable String roleId,
                                                          TwGlobalConfig globalConfig,
-                                                         @Nullable StdScope roleScope) {
+                                                         @Nullable StdScope roleScope,
+                                                         @Nullable StdScope parameters) {
         String configuredId = scopeLookupCache.getString(roleScope, globalConfig.getInteractionConfigParam());
+        if (configuredId == null) {
+            configuredId = scopeLookupCache.getString(parameters, globalConfig.getInteractionConfigParam());
+        }
         if (configuredId != null && !configuredId.isBlank()) {
             DefaultAssetMap<String, TwInteractionConfig> assetMap = TwInteractionConfig.getAssetMap();
             return assetMap != null ? assetMap.getAssetMap().get(configuredId) : null;
         }
-        return TwInteractionConfig.resolveForRole(CompanionRoleIdResolver.resolveRoleId(npcRef, store));
+        return TwInteractionConfig.resolveForRole(roleId);
     }
 
     static boolean hasEnabledHarvestInteraction(@Nullable TwInteractionConfig config,

@@ -41,7 +41,7 @@ $C = "Common.ui";
  DefaultBackground: (Color: #252c27),
  HoveredBackground: (Color: #35423a),
  PressedBackground: (Color: #2d3831),
- PanelBackground: (Color: #1d241f),
+ PanelBackground: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3),
  LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, TextColor: #d6d9d0),
  EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #d6d9d0),
  SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, TextColor: #f0eee7),

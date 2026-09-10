@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import org.junit.jupiter.api.Test;
+import com.hypixel.hytale.server.npc.util.expression.StdScope;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -81,6 +82,20 @@ class CommandLinkedPanelCooldownSnapshotServiceTest {
     void harvestInteractionCanExplicitlyOptOutOfTheHarvestabilityRequirement() {
         assertTrue(CommandLinkedPanelCooldownSnapshotService.hasEnabledHarvestInteraction(
                 configWith("{\"Type\":\"Harvest\",\"RequireHarvestable\":false}"), false));
+    }
+
+    @Test
+    void harvestCapabilityReadsDeclaredRoleParametersWhenSensorScopeOmitsThem() {
+        var service = new CommandLinkedPanelCooldownSnapshotService();
+        var sensor = new StdScope(null);
+        var parameters = new StdScope(null);
+        parameters.addConst("IsHarvestable", true);
+        var config = configWith("{\"Type\":\"Harvest\"}");
+        assertTrue(service.hasEnabledHarvestCapability(config, sensor, parameters, "IsHarvestable"));
+        sensor.addConst("IsHarvestable", false);
+        assertFalse(new CommandLinkedPanelCooldownSnapshotService()
+                .hasEnabledHarvestCapability(config, sensor, parameters, "IsHarvestable"));
+        assertFalse(service.hasEnabledHarvestCapability(config, null, null, "IsHarvestable"));
     }
 
     private static TwInteractionConfig configWith(String entry) {

@@ -4,7 +4,10 @@
 
 - Companion cards keep breeding and harvest readiness visible after cooldowns.
   Breeding indicators dim and explain low happiness or disabled breeding.
-  Refined level/talent controls and command/group selector alignment.
+  Harvest capability includes declared role parameters, including sheep shearing.
+  Refined level/talent controls and command/group selector alignment; level
+  buttons fit their digit count and talent buttons retain a distinct hover state.
+  Dropdown popups reuse the shared frame to stand apart from underlying cards.
 
 - Existing NPCs now fill missing random attachment sets when they load, using
   the model's normal weights. Saved choices and explicit attachment migrations

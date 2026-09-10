@@ -10,6 +10,8 @@ import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierBreakdownService;
 import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
 import com.alechilles.alecstamework.npc.progression.TraitModifierService;
+import com.hypixel.hytale.server.core.ui.Anchor;
+import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -52,14 +54,50 @@ final class LinkedNpcPanelProgressionBinder {
         if (stat == null) {
             return;
         }
-        commandBuilder.set(levelTextSelector + ".Text", resolveLevelText(stat.label()));
+        String levelText = resolveLevelText(stat.label());
+        commandBuilder.set(levelTextSelector + ".Text", levelText);
         commandBuilder.set(tooltipSelector + ".TooltipText", resolveXpTooltip(stat));
+        if (ringSelector.startsWith("#TameworkLinkedPanelList[")) {
+            bindCardLevelGeometry(commandBuilder, ringSelector, levelText);
+        }
         LinkedNpcPanelRingFill.SegmentFill fill = LinkedNpcPanelRingFill.resolve(progressRatio(stat.current(), stat.max()));
         commandBuilder.setObject(ringSelector + " #RingFillBar1.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar1Anchor(fill.bar1()));
         commandBuilder.setObject(ringSelector + " #RingFillBar2.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar2Anchor(fill.bar2()));
         commandBuilder.setObject(ringSelector + " #RingFillBar3.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar3Anchor(fill.bar3()));
         commandBuilder.setObject(ringSelector + " #RingFillBar4.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar4Anchor(fill.bar4()));
         commandBuilder.setObject(ringSelector + " #RingFillBar5.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar5Anchor(fill.bar5()));
+    }
+
+    /**
+     * The linked-card level button follows the talent-point button and sizes to
+     * the rendered level. The target HUD has its own compact ring layout, so it
+     * intentionally keeps its authored geometry.
+     */
+    private static void bindCardLevelGeometry(UICommandBuilder commandBuilder,
+                                              String ringSelector,
+                                              String levelText) {
+        int width = resolveLevelControlWidth(levelText);
+        int left = 406 - width;
+        String cardSelector = ringSelector.substring(0, ringSelector.length() - " #XpProgressRing".length());
+        commandBuilder.setObject(cardSelector + " #TalentPointAction.Anchor", fixedAnchor(24, left - 38, 34, 24));
+        commandBuilder.setObject(ringSelector + ".Anchor", fixedAnchor(24, left, width, 24));
+        commandBuilder.setObject(ringSelector + " #XpTooltip.Anchor", fixedAnchor(0, 0, width, 24));
+        commandBuilder.setObject(ringSelector + " #XpLevelText.Anchor",
+                fixedAnchor(2, 30, Math.max(14, width - 34), 20));
+    }
+
+    private static int resolveLevelControlWidth(String levelText) {
+        int digits = levelText == null || levelText.isBlank() ? 1 : levelText.length();
+        return 40 + digits * 8;
+    }
+
+    private static Anchor fixedAnchor(int top, int left, int width, int height) {
+        Anchor anchor = new Anchor();
+        anchor.setTop(Value.of(top));
+        anchor.setLeft(Value.of(left));
+        anchor.setWidth(Value.of(width));
+        anchor.setHeight(Value.of(height));
+        return anchor;
     }
 
     static void bindTalentPointIndicator(UICommandBuilder commandBuilder,
