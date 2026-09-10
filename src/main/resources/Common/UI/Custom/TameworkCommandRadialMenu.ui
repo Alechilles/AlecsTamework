@@ -23,7 +23,7 @@ $C.@PageOverlay {
      Anchor: (Top: 8, Right: 100, Width: 28, Height: 26);
      Visible: false;
      TextButton #CommandMenuSettingsButton { Anchor: (Full: 0); Text: ""; Style: $A.@PanelButton; TooltipText: %server.tamework.ui.settings.title; }
-     Group { Anchor: (Top: 3, Left: 4, Width: 20, Height: 20); HitTestVisible: false; Background: (TexturePath: "Common/IconMaskSettings.png", Color: #e8e4da); }
+     Group { Anchor: (Top: 1, Left: 2, Width: 24, Height: 24); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelActions/Settings_Glyph_Default.png"); }
     }
     TextButton #CommandMenuCloseButton { Anchor: (Top: 8, Right: 14, Width: 78, Height: 26); Text: %server.tamework.ui.shared.button.close; Style: $A.@PanelButton; }
    }
