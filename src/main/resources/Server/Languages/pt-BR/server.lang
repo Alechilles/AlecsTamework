@@ -928,3 +928,7 @@ tamework.ui.talents.saved.unavailable = Os talentos salvos deste companheiro est
 tamework.ui.talents.saved.saving = Salvando alterações de talentos…
 tamework.ui.talents.saved.saved = Alterações de talentos salvas.
 tamework.ui.talents.saved.changed = O companheiro mudou ou não foi possível salvar o talento. Os dados disponíveis foram atualizados.
+
+tamework.ui.linkedPanel.sort.happiness=Felicidade
+tamework.ui.linkedPanel.sort.hunger=Fome
+tamework.ui.linkedPanel.sort.thirst=Sede

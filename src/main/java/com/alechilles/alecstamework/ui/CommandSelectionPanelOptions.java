@@ -55,6 +55,18 @@ final class CommandSelectionPanelOptions {
                 new DropdownEntryInfo(
                         LocalizableString.fromString(LocalizedText.resolve(language, "tamework.ui.linkedPanel.sort.group")),
                         "Group"
+                ),
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(LocalizedText.resolve(language, "tamework.ui.linkedPanel.sort.happiness")),
+                        "Happiness"
+                ),
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(LocalizedText.resolve(language, "tamework.ui.linkedPanel.sort.hunger")),
+                        "Hunger"
+                ),
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(LocalizedText.resolve(language, "tamework.ui.linkedPanel.sort.thirst")),
+                        "Thirst"
                 )
         ));
     }

@@ -928,3 +928,7 @@ tamework.ui.talents.saved.unavailable = Gespeicherte Talentdaten sind für diese
 tamework.ui.talents.saved.saving = Talentänderungen werden gespeichert…
 tamework.ui.talents.saved.saved = Talentänderungen gespeichert.
 tamework.ui.talents.saved.changed = Der Begleiter wurde geändert oder das Talent konnte nicht gespeichert werden. Die neuesten verfügbaren Daten wurden geladen.
+
+tamework.ui.linkedPanel.sort.happiness=Zufriedenheit
+tamework.ui.linkedPanel.sort.hunger=Hunger
+tamework.ui.linkedPanel.sort.thirst=Durst

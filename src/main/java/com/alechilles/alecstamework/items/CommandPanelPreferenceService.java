@@ -40,7 +40,10 @@ final class CommandPanelPreferenceService {
         Default,
         Name,
         Species,
-        Group;
+        Group,
+        Happiness,
+        Hunger,
+        Thirst;
 
         static PanelSort fromMetadata(String raw) {
             if (raw == null || raw.isBlank()) {

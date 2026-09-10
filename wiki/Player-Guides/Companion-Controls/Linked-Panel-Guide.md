@@ -61,7 +61,9 @@ records without a complete saved talent snapshot cannot use offline spending.
   Bonded-companion tools keep their separate roster controls.
 
 ## Sorting and filtering
-- Sort modes can include default order, name, species, or group.
+- Sort modes include default order, name, species, group, happiness, hunger, and thirst.
+- Care sorts show the lowest percentage first, including inactive companions. Unknown
+  values sort last. Unloaded companions use their last-known saved values.
 - Filter modes can include none, name, species, or group.
 - Some tools let you type filter text while the panel is open.
 

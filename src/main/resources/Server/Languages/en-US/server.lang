@@ -929,3 +929,7 @@ tamework.ui.talents.saved.unavailable = Saved talent data is unavailable for thi
 tamework.ui.talents.saved.saving = Saving talent changes…
 tamework.ui.talents.saved.saved = Talent changes saved.
 tamework.ui.talents.saved.changed = The companion changed or the talent could not be saved. The latest available data has been refreshed.
+
+tamework.ui.linkedPanel.sort.happiness=Happiness
+tamework.ui.linkedPanel.sort.hunger=Hunger
+tamework.ui.linkedPanel.sort.thirst=Thirst

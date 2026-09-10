@@ -928,3 +928,7 @@ tamework.ui.talents.saved.unavailable = Les talents sauvegardés de ce compagnon
 tamework.ui.talents.saved.saving = Sauvegarde des talents…
 tamework.ui.talents.saved.saved = Talents sauvegardés.
 tamework.ui.talents.saved.changed = Le compagnon a changé ou le talent n’a pas pu être sauvegardé. Les dernières données disponibles ont été actualisées.
+
+tamework.ui.linkedPanel.sort.happiness=Bonheur
+tamework.ui.linkedPanel.sort.hunger=Faim
+tamework.ui.linkedPanel.sort.thirst=Soif

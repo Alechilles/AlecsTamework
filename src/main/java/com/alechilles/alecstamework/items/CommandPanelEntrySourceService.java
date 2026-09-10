@@ -432,7 +432,7 @@ final class CommandPanelEntrySourceService {
         return filtered;
     }
 
-    private Comparator<LinkedNpcEntry> buildComparator(CommandPanelPreferenceService.PanelSort sort) {
+    static Comparator<LinkedNpcEntry> buildComparator(CommandPanelPreferenceService.PanelSort sort) {
         Comparator<LinkedNpcEntry> base =
                 Comparator.comparing((LinkedNpcEntry value) -> value.active() ? 0 : 1);
         Comparator<LinkedNpcEntry> byName = Comparator
@@ -440,6 +440,19 @@ final class CommandPanelEntrySourceService {
                 .thenComparing(value -> value.npcUuid().toString());
         if (sort == null) {
             return base.thenComparing(byName);
+        }
+        // Care sorts prioritize need even when the animal is inactive.
+        if (sort == CommandPanelPreferenceService.PanelSort.Happiness) {
+            return Comparator.comparingDouble((LinkedNpcEntry value) ->
+                    careRatio(value.currentHappiness(), value.maxHappiness())).thenComparing(byName);
+        }
+        if (sort == CommandPanelPreferenceService.PanelSort.Hunger) {
+            return Comparator.comparingDouble((LinkedNpcEntry value) ->
+                    careRatio(value.currentHunger(), value.maxHunger())).thenComparing(byName);
+        }
+        if (sort == CommandPanelPreferenceService.PanelSort.Thirst) {
+            return Comparator.comparingDouble((LinkedNpcEntry value) ->
+                    careRatio(value.currentThirst(), value.maxThirst())).thenComparing(byName);
         }
         if (sort == CommandPanelPreferenceService.PanelSort.Name) {
             return base.thenComparing(byName);
@@ -458,6 +471,11 @@ final class CommandPanelEntrySourceService {
                         String.CASE_INSENSITIVE_ORDER
                 )
                 .thenComparing(byName);
+    }
+
+    private static double careRatio(int current, int maximum) {
+        return maximum <= 0 ? Double.POSITIVE_INFINITY
+                : Math.max(0.0, Math.min(1.0, (double) current / maximum));
     }
 
     private List<LinkedNpcEntry> partitionByActive(List<LinkedNpcEntry> input) {
@@ -503,7 +521,7 @@ final class CommandPanelEntrySourceService {
         return candidate.toLowerCase(Locale.ROOT).contains(filterNormalized);
     }
 
-    private String firstNonBlank(String first, String second) {
+    private static String firstNonBlank(String first, String second) {
         if (first != null && !first.isBlank()) {
             return first;
         }
@@ -513,7 +531,7 @@ final class CommandPanelEntrySourceService {
         return "";
     }
 
-    private String safe(String value) {
+    private static String safe(String value) {
         return value == null ? "" : value;
     }
 

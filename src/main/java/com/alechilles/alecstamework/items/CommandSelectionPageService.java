@@ -747,7 +747,7 @@ final class CommandSelectionPageService {
                 context.toolAuthority(), panel.increaseRadius());
         addPanel(catalog, "CLEAR_FILTERS", "Clear filters", "clear",
                 context.preferenceAuthority(), panel.clearFilters());
-        for (String sort : List.of("Default", "Name", "Species", "Group")) {
+        for (String sort : List.of("Default", "Name", "Species", "Group", "Happiness", "Hunger", "Thirst")) {
             addPanel(catalog, "SORT_" + sort.toUpperCase(java.util.Locale.ROOT),
                     "Sort by " + sort.toLowerCase(java.util.Locale.ROOT),
                     "sort:" + sort, context.preferenceAuthority(),

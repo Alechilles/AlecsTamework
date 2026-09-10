@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Added Happiness, Hunger, and Thirst sorting, with the lowest known care
+  percentage first and unknown values last, including inactive companions.
+
 - Owners can spend or reset talent points for dead and lost companions with a
   complete saved restoration snapshot. Purchases carry through revival and recovery.
 
