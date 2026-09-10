@@ -119,7 +119,7 @@ final class LinkedNpcPanelProgressionBinder {
         return stat == null ? 0 : Math.max(0, stat.current());
     }
 
-    private static String resolveLevelText(String label) {
+    static String resolveLevelText(String label) {
         if (label == null || label.isBlank()) {
             return "?";
         }

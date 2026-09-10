@@ -2,6 +2,10 @@
 
 ## Unreleased development changes
 
+- The target HUD matches the charcoal command menu, with readable health and
+  needs meters, breeding and harvest cooldown/readiness bars, and compact
+  appearance labels such as `Coat: Brown`.
+
 - The command menu includes a settings cog for players allowed to use `/tw settings`.
   Fixed the cog texture reference.
 - Dead, lost, and unloaded companion cards retain available saved stats, traits,

@@ -1,8 +1,9 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.items.CommandTargetHudViewModel;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import com.hypixel.hytale.server.core.ui.Anchor;
+import com.hypixel.hytale.server.core.ui.Value;
+import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Assertions;
@@ -10,171 +11,106 @@ import org.junit.jupiter.api.Test;
 
 class CommandTargetHudBinderTest {
     @Test
-    void binderControlsOptionalRowsExplicitly() throws Exception {
-        String source = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/ui/CommandTargetHudBinder.java"
-        ));
-
-        Assertions.assertTrue(source.contains("#FoodRow.Visible"));
-        Assertions.assertTrue(source.contains("#FavoriteFoodBlock.Visible"));
-        Assertions.assertTrue(source.contains("#FoodStripBlock.Visible"));
-        Assertions.assertTrue(source.contains("bindFoodStrip"));
-        Assertions.assertTrue(source.contains("#FoodSlot"));
-        Assertions.assertTrue(source.contains("bindFoodValue"));
-        Assertions.assertTrue(source.contains("#FoodValuePositive"));
-        Assertions.assertTrue(source.contains("#FoodValueNegative"));
-        Assertions.assertTrue(source.contains("#FoodValueNeutral"));
-        Assertions.assertTrue(source.contains("new ItemGridSlot(new ItemStack"));
-        Assertions.assertTrue(source.contains(".Slots"));
-        Assertions.assertTrue(source.contains("#FoodMore.Visible"));
-        Assertions.assertTrue(source.contains("#GenderMaleIcon.Visible"));
-        Assertions.assertTrue(source.contains("#GenderFemaleIcon.Visible"));
-        Assertions.assertTrue(source.contains("\"#AttachmentRow\" + i"));
-        Assertions.assertTrue(source.contains("selector + \".Visible\""));
-        Assertions.assertTrue(source.contains("#Text.Text"));
-        Assertions.assertTrue(source.contains("#TameRequirementRow.Visible"));
-        Assertions.assertTrue(source.contains("#TameRequirementCurrent.Visible"));
-        Assertions.assertTrue(source.contains("#TameRequirementCurrent.Text"));
-        Assertions.assertTrue(source.contains("LinkedNpcPanelVitalsBinder.bind"));
-        Assertions.assertTrue(source.contains("HEALTH_FILL_MAX_WIDTH = 230"));
-        Assertions.assertTrue(source.contains("LinkedNpcPanelVitalsBinder.bind(commandBuilder, \"#Root\", status, language, HEALTH_FILL_MAX_WIDTH)"));
-        Assertions.assertTrue(source.contains("LinkedNpcPanelProgressionBinder.bindXpProgressRing"));
-        Assertions.assertTrue(source.contains("LinkedNpcTraitIndicatorBinder.bind"));
-        Assertions.assertTrue(source.contains("#StatusRingRow.Visible"));
-        Assertions.assertTrue(source.contains("#ProgressionRow.Visible"));
-        Assertions.assertTrue(source.contains("#TraitRingRow.Visible"));
-        Assertions.assertTrue(source.contains("#OwnerRow.Visible"));
-        Assertions.assertTrue(source.contains("#OwnerText.Text"));
-        Assertions.assertTrue(source.contains("bindLayout"));
-        Assertions.assertTrue(source.contains("#Root.Anchor"));
-        Assertions.assertTrue(source.contains("#FoodTameRow.Anchor"));
-        Assertions.assertTrue(source.contains("#OwnerRow.Anchor"));
-        Assertions.assertTrue(source.contains("#AttachmentRow\" + i + \".Anchor"));
+    void rendersNeedPercentagesAndMatchingFillWidths() {
+        UICommandBuilder commands = bind(model(loadedNeedsStatus("Duck"), List.of()));
+        UICommandBuilder expected = new UICommandBuilder();
+        expected.set("#Root #NeedHappiness #NeedValueText.Text", "80%");
+        expected.set("#Root #NeedHunger #NeedValueText.Text", "70%");
+        expected.set("#Root #NeedThirst #NeedValueText.Text", "60%");
+        Anchor fill = new Anchor();
+        fill.setLeft(Value.of(0));
+        fill.setTop(Value.of(26));
+        fill.setWidth(Value.of(80));
+        fill.setHeight(Value.of(6));
+        expected.setObject("#NeedHappiness #MeterFill.Anchor", fill);
+        assertCommands(expected, commands);
     }
 
     @Test
-    void uiAssetContainsExpectedSelectors() throws Exception {
-        String ui = Files.readString(Path.of(
-                "src/main/resources/Common/UI/Custom/TameworkCommandTargetHud.ui"
-        )).replace("\r\n", "\n");
-
-        Assertions.assertTrue(ui.contains("FoodRow"));
-        Assertions.assertTrue(ui.contains("FavoriteFoodBlock"));
-        Assertions.assertTrue(ui.contains("FoodStripBlock"));
-        Assertions.assertTrue(ui.contains("ItemGrid #FoodItemGrid"));
-        Assertions.assertTrue(ui.contains("FoodSlot0"));
-        Assertions.assertTrue(ui.contains("FoodSlot1"));
-        Assertions.assertTrue(ui.contains("FoodSlot2"));
-        Assertions.assertTrue(ui.contains("FoodSlot3"));
-        Assertions.assertTrue(ui.contains("SlotSize: 28"));
-        Assertions.assertTrue(ui.contains("SlotIconSize: 28"));
-        Assertions.assertTrue(ui.contains("FoodValuePositive"));
-        Assertions.assertTrue(ui.contains("TextColor: #5CF75F"));
-        Assertions.assertTrue(ui.contains("FoodValueNegative"));
-        Assertions.assertTrue(ui.contains("TextColor: #F75C5C"));
-        Assertions.assertTrue(ui.contains("FoodValueNeutral"));
-        Assertions.assertTrue(ui.contains("FoodMore"));
-        Assertions.assertTrue(ui.contains("GenderMaleIcon"));
-        Assertions.assertTrue(ui.contains("GenderFemaleIcon"));
-        Assertions.assertTrue(ui.contains("RenderItemQualityBackground: false"));
-        Assertions.assertTrue(ui.contains("AttachmentRow0"));
-        Assertions.assertTrue(ui.contains("AttachmentRow5"));
-        Assertions.assertTrue(ui.contains("Label #Text"));
-        Assertions.assertTrue(ui.contains("TameRequirementRow"));
-        Assertions.assertTrue(ui.contains("TameRequirementCurrent"));
-        Assertions.assertTrue(ui.contains("Anchor: (Top: 0, Right: 0, Width: 116, Height: 52);"));
-        Assertions.assertTrue(ui.contains("HealthText"));
-        Assertions.assertTrue(ui.contains("HealthTextShadow"));
-        Assertions.assertTrue(ui.contains("HealthTooltip"));
-        Assertions.assertTrue(ui.contains("StatusRingRow"));
-        Assertions.assertTrue(ui.contains("NeedHappiness"));
-        Assertions.assertTrue(ui.contains("NeedHunger"));
-        Assertions.assertTrue(ui.contains("NeedThirst"));
-        Assertions.assertTrue(ui.contains("BreedingCooldown"));
-        Assertions.assertTrue(ui.contains("HarvestCooldown"));
-        Assertions.assertTrue(ui.contains("ProgressionRow"));
-        Assertions.assertTrue(ui.contains("Group #ProgressionRow {\n        Anchor: (Top: 62, Right: 0, Width: 56, Height: 26);"));
-        Assertions.assertTrue(ui.contains("XpProgressRing"));
-        Assertions.assertTrue(ui.contains("TalentPointAction"));
-        Assertions.assertTrue(ui.contains("TraitRingRow"));
-        Assertions.assertTrue(ui.contains("Group #TraitRingRow {\n            Anchor: (Top: 0, Right: 0, Width: 120, Height: 24);"));
-        Assertions.assertTrue(ui.contains("TraitSlot0"));
-        Assertions.assertTrue(ui.contains("OwnerRow"));
-        Assertions.assertTrue(ui.contains("OwnerText"));
-        Assertions.assertTrue(ui.contains("Group #FoodTameRow {\n        Anchor: (Top: 96, Left: 0, Right: 0, Height: 60);\n        Visible: false;"));
+    void readyCooldownsRemainVisibleAndReserveSpaceWithoutNeeds() {
+        LinkedNpcEntry ready = cooldownStatus(false);
+        UICommandBuilder commands = bind(model(ready, List.of()));
+        UICommandBuilder expected = new UICommandBuilder();
+        expected.set("#CooldownRow.Visible", true);
+        expected.set("#Root #BreedingCooldown.Visible", true);
+        expected.set("#Root #HarvestCooldown.Visible", true);
+        assertCommands(expected, commands);
+        Assertions.assertTrue(data(commands, "#Root #HarvestCooldown #CooldownText.Text").toLowerCase().contains("ready"));
+        var readyLayout = CommandTargetHudBinder.resolveLayout(model(ready, List.of()));
+        var emptyLayout = CommandTargetHudBinder.resolveLayout(model(unloadedStatus("Duck"), List.of()));
+        Assertions.assertTrue(readyLayout.rootHeight() > emptyLayout.rootHeight());
+        UICommandBuilder cooling = bind(model(cooldownStatus(true), List.of()));
+        Assertions.assertTrue(data(cooling, "#Root #BreedingCooldown #CooldownText.Text").contains("1:00"));
     }
 
     @Test
-    void untamedFavoriteOnlyLayoutShrinksPanel() {
-        CommandTargetHudBinder.Layout layout = CommandTargetHudBinder.resolveLayout(new CommandTargetHudViewModel(
-                unloadedStatus("Doe"),
-                new CommandTargetHudViewModel.FoodRow("AH_Lettuce", "Lettuce", null, 6.0),
-                List.of(),
-                List.of(),
-                null,
-                null
-        ));
-
-        Assertions.assertEquals(62, layout.foodTameTop());
-        Assertions.assertEquals(36, layout.foodTameHeight());
-        Assertions.assertEquals(120, layout.rootHeight());
-        Assertions.assertEquals(0, layout.attachmentCount());
+    void rendersAppearancePairsAndClearsOldRowsWhenTargetChanges() {
+        var appearance = List.of(new CommandTargetHudViewModel.AttachmentRow("Coat", "Brown"),
+                new CommandTargetHudViewModel.AttachmentRow("Eyes", "Red"));
+        UICommandBuilder commands = bind(model(loadedNeedsStatus("Duck"), appearance));
+        UICommandBuilder expected = new UICommandBuilder();
+        expected.set("#AttachmentRow0 #Text.Text", "Coat: Brown");
+        expected.set("#AttachmentRow1 #Text.Text", "Eyes: Red");
+        assertCommands(expected, commands);
+        CommandTargetHudBinder.bind(commands, model(loadedNeedsStatus("Cat"), List.of()), "en-US");
+        expected = new UICommandBuilder();
+        expected.set("#AttachmentRow0.Visible", false);
+        expected.set("#AttachmentRow1.Visible", false);
+        expected.set("#AppearanceDivider.Visible", false);
+        assertCommands(expected, commands);
     }
 
     @Test
-    void tamedDetailedLayoutStacksVisibleRowsWithoutFixedGaps() {
-        CommandTargetHudBinder.Layout layout = CommandTargetHudBinder.resolveLayout(new CommandTargetHudViewModel(
-                loadedNeedsStatus("Stag"),
-                null,
-                List.of(
-                        new CommandTargetHudViewModel.FoodRow("AH_Lettuce", "Lettuce", null, 6.0),
-                        new CommandTargetHudViewModel.FoodRow("AH_PremiumFeed", "Premium Feed", null, 10.0)
-                ),
-                List.of(
-                        new CommandTargetHudViewModel.AttachmentRow("Antlers", "Brown"),
-                        new CommandTargetHudViewModel.AttachmentRow("Fur Color", "Dark Brown")
-                ),
-                null,
-                null
-        ));
-
-        Assertions.assertEquals(62, layout.statusTop());
-        Assertions.assertEquals(96, layout.foodTameTop());
-        Assertions.assertEquals(46, layout.foodTameHeight());
-        Assertions.assertEquals(150, layout.firstAttachmentTop());
-        Assertions.assertEquals(208, layout.rootHeight());
-    }
-
-    @Test
-    void ownerRowAddsBottomAlignedHeightWhenVisible() {
-        CommandTargetHudBinder.Layout layout = CommandTargetHudBinder.resolveLayout(new CommandTargetHudViewModel(
-                unloadedStatus("Stag"),
-                null,
-                List.of(),
-                List.of(),
-                null,
-                "Alec"
-        ));
-
+    void optionalSectionsCollapseAndAppearancePrecedesFoodAndOwner() {
+        var food = new CommandTargetHudViewModel.FoodRow("Food_Corn", "Corn", null, 5.0);
+        var detailed = new CommandTargetHudViewModel(loadedNeedsStatus("Duck"), food, List.of(food),
+                List.of(new CommandTargetHudViewModel.AttachmentRow("Coat", "Brown")),
+                new CommandTargetHudViewModel.TameRequirementRow(true, 4, "2 (42s)"), "Alec");
+        var layout = CommandTargetHudBinder.resolveLayout(detailed);
+        Assertions.assertTrue(layout.foodTameVisible());
         Assertions.assertTrue(layout.ownerVisible());
-        Assertions.assertEquals(62, layout.ownerTop());
-        Assertions.assertEquals(102, layout.rootHeight());
+        Assertions.assertTrue(layout.firstAttachmentTop() < layout.foodTameTop());
+        Assertions.assertTrue(layout.foodTameTop() + layout.foodTameHeight() <= layout.ownerTop());
+        Assertions.assertTrue(layout.ownerTop() < layout.rootHeight());
+        var minimal = CommandTargetHudBinder.resolveLayout(model(unloadedStatus("Duck"), List.of()));
+        Assertions.assertFalse(minimal.foodTameVisible());
+        Assertions.assertFalse(minimal.ownerVisible());
+        Assertions.assertTrue(minimal.rootHeight() < layout.rootHeight());
     }
 
-    @Test
-    void tameRequirementRowUsesEnoughHeightForCurrentStackText() {
-        CommandTargetHudBinder.Layout layout = CommandTargetHudBinder.resolveLayout(new CommandTargetHudViewModel(
-                unloadedStatus("Wolf"),
-                new CommandTargetHudViewModel.FoodRow("Food_Wildmeat_Raw", "Raw Wildmeat", null, 6.0),
-                List.of(),
-                List.of(),
-                new CommandTargetHudViewModel.TameRequirementRow(true, 4, "2 (42s)"),
-                null
-        ));
+    private static CommandTargetHudViewModel model(LinkedNpcEntry status,
+            List<CommandTargetHudViewModel.AttachmentRow> attachments) {
+        return new CommandTargetHudViewModel(status, null, List.of(), attachments, null, null);
+    }
 
-        Assertions.assertEquals(62, layout.foodTameTop());
-        Assertions.assertEquals(52, layout.foodTameHeight());
-        Assertions.assertEquals(136, layout.rootHeight());
+    private static UICommandBuilder bind(CommandTargetHudViewModel model) {
+        UICommandBuilder commands = new UICommandBuilder();
+        CommandTargetHudBinder.bind(commands, model, "en-US");
+        return commands;
+    }
+
+    private static void assertCommands(UICommandBuilder expected, UICommandBuilder actual) {
+        for (var command : expected.getCommands()) {
+            Assertions.assertEquals(command.data, data(actual, command.selector), command.selector);
+        }
+    }
+
+    private static String data(UICommandBuilder commands, String selector) {
+        String result = null;
+        for (var command : commands.getCommands()) {
+            if (selector.equals(command.selector)) result = command.data;
+        }
+        Assertions.assertNotNull(result, selector);
+        return result;
+    }
+
+    private static LinkedNpcEntry cooldownStatus(boolean active) {
+        return new LinkedNpcEntry(UUID.randomUUID(), "Sheep", 25, 25, 0, 0, 80,
+                null, 0, 0, 0, 0, true, false, false, false, false, false, 0L,
+                null, null, null, LinkedNpcTraitIndicator.EMPTY,
+                false, false, false, false, true, true,
+                null, null, null, null, null, true, active, active ? 60_000L : 0L,
+                active ? 0.5 : 1.0, true, false, 0L, 1.0, true);
     }
 
     private static LinkedNpcEntry unloadedStatus(String displayName) {

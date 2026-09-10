@@ -15,6 +15,7 @@ Many Tamework-powered mods share a cluster of long-term progression systems. The
 - Often improved by feeding, care, or positive interactions
 - Can influence breeding readiness or other companion behavior
 - The linked panel and target HUD show a thin red mark at the configured breeding happiness requirement. The mark is hidden when no happiness requirement applies. Reaching it satisfies the happiness check; other breeding rules still apply. Mods can set separate requirements for specific breeding interactions.
+- The target HUD shows needs as percentage bars and breeding/harvest timers as progress bars with remaining time or readiness text. Breeding dims when switched off or blocked by low happiness. Random appearance attributes appear as text, such as `Coat: Brown`.
 - Some mods also show short-lived active happiness impulses (for example recent feed, pet, or damage effects)
 
 ## Needs

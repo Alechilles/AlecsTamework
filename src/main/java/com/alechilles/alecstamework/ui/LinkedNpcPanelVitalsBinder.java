@@ -19,6 +19,46 @@ final class LinkedNpcPanelVitalsBinder {
     private LinkedNpcPanelVitalsBinder() {
     }
 
+    static void bindHud(UICommandBuilder commands, LinkedNpcEntry entry, String language, int healthWidth) {
+        bindHealth(commands, "#Root", entry, language, healthWidth, 20, false);
+        bindNeedMeters(commands, "#Root", entry, language);
+        bindBreedingCooldownMeter(commands, "#Root", entry, language);
+        bindHarvestCooldownMeter(commands, "#Root", entry, language);
+        String[] needs = {"#NeedHappiness", "#NeedHunger", "#NeedThirst"};
+        double[] ratios = {entry.happinessRatio(), entry.hungerRatio(), entry.thirstRatio()};
+        for (int i = 0; i < needs.length; i++) {
+            commands.setObject(needs[i] + " #MeterFill.Anchor", hudFill(ratios[i], 100));
+            commands.set(needs[i] + " #NeedValueText.Style", Value.ref("TameworkCommandTargetHud.ui", "MeterValue"));
+        }
+        Anchor marker = hudFill(0, 2);
+        marker.setLeft(Value.of((int) Math.round(clamp(entry.breedingHappinessRatio()) * 98)));
+        marker.setTop(Value.of(24));
+        marker.setWidth(Value.of(2));
+        marker.setHeight(Value.of(10));
+        commands.setObject("#NeedHappiness #BreedingThresholdMarker.Anchor", marker);
+        commands.setObject("#BreedingCooldown #MeterFill.Anchor", hudFill(
+                entry.breedingCooldownRemainingMs() < 0 ? 0 : entry.breedingCooldownActive() ? entry.breedingCooldownRatio() : 1, 156));
+        commands.setObject("#HarvestCooldown #MeterFill.Anchor", hudFill(
+                entry.harvestCooldownRemainingMs() < 0 ? 0 : entry.harvestCooldownActive() ? entry.harvestCooldownRatio() : 1, 156));
+        boolean breedingMuted = !entry.loaded() || !entry.breedingEnabled()
+                || LinkedNpcPanelStatusTextService.breedingBlockedByHappiness(entry);
+        commands.set("#BreedingCooldown #CooldownText.Style", Value.ref("TameworkCommandTargetHud.ui",
+                breedingMuted ? "CooldownMuted" : "CooldownValue"));
+        commands.set("#HarvestCooldown #CooldownText.Style", Value.ref("TameworkCommandTargetHud.ui",
+                entry.loaded() ? "CooldownValue" : "CooldownMuted"));
+        commands.set("#BreedingCooldown #CooldownLabel.Style", Value.ref("TameworkCommandTargetHud.ui", "CooldownLabel"));
+        commands.set("#HarvestCooldown #CooldownLabel.Style", Value.ref("TameworkCommandTargetHud.ui", "CooldownLabel"));
+    }
+
+    private static Anchor hudFill(double ratio, int width) {
+        Anchor anchor = new Anchor();
+        anchor.setLeft(Value.of(0));
+        anchor.setTop(Value.of(26));
+        anchor.setWidth(Value.of((int) Math.round(clamp(ratio) * width)));
+        anchor.setHeight(Value.of(6));
+        return anchor;
+    }
+
     static void bind(UICommandBuilder commandBuilder, String entrySelector, LinkedNpcEntry entry) {
         bind(commandBuilder, entrySelector, entry, null);
     }
@@ -28,18 +68,6 @@ final class LinkedNpcPanelVitalsBinder {
         bindNeedMeters(commandBuilder, entrySelector, entry, language);
         bindBreedingCooldownMeter(commandBuilder, entrySelector, entry, language);
         bindHarvestCooldownMeter(commandBuilder, entrySelector, entry, language);
-    }
-
-    static void bind(UICommandBuilder commandBuilder,
-                     String entrySelector,
-                     LinkedNpcEntry entry,
-                     String language,
-                     int healthFillMaxWidth) {
-        // The target HUD keeps its compact health bar; panel cards use the taller variant.
-        bindHealth(commandBuilder, entrySelector, entry, language, healthFillMaxWidth, 12, false);
-        bindNeedRings(commandBuilder, entrySelector, entry, language);
-        bindBreedingCooldown(commandBuilder, entrySelector, entry, language);
-        bindHarvestCooldown(commandBuilder, entrySelector, entry, language);
     }
 
     private static void bindHealth(UICommandBuilder commandBuilder,
@@ -117,43 +145,6 @@ final class LinkedNpcPanelVitalsBinder {
         commandBuilder.set(healthTextShadowSelector + ".Text", notAvailable);
         commandBuilder.set(healthFillSelector + ".Visible", false);
         commandBuilder.set(healthTooltipSelector + ".TooltipText", notAvailable);
-    }
-
-    private static void bindNeedRings(UICommandBuilder commandBuilder,
-                                      String entrySelector,
-                                      LinkedNpcEntry entry,
-                                      String language) {
-        bindNeedRing(
-                commandBuilder,
-                entrySelector + " #NeedHappiness",
-                new NeedIcon(LocalizedText.resolve(language, "tamework.ui.linkedPanel.needIcons.happiness"), ICON_NEED_HAPPINESS),
-                resolveHappinessNeed(entry, language),
-                shouldShowHappiness(entry),
-                "#d7ba77"
-        );
-        String markerSelector = entrySelector + " #NeedHappiness #BreedingThresholdMarker";
-        boolean showMarker = shouldShowBreedingThreshold(entry);
-        commandBuilder.set(markerSelector + ".Visible", showMarker);
-        if (showMarker) {
-            commandBuilder.setObject(markerSelector + ".Anchor",
-                    LinkedNpcPanelAnchorFactory.buildNeedRingThresholdAnchor(entry.breedingHappinessRatio()));
-        }
-        bindNeedRing(
-                commandBuilder,
-                entrySelector + " #NeedHunger",
-                new NeedIcon(LocalizedText.resolve(language, "tamework.ui.linkedPanel.needIcons.hunger"), ICON_NEED_HUNGER),
-                resolveHungerNeed(entry, language),
-                shouldShowNeeds(entry),
-                "#ba9b79"
-        );
-        bindNeedRing(
-                commandBuilder,
-                entrySelector + " #NeedThirst",
-                new NeedIcon(LocalizedText.resolve(language, "tamework.ui.linkedPanel.needIcons.thirst"), ICON_NEED_THIRST),
-                resolveThirstNeed(entry, language),
-                shouldShowNeeds(entry),
-                "#7eb6b0"
-        );
     }
 
     private static void bindNeedMeters(UICommandBuilder commandBuilder,
@@ -306,42 +297,6 @@ final class LinkedNpcPanelVitalsBinder {
         return new NeedVisual(0.0, LocalizedText.resolve(language, "tamework.ui.linkedPanel.thirst.unavailable"), false, false);
     }
 
-    private static void bindNeedRing(UICommandBuilder commandBuilder,
-                                     String slotSelector,
-                                     NeedIcon icon,
-                                     NeedVisual visual,
-                                     boolean visible,
-                                     String fillColor) {
-        commandBuilder.set(slotSelector + ".Visible", visible);
-        if (!visible) {
-            return;
-        }
-        if (icon.hasTexturePath()) {
-            commandBuilder.set(slotSelector + " #NeedIcon.Visible", false);
-            commandBuilder.set(slotSelector + " #NeedIconImage.Visible", true);
-            commandBuilder.set(slotSelector + " #NeedIconImage.Background", icon.texturePath());
-        } else {
-            commandBuilder.set(slotSelector + " #NeedIconImage.Visible", false);
-            commandBuilder.set(slotSelector + " #NeedIcon.Visible", true);
-            commandBuilder.set(slotSelector + " #NeedIcon.Text", icon.fallbackText());
-        }
-        commandBuilder.set(slotSelector + " #NeedTooltip.TooltipText", visual.tooltipText());
-        LinkedNpcPanelRingFill.SegmentFill fill = LinkedNpcPanelRingFill.resolve(visual.available() ? visual.fillRatio() : 0.0);
-        commandBuilder.setObject(slotSelector + " #RingFillBar1.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar1Anchor(fill.bar1()));
-        commandBuilder.setObject(slotSelector + " #RingFillBar2.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar2Anchor(fill.bar2()));
-        commandBuilder.setObject(slotSelector + " #RingFillBar3.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar3Anchor(fill.bar3()));
-        commandBuilder.setObject(slotSelector + " #RingFillBar4.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar4Anchor(fill.bar4()));
-        commandBuilder.setObject(slotSelector + " #RingFillBar5.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar5Anchor(fill.bar5()));
-        if (visual.muted()) {
-            fillColor = MUTED_FILL_COLOR;
-        }
-        commandBuilder.set(slotSelector + " #RingFillBar1.Background", fillColor);
-        commandBuilder.set(slotSelector + " #RingFillBar2.Background", fillColor);
-        commandBuilder.set(slotSelector + " #RingFillBar3.Background", fillColor);
-        commandBuilder.set(slotSelector + " #RingFillBar4.Background", fillColor);
-        commandBuilder.set(slotSelector + " #RingFillBar5.Background", fillColor);
-    }
-
     private static void bindNeedMeter(UICommandBuilder commandBuilder,
                                       String slotSelector,
                                       NeedIcon icon,
@@ -373,50 +328,6 @@ final class LinkedNpcPanelVitalsBinder {
         );
         commandBuilder.set(slotSelector + " #MeterFill.Background",
                 visual.muted() ? MUTED_FILL_COLOR : fillColor);
-    }
-
-    private static void bindBreedingCooldown(UICommandBuilder commandBuilder,
-                                             String entrySelector,
-                                             LinkedNpcEntry entry,
-                                             String language) {
-        String slotSelector = entrySelector + " #BreedingCooldown";
-        boolean cooldownRecharging = entry.breedingCooldownKnown();
-        commandBuilder.set(slotSelector + ".Visible", cooldownRecharging);
-        if (!cooldownRecharging) {
-            return;
-        }
-        commandBuilder.set(
-                slotSelector + " #BreedingCooldownTooltip.TooltipText",
-                LinkedNpcPanelStatusTextService.resolveBreedingCooldownTooltip(entry, language)
-        );
-        LinkedNpcPanelRingFill.SegmentFill fill = LinkedNpcPanelRingFill.resolve(entry.breedingCooldownRatio());
-        commandBuilder.setObject(slotSelector + " #RingFillBar1.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar1Anchor(fill.bar1()));
-        commandBuilder.setObject(slotSelector + " #RingFillBar2.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar2Anchor(fill.bar2()));
-        commandBuilder.setObject(slotSelector + " #RingFillBar3.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar3Anchor(fill.bar3()));
-        commandBuilder.setObject(slotSelector + " #RingFillBar4.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar4Anchor(fill.bar4()));
-        commandBuilder.setObject(slotSelector + " #RingFillBar5.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar5Anchor(fill.bar5()));
-    }
-
-    private static void bindHarvestCooldown(UICommandBuilder commandBuilder,
-                                            String entrySelector,
-                                            LinkedNpcEntry entry,
-                                            String language) {
-        String slotSelector = entrySelector + " #HarvestCooldown";
-        boolean cooldownRecharging = entry.harvestCooldownKnown();
-        commandBuilder.set(slotSelector + ".Visible", cooldownRecharging);
-        if (!cooldownRecharging) {
-            return;
-        }
-        commandBuilder.set(
-                slotSelector + " #HarvestCooldownTooltip.TooltipText",
-                LinkedNpcPanelStatusTextService.resolveHarvestCooldownTooltip(entry, language)
-        );
-        LinkedNpcPanelRingFill.SegmentFill fill = LinkedNpcPanelRingFill.resolve(entry.harvestCooldownRatio());
-        commandBuilder.setObject(slotSelector + " #RingFillBar1.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar1Anchor(fill.bar1()));
-        commandBuilder.setObject(slotSelector + " #RingFillBar2.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar2Anchor(fill.bar2()));
-        commandBuilder.setObject(slotSelector + " #RingFillBar3.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar3Anchor(fill.bar3()));
-        commandBuilder.setObject(slotSelector + " #RingFillBar4.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar4Anchor(fill.bar4()));
-        commandBuilder.setObject(slotSelector + " #RingFillBar5.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar5Anchor(fill.bar5()));
     }
 
     private static void bindBreedingCooldownMeter(UICommandBuilder commands, String card,

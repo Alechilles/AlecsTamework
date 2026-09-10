@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.items.CommandTargetHudViewModel;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.ui.Anchor;
 import com.hypixel.hytale.server.core.ui.ItemGridSlot;
@@ -18,20 +19,19 @@ final class CommandTargetHudBinder {
     private static final int MAX_FOOD_STRIP_ITEMS = 4;
     private static final int ROOT_TOP = 218;
     private static final int ROOT_RIGHT = 26;
-    private static final int ROOT_WIDTH = 252;
-    private static final int HEALTH_FILL_MAX_WIDTH = 230;
+    private static final int ROOT_WIDTH = 344;
+    private static final int HEALTH_FILL_MAX_WIDTH = 322;
     private static final int ROOT_VERTICAL_CHROME = 22;
     private static final int HEADER_TOP = 0;
     private static final int HEADER_HEIGHT = 26;
-    private static final int HEALTH_TOP = 28;
+    private static final int HEALTH_TOP = 46;
     private static final int HEALTH_HEIGHT = 28;
-    private static final int FIRST_DYNAMIC_ROW_TOP = 62;
+    private static final int FIRST_DYNAMIC_ROW_TOP = 80;
     private static final int SECTION_GAP = 6;
     private static final int FOOD_ATTACHMENT_GAP = 8;
-    private static final int STATUS_ROW_WIDTH = 154;
-    private static final int STATUS_ROW_HEIGHT = 28;
-    private static final int PROGRESSION_ROW_WIDTH = 56;
-    private static final int PROGRESSION_ROW_HEIGHT = 26;
+    private static final int STATUS_ROW_WIDTH = 324;
+    private static final int STATUS_ROW_HEIGHT = 48;
+    private static final int PROGRESSION_ROW_WIDTH = 110;
     private static final int FAVORITE_FOOD_HEIGHT = 36;
     private static final int FOOD_STRIP_HEIGHT = 46;
     private static final int FOOD_STACK_GAP = 4;
@@ -54,10 +54,10 @@ final class CommandTargetHudBinder {
         commandBuilder.set("#GenderMaleIcon.Visible", status.isMale());
         commandBuilder.set("#GenderFemaleIcon.Visible", status.isFemale());
         commandBuilder.set("#Name.Text", safe(status.displayName(), LocalizedText.resolve(language, "tamework.ui.commandTargetHud.name.unknown")));
-        LinkedNpcPanelVitalsBinder.bind(commandBuilder, "#Root", status, language, HEALTH_FILL_MAX_WIDTH);
-        bindStatusRingVisibility(commandBuilder, status);
+        LinkedNpcPanelVitalsBinder.bindHud(commandBuilder, status, language, HEALTH_FILL_MAX_WIDTH);
+        bindStatusVisibility(commandBuilder, status);
         bindProgression(commandBuilder, status);
-        bindTraitRings(commandBuilder, status.traitIndicators());
+        bindTraits(commandBuilder, status.traitIndicators());
         bindFood(commandBuilder, model.favoriteFood(), model.compatibleFoods(), language);
         bindAttachments(commandBuilder, model.attachments());
         bindTameRequirement(commandBuilder, model.tameRequirement(), language);
@@ -72,7 +72,11 @@ final class CommandTargetHudBinder {
         commandBuilder.setObject("#HeaderRow.Anchor", fullWidthAnchor(HEADER_TOP, HEADER_HEIGHT));
         commandBuilder.setObject("#HealthRow.Anchor", fullWidthAnchor(HEALTH_TOP, HEALTH_HEIGHT));
         commandBuilder.setObject("#StatusRingRow.Anchor", leftAnchor(layout.statusTop(), STATUS_ROW_WIDTH, STATUS_ROW_HEIGHT));
-        commandBuilder.setObject("#ProgressionRow.Anchor", rightAnchor(layout.statusTop(), PROGRESSION_ROW_WIDTH, PROGRESSION_ROW_HEIGHT));
+        commandBuilder.setObject("#ProgressionRow.Anchor", rightAnchor(26, PROGRESSION_ROW_WIDTH, 18));
+        commandBuilder.set("#CooldownRow.Visible", model.status().breedingCooldownKnown() || model.status().harvestCooldownKnown());
+        commandBuilder.setObject("#CooldownRow.Anchor", fullWidthAnchor(layout.cooldownTop(), 48));
+        commandBuilder.set("#AppearanceDivider.Visible", layout.attachmentCount() > 0);
+        commandBuilder.setObject("#AppearanceDivider.Anchor", fullWidthAnchor(layout.firstAttachmentTop() - 4, 1));
         commandBuilder.set("#FoodTameRow.Visible", layout.foodTameVisible());
         commandBuilder.setObject("#FoodTameRow.Anchor", fullWidthAnchor(layout.foodTameTop(), layout.foodTameHeight()));
         commandBuilder.setObject("#FoodRow.Anchor", leftAnchor(0, layout.foodRowWidth(), layout.foodRowHeight()));
@@ -88,7 +92,6 @@ final class CommandTargetHudBinder {
     static Layout resolveLayout(@Nonnull CommandTargetHudViewModel model) {
         LinkedNpcEntry status = model.status();
         boolean hasStatusRow = hasStatusRow(status);
-        boolean hasProgressionRow = hasProgressionRow(status);
         boolean hasFavoriteFood = model.favoriteFood() != null;
         boolean hasFoodStrip = hasRenderableFoods(model.compatibleFoods());
         boolean hasTameRequirement = model.tameRequirement() != null;
@@ -98,8 +101,20 @@ final class CommandTargetHudBinder {
         int nextTop = FIRST_DYNAMIC_ROW_TOP;
         int contentBottom = HEALTH_TOP + HEALTH_HEIGHT;
         int statusTop = nextTop;
-        if (hasStatusRow || hasProgressionRow) {
+        if (hasStatusRow) {
             contentBottom = statusTop + STATUS_ROW_HEIGHT;
+            nextTop = contentBottom + SECTION_GAP;
+        }
+
+        int cooldownTop = nextTop;
+        if (status.breedingCooldownKnown() || status.harvestCooldownKnown()) {
+            contentBottom = cooldownTop + 48;
+            nextTop = contentBottom + SECTION_GAP;
+        }
+
+        int firstAttachmentTop = nextTop;
+        if (attachmentCount > 0) {
+            contentBottom = firstAttachmentTop + (attachmentCount * ATTACHMENT_ROW_HEIGHT);
             nextTop = contentBottom + SECTION_GAP;
         }
 
@@ -114,12 +129,6 @@ final class CommandTargetHudBinder {
             nextTop = contentBottom + FOOD_ATTACHMENT_GAP;
         }
 
-        int firstAttachmentTop = nextTop;
-        if (attachmentCount > 0) {
-            contentBottom = firstAttachmentTop + (attachmentCount * ATTACHMENT_ROW_HEIGHT);
-            nextTop = contentBottom + SECTION_GAP;
-        }
-
         int ownerTop = nextTop;
         if (hasOwner) {
             contentBottom = ownerTop + OWNER_ROW_HEIGHT;
@@ -128,6 +137,7 @@ final class CommandTargetHudBinder {
         return new Layout(
                 ROOT_VERTICAL_CHROME + contentBottom,
                 statusTop,
+                cooldownTop,
                 foodTameTop,
                 foodTameHeight,
                 foodTameHeight > 0,
@@ -154,11 +164,8 @@ final class CommandTargetHudBinder {
     }
 
     private static boolean hasStatusRow(@Nonnull LinkedNpcEntry status) {
-        return status.hasHappiness()
-                || status.hasHunger()
-                || status.hasThirst()
-                || (status.breedingCooldownKnown() && status.breedingCooldownActive())
-                || (status.harvestCooldownKnown() && status.harvestCooldownActive());
+        return (TameworkRuntimeSettings.happinessEnabled(true) && status.hasHappiness())
+                || (TameworkRuntimeSettings.needsEnabled(true) && (status.hasHunger() || status.hasThirst()));
     }
 
     private static boolean hasProgressionRow(@Nonnull LinkedNpcEntry status) {
@@ -179,23 +186,21 @@ final class CommandTargetHudBinder {
         return ownerDisplayName != null && !ownerDisplayName.isBlank();
     }
 
-    private static void bindStatusRingVisibility(UICommandBuilder commandBuilder, LinkedNpcEntry status) {
-        commandBuilder.set("#NeedHappiness.Visible", status.hasHappiness());
-        commandBuilder.set("#NeedHunger.Visible", status.hasHunger());
-        commandBuilder.set("#NeedThirst.Visible", status.hasThirst());
+    private static void bindStatusVisibility(UICommandBuilder commandBuilder, LinkedNpcEntry status) {
+        commandBuilder.set("#NeedHappiness.Visible", TameworkRuntimeSettings.happinessEnabled(true) && status.hasHappiness());
+        commandBuilder.set("#NeedHunger.Visible", TameworkRuntimeSettings.needsEnabled(true) && status.hasHunger());
+        commandBuilder.set("#NeedThirst.Visible", TameworkRuntimeSettings.needsEnabled(true) && status.hasThirst());
         commandBuilder.set("#StatusRingRow.Visible", hasStatusRow(status));
     }
 
     private static void bindProgression(UICommandBuilder commandBuilder, LinkedNpcEntry status) {
         boolean hasTalentPoints = LinkedNpcPanelProgressionBinder.availableTalentPoints(status.futureStatB()) > 0;
         commandBuilder.set("#ProgressionRow.Visible", hasProgressionRow(status));
-        LinkedNpcPanelProgressionBinder.bindXpProgressRing(
-                commandBuilder,
-                "#XpProgressRing",
-                "#XpProgressRing #XpLevelText",
-                "#XpProgressRing #XpTooltip",
-                status.futureStatA()
-        );
+        commandBuilder.set("#XpProgressRing.Visible", status.futureStatA() != null);
+        if (status.futureStatA() != null) {
+            commandBuilder.set("#XpLevelText.Text", LinkedNpcPanelProgressionBinder.resolveLevelText(status.futureStatA().label()));
+            commandBuilder.set("#XpTooltip.TooltipText", LinkedNpcPanelProgressionBinder.resolveXpTooltip(status.futureStatA()));
+        }
         LinkedNpcPanelProgressionBinder.bindTalentPointIndicator(
                 commandBuilder,
                 "#TalentPointAction",
@@ -206,10 +211,30 @@ final class CommandTargetHudBinder {
         );
     }
 
-    private static void bindTraitRings(UICommandBuilder commandBuilder, LinkedNpcTraitIndicator[] indicators) {
+    private static void bindTraits(UICommandBuilder commandBuilder, LinkedNpcTraitIndicator[] indicators) {
         LinkedNpcTraitIndicator[] safeIndicators = indicators == null ? LinkedNpcTraitIndicator.EMPTY : indicators;
         commandBuilder.set("#TraitRingRow.Visible", safeIndicators.length > 0);
-        LinkedNpcTraitIndicatorBinder.bind(commandBuilder, "#Root", safeIndicators);
+        for (int i = 0; i < LinkedNpcTraitIndicatorBinder.MAX_VISIBLE_TRAIT_INDICATORS; i++) {
+            String slot = "#TraitSlot" + i;
+            boolean visible = i < safeIndicators.length;
+            commandBuilder.set(slot + ".Visible", visible);
+            if (!visible) {
+                continue;
+            }
+            LinkedNpcTraitIndicator trait = safeIndicators[i];
+            commandBuilder.set(slot + " #TraitIconImage.Visible", trait.hasIconTexturePath());
+            commandBuilder.set(slot + " #TraitIcon.Visible", !trait.hasIconTexturePath());
+            if (trait.hasIconTexturePath()) {
+                commandBuilder.set(slot + " #TraitIconImage.Background", trait.iconTexturePath());
+            } else {
+                commandBuilder.set(slot + " #TraitIcon.Text", trait.iconText());
+            }
+            commandBuilder.set(slot + " #TraitTooltip.TooltipText", trait.tooltipText());
+            commandBuilder.set(slot + " #TraitTick.Background", trait.belowDefault() ? "#d45f5f" : "#6fc576");
+            Anchor tick = leftAnchor(0, Math.max(2, (int) Math.round(trait.fillRatio() * 20)), 3);
+            tick.setLeft(Value.of(2));
+            commandBuilder.setObject(slot + " #TraitTick.Anchor", tick);
+        }
     }
 
     private static void bindFood(UICommandBuilder commandBuilder,
@@ -455,6 +480,7 @@ final class CommandTargetHudBinder {
 
     record Layout(int rootHeight,
                   int statusTop,
+                  int cooldownTop,
                   int foodTameTop,
                   int foodTameHeight,
                   boolean foodTameVisible,
