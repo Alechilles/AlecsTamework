@@ -6,6 +6,8 @@ import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
+import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
+import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -273,6 +275,38 @@ final class CommandSelectionLinkedPanelRuntime {
         LinkedNpcPanelCardBinder.bind(commands, events, index, entry, append,
                 page.isPendingUnlink(entry.npcUuid()), page.cardBindingConfig,
                 page.resolveLanguage(), presentation);
+        if (presentation != null && presentation.bonded() != null) return;
+        String selector = "#TameworkLinkedPanelList[" + index + "] #GroupSelector";
+        boolean available = canAssignGroup(entry, presentation)
+                && !page.isPendingUnlink(entry.npcUuid());
+        commands.set(selector + ".Visible", available);
+        if (!available) return;
+        List<DropdownEntryInfo> entries = resolveGroupEntries();
+        commands.set(selector + ".Entries", entries.isEmpty()
+                ? LinkedNpcPanelGroupAssignOverlayState.fallbackEntries(page.resolveLanguage()) : entries);
+        commands.set(selector + ".Value",
+                LinkedNpcPanelGroupAssignOverlayState.normalizeDropdownValue(entry.groupId()));
+        LinkedNpcPanelGroupTabBinder.bind(commands, selector, entry, false);
+        events.addEventBinding(CustomUIEventBindingType.ValueChanged, selector,
+                EventData.of(CommandSelectionPageEventBinder.EVENT_COMMAND_ID,
+                        CommandSelectionPageEventBinder.ASSIGN_GROUP_COMMAND_PREFIX + entry.npcUuid())
+                        .append(CommandSelectionPageEventBinder.KEY_PANEL_GROUP_ASSIGN_VALUE, selector + ".Value"), false);
+    }
+
+    private boolean canAssignGroup(LinkedNpcEntry entry, CommandPanelFeaturePresentation presentation) {
+        return entry != null && entry.linked() && !page.cardBindingConfig.ownerCommandFamilyRoster()
+                && (presentation == null || presentation.bonded() == null && !presentation.managesRosterRow());
+    }
+
+    void assignGroup(UUID npcUuid, String value) {
+        LinkedNpcEntry entry = resolveEntry(npcUuid);
+        if (!canAssignGroup(entry, page.featureController.presentation(npcUuid))
+                || page.isPendingUnlink(npcUuid) || page.panelAssignGroupCallback == null) return;
+        // The existing callback revalidates the current command item, link, and group before writing.
+        page.panelAssignGroupCallback.accept(npcUuid,
+                LinkedNpcPanelGroupAssignOverlayState.normalizeGroupIdForAssignment(value));
+        page.pendingUnlinkNpcUuid = null;
+        refreshEntries();
     }
 
     void openGroupAssignOverlay(UUID npcUuid) {

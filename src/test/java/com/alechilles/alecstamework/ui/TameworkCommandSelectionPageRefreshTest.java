@@ -31,6 +31,52 @@ class TameworkCommandSelectionPageRefreshTest {
     private static final LinkedNpcEntry ENTRY = new LinkedNpcEntry(CARD, "Nimbus", 10, 10, 0, 0, null, 0, 0, 0, 0, true, true, false, false, false, false, 0L, new LinkedNpcTraitIndicator[0]);
 
     @Test
+    void inlineGroupSelectionRoutesAssignmentAndClearingWithoutOpeningAModal() throws Exception {
+        TameworkCommandSelectionPage page = page(new CapturedPackets(), new AtomicReference<>(),
+                new NavigationFixture(), legacyConfig());
+        List<String> assignments = new ArrayList<>();
+        replaceField(page, "panelAssignGroupCallback", (BiConsumer<UUID, String>)
+                (id, group) -> assignments.add(id + "/" + group));
+        UIEventBuilder events = new UIEventBuilder();
+        page.build(null, new UICommandBuilder(), events, null);
+        assertTrue(java.util.Arrays.stream(events.getEvents()).anyMatch(binding ->
+                binding.type == com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType.ValueChanged
+                        && binding.data.contains("__assigngroup__:" + CARD)
+                        && binding.data.contains("#GroupSelector.Value")));
+
+        groupEvent(page, CARD, "pasture");
+        groupEvent(page, CARD, "None");
+        groupEvent(page, UUID.randomUUID(), "pasture");
+
+        assertEquals(List.of(CARD + "/pasture", CARD + "/null"), assignments);
+        page.onDismiss(null, null);
+    }
+
+    @Test
+    void inlineGroupSelectionRejectsManagedRosterTargets() throws Exception {
+        for (TwCommandItemConfig config : List.of(config(), genericConfig())) {
+            TameworkCommandSelectionPage page = page(new CapturedPackets(), new AtomicReference<>(),
+                    new NavigationFixture(), config);
+            AtomicInteger assignments = new AtomicInteger();
+            replaceField(page, "panelAssignGroupCallback", (BiConsumer<UUID, String>)
+                    (id, group) -> assignments.incrementAndGet());
+            build(page);
+            groupEvent(page, CARD, "pasture");
+            assertEquals(0, assignments.get());
+            page.onDismiss(null, null);
+        }
+    }
+
+    private static void groupEvent(TameworkCommandSelectionPage page, UUID id, String group) throws Exception {
+        CommandSelectionEventData data = new CommandSelectionEventData();
+        Field command = CommandSelectionEventData.class.getDeclaredField("commandId");
+        command.setAccessible(true);
+        unsafe().putObject(data, unsafe().objectFieldOffset(command), "__assigngroup__:" + id);
+        data.panelGroupAssignValue = group;
+        page.handleDataEvent(null, null, data);
+    }
+
+    @Test
     void primaryAssignmentsReuseSelectionWithoutClosingOrAcceptingHiddenCommands() throws Exception {
         for (String roster : List.of("", "\"RosterStorage\":\"OwnerCommandFamily\",\"CommandFamilyId\":\"test:family\",")) {
             TwCommandItemConfig config = TwCommandItemConfig.CODEC.decode(BsonDocument.parse(

@@ -19,7 +19,9 @@ Group #Title {
 
                 CheckBox #TameworkLinkedPanelAutoLinkCheck {
                     Anchor: (Top: 3, Left: 0, Width: 22, Height: 22);
-                    Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                    Background: (Color: #252c27);
+                    OutlineColor: #4a5a50;
+                    OutlineSize: 1;
                     Padding: (Full: 4);
                     Style: $C.@DefaultCheckBoxStyle;
                 }
@@ -164,9 +166,15 @@ Group #TameworkLinkedPanelControlsSecondary {
                     Visible: false;
 
                     TextField #TameworkLinkedPanelFilterInput {
-                        Style: $C.@DefaultInputFieldStyle;
-                        PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
-                        Background: $C.@InputBoxBackground;
+                        Style: $A.@PanelInputFieldStyle;
+                        PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
+                        Background: (Color: #252c27);
+                        OutlineColor: #4a5a50;
+                        OutlineSize: 1;
+                        Decoration: (
+                            Default: (Background: (Color: #252c27), OutlineColor: #4a5a50, OutlineSize: 1),
+                            Focused: (Background: (Color: #2d3831), OutlineColor: #91b59b, OutlineSize: 1)
+                        );
                         Anchor: (Width: 172, Height: 28);
                         Padding: (Horizontal: 8);
                         PlaceholderText: %server.tamework.ui.linkedPanel.filter.placeholder;
@@ -179,7 +187,9 @@ Group #TameworkLinkedPanelActiveHighlightControls {
 
                 CheckBox #TameworkLinkedPanelActiveHighlightCheck {
                     Anchor: (Top: 3, Left: 0, Width: 22, Height: 22);
-                    Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                    Background: (Color: #252c27);
+                    OutlineColor: #4a5a50;
+                    OutlineSize: 1;
                     Padding: (Full: 4);
                     Style: $C.@DefaultCheckBoxStyle;
                 }

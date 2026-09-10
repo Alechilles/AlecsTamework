@@ -7,6 +7,9 @@
   identity, traits and stacked meters, and captioned actions into fixed columns.
   Unavailable companions put their status beside the relevant action, and
   disabled needs remain hidden.
+- Linked cards assign groups directly from a dropdown with a group-colored
+  border. Traits and level share one row; active switches, filters, and
+  checkboxes use the matching panel style.
 - Action buttons now reuse two frame textures and sixteen glyphs, replacing the
   separate baked state images to reduce UI texture use.
 

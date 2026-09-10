@@ -532,6 +532,14 @@ public final class TameworkCommandSelectionPage
         if (rosterEventBoundary.blocks(data, commandId)) {
             return;
         }
+        if (commandId.startsWith(ASSIGN_GROUP_COMMAND_PREFIX)) {
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, ASSIGN_GROUP_COMMAND_PREFIX);
+            if (npcUuid != null && data.panelGroupAssignValue != null) {
+                linkedPanelRuntime.assignGroup(npcUuid, data.panelGroupAssignValue);
+                sendCardRefreshUpdate();
+            }
+            return;
+        }
         if (data.panelGroupAssignValue != null) {
             groupAssignOverlay.updateSelectedValue(data.panelGroupAssignValue);
         }

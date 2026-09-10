@@ -37,6 +37,7 @@ final class CommandSelectionRosterEventBoundary {
         return commandId.startsWith(LINK_COMMAND_PREFIX)
                 || commandId.startsWith(UNLINK_COMMAND_PREFIX)
                 || commandId.startsWith(OPEN_GROUP_PICKER_COMMAND_PREFIX)
+                || commandId.startsWith(ASSIGN_GROUP_COMMAND_PREFIX)
                 || commandId.startsWith(TOGGLE_ACTIVE_COMMAND_PREFIX)
                 || commandId.startsWith(TOGGLE_BREEDING_COMMAND_PREFIX)
                 || commandId.startsWith(RELEASE_COMMAND_PREFIX)

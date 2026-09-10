@@ -108,8 +108,6 @@ final class LinkedNpcPanelCardBinder {
         String breedingToggleEnabledSelector = entrySelector + " #BreedingToggleEnabledButton";
         String breedingToggleDisabledSelector = entrySelector + " #BreedingToggleDisabledButton";
         String inactiveBadgeSelector = entrySelector + " #StatusInactive";
-        String groupTabSelector = entrySelector + " #GroupTab";
-        String groupTabButtonSelector = entrySelector + " #GroupTabButton";
         String respawnSelector = entrySelector + " #RespawnButton";
         String locateSelector = entrySelector + " #LocateButton";
         String recallSelector = entrySelector + " #RecallButton";
@@ -249,17 +247,8 @@ final class LinkedNpcPanelCardBinder {
                 ? "tamework.ui.linkedPanel.bonded.shoulder.down.tooltip"
                 : "tamework.ui.linkedPanel.bonded.shoulder.toMe.tooltip") : "");
         commandBuilder.set(inactiveBadgeSelector + ".Visible", showInactiveBadge);
-        LinkedNpcPanelGroupTabBinder.bind(
-                commandBuilder,
-                groupTabSelector,
-                entry,
-                pendingUnlink
-        );
         bindCardLayout(commandBuilder, entrySelector, entry, managedRoster,
                 showActiveToggleActive || showActiveToggleInactive);
-        commandBuilder.set(groupTabButtonSelector + ".Text", entry.groupName() == null || entry.groupName().isBlank()
-                ? LocalizedText.resolve(language, "tamework.ui.linkedPanel.groupAssign.title") : entry.groupName());
-        commandBuilder.set(groupTabButtonSelector + ".Visible", !pendingUnlink);
         commandBuilder.set(entrySelector + " #CooldownRow.Visible", !pendingUnlink && entry.hasHealth());
         LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry, language);
         LinkedNpcPanelProgressionBinder.bindXpProgressRing(
@@ -397,14 +386,6 @@ final class LinkedNpcPanelCardBinder {
                     false
             );
         }
-        if (!pendingUnlink) {
-            eventBuilder.addEventBinding(
-                    CustomUIEventBindingType.Activating,
-                    groupTabButtonSelector,
-                    EventData.of(config.eventCommandId(), config.openGroupPickerCommandPrefix() + entry.npcUuid()),
-                    false
-            );
-        }
         if (showRespawn) {
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
@@ -509,15 +490,15 @@ final class LinkedNpcPanelCardBinder {
         commands.set(card + " #NeedRingRow.Visible", !compact);
         commands.set(card + " #TraitStrip.Visible", !compact);
         commands.set(card + " #StatusDivider.Visible", true);
-        commands.setObject(card + " #GroupTab.Anchor", fixedAnchor(8, -10, 5, compact ? 80 : 112));
-        commands.setObject(card + " #GroupTabButton.Anchor", fixedAnchor(compact ? 72 : 102, 0, 144, 26));
+        commands.setObject(card + " #GroupSelector.Anchor", fixedAnchor(compact ? 72 : 102, 0, 144, 26));
         commands.setObject(card + " #HealthFrame.Anchor", fixedAnchor(50, compact ? 568 : 172, compact ? 278 : 234, 14));
-        commands.set(card + " #HealthFrame.Background", compact ? "#000000(0.0)" : "#151916");
+        // Runtime string patches accept opaque hex colors; alpha syntax is parsed as a texture path.
+        commands.set(card + " #HealthFrame.Background", compact ? "#202423" : "#151916");
         commands.setObject(card + " #HealthText.Anchor", fixedAnchor(0, 0, compact ? 276 : 232, 14));
         commands.setObject(card + " #HealthTextShadow.Anchor", fixedAnchor(0, 1, compact ? 276 : 232, 14));
         commands.setObject(card + " #HealthTooltip.Anchor", fixedAnchor(0, 0, compact ? 278 : 234, 14));
-        commands.setObject(card + " #XpProgressRing.Anchor", fixedAnchor(28, 332, 74, 22));
-        commands.setObject(card + " #TalentPointAction.Anchor", fixedAnchor(28, 300, 24, 24));
+        commands.setObject(card + " #XpProgressRing.Anchor", fixedAnchor(4, 332, 74, 22));
+        commands.setObject(card + " #TalentPointAction.Anchor", fixedAnchor(4, 304, 24, 24));
         int nameLeft = entry.isMale() || entry.isFemale() ? 28 : 0;
         commands.setObject(card + " #GenderMaleIcon.Anchor", fixedAnchor(1, 0, 22, 22));
         commands.setObject(card + " #GenderFemaleIcon.Anchor", fixedAnchor(1, 0, 22, 22));

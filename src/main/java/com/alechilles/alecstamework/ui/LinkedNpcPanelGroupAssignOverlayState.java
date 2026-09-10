@@ -96,14 +96,14 @@ final class LinkedNpcPanelGroupAssignOverlayState {
         return dropdownEntries;
     }
 
-    private static List<DropdownEntryInfo> fallbackEntries(@Nullable String language) {
+    static List<DropdownEntryInfo> fallbackEntries(@Nullable String language) {
         return List.of(new DropdownEntryInfo(
                 LocalizableString.fromString(LocalizedText.resolve(language, "tamework.ui.linkedPanel.groupAssign.none")),
                 NONE_VALUE
         ));
     }
 
-    private static String normalizeDropdownValue(@Nullable String value) {
+    static String normalizeDropdownValue(@Nullable String value) {
         if (value == null || value.isBlank()) {
             return NONE_VALUE;
         }
@@ -121,7 +121,7 @@ final class LinkedNpcPanelGroupAssignOverlayState {
         }
     }
 
-    private static String normalizeGroupIdForAssignment(@Nullable String value) {
+    static String normalizeGroupIdForAssignment(@Nullable String value) {
         if (value == null || value.isBlank()) {
             return null;
         }

@@ -35,6 +35,7 @@ final class CommandSelectionPageEventBinder {
             "__removal_menu__:";
     static final String OPEN_GROUP_PICKER_COMMAND_PREFIX =
             "__opengroup__:";
+    static final String ASSIGN_GROUP_COMMAND_PREFIX = "__assigngroup__:";
     static final String TOGGLE_ACTIVE_COMMAND_PREFIX = "__active__:";
     static final String TOGGLE_BREEDING_COMMAND_PREFIX =
             "__breeding__:";

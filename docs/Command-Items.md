@@ -79,6 +79,10 @@ the companion list. Linked, Nearby, and Owned tabs switch the list source.
 Changing LMB updates the selected primary command and keeps the menu open.
 The original primary-command eligibility rules still apply.
 
+For legacy linked companions, the group dropdown on each card assigns or clears
+its group immediately. The dropdown border shows the group's color. Group
+assignment remains tied to the current command item's links.
+
 Set `ShowInRadial: false` on a command entry to offer it through the hotswap
 selectors without consuming one of the primary selector's eight slots.
 

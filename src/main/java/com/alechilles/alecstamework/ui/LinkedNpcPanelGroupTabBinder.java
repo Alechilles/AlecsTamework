@@ -4,10 +4,10 @@ import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import java.util.Locale;
 
 /**
- * Binds the per-card group tab visual (name + color) for linked companions.
+ * Applies group color to the inline assignment selector's border.
  */
 final class LinkedNpcPanelGroupTabBinder {
-    private static final String DEFAULT_GROUP_COLOR = "#4b657f";
+    private static final String DEFAULT_GROUP_COLOR = "#454e48";
 
     private LinkedNpcPanelGroupTabBinder() {
     }
@@ -25,7 +25,7 @@ final class LinkedNpcPanelGroupTabBinder {
             return;
         }
         String color = normalizeColor(entry.groupColorHex());
-        commandBuilder.set(tabSelector + ".Background", color);
+        commandBuilder.set(tabSelector + ".OutlineColor", color);
     }
 
     private static String normalizeColor(String raw) {
