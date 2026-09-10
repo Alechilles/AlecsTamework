@@ -573,6 +573,12 @@ final class CommandLoadedNpcStatusSnapshotService {
         if (label == null || label.isBlank()) {
             return LocalizedText.resolve((String) null, "tamework.ui.linkedPanel.happiness.modifier.generic");
         }
+        if (label.regionMatches(true, 0, "Hunger (needs disabled):", 0, "Hunger (needs disabled):".length())) {
+            return label.substring("Hunger (needs disabled):".length()).trim();
+        }
+        if (label.regionMatches(true, 0, "Thirst (needs disabled):", 0, "Thirst (needs disabled):".length())) {
+            return label.substring("Thirst (needs disabled):".length()).trim();
+        }
         if (label.regionMatches(true, 0, "Hunger:", 0, "Hunger:".length())) {
             return label.substring("Hunger:".length()).trim();
         }

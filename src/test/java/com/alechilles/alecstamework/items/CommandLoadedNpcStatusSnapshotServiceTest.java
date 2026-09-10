@@ -5,6 +5,21 @@ import org.junit.jupiter.api.Test;
 
 class CommandLoadedNpcStatusSnapshotServiceTest {
     @Test
+    void happinessTooltipTranslatesBandsWhenNeedsAreDisabled() {
+        var service = new CommandLoadedNpcStatusSnapshotService(null, null, null, null);
+        var modifiers = java.util.List.of(
+                new com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService.ModifierEntry(
+                        "hunger_band", "Hunger (needs disabled): tamework.happiness.hunger.wellFed", 10.0),
+                new com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService.ModifierEntry(
+                        "thirst_band", "Thirst (needs disabled): tamework.happiness.thirst.quenched", 8.0));
+        var snapshot = new com.alechilles.alecstamework.npc.progression.CompanionHappinessService.HappinessSnapshot(
+                15, 0, 100, 65, 83, modifiers);
+
+        Assertions.assertEquals("Well-fed: +10.00\nQuenched: +8.00",
+                service.buildHappinessModifierBreakdown(snapshot, "en-US"));
+    }
+
+    @Test
     void happinessTooltipCombinesOnlyActiveCareContributions() {
         var service = new CommandLoadedNpcStatusSnapshotService(null, null, null, null);
         var modifiers = java.util.List.of(
