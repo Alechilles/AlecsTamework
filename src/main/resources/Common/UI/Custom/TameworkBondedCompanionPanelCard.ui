@@ -263,11 +263,11 @@ Group {
             Background: #85b99a;
         }
 
-        Label #BondedHealthTextShadow { Anchor: (Top: 1, Left: 1, Right: 0, Height: 20); Text: "? / ?"; Style: (FontSize: 15, RenderBold: true, TextColor: #414640, HorizontalAlignment: Center, VerticalAlignment: Center); }
+        Label #BondedHealthTextShadow { Anchor: (Top: 1, Left: 1, Width: 234, Height: 20); Text: "? / ?"; Style: (FontSize: 13, RenderBold: true, TextColor: #101510, HorizontalAlignment: Center, VerticalAlignment: Center); }
         Label #BondedHealthText {
             Anchor: (Top: 0, Left: 0, Right: 0, Height: 20);
             Text: "? / ?";
-            Style: (FontSize: 13, RenderBold: true, TextColor: #fff8e8, HorizontalAlignment: Center, VerticalAlignment: Center);
+            Style: (FontSize: 13, RenderBold: true, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center);
         }
     }
 

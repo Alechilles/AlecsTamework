@@ -131,8 +131,8 @@ Group {
         Anchor: (Top: 50, Left: 172, Width: 234, Height: 22);
         Background: #151916(0.95);
         Group #HealthFill { Anchor: (Top: 1, Left: 1, Width: 232, Height: 20); Background: #6fc576; }
-        Label #HealthTextShadow { Anchor: (Top: 1, Left: 2, Width: 230, Height: 20); Text: "?/?"; Style: (FontSize: 15, RenderBold: true, TextColor: #414640, HorizontalAlignment: Center, VerticalAlignment: Center); }
-        Label #HealthText { Anchor: (Top: 0, Left: 0, Width: 230, Height: 20); Text: "?/?"; Style: (FontSize: 13, RenderBold: true, TextColor: #fff8e8, HorizontalAlignment: Center, VerticalAlignment: Center); }
+        Label #HealthTextShadow { Anchor: (Top: 1, Left: 1, Width: 230, Height: 20); Text: "?/?"; Style: (FontSize: 13, RenderBold: true, TextColor: #101510, HorizontalAlignment: Center, VerticalAlignment: Center); }
+        Label #HealthText { Anchor: (Top: 0, Left: 0, Width: 230, Height: 20); Text: "?/?"; Style: (FontSize: 13, RenderBold: true, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center); }
         TextButton #HealthTooltip { Anchor: (Top: 0, Left: 0, Width: 234, Height: 22); Style: @TraitTooltipButtonStyle; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.health.notAvailable; TextTooltipStyle: @LinkedActionTooltipStyle; }
     }
     Group #TalentPointAction {
