@@ -294,7 +294,7 @@ final class CommandSelectionLinkedPanelRuntime {
     }
 
     private boolean canAssignGroup(LinkedNpcEntry entry, CommandPanelFeaturePresentation presentation) {
-        return entry != null && entry.linked() && !page.cardBindingConfig.ownerCommandFamilyRoster()
+        return entry != null && !page.cardBindingConfig.ownerCommandFamilyRoster()
                 && (presentation == null || presentation.bonded() == null && !presentation.managesRosterRow());
     }
 
@@ -302,7 +302,7 @@ final class CommandSelectionLinkedPanelRuntime {
         LinkedNpcEntry entry = resolveEntry(npcUuid);
         if (!canAssignGroup(entry, page.featureController.presentation(npcUuid))
                 || page.isPendingUnlink(npcUuid) || page.panelAssignGroupCallback == null) return;
-        // The existing callback revalidates the current command item, link, and group before writing.
+        // The existing callback revalidates the tool and group, and links eligible unlinked NPCs.
         page.panelAssignGroupCallback.accept(npcUuid,
                 LinkedNpcPanelGroupAssignOverlayState.normalizeGroupIdForAssignment(value));
         page.pendingUnlinkNpcUuid = null;

@@ -32,24 +32,31 @@ class TameworkCommandSelectionPageRefreshTest {
 
     @Test
     void inlineGroupSelectionRoutesAssignmentAndClearingWithoutOpeningAModal() throws Exception {
-        TameworkCommandSelectionPage page = page(new CapturedPackets(), new AtomicReference<>(),
-                new NavigationFixture(), legacyConfig());
-        List<String> assignments = new ArrayList<>();
-        replaceField(page, "panelAssignGroupCallback", (BiConsumer<UUID, String>)
-                (id, group) -> assignments.add(id + "/" + group));
-        UIEventBuilder events = new UIEventBuilder();
-        page.build(null, new UICommandBuilder(), events, null);
-        assertTrue(java.util.Arrays.stream(events.getEvents()).anyMatch(binding ->
-                binding.type == com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType.ValueChanged
-                        && binding.data.contains("__assigngroup__:" + CARD)
-                        && binding.data.contains("#GroupSelector.Value")));
+        LinkedNpcEntry unlinked = new LinkedNpcEntry(CARD, "Nimbus", 10, 10, 0, 0, 0,
+                "", 0, 0, 0, 0, true, false, false, false, false, false,
+                -1L, null, null, null, LinkedNpcTraitIndicator.EMPTY,
+                false, false, false, false, false, false,
+                "duck", "Duck", null, null, null, false, false, 0L, 0.0, false);
+        for (LinkedNpcEntry entry : List.of(ENTRY, unlinked)) {
+            TameworkCommandSelectionPage page = page(new CapturedPackets(), new AtomicReference<>(),
+                    new NavigationFixture(), legacyConfig(), OWNER, List::of, entry);
+            List<String> assignments = new ArrayList<>();
+            replaceField(page, "panelAssignGroupCallback", (BiConsumer<UUID, String>)
+                    (id, group) -> assignments.add(id + "/" + group));
+            UIEventBuilder events = new UIEventBuilder();
+            page.build(null, new UICommandBuilder(), events, null);
+            assertTrue(java.util.Arrays.stream(events.getEvents()).anyMatch(binding ->
+                    binding.type == com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType.ValueChanged
+                            && binding.data.contains("__assigngroup__:" + CARD)
+                            && binding.data.contains("#GroupSelector.Value")));
 
-        groupEvent(page, CARD, "pasture");
-        groupEvent(page, CARD, "None");
-        groupEvent(page, UUID.randomUUID(), "pasture");
+            groupEvent(page, CARD, "pasture");
+            groupEvent(page, CARD, "None");
+            groupEvent(page, UUID.randomUUID(), "pasture");
 
-        assertEquals(List.of(CARD + "/pasture", CARD + "/null"), assignments);
-        page.onDismiss(null, null);
+            assertEquals(List.of(CARD + "/pasture", CARD + "/null"), assignments);
+            page.onDismiss(null, null);
+        }
     }
 
     @Test
@@ -427,13 +434,16 @@ class TameworkCommandSelectionPageRefreshTest {
         return page(packets, feature, fixture, commandConfig, OWNER, activationEntries);
     }
     private static TameworkCommandSelectionPage page(CapturedPackets packets, AtomicReference<CommandPanelFeaturePresentation> feature, NavigationFixture fixture, TwCommandItemConfig commandConfig, UUID owner, Supplier<List<com.hypixel.hytale.server.core.ui.DropdownEntryInfo>> activationEntries) throws Exception {
+        return page(packets, feature, fixture, commandConfig, owner, activationEntries, ENTRY);
+    }
+    private static TameworkCommandSelectionPage page(CapturedPackets packets, AtomicReference<CommandPanelFeaturePresentation> feature, NavigationFixture fixture, TwCommandItemConfig commandConfig, UUID owner, Supplier<List<com.hypixel.hytale.server.core.ui.DropdownEntryInfo>> activationEntries, LinkedNpcEntry entry) throws Exception {
         try (AutoCloseable ignored = LinkedNpcPanelRefreshTestSeam.installPacketSender(packets::capture);
              AutoCloseable ignoredNavigator = LinkedNpcPanelRefreshTestSeam.installDeferredNavigator(fixture::defer)) {
             PlayerRef player = (PlayerRef) unsafe().allocateInstance(PlayerRef.class);
             put(player, "uuid", owner); put(player, "username", "PageRefreshTester"); put(player, "language", "en-US");
             Consumer<UUID> noUuid = value -> { }; Consumer<String> noString = value -> { }; BiConsumer<UUID, String> noGroup = (a, b) -> { };
             return new TameworkCommandSelectionPage(player, commandConfig, null, true,
-                    () -> List.of(ENTRY), () -> List.of(ENTRY), () -> feature.get() == null
+                    () -> List.of(entry), () -> List.of(entry), () -> feature.get() == null
                             ? Map.of() : Map.of(CARD, feature.get()), () -> null,
                     () -> "LinkedMode", () -> false, () -> "16", () -> "Default", () -> "None", () -> "", activationEntries, () -> "", List::of, value -> true, true,
                     noUuid, noUuid, noUuid, noUuid, noUuid, noUuid, noUuid, (a,b,c)->{}, (a,b,c)->{}, (a,b,c)->{}, (a,b,c)->{}, (a,b,c)->{}, noUuid, noUuid, noUuid, noUuid, fixture::talent, noString, value->{}, ()->{}, ()->{}, fixture::groups, noString, noString, noString, ()->{}, noString, noGroup, fixture.selections::add, fixture.source);
