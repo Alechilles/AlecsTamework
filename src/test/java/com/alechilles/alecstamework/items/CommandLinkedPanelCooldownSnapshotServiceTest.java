@@ -110,7 +110,7 @@ class CommandLinkedPanelCooldownSnapshotServiceTest {
     }
 
     @Test
-    void harvestCapabilityUsesVariantModifierHarvestability() throws Exception {
+    void harvestCapabilityEvaluatesComputedVariantHarvestability() throws Exception {
         sun.misc.Unsafe unsafe = unsafe();
         BuilderParameters parameters = parametersWithHarvestable(false);
         BuilderRole base = BuilderRole.class.cast(
@@ -120,7 +120,9 @@ class CommandLinkedPanelCooldownSnapshotServiceTest {
 
         BuilderRoleVariant variant = new BuilderRoleVariant();
         setField(variant, "referenceIndex", 42);
-        setField(variant, "modifier", harvestabilityModifier(parameters, true));
+        BuilderParameters variantParameters = parametersWithHarvestable(true);
+        setField(variant, "builderParameters", variantParameters);
+        setField(variant, "modifier", harvestabilityModifier(variantParameters));
         setField(variant, "builderManager", manager);
 
         var service = new CommandLinkedPanelCooldownSnapshotService();
@@ -131,6 +133,18 @@ class CommandLinkedPanelCooldownSnapshotServiceTest {
         assertTrue(service.hasEnabledHarvestCapability(
                 config, null, CommandLinkedPanelCooldownSnapshotService
                         .resolveRoleParameterScope(variant), "IsHarvestable"));
+    }
+
+    @Test
+    void invalidRoleExpressionsCannotEscapeTheOptionalHarvestLookup() {
+        BuilderRoleVariant invalid = new BuilderRoleVariant() {
+            @Override
+            public com.hypixel.hytale.server.npc.util.expression.Scope createExecutionScope() {
+                throw new IllegalStateException("Invalid role expression");
+            }
+        };
+        org.junit.jupiter.api.Assertions.assertNull(
+                CommandLinkedPanelCooldownSnapshotService.resolveRoleParameterScope(invalid));
     }
 
     private static BuilderParameters parametersWithHarvestable(boolean harvestable)
@@ -152,10 +166,12 @@ class CommandLinkedPanelCooldownSnapshotServiceTest {
     }
 
     private static BuilderModifier harvestabilityModifier(
-            BuilderParameters parameters, boolean harvestable) {
+            BuilderParameters parameters) {
         JsonObject root = new JsonObject();
         JsonObject modify = new JsonObject();
-        modify.addProperty("IsHarvestable", harvestable);
+        JsonObject computed = new JsonObject();
+        computed.addProperty("Compute", "IsHarvestable");
+        modify.add("IsHarvestable", computed);
         root.add("Modify", modify);
         return BuilderModifier.fromJSON(root, parameters,
                 new StateMappingHelper(), new ExtraInfo());

@@ -5,6 +5,8 @@
 - Companion cards keep breeding and harvest readiness visible after cooldowns.
   Breeding indicators dim and explain low happiness or disabled breeding.
   Harvest capability uses effective role parameters and variant overrides, including sheep shearing.
+  Computed role values use an initialized expression scope; failed optional
+  harvest lookups cannot crash the world tick.
   Refined level/talent controls and command/group selector alignment; level
   buttons fit their digit count and talent buttons retain a distinct hover state.
   Dropdown popups reuse the shared frame to stand apart from underlying cards.

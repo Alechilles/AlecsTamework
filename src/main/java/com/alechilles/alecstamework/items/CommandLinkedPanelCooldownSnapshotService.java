@@ -120,13 +120,20 @@ final class CommandLinkedPanelCooldownSnapshotService {
 
     @Nullable
     static StdScope resolveRoleParameterScope(@Nullable Builder<Role> builder) {
-        // Variant Modify values live in the modifier scope, not its declared parameters.
-        if (builder instanceof BuilderRoleVariant variant) {
-            Scope scope = variant.createModifierScope(new ExecutionContext());
-            return scope instanceof StdScope standard ? standard : scope != null ? new StdScope(scope) : null;
+        try {
+            // Computed Modify values read the variant's execution parameters first.
+            if (builder instanceof BuilderRoleVariant variant) {
+                ExecutionContext context = new ExecutionContext();
+                context.setScope(variant.createExecutionScope());
+                Scope scope = variant.createModifierScope(context);
+                return scope instanceof StdScope standard ? standard : scope != null ? new StdScope(scope) : null;
+            }
+            BuilderParameters parameters = builder != null ? builder.getBuilderParameters() : null;
+            return parameters != null ? parameters.createScope() : null;
+        } catch (RuntimeException exception) {
+            // Optional presentation data must not terminate the owning world's tick.
+            return null;
         }
-        BuilderParameters parameters = builder != null ? builder.getBuilderParameters() : null;
-        return parameters != null ? parameters.createScope() : null;
     }
 
     @Nullable
