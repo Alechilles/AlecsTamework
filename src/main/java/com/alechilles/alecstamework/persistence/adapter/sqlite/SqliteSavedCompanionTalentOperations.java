@@ -154,7 +154,7 @@ public final class SqliteSavedCompanionTalentOperations {
         }
         TwTalentConfig config = resolveConfig(
                 identity.roleId(), request.expectedTalentConfigId());
-        if (config == null) {
+        if (config == null || config.getAllocationRevision() != request.expectedAllocationRevision()) {
             return rejected(operationId, request,
                     SavedCompanionTalentOutcome.Status.CONFIG_STALE,
                     lifecycle.revision().value());

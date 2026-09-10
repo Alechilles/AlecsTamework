@@ -97,6 +97,7 @@ final class CommandSavedTalentPageService {
         TwTalentConfig config = TwTalentConfig.resolveForRole(state.profile.identity().roleId());
         if (levels == null || config == null) return TameworkCompanionTalentsPage.PageData.empty();
         state.presentedConfigId = config.getId();
+        state.presentedAllocationRevision = config.getAllocationRevision();
         var talents = CompanionTalentService.reconcileAllocation(saved.talents(), config);
         int level = leveling.getLevel();
         boolean max = level >= levels.getLevels().getMaxLevel();
@@ -123,7 +124,7 @@ final class CommandSavedTalentPageService {
         OperationId operationId = OperationId.create();
         var request = new SavedCompanionTalentRequest(profileId, new OwnerId(state.owner),
                 state.profile.lifecycle().revision(), snapshot.snapshotId(), snapshot.payloadHash(),
-                action, talentId, state.presentedConfigId, System.currentTimeMillis());
+                action, talentId, state.presentedConfigId, state.presentedAllocationRevision, System.currentTimeMillis());
         state.pending = true;
         try {
             var submitted = persistence.operations().updateSavedTalents(operationId,
@@ -202,6 +203,7 @@ final class CommandSavedTalentPageService {
         SavedCompanionTalentSnapshot snapshot;
         String language;
         String presentedConfigId;
+        long presentedAllocationRevision;
         boolean pending;
         State(UUID owner, String toolId, CompanionProfileReadModel profile, SavedCompanionTalentSnapshot snapshot) {
             this.owner = owner;

@@ -168,14 +168,14 @@ class SqliteSavedCompanionTalentOperationsTest {
                 PROFILE, OwnerId.parse("20000000-0000-0000-0000-000000000002"),
                 LifecycleRevision.INITIAL, original.snapshotId(),
                 original.payloadHash(), SavedCompanionTalentRequest.Action.PURCHASE,
-                "base", CONFIG, -300L);
+                "base", CONFIG, 0L, -300L);
         assertRejected(wrongOwner, "30000000-0000-0000-0000-000000000002");
 
         SavedCompanionTalentRequest stale = new SavedCompanionTalentRequest(
                 PROFILE, OWNER, LifecycleRevision.INITIAL, original.snapshotId(),
                 Sha256Hash.ofUtf8("other"),
                 SavedCompanionTalentRequest.Action.PURCHASE,
-                "base", CONFIG, -300L);
+                "base", CONFIG, 0L, -300L);
         assertRejected(stale, "30000000-0000-0000-0000-000000000003");
         assertEquals(original.snapshotId(), currentSnapshot().snapshotId());
 
@@ -187,6 +187,21 @@ class SqliteSavedCompanionTalentOperationsTest {
         ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
         assertEquals(OperationWorkflowResult.Status.PUBLISHED, valid.status());
         assertTrue(SqliteSavedCompanionTalentOperations.isApplied(valid));
+    }
+
+    @Test
+    void rejectsTreeRevisionChangedAfterThePageWasPresented() throws Exception {
+        var purchase = request(SavedCompanionTalentRequest.Action.PURCHASE, "base", original);
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, operations.submit(
+                OperationId.create(), new IdempotencyKey("before-reload"), purchase)
+                .completion().toCompletableFuture().get(10, TimeUnit.SECONDS).status());
+        var purchased = currentSnapshot();
+        var staleClick = request(SavedCompanionTalentRequest.Action.PURCHASE, "advanced", purchased);
+        TwTalentConfig.resolveForRole(ROLE).setAllocationRevision(1L);
+        assertRejected(staleClick, "30000000-0000-0000-0000-000000000009");
+        assertEquals(purchased.snapshotId(), currentSnapshot().snapshotId());
+        assertArrayEquals(new String[] {"base"}, SavedCompanionTalentSnapshot
+                .decode(currentSnapshot()).talents().getPurchasedTalentIds());
     }
 
     @Test
@@ -221,7 +236,7 @@ class SqliteSavedCompanionTalentOperationsTest {
     ) {
         return new SavedCompanionTalentRequest(PROFILE, OWNER,
                 LifecycleRevision.INITIAL, snapshot.snapshotId(),
-                snapshot.payloadHash(), action, talentId, CONFIG, -300L);
+                snapshot.payloadHash(), action, talentId, CONFIG, 0L, -300L);
     }
 
     private PersistenceStartupCoordinator readyAdmission() {

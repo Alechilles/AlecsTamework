@@ -56,6 +56,7 @@ public final class SavedCompanionTalentDefinition
         }
         json.addProperty("expectedTalentConfigId",
                 request.expectedTalentConfigId());
+        json.addProperty("expectedAllocationRevision", request.expectedAllocationRevision());
         json.addProperty("requestedAtMs", request.requestedAtMs());
         return json.toString();
     }
@@ -77,6 +78,7 @@ public final class SavedCompanionTalentDefinition
                 talentId == null || talentId.isJsonNull()
                         ? null : talentId.getAsString(),
                 json.get("expectedTalentConfigId").getAsString(),
+                json.get("expectedAllocationRevision").getAsLong(),
                 json.get("requestedAtMs").getAsLong()
         );
     }

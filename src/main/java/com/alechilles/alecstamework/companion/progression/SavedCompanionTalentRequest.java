@@ -18,13 +18,14 @@ public record SavedCompanionTalentRequest(
         @Nonnull Action action,
         @Nullable String talentId,
         @Nonnull String expectedTalentConfigId,
+        long expectedAllocationRevision,
         long requestedAtMs
 ) {
     public SavedCompanionTalentRequest {
         if (profileId == null || ownerId == null
                 || expectedLifecycleRevision == null
                 || expectedSnapshotId == null || expectedSnapshotHash == null
-                || action == null) {
+                || action == null || expectedAllocationRevision < 0) {
             throw new IllegalArgumentException(
                     "Saved companion talent request evidence is required"
             );
