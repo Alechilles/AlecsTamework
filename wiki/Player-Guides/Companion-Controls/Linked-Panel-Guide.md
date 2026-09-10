@@ -34,6 +34,16 @@ available talent points from that exact live companion. These updates are
 grouped so the panel stays responsive while you use its controls. Stored and
 dead companions continue to show their saved progression snapshot.
 
+## Saved talent points
+
+You can open the talent tree and spend or reset points for your dead and `LOST`
+companions when Tamework has a complete saved restoration snapshot. Changes are
+saved immediately and carry through revival or recovery. In Owned mode, an item
+link is not required. Normal talent requirements still apply.
+
+Ordinary unloaded companions must load before you can spend their points. Older
+records without a complete saved talent snapshot cannot use offline spending.
+
 ## Panel modes
 - `LinkedMode` shows companions linked to the current tool.
 - `NearbyMode` shows nearby eligible companions, usually for quick local management.

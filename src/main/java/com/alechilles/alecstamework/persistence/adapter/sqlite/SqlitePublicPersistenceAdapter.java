@@ -326,6 +326,11 @@ public final class SqlitePublicPersistenceAdapter {
     }
 
     @Nonnull
+    public SqliteSavedCompanionTalentOperations savedCompanionTalentOperations() {
+        return publicOperations.savedTalents();
+    }
+
+    @Nonnull
     public SqliteCompanionProfileReader profileReader() {
         return profiles;
     }

@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Owners can spend or reset talent points for dead and lost companions with a
+  complete saved restoration snapshot. Purchases carry through revival and recovery.
+
 - Removal mode preserves group, active, talent, and cooldown controls. Dead cards
   retain talent indicators and an empty health bar, with saved maximum health
   when available. The command menu uses the shared X icon to close.

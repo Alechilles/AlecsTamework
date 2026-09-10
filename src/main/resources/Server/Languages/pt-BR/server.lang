@@ -923,3 +923,8 @@ tamework.ui.commandTargetHud.foodPreferences=Preferências alimentares
 tamework.ui.commandMenu.feedback = Feedback
 tamework.ui.commandMenu.feedbackTooltip = Relate um problema ou sugira uma melhoria.
 tamework.ui.commandMenu.feedbackUnavailable = O formulário de feedback está indisponível no momento.
+
+tamework.ui.talents.saved.unavailable = Os talentos salvos deste companheiro estão indisponíveis.
+tamework.ui.talents.saved.saving = Salvando alterações de talentos…
+tamework.ui.talents.saved.saved = Alterações de talentos salvas.
+tamework.ui.talents.saved.changed = O companheiro mudou ou não foi possível salvar o talento. Os dados disponíveis foram atualizados.

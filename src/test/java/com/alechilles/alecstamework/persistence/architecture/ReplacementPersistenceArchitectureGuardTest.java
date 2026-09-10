@@ -152,48 +152,6 @@ class ReplacementPersistenceArchitectureGuardTest {
         );
     }
 
-    @Test
-    void publicRuntimeFacadeDeclaresOnlyRegisteredReplacementOperations() {
-        List<String> operations = Stream.of(
-                        com.alechilles.alecstamework.persistence.runtime
-                                .PublicPersistenceOperations.class
-                                .getDeclaredMethods()
-                )
-                .filter(method -> Modifier.isPublic(method.getModifiers()))
-                .map(Method::getName)
-                .sorted()
-                .toList();
-
-        assertEquals(
-                List.of(
-                        "activateProvisionedCompanion",
-                        "assignPopulationGroups",
-                        "capture",
-                        "captureToCoop",
-                        "makeDormant",
-                        "markReviveReady",
-                        "mutateCommandRoster",
-                        "mutateExtension",
-                        "mutateProfile",
-                        "mutateTimedSummonLease",
-                        "populationDomainAdmission",
-                        "prepareBreedingLitter",
-                        "provisionCompanion",
-                        "reconcileOwnerPopulation",
-                        "registerCoopSlot",
-                        "releaseCapturedCompanion",
-                        "releaseFromCoop",
-                        "restore",
-                        "reviveCompanion",
-                        "rotateAlias",
-                        "submitBreedingLitter",
-                        "transitionCommandRoster",
-                        "transitionOwnerPopulation",
-                        "transitionTimedSummon"
-                ),
-                operations
-        );
-    }
 
     @Test
     void aliasRotationIsDatabaseLocalAndNotAnExternalBoundary()

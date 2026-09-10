@@ -24,6 +24,7 @@ import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDe
 import com.alechilles.alecstamework.companion.revival.PaidRevivalDefinition;
 import com.alechilles.alecstamework.npc.actions.BreedingLitterOperation;
 import com.alechilles.alecstamework.companion.revival.ReviveReadyDefinition;
+import com.alechilles.alecstamework.companion.progression.SavedCompanionTalentDefinition;
 import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceContainmentListener;
@@ -69,6 +70,7 @@ final class SqlitePublicOperationSet {
     private final SqliteProfileExtensionOperations extensions;
     private final SqliteLifecycleAdmissionBinding lifecycleAdmission;
     private final SqliteReviveReadyOperations reviveReady;
+    private final SqliteSavedCompanionTalentOperations savedTalents;
 
     SqlitePublicOperationSet(
             @Nonnull PersistenceFeatureRegistry registry,
@@ -330,6 +332,8 @@ final class SqlitePublicOperationSet {
         );
         reviveReady = new SqliteReviveReadyOperations(database,
                 consumers.apply(ReviveReadyDefinition.INSTANCE.kind()));
+        savedTalents = new SqliteSavedCompanionTalentOperations(database,
+                consumers.apply(SavedCompanionTalentDefinition.INSTANCE.kind()));
     }
 
     SqliteOperationEngine engine() {
@@ -437,4 +441,6 @@ final class SqlitePublicOperationSet {
     }
 
     SqliteReviveReadyOperations reviveReady() { return reviveReady; }
+
+    SqliteSavedCompanionTalentOperations savedTalents() { return savedTalents; }
 }

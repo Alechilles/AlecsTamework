@@ -44,6 +44,8 @@ import com.alechilles.alecstamework.companion.revival.PaidRevivalRequest;
 import com.alechilles.alecstamework.npc.actions.BreedingLitterOperation;
 import com.alechilles.alecstamework.companion.revival.ReviveReadyDefinition;
 import com.alechilles.alecstamework.companion.revival.ReviveReadyRequest;
+import com.alechilles.alecstamework.companion.progression.SavedCompanionTalentDefinition;
+import com.alechilles.alecstamework.companion.progression.SavedCompanionTalentRequest;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
@@ -282,6 +284,14 @@ final class SqlitePublicRecoveryRegistry {
                                 claim.operation().operationId(),
                                 claim.operation().idempotencyKey(),
                                 payload(claim, ReviveReadyRequest.class)
+                        ).completion()
+                ),
+                Map.entry(
+                        SavedCompanionTalentDefinition.INSTANCE.kind(),
+                        claim -> operations.savedTalents().submit(
+                                claim.operation().operationId(),
+                                claim.operation().idempotencyKey(),
+                                payload(claim, SavedCompanionTalentRequest.class)
                         ).completion()
                 ),
                 Map.entry(

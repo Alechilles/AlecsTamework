@@ -111,6 +111,8 @@ public final class SqliteOperationFeatureScopeCatalog {
                 SqliteCompanionDormantOperations.FEATURE_SCOPE);
         put(scopes, CompanionRestorationDefinition.KIND,
                 SqliteCompanionRestorationOperations.FEATURE_SCOPE);
+        put(scopes, com.alechilles.alecstamework.companion.progression.SavedCompanionTalentDefinition.KIND,
+                SqliteSavedCompanionTalentOperations.FEATURE_SCOPE);
         put(scopes, ReviveReadyDefinition.KIND,
                 SqliteReviveReadyOperations.FEATURE_SCOPE);
         put(scopes, CoopSlotRegistrationDefinition.KIND,

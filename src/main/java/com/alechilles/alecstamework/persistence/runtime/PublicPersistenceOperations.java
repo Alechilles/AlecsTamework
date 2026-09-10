@@ -23,6 +23,7 @@ import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRe
 import com.alechilles.alecstamework.companion.revival.PaidRevivalRequest;
 import com.alechilles.alecstamework.npc.actions.BreedingLitterOperation;
 import com.alechilles.alecstamework.companion.revival.ReviveReadyRequest;
+import com.alechilles.alecstamework.companion.progression.SavedCompanionTalentRequest;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteDatabaseOperationCoordinator;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicPersistenceAdapter;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSingleWriter;
@@ -265,6 +266,23 @@ public final class PublicPersistenceOperations {
     ) {
         var submitted = adapter().reviveReadyOperations().submit(
                 operationId, idempotencyKey, request);
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    /**
+     * Mutates a supported dead/lost restoration snapshot. Published workflows include a
+     * {@link com.alechilles.alecstamework.companion.progression.SavedCompanionTalentOutcome};
+     * callers must inspect that outcome because domain denials also finish publication.
+     */
+    @Nonnull
+    public PublicOperationSubmission updateSavedTalents(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull SavedCompanionTalentRequest request
+    ) {
+        var submitted = adapter().savedCompanionTalentOperations().submit(
+                operationId, idempotencyKey, request
+        );
         return submission(submitted.acceptance(), submitted.completion());
     }
 

@@ -52,6 +52,19 @@ final class CommandUiManagedTalentFlowService {
             Context context,
             Snapshot snapshot
     ) {
+        return build(session, context.rowId(), context.profileId(), context.route(), snapshot,
+                (kind, label, talentId, confirmation) -> action(
+                        session, context, kind, label, talentId, confirmation));
+    }
+
+    @FunctionalInterface
+    interface ActionFactory {
+        CommandUiActionView create(String kind, String label, String talentId, boolean confirmation);
+    }
+
+    CommandUiTalentFlowView build(CommandUiSessionImpl session, UUID rowId, String profileId,
+                                 CommandUiActionGateway.Route route, Snapshot snapshot,
+                                 ActionFactory actions) {
         session.beginManagedFlow();
         TameworkCompanionTalentsPage.PageData page = snapshot.pageData();
         List<CommandUiTalentNodeView> nodes = new ArrayList<>();
@@ -59,7 +72,7 @@ final class CommandUiManagedTalentFlowService {
                 : page.entries()) {
             if (entry == null) continue;
             CommandUiActionView purchase = entry.canPurchase()
-                    ? action(session, context, "PURCHASE_TALENT",
+                    ? actions.create("PURCHASE_TALENT",
                             "Unlock", entry.id(), false) : null;
             nodes.add(new CommandUiTalentNodeView(
                     entry.id(), entry.branchName(), entry.tier(), entry.state(),
@@ -69,14 +82,14 @@ final class CommandUiManagedTalentFlowService {
                     entry.effectSummary(), purchase));
         }
         CommandUiActionView reset = page.canReset()
-                ? action(session, context, "RESET_TALENTS",
+                ? actions.create("RESET_TALENTS",
                         "Reset talents", null, true) : null;
         Map<String, String> metadata = new LinkedHashMap<>(
                 snapshot.metadata());
-        metadata.put("route", context.route() ==
+        metadata.put("route", route ==
                 CommandUiActionGateway.Route.BONDED ? "bonded" : "generic");
         return new CommandUiTalentFlowView(
-                context.rowId(), context.profileId(), page.companionName(),
+                rowId, profileId, page.companionName(),
                 snapshot.level(), snapshot.availablePoints(),
                 page.levelSummary(), page.pointsSummary(), page.statusText(),
                 reset, nodes, metadata);

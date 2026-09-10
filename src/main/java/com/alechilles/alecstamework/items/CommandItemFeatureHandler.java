@@ -299,6 +299,7 @@ public final class CommandItemFeatureHandler {
                 feedbackService,
                 npcNameResolver
         );
+        this.talentPageService.configureSavedTalents(persistence);
         this.bondedTalentPageService = new BondedCompanionTalentPageService(
                 bondedCompanions, feedbackService);
         this.companionPlacementService = new CommandCompanionPlacementService();

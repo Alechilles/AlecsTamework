@@ -48,9 +48,19 @@ final class CommandUiManagedTalentActions {
             BooleanSupplier authority,
             Supplier<Player> playerSupplier
     ) {
-        if (!supportsGeneric() || !entry.linked()
+        if (!supportsGeneric() || (!entry.linked() && !entry.ownedActions())
                 || !entry.isTalentsActionVisible()
                 || !entry.isTalentsActionEnabled()) return;
+        if (!entry.loaded() && (entry.dead() || entry.lost())) {
+            catalog.addRow(rowId, "OPEN_TALENTS", "Talents",
+                    new CommandSelectionPageService.GenericUiActionBinding(
+                            new CommandUiAction("OPEN_TALENTS", entry.npcUuid(), null, false),
+                            authority, unavailable(), false, null,
+                            CommandUiActionGateway.InputPolicy.NONE, 0,
+                            session -> genericTalents.openSavedTalents(session, rowId,
+                                    playerSupplier.get(), toolId, entry.npcUuid(), authority)));
+            return;
+        }
         catalog.addRow(rowId, "OPEN_TALENTS", "Talents", genericBinding(
                 rowId, entry.npcUuid(), toolId, authority, playerSupplier));
     }

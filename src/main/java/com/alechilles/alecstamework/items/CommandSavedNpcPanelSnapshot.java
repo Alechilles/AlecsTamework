@@ -51,8 +51,15 @@ final class CommandSavedNpcPanelSnapshot {
     private final String roleId;
     private final Facts facts;
     private final boolean exactCheckpoint;
+    private final boolean savedTalentsEditable;
 
     private CommandSavedNpcPanelSnapshot(long observedAtMs, String roleId, Facts facts, boolean exactCheckpoint) {
+        this(observedAtMs, roleId, facts, exactCheckpoint, false);
+    }
+
+    private CommandSavedNpcPanelSnapshot(long observedAtMs, String roleId, Facts facts,
+                                        boolean exactCheckpoint, boolean savedTalentsEditable) {
+        this.savedTalentsEditable = savedTalentsEditable;
         this.observedAtMs = observedAtMs;
         this.roleId = trimToNull(roleId);
         this.facts = facts;
@@ -79,6 +86,12 @@ final class CommandSavedNpcPanelSnapshot {
         if (profile == null) {
             return null;
         }
+        var restoration = com.alechilles.alecstamework.companion.progression.SavedCompanionTalentSnapshot.find(profile);
+        if (restoration != null) {
+            // Purchases update the restoration snapshot; an older entity checkpoint must not mask them.
+            var saved = fromState(restoration.fullState(), restoration.snapshot().createdAtMs());
+            return new CommandSavedNpcPanelSnapshot(saved.observedAtMs, saved.roleId, saved.facts, false, true);
+        }
         ArrayList<CommandSavedNpcPanelSnapshot> candidates = new ArrayList<>();
         for (CompanionSnapshot snapshot : profile.currentSnapshots()) {
             CommandSavedNpcPanelSnapshot decoded = decodeFullState(snapshot);
@@ -90,8 +103,10 @@ final class CommandSavedNpcPanelSnapshot {
         if (checkpoint != null) {
             candidates.add(checkpoint);
         }
-        return candidates.stream().max(Comparator.comparingLong(value -> value.observedAtMs))
-                .orElse(null);
+        CommandSavedNpcPanelSnapshot latest = candidates.stream()
+                .max(Comparator.comparingLong(value -> value.observedAtMs)).orElse(null);
+        if (latest == null) return null;
+        return latest;
     }
 
     /** Applies only known saved fields and leaves unavailable legacy fields as supplied by the base entry. */
@@ -118,7 +133,9 @@ final class CommandSavedNpcPanelSnapshot {
                 base.deadRespawnRemainingMs(), base.deathCauseHint(), progression.level,
                 progression.talents, traits, facts.traits != null || base.isTraitsActionVisible(),
                 base.loaded() && base.isTraitsActionEnabled(), progression.talents != null || base.isTalentsActionVisible(),
-                base.loaded() && base.isTalentsActionEnabled(), base.linked(), base.active(),
+                base.loaded() ? base.isTalentsActionEnabled()
+                        : savedTalentsEditable && progression.talents != null && (base.dead() || base.lost()),
+                base.linked(), base.active(),
                 base.speciesId(), base.speciesLabel(), base.groupId(), base.groupName(),
                 base.groupColorHex(), breedingEnabled, breedingAvailable, breeding.active,
                 breeding.remainingMs, breeding.ratio, breeding.known, harvest.active,

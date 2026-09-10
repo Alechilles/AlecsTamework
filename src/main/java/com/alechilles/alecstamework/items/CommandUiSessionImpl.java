@@ -458,6 +458,11 @@ final class CommandUiSessionImpl implements CommandUiSession {
         return generation;
     }
 
+    /** Identifies the flow that may receive a deferred saved-state result. */
+    long currentManagedGeneration() {
+        return managedGeneration.get();
+    }
+
     /** Retires all handles for the current managed flow without refreshing main state. */
     void closeManagedFlow() {
         managedFlowOwner.set(ManagedFlowOwner.NONE);

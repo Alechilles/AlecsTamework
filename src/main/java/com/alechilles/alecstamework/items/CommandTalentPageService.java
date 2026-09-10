@@ -36,6 +36,7 @@ final class CommandTalentPageService {
     private final CommandToolInventoryService toolInventoryService;
     private final CommandFeedbackService feedbackService;
     private final CommandNpcNameResolver npcNameResolver;
+    private CommandSavedTalentPageService savedTalentPages;
 
     CommandTalentPageService(@Nonnull CommandLinkMutationService linkMutationService,
                              @Nonnull CommandToolInventoryService toolInventoryService,
@@ -57,6 +58,20 @@ final class CommandTalentPageService {
         openTalentPage(player,
                 () -> resolveLinkedCompanionTalentContext(player, toolId, npcUuid),
                 backCallback);
+    }
+
+    void configureSavedTalents(com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades persistence) {
+        savedTalentPages = persistence == null ? null
+                : new CommandSavedTalentPageService(persistence, toolInventoryService, this);
+    }
+
+    java.util.concurrent.CompletionStage<com.alechilles.alecstamework.api.commandui.CommandUiActionResult> openSavedTalents(
+            CommandUiSessionImpl session, UUID rowId, Player player, String toolId, UUID npcId,
+            java.util.function.BooleanSupplier authority) {
+        return savedTalentPages == null
+                ? java.util.concurrent.CompletableFuture.completedFuture(
+                        com.alechilles.alecstamework.api.commandui.CommandUiActionResult.notFound("Saved talents are unavailable"))
+                : savedTalentPages.open(session, rowId, player, toolId, npcId, authority);
     }
 
     /** Opens the shared talent page for a caller-authorized live companion. */
@@ -125,6 +140,16 @@ final class CommandTalentPageService {
                 context.roleId()
         );
         int availablePoints = CompanionTalentService.resolveAvailablePoints(context.npcRef(), context.store());
+        TwTalentConfig config = CompanionTalentService.resolveTalentConfig(context.npcRef(), context.store());
+        ComponentType<EntityStore, TameworkTalentsComponent> type = TameworkTalentsComponent.getComponentType();
+        TameworkTalentsComponent talents = type == null ? null : context.store().getComponent(context.npcRef(), type);
+        return buildTalentPageData(language, context.displayName(), leveling, availablePoints, config, talents);
+    }
+
+    TameworkCompanionTalentsPage.PageData buildTalentPageData(
+            @Nullable String language, String displayName,
+            @Nullable CompanionLevelingService.LevelingSnapshot leveling, int availablePoints,
+            @Nullable TwTalentConfig talentConfig, @Nullable TameworkTalentsComponent talents) {
         String levelSummary;
         if (leveling == null) {
             levelSummary = LocalizedText.resolve(language, "tamework.ui.talents.levelSummary.unavailable");
@@ -140,10 +165,9 @@ final class CommandTalentPageService {
             );
         }
         String pointsSummary = LocalizedText.format(language, "tamework.ui.talents.points.available", availablePoints);
-        TwTalentConfig talentConfig = CompanionTalentService.resolveTalentConfig(context.npcRef(), context.store());
         if (talentConfig == null || !talentConfig.isEnabled() || talentConfig.getTalents().length == 0) {
             return new TameworkCompanionTalentsPage.PageData(
-                    context.displayName(),
+                    displayName,
                     levelSummary,
                     pointsSummary,
                     LocalizedText.resolve(language, "tamework.ui.talents.status.noTree"),
@@ -151,8 +175,6 @@ final class CommandTalentPageService {
                     List.of()
             );
         }
-        ComponentType<EntityStore, TameworkTalentsComponent> talentsType = TameworkTalentsComponent.getComponentType();
-        TameworkTalentsComponent talents = talentsType != null ? context.store().getComponent(context.npcRef(), talentsType) : null;
         boolean canReset = talents != null && (talents.getSpentPoints() > 0 || talents.getPurchasedTalentIds().length > 0);
         ArrayList<TameworkCompanionTalentsPage.TreeNodeEntry> entries = new ArrayList<>();
         for (TwTalentConfig.TalentDefinition talent : talentConfig.getTalents()) {
@@ -237,7 +259,7 @@ final class CommandTalentPageService {
             return left.displayName().compareToIgnoreCase(right.displayName());
         });
         return new TameworkCompanionTalentsPage.PageData(
-                context.displayName(),
+                displayName,
                 levelSummary,
                 pointsSummary,
                 entries.isEmpty()
