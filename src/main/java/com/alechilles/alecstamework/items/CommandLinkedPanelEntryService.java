@@ -319,6 +319,10 @@ final class CommandLinkedPanelEntryService {
                     recallLostRemainingMs
             ).withRoleSubtitle(npcNameResolver.resolveRoleSubtitle(
                     customName, speciesRoleId, record.cachedNameKey));
+            CommandSavedNpcPanelSnapshot saved = persistenceView == null ? null : persistenceView.savedPanel(record, player.getUuid());
+            if (saved != null) {
+                entry = saved.apply(entry, player.getPlayerRef() == null ? null : player.getPlayerRef().getLanguage());
+            }
             entries.add(entry);
             renderedIds.put(record.npcUuid, entry.npcUuid());
         }

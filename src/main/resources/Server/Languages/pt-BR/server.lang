@@ -912,3 +912,8 @@ tamework.ui.linkedPanel.action.breedingOff=Reprodução não
 
 tamework.ui.linkedPanel.breedingCooldown.unhappy=Infeliz demais para procriar. Aumente a felicidade até o limite necessário.
 tamework.ui.linkedPanel.breedingCooldown.off=A procriação está desativada para este animal.
+
+tamework.ui.linkedPanel.cached.lastKnown=Último estado conhecido
+tamework.ui.linkedPanel.cached.lastKnownTooltip=Último estado salvo; atualizado quando o companheiro é carregado.
+tamework.ui.linkedPanel.cached.unknown=Desconhecido
+tamework.ui.linkedPanel.cached.timerUnknown=O estado salvo não contém informações de tempo suficientes. Atualizado quando o companheiro é carregado.

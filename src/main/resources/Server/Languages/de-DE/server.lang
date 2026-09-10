@@ -912,3 +912,8 @@ tamework.ui.linkedPanel.action.breedingOff=Zucht aus
 
 tamework.ui.linkedPanel.breedingCooldown.unhappy=Zu unglücklich zum Züchten. Erhöhe die Zufriedenheit bis zur Zuchtschwelle.
 tamework.ui.linkedPanel.breedingCooldown.off=Die Zucht ist für dieses Tier ausgeschaltet.
+
+tamework.ui.linkedPanel.cached.lastKnown=Zuletzt bekannt
+tamework.ui.linkedPanel.cached.lastKnownTooltip=Zuletzt gespeicherter Zustand; wird aktualisiert, wenn der Begleiter geladen ist.
+tamework.ui.linkedPanel.cached.unknown=Unbekannt
+tamework.ui.linkedPanel.cached.timerUnknown=Der gespeicherte Zustand enthält nicht genügend Zeitinformationen. Wird aktualisiert, wenn der Begleiter geladen ist.

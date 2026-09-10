@@ -173,12 +173,18 @@ final class CommandLinkedPanelProgressionPresentationService {
             return LinkedNpcTraitIndicator.EMPTY;
         }
         Map<String, Double> rolledValues = buildRolledValueMap(traits);
-        if (rolledValues.isEmpty()) {
+        return buildSavedTraitIndicators(config, rolledValues,
+                CompanionRoleIdResolver.resolveRoleId(npcRef, store), language);
+    }
+
+    /** Uses the same trait icons and tooltips for immutable saved values and live values. */
+    LinkedNpcTraitIndicator[] buildSavedTraitIndicators(TwTraitConfig config,
+            Map<String, Double> rolledValues, String roleId, String language) {
+        if (config == null || rolledValues.isEmpty()) {
             return LinkedNpcTraitIndicator.EMPTY;
         }
         ArrayList<LinkedNpcTraitIndicator> indicators = new ArrayList<>(MAX_TRAIT_INDICATORS);
-        TwHappinessConfig happinessConfig = TwHappinessConfig.resolveForRole(
-                CompanionRoleIdResolver.resolveRoleId(npcRef, store));
+        TwHappinessConfig happinessConfig = TwHappinessConfig.resolveForRole(roleId);
         boolean flatDisposition = happinessConfig != null
                 && happinessConfig.getDisposition().getMode() == TwHappinessConfig.DispositionMode.FLAT;
         for (TwTraitConfig.TraitDefinition definition : config.getTraits()) {

@@ -10,6 +10,10 @@ $C = "Common.ui";
 @TraitTooltipButtonStyle = TextButtonStyle(Default: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Hovered: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Pressed: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Disabled: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle));
 @ActionCaptionStyle = LabelStyle(FontSize: 10, TextColor: #c8ccc5, HorizontalAlignment: Center, VerticalAlignment: Center);
 
+@HealthTextNormal = LabelStyle(FontSize: 13, RenderBold: true, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center);
+@HealthTextMuted = LabelStyle(FontSize: 13, RenderBold: true, TextColor: #c0c5c0, HorizontalAlignment: Center, VerticalAlignment: Center);
+@HealthTextShadowNormal = LabelStyle(FontSize: 13, RenderBold: true, TextColor: #101510, HorizontalAlignment: Center, VerticalAlignment: Center);
+@HealthTextShadowMuted = LabelStyle(FontSize: 13, RenderBold: true, TextColor: #171c17, HorizontalAlignment: Center, VerticalAlignment: Center);
 @CooldownTextNormal = LabelStyle(FontSize: 9, TextColor: #d3d7cf);
 @CooldownLabelNormal = LabelStyle(FontSize: 9, TextColor: #b9beb8);
 @CooldownTextMuted = LabelStyle(FontSize: 9, TextColor: #858b85);

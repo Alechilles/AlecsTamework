@@ -359,7 +359,9 @@ Linked panel supports:
 - Status lanes for loaded, unloaded, captured, cooped, roster-stored,
   provisioned-dormant, dead, and Lost companions; ordinary unloaded rows keep
   the latest custom display name from the live snapshot or durable profile,
-  including across restart
+  including across restart. Saved health, needs, traits, progression, and applicable
+  breeding/harvest indicators remain visible with muted last-known values.
+  Missing saved timing is marked unknown; live-only actions remain unavailable.
 - Per-row actions: `Locate`, `Recall`, `Set Home`, `Return Home`, and `Revive`/`Recover` (when enabled/ready). In Linked, Nearby, and Owned modes, the red X opens compact `Release` and `Unlink` buttons, plus `Cull` for a loaded, living animal. Unlink is disabled when no item link exists. Release replaces Abandon and permanently clears ownership; captured and cooped animals must leave storage first.
 - Action icons reuse two normal/hover frame textures and sixteen separate glyphs. Flight, shoulder, and breeding toggles show their current state. Larger cards keep passive traits separate and display needs plus applicable cooldowns as horizontal meters.
 - Loaded normal linked rows whose role enables `FlightToggle` show the same

@@ -39,6 +39,51 @@ class LinkedNpcPanelVitalsBinderTest {
         Assertions.assertEquals("0:00", LinkedNpcPanelStatusMeter.formatRemainingClock(-1L));
     }
 
+    @Test
+    void keepsKnownVitalsAndCooldownsVisibleForOfflineEntry() {
+        LinkedNpcEntry entry = offlineEntry(125_000L, true).withBreedingHappinessRatio(0.7);
+
+        UICommandBuilder commands = bind(entry);
+
+        UICommandBuilder expected = new UICommandBuilder();
+        expected.set("#Card #HealthText.Text", "40/100");
+        expected.set("#Card #NeedHappiness #NeedValueText.Text", "50%");
+        expected.set("#Card #NeedHunger #NeedValueText.Text", "60%");
+        expected.set("#Card #NeedThirst #NeedValueText.Text", "70%");
+        expected.set("#Card #BreedingCooldown.Visible", true);
+        expected.set("#Card #HarvestCooldown.Visible", true);
+        expected.set(MARKER + ".Visible", true);
+        for (var command : expected.getCommands()) {
+            Assertions.assertEquals(command.data, data(commands, command.selector));
+        }
+        Assertions.assertTrue(data(commands, "#Card #HealthTooltip.TooltipText").contains("Last known"));
+        Assertions.assertTrue(data(commands, "#Card #BreedingCooldown #BreedingCooldownTooltip.TooltipText")
+                .contains("Last known"));
+    }
+
+    @Test
+    void doesNotCallAnOfflineCooldownReadyWhenSavedTimerIsUnknown() {
+        LinkedNpcEntry entry = offlineEntry(-1L, false);
+        UICommandBuilder commands = bind(entry);
+
+        String label = data(commands, "#Card #HarvestCooldown #CooldownText.Text");
+        Assertions.assertTrue(label.contains("Unknown"));
+        Assertions.assertFalse(label.contains("Harvest ready"));
+    }
+
+    private static LinkedNpcEntry offlineEntry(long harvestRemainingMs, boolean harvestActive) {
+        return new LinkedNpcEntry(
+                UUID.randomUUID(), "Offline Companion", null,
+                40, 100, 50, 100, 50, null,
+                60, 100, 70, 100, false, false, false, false, false, false,
+                0L, null, null, null, LinkedNpcTraitIndicator.EMPTY,
+                false, false, false, false, true, true,
+                null, null, null, null, null, true, true, true,
+                65_000L, 0.5, true, harvestActive, harvestRemainingMs, 0.25, true,
+                false, 0L
+        );
+    }
+
     // Catches a tick placed on the wrong side of the meter,
     // including threshold data lost while normalizing or copying the panel entry.
     @Test
@@ -79,7 +124,6 @@ class LinkedNpcPanelVitalsBinderTest {
         for (double ratio : new double[] {-1.0, 0.0, Double.NaN, 1.5}) {
             assertHidden(entry(true).withBreedingHappinessRatio(ratio));
         }
-        assertHidden(entry(false).withBreedingHappinessRatio(0.7));
     }
 
     @Test

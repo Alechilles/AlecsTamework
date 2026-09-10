@@ -1012,7 +1012,12 @@ public final class TameworkCommandSelectionPage
     }
     private boolean canOpenSettings(Ref<EntityStore> ref, Store<EntityStore> store) {
         if (ref == null || !ref.isValid() || store == null) return false;
-        return TameworkSettingsPageService.hasAccess(playerRef, playerRef);
+        try {
+            return TameworkSettingsPageService.hasAccess(playerRef, playerRef);
+        } catch (RuntimeException unavailable) {
+            // Permission infrastructure may be unavailable during page teardown; fail closed.
+            return false;
+        }
     }
 
     private boolean beginPageNavigation() {

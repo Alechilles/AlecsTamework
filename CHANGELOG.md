@@ -3,6 +3,10 @@
 ## Unreleased development changes
 
 - The command menu includes a settings cog for players allowed to use `/tw settings`.
+  Fixed the cog texture reference.
+- Dead, lost, and unloaded companion cards retain available saved stats, traits,
+  progression, and care indicators. Saved values are muted and labeled as last known;
+  unavailable saved cooldown timing is shown as unknown.
 
 - Companion cards keep breeding and harvest readiness visible after cooldowns.
   Breeding indicators dim and explain low happiness or disabled breeding.

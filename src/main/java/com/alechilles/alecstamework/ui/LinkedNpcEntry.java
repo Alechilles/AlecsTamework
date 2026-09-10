@@ -473,11 +473,13 @@ public final class LinkedNpcEntry {
         this.breedingEnabled = breedingEnabled;
         this.breedingAvailable = breedingAvailable || breedingCooldownKnown;
         this.breedingCooldownActive = breedingCooldownActive;
-        this.breedingCooldownRemainingMs = Math.max(0L, breedingCooldownRemainingMs);
+        this.breedingCooldownRemainingMs = !loaded && breedingCooldownRemainingMs < 0L
+                ? -1L : Math.max(0L, breedingCooldownRemainingMs);
         this.breedingCooldownRatio = sanitizeRatio(breedingCooldownRatio);
         this.breedingCooldownKnown = breedingCooldownKnown;
         this.harvestCooldownActive = harvestCooldownActive;
-        this.harvestCooldownRemainingMs = Math.max(0L, harvestCooldownRemainingMs);
+        this.harvestCooldownRemainingMs = !loaded && harvestCooldownRemainingMs < 0L
+                ? -1L : Math.max(0L, harvestCooldownRemainingMs);
         this.harvestCooldownRatio = sanitizeRatio(harvestCooldownRatio);
         this.harvestCooldownKnown = harvestCooldownKnown;
         this.recallPending = recallPending;
@@ -498,7 +500,7 @@ public final class LinkedNpcEntry {
     }
 
     public boolean hasHealth() {
-        return loaded && maxHealth > 0;
+        return maxHealth > 0;
     }
 
     public UUID npcUuid() {
@@ -687,6 +689,10 @@ public final class LinkedNpcEntry {
         return harvestCooldownKnown;
     }
 
+    boolean hasKnownCooldowns() {
+        return breedingCooldownKnown || harvestCooldownKnown;
+    }
+
     public boolean recallPending() {
         return recallPending;
     }
@@ -758,7 +764,7 @@ public final class LinkedNpcEntry {
     }
 
     public boolean hasHappiness() {
-        return loaded && maxHappiness > 0;
+        return maxHappiness > 0;
     }
 
     public double happinessRatio() {
@@ -769,7 +775,7 @@ public final class LinkedNpcEntry {
     }
 
     public boolean hasHunger() {
-        return loaded && maxHunger > 0;
+        return maxHunger > 0;
     }
 
     public double hungerRatio() {
@@ -780,7 +786,18 @@ public final class LinkedNpcEntry {
     }
 
     public boolean hasThirst() {
-        return loaded && maxThirst > 0;
+        return maxThirst > 0;
+    }
+
+    boolean hasKnownCardDetails() {
+        return hasHealth()
+                || hasHappiness()
+                || hasHunger()
+                || hasThirst()
+                || hasKnownCooldowns()
+                || traitIndicators.length > 0
+                || futureStatA != null
+                || futureStatB != null;
     }
 
     public double thirstRatio() {

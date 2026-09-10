@@ -51,15 +51,15 @@ final class CommandTargetHudSnapshotFactory {
     @Nonnull
     private static CommandTargetHudSnapshot.Vitals vitals(@Nonnull LinkedNpcEntry status) {
         return new CommandTargetHudSnapshot.Vitals(
-                status.hasHealth() ? status.currentHealth() : null,
-                status.hasHealth() ? status.maxHealth() : null,
-                status.hasHappiness() ? status.currentHappiness() : null,
-                status.hasHappiness() ? status.maxHappiness() : null,
-                status.hasHappiness() ? status.targetHappinessPercent() : null,
-                status.hasHunger() ? status.currentHunger() : null,
-                status.hasHunger() ? status.maxHunger() : null,
-                status.hasThirst() ? status.currentThirst() : null,
-                status.hasThirst() ? status.maxThirst() : null
+                status.loaded() && status.hasHealth() ? status.currentHealth() : null,
+                status.loaded() && status.hasHealth() ? status.maxHealth() : null,
+                status.loaded() && status.hasHappiness() ? status.currentHappiness() : null,
+                status.loaded() && status.hasHappiness() ? status.maxHappiness() : null,
+                status.loaded() && status.hasHappiness() ? status.targetHappinessPercent() : null,
+                status.loaded() && status.hasHunger() ? status.currentHunger() : null,
+                status.loaded() && status.hasHunger() ? status.maxHunger() : null,
+                status.loaded() && status.hasThirst() ? status.currentThirst() : null,
+                status.loaded() && status.hasThirst() ? status.maxThirst() : null
         );
     }
 

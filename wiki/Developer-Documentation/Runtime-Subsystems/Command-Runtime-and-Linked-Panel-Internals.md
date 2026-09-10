@@ -44,6 +44,14 @@ canonical name, and restorable state. Entity UUIDs are replaceable aliases:
 historical UUIDs resolve back to the same profile before relocation,
 restoration, or spawn decisions.
 
+Offline command cards read saved full-state snapshots and exact entity checkpoints
+through the existing persistence queries. A bounded read-only cache retains at most
+256 profiles and admits at most 16 reads at once. Profile updates invalidate cached
+values; unchanged results expire after one minute and unavailable results retry after
+ten seconds. Completion signals refresh subscribed owner menus through the existing
+world-thread dispatcher. The command feature handler closes the cache and subscriptions
+at shutdown. Saved card values never authorize a live action or mutate persistence.
+
 ## Important runtime seams
 - Nearby and linked modes are separate entry sources
 - The canonical lifecycle alone determines active, unloaded, captured, cooped,

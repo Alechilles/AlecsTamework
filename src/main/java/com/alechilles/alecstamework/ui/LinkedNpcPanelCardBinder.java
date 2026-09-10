@@ -205,7 +205,7 @@ final class LinkedNpcPanelCardBinder {
                 && !pendingUnlink;
         commandBuilder.set(
                 statusUnloadedSelector + ".Visible",
-                false // The unavailable status is shown beside its action in the health/status area.
+                !entry.loaded() && !pendingUnlink
         );
         commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry, language));
         commandBuilder.set(recallCountdownSelector + ".Visible", showRecallCountdown);
@@ -251,7 +251,8 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(inactiveBadgeSelector + ".Visible", showInactiveBadge);
         bindCardLayout(commandBuilder, entrySelector, entry, managedRoster,
                 showActiveToggleActive || showActiveToggleInactive);
-        commandBuilder.set(entrySelector + " #CooldownRow.Visible", !pendingUnlink && entry.hasHealth());
+        commandBuilder.set(entrySelector + " #CooldownRow.Visible",
+                !pendingUnlink && entry.hasKnownCooldowns());
         LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry, language);
         LinkedNpcPanelProgressionBinder.bindXpProgressRing(
                 commandBuilder,
@@ -489,16 +490,20 @@ final class LinkedNpcPanelCardBinder {
     /** Keep unavailable cards concise and reset geometry when a reused row becomes live again. */
     static void bindCardLayout(UICommandBuilder commands, String card, LinkedNpcEntry entry,
                                boolean managedRoster, boolean showActiveToggle) {
-        boolean compact = !managedRoster && !entry.hasHealth();
+        boolean compact = !managedRoster && !entry.hasKnownCardDetails();
         commands.setObject(card + ".Anchor", buildCardAnchor(managedRoster, compact));
         commands.set(card + " #NeedRingRow.Visible", !compact);
         commands.set(card + " #TraitStrip.Visible", !compact);
         commands.set(card + " #HealthTextShadow.Visible", entry.hasHealth());
         commands.set(card + " #StatusDivider.Visible", true);
+        commands.setObject(card + " #StatusUnloaded.Anchor",
+                fixedAnchor(compact ? 48 : 74, compact ? 568 : 432, compact ? 278 : 270, 20));
         commands.setObject(card + " #GroupSelector.Anchor", fixedAnchor(compact ? 72 : 102, 0, 144, 26));
         commands.setObject(card + " #HealthFrame.Anchor", fixedAnchor(50, compact ? 568 : 172, compact ? 278 : 234, 22));
         // Runtime string patches accept opaque hex colors; alpha syntax is parsed as a texture path.
-        commands.set(card + " #HealthFrame.Background", compact ? "#202423" : "#151916");
+        commands.set(card + " #HealthFrame.Background",
+                !entry.loaded() && entry.hasKnownCardDetails() ? "#202423"
+                        : compact ? "#202423" : "#151916");
         commands.setObject(card + " #HealthText.Anchor", fixedAnchor(0, 0, compact ? 276 : 232, 20));
         commands.setObject(card + " #HealthTextShadow.Anchor", fixedAnchor(1, 1, compact ? 276 : 232, 20));
         commands.setObject(card + " #HealthTooltip.Anchor", fixedAnchor(0, 0, compact ? 278 : 234, 22));

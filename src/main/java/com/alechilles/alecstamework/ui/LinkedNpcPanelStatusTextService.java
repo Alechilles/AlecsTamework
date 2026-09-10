@@ -6,6 +6,10 @@ import com.alechilles.alecstamework.localization.LocalizedText;
  * Formats linked NPC panel status and health text labels.
  */
 final class LinkedNpcPanelStatusTextService {
+    private static final String LAST_KNOWN_LABEL_KEY = "tamework.ui.linkedPanel.cached.lastKnown";
+    private static final String LAST_KNOWN_TOOLTIP_KEY = "tamework.ui.linkedPanel.cached.lastKnownTooltip";
+    private static final String LAST_KNOWN_LABEL_FALLBACK = "Last known";
+
     private LinkedNpcPanelStatusTextService() {
     }
 
@@ -130,26 +134,28 @@ final class LinkedNpcPanelStatusTextService {
     }
 
     static String resolveBreedingCooldownTooltip(LinkedNpcEntry entry, String language) {
-        if (entry == null || !entry.loaded()) {
+        if (entry == null || !entry.breedingCooldownKnown()) {
             return LocalizedText.resolve(language, "tamework.ui.linkedPanel.breedingCooldown.unavailable");
         }
-        if (!entry.breedingCooldownKnown()) {
-            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.breedingCooldown.unavailable");
-        }
+        String tooltip;
         if (!entry.breedingEnabled()) {
-            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.breedingCooldown.off");
+            tooltip = LocalizedText.resolve(language, "tamework.ui.linkedPanel.breedingCooldown.off");
+        } else if (entry.breedingCooldownRemainingMs() < 0L) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.cached.timerUnknown");
+        } else if (breedingBlockedByHappiness(entry)) {
+            tooltip = LocalizedText.resolve(language, "tamework.ui.linkedPanel.breedingCooldown.unhappy");
+        } else if (!entry.breedingCooldownActive()) {
+            tooltip = LocalizedText.resolve(language, "tamework.ui.linkedPanel.breedingCooldown.ready");
+        } else if (!entry.loaded() && entry.breedingCooldownRemainingMs() <= 0L) {
+            return resolveLastKnownTooltip(language);
+        } else {
+            tooltip = LocalizedText.format(
+                    language,
+                    "tamework.ui.linkedPanel.breedingCooldown.remaining",
+                    formatRemainingClock(entry.breedingCooldownRemainingMs())
+            );
         }
-        if (breedingBlockedByHappiness(entry)) {
-            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.breedingCooldown.unhappy");
-        }
-        if (!entry.breedingCooldownActive()) {
-            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.breedingCooldown.ready");
-        }
-        return LocalizedText.format(
-                language,
-                "tamework.ui.linkedPanel.breedingCooldown.remaining",
-                formatRemainingClock(entry.breedingCooldownRemainingMs())
-        );
+        return appendLastKnownTooltip(tooltip, entry, language);
     }
 
     static String resolveHarvestCooldownTooltip(LinkedNpcEntry entry) {
@@ -157,20 +163,57 @@ final class LinkedNpcPanelStatusTextService {
     }
 
     static String resolveHarvestCooldownTooltip(LinkedNpcEntry entry, String language) {
-        if (entry == null || !entry.loaded()) {
+        if (entry == null || !entry.harvestCooldownKnown()) {
             return LocalizedText.resolve(language, "tamework.ui.linkedPanel.harvestCooldown.unavailable");
         }
-        if (!entry.harvestCooldownKnown()) {
-            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.harvestCooldown.unavailable");
+        String tooltip;
+        if (entry.harvestCooldownRemainingMs() < 0L) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.cached.timerUnknown");
+        } else if (!entry.harvestCooldownActive()) {
+            tooltip = LocalizedText.resolve(language, "tamework.ui.linkedPanel.harvestCooldown.ready");
+        } else if (!entry.loaded() && entry.harvestCooldownRemainingMs() <= 0L) {
+            return resolveLastKnownTooltip(language);
+        } else {
+            tooltip = LocalizedText.format(
+                    language,
+                    "tamework.ui.linkedPanel.harvestCooldown.remaining",
+                    formatRemainingClock(entry.harvestCooldownRemainingMs())
+            );
         }
-        if (!entry.harvestCooldownActive()) {
-            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.harvestCooldown.ready");
+        return appendLastKnownTooltip(tooltip, entry, language);
+    }
+
+    static String appendLastKnownTooltip(String tooltip, LinkedNpcEntry entry, String language) {
+        if (entry == null || entry.loaded() || tooltip == null || tooltip.isBlank()) {
+            return tooltip;
         }
-        return LocalizedText.format(
-                language,
-                "tamework.ui.linkedPanel.harvestCooldown.remaining",
-                formatRemainingClock(entry.harvestCooldownRemainingMs())
-        );
+        return tooltip + "\n" + resolveLastKnownTooltip(language);
+    }
+
+    static String resolveCooldownLabel(boolean active, long remainingMs, String readyText,
+                                       LinkedNpcEntry entry, String language) {
+        if (remainingMs < 0L) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.cached.unknown");
+        }
+        if (!active) {
+            return readyText;
+        }
+        if (entry != null && !entry.loaded() && remainingMs <= 0L) {
+            return resolveLastKnownLabel(language);
+        }
+        return formatRemainingClock(remainingMs);
+    }
+
+    private static String resolveLastKnownLabel(String language) {
+        String label = LocalizedText.resolve(language, LAST_KNOWN_LABEL_KEY);
+        return LAST_KNOWN_LABEL_KEY.equals(label) ? LAST_KNOWN_LABEL_FALLBACK : label;
+    }
+
+    private static String resolveLastKnownTooltip(String language) {
+        String hint = LocalizedText.resolve(language, LAST_KNOWN_TOOLTIP_KEY);
+        return LAST_KNOWN_TOOLTIP_KEY.equals(hint)
+                ? "Last known state; refreshes when loaded."
+                : hint;
     }
 
     static String formatRemainingTime(long remainingMs, String language) {

@@ -96,6 +96,15 @@ final class CommandLinkedPanelCooldownSnapshotService {
                 roleScope, parameters, globalConfig.getIsHarvestableParam());
     }
 
+    /** Resolves saved-card capability without accessing another world's entity. */
+    boolean hasEnabledHarvestCapability(@Nullable String roleId) {
+        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
+        if (globalConfig == null) return false;
+        StdScope parameters = resolveRoleParameterScope(roleId);
+        return hasEnabledHarvestCapability(resolveInteractionConfig(roleId, globalConfig, null, parameters),
+                null, parameters, globalConfig.getIsHarvestableParam());
+    }
+
     boolean hasEnabledHarvestCapability(@Nullable TwInteractionConfig config,
                                         @Nullable StdScope sensorScope,
                                         @Nullable StdScope parameters,
@@ -270,7 +279,7 @@ final class CommandLinkedPanelCooldownSnapshotService {
                 : 0L;
     }
 
-    private static String resolveHarvestAlarmName() {
+    static String resolveHarvestAlarmName() {
         TwGlobalConfig config = TwGlobalConfig.resolveActive();
         String configured = config != null ? config.getHarvestAlarmName() : null;
         return configured != null && !configured.isBlank() ? configured : DEFAULT_HARVEST_ALARM_NAME;

@@ -913,3 +913,8 @@ tamework.ui.linkedPanel.action.breedingOff=Breeding Off
 
 tamework.ui.linkedPanel.breedingCooldown.unhappy=Too unhappy to breed. Raise happiness to the breeding threshold.
 tamework.ui.linkedPanel.breedingCooldown.off=Breeding is off for this animal.
+
+tamework.ui.linkedPanel.cached.lastKnown=Last known
+tamework.ui.linkedPanel.cached.lastKnownTooltip=Last known saved state; refreshes when the companion is loaded.
+tamework.ui.linkedPanel.cached.unknown=Unknown
+tamework.ui.linkedPanel.cached.timerUnknown=The saved state does not include enough timing information. Refreshes when the companion is loaded.

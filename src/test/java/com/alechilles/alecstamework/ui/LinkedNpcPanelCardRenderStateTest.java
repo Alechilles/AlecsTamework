@@ -47,6 +47,20 @@ class LinkedNpcPanelCardRenderStateTest {
         assertVisible(commands, "#Card #TraitStrip.Visible", true);
     }
 
+    @Test
+    void offlineNeedsKeepTheCardExpandedWhenHealthIsUnknown() {
+        UUID id = UUID.randomUUID();
+        LinkedNpcEntry offline = new LinkedNpcEntry(id, "Duck", 0, 0,
+                50, 100, "", 60, 100, 70, 100, false, false,
+                false, false, false, false, 0L, LinkedNpcTraitIndicator.EMPTY);
+        UICommandBuilder commands = new UICommandBuilder();
+
+        LinkedNpcPanelCardBinder.bindCardLayout(commands, "#Card", offline, false, false);
+
+        assertVisible(commands, "#Card #NeedRingRow.Visible", true);
+        assertVisible(commands, "#Card #TraitStrip.Visible", true);
+    }
+
     private static void assertVisible(UICommandBuilder commands, String selector, boolean visible) {
         UICommandBuilder expected = new UICommandBuilder();
         expected.set(selector, visible);

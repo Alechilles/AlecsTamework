@@ -70,6 +70,7 @@ public final class CommandItemFeatureHandler {
     private static final double RECALL_FORCE_RELOCATE_DISTANCE = 80.0;
 
     private final CommandItemRegistry registry;
+    private final CommandPersistenceView persistenceView;
     private final CommandNpcRelocationService relocationService;
     private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
@@ -214,7 +215,7 @@ public final class CommandItemFeatureHandler {
         this.npcExistenceService = stateSnapshotService != null
                 ? new CommandNpcExistenceService(stateSnapshotService.getLoadedNpcIdentityIndex())
                 : new CommandNpcExistenceService();
-        CommandPersistenceView persistenceView = persistence != null
+        this.persistenceView = persistence != null
                 ? new CommandPersistenceView(persistence)
                 : null;
         CommandRosterPanelRecordSource rosterPanelRecordSource =
@@ -452,6 +453,9 @@ public final class CommandItemFeatureHandler {
                 bondedRefreshSignals,
                 new CommandLinkedFlightToggleActionService()::toggle
         );
+        if (persistenceView != null) {
+            this.selectionPageService.configureSavedPanelSignals(persistenceView::savedPanelSignals);
+        }
         this.selectionPageService.configureShoulderRideAction(
                 new BondedCompanionShoulderRideActionService(
                         BondedCompanionPanelActionRouter::resolvePlayerFromEvent,
@@ -538,9 +542,10 @@ public final class CommandItemFeatureHandler {
     public void onPlayerConnect(@Nullable UUID ownerUuid) {
         bondedPanelLifecycle.warmForOwner(ownerUuid);
     }
-    /** Stops the owned bonded panel loader before durable persistence closes. */
+    /** Stops command panel snapshot caches before durable persistence closes. */
     public void close() {
         bondedPanelLifecycle.close();
+        if (persistenceView != null) persistenceView.close();
     }
 
     /** Connects command menu opening to the live public provider registry. */

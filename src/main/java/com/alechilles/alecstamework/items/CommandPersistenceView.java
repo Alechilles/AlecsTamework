@@ -1,5 +1,11 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
+import com.alechilles.alecstamework.companion.extension.ProfileExtensionProjectionValue;
+import com.alechilles.alecstamework.items.persistence.checkpoint.ReplacementCompanionEntityCheckpointSink;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
+import com.alechilles.alecstamework.ui.LinkedPanelRefreshSignalSource;
+import java.util.Comparator;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
@@ -22,6 +28,8 @@ import javax.annotation.Nullable;
  */
 final class CommandPersistenceView {
     private final ProjectionLookup projections;
+    private CommandSavedNpcPanelCache savedPanels;
+    private java.util.function.Function<ProfileId, ProfileExtensionProjectionValue> checkpointLookup = ignored -> null;
 
     CommandPersistenceView(@Nonnull PersistenceDomainFacades persistence) {
         this(new ProjectionLookup() {
@@ -39,6 +47,15 @@ final class CommandPersistenceView {
                 return persistence.queries().projectedProfile(alias);
             }
         });
+        checkpointLookup = id -> persistence.queries().projectedExtensions(id,
+                ReplacementCompanionEntityCheckpointSink.NAMESPACE).values().stream()
+                .max(Comparator.comparingLong(ProfileExtensionProjectionValue::updatedAtMs)).orElse(null);
+        savedPanels = new CommandSavedNpcPanelCache(id -> persistence.queries().findProfile(id).thenApply(read -> {
+            if (!(read instanceof PersistenceReadResult.Found<
+                    CompanionProfileReadModel> found)) return null;
+            ProfileExtensionProjectionValue checkpoint = checkpointLookup.apply(id);
+            return CommandSavedNpcPanelSnapshot.decode(found.value(), checkpoint == null ? null : checkpoint.jsonPayload());
+        }));
     }
 
     CommandPersistenceView(@Nonnull ProjectionLookup projections) {
@@ -46,6 +63,23 @@ final class CommandPersistenceView {
                 projections, "Profile projections are required"
         );
     }
+
+    CommandSavedNpcPanelSnapshot savedPanel(LinkedNpcRecord record, UUID viewer) {
+        ProfileId id = find(record).map(ProfileSnapshot::profileId).orElse(null);
+        CompanionProfileProjectionState projection = id == null ? null : safeFind(id).orElse(null);
+        if (savedPanels == null || projection == null) return null;
+        ProfileExtensionProjectionValue checkpoint = checkpointLookup.apply(id);
+        return savedPanels.peek(id, viewer, new CommandSavedNpcPanelCache.Revision(
+                projection.lastUpdatedAtMs(), checkpoint == null ? null : checkpoint.key().toString(),
+                checkpoint == null ? 0L : checkpoint.revision()));
+    }
+
+    LinkedPanelRefreshSignalSource savedPanelSignals(UUID owner) {
+        return savedPanels == null ? LinkedPanelRefreshSignalSource.none()
+                : savedPanels.signals(owner);
+    }
+
+    void close() { if (savedPanels != null) savedPanels.close(); }
 
     /**
      * Resolves one command record by stable profile first and known alias second.
