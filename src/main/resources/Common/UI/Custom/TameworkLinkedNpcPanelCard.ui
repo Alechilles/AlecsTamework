@@ -24,6 +24,7 @@ Group {
     Group #GenderMaleIcon { Anchor: (Top: 1, Left: 34, Width: 22, Height: 22); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Male.png"); Visible: false; }
     Group #GenderFemaleIcon { Anchor: (Top: 1, Left: 34, Width: 22, Height: 22); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Female.png"); Visible: false; }
     Label #Name { Anchor: (Top: 0, Left: 64, Width: 388, Height: 26); Text: %server.tamework.ui.linkedPanel.subtitle.defaultNpcName; Style: (FontSize: 18, RenderBold: true, TextColor: #f0eee7, HorizontalAlignment: Start, VerticalAlignment: Center); }
+    Label #RoleSubtitle { Anchor: (Top: 25, Left: 0, Width: 148, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #afb6b0, VerticalAlignment: Center); Visible: false; }
     Label #StatusUnloaded { Anchor: (Top: 68, Left: 0, Width: 148, Height: 18); Text: %server.tamework.ui.linkedPanel.status.unloaded; Style: (FontSize: 10, RenderBold: true, TextColor: #ffe5b4, HorizontalAlignment: End, VerticalAlignment: Center); Visible: false; }
     TextButton #RemoveButton { Anchor: (Top: 0, Right: 0, Width: 28, Height: 28); Style: $A.@Remove; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.removalMenu; TextTooltipStyle: @LinkedActionTooltipStyle; }
     Group #RemoveButtonGlyph { Anchor: (Top: 0, Right: 0, Width: 28, Height: 28); Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png"); Visible: true; HitTestVisible: false; }
@@ -130,25 +131,26 @@ Group {
         Anchor: (Top: 50, Left: 172, Width: 234, Height: 22);
         Background: #151916(0.95);
         Group #HealthFill { Anchor: (Top: 1, Left: 1, Width: 232, Height: 20); Background: #6fc576; }
-        Group #HealthTextBackdrop { Anchor: (Top: 2, Left: 69, Width: 96, Height: 18); Background: #101713(0.94); }
-        Label #HealthTextShadow { Anchor: (Top: 1, Left: 2, Width: 230, Height: 20); Text: "?/?"; Style: (FontSize: 13, RenderBold: true, TextColor: #10150f(0.95), HorizontalAlignment: Center, VerticalAlignment: Center); }
+        Label #HealthTextShadow { Anchor: (Top: 1, Left: 2, Width: 230, Height: 20); Text: "?/?"; Style: (FontSize: 15, RenderBold: true, TextColor: #414640, HorizontalAlignment: Center, VerticalAlignment: Center); }
         Label #HealthText { Anchor: (Top: 0, Left: 0, Width: 230, Height: 20); Text: "?/?"; Style: (FontSize: 13, RenderBold: true, TextColor: #fff8e8, HorizontalAlignment: Center, VerticalAlignment: Center); }
         TextButton #HealthTooltip { Anchor: (Top: 0, Left: 0, Width: 234, Height: 22); Style: @TraitTooltipButtonStyle; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.health.notAvailable; TextTooltipStyle: @LinkedActionTooltipStyle; }
     }
     Group #TalentPointAction {
         Anchor: (Top: 26, Left: 304, Width: 24, Height: 24);
         Visible: false;
-        Group #TalentPointIcon { Anchor: (Top: 1, Left: 2, Width: 18, Height: 18); Background: (TexturePath: "Tamework/LinkedPanelIcons/TalentPoint_UpArrow.png"); }
-        Group #TalentPointCountBadgeBorder { Anchor: (Top: 0, Left: 10, Width: 14, Height: 12); Background: #f6d56b; }
-        Group #TalentPointCountBadgeFill { Anchor: (Top: 1, Left: 11, Width: 12, Height: 10); Background: #131713; }
-        Label #TalentPointCountShadow { Anchor: (Top: 1, Left: 12, Width: 12, Height: 10); Text: "1"; Style: (FontSize: 8, RenderBold: true, TextColor: #000000, HorizontalAlignment: Center, VerticalAlignment: Center); }
-        Label #TalentPointCount { Anchor: (Top: 0, Left: 11, Width: 12, Height: 10); Text: "1"; Style: (FontSize: 8, RenderBold: true, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center); }
-        TextButton #TalentPointButton { Anchor: (Top: 0, Left: 0, Width: 24, Height: 20); Style: @TraitTooltipButtonStyle; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.futureAction.talents; TextTooltipStyle: @LinkedActionTooltipStyle; }
+        TextButton #TalentPointButton { Anchor: (Top: 0, Left: 0, Width: 24, Height: 24); Style: $A.@PanelButton; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.futureAction.talents; TextTooltipStyle: @LinkedActionTooltipStyle; }
+        Group #TalentPointIcon { Anchor: (Top: 3, Left: 3, Width: 18, Height: 18); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelControls/TalentPoints.png"); }
+        Group #TalentPointCountBadgeBorder { HitTestVisible: false; Anchor: (Top: 0, Left: 10, Width: 14, Height: 12); Background: #7e9686; }
+        Group #TalentPointCountBadgeFill { HitTestVisible: false; Anchor: (Top: 1, Left: 11, Width: 12, Height: 10); Background: #131713; }
+        Label #TalentPointCountShadow { HitTestVisible: false; Anchor: (Top: 1, Left: 12, Width: 12, Height: 10); Text: "1"; Style: (FontSize: 8, RenderBold: true, TextColor: #000000, HorizontalAlignment: Center, VerticalAlignment: Center); }
+        Label #TalentPointCount { HitTestVisible: false; Anchor: (Top: 0, Left: 11, Width: 12, Height: 10); Text: "1"; Style: (FontSize: 8, RenderBold: true, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center); }
+
     }
     Group #XpProgressRing {
         Anchor: (Top: 26, Left: 332, Width: 74, Height: 22);
         Visible: false;
-        Label { Anchor: (Top: 0, Left: 0, Width: 34, Height: 20); Text: "Lv."; Style: (FontSize: 12, TextColor: #afb6b0, VerticalAlignment: Center); }
+        TextButton #XpTooltip { Anchor: (Top: 0, Left: 0, Width: 74, Height: 24); Style: $A.@PanelButton; Text: ""; TooltipText: "0/0 XP"; TextTooltipStyle: @LinkedProgressionTooltipStyle; }
+        Label { Anchor: (Top: 2, Left: 7, Width: 24, Height: 20); HitTestVisible: false; Text: "Lv."; Style: (FontSize: 12, TextColor: #afb6b0, VerticalAlignment: Center); }
         Group #RingTrackTopLeft { Anchor: (Top: 0, Left: 0, Width: 12, Height: 3); Background: #353c36; Visible: false; }
         Group #RingTrackTopRight { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #353c36; Visible: false; }
         Group #RingTrackLeft { Anchor: (Top: 0, Left: 0, Width: 3, Height: 20); Background: #353c36; Visible: false; }
@@ -160,8 +162,9 @@ Group {
         Group #RingFillBar4 { Anchor: (Top: 0, Left: 21, Width: 3, Height: 20); Background: #7cc6f2; Visible: false; }
         Group #RingFillBar5 { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #7cc6f2; Visible: false; }
         Group #CornerMaskOverlay { Anchor: (Top: 0, Left: 0, Width: 24, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/Corner_Mask_24.png"); Visible: false; }
-        Label #XpLevelText { Anchor: (Top: 0, Right: 0, Width: 38, Height: 20); Text: "1"; Style: (FontSize: 14, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Center, VerticalAlignment: Center); }
-        TextButton #XpTooltip { Anchor: (Top: 0, Left: 0, Width: 74, Height: 20); Style: @TraitTooltipButtonStyle; Text: ""; TooltipText: "0/0 XP"; TextTooltipStyle: @LinkedProgressionTooltipStyle; }
+        Label #TalentsArrow { Anchor: (Top: 2, Right: 4, Width: 10, Height: 20); Text: ">"; HitTestVisible: false; Style: (FontSize: 12, RenderBold: true, TextColor: #c6d9c9, Alignment: Center); }
+        Label #XpLevelText { Anchor: (Top: 2, Right: 15, Width: 26, Height: 20); HitTestVisible: false; Text: "1"; Style: (FontSize: 14, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Center, VerticalAlignment: Center); }
+
     }
 
     Group #NeedRingRow {

@@ -151,6 +151,31 @@ final class CommandNpcNameResolver {
         return resolveDisplayNameComponent(npcRef, store);
     }
 
+    /** Resolves only an explicit companion name, never the NPC's generated display name. */
+    String resolveCustomNpcName(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return null;
+        }
+        ComponentType<EntityStore, TameworkNpcNameComponent> nameType = TameworkNpcNameComponent.getComponentType();
+        if (nameType == null) {
+            return null;
+        }
+        TameworkNpcNameComponent nameComponent = store.getComponent(npcRef, nameType);
+        if (nameComponent == null || nameComponent.getName() == null || nameComponent.getName().isBlank()) {
+            return null;
+        }
+        return nameComponent.getName().trim();
+    }
+
+    /** Returns the localized role label only when an explicit companion name is present. */
+    String resolveRoleSubtitle(String customName, String roleId, String nameKey) {
+        if (customName == null || customName.isBlank()) {
+            return "";
+        }
+        String roleLabel = resolveRoleDisplayName(roleId, nameKey);
+        return roleLabel == null || roleLabel.isBlank() ? "" : roleLabel;
+    }
+
     private String resolveDisplayNameComponent(Ref<EntityStore> npcRef, Store<EntityStore> store) {
         return NpcDisplayNameComponentService.resolvePersistentOrRuntimeName(npcRef, store);
     }

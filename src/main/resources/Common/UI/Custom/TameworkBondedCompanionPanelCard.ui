@@ -263,7 +263,7 @@ Group {
             Background: #85b99a;
         }
 
-        Group { Anchor: (Top: 2, Left: 69, Width: 96, Height: 18); Background: #101713(0.94); }
+        Label #BondedHealthTextShadow { Anchor: (Top: 1, Left: 1, Right: 0, Height: 20); Text: "? / ?"; Style: (FontSize: 15, RenderBold: true, TextColor: #414640, HorizontalAlignment: Center, VerticalAlignment: Center); }
         Label #BondedHealthText {
             Anchor: (Top: 0, Left: 0, Right: 0, Height: 20);
             Text: "? / ?";

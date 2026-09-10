@@ -176,4 +176,14 @@ class CommandNpcNameResolverTest {
                 )
         );
     }
+
+    @Test
+    void providesLocalizedRoleSubtitleOnlyForNamedCompanions() {
+        TranslationRegistry registry = new TranslationRegistry();
+        registry.put("npcRoles.Duck.name", "Duck");
+        CommandNpcNameResolver resolver = new CommandNpcNameResolver(registry);
+
+        assertEquals("Duck", resolver.resolveRoleSubtitle("Daffodil", "Tamed_Duck", null));
+        assertEquals("", resolver.resolveRoleSubtitle(null, "Tamed_Duck", null));
+    }
 }

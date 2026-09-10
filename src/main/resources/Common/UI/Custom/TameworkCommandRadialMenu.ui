@@ -22,37 +22,54 @@ $C.@PageOverlay {
     TextButton #CommandMenuCloseButton { Anchor: (Top: 8, Right: 14, Width: 78, Height: 26); Text: %server.tamework.ui.shared.button.close; Style: $A.@PanelButton; }
    }
    Group #TameworkCommandAssignments {
-    Anchor: (Top: 54, Left: 12, Width: 152, Bottom: 16);
-    Background: #1a201c;
+     Anchor: (Top: 54, Left: 12, Width: 152, Bottom: 16);
+    Background: #171d19;
+    OutlineColor: #414845;
+    OutlineSize: 1;
     Group #TameworkCommandPrimaryAssignment {
-     Anchor: (Top: 0, Left: 0, Width: 152, Height: 80);
-     Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
-     Label { Anchor: (Top: 10, Left: 12, Width: 36, Height: 22); Text: "LMB"; Style: @CommandAssignmentKeyStyle; }
-     DropdownBox #TameworkCommandPrimary { Anchor: (Top: 40, Left: 8, Width: 136, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: "No commands"; }
+     Anchor: (Top: 8, Left: 8, Width: 136, Height: 70);
+     Background: #202923;
+     OutlineColor: #414845;
+     OutlineSize: 1;
+     Label { Anchor: (Top: 4, Left: 8, Right: 8, Height: 24); Text: "LMB"; Style: @CommandAssignmentKeyStyle; }
+     Group { Anchor: (Top: 29, Left: 8, Right: 8, Height: 1); Background: #414845(0.72); }
+     DropdownBox #TameworkCommandPrimary { Anchor: (Top: 34, Left: 8, Right: 8, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: "No commands"; }
     }
     Group #TameworkCommandHotswapQAssignment {
-     Anchor: (Top: 92, Left: 0, Width: 152, Height: 80);
-     Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
-     Label { Anchor: (Top: 10, Left: 12, Width: 36, Height: 22); Text: "Q"; Style: @CommandAssignmentKeyStyle; }
-     DropdownBox #TameworkCommandHotswapQ { Anchor: (Top: 40, Left: 8, Width: 136, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: "No commands"; }
+     Anchor: (Top: 86, Left: 8, Width: 136, Height: 70);
+     Background: #202923;
+     OutlineColor: #414845;
+     OutlineSize: 1;
+     Label { Anchor: (Top: 4, Left: 8, Right: 8, Height: 24); Text: "Q"; Style: @CommandAssignmentKeyStyle; }
+     Group { Anchor: (Top: 29, Left: 8, Right: 8, Height: 1); Background: #414845(0.72); }
+     DropdownBox #TameworkCommandHotswapQ { Anchor: (Top: 34, Left: 8, Right: 8, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: "No commands"; }
     }
     Group #TameworkCommandHotswapEAssignment {
-     Anchor: (Top: 184, Left: 0, Width: 152, Height: 80);
-     Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
-     Label { Anchor: (Top: 10, Left: 12, Width: 36, Height: 22); Text: "E"; Style: @CommandAssignmentKeyStyle; }
-     DropdownBox #TameworkCommandHotswapE { Anchor: (Top: 40, Left: 8, Width: 136, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: "No commands"; }
+     Anchor: (Top: 164, Left: 8, Width: 136, Height: 70);
+     Background: #202923;
+     OutlineColor: #414845;
+     OutlineSize: 1;
+     Label { Anchor: (Top: 4, Left: 8, Right: 8, Height: 24); Text: "E"; Style: @CommandAssignmentKeyStyle; }
+     Group { Anchor: (Top: 29, Left: 8, Right: 8, Height: 1); Background: #414845(0.72); }
+     DropdownBox #TameworkCommandHotswapE { Anchor: (Top: 34, Left: 8, Right: 8, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: "No commands"; }
     }
     Group #TameworkCommandHotswapRAssignment {
-     Anchor: (Top: 276, Left: 0, Width: 152, Height: 80);
-     Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
-     Label { Anchor: (Top: 10, Left: 12, Width: 36, Height: 22); Text: "R"; Style: @CommandAssignmentKeyStyle; }
-     DropdownBox #TameworkCommandHotswapR { Anchor: (Top: 40, Left: 8, Width: 136, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: "No commands"; }
+     Anchor: (Top: 242, Left: 8, Width: 136, Height: 70);
+     Background: #202923;
+     OutlineColor: #414845;
+     OutlineSize: 1;
+     Label { Anchor: (Top: 4, Left: 8, Right: 8, Height: 24); Text: "R"; Style: @CommandAssignmentKeyStyle; }
+     Group { Anchor: (Top: 29, Left: 8, Right: 8, Height: 1); Background: #414845(0.72); }
+     DropdownBox #TameworkCommandHotswapR { Anchor: (Top: 34, Left: 8, Right: 8, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: "No commands"; }
     }
 
     Group #TameworkGroupQuickSelect {
-     Anchor: (Top: 374, Left: 0, Right: 0, Bottom: 0);
-     Label { Anchor: (Top: 0, Left: 8, Right: 0, Height: 24); Text: %server.tamework.ui.linkedPanel.manageGroups; Style: (FontSize: 14, RenderBold: true, TextColor: #e8e4da); }
-     Group { Anchor: (Top: 30, Left: 0, Right: 0, Bottom: 0); LayoutMode: TopScrolling; KeepScrollPosition: true; ScrollbarStyle: $C.@DefaultScrollbarStyle; Padding: (Right: 6);
+     Anchor: (Top: 328, Left: 8, Right: 8, Bottom: 8);
+     Background: #202923;
+     OutlineColor: #414845;
+     OutlineSize: 1;
+     Label { Anchor: (Top: 4, Left: 8, Right: 8, Height: 22); Text: %server.tamework.ui.linkedPanel.manageGroups; Style: (FontSize: 13, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Center, VerticalAlignment: Center); }
+     Group { Anchor: (Top: 28, Left: 8, Right: 8, Bottom: 0); LayoutMode: TopScrolling; KeepScrollPosition: true; ScrollbarStyle: $C.@DefaultScrollbarStyle; Padding: (Right: 6, Top: 4, Bottom: 4);
       Group #TameworkGroupQuickSelectList { LayoutMode: Top; }
      }
     }

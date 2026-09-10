@@ -214,6 +214,20 @@ class LinkedNpcPanelStatusTextServiceTest {
     }
 
     @Test
+    void snapshotMapperPreservesNamedCompanionRoleSubtitleAcrossRefresh() {
+        LinkedNpcEntry entry = new LinkedNpcEntry(
+                UUID.randomUUID(), "Daffodil", 25, 25, 0, 0, null,
+                0, 0, 0, 0, true, false, false, false, false, false,
+                0L, LinkedNpcTraitIndicator.EMPTY
+        ).withRoleSubtitle("Duck");
+
+        LinkedNpcEntry[] snapshots = LinkedNpcEntrySnapshotMapper.build(List.of(entry));
+
+        assertEquals(1, snapshots.length);
+        assertEquals("Duck", snapshots[0].roleSubtitle());
+    }
+
+    @Test
     void saturatedCooldownFormattingNeverWrapsNegative() {
         String clock = LinkedNpcPanelStatusTextService.formatRemainingClock(Long.MAX_VALUE);
         String duration = LinkedNpcPanelStatusTextService.formatRemainingTime(Long.MAX_VALUE, null);

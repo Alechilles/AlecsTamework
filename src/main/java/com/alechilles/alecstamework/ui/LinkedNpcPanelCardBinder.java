@@ -126,6 +126,8 @@ final class LinkedNpcPanelCardBinder {
             commandBuilder.append("#TameworkLinkedPanelList", config.linkedPanelCardUiPath());
         }
         commandBuilder.set(nameSelector + ".Text", entry.displayName());
+        commandBuilder.set(entrySelector + " #RoleSubtitle.Text", entry.roleSubtitle());
+        commandBuilder.set(entrySelector + " #RoleSubtitle.Visible", !entry.roleSubtitle().isBlank());
         commandBuilder.set(maleIconSelector + ".Visible", entry.isMale());
         commandBuilder.set(femaleIconSelector + ".Visible", entry.isFemale());
         boolean isLinked = entry.linked();
@@ -263,6 +265,8 @@ final class LinkedNpcPanelCardBinder {
                         && entry.isTalentsActionEnabled()
                         && entry.futureStatA() != null
                         && !pendingUnlink;
+        commandBuilder.set(xpTooltipSelector + ".Disabled", !canOpenTalentsFromLevelIndicator);
+        commandBuilder.set(xpProgressRingSelector + " #TalentsArrow.Visible", canOpenTalentsFromLevelIndicator);
         boolean showTalentPointAction =
                 entry.isTalentsActionVisible()
                         && entry.isTalentsActionEnabled()
@@ -489,7 +493,7 @@ final class LinkedNpcPanelCardBinder {
         commands.setObject(card + ".Anchor", buildCardAnchor(managedRoster, compact));
         commands.set(card + " #NeedRingRow.Visible", !compact);
         commands.set(card + " #TraitStrip.Visible", !compact);
-        commands.set(card + " #HealthTextBackdrop.Visible", entry.hasHealth());
+        commands.set(card + " #HealthTextShadow.Visible", entry.hasHealth());
         commands.set(card + " #StatusDivider.Visible", true);
         commands.setObject(card + " #GroupSelector.Anchor", fixedAnchor(compact ? 72 : 102, 0, 144, 26));
         commands.setObject(card + " #HealthFrame.Anchor", fixedAnchor(50, compact ? 568 : 172, compact ? 278 : 234, 22));
@@ -498,12 +502,16 @@ final class LinkedNpcPanelCardBinder {
         commands.setObject(card + " #HealthText.Anchor", fixedAnchor(0, 0, compact ? 276 : 232, 20));
         commands.setObject(card + " #HealthTextShadow.Anchor", fixedAnchor(1, 1, compact ? 276 : 232, 20));
         commands.setObject(card + " #HealthTooltip.Anchor", fixedAnchor(0, 0, compact ? 278 : 234, 22));
-        commands.setObject(card + " #XpProgressRing.Anchor", fixedAnchor(26, 332, 74, 22));
-        commands.setObject(card + " #TalentPointAction.Anchor", fixedAnchor(26, 304, 24, 24));
+        commands.setObject(card + " #XpProgressRing.Anchor", fixedAnchor(24, 332, 74, 24));
+        commands.setObject(card + " #TalentPointAction.Anchor", fixedAnchor(24, 304, 24, 24));
+        int activeTop = compact ? 48 : 78;
+        commands.setObject(card + " #ActiveToggleActiveButton.Anchor", fixedAnchor(activeTop, 0, 40, 20));
+        commands.setObject(card + " #ActiveToggleInactiveButton.Anchor", fixedAnchor(activeTop, 0, 40, 20));
+        commands.setObject(card + " #StatusInactive.Anchor", fixedAnchor(activeTop, 48, 96, 20));
         int nameLeft = entry.isMale() || entry.isFemale() ? 28 : 0;
         commands.setObject(card + " #GenderMaleIcon.Anchor", fixedAnchor(1, 0, 22, 22));
         commands.setObject(card + " #GenderFemaleIcon.Anchor", fixedAnchor(1, 0, 22, 22));
-        commands.setObject(card + " #Name.Anchor", fixedAnchor(0, nameLeft, 150 - nameLeft, 30));
+        commands.setObject(card + " #Name.Anchor", fixedAnchor(0, nameLeft, 150 - nameLeft, 24));
     }
 
     private static Anchor fixedAnchor(int top, int left, int width, int height) {

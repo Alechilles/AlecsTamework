@@ -11,6 +11,7 @@ import java.util.UUID;
 public final class LinkedNpcEntry {
     private final UUID npcUuid;
     private final String displayName;
+    private final String roleSubtitle;
     private final String gender;
     private final int currentHealth;
     private final int maxHealth;
@@ -440,6 +441,7 @@ public final class LinkedNpcEntry {
                           long recallLostRemainingMs) {
         this.npcUuid = npcUuid;
         this.displayName = displayName;
+        this.roleSubtitle = "";
         this.gender = normalizeGender(gender);
         this.currentHealth = currentHealth;
         this.maxHealth = maxHealth;
@@ -505,6 +507,14 @@ public final class LinkedNpcEntry {
 
     public String displayName() {
         return displayName;
+    }
+
+    /**
+     * Localized species or role name shown under a player-assigned companion name.
+     * Empty when the display name is already the role name.
+     */
+    public String roleSubtitle() {
+        return roleSubtitle;
     }
 
     public String gender() {
@@ -733,6 +743,13 @@ public final class LinkedNpcEntry {
                 flightToggleAvailable, flightToggleAirborne, available, mounted);
     }
 
+    /** Returns an immutable presentation copy with an optional role subtitle. */
+    public LinkedNpcEntry withRoleSubtitle(String subtitle) {
+        String normalized = normalizeRoleSubtitle(subtitle);
+        return Objects.equals(roleSubtitle, normalized) ? this
+                : new LinkedNpcEntry(this, normalized);
+    }
+
     public double healthRatio() {
         if (!hasHealth()) {
             return 0.0;
@@ -845,6 +862,13 @@ public final class LinkedNpcEntry {
                 source.breedingHappinessRatio, ownedActions);
     }
 
+    private LinkedNpcEntry(LinkedNpcEntry source, String roleSubtitle) {
+        this(source, source.recoveryHeld, source.recoveryIncidentId,
+                source.flightToggleAvailable, source.flightToggleAirborne,
+                source.shoulderRideAvailable, source.shoulderRideMounted,
+                source.breedingHappinessRatio, source.ownedActions, roleSubtitle);
+    }
+
     private LinkedNpcEntry(LinkedNpcEntry source,
                            boolean recoveryHeld,
                            String incidentId,
@@ -866,8 +890,24 @@ public final class LinkedNpcEntry {
                            boolean shoulderRideMounted,
                            double breedingHappinessRatio,
                            boolean ownedActions) {
+        this(source, recoveryHeld, incidentId, flightToggleAvailable, flightToggleAirborne,
+                shoulderRideAvailable, shoulderRideMounted, breedingHappinessRatio,
+                ownedActions, source.roleSubtitle);
+    }
+
+    private LinkedNpcEntry(LinkedNpcEntry source,
+                           boolean recoveryHeld,
+                           String incidentId,
+                           boolean flightToggleAvailable,
+                           boolean flightToggleAirborne,
+                           boolean shoulderRideAvailable,
+                           boolean shoulderRideMounted,
+                           double breedingHappinessRatio,
+                           boolean ownedActions,
+                           String roleSubtitle) {
         this.npcUuid = source.npcUuid;
         this.displayName = source.displayName;
+        this.roleSubtitle = normalizeRoleSubtitle(roleSubtitle);
         this.gender = source.gender;
         this.currentHealth = source.currentHealth;
         this.maxHealth = source.maxHealth;
@@ -958,6 +998,10 @@ public final class LinkedNpcEntry {
         return null;
     }
 
+    private static String normalizeRoleSubtitle(String value) {
+        return value == null || value.isBlank() ? "" : value.trim();
+    }
+
     @Override
     public boolean equals(Object obj) {
         if (this == obj) {
@@ -1008,6 +1052,7 @@ public final class LinkedNpcEntry {
                 && shoulderRideMounted == other.shoulderRideMounted
                 && Objects.equals(npcUuid, other.npcUuid)
                 && Objects.equals(displayName, other.displayName)
+                && Objects.equals(roleSubtitle, other.roleSubtitle)
                 && Objects.equals(gender, other.gender)
                 && Objects.equals(happinessModifierBreakdown, other.happinessModifierBreakdown)
                 && Objects.equals(deathCauseHint, other.deathCauseHint)
@@ -1026,6 +1071,7 @@ public final class LinkedNpcEntry {
         int result = Objects.hash(
                 npcUuid,
                 displayName,
+                roleSubtitle,
                 gender,
                 currentHealth,
                 maxHealth,

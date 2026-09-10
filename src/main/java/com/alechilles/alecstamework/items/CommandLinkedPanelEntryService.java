@@ -33,6 +33,7 @@ final class CommandLinkedPanelEntryService {
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
     private final CommandNpcRelocationService relocationService;
     private final CommandNpcNameResolver npcNameResolver;
+    private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
     private final CommandLinkedPanelUnloadedNameService unloadedNameService;
     private final CommandLinkPolicyService linkPolicyService;
     private final CommandGroupService groupService;
@@ -53,6 +54,7 @@ final class CommandLinkedPanelEntryService {
         this.linkedNpcRecordStore = linkedNpcRecordStore;
         this.relocationService = relocationService;
         this.npcNameResolver = npcNameResolver;
+        this.stateSnapshotService = stateSnapshotService;
         this.unloadedNameService = new CommandLinkedPanelUnloadedNameService(
                 this.npcNameResolver, stateSnapshotService, persistenceView
         );
@@ -178,6 +180,11 @@ final class CommandLinkedPanelEntryService {
                         displayName
                 );
             }
+            String customName = firstNonBlank(
+                    canonicalProfile == null ? null : canonicalProfile.customName(),
+                    resolveSnapshotCustomName(record),
+                    null
+            );
             String gender = null;
             String speciesRoleId = firstNonBlank(
                     canonicalProfile == null
@@ -310,7 +317,8 @@ final class CommandLinkedPanelEntryService {
                     harvestCooldownKnown,
                     recallPending,
                     recallLostRemainingMs
-            );
+            ).withRoleSubtitle(npcNameResolver.resolveRoleSubtitle(
+                    customName, speciesRoleId, record.cachedNameKey));
             entries.add(entry);
             renderedIds.put(record.npcUuid, entry.npcUuid());
         }
@@ -394,6 +402,16 @@ final class CommandLinkedPanelEntryService {
         }
         String raw = uuid.toString();
         return raw.length() >= 8 ? raw.substring(0, 8) : raw;
+    }
+
+    @Nullable
+    private String resolveSnapshotCustomName(LinkedNpcRecord record) {
+        if (stateSnapshotService == null || record == null || record.npcUuid == null) {
+            return null;
+        }
+        CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot snapshot =
+                stateSnapshotService.getSnapshot(record.npcUuid);
+        return snapshot == null ? null : snapshot.customName();
     }
 
     private String normalize(String value) {

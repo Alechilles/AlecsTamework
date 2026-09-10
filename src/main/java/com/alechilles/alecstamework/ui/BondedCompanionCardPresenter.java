@@ -263,6 +263,7 @@ final class BondedCompanionCardPresenter {
         int maximum = positiveRoundedInt(attributes.get("maxHealth"), 100);
         int current = boundedInt(attributes.get("currentHealth"), maximum,
                 percent(attributes.get("healthPercent"), maximum));
+        commands.set(entrySelector + " #BondedHealthTextShadow.Text", current + " / " + maximum);
         commands.set(entrySelector + " #BondedHealthText.Text",
                 current + " / " + maximum);
         commands.setObject(entrySelector + " #BondedHealthFill.Anchor",

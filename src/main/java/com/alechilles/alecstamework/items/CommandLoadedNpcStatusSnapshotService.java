@@ -94,6 +94,7 @@ final class CommandLoadedNpcStatusSnapshotService {
                 resolveSpeciesRole(npcRef, store, npc, resolvedContext.cachedRoleId());
         String resolvedRoleId = normalize(roleResolution.roleId());
         String displayName = npcNameResolver.resolveNpcDisplayName(npcRef, store, npc);
+        String customName = npcNameResolver.resolveCustomNpcName(npcRef, store);
         if (roleResolution.temporarilyParked()) {
             displayName = firstNonBlank(
                     resolvedContext.fallbackDisplayName(),
@@ -282,7 +283,9 @@ final class CommandLoadedNpcStatusSnapshotService {
                 TwCompanionConfig.resolveEffectiveForRole(resolvedRoleId)
                         .getShoulderRide();
         boolean mounted = isShoulderMounted(npcRef, player, store);
-        return result.withShoulderRide(mounted || shoulderRide.isConfigured(), mounted);
+        return result.withShoulderRide(mounted || shoulderRide.isConfigured(), mounted)
+                .withRoleSubtitle(npcNameResolver.resolveRoleSubtitle(
+                        customName, resolvedRoleId, resolvedContext.cachedNameKey()));
     }
 
     private static boolean isShoulderMounted(Ref<EntityStore> npcRef,

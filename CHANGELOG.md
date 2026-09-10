@@ -13,7 +13,9 @@
   disabled needs remain hidden.
 - Linked cards assign groups directly from a dropdown with a group-colored
   border. Traits and level share the row above a thicker, higher-contrast
-  health bar. Group shortcuts sit below the command assignments, and the
+  health bar with a soft text shadow. Named companions show their role below
+  their name, and active toggles sit above group selection. Level and available
+  talent points use matching button controls. Group shortcuts sit below the command assignments, and the
   header shows the Tamework logo and current mode count. Auto-Link and
   Highlight Active share one row.
 - Action buttons now reuse two frame textures and sixteen glyphs, replacing the
