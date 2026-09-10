@@ -311,7 +311,7 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(entrySelector + " #StatusEmblem.Visible", emblem != null);
         if (emblem != null) {
             boolean compact = !managedRoster && !entry.hasKnownCardDetails();
-            int statusLeft = Math.max(624, actionLeft + 8);
+            int statusLeft = actionLeft + 8;
             int statusWidth = Math.max(64, 846 - statusLeft);
             int emblemSize = compact ? 48 : 56;
             commandBuilder.set(entrySelector + " #StatusEmblem.Background", emblem);
