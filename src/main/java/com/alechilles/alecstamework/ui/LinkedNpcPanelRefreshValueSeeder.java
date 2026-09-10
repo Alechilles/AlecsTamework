@@ -17,7 +17,7 @@ final class LinkedNpcPanelRefreshValueSeeder {
             values.remember("#TameworkMode" + tab + ".Style",
                     LinkedNpcPanelPresentationSupport.modeTabStyle(tab, LinkedNpcPanelPresentationSupport.mode(mode)));
         }
-        values.remember("#TameworkLinkedPanelTitle.Text", LinkedNpcPanelPresentationSupport.title(mode, entries, language)); values.remember("#TameworkLinkedPanelGroupSelectorDropdown.Entries", LinkedNpcPanelPresentationSupport.entries(groupEntries));
+        values.remember("#TameworkCommandMenuTitle.Text", LinkedNpcPanelPresentationSupport.title(mode, entries, language)); values.remember("#TameworkLinkedPanelGroupSelectorDropdown.Entries", LinkedNpcPanelPresentationSupport.entries(groupEntries));
         values.remember("#TameworkLinkedPanelGroupSelectorDropdown.Value", LinkedNpcPanelPresentationSupport.value(groupValue, "")); values.remember("#TameworkLinkedPanelModeDropdown.Entries", CommandSelectionPanelOptions.resolveModeDropdownEntries(language));
         values.remember("#TameworkLinkedPanelModeDropdown.Value", LinkedNpcPanelPresentationSupport.mode(mode)); values.remember("#TameworkLinkedPanelAutoLinkCheck.Value", LinkedNpcPanelPresentationSupport.autoLink(autoLink));
         values.remember("#TameworkLinkedPanelActiveHighlightCheck.Value", LinkedNpcPanelPresentationSupport.activeHighlight(activeHighlight));

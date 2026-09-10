@@ -388,7 +388,6 @@ public final class TameworkCommandSelectionPage
             commandBuilder.append("#TameworkCommandMenuWheel", LINKED_PANEL_UI_PATH);
             BondedCompanionPanelChrome.bind(commandBuilder, rosterEventBoundary.bondedRoster());
             commandBuilder.set("#TameworkCommandMenuWheel.Visible", true);
-            commandBuilder.set("#TameworkCommandMenuTitle.Text", LocalizedText.resolve(playerRef, "tamework.ui.commandMenu.title"));
             commandBuilder.set("#TameworkCommandMenuSubtitle.Text", LocalizedText.resolve(playerRef, "tamework.ui.commandMenu.subtitle"));
             commandBuilder.set(
                     "#TameworkCommandMenuCurrent.Text",
@@ -398,7 +397,7 @@ public final class TameworkCommandSelectionPage
             );
             hotswapController.build(commandBuilder, options, selectedCommandId);
             commandBuilder.set("#TameworkLinkedPanelRoot.Visible", true);
-            commandBuilder.set("#TameworkLinkedPanelTitle.Text", LinkedNpcPanelPresentationSupport.title(panelModeValueSupplier, linkedNpcEntries, resolveLanguage()));
+            commandBuilder.set("#TameworkCommandMenuTitle.Text", LinkedNpcPanelPresentationSupport.title(panelModeValueSupplier, linkedNpcEntries, resolveLanguage()));
             commandBuilder.set("#TameworkLinkedPanelGroupSelectorDropdown.Entries", LinkedNpcPanelPresentationSupport.entries(panelGroupActivationEntriesSupplier));
             commandBuilder.set("#TameworkLinkedPanelGroupSelectorDropdown.Value", LinkedNpcPanelPresentationSupport.value(panelGroupActivationValueSupplier, ""));
             commandBuilder.set("#TameworkLinkedPanelModeDropdown.Entries", CommandSelectionPanelOptions.resolveModeDropdownEntries(resolveLanguage()));

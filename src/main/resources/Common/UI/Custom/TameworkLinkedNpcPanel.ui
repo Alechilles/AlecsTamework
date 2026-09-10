@@ -8,14 +8,28 @@ Group #TameworkLinkedPanelRoot {
  Background: #181c1a;
 Group #Title {
             Anchor: (Top: 6, Left: 10, Right: 10, Height: 30);
-            $C.@Title #TameworkLinkedPanelTitle {
-                @Alignment = Start;
-                @Text = %server.tamework.ui.linkedPanel.title.linked;
-                Anchor: (Top: 0, Left: 252, Width: 232, Height: 28);
-            }
 
+
+Group #TameworkLinkedPanelActiveHighlightControls {
+                Anchor: (Top: 0, Left: 380, Width: 178, Height: 28);
+
+                CheckBox #TameworkLinkedPanelActiveHighlightCheck {
+                    Anchor: (Top: 3, Left: 0, Width: 22, Height: 22);
+                    Background: (Color: #252c27);
+                    OutlineColor: #4a5a50;
+                    OutlineSize: 1;
+                    Padding: (Full: 4);
+                    Style: $C.@DefaultCheckBoxStyle;
+                }
+
+                Label #TameworkLinkedPanelActiveHighlightLabel {
+                    Anchor: (Right: 0, Width: 152, Height: 28);
+                    Text: %server.tamework.ui.linkedPanel.activeHighlight.label;
+                    Style: (FontSize: 13, TextColor: #b9beb8, HorizontalAlignment: Start, VerticalAlignment: Center);
+                }
+            }
             Group #TameworkLinkedPanelAutoLinkControls {
-                Anchor: (Top: 0, Right: 144, Width: 104, Height: 28);
+                Anchor: (Top: 0, Left: 252, Width: 104, Height: 28);
 
                 CheckBox #TameworkLinkedPanelAutoLinkCheck {
                     Anchor: (Top: 3, Left: 0, Width: 22, Height: 22);
@@ -54,7 +68,7 @@ Group #Title {
                     Style: $A.@PanelButton;
                 }
 Group #TameworkLinkedPanelSubtitleRadiusSlot {
-                    Anchor: (Top: 0, Left: 500, Width: 124, Height: 28);
+                    Anchor: (Top: 0, Left: 580, Width: 124, Height: 28);
                     LayoutMode: Left;
 
                     Group {
@@ -100,7 +114,7 @@ Group #TameworkLinkedPanelSubtitleRadiusSlot {
  Anchor: (Top: 44, Left: 10, Right: 10, Bottom: 10);
  LayoutMode: Top;
  Group #TameworkLinkedPanelToolbar { Anchor: (Height: 34);
- Group #TameworkLinkedPanelSubtitleRow { Anchor: (Top: 0, Left: 0, Width: 158, Height: 28);
+ Group #TameworkLinkedPanelSubtitleRow { Visible: false; Anchor: (Top: 0, Left: 0, Width: 158, Height: 28);
 DropdownBox #TameworkLinkedPanelGroupSelectorDropdown {
                     Anchor: (Top: 0, Left: 0, Width: 152, Height: 28);
                     OutlineColor: #454e48;
@@ -111,7 +125,7 @@ DropdownBox #TameworkLinkedPanelGroupSelectorDropdown {
                 }
 }
 Group #TameworkLinkedPanelControlsSecondary {
-                Anchor: (Top: 0, Left: 168, Width: 544, Height: 28);
+                Anchor: (Top: 0, Left: 0, Width: 544, Height: 28);
                 LayoutMode: Left;
 
                 Label #TameworkLinkedPanelSortLabel {
@@ -182,24 +196,7 @@ Group #TameworkLinkedPanelControlsSecondary {
                     }
                 }
             }
-Group #TameworkLinkedPanelActiveHighlightControls {
-                Anchor: (Top: 0, Right: 0, Width: 178, Height: 28);
 
-                CheckBox #TameworkLinkedPanelActiveHighlightCheck {
-                    Anchor: (Top: 3, Left: 0, Width: 22, Height: 22);
-                    Background: (Color: #252c27);
-                    OutlineColor: #4a5a50;
-                    OutlineSize: 1;
-                    Padding: (Full: 4);
-                    Style: $C.@DefaultCheckBoxStyle;
-                }
-
-                Label #TameworkLinkedPanelActiveHighlightLabel {
-                    Anchor: (Right: 0, Width: 152, Height: 28);
-                    Text: %server.tamework.ui.linkedPanel.activeHighlight.label;
-                    Style: (FontSize: 13, TextColor: #b9beb8, HorizontalAlignment: Start, VerticalAlignment: Center);
-                }
-            }
 }
 Label #TameworkLinkedPanelEmptyState {
                 Anchor: (Top: 8, Height: 48);

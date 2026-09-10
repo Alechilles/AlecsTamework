@@ -33,6 +33,8 @@ public final class CommandSelectionEventData {
                     (event, value) -> event.panelModeValue = value,
                     event -> event.panelModeValue)
             .add()
+            .append(new KeyedCodec<>(CommandSelectionPageEventBinder.KEY_PANEL_MODE_LITERAL, Codec.STRING),
+                    (event, value) -> event.panelModeValue = value, event -> event.panelModeValue).add()
             .append(
                     new KeyedCodec<>(KEY_PANEL_AUTO_LINK_ENABLED, Codec.BOOLEAN),
                     (event, value) -> event.panelAutoLinkEnabled = value,
@@ -63,6 +65,8 @@ public final class CommandSelectionEventData {
                     (event, value) -> event.panelGroupActiveValue = value,
                     event -> event.panelGroupActiveValue)
             .add()
+            .append(new KeyedCodec<>(CommandSelectionPageEventBinder.KEY_PANEL_GROUP_ACTIVE_LITERAL, Codec.STRING),
+                    (event, value) -> event.panelGroupActiveValue = value, event -> event.panelGroupActiveValue).add()
             .append(
                     new KeyedCodec<>(KEY_PANEL_GROUP_ASSIGN_VALUE, Codec.STRING),
                     (event, value) -> event.panelGroupAssignValue = value,

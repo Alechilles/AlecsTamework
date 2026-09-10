@@ -11,7 +11,7 @@ $C = "Common.ui";
 @ActionCaptionStyle = LabelStyle(FontSize: 10, TextColor: #c8ccc5, HorizontalAlignment: Center, VerticalAlignment: Center);
 
 Group {
-    Anchor: (Top: 3, Left: 0, Right: 0, Height: 154);
+    Anchor: (Top: 3, Left: 0, Right: 0, Height: 158);
     Background: #202423;
     OutlineColor: #414845;
     OutlineSize: 1;
@@ -30,7 +30,8 @@ Group {
 
     DropdownBox #GroupSelector { Anchor: (Top: 102, Left: 0, Width: 144, Height: 26); Style: $A.@PanelDropdown; OutlineColor: #454e48; OutlineSize: 2; MaxSelection: 1; NoItemsText: %server.tamework.ui.linkedPanel.groupAssign.none; Visible: false; }
     Group #TraitStrip {
-        Anchor: (Top: 0, Left: 172, Width: 128, Height: 30);
+        // Traits share the progression row immediately above the health bar.
+        Anchor: (Top: 20, Left: 172, Width: 128, Height: 30);
         LayoutMode: Left;
         Group #TraitSlot0 {
             Anchor: (Width: 32, Height: 30); Visible: false;
@@ -126,15 +127,16 @@ Group {
     Label #RespawnButtonCaption { Anchor: (Top: 80, Right: 413, Width: 64, Height: 16); Text: %server.tamework.ui.linkedPanel.action.revive; Style: @ActionCaptionStyle; Visible: false; }
 
     Group #HealthFrame {
-        Anchor: (Top: 50, Left: 172, Width: 234, Height: 14);
+        Anchor: (Top: 50, Left: 172, Width: 234, Height: 22);
         Background: #151916(0.95);
-        Group #HealthFill { Anchor: (Top: 1, Left: 1, Width: 232, Height: 12); Background: #6fc576; }
-        Label #HealthTextShadow { Anchor: (Top: 0, Left: 1, Width: 230, Height: 14); Text: "?/?"; Style: (FontSize: 10, RenderBold: true, TextColor: #131713(0.9), HorizontalAlignment: Center, VerticalAlignment: Center); }
-        Label #HealthText { Anchor: (Top: 0, Left: 0, Width: 230, Height: 14); Text: "?/?"; Style: (FontSize: 10, RenderBold: true, TextColor: #f0eee7, HorizontalAlignment: Center, VerticalAlignment: Center); }
-        TextButton #HealthTooltip { Anchor: (Top: 0, Left: 0, Width: 234, Height: 14); Style: @TraitTooltipButtonStyle; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.health.notAvailable; TextTooltipStyle: @LinkedActionTooltipStyle; }
+        Group #HealthFill { Anchor: (Top: 1, Left: 1, Width: 232, Height: 20); Background: #6fc576; }
+        Group #HealthTextBackdrop { Anchor: (Top: 2, Left: 69, Width: 96, Height: 18); Background: #101713(0.94); }
+        Label #HealthTextShadow { Anchor: (Top: 1, Left: 2, Width: 230, Height: 20); Text: "?/?"; Style: (FontSize: 13, RenderBold: true, TextColor: #10150f(0.95), HorizontalAlignment: Center, VerticalAlignment: Center); }
+        Label #HealthText { Anchor: (Top: 0, Left: 0, Width: 230, Height: 20); Text: "?/?"; Style: (FontSize: 13, RenderBold: true, TextColor: #fff8e8, HorizontalAlignment: Center, VerticalAlignment: Center); }
+        TextButton #HealthTooltip { Anchor: (Top: 0, Left: 0, Width: 234, Height: 22); Style: @TraitTooltipButtonStyle; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.health.notAvailable; TextTooltipStyle: @LinkedActionTooltipStyle; }
     }
     Group #TalentPointAction {
-        Anchor: (Top: 4, Left: 304, Width: 24, Height: 20);
+        Anchor: (Top: 26, Left: 304, Width: 24, Height: 24);
         Visible: false;
         Group #TalentPointIcon { Anchor: (Top: 1, Left: 2, Width: 18, Height: 18); Background: (TexturePath: "Tamework/LinkedPanelIcons/TalentPoint_UpArrow.png"); }
         Group #TalentPointCountBadgeBorder { Anchor: (Top: 0, Left: 10, Width: 14, Height: 12); Background: #f6d56b; }
@@ -144,7 +146,7 @@ Group {
         TextButton #TalentPointButton { Anchor: (Top: 0, Left: 0, Width: 24, Height: 20); Style: @TraitTooltipButtonStyle; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.futureAction.talents; TextTooltipStyle: @LinkedActionTooltipStyle; }
     }
     Group #XpProgressRing {
-        Anchor: (Top: 4, Left: 332, Width: 74, Height: 20);
+        Anchor: (Top: 26, Left: 332, Width: 74, Height: 22);
         Visible: false;
         Label { Anchor: (Top: 0, Left: 0, Width: 34, Height: 20); Text: "Lv."; Style: (FontSize: 12, TextColor: #afb6b0, VerticalAlignment: Center); }
         Group #RingTrackTopLeft { Anchor: (Top: 0, Left: 0, Width: 12, Height: 3); Background: #353c36; Visible: false; }
@@ -163,7 +165,7 @@ Group {
     }
 
     Group #NeedRingRow {
-        Anchor: (Top: 70, Left: 172, Width: 234, Height: 66);
+        Anchor: (Top: 74, Left: 172, Width: 234, Height: 66);
         LayoutMode: Top;
         Group #NeedHappiness { Anchor: (Width: 234, Height: 22);
             Group #NeedIconImage { Anchor: (Top: 2, Left: 0, Width: 16, Height: 16); Background: "Tamework/LinkedPanelIcons/Need_Happiness.png"; }

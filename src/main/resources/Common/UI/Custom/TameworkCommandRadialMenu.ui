@@ -16,7 +16,8 @@ $C.@PageOverlay {
    Group #TameworkCommandMenuHeader {
     Anchor: (Top: 3, Left: 3, Right: 3, Height: 42);
     Background: #252b27;
-    Label #TameworkCommandMenuTitle { Anchor: (Left: 18, Width: 300, Height: 42); Text: ""; Style: (FontSize: 23, RenderBold: true, TextColor: #f0eee7, VerticalAlignment: Center); }
+    Group #TameworkCommandMenuLogo { Anchor: (Top: 4, Left: 12, Width: 34, Height: 34); Background: "Tamework/Telemetry/TameworkConsentIcon.png"; }
+    Label #TameworkCommandMenuTitle { Anchor: (Left: 56, Right: 110, Height: 42); Text: ""; Style: (FontSize: 23, RenderBold: true, TextColor: #f0eee7, VerticalAlignment: Center); }
     Label #TameworkCommandMenuSubtitle { Anchor: (Left: 330, Width: 500, Height: 42); Text: ""; Visible: false; Style: (FontSize: 12, TextColor: #afb6b0); }
     TextButton #CommandMenuCloseButton { Anchor: (Top: 8, Right: 14, Width: 78, Height: 26); Text: %server.tamework.ui.shared.button.close; Style: $A.@PanelButton; }
    }
@@ -46,6 +47,14 @@ $C.@PageOverlay {
      Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
      Label { Anchor: (Top: 10, Left: 12, Width: 36, Height: 22); Text: "R"; Style: @CommandAssignmentKeyStyle; }
      DropdownBox #TameworkCommandHotswapR { Anchor: (Top: 40, Left: 8, Width: 136, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: "No commands"; }
+    }
+
+    Group #TameworkGroupQuickSelect {
+     Anchor: (Top: 374, Left: 0, Right: 0, Bottom: 0);
+     Label { Anchor: (Top: 0, Left: 8, Right: 0, Height: 24); Text: %server.tamework.ui.linkedPanel.manageGroups; Style: (FontSize: 14, RenderBold: true, TextColor: #e8e4da); }
+     Group { Anchor: (Top: 30, Left: 0, Right: 0, Bottom: 0); LayoutMode: TopScrolling; KeepScrollPosition: true; ScrollbarStyle: $C.@DefaultScrollbarStyle; Padding: (Right: 6);
+      Group #TameworkGroupQuickSelectList { LayoutMode: Top; }
+     }
     }
    }
   }

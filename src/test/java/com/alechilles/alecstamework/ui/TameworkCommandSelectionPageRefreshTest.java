@@ -31,6 +31,71 @@ class TameworkCommandSelectionPageRefreshTest {
     private static final LinkedNpcEntry ENTRY = new LinkedNpcEntry(CARD, "Nimbus", 10, 10, 0, 0, null, 0, 0, 0, 0, true, true, false, false, false, false, 0L, new LinkedNpcTraitIndicator[0]);
 
     @Test
+    void modeTabClicksNeedNoClientPropertyLookupAndUpdateTheHeader() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(),
+                new NavigationFixture(), legacyConfig());
+        AtomicReference<String> mode = new AtomicReference<>("LinkedMode");
+        replaceField(page, "panelModeValueSupplier", (Supplier<String>) mode::get);
+        replaceField(page, "panelSetModeCallback", (Consumer<String>) mode::set);
+        UIEventBuilder events = new UIEventBuilder();
+        page.build(null, new UICommandBuilder(), events, null);
+        for (String tab : List.of("Nearby", "Owned", "Linked")) {
+            var binding = java.util.Arrays.stream(events.getEvents())
+                    .filter(event -> event.selector.equals("#TameworkMode" + tab)).findFirst().orElseThrow();
+            BsonDocument payload = BsonDocument.parse(binding.data);
+            assertTrue(payload.keySet().stream().noneMatch(key -> key.startsWith("@")),
+                    "A tab click must not ask the client to resolve a literal mode as a UI property.");
+            page.handleDataEvent(null, null, CommandSelectionEventData.CODEC.decode(payload,
+                    new com.hypixel.hytale.codec.ExtraInfo()));
+            assertEquals(tab + "Mode", mode.get());
+            refresh(page, true);
+            assertTrue(java.util.Arrays.stream(packets.updates.getLast().commands.getCommands()).anyMatch(command ->
+                    command.selector.equals("#TameworkCommandMenuTitle.Text")
+                            && command.data.contains("Command Menu - 1 " + tab)));
+        }
+        page.onDismiss(null, null);
+    }
+
+    @Test
+    void groupShortcutsActivateTheExistingSelectionAndRefreshWithoutRepeatedPackets() throws Exception {
+        var all = new com.hypixel.hytale.server.core.ui.DropdownEntryInfo(
+                com.hypixel.hytale.server.core.ui.LocalizableString.fromString("All"), "__all__");
+        var pasture = new com.hypixel.hytale.server.core.ui.DropdownEntryInfo(
+                com.hypixel.hytale.server.core.ui.LocalizableString.fromString("Pasture"), "pasture");
+        AtomicReference<List<com.hypixel.hytale.server.core.ui.DropdownEntryInfo>> groups =
+                new AtomicReference<>(List.of(all, pasture));
+        CapturedPackets packets = new CapturedPackets();
+        TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(),
+                new NavigationFixture(), legacyConfig(), groups::get);
+        AtomicReference<String> selection = new AtomicReference<>("__all__");
+        replaceField(page, "panelGroupActivationValueSupplier", (Supplier<String>) selection::get);
+        replaceField(page, "panelSetGroupActivationCallback", (Consumer<String>) selection::set);
+        UIEventBuilder events = new UIEventBuilder();
+        page.build(null, new UICommandBuilder(), events, null);
+        for (int index : List.of(1, 0)) {
+            String selector = "#TameworkGroupQuickSelectList[" + index + "] #QuickGroupButton";
+            var binding = java.util.Arrays.stream(events.getEvents())
+                    .filter(event -> event.selector.equals(selector)).findFirst().orElseThrow();
+            BsonDocument payload = BsonDocument.parse(binding.data);
+            assertTrue(payload.keySet().stream().noneMatch(key -> key.startsWith("@")));
+            page.handleDataEvent(null, null, CommandSelectionEventData.CODEC.decode(payload,
+                    new com.hypixel.hytale.codec.ExtraInfo()));
+            assertEquals(index == 0 ? "__all__" : "pasture", selection.get());
+            refresh(page, true);
+            assertCommand(packets.updates.getLast(), selector + ".Style");
+        }
+        packets.updates.clear();
+        refresh(page, true);
+        assertEquals(0, packets.updates.size());
+        groups.set(List.of(all));
+        refresh(page, true);
+        assertTrue(java.util.Arrays.stream(packets.updates.getLast().events.getEvents())
+                .anyMatch(event -> event.data.contains("__all__")));
+        page.onDismiss(null, null);
+    }
+
+    @Test
     void inlineGroupSelectionRoutesAssignmentAndClearingWithoutOpeningAModal() throws Exception {
         LinkedNpcEntry unlinked = new LinkedNpcEntry(CARD, "Nimbus", 10, 10, 0, 0, 0,
                 "", 0, 0, 0, 0, true, false, false, false, false, false,

@@ -26,6 +26,7 @@ final class CommandSelectionLinkedPanelRuntime {
     }
 
     void build(UICommandBuilder commands, UIEventBuilder events) {
+        bindGroupShortcuts(commands, events, page.refreshTransaction.values(), true);
         page.cardRenderState.markRendered(page.linkedNpcEntries,
                 page.pendingUnlinkNpcUuid, page.featureController.presentations());
         commands.clear("#TameworkLinkedPanelList");
@@ -141,7 +142,8 @@ final class CommandSelectionLinkedPanelRuntime {
         UIEventBuilder events = new UIEventBuilder();
         LinkedNpcPanelRefreshValues values = page.refreshTransaction.stagedValues();
         String language = page.resolveLanguage();
-        values.set(commands, "#TameworkLinkedPanelTitle.Text",
+        bindGroupShortcuts(commands, events, values, false);
+        values.set(commands, "#TameworkCommandMenuTitle.Text",
                 LinkedNpcPanelPresentationSupport.title(page.panelModeValueSupplier,
                         page.linkedNpcEntries, language));
         values.set(commands, "#TameworkLinkedPanelGroupSelectorDropdown.Entries",
@@ -291,6 +293,14 @@ final class CommandSelectionLinkedPanelRuntime {
                 EventData.of(CommandSelectionPageEventBinder.EVENT_COMMAND_ID,
                         CommandSelectionPageEventBinder.ASSIGN_GROUP_COMMAND_PREFIX + entry.npcUuid())
                         .append(CommandSelectionPageEventBinder.KEY_PANEL_GROUP_ASSIGN_VALUE, selector + ".Value"), false);
+    }
+
+    private void bindGroupShortcuts(UICommandBuilder commands, UIEventBuilder events,
+                                    LinkedNpcPanelRefreshValues values, boolean initial) {
+        CommandGroupQuickSelectBinder.bind(commands, events, values,
+                LinkedNpcPanelPresentationSupport.entries(page.panelGroupActivationEntriesSupplier),
+                LinkedNpcPanelPresentationSupport.value(page.panelGroupActivationValueSupplier, ""),
+                !page.config.usesBondedCompanionRoster() && !page.cardBindingConfig.ownerCommandFamilyRoster(), initial);
     }
 
     private boolean canAssignGroup(LinkedNpcEntry entry, CommandPanelFeaturePresentation presentation) {

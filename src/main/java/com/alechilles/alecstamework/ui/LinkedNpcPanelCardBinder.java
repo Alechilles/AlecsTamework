@@ -12,7 +12,7 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
  * Binds one linked-panel NPC card including visual state and per-row interaction handlers.
  */
 final class LinkedNpcPanelCardBinder {
-    private static final int NORMAL_CARD_HEIGHT = 154;
+    private static final int NORMAL_CARD_HEIGHT = 158;
     private static final int ROSTER_CARD_HEIGHT = 194;
 
     static void bindBreedingTooltips(UICommandBuilder commands, String selector,
@@ -306,10 +306,10 @@ final class LinkedNpcPanelCardBinder {
         if (!entry.hasHealth() && !managedRoster) {
             int statusLeft = Math.max(568, actionLeft + 6);
             int statusWidth = 846 - statusLeft;
-            commandBuilder.setObject(entrySelector + " #HealthFrame.Anchor", fixedAnchor(50, statusLeft, statusWidth, 14));
-            commandBuilder.setObject(entrySelector + " #HealthText.Anchor", fixedAnchor(0, 0, statusWidth - 2, 14));
-            commandBuilder.setObject(entrySelector + " #HealthTextShadow.Anchor", fixedAnchor(0, 1, statusWidth - 2, 14));
-            commandBuilder.setObject(entrySelector + " #HealthTooltip.Anchor", fixedAnchor(0, 0, statusWidth, 14));
+            commandBuilder.setObject(entrySelector + " #HealthFrame.Anchor", fixedAnchor(50, statusLeft, statusWidth, 22));
+            commandBuilder.setObject(entrySelector + " #HealthText.Anchor", fixedAnchor(0, 0, statusWidth - 2, 20));
+            commandBuilder.setObject(entrySelector + " #HealthTextShadow.Anchor", fixedAnchor(1, 1, statusWidth - 2, 20));
+            commandBuilder.setObject(entrySelector + " #HealthTooltip.Anchor", fixedAnchor(0, 0, statusWidth, 22));
             commandBuilder.setObject(entrySelector + " #RecallCountdown.Anchor", fixedAnchor(72, statusLeft, statusWidth, 20));
         }
         commandBuilder.set(flightToggleSelector + "Caption.Text", LocalizedText.resolve(language,
@@ -489,16 +489,17 @@ final class LinkedNpcPanelCardBinder {
         commands.setObject(card + ".Anchor", buildCardAnchor(managedRoster, compact));
         commands.set(card + " #NeedRingRow.Visible", !compact);
         commands.set(card + " #TraitStrip.Visible", !compact);
+        commands.set(card + " #HealthTextBackdrop.Visible", entry.hasHealth());
         commands.set(card + " #StatusDivider.Visible", true);
         commands.setObject(card + " #GroupSelector.Anchor", fixedAnchor(compact ? 72 : 102, 0, 144, 26));
-        commands.setObject(card + " #HealthFrame.Anchor", fixedAnchor(50, compact ? 568 : 172, compact ? 278 : 234, 14));
+        commands.setObject(card + " #HealthFrame.Anchor", fixedAnchor(50, compact ? 568 : 172, compact ? 278 : 234, 22));
         // Runtime string patches accept opaque hex colors; alpha syntax is parsed as a texture path.
         commands.set(card + " #HealthFrame.Background", compact ? "#202423" : "#151916");
-        commands.setObject(card + " #HealthText.Anchor", fixedAnchor(0, 0, compact ? 276 : 232, 14));
-        commands.setObject(card + " #HealthTextShadow.Anchor", fixedAnchor(0, 1, compact ? 276 : 232, 14));
-        commands.setObject(card + " #HealthTooltip.Anchor", fixedAnchor(0, 0, compact ? 278 : 234, 14));
-        commands.setObject(card + " #XpProgressRing.Anchor", fixedAnchor(4, 332, 74, 22));
-        commands.setObject(card + " #TalentPointAction.Anchor", fixedAnchor(4, 304, 24, 24));
+        commands.setObject(card + " #HealthText.Anchor", fixedAnchor(0, 0, compact ? 276 : 232, 20));
+        commands.setObject(card + " #HealthTextShadow.Anchor", fixedAnchor(1, 1, compact ? 276 : 232, 20));
+        commands.setObject(card + " #HealthTooltip.Anchor", fixedAnchor(0, 0, compact ? 278 : 234, 22));
+        commands.setObject(card + " #XpProgressRing.Anchor", fixedAnchor(26, 332, 74, 22));
+        commands.setObject(card + " #TalentPointAction.Anchor", fixedAnchor(26, 304, 24, 24));
         int nameLeft = entry.isMale() || entry.isFemale() ? 28 : 0;
         commands.setObject(card + " #GenderMaleIcon.Anchor", fixedAnchor(1, 0, 22, 22));
         commands.setObject(card + " #GenderFemaleIcon.Anchor", fixedAnchor(1, 0, 22, 22));

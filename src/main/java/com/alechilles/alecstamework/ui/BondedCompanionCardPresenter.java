@@ -267,7 +267,7 @@ final class BondedCompanionCardPresenter {
                 current + " / " + maximum);
         commands.setObject(entrySelector + " #BondedHealthFill.Anchor",
                 fillAnchor(1, 1, (int) Math.round(HEALTH_FILL_WIDTH
-                        * current / maximum), 16));
+                        * current / maximum), 20));
     }
 
     private static void bindXpProgress(

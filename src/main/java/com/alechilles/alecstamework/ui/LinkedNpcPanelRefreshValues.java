@@ -50,7 +50,7 @@ final class LinkedNpcPanelRefreshValues {
         commands.set(selector, value);
     }
 
-    private boolean changed(String selector, Object value) {
+    boolean changed(String selector, Object value) {
         if (Objects.equals(previousValues.get(selector), value)
                 && previousValues.containsKey(selector)) return false;
         previousValues.put(selector, value);

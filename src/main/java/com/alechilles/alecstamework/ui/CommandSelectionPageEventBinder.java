@@ -12,6 +12,8 @@ final class CommandSelectionPageEventBinder {
     static final String EVENT_COMMAND_ID = "CommandId";
     static final String KEY_PRIMARY_VALUE = "@PrimaryCommandValue";
     static final String KEY_PANEL_MODE_VALUE = "@PanelModeValue";
+    // Keys prefixed with @ resolve client UI properties; button constants need literal keys.
+    static final String KEY_PANEL_MODE_LITERAL = "PanelModeValue";
     static final String KEY_PANEL_AUTO_LINK_ENABLED =
             "@PanelAutoLinkEnabled";
     static final String KEY_PANEL_ACTIVE_HIGHLIGHT_ENABLED =
@@ -23,6 +25,7 @@ final class CommandSelectionPageEventBinder {
             "@PanelFilterTextInput";
     static final String KEY_PANEL_GROUP_ACTIVE_VALUE =
             "@PanelGroupActiveValue";
+    static final String KEY_PANEL_GROUP_ACTIVE_LITERAL = "PanelGroupActiveValue";
     static final String KEY_PANEL_GROUP_ASSIGN_VALUE =
             "@PanelGroupAssignValue";
     static final String KEY_HOTSWAP_Q_VALUE = "@HotswapQValue";
@@ -92,11 +95,11 @@ final class CommandSelectionPageEventBinder {
             @Nonnull LinkedNpcPanelFeatureController featureController
     ) {
         events.addEventBinding(CustomUIEventBindingType.Activating, "#TameworkModeLinked",
-                EventData.of(KEY_PANEL_MODE_VALUE, TameworkCommandSelectionPage.PANEL_MODE_LINKED), false);
+                EventData.of(KEY_PANEL_MODE_LITERAL, TameworkCommandSelectionPage.PANEL_MODE_LINKED), false);
         events.addEventBinding(CustomUIEventBindingType.Activating, "#TameworkModeNearby",
-                EventData.of(KEY_PANEL_MODE_VALUE, TameworkCommandSelectionPage.PANEL_MODE_NEARBY), false);
+                EventData.of(KEY_PANEL_MODE_LITERAL, TameworkCommandSelectionPage.PANEL_MODE_NEARBY), false);
         events.addEventBinding(CustomUIEventBindingType.Activating, "#TameworkModeOwned",
-                EventData.of(KEY_PANEL_MODE_VALUE, TameworkCommandSelectionPage.PANEL_MODE_OWNED), false);
+                EventData.of(KEY_PANEL_MODE_LITERAL, TameworkCommandSelectionPage.PANEL_MODE_OWNED), false);
         bindValue(
                 events,
                 "#TameworkLinkedPanelAutoLinkCheck",

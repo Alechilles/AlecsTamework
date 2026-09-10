@@ -79,6 +79,10 @@ the companion list. Linked, Nearby, and Owned tabs switch the list source.
 Changing LMB updates the selected primary command and keeps the menu open.
 The original primary-command eligibility rules still apply.
 
+Group shortcuts below the command assignments activate all companions, none,
+or a named group. The selected shortcut is highlighted, and the list scrolls
+when needed. The menu title includes the current mode and visible NPC count.
+
 For legacy command items, the group dropdown on each card assigns or clears
 its group immediately. Selecting a group also links an eligible unlinked NPC.
 The dropdown border shows the group's color. Group assignment remains tied to
@@ -348,9 +352,9 @@ Linked panel supports:
   This setting starts disabled and applies only to generic item-metadata
   rosters on Update 6. Update 5 does not run the indicator system because it
   lacks the required model-particle cleanup support.
-- Group active selector: `All`, `None`, or one configured group
+- Group shortcuts in the sidebar: `All`, `None`, or one configured group
 - Breeding enable/disable row toggles (default: disabled)
-- Group assignment overlay per row
+- Group assignment dropdown per row, with a group-colored border
 - Group manager flow (create/rename/recolor/delete)
 - Status lanes for loaded, unloaded, captured, cooped, roster-stored,
   provisioned-dormant, dead, and Lost companions; ordinary unloaded rows keep

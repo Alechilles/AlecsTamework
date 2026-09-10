@@ -8,8 +8,10 @@
   Unavailable companions put their status beside the relevant action, and
   disabled needs remain hidden.
 - Linked cards assign groups directly from a dropdown with a group-colored
-  border. Traits and level share one row; active switches, filters, and
-  checkboxes use the matching panel style.
+  border. Traits and level share the row above a thicker, higher-contrast
+  health bar. Group shortcuts sit below the command assignments, and the
+  header shows the Tamework logo and current mode count. Auto-Link and
+  Highlight Active share one row.
 - Action buttons now reuse two frame textures and sixteen glyphs, replacing the
   separate baked state images to reduce UI texture use.
 

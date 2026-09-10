@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
+import com.hypixel.hytale.server.core.ui.Anchor;
+import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 
 /**
@@ -21,7 +23,7 @@ final class LinkedNpcPanelVitalsBinder {
     }
 
     static void bind(UICommandBuilder commandBuilder, String entrySelector, LinkedNpcEntry entry, String language) {
-        bindHealth(commandBuilder, entrySelector, entry, language, CARD_HEALTH_FILL_MAX_WIDTH);
+        bindHealth(commandBuilder, entrySelector, entry, language, CARD_HEALTH_FILL_MAX_WIDTH, 20);
         bindNeedMeters(commandBuilder, entrySelector, entry, language);
         bindBreedingCooldownMeter(commandBuilder, entrySelector, entry, language);
         bindHarvestCooldownMeter(commandBuilder, entrySelector, entry, language);
@@ -32,7 +34,8 @@ final class LinkedNpcPanelVitalsBinder {
                      LinkedNpcEntry entry,
                      String language,
                      int healthFillMaxWidth) {
-        bindHealth(commandBuilder, entrySelector, entry, language, healthFillMaxWidth);
+        // The target HUD keeps its compact health bar; panel cards use the taller variant.
+        bindHealth(commandBuilder, entrySelector, entry, language, healthFillMaxWidth, 12);
         bindNeedRings(commandBuilder, entrySelector, entry, language);
         bindBreedingCooldown(commandBuilder, entrySelector, entry, language);
         bindHarvestCooldown(commandBuilder, entrySelector, entry, language);
@@ -42,7 +45,8 @@ final class LinkedNpcPanelVitalsBinder {
                                    String entrySelector,
                                    LinkedNpcEntry entry,
                                    String language,
-                                   int healthFillMaxWidth) {
+                                   int healthFillMaxWidth,
+                                   int healthFillHeight) {
         String healthTextSelector = entrySelector + " #HealthText";
         String healthTextShadowSelector = entrySelector + " #HealthTextShadow";
         String healthFillSelector = entrySelector + " #HealthFill";
@@ -53,10 +57,10 @@ final class LinkedNpcPanelVitalsBinder {
             commandBuilder.set(healthTextShadowSelector + ".Text", healthText);
             commandBuilder.set(healthFillSelector + ".Visible", true);
             commandBuilder.set(healthTooltipSelector + ".TooltipText", healthText);
-            commandBuilder.setObject(
-                    healthFillSelector + ".Anchor",
-                    LinkedNpcPanelAnchorFactory.buildHealthFillAnchor(entry.healthRatio(), healthFillMaxWidth)
-            );
+            Anchor healthFill = LinkedNpcPanelAnchorFactory.buildHealthFillAnchor(
+                    entry.healthRatio(), healthFillMaxWidth);
+            healthFill.setHeight(Value.of(healthFillHeight));
+            commandBuilder.setObject(healthFillSelector + ".Anchor", healthFill);
             return;
         }
         if (entry.dead()) {
