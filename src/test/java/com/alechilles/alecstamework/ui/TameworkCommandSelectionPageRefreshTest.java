@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Observable page refresh coverage through the package-scoped packet boundary. */
@@ -434,6 +435,20 @@ class TameworkCommandSelectionPageRefreshTest {
         TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(feature(4, false)), fixture);
         build(page); event(page, "__talents__:" + CARD);
         assertEquals(1, fixture.source.closes); assertEquals(0, fixture.talents); fixture.run(); assertEquals(1, fixture.talents);
+    }
+
+    @Test
+    void settingsWithoutAuthorizedPlayerKeepsCommandMenuOpen() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        NavigationFixture fixture = new NavigationFixture();
+        TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(feature(4, false)), fixture);
+        build(page);
+        event(page, "__settings__");
+        assertEquals(0, fixture.source.closes);
+        assertNull(fixture.deferred);
+        event(page, "__talents__:" + CARD);
+        fixture.run();
+        assertEquals(1, fixture.talents);
     }
 
     @Test

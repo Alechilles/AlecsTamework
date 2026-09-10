@@ -392,6 +392,7 @@ public final class TameworkCommandSelectionPage
         try {
             refreshLinkedNpcEntries();
             commandBuilder.append(UI_PATH);
+            commandBuilder.set("#CommandMenuSettings.Visible", canOpenSettings(ref, store));
             commandBuilder.append("#TameworkCommandMenuWheel", LINKED_PANEL_UI_PATH);
             BondedCompanionPanelChrome.bind(commandBuilder, rosterEventBoundary.bondedRoster());
             commandBuilder.set("#TameworkCommandMenuWheel.Visible", true);
@@ -488,6 +489,24 @@ public final class TameworkCommandSelectionPage
             return;
         }
         String commandId = receivedCommandId;
+        if (CommandSelectionPageEventBinder.SETTINGS_COMMAND_ID.equals(commandId)) {
+            if (!canOpenSettings(ref, store) || !beginPageNavigation()) return;
+            navigateAfterUiDrain(() -> {
+                try {
+                    Ref<EntityStore> currentRef = playerRef.getReference();
+                    if (currentRef == null || !currentRef.isValid()) return;
+                    String error = TameworkSettingsPageService.openSettingsPage(
+                            currentRef, currentRef.getStore(), "command_menu", "settings_button");
+                    if (error != null) {
+                        playerRef.sendMessage(com.hypixel.hytale.server.core.Message.raw(error));
+                        close();
+                    }
+                } finally {
+                    navigationPending = false;
+                }
+            });
+            return;
+        }
         if (handleShoulderRide(commandId, ref, store)) {
             return;
         }
@@ -991,6 +1010,11 @@ public final class TameworkCommandSelectionPage
         refreshLifecycle.close();
         close();
     }
+    private boolean canOpenSettings(Ref<EntityStore> ref, Store<EntityStore> store) {
+        if (ref == null || !ref.isValid() || store == null) return false;
+        return TameworkSettingsPageService.hasAccess(playerRef, playerRef);
+    }
+
     private boolean beginPageNavigation() {
         if (navigationPending) {
             return false;

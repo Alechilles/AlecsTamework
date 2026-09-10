@@ -2,6 +2,8 @@
 
 ## Unreleased development changes
 
+- The command menu includes a settings cog for players allowed to use `/tw settings`.
+
 - Companion cards keep breeding and harvest readiness visible after cooldowns.
   Breeding indicators dim and explain low happiness or disabled breeding.
   Harvest capability uses effective role parameters and variant overrides, including sheep shearing.

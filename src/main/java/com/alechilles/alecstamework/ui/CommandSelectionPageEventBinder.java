@@ -175,7 +175,10 @@ final class CommandSelectionPageEventBinder {
         featureController.bindEvents(events, EVENT_COMMAND_ID);
     }
 
+    static final String SETTINGS_COMMAND_ID = "__settings__";
+
     static void bindClose(@Nonnull UIEventBuilder events) {
+        bindAction(events, "#CommandMenuSettingsButton", SETTINGS_COMMAND_ID);
         bindValue(events, "#TameworkCommandPrimary", KEY_PRIMARY_VALUE);
         bindAction(
                 events, "#CommandMenuCloseButton", CLOSE_COMMAND_ID
