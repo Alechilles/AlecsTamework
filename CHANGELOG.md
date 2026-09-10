@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Command HUDs retry their join-time activation after the client finishes loading,
+  so an already-equipped flute does not need to be put away and reselected.
+
 - The target HUD matches the charcoal command menu, with readable health and
   needs meters, breeding and harvest cooldown/readiness bars, and compact
   appearance labels such as `Coat: Brown`.

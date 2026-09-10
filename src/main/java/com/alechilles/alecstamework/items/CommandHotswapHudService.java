@@ -170,7 +170,7 @@ public final class CommandHotswapHudService extends TickingSystem<EntityStore> {
                               @Nonnull UUID playerUuid,
                               @Nullable Player player,
                               long nowMs) {
-        if (playerUuid == null || !CommandHudClientReadiness.canRender(player)) {
+        if (playerUuid == null || !CommandHudClientReadiness.canRenderOrRetry(player, activationTracker, store, playerUuid)) {
             return;
         }
         ActiveCommandItem activeCommand = resolveActiveCommand(player);
