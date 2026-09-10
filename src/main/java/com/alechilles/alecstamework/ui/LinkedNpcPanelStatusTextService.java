@@ -47,6 +47,15 @@ final class LinkedNpcPanelStatusTextService {
         return primary + "\n" + entry.deathCauseHint();
     }
 
+    /** Uses the same lifecycle precedence as the status label; recovery holds keep their own text. */
+    static String resolveAvailabilityEmblem(LinkedNpcEntry entry) {
+        if (entry == null || entry.recoveryHeld()) return null;
+        String name = entry.dead() ? "Dead" : entry.inCoop() ? "InCoop"
+                : entry.lost() ? "Lost" : entry.captured() ? "Captured"
+                : !entry.loaded() ? "Unloaded" : null;
+        return name == null ? null : "Tamework/StatusEmblems/" + name + ".png";
+    }
+
     static String resolveAvailabilityStatusText(LinkedNpcEntry entry) {
         return resolveAvailabilityStatusText(entry, null);
     }

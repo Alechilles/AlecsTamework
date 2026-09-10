@@ -205,7 +205,7 @@ final class LinkedNpcPanelCardBinder {
                 && !pendingUnlink;
         commandBuilder.set(
                 statusUnloadedSelector + ".Visible",
-                !entry.loaded() && !pendingUnlink
+                !entry.loaded() || entry.dead() || entry.lost() || entry.captured() || entry.inCoop()
         );
         commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry, language));
         commandBuilder.set(recallCountdownSelector + ".Visible", showRecallCountdown);
@@ -307,14 +307,20 @@ final class LinkedNpcPanelCardBinder {
                 actionLeft += 60;
             }
         }
-        if (!entry.hasHealth() && !entry.dead() && !managedRoster) {
-            int statusLeft = Math.max(568, actionLeft + 6);
-            int statusWidth = 846 - statusLeft;
-            commandBuilder.setObject(entrySelector + " #HealthFrame.Anchor", fixedAnchor(50, statusLeft, statusWidth, 22));
-            commandBuilder.setObject(entrySelector + " #HealthText.Anchor", fixedAnchor(0, 0, statusWidth - 2, 20));
-            commandBuilder.setObject(entrySelector + " #HealthTextShadow.Anchor", fixedAnchor(1, 1, statusWidth - 2, 20));
-            commandBuilder.setObject(entrySelector + " #HealthTooltip.Anchor", fixedAnchor(0, 0, statusWidth, 22));
-            commandBuilder.setObject(entrySelector + " #RecallCountdown.Anchor", fixedAnchor(72, statusLeft, statusWidth, 20));
+        String emblem = LinkedNpcPanelStatusTextService.resolveAvailabilityEmblem(entry);
+        commandBuilder.set(entrySelector + " #StatusEmblem.Visible", emblem != null);
+        if (emblem != null) {
+            boolean compact = !managedRoster && !entry.hasKnownCardDetails();
+            int statusLeft = Math.max(624, actionLeft + 8);
+            int statusWidth = Math.max(64, 846 - statusLeft);
+            int emblemSize = compact ? 48 : 56;
+            commandBuilder.set(entrySelector + " #StatusEmblem.Background", emblem);
+            commandBuilder.setObject(entrySelector + " #StatusEmblem.Anchor",
+                    fixedAnchor(compact ? 6 : 10, statusLeft + (statusWidth - emblemSize) / 2, emblemSize, emblemSize));
+            commandBuilder.setObject(statusUnloadedSelector + ".Anchor",
+                    fixedAnchor(compact ? 56 : 68, statusLeft, statusWidth, 18));
+            commandBuilder.setObject(recallCountdownSelector + ".Anchor",
+                    fixedAnchor(compact ? 75 : 87, statusLeft, statusWidth, 14));
         }
         commandBuilder.set(flightToggleSelector + "Caption.Text", LocalizedText.resolve(language,
                 "tamework.ui.linkedPanel.action." + (entry.flightToggleAirborne() ? "flightAirborne" : "flightGrounded")));
@@ -498,15 +504,15 @@ final class LinkedNpcPanelCardBinder {
         commands.setObject(card + " #StatusUnloaded.Anchor",
                 fixedAnchor(compact ? 48 : 74, compact ? 568 : 432, compact ? 278 : 270, 20));
         commands.setObject(card + " #GroupSelector.Anchor", fixedAnchor(compact ? 72 : 102, 0, 144, 26));
-        commands.setObject(card + " #HealthFrame.Anchor", fixedAnchor(50, compact && !entry.dead() ? 568 : 172, compact ? 278 : 234, 22));
+        commands.setObject(card + " #HealthFrame.Anchor", fixedAnchor(50, 172, 234, 22));
         // Runtime string patches accept opaque hex colors; alpha syntax is parsed as a texture path.
         commands.set(card + " #HealthFrame.Background",
                 entry.dead() ? "#151916"
                         : !entry.loaded() && entry.hasKnownCardDetails() ? "#202423"
                         : compact ? "#202423" : "#151916");
-        commands.setObject(card + " #HealthText.Anchor", fixedAnchor(0, 0, compact ? 276 : 232, 20));
-        commands.setObject(card + " #HealthTextShadow.Anchor", fixedAnchor(1, 1, compact ? 276 : 232, 20));
-        commands.setObject(card + " #HealthTooltip.Anchor", fixedAnchor(0, 0, compact ? 278 : 234, 22));
+        commands.setObject(card + " #HealthText.Anchor", fixedAnchor(0, 0, 232, 20));
+        commands.setObject(card + " #HealthTextShadow.Anchor", fixedAnchor(1, 1, 232, 20));
+        commands.setObject(card + " #HealthTooltip.Anchor", fixedAnchor(0, 0, 234, 22));
         // Keep the talent-point control first, then right-align the level control
         // so its width can shrink and grow with the displayed level digits.
         commands.setObject(card + " #XpProgressRing.Anchor", fixedAnchor(18, 358, 48, 24));

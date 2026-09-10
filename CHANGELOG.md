@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Companion cards use compact status emblems for dead, lost, unloaded, captured,
+  and coop states, keeping saved details and action controls visible.
+
 - Fixed active-highlight helpers retaining an invalid mount after their NPC is
   removed, which could crash the world while preparing mount updates.
 

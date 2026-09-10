@@ -401,6 +401,38 @@ class TameworkCommandSelectionPageRefreshTest {
     }
 
     @Test
+    void availabilityEmblemsPreserveSavedHealthAndRemainVisibleDuringRemoval() throws Exception {
+        String[] states = {"Dead", "Unloaded", "Lost", "Captured", "InCoop", "Live"};
+        for (String state : states) {
+            for (boolean removing : new boolean[] {false, true}) {
+                boolean dead = state.equals("Dead");
+                LinkedNpcEntry entry = new LinkedNpcEntry(CARD, "Nimbus", dead ? 0 : 75, 100, 50, 100, "",
+                        50, 100, 50, 100, state.equals("Live"), false, dead,
+                        state.equals("Captured"), state.equals("InCoop"), state.equals("Lost"),
+                        0L, null, new LinkedNpcEntry.FutureStat("Talent Points", 2, 99),
+                        LinkedNpcTraitIndicator.EMPTY, false, false, true, false);
+                TameworkCommandSelectionPage page = page(new CapturedPackets(), new AtomicReference<>(),
+                        new NavigationFixture(), legacyConfig(), OWNER, List::of, entry);
+                if (removing) {
+                    replaceField(page, "pendingUnlinkNpcUuid", CARD);
+                }
+                UICommandBuilder commands = new UICommandBuilder();
+                UIEventBuilder events = new UIEventBuilder();
+                page.build(null, commands, events, null);
+                CapturedUpdate update = new CapturedUpdate(commands, events);
+                String card = "#TameworkLinkedPanelList[0]";
+                assertCommand(update, card + " #StatusEmblem.Visible", Boolean.toString(!state.equals("Live")));
+                if (!state.equals("Live")) {
+                    assertCommand(update, card + " #StatusEmblem.Background", "Tamework/StatusEmblems/" + state + ".png");
+                    assertCommand(update, card + " #StatusUnloaded.Visible", "true");
+                }
+                assertCommand(update, card + " #HealthText.Text", dead ? "0/100" : "75/100");
+                page.onDismiss(null, null);
+            }
+        }
+    }
+
+    @Test
     void deadCardRetainsSavedTalentPointsWithoutOfferingLiveOnlyEditing() throws Exception {
         LinkedNpcEntry dead = new LinkedNpcEntry(CARD, "Nimbus", 0, 100, 50, 100, "",
                 50, 100, 50, 100, false, false, true, false, false, false,

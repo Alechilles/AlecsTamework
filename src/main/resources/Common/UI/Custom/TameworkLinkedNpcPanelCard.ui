@@ -33,7 +33,8 @@ Group {
     Group #GenderFemaleIcon { Anchor: (Top: 1, Left: 34, Width: 22, Height: 22); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Female.png"); Visible: false; }
     Label #Name { Anchor: (Top: 0, Left: 64, Width: 388, Height: 26); Text: %server.tamework.ui.linkedPanel.subtitle.defaultNpcName; Style: (FontSize: 18, RenderBold: true, TextColor: #f0eee7, HorizontalAlignment: Start, VerticalAlignment: Center); }
     Label #RoleSubtitle { Anchor: (Top: 25, Left: 0, Width: 148, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #afb6b0, VerticalAlignment: Center); Visible: false; }
-    Label #StatusUnloaded { Anchor: (Top: 68, Left: 0, Width: 148, Height: 18); Text: %server.tamework.ui.linkedPanel.status.unloaded; Style: (FontSize: 10, RenderBold: true, TextColor: #ffe5b4, HorizontalAlignment: End, VerticalAlignment: Center); Visible: false; }
+    Label #StatusUnloaded { Anchor: (Top: 68, Left: 0, Width: 148, Height: 18); Text: %server.tamework.ui.linkedPanel.status.unloaded; Style: (FontSize: 10, RenderBold: true, TextColor: #ffe5b4, HorizontalAlignment: Center, VerticalAlignment: Center); Visible: false; }
+    Group #StatusEmblem { Anchor: (Top: 10, Left: 707, Width: 56, Height: 56); Background: "Tamework/StatusEmblems/Unloaded.png"; HitTestVisible: false; Visible: false; }
     TextButton #RemoveButton { Anchor: (Top: 0, Right: 0, Width: 28, Height: 28); Style: $A.@Remove; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.removalMenu; TextTooltipStyle: @LinkedActionTooltipStyle; }
     Group #RemoveButtonGlyph { Anchor: (Top: 0, Right: 0, Width: 28, Height: 28); Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png"); Visible: true; HitTestVisible: false; }
 
