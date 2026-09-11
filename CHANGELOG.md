@@ -12,7 +12,8 @@
 - Fixed the Feedback button crashing the world when another mod embeds Beacon.
 
 - Companion cards use compact status emblems for dead, lost, unloaded, captured,
-  and coop states, keeping saved details and action controls visible.
+  and coop states, centered in the action section regardless of visible buttons,
+  keeping saved details and action controls visible.
 
 - Fixed active-highlight helpers retaining an invalid mount after their NPC is
   removed, which could crash the world while preparing mount updates.
