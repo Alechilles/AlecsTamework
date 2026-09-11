@@ -45,6 +45,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String ACTION_APPLY = "Apply";
     private static final String ACTION_LOAD_PRESET = "LoadPreset";
     private static final String ACTION_CLOSE = "Close";
+    private static final String ACTION_EDIT = "Edit";
 
     private static final String KEY_PRESET = "@Preset";
     private static final String KEY_POP_LIMIT = "@PopulationLimit";
@@ -89,6 +90,9 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private final TameworkSettingsFormParser formParser;
 
     private TameworkSettingsValues currentValues;
+    private TameworkSettingsValues savedValues;
+    private EventPayload draftPayload;
+    private boolean unsavedChanges;
     private String statusLine = "";
     private String warningLine = "";
     private boolean applyInProgress;
@@ -139,6 +143,12 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 statusLine = resolveText("tamework.ui.settings.status.refreshed");
                 refreshUi();
             }
+            case ACTION_EDIT -> {
+                draftPayload = data;
+                warningLine = "";
+                updateUnsavedChanges();
+                refreshFeedback();
+            }
             case ACTION_LOAD_PRESET -> onLoadPreset(data);
             case ACTION_APPLY -> onApply(data, store);
             default -> {
@@ -152,6 +162,14 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     }
 
     private void bindStaticEvents(@Nonnull UIEventBuilder eventBuilder) {
+        EventData editEvent = appendFormEventData(EventData.of(ACTION, ACTION_EDIT));
+        for (var binding : editEvent.events().entrySet()) {
+            // Selecting a preset alone does not change settings; Load Preset does.
+            if (ACTION.equals(binding.getKey()) || KEY_PRESET.equals(binding.getKey())) continue;
+            String valueSelector = binding.getValue();
+            String selector = valueSelector.substring(0, valueSelector.length() - ".Value".length());
+            eventBuilder.addEventBinding(CustomUIEventBindingType.ValueChanged, selector, editEvent, false);
+        }
         eventBuilder.addEventBinding(
                 CustomUIEventBindingType.Activating,
                 "#TwSettingsRefreshButton",
@@ -222,13 +240,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
 
     private void render(@Nonnull UICommandBuilder commandBuilder) {
         TameworkSettingsPageTextBinder.bindStaticText(commandBuilder, playerRef);
-        commandBuilder.set("#TwSettingsStatusLine.Text", warningLine.isBlank() ? statusLine : warningLine);
-        commandBuilder.set(
-                "#TwSettingsApplyButton.Text",
-                applyInProgress
-                        ? resolveText("tamework.ui.settings.button.applying")
-                        : resolveText("tamework.ui.shared.button.apply")
-        );
+        renderFeedback(commandBuilder);
         commandBuilder.set("#TwSettingsPresetDropdown.Entries", TameworkSettingsPreset.dropdownEntries(resolveLanguage()));
         commandBuilder.set("#TwSettingsPresetDropdown.Value", TameworkSettingsPreset.match(currentValues).value());
         commandBuilder.set("#TwSettingsPopulationLimitInput.Value", String.valueOf(currentValues.populationLimitPerPlayerOwnedTotal()));
@@ -274,27 +286,57 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         commandBuilder.set("#TwSettingsRecallTeleportingEnabledCheck.Value", currentValues.recallTeleportingEnabled());
     }
 
+    private void updateUnsavedChanges() {
+        if (draftPayload == null) {
+            unsavedChanges = !currentValues.equals(savedValues);
+            return;
+        }
+        unsavedChanges = formParser.hasChanges(draftPayload, currentValues, savedValues);
+    }
+
+    private void renderFeedback(@Nonnull UICommandBuilder commandBuilder) {
+        commandBuilder.set("#TwSettingsStatusLine.Text", warningLine.isBlank() ? statusLine : warningLine);
+        commandBuilder.set(
+                "#TwSettingsApplyButton.Text",
+                applyInProgress
+                        ? resolveText("tamework.ui.settings.button.applying")
+                        : resolveText("tamework.ui.shared.button.apply")
+        );
+        commandBuilder.set("#TwSettingsUnsavedWarning.Visible", unsavedChanges);
+        commandBuilder.set("#TwSettingsStatusLine.Visible", !unsavedChanges || !warningLine.isBlank());
+        commandBuilder.set("#TwSettingsUnsavedText.Text", resolveText("tamework.ui.settings.warning.unsavedChanges"));
+    }
+
+    private void refreshFeedback() {
+        UICommandBuilder commandBuilder = new UICommandBuilder();
+        renderFeedback(commandBuilder);
+        sendUpdate(commandBuilder, null, false);
+    }
+
     private void onApply(@Nonnull EventPayload payload, @Nonnull Store<EntityStore> store) {
         if (applyInProgress) {
             warningLine = resolveText("tamework.ui.settings.warning.applyInProgress");
             statusLine = "";
-            refreshUi();
+            refreshFeedback();
             return;
         }
 
+        draftPayload = payload;
+        updateUnsavedChanges();
         TameworkSettingsFormParser.ParseResult parseResult = parseValues(payload);
         if (!parseResult.success()) {
             warningLine = parseResult.message();
             statusLine = "";
-            refreshUi();
+            refreshFeedback();
             return;
         }
 
         TameworkSettingsValues requested = parseResult.values();
+        currentValues = requested;
         applyInProgress = true;
         statusLine = resolveText("tamework.ui.settings.status.applying");
         warningLine = "";
-        refreshUi();
+        refreshFeedback();
 
         CompletableFuture
                 .supplyAsync(() -> applySettings(requested))
@@ -304,18 +346,21 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                         plugin.getLogger().at(Level.WARNING).withCause(throwable).log("Tamework settings apply failed.");
                         statusLine = "";
                         warningLine = resolveText("tamework.ui.settings.warning.applyFailed");
-                        refreshUi();
+                        refreshFeedback();
                         return;
                     }
-                    loadCurrentValues();
                     if (outcome == null) {
                         statusLine = "";
                         warningLine = resolveText("tamework.ui.settings.warning.applyFailed");
                     } else if (outcome.partial()) {
+                        savedValues = TameworkSettingsValues.fromRuntime();
+                        updateUnsavedChanges();
                         CompanionStatModifierRefreshService.refreshLoadedNpcStatModifiers(store);
                         statusLine = outcome.message();
                         warningLine = outcome.warning();
                     } else if (outcome.success()) {
+                        savedValues = TameworkSettingsValues.fromRuntime();
+                        updateUnsavedChanges();
                         CompanionStatModifierRefreshService.refreshLoadedNpcStatModifiers(store);
                         statusLine = outcome.message();
                         warningLine = "";
@@ -323,7 +368,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                         statusLine = "";
                         warningLine = outcome.warning();
                     }
-                    refreshUi();
+                    refreshFeedback();
                 }));
     }
 
@@ -332,7 +377,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         if (!preset.isLoadable()) {
             statusLine = resolveText("tamework.ui.settings.status.selectPreset");
             warningLine = "";
-            refreshUi();
+            refreshFeedback();
             return;
         }
         TameworkSettingsFormParser.ParseResult parseResult = parseValues(payload);
@@ -340,6 +385,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 ? parseResult.values()
                 : currentValues;
         currentValues = preset.applyTo(baseValues);
+        draftPayload = null;
+        updateUnsavedChanges();
         statusLine = parseResult.success()
                 ? formatText("tamework.ui.settings.status.loadedPreset", preset.displayName(resolveLanguage()))
                 : formatText("tamework.ui.settings.status.loadedPresetDiscardedInvalid", preset.displayName(resolveLanguage()));
@@ -392,6 +439,10 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
 
     private void loadCurrentValues() {
         currentValues = TameworkSettingsValues.fromRuntime();
+        savedValues = currentValues;
+        draftPayload = null;
+        unsavedChanges = false;
+        warningLine = "";
     }
 
     private List<DropdownEntryInfo> needsTickPolicyModeEntries() {

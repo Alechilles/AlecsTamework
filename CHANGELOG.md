@@ -23,7 +23,9 @@
   and flight/control HUD frames to the shared charcoal style without adding textures.
 
 - Restyled the settings menu to match the charcoal command panel, with clearer
-  sections, roomier controls, and shared textures.
+  sections, roomier controls, and shared textures. Centered its close icon and
+  added an amber unsaved-changes warning with flashing warning icons below Apply.
+  Failed validation or saving keeps the entered settings available for correction.
 
 - Capturing companions preserves exact health values for their saved gray health bars.
 - Fixed the Feedback button crashing the world when another mod embeds Beacon.

@@ -177,6 +177,7 @@ tamework.ui.settings.preset.custom=Personnalisé
 tamework.ui.settings.preset.simplified=Simplifié (type Minecraft)
 tamework.ui.settings.preset.easier=Plus facile
 tamework.ui.settings.preset.fullExperience=Expérience complète
+tamework.ui.settings.warning.unsavedChanges=Modifications non enregistrées - Cliquez sur "Appliquer" pour les enregistrer !
 tamework.ui.settings.status.refreshed=Paramètres actualisés.
 tamework.ui.settings.dismissReminder=Vous pouvez modifier ces paramètres à tout moment avec /tw settings.
 tamework.ui.settings.button.applying=Application...

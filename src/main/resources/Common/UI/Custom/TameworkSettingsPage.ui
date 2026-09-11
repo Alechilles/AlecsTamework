@@ -44,7 +44,7 @@ $C.@PageOverlay {
           TooltipText: %server.tamework.ui.shared.button.close;
           Style: $A.@Remove;
         }
-        Group { Anchor: (Top: 3, Left: 3, Width: 24, Height: 28); HitTestVisible: false; Background: "Tamework/PanelActions/Remove_Glyph_Default.png"; }
+        Group { Anchor: (Top: 3, Left: 3, Width: 24, Height: 24); HitTestVisible: false; Background: "Tamework/PanelActions/Remove_Glyph_Default.png"; }
       }
     }
 
@@ -52,6 +52,34 @@ $C.@PageOverlay {
       Anchor: (Top: 56, Left: 10, Right: 10, Bottom: 12);
       LayoutMode: Top;
       Padding: (Left: 10, Right: 10, Top: 6, Bottom: 8);
+
+      Group #TwSettingsUnsavedWarning {
+        Anchor: (Height: 20);
+        Visible: false;
+
+        // One visible frame and one transparent frame, each held for one second.
+        Sprite {
+          Anchor: (Left: 0, Width: 20, Height: 20);
+          TexturePath: "Tamework/PanelActions/UnsavedWarning.png";
+          Frame: (Width: 32, Height: 32, PerRow: 2, Count: 2);
+          FramesPerSecond: 1;
+          RepeatCount: 0;
+        }
+
+        Label #TwSettingsUnsavedText {
+          Anchor: (Left: 26, Right: 26, Height: 20);
+          Text: "";
+          Style: (FontSize: 14, RenderBold: true, TextColor: #ffcf40, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+
+        Sprite {
+          Anchor: (Right: 0, Width: 20, Height: 20);
+          TexturePath: "Tamework/PanelActions/UnsavedWarning.png";
+          Frame: (Width: 32, Height: 32, PerRow: 2, Count: 2);
+          FramesPerSecond: 1;
+          RepeatCount: 0;
+        }
+      }
 
       Label #TwSettingsStatusLine {
         Anchor: (Top: 0, Height: 20);

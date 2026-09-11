@@ -14,6 +14,12 @@ It writes universe-local JSON under
 separate from the canonical companion database, `tamework-state.sqlite`;
 settings do not form a second companion-lifecycle authority.
 
+Edits remain pending until you click **Apply**. A bright amber warning below the
+button row marks unsaved changes, with warning icons flashing on and off every
+second. The warning clears after a successful apply, when all edits are reverted,
+or when **Refresh** reloads the saved settings. Validation or save failures keep
+the draft available so you can correct it and try again.
+
 ## Population limit
 
 `LimitPerPlayerOwnedTotal` is a durable canonical owner cap:

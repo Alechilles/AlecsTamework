@@ -22,6 +22,14 @@ final class TameworkSettingsFormParser {
         this.logger = logger;
     }
 
+    /** Invalid input is still an unsaved edit, even though Apply cannot accept it. */
+    boolean hasChanges(@Nonnull TameworkSettingsPage.EventPayload payload,
+                       @Nonnull TameworkSettingsValues currentValues,
+                       @Nonnull TameworkSettingsValues savedValues) {
+        ParseResult result = parse(payload, currentValues);
+        return !result.success() || !savedValues.equals(result.values());
+    }
+
     @Nonnull
     ParseResult parse(@Nonnull TameworkSettingsPage.EventPayload payload,
                       @Nonnull TameworkSettingsValues currentValues) {
