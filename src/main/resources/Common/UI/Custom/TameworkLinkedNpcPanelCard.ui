@@ -17,8 +17,8 @@ $C = "Common.ui";
 @CooldownTextNormal = LabelStyle(FontSize: 9, TextColor: #d3d7cf);
 @CooldownLabelNormal = LabelStyle(FontSize: 9, TextColor: #b9beb8);
 @CooldownTextMuted = LabelStyle(FontSize: 9, TextColor: #858b85);
-@PortraitStyle = ItemGridStyle(SlotSize: 56, SlotSpacing: 0, SlotIconSize: 56);
-@PortraitCompactStyle = ItemGridStyle(SlotSize: 36, SlotSpacing: 0, SlotIconSize: 36);
+@PortraitStyle = ItemGridStyle(SlotSize: 92, SlotSpacing: 0, SlotIconSize: 92);
+@PortraitCompactStyle = ItemGridStyle(SlotSize: 48, SlotSpacing: 0, SlotIconSize: 48);
 
 Group {
     Anchor: (Top: 3, Left: 0, Right: 0, Height: 176);
@@ -31,12 +31,12 @@ Group {
 
     Group { Anchor: (Top: 26, Left: 0, Right: 36, Height: 1); Background: #343c37; HitTestVisible: false; }
 
+    ItemGrid #Portrait { Anchor: (Top: 28, Left: 28, Width: 92, Height: 92); SlotsPerRow: 1; RenderItemQualityBackground: false; DisplayItemQuantity: false; InfoDisplay: None; Style: @PortraitStyle; HitTestVisible: false; Visible: false; }
     TextButton #ActiveToggleActiveButton { Anchor: (Top: 42, Left: 0, Width: 40, Height: 20); Style: @LinkedActiveStateOnButtonStyle; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.activeEnabled; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
     TextButton #ActiveToggleInactiveButton { Anchor: (Top: 42, Left: 0, Width: 40, Height: 20); Style: @LinkedActiveStateOffButtonStyle; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.activeDisabled; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
     Group #GenderMaleIcon { Anchor: (Top: 1, Left: 34, Width: 22, Height: 22); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Male.png"); Visible: false; }
     Group #GenderFemaleIcon { Anchor: (Top: 1, Left: 34, Width: 22, Height: 22); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Female.png"); Visible: false; }
     Label #Name { Anchor: (Top: 0, Left: 28, Right: 36, Height: 24); Text: %server.tamework.ui.linkedPanel.subtitle.defaultNpcName; Style: (FontSize: 18, RenderBold: true, TextColor: #f0eee7, HorizontalAlignment: Start, VerticalAlignment: Center); }
-    ItemGrid #Portrait { Anchor: (Top: 56, Left: 80, Width: 56, Height: 56); SlotsPerRow: 1; RenderItemQualityBackground: false; DisplayItemQuantity: false; InfoDisplay: None; Style: @PortraitStyle; HitTestVisible: false; Visible: false; }
     Label #RoleSubtitle { Anchor: (Top: 37, Left: 0, Width: 148, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #afb6b0, VerticalAlignment: Center); Visible: false; }
     Label #StatusUnloaded { Anchor: (Top: 68, Left: 0, Width: 148, Height: 18); Text: %server.tamework.ui.linkedPanel.status.unloaded; Style: (FontSize: 10, RenderBold: true, TextColor: #ffe5b4, HorizontalAlignment: Center, VerticalAlignment: Center); Visible: false; }
     Group #StatusEmblem { Anchor: (Top: 10, Left: 707, Width: 56, Height: 56); Background: "Tamework/StatusEmblems/Unloaded.png"; HitTestVisible: false; Visible: false; }
