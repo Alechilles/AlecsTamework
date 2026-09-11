@@ -26,6 +26,7 @@ public enum TameworkConfigFamily {
     DEBUG,
     CAPTURE_POLICY,
     POPULATION_GROUP,
-    MANAGED_ACTIVITY
+    MANAGED_ACTIVITY,
+    DYNAMIC_ICONS
 }
 

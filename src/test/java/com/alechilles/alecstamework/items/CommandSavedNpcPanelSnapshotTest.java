@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
@@ -18,8 +17,6 @@ import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopR
 import com.alechilles.alecstamework.items.persistence.TameworkSnapshotCodecs;
 import com.alechilles.alecstamework.items.persistence.checkpoint.CompanionEntityCheckpoint;
 import com.alechilles.alecstamework.items.persistence.checkpoint.CompanionEntityCheckpointCodec;
-import com.alechilles.alecstamework.config.ItemFeatureConfig;
-import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
@@ -29,13 +26,11 @@ import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.hypixel.hytale.codec.ExtraInfo;
-import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
-import sun.misc.Unsafe;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -71,15 +66,10 @@ class CommandSavedNpcPanelSnapshotTest {
 
     @Test
     void appliesAttachmentSpecificPortraitFromFullState() throws Exception {
-        ItemFeatureRegistry registry = new ItemFeatureRegistry();
-        registry.register("SheepCaptureItem", ItemFeatureConfig.builder()
-                .spawnerIconOverridesByRole(Map.of("Tamed_Sheep", List.of(
-                        new ItemFeatureConfig.SpawnerIconOverride(
-                                Map.of("Coat", "Black"), "Icons/Portraits/Sheep_Black.png")
-                )))
-                .build());
-        Tamework previous = installRegistry(registry);
-        try {
+        try (var assets = new DynamicIconTestAssets("""
+                {"RoleIds":["Tamed_Sheep"],"IconOverrides":[
+                  {"Icon":"Icons/Portraits/Sheep_Black.png","Attachments":{"Coat":"Black"}}]}
+                """)) {
             ProfileId profileId = new ProfileId(UUID.randomUUID());
             CoopResidentStateSnapshot state = new CoopResidentStateSnapshot(
                     UUID.randomUUID(), null, -1, "Tamed_Sheep", null, null,
@@ -101,8 +91,6 @@ class CommandSavedNpcPanelSnapshotTest {
             assertNotNull(saved);
             assertEquals("Icons/Portraits/Sheep_Black.png",
                     saved.apply(baseCard(), null).portraitIcon());
-        } finally {
-            restoreTamework(previous);
         }
     }
 
@@ -185,27 +173,4 @@ class CommandSavedNpcPanelSnapshotTest {
                 0L, new com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator[0]);
     }
 
-    private static Tamework installRegistry(ItemFeatureRegistry registry) throws Exception {
-        Field singleton = Tamework.class.getDeclaredField("instance");
-        singleton.setAccessible(true);
-        Tamework previous = (Tamework) singleton.get(null);
-        Tamework replacement = (Tamework) unsafe().allocateInstance(Tamework.class);
-        Field itemFeatures = Tamework.class.getDeclaredField("itemFeatureRegistry");
-        itemFeatures.setAccessible(true);
-        itemFeatures.set(replacement, registry);
-        singleton.set(null, replacement);
-        return previous;
-    }
-
-    private static void restoreTamework(Tamework previous) throws Exception {
-        Field singleton = Tamework.class.getDeclaredField("instance");
-        singleton.setAccessible(true);
-        singleton.set(null, previous);
-    }
-
-    private static Unsafe unsafe() throws Exception {
-        Field field = Unsafe.class.getDeclaredField("theUnsafe");
-        field.setAccessible(true);
-        return (Unsafe) field.get(null);
-    }
 }

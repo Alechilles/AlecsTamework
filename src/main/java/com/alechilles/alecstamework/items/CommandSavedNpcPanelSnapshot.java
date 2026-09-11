@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.config.assets.TwDynamicIconConfig;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotDecodeResult;
@@ -379,9 +380,8 @@ final class CommandSavedNpcPanelSnapshot {
 
     /** Resolves optional saved appearance only while the caller owns the world-thread card pass. */
     private String resolvePortrait(String role, String fallback) {
-        Tamework plugin = Tamework.getInstance();
-        String resolved = CommandNpcPortraitResolver.resolve(
-                plugin == null ? null : plugin.getItemFeatureRegistry(), role,
+        String resolved = TwDynamicIconConfig.resolveIcon(
+                role,
                 appearance == null ? null : appearance.attachments);
         if (trimToNull(resolved) != null) {
             return resolved;

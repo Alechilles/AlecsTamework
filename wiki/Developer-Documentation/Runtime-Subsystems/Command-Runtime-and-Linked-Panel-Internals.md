@@ -119,3 +119,16 @@ thread; deferred work carries only stable IDs and immutable sightings.
 
 
 
+
+## Companion portraits
+
+`TwDynamicIconConfig.resolveIcon(roleId, attachments)` provides shared companion
+icons to filled spawners and normal/bonded panel presentation. Loaded rows use
+current model attachments; offline and stored rows use saved appearance data.
+No spawner registry or capture item is needed to resolve a portrait.
+
+`CommandNpcPortraitAssets` creates icon-only display items from enabled dynamic
+icon assets during core-owned asset callbacks. Asset changes invalidate role
+lookup and register new icon paths; existing display aliases remain until
+shutdown. Panel binding reuses the item renderer and existing PNGs. No entity
+access, periodic scan, or new executor is added by dynamic icon resolution.

@@ -59,6 +59,7 @@ import com.alechilles.alecstamework.config.assets.TwCompanionMovementConfig;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.config.assets.TwDebugConfig;
 import com.alechilles.alecstamework.config.assets.TwDynamicAttachmentsConfig;
+import com.alechilles.alecstamework.config.assets.TwDynamicIconConfig;
 import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
@@ -335,6 +336,7 @@ public class Tamework extends JavaPlugin {
     private boolean breedingAssetsRegistered;
     private boolean attachmentMigrationAssetsRegistered;
     private boolean attachmentDisplayAssetsRegistered;
+    private boolean dynamicIconAssetsRegistered;
     private boolean dynamicAttachmentsAssetsRegistered;
     private boolean companionMovementAssetsRegistered;
     private boolean levelingAssetsRegistered;
@@ -535,6 +537,7 @@ public class Tamework extends JavaPlugin {
         registerBreedingAssets();
         registerAttachmentMigrationAssets();
         registerAttachmentDisplayAssets();
+        registerDynamicIconAssets();
         registerDynamicAttachmentsAssets();
         registerCompanionMovementAssets();
         registerLevelingAssets();
@@ -551,7 +554,7 @@ public class Tamework extends JavaPlugin {
         );
         deferCraftingRecipeSubscriptions();
         deferAssetSubscription(
-                TameworkRuntimeModule.SPAWNER_ITEMS,
+                TameworkRuntimeModule.CORE_OWNERSHIP,
                 "item-assets-loaded",
                 () -> getEventRegistry().register(
                         LoadedAssetsEvent.class, Item.class, this::onItemAssetsLoaded
@@ -879,6 +882,9 @@ public class Tamework extends JavaPlugin {
                         persistenceComposition.directLiveCoopProjections()
                 )
         );
+        // Initial assets load before deferred subscriptions; publish portraits even without spawners.
+        reconcileNpcPortraitAssets();
+
         // Load item feature configs from bundled defaults and mod overrides.
         int loadedSpawner = loadSpawnerItemAssets();
         int loadedNaming = loadNameItemAssets();
@@ -2564,6 +2570,41 @@ public class Tamework extends JavaPlugin {
         attachmentDisplayAssetsRegistered = true;
     }
 
+    private void registerDynamicIconAssets() {
+        if (dynamicIconAssetsRegistered) return;
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwDynamicIconConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/DynamicIcons")
+                        .setCodec(TwDynamicIconConfig.CODEC)
+                        .setKeyFunction(TwDynamicIconConfig::getId)
+                        .build()
+        );
+        // Shared presentation assets must remain available without active spawner items.
+        deferAssetSubscription(TameworkRuntimeModule.CORE_OWNERSHIP, "dynamic-icon-assets-loaded",
+                () -> getEventRegistry().register(LoadedAssetsEvent.class,
+                        TwDynamicIconConfig.class, this::onDynamicIconAssetsLoaded));
+        deferAssetSubscription(TameworkRuntimeModule.CORE_OWNERSHIP, "dynamic-icon-assets-removed",
+                () -> getEventRegistry().register(RemovedAssetsEvent.class,
+                        TwDynamicIconConfig.class, this::onDynamicIconAssetsRemoved));
+        dynamicIconAssetsRegistered = true;
+    }
+
+    private void onDynamicIconAssetsLoaded(
+            LoadedAssetsEvent<String, TwDynamicIconConfig, DefaultAssetMap<String, TwDynamicIconConfig>> event) {
+        TwDynamicIconConfig.clearRoleCache();
+        reconcileNpcPortraitAssets();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.DYNAMIC_ICONS, event.getLoadedAssets().keySet());
+        }
+    }
+
+    private void onDynamicIconAssetsRemoved(
+            RemovedAssetsEvent<String, TwDynamicIconConfig, DefaultAssetMap<String, TwDynamicIconConfig>> event) {
+        TwDynamicIconConfig.clearRoleCache();
+        reconcileNpcPortraitAssets();
+        emitExperimentalConfigReload(TameworkConfigFamily.DYNAMIC_ICONS, event.getRemovedAssets());
+    }
+
     private void registerDynamicAttachmentsAssets() {
         if (dynamicAttachmentsAssetsRegistered) {
             return;
@@ -2804,10 +2845,10 @@ public class Tamework extends JavaPlugin {
 
     private void reconcileNpcPortraitAssets() {
         try {
-            int registered = commandNpcPortraitAssets.reconcile(itemFeatureRegistry);
+            int registered = commandNpcPortraitAssets.reconcile();
             if (registered > 0) {
                 getLogger().at(Level.INFO).log("Registered " + registered
-                        + " companion portrait icons using existing capture textures.");
+                        + " companion portrait icons from dynamic icon assets.");
             }
         } catch (RuntimeException failure) {
             getLogger().at(Level.WARNING).withCause(failure).log(
@@ -3234,7 +3275,6 @@ public class Tamework extends JavaPlugin {
             return 0;
         }
         spawnerReloadPendingOnItemAssets = false;
-        reconcileNpcPortraitAssets();
         return result.loadedCount();
     }
 

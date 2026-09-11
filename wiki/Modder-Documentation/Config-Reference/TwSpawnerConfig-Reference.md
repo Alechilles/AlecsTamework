@@ -22,7 +22,7 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 - Omitted top-level object sections inherit from the parent.
 - Explicit object sections inherit missing nested keys from the parent.
 - Explicit arrays and maps replace the parent value.
-- `AllowedRoles.Allowlist`, `AllowedRoles.Denylist`, `IconOverrides`, `IconOverridesByRole`, and `IconOverrideGroups` all replace the parent value when explicitly authored.
+- `AllowedRoles.Allowlist` and `AllowedRoles.Denylist` all replace the parent value when explicitly authored.
 
 ## Top-Level Structure
 ```json
@@ -33,9 +33,6 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
   "AllowedRoles": { "...": "..." },
   "Capture": { "...": "..." },
   "Spawn": { "...": "..." },
-  "IconOverrides": [],
-  "IconOverridesByRole": {},
-  "IconOverrideGroups": [],
   "TooltipMode": "Additive"
 }
 ```
@@ -139,26 +136,15 @@ do not author the same completion particle/sound in two paths.
 - `CooldownMs`
 - `MaxDistance`
 
-### `IconOverrides`
-Array of conditional icon overrides. Each entry supports:
-- `Icon`
-- `Attachments`
+### Companion appearance icons
 
-`Attachments` is a map of attachment-set name to expected attachment option. Tamework uses it to match a captured NPC’s metadata to the correct icon.
+Capture items resolve their companion icon through
+[TwDynamicIconConfig](/mod/alecs-tamework/twdynamiciconconfig-reference), using
+the saved role and attachments. The same assets provide normal and roster panel
+portraits. `IconDefault` on this spawner remains its generic item fallback.
 
-### `IconOverridesByRole`
-Map of role id to `IconOverrides` arrays. Use it when icon rules differ per role instead of only by attachment combination.
-
-### `IconOverrideGroups`
-Ordered array of shared role groups. Use it when multiple roles should share one icon rule set.
-
-Each group supports:
-
-- `Roles`: role ids covered by the group.
-- `IconDefault`: optional default icon for roles in the group.
-- `Overrides`: attachment-based icon overrides shared by those roles.
-
-Runtime icon lookup checks exact role overrides first, then the first matching shared role group, then that group's `IconDefault`, then global overrides, then top-level `IconDefault`.
+Inline icon maps are no longer supported. Move each former shared role group
+into a dynamic icon asset with `RoleIds`, `IconDefault`, and `IconOverrides`.
 
 ### `TooltipMode`
 Controls how captured-spawner item display metadata composes the base item description and Tamework detail lines.
@@ -244,7 +230,7 @@ Appearance header.
 - `RequireOwner` is an explicit override, not the same thing as `OwnerRestricted`.
 - Use `/tw settings` for the global capture/spawn owner-transfer defaults.
 - Unset `RequireOwner` values are not equivalent to `false`; they defer to global ownership-requirement defaults.
-- `IconOverrides`, `IconOverridesByRole`, and `IconOverrideGroups` are explicit array/map values and replace the parent content when authored in a child asset.
+- Companion icon rules belong to `TwDynamicIconConfig`; update dependent packs together when migrating the removed inline icon maps.
 - `/tw reloadconfig` is required after editing spawner configs during development.
 - Role-side probability policy belongs in `TwCapturePolicyConfig`, not copied
   into every capture item.

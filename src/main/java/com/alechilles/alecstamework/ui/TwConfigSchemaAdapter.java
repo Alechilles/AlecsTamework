@@ -13,6 +13,7 @@ import com.alechilles.alecstamework.config.assets.TwCompanionMovementConfig;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.config.assets.TwDebugConfig;
 import com.alechilles.alecstamework.config.assets.TwDynamicAttachmentsConfig;
+import com.alechilles.alecstamework.config.assets.TwDynamicIconConfig;
 import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
@@ -160,6 +161,7 @@ final class TwConfigSchemaAdapter {
             case MANAGED_ACTIVITY -> TwManagedActivityConfig.CODEC;
             case ATTACHMENT_MIGRATION -> TwAttachmentMigrationConfig.CODEC;
             case ATTACHMENT_DISPLAY -> TwAttachmentDisplayConfig.CODEC;
+            case DYNAMIC_ICONS -> TwDynamicIconConfig.CODEC;
             case DYNAMIC_ATTACHMENTS -> TwDynamicAttachmentsConfig.CODEC;
             case COMPANION_MOVEMENT -> TwCompanionMovementConfig.CODEC;
             case LEVELING -> TwLevelingConfig.CODEC;

@@ -7,6 +7,14 @@ The system is asset-driven around:
 - `TameworkCommand` item interaction
 - `CommandItemFeatureHandler` orchestration
 
+## Companion portraits
+
+Normal and bonded roster panels resolve portraits from `TwDynamicIconConfig`
+assets using the companion's role and current or saved attachment selections.
+The lookup is independent of spawner items. See the
+[dynamic icon reference](../wiki/Modder-Documentation/Config-Reference/TwDynamicIconConfig-Reference.md)
+for authoring and precedence.
+
 ## Runtime Architecture (Contributor View)
 Command runtime is split to keep the orchestrator thin:
 - Orchestrator: `CommandItemFeatureHandler`

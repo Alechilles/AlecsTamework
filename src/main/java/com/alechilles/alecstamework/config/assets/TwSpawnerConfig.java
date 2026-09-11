@@ -16,16 +16,12 @@ import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
-import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
-import com.hypixel.hytale.codec.codecs.map.MapCodec;
 import com.hypixel.hytale.codec.lookup.StringCodecMapCodec;
 import com.hypixel.hytale.codec.schema.SchemaContext;
 import com.hypixel.hytale.codec.schema.config.ArraySchema;
 import com.hypixel.hytale.codec.schema.config.Schema;
 import com.hypixel.hytale.codec.schema.config.StringSchema;
 import com.hypixel.hytale.common.util.ArrayUtil;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -151,65 +147,6 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         ALLOWED_ROLES_CODEC.register("Denylist", DenylistRoles.class, DENYLIST_ROLES_CODEC);
     }
 
-    public static final BuilderCodec<SpawnerIconOverride> ICON_OVERRIDE_CODEC = BuilderCodec.builder(
-            SpawnerIconOverride.class, SpawnerIconOverride::new
-        )
-        .<String>append(
-            new KeyedCodec<>("Icon", Codec.STRING),
-            (override, icon) -> override.icon = icon,
-            override -> override.icon
-        )
-        .documentation("Item icon asset ID override.")
-        .add()
-        .<Map<String, String>>append(
-            new KeyedCodec<>("Attachments", MapCodec.STRING_HASH_MAP_CODEC),
-            (override, attachments) -> override.attachments = attachments == null
-                ? Collections.emptyMap()
-                : attachments,
-            override -> override.attachments
-        )
-        .documentation("Attachment overrides for the icon.")
-        .add()
-        .build();
-
-    public static final ArrayCodec<SpawnerIconOverride> ICON_OVERRIDE_ARRAY_CODEC =
-        new ArrayCodec<>(ICON_OVERRIDE_CODEC, SpawnerIconOverride[]::new);
-
-    private static final SpawnerIconOverride[] EMPTY_OVERRIDES = new SpawnerIconOverride[0];
-    private static final SpawnerIconOverrideGroup[] EMPTY_OVERRIDE_GROUPS = new SpawnerIconOverrideGroup[0];
-
-    public static final BuilderCodec<SpawnerIconOverrideGroup> ICON_OVERRIDE_GROUP_CODEC = BuilderCodec.builder(
-            SpawnerIconOverrideGroup.class, SpawnerIconOverrideGroup::new
-        )
-        .<String[]>append(
-            new KeyedCodec<>("Roles", NPC_ROLE_ARRAY_CODEC),
-            (group, roles) -> group.roles = roles == null ? ArrayUtil.EMPTY_STRING_ARRAY : roles,
-            group -> group.roles
-        )
-        .documentation("Role IDs that share these icon overrides.")
-        .add()
-        .<String>append(
-            new KeyedCodec<>("IconDefault", Codec.STRING),
-            (group, iconDefault) -> group.iconDefault = iconDefault,
-            group -> group.iconDefault
-        )
-        .documentation("Fallback icon for the listed roles when no attachment override matches. Use this for base-only models.")
-        .add()
-        .<SpawnerIconOverride[]>append(
-            new KeyedCodec<>("Overrides", ICON_OVERRIDE_ARRAY_CODEC),
-            (group, overrides) -> group.overrides = overrides == null ? EMPTY_OVERRIDES : overrides,
-            group -> group.overrides
-        )
-        .documentation("Icon overrides shared by the listed roles.")
-        .add()
-        .build();
-
-    public static final ArrayCodec<SpawnerIconOverrideGroup> ICON_OVERRIDE_GROUP_ARRAY_CODEC =
-        new ArrayCodec<>(ICON_OVERRIDE_GROUP_CODEC, SpawnerIconOverrideGroup[]::new);
-
-    public static final MapCodec<SpawnerIconOverride[], Map<String, SpawnerIconOverride[]>> ICON_OVERRIDES_BY_ROLE_CODEC =
-        new MapCodec<>(ICON_OVERRIDE_ARRAY_CODEC, Object2ObjectOpenHashMap::new);
-
     public static final BuilderCodec<CaptureSettings> CAPTURE_CODEC =
             TwSpawnerCaptureSettingsCodec.CODEC;
     public static final BuilderCodec<SpawnSettings> SPAWN_CODEC = BuilderCodec.builder(
@@ -299,7 +236,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             (asset, value) -> asset.iconDefault = value,
             asset -> asset.iconDefault
         )
-        .documentation("Default icon for the spawner item.")
+        .documentation("Fallback icon for the filled spawner when no TwDynamicIconConfig matches. Inheritance: omitted inherits from parent.")
         .add()
         .<AllowedRoles>append(
             new KeyedCodec<>("AllowedRoles", ALLOWED_ROLES_CODEC),
@@ -325,30 +262,6 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         .documentation("Spawn settings for spawner items. Inheritance: omitted section inherits from parent; when "
                 + "present, only explicitly defined nested fields override parent.")
         .add()
-        .<SpawnerIconOverride[]>append(
-            new KeyedCodec<>("IconOverrides", ICON_OVERRIDE_ARRAY_CODEC),
-            (asset, value) -> asset.iconOverrides = value == null ? EMPTY_OVERRIDES : value,
-            asset -> asset.iconOverrides
-        )
-        .documentation("Icon overrides that apply to all roles. Inheritance: omitted value inherits from parent; "
-                + "explicit array replaces parent value (no merge).")
-        .add()
-        .<Map<String, SpawnerIconOverride[]>>append(
-            new KeyedCodec<>("IconOverridesByRole", ICON_OVERRIDES_BY_ROLE_CODEC),
-            (asset, value) -> asset.iconOverridesByRole = value == null ? Collections.emptyMap() : value,
-            asset -> asset.iconOverridesByRole
-        )
-        .documentation("Icon overrides keyed by role ID. Inheritance: omitted value inherits from parent; explicit "
-                + "map replaces parent value (no merge).")
-        .add()
-        .<SpawnerIconOverrideGroup[]>append(
-            new KeyedCodec<>("IconOverrideGroups", ICON_OVERRIDE_GROUP_ARRAY_CODEC),
-            (asset, value) -> asset.iconOverrideGroups = value == null ? EMPTY_OVERRIDE_GROUPS : value,
-            asset -> asset.iconOverrideGroups
-        )
-        .documentation("Ordered shared icon override groups for multiple roles. Inheritance: omitted value inherits "
-                + "from parent; explicit array replaces parent value (no merge).")
-        .add()
         .<ItemFeatureConfig.SpawnerTooltipMode>append(
             new KeyedCodec<>("TooltipMode", TOOLTIP_MODE_CODEC),
             (asset, value) -> asset.tooltipMode =
@@ -370,9 +283,6 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
     private String filledItemId;
     private boolean filledItemIdExplicit;
     private String iconDefault;
-    private SpawnerIconOverride[] iconOverrides = EMPTY_OVERRIDES;
-    private Map<String, SpawnerIconOverride[]> iconOverridesByRole = Collections.emptyMap();
-    private SpawnerIconOverrideGroup[] iconOverrideGroups = EMPTY_OVERRIDE_GROUPS;
     private ItemFeatureConfig.SpawnerTooltipMode tooltipMode = ItemFeatureConfig.SpawnerTooltipMode.ADDITIVE;
     private CaptureSettings capture = new CaptureSettings();
     private SpawnSettings spawn = new SpawnSettings();
@@ -457,9 +367,6 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         } else {
             inheritSpawnSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Spawn"));
         }
-        if (!explicitTopLevelKeys.contains("IconOverrides")) iconOverrides = parent.iconOverrides;
-        if (!explicitTopLevelKeys.contains("IconOverridesByRole")) iconOverridesByRole = parent.iconOverridesByRole;
-        if (!explicitTopLevelKeys.contains("IconOverrideGroups")) iconOverrideGroups = parent.iconOverrideGroups;
         if (!explicitTopLevelKeys.contains("TooltipMode")) tooltipMode = parent.tooltipMode;
     }
 
@@ -611,9 +518,6 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             .spawnMaxDistance(spawnSettings.maxDistance)
             .spawnerFilledItemId(filledItemId)
             .spawnerIconDefault(iconDefault)
-            .spawnerIconOverrides(toOverrides(iconOverrides))
-            .spawnerIconOverridesByRole(toOverridesByRole(iconOverridesByRole))
-            .spawnerIconOverrideGroups(toOverrideGroups(iconOverrideGroups))
             .spawnerTooltipMode(tooltipMode)
             .captureMechanics(TwSpawnerConfigRuntimeAdapter.captureMechanics(captureSettings))
             .build();
@@ -632,64 +536,6 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             return List.of();
         }
         return List.of(values);
-    }
-
-    private static List<ItemFeatureConfig.SpawnerIconOverride> toOverrides(SpawnerIconOverride[] overrides) {
-        if (overrides == null || overrides.length == 0) {
-            return List.of();
-        }
-        List<ItemFeatureConfig.SpawnerIconOverride> list = new ArrayList<>(overrides.length);
-        for (SpawnerIconOverride override : overrides) {
-            if (override == null || override.icon == null || override.icon.isBlank()) {
-                continue;
-            }
-            list.add(new ItemFeatureConfig.SpawnerIconOverride(override.attachments, override.icon));
-        }
-        return list.isEmpty() ? List.of() : list;
-    }
-
-    private static Map<String, List<ItemFeatureConfig.SpawnerIconOverride>> toOverridesByRole(
-        Map<String, SpawnerIconOverride[]> overridesByRole
-    ) {
-        if (overridesByRole == null || overridesByRole.isEmpty()) {
-            return Map.of();
-        }
-        Map<String, List<ItemFeatureConfig.SpawnerIconOverride>> result = new Object2ObjectOpenHashMap<>();
-        for (Map.Entry<String, SpawnerIconOverride[]> entry : overridesByRole.entrySet()) {
-            String roleId = entry.getKey();
-            if (roleId == null || roleId.isBlank()) {
-                continue;
-            }
-            List<ItemFeatureConfig.SpawnerIconOverride> overrides = toOverrides(entry.getValue());
-            if (!overrides.isEmpty()) {
-                result.put(roleId, overrides);
-            }
-        }
-        return result.isEmpty() ? Map.of() : result;
-    }
-
-    private static List<ItemFeatureConfig.SpawnerIconOverrideGroup> toOverrideGroups(
-        SpawnerIconOverrideGroup[] groups
-    ) {
-        if (groups == null || groups.length == 0) {
-            return List.of();
-        }
-        List<ItemFeatureConfig.SpawnerIconOverrideGroup> result = new ArrayList<>(groups.length);
-        for (SpawnerIconOverrideGroup group : groups) {
-            if (group == null || group.roles == null || group.roles.length == 0) {
-                continue;
-            }
-            List<ItemFeatureConfig.SpawnerIconOverride> overrides = toOverrides(group.overrides);
-            String iconDefault = group.iconDefault;
-            if (overrides.isEmpty() && (iconDefault == null || iconDefault.isBlank())) {
-                continue;
-            }
-            List<String> roles = toList(group.roles);
-            if (!roles.isEmpty()) {
-                result.add(new ItemFeatureConfig.SpawnerIconOverrideGroup(roles, overrides, iconDefault));
-            }
-        }
-        return result.isEmpty() ? List.of() : result;
     }
 
     /** Base role filter model for spawner capture/spawn restrictions. */
@@ -791,39 +637,4 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         private double maxDistance;
     }
 
-    public static final class SpawnerIconOverride {
-        private Map<String, String> attachments = Collections.emptyMap();
-        private String icon;
-
-        public Map<String, String> getAttachments() {
-            return attachments;
-        }
-
-        public String getIcon() {
-            return icon;
-        }
-    }
-
-    public static final class SpawnerIconOverrideGroup {
-        private String[] roles = ArrayUtil.EMPTY_STRING_ARRAY;
-        private String iconDefault;
-        private SpawnerIconOverride[] overrides = EMPTY_OVERRIDES;
-
-        public String[] getRoles() {
-            return roles;
-        }
-
-        public String getIconDefault() {
-            return iconDefault;
-        }
-
-        public SpawnerIconOverride[] getOverrides() {
-            return overrides;
-        }
-    }
 }
-
-
-
-
-

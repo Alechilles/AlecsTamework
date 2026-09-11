@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.config.assets.TwCompanionMovementConfig;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.config.assets.TwDebugConfig;
 import com.alechilles.alecstamework.config.assets.TwDynamicAttachmentsConfig;
+import com.alechilles.alecstamework.config.assets.TwDynamicIconConfig;
 import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
@@ -63,6 +64,7 @@ public enum TwConfigFamily {
     ),
     ATTACHMENT_MIGRATION("attachment-migration", "Attachment Migrations", "Tamework/AttachmentMigrations", true, true),
     ATTACHMENT_DISPLAY("attachment-display", "Attachment Displays", "Tamework/AttachmentDisplays", true, true),
+    DYNAMIC_ICONS("dynamic-icons", "Dynamic Icons", "Tamework/DynamicIcons", true, true),
     DYNAMIC_ATTACHMENTS("dynamic-attachments", "Dynamic Attachments", "Tamework/DynamicAttachments", true, true),
     COMPANION_MOVEMENT("companion-movement", "Companion Movement", "Tamework/CompanionMovement", true, true),
     LEVELING("leveling", "Leveling", "Tamework/Leveling", true, true),
@@ -174,6 +176,8 @@ public enum TwConfigFamily {
                     (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwAttachmentMigrationConfig.getAssetStore();
             case ATTACHMENT_DISPLAY ->
                     (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwAttachmentDisplayConfig.getAssetStore();
+            case DYNAMIC_ICONS ->
+                    (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwDynamicIconConfig.getAssetStore();
             case DYNAMIC_ATTACHMENTS ->
                     (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwDynamicAttachmentsConfig.getAssetStore();
             case COMPANION_MOVEMENT ->

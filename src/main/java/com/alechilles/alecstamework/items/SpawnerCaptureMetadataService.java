@@ -216,9 +216,6 @@ final class SpawnerCaptureMetadataService {
                                @Nullable String itemId,
                                @Nullable String roleId) {
         ItemFeatureConfig resolved = resolveIconConfig(config);
-        if (resolved == null) {
-            return null;
-        }
         Map<String, String> attachments = null;
         if (attachmentsJson != null && !attachmentsJson.isBlank()) {
             try {

@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.config.ItemFeatureConfig;
-import com.alechilles.alecstamework.config.ItemFeatureRegistry;
+import com.alechilles.alecstamework.config.assets.TwDynamicIconConfig;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -23,12 +22,13 @@ public final class CommandNpcPortraitAssets {
     private static final String SOURCE = "Alechilles:Alec's Tamework!";
     private final AtomicBoolean reconciling = new AtomicBoolean();
 
-    public int reconcile(ItemFeatureRegistry registry) {
-        if (registry == null || Item.getAssetStore() == null || !reconciling.compareAndSet(false, true)) {
+    public int reconcile() {
+        var assets = TwDynamicIconConfig.getAssetMap();
+        if (assets == null || Item.getAssetStore() == null || !reconciling.compareAndSet(false, true)) {
             return 0;
         }
         try {
-            List<Item> missing = missingAliases(registry.snapshot().values(),
+            List<Item> missing = missingAliases(assets.getAssetMap().values(),
                     Item.getAssetMap().getAssetMap());
             if (!missing.isEmpty()) {
                 var result = Item.getAssetStore().loadAssets(SOURCE, missing);
@@ -44,18 +44,13 @@ public final class CommandNpcPortraitAssets {
         }
     }
 
-    static List<Item> missingAliases(Collection<ItemFeatureConfig> configs, Map<String, Item> existing) {
+    static List<Item> missingAliases(Collection<TwDynamicIconConfig> configs, Map<String, Item> existing) {
         Set<String> icons = new TreeSet<>();
-        for (ItemFeatureConfig config : configs) {
-            if (config.getSpawnerIconOverridesByRole() != null) {
-                config.getSpawnerIconOverridesByRole().values().forEach(overrides -> collect(icons, overrides));
-            }
-            if (config.getSpawnerIconOverrideGroups() != null) {
-                for (var group : config.getSpawnerIconOverrideGroups()) {
-                    if (group == null || group.getRoles().isEmpty()) continue;
-                    add(icons, group.getIconDefault());
-                    collect(icons, group.getOverrides());
-                }
+        for (TwDynamicIconConfig config : configs) {
+            if (!config.isEnabled() || config.getRoleIds().length == 0) continue;
+            add(icons, config.getIconDefault());
+            for (var override : config.getIconOverrides()) {
+                if (override != null) add(icons, override.getIcon());
             }
         }
         Set<String> registered = new HashSet<>();
@@ -68,11 +63,6 @@ public final class CommandNpcPortraitAssets {
             if (!existing.containsKey(id)) aliases.add(new PortraitItem(id, icon));
         }
         return aliases;
-    }
-
-    private static void collect(Set<String> icons, List<ItemFeatureConfig.SpawnerIconOverride> overrides) {
-        if (overrides == null) return;
-        for (var override : overrides) if (override != null) add(icons, override.getIcon());
     }
 
     private static void add(Set<String> icons, String icon) {

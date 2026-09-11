@@ -16,6 +16,22 @@ import org.junit.jupiter.api.Test;
 /** Verifies panel actions preserve precise policy failures for tooltip feedback. */
 class BondedCompanionPanelFeaturePresentationSourceTest {
     @Test
+    void storedRosterPortraitUsesSavedAttachmentsWithoutAnySpawner() throws Exception {
+        try (var assets = new DynamicIconTestAssets("""
+                {"RoleIds":["Tamed_NordicDrake"],"IconDefault":"drake.png",
+                 "IconOverrides":[{"Icon":"blue-drake.png","Attachments":{"Color":"Blue"}}]}
+                """)) {
+            var profile = new BondedCompanionProfileView(
+                    "profile-icons", UUID.randomUUID(), "test:roster", "test:dragons",
+                    "Tamed_NordicDrake", "Naomi", "Nordic Drake", "Female", 1L,
+                    BondedCompanionStateView.STORED, true, false, false,
+                    Map.of("attachments", "{Color=Blue}"), null, 0L, null);
+            var row = BondedCompanionPanelFeaturePresentationSource.presentation(profile, 0L, null);
+            assertEquals("blue-drake.png", row.attributes().get("portraitIcon"));
+        }
+    }
+
+    @Test
     void activeCompanionCarriesItsLeasedNpcIdentityAndSessionTiming() {
         UUID liveNpcUuid = UUID.fromString(
                 "74000000-0000-0000-0000-000000000003");

@@ -174,23 +174,17 @@ operation does not play success effects.
 
 For a hold-to-capture item, run `TameworkCaptureChannel` with `Phase: Begin`, then chain a native `Charging` interaction. Route its zero-second/release branch to `Phase: Cancel` and its completion branch to `Phase: Complete`. The native charge duration remains an item-asset choice; server policy is rechecked on completion before any ownership, item, or NPC state changes are committed.
 
-## Icon overrides
-Optional overrides for filled spawner icons based on attachments or role.
+## Companion icons
 
-Fields:
-- `IconOverrides`: array of overrides with `Icon` and `Attachments` map.
-- `IconOverridesByRole`: map of role id to override arrays.
-- `IconOverrideGroups`: ordered array of shared role groups with `Roles`,
-  optional group `IconDefault`, and `Overrides`.
+Companion appearance mappings live in [TwDynamicIconConfig](../wiki/Modder-Documentation/Config-Reference/TwDynamicIconConfig-Reference.md)
+assets under `Server/Tamework/DynamicIcons/`. Capture items and both command
+panels resolve the same icon from the NPC role and attachment selections.
+Spawner `IconDefault` remains the filled item's fallback when no companion icon
+matches. The old inline `IconOverrides`, `IconOverridesByRole`, and
+`IconOverrideGroups` fields are removed; migrate those maps to dynamic icon assets.
 
-Attachment maps use the NPC attachment keys as the match criteria.
-Runtime lookup checks exact role overrides first, then the first matching shared
-role group, then that group's `IconDefault`, then global overrides, then the
-top-level `IconDefault`. Use group `IconDefault` for roles whose captured NPCs
-have no attachment variants but still need their own base-skin icon.
-
-The current spawner icon tooling guide lives in the wiki:
-[Spawner Icon Generation](../wiki/Modder-Documentation/System-Integration/Spawner-Icon-Generation.md).
+See [Spawner Icon Generation](../wiki/Modder-Documentation/System-Integration/Spawner-Icon-Generation.md)
+for generating the PNGs and shared config assets.
 
 ## Example
 ```json

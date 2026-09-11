@@ -49,9 +49,6 @@ final class SpawnerInteractionConfigResolver {
                 .spawnMaxDistance(baseConfig.getSpawnMaxDistance())
                 .spawnerFilledItemId(baseConfig.getSpawnerFilledItemId())
                 .spawnerIconDefault(baseConfig.getSpawnerIconDefault())
-                .spawnerIconOverrides(baseConfig.getSpawnerIconOverrides())
-                .spawnerIconOverridesByRole(baseConfig.getSpawnerIconOverridesByRole())
-                .spawnerIconOverrideGroups(baseConfig.getSpawnerIconOverrideGroups())
                 .spawnerTooltipMode(baseConfig.getSpawnerTooltipMode())
                 .captureMechanics(baseConfig.getCaptureMechanics())
                 .build();

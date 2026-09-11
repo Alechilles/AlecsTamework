@@ -16,6 +16,7 @@ This subsection contains one page per `Tw*Config` asset family.
 - [TwCompanionMovementConfig Reference](/mod/alecs-tamework/twcompanionmovementconfig-reference)
 - [TwPopulationGroupConfig Reference](/mod/alecs-tamework/twpopulationgroupconfig-reference)
 - [TwInteractionConfig Reference](/mod/alecs-tamework/twinteractionconfig-reference)
+- [TwDynamicIconConfig Reference](/mod/alecs-tamework/twdynamiciconconfig-reference)
 - [TwSpawnerConfig Reference](/mod/alecs-tamework/twspawnerconfig-reference)
 - [TwNameItemConfig Reference](/mod/alecs-tamework/twnameitemconfig-reference)
 - [TwNamesConfig Reference](/mod/alecs-tamework/twnamesconfig-reference)

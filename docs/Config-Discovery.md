@@ -7,6 +7,7 @@ This document explains where Tamework config assets live and how each family res
 - `TwCompanionConfig`: `<ModRoot>/Server/Tamework/Companion/*.json`
 - `TwCompanionMovementConfig`: `<ModRoot>/Server/Tamework/CompanionMovement/*.json`
 - `TwInteractionConfig`: `<ModRoot>/Server/Tamework/Interactions/*.json`
+- `TwDynamicIconConfig`: `<ModRoot>/Server/Tamework/DynamicIcons/*.json`
 - `TwSpawnerConfig`: `<ModRoot>/Server/Tamework/Items/Spawners/*.json`
 - `TwNameItemConfig`: `<ModRoot>/Server/Tamework/Items/Naming/*.json`
 - `TwNamesConfig`: `<ModRoot>/Server/Tamework/Names/*.json`
@@ -54,6 +55,12 @@ Resolved by role id + `Priority`:
   map authorized `TameworkCullNpc` item interactions to one activity and one
   domestic drop table per family. Duplicate roles inside one profile are
   rejected.
+
+### Dynamic icon family
+- `TwDynamicIconConfig` selects one enabled config per normalized role ID: higher `Priority`, then case-insensitive lowest asset ID.
+- Ordered attachment predicates select the icon; `IconDefault` covers unmatched or missing attachments.
+- Capture items, normal panels, and bonded roster panels share this lookup independently of spawner assets.
+- The config editor and asset load/remove events refresh this family; old display aliases remain valid until shutdown.
 
 ### Dynamic attachment family
 - `TwDynamicAttachmentsConfig` is indexed by role id and evaluates ordered conditional rules.

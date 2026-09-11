@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.config.assets.TwDynamicIconConfig;
 import com.alechilles.alecstamework.localization.RoleNameResolver;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
@@ -320,8 +321,7 @@ final class CommandLinkedPanelEntryService {
                     recallLostRemainingMs
             ).withRoleSubtitle(npcNameResolver.resolveRoleSubtitle(
                     customName, speciesRoleId, record.cachedNameKey))
-                    .withPortraitIcon(CommandNpcPortraitResolver.resolve(
-                            Tamework.getInstance() == null ? null : Tamework.getInstance().getItemFeatureRegistry(),
+                    .withPortraitIcon(TwDynamicIconConfig.resolveIcon(
                             speciesRoleId, null));
             CommandSavedNpcPanelSnapshot saved = persistenceView == null ? null : persistenceView.savedPanel(record, player.getUuid());
             if (saved != null) {

@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.config.assets.TwDynamicIconConfig;
 import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
@@ -294,11 +295,9 @@ final class CommandLoadedNpcStatusSnapshotService {
 
     /** Reads appearance only in the existing world-thread card snapshot pass. */
     private String resolvePortrait(Ref<EntityStore> npcRef, Store<EntityStore> store, String roleId) {
-        Tamework plugin = Tamework.getInstance();
-        if (plugin == null) return null;
         ModelComponent component = safeGetComponent(store, npcRef, ModelComponent.getComponentType());
         var model = component == null ? null : component.getModel();
-        String icon = CommandNpcPortraitResolver.resolve(plugin.getItemFeatureRegistry(), roleId,
+        String icon = TwDynamicIconConfig.resolveIcon(roleId,
                 model == null ? null : model.getRandomAttachmentIds());
         if (icon != null || model == null || model.getModelAssetId() == null) return icon;
         ModelAsset asset = ModelAsset.getAssetMap().getAsset(model.getModelAssetId());

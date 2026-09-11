@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.*;
-import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.config.assets.TwDynamicIconConfig;
 import com.alechilles.alecstamework.ui.BondedCompanionPanelPresentation;
 import com.alechilles.alecstamework.ui.BondedCompanionStatusPresentation;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
@@ -108,9 +108,7 @@ final class BondedCompanionPanelFeaturePresentationSource {
                 attributes.put(key, value);
             }
         });
-        Tamework plugin = Tamework.getInstance();
-        String portrait = CommandNpcPortraitResolver.resolve(
-                plugin == null ? null : plugin.getItemFeatureRegistry(),
+        String portrait = TwDynamicIconConfig.resolveIcon(
                 profile.roleId(), portraitAttachments(source.get("attachments")));
         if (portrait != null) attributes.put("portraitIcon", portrait);
         if (profile.activeLease() != null

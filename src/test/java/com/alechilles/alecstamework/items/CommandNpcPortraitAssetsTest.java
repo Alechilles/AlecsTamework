@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import java.util.HashMap;
 import java.util.List;
@@ -11,15 +10,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class CommandNpcPortraitAssetsTest {
     @Test
-    void sharedCaptureImagesProduceReusableClientIconsWithoutGenericLantern() {
+    void standaloneImagesProduceReusableClientIconsWithoutCaptureItems() throws Exception {
         String sheep = "Icons/ItemsGenerated/Sheep.png";
-        var config = ItemFeatureConfig.builder()
-                .spawnerIconDefault("Icons/Lantern.png")
-                .spawnerIconOverridesByRole(Map.of("Sheep", List.of(
-                        new ItemFeatureConfig.SpawnerIconOverride(Map.of("Coat", "White"), sheep))))
-                .spawnerIconOverrideGroups(List.of(new ItemFeatureConfig.SpawnerIconOverrideGroup(
-                        List.of("Sheep", "Tamed_Sheep"), List.of(), sheep)))
-                .build();
+        var config = DynamicIconTestAssets.config("""
+                {"RoleIds":["Sheep"],"IconDefault":"Icons/ItemsGenerated/Sheep.png",
+                 "IconOverrides":[{"Icon":"Icons/ItemsGenerated/Sheep.png","Attachments":{"Coat":"White"}}]}
+                """);
         List<Item> aliases = CommandNpcPortraitAssets.missingAliases(List.of(config, config), Map.of());
         assertEquals(List.of(sheep), aliases.stream().map(item -> item.toPacket().icon).toList());
         var packet = aliases.getFirst().toPacket();

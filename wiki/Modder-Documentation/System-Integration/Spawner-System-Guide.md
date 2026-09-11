@@ -46,7 +46,7 @@ operation does not play success feedback.
 
 ## Tooling support
 - [Spawner Icon Generation](/mod/alecs-tamework/spawner-icon-generation) covers the Blockbench wizard, jobs JSON renderer, Python generator, and batch manifest workflow.
-- `scripts/tools/generate_spawner_icon_overrides.py` can generate `IconOverridesByRole` and shared `IconOverrideGroups`.
+- `scripts/tools/generate_spawner_icon_overrides.py` generates shared `TwDynamicIconConfig` assets for capture items and both command panels.
 - Captured-spawner names and detail lines are written into base Hytale item display metadata.
 
 ## Reloading

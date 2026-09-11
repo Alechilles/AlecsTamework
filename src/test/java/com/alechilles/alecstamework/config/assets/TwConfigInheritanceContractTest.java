@@ -328,7 +328,7 @@ class TwConfigInheritanceContractTest {
     }
 
     @Test
-    void spawnerCaptureNestedMergeAndMapReplacementWork() throws Exception {
+    void spawnerCaptureNestedMergePreservesExplicitDistance() throws Exception {
         TwSpawnerConfig parent = new TwSpawnerConfig();
         TwSpawnerConfig child = new TwSpawnerConfig();
 
@@ -341,58 +341,13 @@ class TwConfigInheritanceContractTest {
         setField(parent, "capture", parentCapture);
         setField(child, "capture", childCapture);
 
-        Map<String, TwSpawnerConfig.SpawnerIconOverride[]> parentByRole = Map.of("Role_A", new TwSpawnerConfig.SpawnerIconOverride[0]);
-        Map<String, TwSpawnerConfig.SpawnerIconOverride[]> childByRole = Map.of("Role_B", new TwSpawnerConfig.SpawnerIconOverride[0]);
-        setField(parent, "iconOverridesByRole", parentByRole);
-        setField(child, "iconOverridesByRole", childByRole);
-
         Map<String, Set<String>> nested = new HashMap<>();
         nested.put("Capture", Set.of("MaxDistance"));
-        child.inheritMissingTopLevelFrom(parent, Set.of("Capture", "IconOverridesByRole"), nested);
+        child.inheritMissingTopLevelFrom(parent, Set.of("Capture"), nested);
 
-        Field requireOwnerField = TwSpawnerConfig.CaptureSettings.class.getDeclaredField("requireOwner");
-        requireOwnerField.setAccessible(true);
-        assertEquals(Boolean.TRUE, requireOwnerField.get(childCapture));
-        assertEquals(3.0d, getDoubleField(childCapture, "maxDistance"), 0.00001d);
-        assertSame(childByRole, getField(child, "iconOverridesByRole"));
-    }
-
-    @Test
-    void spawnerIconOverrideGroupsInheritWhenOmittedAndReplaceWhenExplicit() throws Exception {
-        TwSpawnerConfig parent = new TwSpawnerConfig();
-        TwSpawnerConfig childInherit = new TwSpawnerConfig();
-        TwSpawnerConfig childReplace = new TwSpawnerConfig();
-
-        TwSpawnerConfig.SpawnerIconOverrideGroup[] parentGroups =
-                new TwSpawnerConfig.SpawnerIconOverrideGroup[] { new TwSpawnerConfig.SpawnerIconOverrideGroup() };
-        TwSpawnerConfig.SpawnerIconOverrideGroup[] childGroups =
-                new TwSpawnerConfig.SpawnerIconOverrideGroup[] { new TwSpawnerConfig.SpawnerIconOverrideGroup() };
-        setField(parent, "iconOverrideGroups", parentGroups);
-        setField(childInherit, "iconOverrideGroups", childGroups);
-        setField(childReplace, "iconOverrideGroups", childGroups);
-
-        childInherit.inheritMissingTopLevelFrom(parent, Set.of());
-        childReplace.inheritMissingTopLevelFrom(parent, Set.of("IconOverrideGroups"));
-
-        assertSame(parentGroups, getField(childInherit, "iconOverrideGroups"));
-        assertSame(childGroups, getField(childReplace, "iconOverrideGroups"));
-    }
-
-    @Test
-    void spawnerIconOverrideGroupsMapGroupDefaultsWithoutOverrides() throws Exception {
-        TwSpawnerConfig config = new TwSpawnerConfig();
-        TwSpawnerConfig.SpawnerIconOverrideGroup group = new TwSpawnerConfig.SpawnerIconOverrideGroup();
-        setField(group, "roles", new String[] { "Cow", "Tamed_Cow" });
-        setField(group, "iconDefault", "Icons/Cow/base.png");
-        setField(config, "iconOverrideGroups", new TwSpawnerConfig.SpawnerIconOverrideGroup[] { group });
-
-        ItemFeatureConfig itemConfig = config.toItemFeatureConfig();
-
-        assertEquals(1, itemConfig.getSpawnerIconOverrideGroups().size());
-        ItemFeatureConfig.SpawnerIconOverrideGroup mapped = itemConfig.getSpawnerIconOverrideGroups().get(0);
-        assertEquals(List.of("Cow", "Tamed_Cow"), mapped.getRoles());
-        assertEquals("Icons/Cow/base.png", mapped.getIconDefault());
-        assertTrue(mapped.getOverrides().isEmpty());
+        ItemFeatureConfig resolved = child.toItemFeatureConfig();
+        assertEquals(Boolean.TRUE, resolved.getCaptureRequireOwnerOverride());
+        assertEquals(3.0d, resolved.getCaptureMaxDistance(), 0.00001d);
     }
 
     @Test
