@@ -315,9 +315,11 @@ class BondedCompanionCardPresenterTest {
                 true, null, 0L), null
         );
         UICommandBuilder commands = new UICommandBuilder();
+        UIEventBuilder events = new UIEventBuilder();
+        UUID cardUuid = UUID.randomUUID();
 
-        BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
-                "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
+        BondedCompanionCardPresenter.bind(commands, events,
+                "#Card", cardUuid, row, false, bindingConfig(), "en-US");
 
         assertCommand(commands, "#Card #BondedSpecies.Text", "Nordic Drake");
         assertCommand(commands, "#Card #BondedLevelText.Text", "Lv. 1");
@@ -328,6 +330,10 @@ class BondedCompanionCardPresenterTest {
                 "Gender belongs exclusively to the existing gender icon.");
         assertCommand(commands, "#Card #BondedTalentPointAction.Visible", "false");
         assertCommand(commands, "#Card #BondedTalentPointCount.Visible", "false");
+        assertTrue(java.util.Arrays.stream(events.getEvents()).anyMatch(event ->
+                        "#Card #BondedTalentPointButton".equals(event.selector)
+                                && event.data.contains(bindingConfig().openTalentsCommandPrefix() + cardUuid)),
+                "The initially hidden badge must open talents when a live level-up reveals it.");
         assertFalse(java.util.Arrays.stream(commands.getCommands())
                         .anyMatch(command -> "#Card #BondedLevelText.Text".equals(command.selector)
                                 && command.data.contains("<color")),

@@ -416,11 +416,10 @@ final class BondedCompanionCardPresenter {
             events.addEventBinding(CustomUIEventBindingType.Activating,
                     entrySelector + " #BondedProgressionButton",
                     EventData.of(config.eventCommandId(), commandValue), false);
-            if (progression.talentsConfigured() && progression.availablePoints() > 0) {
-                events.addEventBinding(CustomUIEventBindingType.Activating,
-                        entrySelector + " #BondedTalentPointButton",
-                        EventData.of(config.eventCommandId(), commandValue), false);
-            }
+            // Bind while hidden too: a live level-up can reveal this badge without rebuilding the card.
+            events.addEventBinding(CustomUIEventBindingType.Activating,
+                    entrySelector + " #BondedTalentPointButton",
+                    EventData.of(config.eventCommandId(), commandValue), false);
             if (xpProgressVisible(progression, attributes)) {
                 events.addEventBinding(CustomUIEventBindingType.Activating,
                         entrySelector + " #BondedXpButton",
