@@ -19,8 +19,8 @@ art graph.
 - Tamework keeps a direct `beacon-runtime` dependency because its
   conventional project is used by `CrashTelemetryService`. Patchwork carries
   the same runtime transitively for its contributed project. The release line
-  is Patchwork `1.4.1` with Beacon `2.0.1`; Gradle dependency convergence must
-  select `2.0.1` for both edges.
+  is Patchwork `1.4.1` with Beacon `2.0.2`; Gradle dependency convergence must
+  select `2.0.2` for both edges.
 - Beacon implementation classes are isolated in Tamework’s shaded namespace to
   prevent mixed class loading when other mods embed Beacon. Its process-wide
   registry keys stay unchanged so the embedded copies still coordinate.
@@ -97,7 +97,7 @@ convergence can be inspected with:
 ./gradlew dependencyInsight --dependency beacon-runtime --configuration runtimeClasspath
 ```
 
-The expected selected version is `2.0.1`, whether Beacon is reached directly
+The expected selected version is `2.0.2`, whether Beacon is reached directly
 from Tamework or transitively through Patchwork.
 
 Tamework and Patchwork expose separate telemetry consent entries. The
