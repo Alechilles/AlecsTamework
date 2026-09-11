@@ -2,8 +2,9 @@
 
 ## Unreleased development changes
 
-- Regular NPC cards reuse capture-item animal images, matching appearance variants
-  where configured and using saved appearance for unavailable companions.
+- Regular NPC cards can reuse registered item icons matching their capture image.
+  Capture-only images stay hidden because Custom UI cannot read their item metadata;
+  this prevents the portrait update from disconnecting the player.
 
 - NPC names span the companion card header, with a small increase in card height
   for comfortable spacing below the header and full names available on hover.

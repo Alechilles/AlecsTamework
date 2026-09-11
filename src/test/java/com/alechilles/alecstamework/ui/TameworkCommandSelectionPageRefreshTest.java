@@ -383,13 +383,14 @@ class TameworkCommandSelectionPageRefreshTest {
     }
 
     @Test
-    void changingAppearanceRefreshesPortraitAndMissingImageClearsIt() throws Exception {
+    void changingAppearanceUsesRegisteredIconAndClearsUnsupportedCaptureImage() throws Exception {
         Field storeField = Item.class.getDeclaredField("ASSET_STORE");
         storeField.setAccessible(true);
         Object previousStore = storeField.get(null);
         try {
             storeField.set(null, new TestItemAssetStore(new DefaultAssetMap<>(
-                    Map.of("Soil_Dirt", new Item("Soil_Dirt")))));
+                    Map.of("Sheep", portraitItem("Sheep", "Icons/ItemsGenerated/Sheep.png"),
+                            "Sheep_Shorn", portraitItem("Sheep_Shorn", "Icons/ItemsGenerated/Sheep_Shorn.png")))));
             CapturedPackets packets = new CapturedPackets();
             AtomicReference<List<LinkedNpcEntry>> entries = new AtomicReference<>(
                     List.of(ENTRY.withPortraitIcon("Icons/ItemsGenerated/Sheep.png")));
@@ -400,16 +401,24 @@ class TameworkCommandSelectionPageRefreshTest {
 
             entries.set(List.of(ENTRY.withPortraitIcon("Icons/ItemsGenerated/Sheep_Shorn.png")));
             refresh(page, false);
-            assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Portrait.Slots", "Sheep_Shorn.png");
+            assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Portrait.Slots", "Sheep_Shorn");
             assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Portrait.Visible", "true");
 
-            entries.set(List.of(ENTRY.withPortraitIcon(null)));
+            entries.set(List.of(ENTRY.withPortraitIcon("Icons/CaptureOnlyVariant.png")));
             refresh(page, false);
             assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Portrait.Visible", "false");
             assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Portrait.Slots", "[]");
         } finally {
             storeField.set(null, previousStore);
         }
+    }
+
+    private static Item portraitItem(String id, String icon) throws Exception {
+        Item item = new Item(id);
+        Field iconField = Item.class.getDeclaredField("icon");
+        iconField.setAccessible(true);
+        iconField.set(item, icon);
+        return item;
     }
 
     @Test

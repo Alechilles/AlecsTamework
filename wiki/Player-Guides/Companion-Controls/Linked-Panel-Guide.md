@@ -29,12 +29,10 @@ recall timer do not override that status.
 
 ## Animal images
 
-Regular NPC cards reuse animal images from capture-item appearance rules. Where the
-installed animal pack provides variants, the image follows the companion's saved
-coat, wool, or other configured attachments. Unavailable companions use their last
-saved appearance. These are static item images, not live model previews; missing
-variant rules can fall back to a species image. If no animal image is available,
-the space stays blank. The separate bonded-roster cards keep their existing layout.
+Regular NPC cards can reuse an existing item icon that matches their capture-image
+rules and current or saved appearance. Capture-only images that require item
+metadata are not supported by Custom UI and stay hidden. These are static images,
+not live model previews. The separate bonded-roster cards keep their existing layout.
 
 ## Live bonded progression
 
