@@ -397,12 +397,12 @@ class TameworkCommandSelectionPageRefreshTest {
                     new NavigationFixture(), legacyConfig());
             replaceField(page, "linkedNpcBaseEntriesSupplier", (Supplier<List<LinkedNpcEntry>>) entries::get);
             build(page);
-    
+
             entries.set(List.of(ENTRY.withPortraitIcon("Icons/ItemsGenerated/Sheep_Shorn.png")));
             refresh(page, false);
             assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Portrait.Slots", "Sheep_Shorn.png");
             assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Portrait.Visible", "true");
-    
+
             entries.set(List.of(ENTRY.withPortraitIcon(null)));
             refresh(page, false);
             assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Portrait.Visible", "false");
