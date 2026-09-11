@@ -68,6 +68,12 @@ matching `-Phytale_version` when testing a prerelease game build.
 - `gradle.properties` is the source of the mod and dependency versions.
 - If a packaged manifest has the wrong version, run a clean build.
 
+For local development installs, keep the manifest's normal mod version when
+dependent mods require a stable version range. Hytale excludes prerelease
+versions such as `3.4.5-formation-dev` from ranges such as `>=3.1.0 <4.0.0`.
+Put development labels in the JAR filename only, and verify the embedded
+`manifest.json` before installing.
+
 ## Verification
 
 Run the test suite before packaging:
