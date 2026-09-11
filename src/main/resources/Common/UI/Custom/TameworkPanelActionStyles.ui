@@ -70,6 +70,9 @@ $C = "Common.ui";
 @GroupRow = TextButtonStyle(Default: (Background: (Color: #202923), LabelStyle: @GroupRowLabel), Hovered: (Background: (Color: #2d3831), LabelStyle: @GroupRowLabel), Pressed: (Background: (Color: #35423a), LabelStyle: @GroupRowLabel), Sounds: $C.@ButtonSounds);
 @GroupRowSelected = TextButtonStyle(Default: (Background: (Color: #35423a), LabelStyle: (...@GroupRowLabel, TextColor: #f0eee7, RenderBold: true)), Hovered: (Background: (Color: #3e4d43), LabelStyle: @GroupRowLabel), Sounds: $C.@ButtonSounds);
 @GroupDropdown = DropdownBoxStyle(...@PanelDropdown,
+ DefaultBackground: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3),
+ HoveredBackground: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 3),
+ PressedBackground: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 3),
  HorizontalPadding: 6,
  LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, FontSize: 12, TextColor: #d6d9d0, RenderUppercase: false),
  EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, FontSize: 12, TextColor: #d6d9d0, RenderUppercase: false),

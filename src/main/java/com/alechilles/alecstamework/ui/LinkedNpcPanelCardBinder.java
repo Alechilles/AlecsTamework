@@ -504,8 +504,8 @@ final class LinkedNpcPanelCardBinder {
         commands.set(card + " #StatusDivider.Visible", true);
         commands.setObject(card + " #StatusUnloaded.Anchor",
                 fixedAnchor(compact ? 48 : 74, compact ? 568 : 432, compact ? 278 : 270, 20));
-        commands.setObject(card + " #GroupSelector.Anchor", fixedAnchor(compact ? 75 : 105, 20, 121, 20));
-        commands.setObject(card + " #GroupSelectorFrame.Anchor", fixedAnchor(compact ? 72 : 102, 0, 144, 26));
+        commands.setObject(card + " #GroupSelector.Anchor", fixedAnchor(compact ? 72 : 102, 0, 144, 26));
+        commands.setObject(card + " #GroupSelectorLabel.Anchor", fixedAnchor(compact ? 72 : 102, 26, 96, 26));
         commands.setObject(card + " #GroupSelectorMarker.Anchor", fixedAnchor(compact ? 79 : 109, 7, 12, 12));
         commands.setObject(card + " #HealthFrame.Anchor", fixedAnchor(50, 172, 234, 22));
         // Runtime string patches accept opaque hex colors; alpha syntax is parsed as a texture path.

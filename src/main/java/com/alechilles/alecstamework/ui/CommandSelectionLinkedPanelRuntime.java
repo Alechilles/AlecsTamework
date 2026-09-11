@@ -282,13 +282,16 @@ final class CommandSelectionLinkedPanelRuntime {
         boolean available = canAssignGroup(entry, presentation);
         commands.set(selector + ".Visible", available);
         commands.set(selector + "Marker.Visible", available);
-        commands.set(selector + "Frame.Visible", available);
+        commands.set(selector + "Label.Visible", available);
         if (!available) return;
         List<DropdownEntryInfo> entries = resolveGroupEntries();
-        commands.set(selector + ".Entries", entries.isEmpty()
-                ? LinkedNpcPanelGroupAssignOverlayState.fallbackEntries(page.resolveLanguage()) : entries);
-        commands.set(selector + ".Value",
-                LinkedNpcPanelGroupAssignOverlayState.normalizeDropdownValue(entry.groupId()));
+        if (entries.isEmpty()) entries = LinkedNpcPanelGroupAssignOverlayState.fallbackEntries(page.resolveLanguage());
+        String selectedGroup = LinkedNpcPanelGroupAssignOverlayState.normalizeDropdownValue(entry.groupId());
+        commands.set(selector + ".Entries", entries);
+        commands.set(selector + ".Value", selectedGroup);
+        commands.setObject(selector + "Label.Text", entries.stream()
+                .filter(option -> option.value().equals(selectedGroup))
+                .findFirst().orElse(entries.get(0)).label());
         LinkedNpcPanelGroupTabBinder.bind(commands, selector, entry);
         events.addEventBinding(CustomUIEventBindingType.ValueChanged, selector,
                 EventData.of(CommandSelectionPageEventBinder.EVENT_COMMAND_ID,
