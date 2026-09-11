@@ -2,6 +2,9 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.hypixel.hytale.assetstore.TestItemAssetStore;
+import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -381,23 +384,32 @@ class TameworkCommandSelectionPageRefreshTest {
 
     @Test
     void changingAppearanceRefreshesPortraitAndMissingImageClearsIt() throws Exception {
-        CapturedPackets packets = new CapturedPackets();
-        AtomicReference<List<LinkedNpcEntry>> entries = new AtomicReference<>(
-                List.of(ENTRY.withPortraitIcon("Icons/ItemsGenerated/Sheep.png")));
-        TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(),
-                new NavigationFixture(), legacyConfig());
-        replaceField(page, "linkedNpcBaseEntriesSupplier", (Supplier<List<LinkedNpcEntry>>) entries::get);
-        build(page);
-
-        entries.set(List.of(ENTRY.withPortraitIcon("Icons/ItemsGenerated/Sheep_Shorn.png")));
-        refresh(page, false);
-        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Portrait.Slots", "Sheep_Shorn.png");
-        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Portrait.Visible", "true");
-
-        entries.set(List.of(ENTRY.withPortraitIcon(null)));
-        refresh(page, false);
-        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Portrait.Visible", "false");
-        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Portrait.Slots", "[]");
+        Field storeField = Item.class.getDeclaredField("ASSET_STORE");
+        storeField.setAccessible(true);
+        Object previousStore = storeField.get(null);
+        try {
+            storeField.set(null, new TestItemAssetStore(new DefaultAssetMap<>(
+                    Map.of("Soil_Dirt", new Item("Soil_Dirt")))));
+            CapturedPackets packets = new CapturedPackets();
+            AtomicReference<List<LinkedNpcEntry>> entries = new AtomicReference<>(
+                    List.of(ENTRY.withPortraitIcon("Icons/ItemsGenerated/Sheep.png")));
+            TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(),
+                    new NavigationFixture(), legacyConfig());
+            replaceField(page, "linkedNpcBaseEntriesSupplier", (Supplier<List<LinkedNpcEntry>>) entries::get);
+            build(page);
+    
+            entries.set(List.of(ENTRY.withPortraitIcon("Icons/ItemsGenerated/Sheep_Shorn.png")));
+            refresh(page, false);
+            assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Portrait.Slots", "Sheep_Shorn.png");
+            assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Portrait.Visible", "true");
+    
+            entries.set(List.of(ENTRY.withPortraitIcon(null)));
+            refresh(page, false);
+            assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Portrait.Visible", "false");
+            assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Portrait.Slots", "[]");
+        } finally {
+            storeField.set(null, previousStore);
+        }
     }
 
     @Test
