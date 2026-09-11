@@ -7,7 +7,7 @@ Group #TameworkLinkedPanelRoot {
  Anchor: (Top: 0, Left: 0, Width: 928, Height: 750);
  Background: #181c1a;
 Group #Title {
-            Anchor: (Top: 6, Left: 10, Right: 10, Height: 30);
+            Anchor: (Top: 10, Left: 10, Right: 10, Height: 30);
 
 
 Group #TameworkLinkedPanelActiveHighlightControls {
