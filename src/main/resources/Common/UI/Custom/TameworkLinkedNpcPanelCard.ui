@@ -232,10 +232,10 @@ Group {
     Group #FlightModeGroundedIcon { Anchor: (Top: 0, Right: 24, Width: 24, Height: 24); Background: (TexturePath: "Tamework/LinkedPanelIcons/FlightMode_Grounded.png"); Visible: false; }
     Group #FlightModeAirborneIcon { Anchor: (Top: 0, Right: 24, Width: 24, Height: 24); Background: (TexturePath: "Tamework/LinkedPanelIcons/FlightMode_Airborne.png"); Visible: false; }
     Group #ShoulderRideIcon { Anchor: (Top: 0, Right: 52, Width: 24, Height: 24); Background: (TexturePath: "Tamework/LinkedPanelIcons/ShoulderRide.png"); Visible: false; }
-    Label #RosterState { Anchor: (Top: 98, Left: 432, Width: 284, Height: 14); Style: (FontSize: 10, TextColor: #c4cbc3, VerticalAlignment: Center); Visible: false; }
-    Label #RosterTimer { Anchor: (Top: 114, Left: 432, Width: 284, Height: 14); Style: (FontSize: 10, TextColor: #b3c9b9, VerticalAlignment: Center); Visible: false; }
-    Label #RosterCapacity { Anchor: (Top: 130, Left: 432, Width: 284, Height: 14); Style: (FontSize: 10, TextColor: #f1c77c, VerticalAlignment: Center); Visible: false; }
-    TextButton #RosterSummonButton { Anchor: (Top: 98, Left: 736, Width: 110, Height: 30); Style: $A.@PanelButton; Text: %server.tamework.ui.linkedPanel.roster.summon; Visible: false; }
-    TextButton #RosterDismissButton { Anchor: (Top: 132, Left: 736, Width: 110, Height: 30); Style: $A.@PanelButton; Text: %server.tamework.ui.linkedPanel.roster.dismiss; Visible: false; }
+    Label #RosterState { Anchor: (Top: 106, Left: 432, Width: 284, Height: 14); Style: (FontSize: 10, TextColor: #c4cbc3, VerticalAlignment: Center); Visible: false; }
+    Label #RosterTimer { Anchor: (Top: 122, Left: 432, Width: 284, Height: 14); Style: (FontSize: 10, TextColor: #b3c9b9, VerticalAlignment: Center); Visible: false; }
+    Label #RosterCapacity { Anchor: (Top: 138, Left: 432, Width: 284, Height: 14); Style: (FontSize: 10, TextColor: #f1c77c, VerticalAlignment: Center); Visible: false; }
+    TextButton #RosterSummonButton { Anchor: (Top: 106, Left: 736, Width: 110, Height: 30); Style: $A.@PanelButton; Text: %server.tamework.ui.linkedPanel.roster.summon; Visible: false; }
+    TextButton #RosterDismissButton { Anchor: (Top: 140, Left: 736, Width: 110, Height: 30); Style: $A.@PanelButton; Text: %server.tamework.ui.linkedPanel.roster.dismiss; Visible: false; }
     Group #StatusDivider { Anchor: (Top: 36, Left: 418, Bottom: 0, Width: 1); Background: #3b433e; }
 }
