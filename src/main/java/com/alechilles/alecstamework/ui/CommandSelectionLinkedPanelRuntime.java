@@ -143,7 +143,7 @@ final class CommandSelectionLinkedPanelRuntime {
         LinkedNpcPanelRefreshValues values = page.refreshTransaction.stagedValues();
         String language = page.resolveLanguage();
         bindGroupShortcuts(commands, events, values, false);
-        values.set(commands, "#TameworkCommandMenuTitle.Text",
+        if (!page.config.usesBondedCompanionRoster()) values.set(commands, "#TameworkCommandMenuTitle.Text",
                 LinkedNpcPanelPresentationSupport.title(page.panelModeValueSupplier,
                         page.linkedNpcEntries, language));
         values.set(commands, "#TameworkLinkedPanelGroupSelectorDropdown.Entries",
@@ -168,7 +168,7 @@ final class CommandSelectionLinkedPanelRuntime {
         values.set(commands, "#TameworkLinkedPanelRadiusValue.Text",
                 LinkedNpcPanelPresentationSupport.radius(
                         page.panelRadiusLabelSupplier, language));
-        values.set(commands, "#TameworkLinkedPanelSortDropdown.Entries",
+        if (!page.config.usesBondedCompanionRoster()) values.set(commands, "#TameworkLinkedPanelSortDropdown.Entries",
                 CommandSelectionPanelOptions.resolveSortDropdownEntries(language));
         values.set(commands, "#TameworkLinkedPanelSortDropdown.Value",
                 LinkedNpcPanelPresentationSupport.sort(page.panelSortValueSupplier));
@@ -177,7 +177,7 @@ final class CommandSelectionLinkedPanelRuntime {
         values.set(commands, "#TameworkLinkedPanelFilterDropdown.Value",
                 LinkedNpcPanelPresentationSupport.filterMode(
                         page.panelFilterModeValueSupplier));
-        values.set(commands, "#TameworkLinkedPanelInlineFilterTextControls.Visible",
+        if (!page.config.usesBondedCompanionRoster()) values.set(commands, "#TameworkLinkedPanelInlineFilterTextControls.Visible",
                 LinkedNpcPanelPresentationSupport.showFilter(
                         page.panelFilterModeValueSupplier));
         if (!page.isFilterEditPending()) {
@@ -202,6 +202,7 @@ final class CommandSelectionLinkedPanelRuntime {
                         page.cardRenderState.presentation(id), presentation,
                         progressionEligible)));
         renderCards(commands, events, hasEntries, features, language);
+        BondedCompanionPanelChrome.bindToolbar(commands, events, page, values);
         if (commands.getCommands().length == 0 && events.getEvents().length == 0) {
             return LinkedNpcPanelRefreshOutcome.evaluated(
                     progressionEligible, shortestCountdown());
@@ -369,8 +370,8 @@ final class CommandSelectionLinkedPanelRuntime {
         page.baseLinkedNpcEntries = LinkedNpcEntrySnapshotMapper.build(entries,
                 LocalizedText.resolve(page.resolveLanguage(),
                         "tamework.ui.linkedPanel.subtitle.defaultNpcName"));
-        applyLocalFilter();
         page.featureController.refresh();
+        applyLocalFilter();
         if (page.pendingUnlinkNpcUuid != null
                 && resolveEntry(page.pendingUnlinkNpcUuid) == null) {
             page.pendingUnlinkNpcUuid = null;
@@ -384,5 +385,9 @@ final class CommandSelectionLinkedPanelRuntime {
                         page.panelFilterModeValueSupplier),
                 LinkedNpcPanelPresentationSupport.input(
                         page.panelFilterInputValueSupplier));
+        if (page.config.usesBondedCompanionRoster()) {
+            page.linkedNpcEntries = BondedCompanionPanelChrome.filter(page.linkedNpcEntries,
+                    page.featureController.presentations(), page.rosterStateFilter);
+        }
     }
 }

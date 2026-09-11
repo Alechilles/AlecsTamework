@@ -87,6 +87,7 @@ public final class TameworkCommandSelectionPage
     LinkedNpcEntry[] linkedNpcEntries;
     final LinkedNpcPanelCardRenderState cardRenderState;
     final LinkedNpcPanelRefreshTransaction refreshTransaction = new LinkedNpcPanelRefreshTransaction();
+    String rosterStateFilter = "All";
     UUID pendingUnlinkNpcUuid;
     final LinkedNpcPanelPendingRemovals pendingRemovals = new LinkedNpcPanelPendingRemovals();
     private String selectedCommandId;
@@ -390,6 +391,16 @@ public final class TameworkCommandSelectionPage
     public void build(@Nonnull Ref<EntityStore> ref, @Nonnull UICommandBuilder commandBuilder,
                       @Nonnull UIEventBuilder eventBuilder, @Nonnull Store<EntityStore> store) {
         try {
+            if (rosterEventBoundary.bondedRoster()) {
+                String sort = LinkedNpcPanelPresentationSupport.sort(panelSortValueSupplier);
+                if (!List.of("Default", "Name", "Species").contains(sort) && panelSetSortCallback != null) {
+                    panelSetSortCallback.accept("Default");
+                }
+                String filter = LinkedNpcPanelPresentationSupport.filterMode(panelFilterModeValueSupplier);
+                if (!List.of("None", "Name").contains(filter) && panelSetFilterModeCallback != null) {
+                    panelSetFilterModeCallback.accept("Name");
+                }
+            }
             refreshLinkedNpcEntries();
             commandBuilder.append(UI_PATH);
             var plugin = com.alechilles.alecstamework.Tamework.getInstance();
@@ -436,6 +447,7 @@ public final class TameworkCommandSelectionPage
             CommandSelectionPageEventBinder.bindPanelControls(
                     eventBuilder, featureController
             );
+            BondedCompanionPanelChrome.bindToolbar(commandBuilder, eventBuilder, this, null);
             CommandSelectionPageEventBinder.bindClose(eventBuilder);
             CommandSelectionPageEventBinder.bindHotswapControls(eventBuilder);
             seedRefreshValues();
@@ -578,6 +590,17 @@ public final class TameworkCommandSelectionPage
             }
             return;
         }
+        if (rosterEventBoundary.bondedRoster()
+                && commandId.startsWith(BondedCompanionPanelChrome.FILTER_COMMAND_PREFIX)) {
+            String selected = commandId.substring(BondedCompanionPanelChrome.FILTER_COMMAND_PREFIX.length());
+            if (BondedCompanionPanelChrome.FILTERS.contains(selected)) {
+                rosterStateFilter = selected;
+                pendingUnlinkNpcUuid = null;
+                refreshLinkedNpcEntries();
+                sendCardRefreshUpdate();
+            }
+            return;
+        }
         if (rosterEventBoundary.blocks(data, commandId)) {
             return;
         }
@@ -677,6 +700,10 @@ public final class TameworkCommandSelectionPage
             return;
         }
         if (data.panelFilterTextInput != null) {
+            if (rosterEventBoundary.bondedRoster() && panelSetFilterModeCallback != null
+                    && !"Name".equals(LinkedNpcPanelPresentationSupport.filterMode(panelFilterModeValueSupplier))) {
+                panelSetFilterModeCallback.accept("Name");
+            }
             pendingFilterTextInput = data.panelFilterTextInput;
             scheduleDebouncedFilterTextApply();
             return;

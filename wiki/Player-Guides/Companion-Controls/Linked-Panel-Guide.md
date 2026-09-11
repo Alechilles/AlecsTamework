@@ -33,7 +33,22 @@ Regular NPC cards reuse capture-image rules for current or saved appearance.
 Tamework registers hidden display-item aliases for these existing images so the
 panel can show them without captured-item metadata or duplicate textures.
 These are static images, not live model previews; available variants depend on
-the animal pack. The separate bonded-roster cards keep their existing layout.
+the animal pack. Bonded-roster cards use the same capture-image rules for their
+saved appearance.
+
+## Bonded roster layout
+
+Bonded rosters have one toolbar with **All**, **Active**, **Stored**, and **Dead**
+tabs, name search, and default/name/species sorting. The left column contains
+command assignments. Active-capacity information comes from the roster policy;
+when several capacity groups apply, hover over the capacity label for details.
+
+Each card keeps the companion's name across the header, with its portrait,
+health, traits, level, and talent controls below. These temporary summons do not
+show happiness, hunger, or thirst meters. Stored health is muted, and dead
+companions retain an empty health bar. The right side shows summon state and the
+available **Summon**, **Dismiss**, or **Revive** action. Finite summon sessions
+show their remaining time; cooldowns and revival requirements still apply.
 
 ## Live bonded progression
 

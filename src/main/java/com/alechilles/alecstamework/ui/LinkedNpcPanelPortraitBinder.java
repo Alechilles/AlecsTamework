@@ -13,14 +13,18 @@ final class LinkedNpcPanelPortraitBinder {
     }
 
     static void bind(UICommandBuilder commands, String card, LinkedNpcEntry entry) {
-        ItemGridSlot slot = portraitSlot(entry.portraitIcon());
-        commands.set(card + " #Portrait.Visible", slot != null);
-        commands.set(card + " #Portrait.Slots", slot == null ? List.<ItemGridSlot>of() : List.of(slot));
+        bindIcon(commands, card + " #Portrait", entry.portraitIcon());
+    }
+
+    static void bindIcon(UICommandBuilder commands, String selector, @Nullable String icon) {
+        ItemGridSlot slot = portraitSlot(icon);
+        commands.set(selector + ".Visible", slot != null);
+        commands.set(selector + ".Slots", slot == null ? List.<ItemGridSlot>of() : List.of(slot));
     }
 
     @Nullable
-    private static ItemGridSlot portraitSlot(String icon) {
-        if (icon.isBlank()) {
+    private static ItemGridSlot portraitSlot(@Nullable String icon) {
+        if (icon == null || icon.isBlank()) {
             return null;
         }
         // Custom UI cannot deserialize CapturedEntity metadata. Only reference an existing

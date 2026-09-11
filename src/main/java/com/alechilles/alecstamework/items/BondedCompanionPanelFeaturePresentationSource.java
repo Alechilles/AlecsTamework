@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.*;
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.ui.BondedCompanionPanelPresentation;
 import com.alechilles.alecstamework.ui.BondedCompanionStatusPresentation;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
@@ -107,8 +108,15 @@ final class BondedCompanionPanelFeaturePresentationSource {
                 attributes.put(key, value);
             }
         });
+        Tamework plugin = Tamework.getInstance();
+        String portrait = CommandNpcPortraitResolver.resolve(
+                plugin == null ? null : plugin.getItemFeatureRegistry(),
+                profile.roleId(), portraitAttachments(source.get("attachments")));
+        if (portrait != null) attributes.put("portraitIcon", portrait);
         if (profile.activeLease() != null
                 && profile.activeLease().expiresAtMs() != 0L) {
+            attributes.put("sessionDurationMs", Long.toString(remaining(
+                    profile.activeLease().expiresAtMs(), profile.activeLease().startedAtMs())));
             attributes.put("sessionRemainingMs", Long.toString(remaining(
                     profile.activeLease().expiresAtMs(), nowMs)));
         }
@@ -147,6 +155,24 @@ final class BondedCompanionPanelFeaturePresentationSource {
                 new BondedCompanionStatusPresentation(
                         profile.state(), action, enabled, block, null,
                         cooldown), quote);
+    }
+
+    // Saved presentation stores attachment identifiers as Java's map text, not JSON.
+    static Map<String, String> portraitAttachments(@Nullable String value) {
+        if (value == null || value.isBlank()) return Map.of();
+        String content = value.trim();
+        if (content.startsWith("{") && content.endsWith("}")) {
+            content = content.substring(1, content.length() - 1);
+        }
+        Map<String, String> result = new LinkedHashMap<>();
+        for (String pair : content.split(",")) {
+            int separator = pair.indexOf('=');
+            if (separator <= 0) continue;
+            String key = pair.substring(0, separator).trim();
+            String selected = pair.substring(separator + 1).trim();
+            if (!selected.isEmpty()) result.put(key, selected);
+        }
+        return Map.copyOf(result);
     }
 
     private QuoteResolution quote(

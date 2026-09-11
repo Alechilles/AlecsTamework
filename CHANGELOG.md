@@ -2,6 +2,11 @@
 
 ## Unreleased development changes
 
+- Rebuilt bonded roster cards around portraits, full-width names, health and
+  progression, with clear summon, dismiss, revival, and session status. Roster
+  companions omit care meters and use one toolbar for state tabs, sorting,
+  name search, and active-capacity information.
+
 - Regular NPC cards reuse capture images through hidden display-item aliases,
   including configured appearance variants, without copying textures into the UI
   atlas or sending unsupported captured-item metadata.

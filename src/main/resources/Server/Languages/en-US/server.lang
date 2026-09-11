@@ -933,3 +933,14 @@ tamework.ui.talents.saved.changed = The companion changed or the talent could no
 tamework.ui.linkedPanel.sort.happiness=Happiness
 tamework.ui.linkedPanel.sort.hunger=Hunger
 tamework.ui.linkedPanel.sort.thirst=Thirst
+
+# Bonded companion roster toolbar
+tamework.ui.roster.title=Companion Roster - {0} Companions
+tamework.ui.roster.filter.all=All
+tamework.ui.roster.filter.active=Active
+tamework.ui.roster.filter.stored=Stored
+tamework.ui.roster.filter.dead=Dead
+tamework.ui.roster.search=Search companions...
+tamework.ui.roster.capacity=Active capacity
+tamework.ui.roster.activeCapacity=Active {0} / {1}
+tamework.ui.roster.emptyFilter=No companions match these filters.

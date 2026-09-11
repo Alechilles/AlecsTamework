@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 /** Verifies panel actions preserve precise policy failures for tooltip feedback. */
 class BondedCompanionPanelFeaturePresentationSourceTest {
     @Test
-    void activeCompanionCarriesItsLeasedNpcIdentityForTalentNavigation() {
+    void activeCompanionCarriesItsLeasedNpcIdentityAndSessionTiming() {
         UUID liveNpcUuid = UUID.fromString(
                 "74000000-0000-0000-0000-000000000003");
         BondedCompanionProfileView profile = new BondedCompanionProfileView(
@@ -24,17 +24,19 @@ class BondedCompanionPanelFeaturePresentationSourceTest {
                 "hydragon:full_dragons", "Tamed_NordicDrake", "Naomi",
                 "Nordic Drake", "Female", 1L, BondedCompanionStateView.ACTIVE,
                 false, true, false, Map.of(), new BondedCompanionLeaseView(
-                "lease-8", liveNpcUuid, "world", 0L, 0L), 0L, null);
+                "lease-8", liveNpcUuid, "world", 1_000L, 21_000L), 0L, null);
         BondedCompanionActionContext context = new BondedCompanionActionContext(
                 new BondedCompanionPlacement("world", 0D, 0D, 0D,
                         0F, 0F, 0F), null);
 
         var row = BondedCompanionPanelFeaturePresentationSource.presentation(
-                profile, 0L, null, context, "world");
+                profile, 6_000L, null, context, "world");
 
         assertEquals(liveNpcUuid.toString(),
                 row.attributes().get(
                         BondedCompanionPresentationAttributes.LIVE_NPC_UUID));
+        assertEquals("15000", row.attributes().get("sessionRemainingMs"));
+        assertEquals("20000", row.attributes().get("sessionDurationMs"));
     }
 
     @Test
