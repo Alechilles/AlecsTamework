@@ -9,10 +9,10 @@ $C = "Common.ui";
 @BondedCardTextTooltipStyle = $C.@DefaultTextTooltipStyle;
 @BondedTransparentButtonLabel = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
 @BondedTransparentButton = TextButtonStyle(Default: (Background: (Color: #000000(0.0)), LabelStyle: @BondedTransparentButtonLabel), Hovered: (Background: (Color: #ffffff(0.06)), LabelStyle: @BondedTransparentButtonLabel), Pressed: (Background: (Color: #ffffff(0.12)), LabelStyle: @BondedTransparentButtonLabel), Disabled: (Background: (Color: #000000(0.0)), LabelStyle: @BondedTransparentButtonLabel), Sounds: $C.@ButtonSounds);
-@BondedPortraitStyle = ItemGridStyle(SlotSize: 76, SlotSpacing: 0, SlotIconSize: 76);
+@BondedPortraitStyle = ItemGridStyle(SlotSize: 128, SlotSpacing: 0, SlotIconSize: 128);
 
 Group {
-    Anchor: (Top: 3, Left: 0, Right: 0, Height: 160);
+    Anchor: (Top: 3, Left: 0, Right: 0, Height: 200);
     Background: #202423;
     OutlineColor: #414845;
     OutlineSize: 1;
@@ -38,7 +38,7 @@ Group {
     Group #BondedGenderFemaleIcon { Anchor: (Top: 7, Left: 16, Width: 20, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Female.png"); Visible: false; }
     Label #BondedName { Anchor: (Top: 3, Left: 42, Right: 42, Height: 28); Text: %server.tamework.ui.linkedPanel.subtitle.defaultNpcName; Style: (FontSize: 17, RenderBold: true, TextColor: #f0eee7, HorizontalAlignment: Start, VerticalAlignment: Center); }
     Label #BondedSpecies { Anchor: (Top: 37, Left: 16, Width: 120, Height: 17); Text: ""; Style: (FontSize: 10, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Center); }
-    ItemGrid #BondedPortrait { Anchor: (Top: 58, Left: 34, Width: 76, Height: 76); SlotsPerRow: 1; RenderItemQualityBackground: false; DisplayItemQuantity: false; InfoDisplay: None; Style: @BondedPortraitStyle; HitTestVisible: false; Visible: false; }
+    ItemGrid #BondedPortrait { Anchor: (Top: 56, Left: 8, Width: 128, Height: 128); SlotsPerRow: 1; RenderItemQualityBackground: false; DisplayItemQuantity: false; InfoDisplay: None; Style: @BondedPortraitStyle; HitTestVisible: false; Visible: false; }
 
     Group #BondedTraitStrip {
         Anchor: (Top: 51, Left: 168, Width: 128, Height: 30);

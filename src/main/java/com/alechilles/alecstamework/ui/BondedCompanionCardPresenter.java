@@ -951,7 +951,7 @@ final class BondedCompanionCardPresenter {
     /** Stable compact allocation for the bonded roster card. */
     private record CardLayout(int actionTop) {
         private int baseHeight() {
-            return 160;
+            return 200;
         }
 
         private Anchor cardAnchor() {

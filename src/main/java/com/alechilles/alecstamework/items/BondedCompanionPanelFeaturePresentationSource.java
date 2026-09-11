@@ -108,8 +108,11 @@ final class BondedCompanionPanelFeaturePresentationSource {
                 attributes.put(key, value);
             }
         });
+        // Morphs change the presentation role; the profile role remains the policy identity.
+        String portraitRole = source.get("roleId");
         String portrait = TwDynamicIconConfig.resolveIcon(
-                profile.roleId(), portraitAttachments(source.get("attachments")));
+                portraitRole == null || portraitRole.isBlank() ? profile.roleId() : portraitRole,
+                portraitAttachments(source.get("attachments")));
         if (portrait != null) attributes.put("portraitIcon", portrait);
         if (profile.activeLease() != null
                 && profile.activeLease().expiresAtMs() != 0L) {

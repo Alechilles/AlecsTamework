@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Enlarged bonded roster portraits and made them follow role morphs, including
+  elemental variants, for active and stored companions.
+
 - Updated embedded Beacon to 2.0.2, reducing its consent and report header
   texture footprint to save UI atlas space.
 

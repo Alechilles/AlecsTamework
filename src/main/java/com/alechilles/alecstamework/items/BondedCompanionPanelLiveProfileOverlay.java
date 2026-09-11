@@ -15,6 +15,21 @@ final class BondedCompanionPanelLiveProfileOverlay {
     private BondedCompanionPanelLiveProfileOverlay() {
     }
 
+    /** Uses a morphed role for presentation without changing the profile's policy identity. */
+    @Nonnull
+    static BondedCompanionProfileView withRoleId(
+            @Nonnull BondedCompanionProfileView profile,
+            @Nullable String roleId
+    ) {
+        if (roleId == null || roleId.isBlank()
+                || roleId.equals(profile.snapshotPresentationData().get("roleId"))) {
+            return profile;
+        }
+        Map<String, String> updated = new LinkedHashMap<>(profile.snapshotPresentationData());
+        updated.put("roleId", roleId);
+        return copy(profile, profile.displayName(), updated);
+    }
+
     /** Returns the original view unless an active projection supplies a name. */
     @Nonnull
     static BondedCompanionProfileView withDisplayName(

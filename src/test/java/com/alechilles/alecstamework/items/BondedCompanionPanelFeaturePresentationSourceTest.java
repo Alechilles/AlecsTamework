@@ -16,6 +16,39 @@ import org.junit.jupiter.api.Test;
 /** Verifies panel actions preserve precise policy failures for tooltip feedback. */
 class BondedCompanionPanelFeaturePresentationSourceTest {
     @Test
+    void liveMorphSupersedesTheStoredPortraitWithoutChangingThePolicyRole() throws Exception {
+        try (var assets = new DynamicIconTestAssets("""
+                {"RoleIds":["Tamed_Wyvern_Mini_Fire"],"IconDefault":"fire.png"}
+                """)) {
+            var profile = BondedPanelTestFixtures.profile(
+                    "morphed", 1L, BondedCompanionStateView.ACTIVE, UUID.randomUUID(),
+                    Map.of("roleId", "Tamed_Wyvern_Mini_Wild"));
+            var live = BondedCompanionPanelLiveProfileOverlay.withRoleId(
+                    profile, "Tamed_Wyvern_Mini_Fire");
+
+            var row = BondedCompanionPanelFeaturePresentationSource.presentation(live, 0L, null);
+
+            assertEquals("fire.png", row.attributes().get("portraitIcon"));
+            assertEquals(profile.roleId(), live.roleId());
+        }
+    }
+
+    @Test
+    void storedMorphedCompanionUsesItsSnapshotRoleForThePortrait() throws Exception {
+        try (var assets = new DynamicIconTestAssets("""
+                {"RoleIds":["Tamed_Wyvern_Mini_Fire"],"IconDefault":"fire.png"}
+                """)) {
+            var profile = BondedPanelTestFixtures.profile(
+                    "morphed", 1L, BondedCompanionStateView.STORED, null,
+                    Map.of("roleId", "Tamed_Wyvern_Mini_Fire"));
+
+            var row = BondedCompanionPanelFeaturePresentationSource.presentation(profile, 0L, null);
+
+            assertEquals("fire.png", row.attributes().get("portraitIcon"));
+        }
+    }
+
+    @Test
     void storedRosterPortraitUsesSavedAttachmentsWithoutAnySpawner() throws Exception {
         try (var assets = new DynamicIconTestAssets("""
                 {"RoleIds":["Tamed_NordicDrake"],"IconDefault":"drake.png",

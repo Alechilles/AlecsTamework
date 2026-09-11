@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
+import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.hypixel.hytale.component.ComponentType;
@@ -142,6 +143,9 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
             BondedCompanionProfileView overlay =
                     BondedCompanionPanelLiveProfileOverlay.withDisplayName(
                             profile, liveDisplayName(player, store, profile));
+            overlay = BondedCompanionPanelLiveProfileOverlay.withRoleId(
+                    overlay, CompanionRoleIdResolver.resolveRoleId(
+                            exactActiveReference(player, store, profile), store));
             overlay = BondedCompanionPanelLiveProfileOverlay.withHealth(
                     overlay, liveHealth(player, store, profile));
             overlay = BondedCompanionPanelLiveProfileOverlay.withProgression(
