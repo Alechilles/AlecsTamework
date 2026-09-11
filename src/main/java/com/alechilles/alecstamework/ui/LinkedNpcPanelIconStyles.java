@@ -39,13 +39,13 @@ final class LinkedNpcPanelIconStyles {
 
     static void placeAction(UICommandBuilder commands, String selector, int left) {
         Anchor position = new Anchor();
-        position.setTop(Value.of(30));
+        position.setTop(Value.of(38));
         position.setLeft(Value.of(left));
         position.setWidth(Value.of(48));
         position.setHeight(Value.of(48));
         anchor(commands, selector, position);
         Anchor caption = new Anchor();
-        caption.setTop(Value.of(80));
+        caption.setTop(Value.of(88));
         caption.setLeft(Value.of(left - 6));
         caption.setWidth(Value.of(60));
         caption.setHeight(Value.of(16));

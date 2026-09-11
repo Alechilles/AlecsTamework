@@ -12,8 +12,8 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
  * Binds one linked-panel NPC card including visual state and per-row interaction handlers.
  */
 final class LinkedNpcPanelCardBinder {
-    private static final int NORMAL_CARD_HEIGHT = 158;
-    private static final int ROSTER_CARD_HEIGHT = 194;
+    private static final int NORMAL_CARD_HEIGHT = 176;
+    private static final int ROSTER_CARD_HEIGHT = 212;
 
     static void bindBreedingTooltips(UICommandBuilder commands, String selector,
                                      LinkedNpcEntry entry, String language) {
@@ -318,11 +318,11 @@ final class LinkedNpcPanelCardBinder {
             int emblemSize = compact ? 36 : 44;
             commandBuilder.set(entrySelector + " #StatusEmblem.Background", emblem);
             commandBuilder.setObject(entrySelector + " #StatusEmblem.Anchor",
-                    fixedAnchor(28, statusLeft + (statusWidth - emblemSize) / 2, emblemSize, emblemSize));
+                    fixedAnchor(36, statusLeft + (statusWidth - emblemSize) / 2, emblemSize, emblemSize));
             commandBuilder.setObject(statusUnloadedSelector + ".Anchor",
-                    fixedAnchor(compact ? 66 : 74, statusLeft, statusWidth, 16));
+                    fixedAnchor(compact ? 74 : 82, statusLeft, statusWidth, 16));
             commandBuilder.setObject(recallCountdownSelector + ".Anchor",
-                    fixedAnchor(compact ? 82 : 90, statusLeft, statusWidth, 12));
+                    fixedAnchor(compact ? 90 : 98, statusLeft, statusWidth, 12));
         }
         commandBuilder.set(flightToggleSelector + "Caption.Text", LocalizedText.resolve(language,
                 "tamework.ui.linkedPanel.action." + (entry.flightToggleAirborne() ? "flightAirborne" : "flightGrounded")));
@@ -505,10 +505,10 @@ final class LinkedNpcPanelCardBinder {
         commands.set(card + " #StatusDivider.Visible", true);
         commands.setObject(card + " #StatusUnloaded.Anchor",
                 fixedAnchor(compact ? 48 : 74, compact ? 568 : 432, compact ? 278 : 270, 20));
-        commands.setObject(card + " #GroupSelector.Anchor", fixedAnchor(compact ? 72 : 102, 0, 144, 26));
-        commands.setObject(card + " #GroupSelectorLabel.Anchor", fixedAnchor(compact ? 72 : 102, 26, 96, 26));
-        commands.setObject(card + " #GroupSelectorMarker.Anchor", fixedAnchor(compact ? 79 : 109, 7, 12, 12));
-        commands.setObject(card + " #HealthFrame.Anchor", fixedAnchor(60, 172, 234, 22));
+        commands.setObject(card + " #GroupSelector.Anchor", fixedAnchor(compact ? 80 : 120, 0, 144, 26));
+        commands.setObject(card + " #GroupSelectorLabel.Anchor", fixedAnchor(compact ? 80 : 120, 26, 96, 26));
+        commands.setObject(card + " #GroupSelectorMarker.Anchor", fixedAnchor(compact ? 87 : 127, 7, 12, 12));
+        commands.setObject(card + " #HealthFrame.Anchor", fixedAnchor(68, 172, 234, 22));
         // Runtime string patches accept opaque hex colors; alpha syntax is parsed as a texture path.
         commands.set(card + " #HealthFrame.Background",
                 entry.dead() ? "#151916"
@@ -519,9 +519,9 @@ final class LinkedNpcPanelCardBinder {
         commands.setObject(card + " #HealthTooltip.Anchor", fixedAnchor(0, 0, 234, 22));
         // Keep the talent-point control first, then right-align the level control
         // so its width can shrink and grow with the displayed level digits.
-        commands.setObject(card + " #XpProgressRing.Anchor", fixedAnchor(30, 358, 48, 24));
-        commands.setObject(card + " #TalentPointAction.Anchor", fixedAnchor(30, 304, 34, 24));
-        int activeTop = compact ? 48 : 78;
+        commands.setObject(card + " #XpProgressRing.Anchor", fixedAnchor(38, 358, 48, 24));
+        commands.setObject(card + " #TalentPointAction.Anchor", fixedAnchor(38, 304, 34, 24));
+        int activeTop = compact ? 56 : 96;
         commands.setObject(card + " #ActiveToggleActiveButton.Anchor", fixedAnchor(activeTop, 0, 40, 20));
         commands.setObject(card + " #ActiveToggleInactiveButton.Anchor", fixedAnchor(activeTop, 0, 40, 20));
         commands.setObject(card + " #StatusInactive.Anchor", fixedAnchor(activeTop, 48, 96, 20));
@@ -549,7 +549,7 @@ final class LinkedNpcPanelCardBinder {
         anchor.setLeft(Value.of(0));
         anchor.setRight(Value.of(0));
         anchor.setHeight(Value.of(managedRoster
-                ? ROSTER_CARD_HEIGHT : compact ? 112 : NORMAL_CARD_HEIGHT));
+                ? ROSTER_CARD_HEIGHT : compact ? 124 : NORMAL_CARD_HEIGHT));
         return anchor;
     }
 

@@ -2,8 +2,8 @@
 
 ## Unreleased development changes
 
-- NPC names span the companion card header without increasing card height, with
-  tighter care-meter spacing and full names available on hover.
+- NPC names span the companion card header, with a small increase in card height
+  for comfortable spacing below the header and full names available on hover.
 
 - Refined group shortcuts and NPC group selectors with shared color diamonds,
   neutral borders, wider shortcut rows, and a compact group-edit button.
