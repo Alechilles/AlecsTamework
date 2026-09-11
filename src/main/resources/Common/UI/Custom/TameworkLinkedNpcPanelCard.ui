@@ -38,8 +38,8 @@ Group {
     TextButton #RemoveButton { Anchor: (Top: 0, Right: 0, Width: 28, Height: 28); Style: $A.@Remove; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.removalMenu; TextTooltipStyle: @LinkedActionTooltipStyle; }
     Group #RemoveButtonGlyph { Anchor: (Top: 0, Right: 0, Width: 28, Height: 28); Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png"); Visible: true; HitTestVisible: false; }
 
-    Group #GroupSelectorFrame { Anchor: (Top: 102, Left: 0, Width: 144, Height: 26); Background: #252c27; OutlineColor: #414845; OutlineSize: 1; HitTestVisible: false; Visible: false; }
-    DropdownBox #GroupSelector { Anchor: (Top: 102, Left: 20, Width: 124, Height: 26); Style: $A.@GroupDropdown; MaxSelection: 1; NoItemsText: %server.tamework.ui.linkedPanel.groupAssign.none; Visible: false; }
+    Group #GroupSelectorFrame { Anchor: (Top: 102, Left: 0, Width: 144, Height: 26); Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3); HitTestVisible: false; Visible: false; }
+    DropdownBox #GroupSelector { Anchor: (Top: 105, Left: 20, Width: 121, Height: 20); Style: $A.@GroupDropdown; MaxSelection: 1; NoItemsText: %server.tamework.ui.linkedPanel.groupAssign.none; Visible: false; }
     Group #GroupSelectorMarker { Anchor: (Top: 109, Left: 7, Width: 12, Height: 12); Background: "Tamework/PanelControls/GroupDiamondOutline.png"; HitTestVisible: false; Visible: false; }
     Group #TraitStrip {
         // Traits share the progression row immediately above the health bar.
