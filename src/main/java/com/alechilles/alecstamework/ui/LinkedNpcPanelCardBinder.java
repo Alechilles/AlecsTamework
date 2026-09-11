@@ -126,6 +126,7 @@ final class LinkedNpcPanelCardBinder {
             commandBuilder.append("#TameworkLinkedPanelList", config.linkedPanelCardUiPath());
         }
         commandBuilder.set(nameSelector + ".Text", entry.displayName());
+        commandBuilder.set(nameSelector + ".TooltipText", entry.displayName());
         commandBuilder.set(entrySelector + " #RoleSubtitle.Text", entry.roleSubtitle());
         commandBuilder.set(entrySelector + " #RoleSubtitle.Visible", !entry.roleSubtitle().isBlank());
         commandBuilder.set(maleIconSelector + ".Visible", entry.isMale());
@@ -314,14 +315,14 @@ final class LinkedNpcPanelCardBinder {
             // Center in the entire action section, independently of visible actions.
             int statusLeft = 432;
             int statusWidth = 414;
-            int emblemSize = compact ? 48 : 56;
+            int emblemSize = compact ? 36 : 44;
             commandBuilder.set(entrySelector + " #StatusEmblem.Background", emblem);
             commandBuilder.setObject(entrySelector + " #StatusEmblem.Anchor",
-                    fixedAnchor(compact ? 6 : 10, statusLeft + (statusWidth - emblemSize) / 2, emblemSize, emblemSize));
+                    fixedAnchor(28, statusLeft + (statusWidth - emblemSize) / 2, emblemSize, emblemSize));
             commandBuilder.setObject(statusUnloadedSelector + ".Anchor",
-                    fixedAnchor(compact ? 56 : 68, statusLeft, statusWidth, 18));
+                    fixedAnchor(compact ? 66 : 74, statusLeft, statusWidth, 16));
             commandBuilder.setObject(recallCountdownSelector + ".Anchor",
-                    fixedAnchor(compact ? 75 : 87, statusLeft, statusWidth, 14));
+                    fixedAnchor(compact ? 82 : 90, statusLeft, statusWidth, 12));
         }
         commandBuilder.set(flightToggleSelector + "Caption.Text", LocalizedText.resolve(language,
                 "tamework.ui.linkedPanel.action." + (entry.flightToggleAirborne() ? "flightAirborne" : "flightGrounded")));
@@ -507,7 +508,7 @@ final class LinkedNpcPanelCardBinder {
         commands.setObject(card + " #GroupSelector.Anchor", fixedAnchor(compact ? 72 : 102, 0, 144, 26));
         commands.setObject(card + " #GroupSelectorLabel.Anchor", fixedAnchor(compact ? 72 : 102, 26, 96, 26));
         commands.setObject(card + " #GroupSelectorMarker.Anchor", fixedAnchor(compact ? 79 : 109, 7, 12, 12));
-        commands.setObject(card + " #HealthFrame.Anchor", fixedAnchor(50, 172, 234, 22));
+        commands.setObject(card + " #HealthFrame.Anchor", fixedAnchor(60, 172, 234, 22));
         // Runtime string patches accept opaque hex colors; alpha syntax is parsed as a texture path.
         commands.set(card + " #HealthFrame.Background",
                 entry.dead() ? "#151916"
@@ -518,8 +519,8 @@ final class LinkedNpcPanelCardBinder {
         commands.setObject(card + " #HealthTooltip.Anchor", fixedAnchor(0, 0, 234, 22));
         // Keep the talent-point control first, then right-align the level control
         // so its width can shrink and grow with the displayed level digits.
-        commands.setObject(card + " #XpProgressRing.Anchor", fixedAnchor(18, 358, 48, 24));
-        commands.setObject(card + " #TalentPointAction.Anchor", fixedAnchor(18, 304, 34, 24));
+        commands.setObject(card + " #XpProgressRing.Anchor", fixedAnchor(30, 358, 48, 24));
+        commands.setObject(card + " #TalentPointAction.Anchor", fixedAnchor(30, 304, 34, 24));
         int activeTop = compact ? 48 : 78;
         commands.setObject(card + " #ActiveToggleActiveButton.Anchor", fixedAnchor(activeTop, 0, 40, 20));
         commands.setObject(card + " #ActiveToggleInactiveButton.Anchor", fixedAnchor(activeTop, 0, 40, 20));
@@ -527,7 +528,10 @@ final class LinkedNpcPanelCardBinder {
         int nameLeft = entry.isMale() || entry.isFemale() ? 28 : 0;
         commands.setObject(card + " #GenderMaleIcon.Anchor", fixedAnchor(1, 0, 22, 22));
         commands.setObject(card + " #GenderFemaleIcon.Anchor", fixedAnchor(1, 0, 22, 22));
-        commands.setObject(card + " #Name.Anchor", fixedAnchor(0, nameLeft, 150 - nameLeft, 24));
+        Anchor nameAnchor = fixedAnchor(0, nameLeft, 0, 24);
+        nameAnchor.setWidth(null);
+        nameAnchor.setRight(Value.of(36));
+        commands.setObject(card + " #Name.Anchor", nameAnchor);
     }
 
     private static Anchor fixedAnchor(int top, int left, int width, int height) {
