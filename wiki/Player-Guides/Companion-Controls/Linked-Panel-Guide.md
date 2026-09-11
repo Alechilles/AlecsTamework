@@ -47,8 +47,10 @@ Each card keeps the companion's name across the header, with its portrait,
 health, traits, level, and talent controls below. These temporary summons do not
 show happiness, hunger, or thirst meters. Stored health is muted, and dead
 companions retain an empty health bar. The right side shows summon state and the
-available **Summon**, **Dismiss**, or **Revive** action. Finite summon sessions
-show their remaining time; cooldowns and revival requirements still apply.
+available **Summon**, **Dismiss**, or **Revive** action with a matching icon.
+Finite summon sessions and cooldowns show their remaining time above a progress
+bar. Clicking the card's X opens permanent deletion confirmation; **Cancel**
+returns to the normal card without deleting the companion.
 
 ## Live bonded progression
 
