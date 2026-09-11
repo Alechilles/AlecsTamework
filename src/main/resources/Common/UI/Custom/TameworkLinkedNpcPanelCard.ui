@@ -27,7 +27,7 @@ Group {
 
     Group { Anchor: (Top: 36, Left: 156, Bottom: 0, Width: 1); Background: #414845; }
 
-    Group { Anchor: (Top: 26, Left: 0, Right: 0, Height: 1); Background: #343c37; HitTestVisible: false; }
+    Group { Anchor: (Top: 26, Left: 0, Right: 36, Height: 1); Background: #343c37; HitTestVisible: false; }
 
     TextButton #ActiveToggleActiveButton { Anchor: (Top: 42, Left: 0, Width: 40, Height: 20); Style: @LinkedActiveStateOnButtonStyle; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.activeEnabled; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
     TextButton #ActiveToggleInactiveButton { Anchor: (Top: 42, Left: 0, Width: 40, Height: 20); Style: @LinkedActiveStateOffButtonStyle; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.activeDisabled; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
