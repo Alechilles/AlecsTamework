@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
@@ -17,6 +18,9 @@ import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopR
 import com.alechilles.alecstamework.items.persistence.TameworkSnapshotCodecs;
 import com.alechilles.alecstamework.items.persistence.checkpoint.CompanionEntityCheckpoint;
 import com.alechilles.alecstamework.items.persistence.checkpoint.CompanionEntityCheckpointCodec;
+import com.alechilles.alecstamework.config.ItemFeatureConfig;
+import com.alechilles.alecstamework.config.ItemFeatureRegistry;
+import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
@@ -25,10 +29,13 @@ import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.hypixel.hytale.codec.ExtraInfo;
+import java.lang.reflect.Field;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
+import sun.misc.Unsafe;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -60,6 +67,43 @@ class CommandSavedNpcPanelSnapshotTest {
         LinkedNpcEntry applied = saved.apply(baseCard(), null);
         assertEquals(18, applied.currentHealth());
         assertEquals(42, applied.maxHealth());
+    }
+
+    @Test
+    void appliesAttachmentSpecificPortraitFromFullState() throws Exception {
+        ItemFeatureRegistry registry = new ItemFeatureRegistry();
+        registry.register("SheepCaptureItem", ItemFeatureConfig.builder()
+                .spawnerIconOverridesByRole(Map.of("Tamed_Sheep", List.of(
+                        new ItemFeatureConfig.SpawnerIconOverride(
+                                Map.of("Coat", "Black"), "Icons/Portraits/Sheep_Black.png")
+                )))
+                .build());
+        Tamework previous = installRegistry(registry);
+        try {
+            ProfileId profileId = new ProfileId(UUID.randomUUID());
+            CoopResidentStateSnapshot state = new CoopResidentStateSnapshot(
+                    UUID.randomUUID(), null, -1, "Tamed_Sheep", null, null,
+                    null, null, null, null, null, null, null, null, null,
+                    new TameworkAttachmentsComponent(null, Map.of("Coat", "Black")),
+                    null, null, null, -1L
+            );
+            var encoded = TameworkSnapshotCodecs.create().encode(
+                    TameworkSnapshotCodecs.COOP, 1, CoopResidentStateSnapshot.class, state);
+            CompanionSnapshot snapshot = new CompanionSnapshot(
+                    SnapshotId.create(), profileId, TameworkSnapshotCodecs.COOP, 1,
+                    encoded.payloadJson(), Sha256Hash.ofUtf8(encoded.payloadJson()),
+                    LifecycleRevision.INITIAL, true, -10L
+            );
+
+            CommandSavedNpcPanelSnapshot saved = CommandSavedNpcPanelSnapshot.decode(
+                    profile(profileId, snapshot));
+
+            assertNotNull(saved);
+            assertEquals("Icons/Portraits/Sheep_Black.png",
+                    saved.apply(baseCard(), null).portraitIcon());
+        } finally {
+            restoreTamework(previous);
+        }
     }
 
     @Test
@@ -139,5 +183,29 @@ class CommandSavedNpcPanelSnapshotTest {
         return new LinkedNpcEntry(UUID.randomUUID(), "Sheep", 1, 1, 0, 0,
                 null, 0, 0, 0, 0, false, false, false, false, false, false,
                 0L, new com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator[0]);
+    }
+
+    private static Tamework installRegistry(ItemFeatureRegistry registry) throws Exception {
+        Field singleton = Tamework.class.getDeclaredField("instance");
+        singleton.setAccessible(true);
+        Tamework previous = (Tamework) singleton.get(null);
+        Tamework replacement = (Tamework) unsafe().allocateInstance(Tamework.class);
+        Field itemFeatures = Tamework.class.getDeclaredField("itemFeatureRegistry");
+        itemFeatures.setAccessible(true);
+        itemFeatures.set(replacement, registry);
+        singleton.set(null, replacement);
+        return previous;
+    }
+
+    private static void restoreTamework(Tamework previous) throws Exception {
+        Field singleton = Tamework.class.getDeclaredField("instance");
+        singleton.setAccessible(true);
+        singleton.set(null, previous);
+    }
+
+    private static Unsafe unsafe() throws Exception {
+        Field field = Unsafe.class.getDeclaredField("theUnsafe");
+        field.setAccessible(true);
+        return (Unsafe) field.get(null);
     }
 }

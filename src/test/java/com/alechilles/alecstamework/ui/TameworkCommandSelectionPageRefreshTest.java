@@ -380,6 +380,27 @@ class TameworkCommandSelectionPageRefreshTest {
     }
 
     @Test
+    void changingAppearanceRefreshesPortraitAndMissingImageClearsIt() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        AtomicReference<List<LinkedNpcEntry>> entries = new AtomicReference<>(
+                List.of(ENTRY.withPortraitIcon("Icons/ItemsGenerated/Sheep.png")));
+        TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(),
+                new NavigationFixture(), legacyConfig());
+        replaceField(page, "linkedNpcBaseEntriesSupplier", (Supplier<List<LinkedNpcEntry>>) entries::get);
+        build(page);
+
+        entries.set(List.of(ENTRY.withPortraitIcon("Icons/ItemsGenerated/Sheep_Shorn.png")));
+        refresh(page, false);
+        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Portrait.Slots", "Sheep_Shorn.png");
+        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Portrait.Visible", "true");
+
+        entries.set(List.of(ENTRY.withPortraitIcon(null)));
+        refresh(page, false);
+        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Portrait.Visible", "false");
+        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #Portrait.Slots", "[]");
+    }
+
+    @Test
     void legacyRecallCountdownRefreshDoesNotRebindCardEvents() throws Exception {
         CapturedPackets packets = new CapturedPackets();
         AtomicReference<List<LinkedNpcEntry>> entries =

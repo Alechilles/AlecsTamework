@@ -12,6 +12,7 @@ public final class LinkedNpcEntry {
     private final UUID npcUuid;
     private final String displayName;
     private final String roleSubtitle;
+    private final String portraitIcon;
     private final String gender;
     private final int currentHealth;
     private final int maxHealth;
@@ -442,6 +443,7 @@ public final class LinkedNpcEntry {
         this.npcUuid = npcUuid;
         this.displayName = displayName;
         this.roleSubtitle = "";
+        this.portraitIcon = "";
         this.gender = normalizeGender(gender);
         this.currentHealth = currentHealth;
         this.maxHealth = maxHealth;
@@ -756,6 +758,19 @@ public final class LinkedNpcEntry {
                 : new LinkedNpcEntry(this, normalized);
     }
 
+    /** Existing capture/model icon used only for card presentation; blank means unavailable. */
+    public String portraitIcon() {
+        return portraitIcon;
+    }
+
+    public LinkedNpcEntry withPortraitIcon(String icon) {
+        String normalized = icon == null ? "" : icon.trim();
+        return Objects.equals(portraitIcon, normalized) ? this
+                : new LinkedNpcEntry(this, recoveryHeld, recoveryIncidentId, flightToggleAvailable,
+                        flightToggleAirborne, shoulderRideAvailable, shoulderRideMounted,
+                        breedingHappinessRatio, ownedActions, roleSubtitle, normalized);
+    }
+
     public double healthRatio() {
         if (!hasHealth()) {
             return 0.0;
@@ -922,6 +937,17 @@ public final class LinkedNpcEntry {
                            double breedingHappinessRatio,
                            boolean ownedActions,
                            String roleSubtitle) {
+        this(source, recoveryHeld, incidentId, flightToggleAvailable, flightToggleAirborne,
+                shoulderRideAvailable, shoulderRideMounted, breedingHappinessRatio,
+                ownedActions, roleSubtitle, source.portraitIcon);
+    }
+
+    private LinkedNpcEntry(LinkedNpcEntry source, boolean recoveryHeld, String incidentId,
+                          boolean flightToggleAvailable, boolean flightToggleAirborne,
+                          boolean shoulderRideAvailable, boolean shoulderRideMounted,
+                          double breedingHappinessRatio, boolean ownedActions,
+                          String roleSubtitle, String portraitIcon) {
+        this.portraitIcon = portraitIcon;
         this.npcUuid = source.npcUuid;
         this.displayName = source.displayName;
         this.roleSubtitle = normalizeRoleSubtitle(roleSubtitle);
@@ -1070,6 +1096,7 @@ public final class LinkedNpcEntry {
                 && Objects.equals(npcUuid, other.npcUuid)
                 && Objects.equals(displayName, other.displayName)
                 && Objects.equals(roleSubtitle, other.roleSubtitle)
+                && Objects.equals(portraitIcon, other.portraitIcon)
                 && Objects.equals(gender, other.gender)
                 && Objects.equals(happinessModifierBreakdown, other.happinessModifierBreakdown)
                 && Objects.equals(deathCauseHint, other.deathCauseHint)
@@ -1089,6 +1116,7 @@ public final class LinkedNpcEntry {
                 npcUuid,
                 displayName,
                 roleSubtitle,
+                portraitIcon,
                 gender,
                 currentHealth,
                 maxHealth,

@@ -1,5 +1,8 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.Tamework;
+import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
+import com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
@@ -285,7 +288,21 @@ final class CommandLoadedNpcStatusSnapshotService {
         boolean mounted = isShoulderMounted(npcRef, player, store);
         return result.withShoulderRide(mounted || shoulderRide.isConfigured(), mounted)
                 .withRoleSubtitle(npcNameResolver.resolveRoleSubtitle(
-                        customName, resolvedRoleId, resolvedContext.cachedNameKey()));
+                        customName, resolvedRoleId, resolvedContext.cachedNameKey()))
+                .withPortraitIcon(resolvedOptions.includePortrait() ? resolvePortrait(npcRef, store, resolvedRoleId) : null);
+    }
+
+    /** Reads appearance only in the existing world-thread card snapshot pass. */
+    private String resolvePortrait(Ref<EntityStore> npcRef, Store<EntityStore> store, String roleId) {
+        Tamework plugin = Tamework.getInstance();
+        if (plugin == null) return null;
+        ModelComponent component = safeGetComponent(store, npcRef, ModelComponent.getComponentType());
+        var model = component == null ? null : component.getModel();
+        String icon = CommandNpcPortraitResolver.resolve(plugin.getItemFeatureRegistry(), roleId,
+                model == null ? null : model.getRandomAttachmentIds());
+        if (icon != null || model == null || model.getModelAssetId() == null) return icon;
+        ModelAsset asset = ModelAsset.getAssetMap().getAsset(model.getModelAssetId());
+        return asset == null ? null : asset.getIcon();
     }
 
     private static boolean isShoulderMounted(Ref<EntityStore> npcRef,
@@ -738,13 +755,13 @@ final class CommandLoadedNpcStatusSnapshotService {
     }
 
     record SnapshotOptions(boolean includeHappinessBreakdown,
-                           boolean includeProgressionModifierTooltip) {
+                           boolean includeProgressionModifierTooltip, boolean includePortrait) {
         static SnapshotOptions linkedPanel() {
-            return new SnapshotOptions(true, true);
+            return new SnapshotOptions(true, true, true);
         }
 
         static SnapshotOptions compactHud() {
-            return new SnapshotOptions(false, false);
+            return new SnapshotOptions(false, false, false);
         }
     }
 

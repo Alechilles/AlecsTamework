@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotDecodeResult;
@@ -21,10 +22,12 @@ import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
 import com.hypixel.hytale.codec.ExtraInfo;
+import com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import java.util.ArrayList;
@@ -50,19 +53,23 @@ final class CommandSavedNpcPanelSnapshot {
     private final long observedAtMs;
     private final String roleId;
     private final Facts facts;
+    private final Appearance appearance;
     private final boolean exactCheckpoint;
     private final boolean savedTalentsEditable;
 
-    private CommandSavedNpcPanelSnapshot(long observedAtMs, String roleId, Facts facts, boolean exactCheckpoint) {
-        this(observedAtMs, roleId, facts, exactCheckpoint, false);
+    private CommandSavedNpcPanelSnapshot(long observedAtMs, String roleId, Facts facts,
+                                         Appearance appearance, boolean exactCheckpoint) {
+        this(observedAtMs, roleId, facts, appearance, exactCheckpoint, false);
     }
 
     private CommandSavedNpcPanelSnapshot(long observedAtMs, String roleId, Facts facts,
-                                        boolean exactCheckpoint, boolean savedTalentsEditable) {
+                                        Appearance appearance, boolean exactCheckpoint,
+                                        boolean savedTalentsEditable) {
         this.savedTalentsEditable = savedTalentsEditable;
         this.observedAtMs = observedAtMs;
         this.roleId = trimToNull(roleId);
         this.facts = facts;
+        this.appearance = appearance;
         this.exactCheckpoint = exactCheckpoint;
     }
 
@@ -90,7 +97,8 @@ final class CommandSavedNpcPanelSnapshot {
         if (restoration != null) {
             // Purchases update the restoration snapshot; an older entity checkpoint must not mask them.
             var saved = fromState(restoration.fullState(), restoration.snapshot().createdAtMs());
-            return new CommandSavedNpcPanelSnapshot(saved.observedAtMs, saved.roleId, saved.facts, false, true);
+            return new CommandSavedNpcPanelSnapshot(saved.observedAtMs, saved.roleId, saved.facts,
+                    saved.appearance, false, true);
         }
         ArrayList<CommandSavedNpcPanelSnapshot> candidates = new ArrayList<>();
         for (CompanionSnapshot snapshot : profile.currentSnapshots()) {
@@ -142,6 +150,7 @@ final class CommandSavedNpcPanelSnapshot {
                 harvest.remainingMs, harvest.ratio, harvest.known, base.recallPending(),
                 base.recallLostRemainingMs());
         applied = applied.withRoleSubtitle(base.roleSubtitle())
+                .withPortraitIcon(resolvePortrait(effectiveRole, base.portraitIcon()))
                 .withBreedingHappinessRatio(base.breedingHappinessRatio())
                 .withFlightToggle(base.flightToggleAvailable(), base.flightToggleAirborne())
                 .withShoulderRide(base.shoulderRideAvailable(), base.shoulderRideMounted());
@@ -175,7 +184,8 @@ final class CommandSavedNpcPanelSnapshot {
     private static CommandSavedNpcPanelSnapshot fromState(CoopResidentStateSnapshot state, long observedAtMs) {
         return new CommandSavedNpcPanelSnapshot(observedAtMs, state.roleId(), Facts.from(
                 state.currentHealth() == null || state.maximumHealth() == null ? null : new Health(state.currentHealth(), state.maximumHealth()),
-                state.happiness(), state.needs(), state.breeding(), state.leveling(), state.traits(), state.talents(), harvest(state.alarms())), false);
+                state.happiness(), state.needs(), state.breeding(), state.leveling(), state.traits(), state.talents(), harvest(state.alarms())),
+                Appearance.from(state.attachments(), null), false);
     }
 
     @Nullable
@@ -203,9 +213,12 @@ final class CommandSavedNpcPanelSnapshot {
             TameworkLevelingComponent leveling = component(components, "TameworkLeveling", TameworkLevelingComponent.CODEC);
             TameworkTraitsComponent traits = component(components, "TameworkTraits", TameworkTraitsComponent.CODEC);
             TameworkTalentsComponent talents = component(components, "TameworkTalents", TameworkTalentsComponent.CODEC);
+            TameworkAttachmentsComponent attachments = component(
+                    components, "TameworkAttachments", TameworkAttachmentsComponent.CODEC);
             TameworkAlarmComponent alarms = component(components, "TameworkAlarm", TameworkAlarmComponent.CODEC);
             return new CommandSavedNpcPanelSnapshot(checkpoint.capturedAtMs(), profile.identity().roleId(),
-                    Facts.from(health, happiness, needs, breeding, leveling, traits, talents, harvest(alarms)), true);
+                    Facts.from(health, happiness, needs, breeding, leveling, traits, talents, harvest(alarms)),
+                    Appearance.from(attachments, component(components, "Model")), true);
         } catch (RuntimeException | LinkageError ignored) {
             return null;
         }
@@ -364,9 +377,72 @@ final class CommandSavedNpcPanelSnapshot {
     @Nullable private static String trimToNull(@Nullable String value) { return value == null || value.isBlank() ? null : value.trim(); }
     @Nullable private static String firstNonBlank(@Nullable String first, @Nullable String second) { return trimToNull(first) != null ? trimToNull(first) : trimToNull(second); }
 
+    /** Resolves optional saved appearance only while the caller owns the world-thread card pass. */
+    private String resolvePortrait(String role, String fallback) {
+        Tamework plugin = Tamework.getInstance();
+        String resolved = CommandNpcPortraitResolver.resolve(
+                plugin == null ? null : plugin.getItemFeatureRegistry(), role,
+                appearance == null ? null : appearance.attachments);
+        if (trimToNull(resolved) != null) {
+            return resolved;
+        }
+        String modelId = appearance == null ? null : appearance.modelId;
+        if (trimToNull(modelId) == null) {
+            return fallback;
+        }
+        try {
+            ModelAsset asset = ModelAsset.getAssetMap() == null
+                    ? null : ModelAsset.getAssetMap().getAsset(modelId);
+            String icon = asset == null ? null : asset.getIcon();
+            return trimToNull(icon) != null ? icon : fallback;
+        } catch (RuntimeException | LinkageError ignored) {
+            return fallback;
+        }
+    }
+
     private record Facts(@Nullable Health health, @Nullable Happiness happiness, @Nullable Needs needs, @Nullable Breeding breeding, @Nullable Leveling leveling, @Nullable Traits traits, @Nullable Talents talents, @Nullable Harvest harvest) {
         static Facts from(@Nullable Health health, @Nullable TameworkHappinessComponent happiness, @Nullable TameworkNeedsComponent needs, @Nullable TameworkBreedingComponent breeding, @Nullable TameworkLevelingComponent leveling, @Nullable TameworkTraitsComponent traits, @Nullable TameworkTalentsComponent talents, @Nullable Harvest harvest) {
             return new Facts(health, happiness == null ? null : new Happiness(happiness.getConfigId(), happiness.getValue()), needs == null ? null : new Needs(needs.getConfigId(), needs.getHunger(), needs.getThirst()), breeding == null ? null : new Breeding(breeding.isEnabled(), breeding.getCooldownUntilMs(), breeding.getCooldownStartedAtMs(), breeding.getCooldownDurationMs()), leveling == null ? null : new Leveling(leveling.getConfigId(), leveling.getLevel(), leveling.getCurrentXp(), leveling.getTotalXp()), traits == null ? null : Traits.from(traits), talents == null ? null : new Talents(talents.getConfigId(), talents.getSpentPoints()), harvest);
+        }
+    }
+    private record Appearance(@Nullable String modelId, Map<String, String> attachments) {
+        private Appearance {
+            modelId = trimToNull(modelId);
+            attachments = attachments == null || attachments.isEmpty() ? Map.of() : Map.copyOf(attachments);
+        }
+
+        static Appearance from(@Nullable TameworkAttachmentsComponent saved,
+                               @Nullable BsonDocument model) {
+            Map<String, String> attachmentIds = saved == null ? Map.of() : saved.getAttachmentIds();
+            BsonDocument modelState = component(model, "Model");
+            String modelId = string(modelState, "Id");
+            if (attachmentIds == null || attachmentIds.isEmpty()) {
+                attachmentIds = stringMap(component(modelState, "RandomAttachments"));
+            }
+            return new Appearance(modelId, attachmentIds);
+        }
+
+        @Nullable
+        private static String string(@Nullable BsonDocument document, String key) {
+            BsonValue value = document == null ? null : document.get(key);
+            return value != null && value.isString() ? trimToNull(value.asString().getValue()) : null;
+        }
+
+        private static Map<String, String> stringMap(@Nullable BsonDocument document) {
+            if (document == null || document.isEmpty()) {
+                return Map.of();
+            }
+            Map<String, String> values = new LinkedHashMap<>();
+            for (Map.Entry<String, BsonValue> entry : document.entrySet()) {
+                String key = trimToNull(entry.getKey());
+                BsonValue value = entry.getValue();
+                String attachment = value != null && value.isString()
+                        ? trimToNull(value.asString().getValue()) : null;
+                if (key != null && attachment != null) {
+                    values.put(key, attachment);
+                }
+            }
+            return values.isEmpty() ? Map.of() : Map.copyOf(values);
         }
     }
     private record Health(int current, int maximum) { Health(double current, double maximum) { this(round(current), Math.max(1, round(maximum))); } }

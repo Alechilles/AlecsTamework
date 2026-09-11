@@ -27,6 +27,15 @@ The panel derives captured, coop, roster-stored, provisioned-dormant, dead, and
 `LOST` status from one saved companion lifecycle. Item metadata and an expired
 recall timer do not override that status.
 
+## Animal images
+
+Companion cards reuse animal images from capture-item appearance rules. Where the
+installed animal pack provides variants, the image follows the companion's saved
+coat, wool, or other configured attachments. Unavailable companions use their last
+saved appearance. These are static item images, not live model previews; missing
+variant rules can fall back to a species image. If no animal image is available,
+the space stays blank.
+
 ## Live bonded progression
 
 When a bonded companion is active, its row shows its current level, XP, and

@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Companion cards reuse capture-item animal images, matching appearance variants
+  where configured and using saved appearance for unavailable companions.
+
 - NPC names span the companion card header, with a small increase in card height
   for comfortable spacing below the header and full names available on hover.
 

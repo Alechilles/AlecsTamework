@@ -25,7 +25,6 @@ import com.hypixel.hytale.server.npc.metadata.CapturedNPCMetadata;
 import org.bson.BsonDocument;
 import java.lang.reflect.Type;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -220,119 +219,17 @@ final class SpawnerCaptureMetadataService {
         if (resolved == null) {
             return null;
         }
-        String defaultIcon = resolved.getSpawnerIconDefault();
-        Map<String, List<ItemFeatureConfig.SpawnerIconOverride>> overridesByRole = resolved.getSpawnerIconOverridesByRole();
-        List<ItemFeatureConfig.SpawnerIconOverride> roleOverrides = null;
-        if (roleId != null && overridesByRole != null && !overridesByRole.isEmpty()) {
-            roleOverrides = overridesByRole.get(roleId);
-        }
-        ItemFeatureConfig.SpawnerIconOverrideGroup roleGroup = firstIconOverrideGroupForRole(
-                resolved.getSpawnerIconOverrideGroups(),
-                roleId
-        );
-        List<ItemFeatureConfig.SpawnerIconOverride> groupOverrides =
-                roleGroup != null ? roleGroup.getOverrides() : null;
-        String groupDefaultIcon = roleGroup != null ? roleGroup.getIconDefault() : null;
-        List<ItemFeatureConfig.SpawnerIconOverride> overrides = resolved.getSpawnerIconOverrides();
-        boolean hasRoleOverrides = roleOverrides != null && !roleOverrides.isEmpty();
-        boolean hasGroupOverrides = groupOverrides != null && !groupOverrides.isEmpty();
-        boolean hasGlobalOverrides = overrides != null && !overrides.isEmpty();
-        boolean hasGroupDefaultIcon = groupDefaultIcon != null && !groupDefaultIcon.isBlank();
-        if (!hasRoleOverrides && !hasGroupOverrides && !hasGlobalOverrides) {
-            return hasGroupDefaultIcon ? groupDefaultIcon : defaultIcon;
-        }
-        if (attachmentsJson == null || attachmentsJson.isBlank()) {
-            return hasGroupDefaultIcon ? groupDefaultIcon : defaultIcon;
-        }
-
-        Map<String, String> attachments;
-        try {
-            attachments = GSON.fromJson(attachmentsJson, ATTACHMENT_MAP_TYPE);
-        } catch (Exception ex) {
-            if (logger != null) {
-                logger.at(Level.WARNING).withCause(ex).log("Spawner icon override: failed to parse attachments.");
-            }
-            return hasGroupDefaultIcon ? groupDefaultIcon : defaultIcon;
-        }
-        if (attachments == null) {
-            return hasGroupDefaultIcon ? groupDefaultIcon : defaultIcon;
-        }
-
-        if (hasRoleOverrides) {
-            for (ItemFeatureConfig.SpawnerIconOverride override : roleOverrides) {
-                if (override == null) {
-                    continue;
-                }
-                if (matchesAttachments(override.getAttachments(), attachments)) {
-                    String icon = override.getIcon();
-                    if (logger != null) {
-                        logger.at(Level.FINE).log(
-                                "Spawner icon override (role): matched item=" + itemId
-                                        + " role=" + roleId
-                                        + " icon=" + icon
-                                        + " attachments=" + attachmentsJson
-                        );
-                    }
-                    return icon;
+        Map<String, String> attachments = null;
+        if (attachmentsJson != null && !attachmentsJson.isBlank()) {
+            try {
+                attachments = GSON.fromJson(attachmentsJson, ATTACHMENT_MAP_TYPE);
+            } catch (Exception ex) {
+                if (logger != null) {
+                    logger.at(Level.WARNING).withCause(ex).log("Spawner icon override: failed to parse attachments.");
                 }
             }
         }
-
-        if (hasGroupOverrides) {
-            for (ItemFeatureConfig.SpawnerIconOverride override : groupOverrides) {
-                if (override == null) {
-                    continue;
-                }
-                if (matchesAttachments(override.getAttachments(), attachments)) {
-                    String icon = override.getIcon();
-                    if (logger != null) {
-                        logger.at(Level.FINE).log(
-                                "Spawner icon override (group): matched item=" + itemId
-                                        + " role=" + roleId
-                                        + " icon=" + icon
-                                        + " attachments=" + attachmentsJson
-                        );
-                    }
-                    return icon;
-                }
-            }
-        }
-
-        if (hasGroupDefaultIcon) {
-            if (logger != null) {
-                logger.at(Level.FINE).log(
-                        "Spawner icon override (group default): matched item=" + itemId
-                                + " role=" + roleId
-                                + " icon=" + groupDefaultIcon
-                                + " attachments=" + attachmentsJson
-                );
-            }
-            return groupDefaultIcon;
-        }
-
-        if (hasGlobalOverrides) {
-            for (ItemFeatureConfig.SpawnerIconOverride override : overrides) {
-                if (override == null) {
-                    continue;
-                }
-                if (matchesAttachments(override.getAttachments(), attachments)) {
-                    String icon = override.getIcon();
-                    if (logger != null) {
-                        logger.at(Level.FINE).log(
-                                "Spawner icon override: matched item=" + itemId + " icon=" + icon + " attachments=" + attachmentsJson
-                        );
-                    }
-                    return icon;
-                }
-            }
-        }
-
-        if (logger != null) {
-            logger.at(Level.FINE).log(
-                    "Spawner icon override: no match item=" + itemId + " role=" + roleId + " attachments=" + attachmentsJson
-            );
-        }
-        return defaultIcon;
+        return SpawnerIconResolver.resolveFullItemIcon(resolved, attachments, roleId);
     }
 
     @Nullable
@@ -451,37 +348,6 @@ final class SpawnerCaptureMetadataService {
         }
         ItemFeatureConfig filledConfig = registry.get(filledId);
         return filledConfig != null ? filledConfig : config;
-    }
-
-    @Nullable
-    private ItemFeatureConfig.SpawnerIconOverrideGroup firstIconOverrideGroupForRole(
-            @Nullable List<ItemFeatureConfig.SpawnerIconOverrideGroup> groups,
-            @Nullable String roleId) {
-        if (roleId == null || roleId.isBlank() || groups == null || groups.isEmpty()) {
-            return null;
-        }
-        for (ItemFeatureConfig.SpawnerIconOverrideGroup group : groups) {
-            if (group == null || group.getRoles().isEmpty()) {
-                continue;
-            }
-            if (group.getRoles().contains(roleId)) {
-                return group;
-            }
-        }
-        return null;
-    }
-
-    private boolean matchesAttachments(@Nullable Map<String, String> required, @Nullable Map<String, String> actual) {
-        if (required == null || required.isEmpty() || actual == null || actual.isEmpty()) {
-            return false;
-        }
-        for (Map.Entry<String, String> entry : required.entrySet()) {
-            String value = actual.get(entry.getKey());
-            if (value == null || !value.equals(entry.getValue())) {
-                return false;
-            }
-        }
-        return true;
     }
 
     @Nullable

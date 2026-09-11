@@ -31,6 +31,9 @@ final class LinkedNpcPanelCardDynamicPresenter {
                     currentFeature, pendingUnlink, bindingConfig, language);
             return;
         }
+        if (!previous.portraitIcon().equals(current.portraitIcon())) {
+            LinkedNpcPanelCardBinder.bindPortrait(commands, selector, current, !current.hasKnownCardDetails());
+        }
         if (vitalsChanged(previous, current)) {
             LinkedNpcPanelVitalsBinder.bind(commands, selector, current, language);
             LinkedNpcPanelCardBinder.bindBreedingTooltips(commands, selector, current, language);
