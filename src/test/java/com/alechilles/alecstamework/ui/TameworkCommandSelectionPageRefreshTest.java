@@ -448,6 +448,7 @@ class TameworkCommandSelectionPageRefreshTest {
         TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(feature(4, false)));
         build(page);
         event(page, CommandSelectionPageEventBinder.UNLINK_COMMAND_PREFIX + CARD);
+        refresh(page, true);
         assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #BondedUnlinkConfirmButton.Visible", "true");
         int beforeStaleCancel = packets.updates.size();
         event(page, BondedCompanionCardPresenter.CANCEL_UNLINK_COMMAND_PREFIX + UUID.randomUUID());
@@ -457,6 +458,7 @@ class TameworkCommandSelectionPageRefreshTest {
                 .findFirst().orElseThrow();
         page.handleDataEvent(null, null, CommandSelectionEventData.CODEC.decode(
                 BsonDocument.parse(cancel.data), new com.hypixel.hytale.codec.ExtraInfo()));
+        refresh(page, true);
         assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #BondedUnlinkConfirmButton.Visible", "false");
         assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #BondedPrimaryActionNoTooltip.Visible", "true");
         page.onDismiss(null, null);
