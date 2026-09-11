@@ -536,10 +536,14 @@ final class LinkedNpcPanelCardBinder {
 
     static void bindPortrait(UICommandBuilder commands, String card, LinkedNpcEntry entry, boolean compact) {
         LinkedNpcPanelPortraitBinder.bind(commands, card, entry);
+        commands.set(card + " #Portrait.Style", Value.ref("TameworkLinkedNpcPanelCard.ui", compact ? "PortraitCompactStyle" : "PortraitStyle"));
         commands.setObject(card + " #Portrait.Anchor", fixedAnchor(compact ? 38 : 56, compact ? 108 : 80, compact ? 36 : 56, compact ? 36 : 56));
         commands.setObject(card + " #RoleSubtitle.Anchor", fixedAnchor(37, 0, compact && !entry.portraitIcon().isBlank() ? 104 : 148, 18));
         int activeTop = compact ? 56 : 96;
-        commands.setObject(card + " #StatusInactive.Anchor", fixedAnchor(entry.portraitIcon().isBlank() ? activeTop : activeTop - 20, entry.portraitIcon().isBlank() ? 48 : 0, entry.portraitIcon().isBlank() ? 96 : 76, 20));
+        boolean portrait = !entry.portraitIcon().isBlank();
+        commands.setObject(card + " #StatusInactive.Anchor", fixedAnchor(
+                portrait && !compact ? activeTop - 20 : activeTop,
+                portrait && !compact ? 0 : 48, portrait ? compact ? 56 : 76 : 96, 20));
     }
 
     private static Anchor fixedAnchor(int top, int left, int width, int height) {

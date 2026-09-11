@@ -225,8 +225,8 @@ final class CommandSavedNpcPanelSnapshot {
     }
 
     @Nullable
-    private static BsonDocument component(BsonDocument components, String name) {
-        BsonValue value = components.get(name);
+    private static BsonDocument component(@Nullable BsonDocument components, String name) {
+        BsonValue value = components == null ? null : components.get(name);
         return value != null && value.isDocument() ? value.asDocument() : null;
     }
 

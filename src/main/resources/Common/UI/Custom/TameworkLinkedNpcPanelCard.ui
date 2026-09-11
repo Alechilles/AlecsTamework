@@ -17,6 +17,8 @@ $C = "Common.ui";
 @CooldownTextNormal = LabelStyle(FontSize: 9, TextColor: #d3d7cf);
 @CooldownLabelNormal = LabelStyle(FontSize: 9, TextColor: #b9beb8);
 @CooldownTextMuted = LabelStyle(FontSize: 9, TextColor: #858b85);
+@PortraitStyle = ItemGridStyle(SlotSize: 56, SlotSpacing: 0, SlotIconSize: 56);
+@PortraitCompactStyle = ItemGridStyle(SlotSize: 36, SlotSpacing: 0, SlotIconSize: 36);
 
 Group {
     Anchor: (Top: 3, Left: 0, Right: 0, Height: 176);
@@ -34,7 +36,7 @@ Group {
     Group #GenderMaleIcon { Anchor: (Top: 1, Left: 34, Width: 22, Height: 22); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Male.png"); Visible: false; }
     Group #GenderFemaleIcon { Anchor: (Top: 1, Left: 34, Width: 22, Height: 22); Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Female.png"); Visible: false; }
     Label #Name { Anchor: (Top: 0, Left: 28, Right: 36, Height: 24); Text: %server.tamework.ui.linkedPanel.subtitle.defaultNpcName; Style: (FontSize: 18, RenderBold: true, TextColor: #f0eee7, HorizontalAlignment: Start, VerticalAlignment: Center); }
-    ItemGrid #Portrait { Anchor: (Top: 56, Left: 80, Width: 56, Height: 56); SlotsPerRow: 1; RenderItemQualityBackground: false; InfoDisplay: None; Style: (SlotSize: 56, SlotSpacing: 0, SlotIconSize: 56); HitTestVisible: false; Visible: false; }
+    ItemGrid #Portrait { Anchor: (Top: 56, Left: 80, Width: 56, Height: 56); SlotsPerRow: 1; RenderItemQualityBackground: false; DisplayItemQuantity: false; InfoDisplay: None; Style: @PortraitStyle; HitTestVisible: false; Visible: false; }
     Label #RoleSubtitle { Anchor: (Top: 37, Left: 0, Width: 148, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #afb6b0, VerticalAlignment: Center); Visible: false; }
     Label #StatusUnloaded { Anchor: (Top: 68, Left: 0, Width: 148, Height: 18); Text: %server.tamework.ui.linkedPanel.status.unloaded; Style: (FontSize: 10, RenderBold: true, TextColor: #ffe5b4, HorizontalAlignment: Center, VerticalAlignment: Center); Visible: false; }
     Group #StatusEmblem { Anchor: (Top: 10, Left: 707, Width: 56, Height: 56); Background: "Tamework/StatusEmblems/Unloaded.png"; HitTestVisible: false; Visible: false; }
