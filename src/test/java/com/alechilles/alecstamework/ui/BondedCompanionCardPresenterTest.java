@@ -7,7 +7,6 @@ import com.alechilles.alecstamework.api.BondedCompanionReviveQuote;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.api.BondedCompanionActionBlockReason;
 import com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes;
-import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import java.awt.image.BufferedImage;
@@ -132,7 +131,7 @@ class BondedCompanionCardPresenterTest {
     @Test
     void dynamicRefreshUpdatesFlightToggleWithoutRecreatingTheCard() {
         UICommandBuilder commands = new UICommandBuilder();
-        BondedCompanionCardPresenter.refreshDynamicState(commands, "#Card", presentation(
+        BondedCompanionCardPresenter.refreshDynamicState(commands, "#Card", null, presentation(
                 BondedCompanionStateView.ACTIVE,
                 BondedCompanionStatusPresentation.Action.DISMISS, true,
                 Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true",
@@ -145,33 +144,38 @@ class BondedCompanionCardPresenterTest {
     }
 
     @Test
-    void lightweightRefreshBindsOnlyEligibleFlightToggleWithItsProfileUuid() {
+    void liveRefreshPreservesFlightInputWhileHealthChangesAndUpdatesFlightFeedback() {
         UUID cardUuid = UUID.randomUUID();
         BondedCompanionPanelPresentation eligible = presentation(
                 BondedCompanionStateView.ACTIVE,
                 BondedCompanionStatusPresentation.Action.DISMISS, true,
-                Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true"),
+                Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true",
+                        "currentHealth", "100", "maxHealth", "100"),
                 null);
-        UIEventBuilder eligibleEvents = new UIEventBuilder();
+        for (boolean airborne : new boolean[] {false, true}) {
+            BondedCompanionPanelPresentation current = presentation(
+                    BondedCompanionStateView.ACTIVE,
+                    BondedCompanionStatusPresentation.Action.DISMISS, true,
+                    Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true",
+                            BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE,
+                            Boolean.toString(airborne), "currentHealth", "90", "maxHealth", "100"), null);
+            UICommandBuilder commands = new UICommandBuilder();
+            UIEventBuilder events = new UIEventBuilder();
+            LinkedNpcPanelCardDynamicPresenter.refresh(commands, events, "#Card", cardUuid,
+                    null, null, CommandPanelFeaturePresentation.bonded(eligible),
+                    CommandPanelFeaturePresentation.bonded(current), false, bindingConfig(), "en-US");
 
-        BondedCompanionCardPresenter.bindEventBindings(eligibleEvents, "#Card",
-                cardUuid, eligible, false, bindingConfig(), "en-US");
-
-        assertTrue(java.util.Arrays.stream(eligibleEvents.getEvents()).anyMatch(event ->
-                        event.type == CustomUIEventBindingType.Activating
-                                && "#Card #BondedFlightToggleButton".equals(event.selector)
-                                && event.data.contains("__bonded_flight_toggle__:" + cardUuid)),
-                "Each eligible lightweight refresh must rebind this profile's flight toggle.");
-
-        UIEventBuilder unavailableEvents = new UIEventBuilder();
-        BondedCompanionCardPresenter.bindEventBindings(unavailableEvents, "#Card",
-                cardUuid, presentation(BondedCompanionStateView.ACTIVE,
-                        BondedCompanionStatusPresentation.Action.DISMISS, true,
-                        Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE,
-                                "false"), null), false, bindingConfig(), "en-US");
-        assertFalse(java.util.Arrays.stream(unavailableEvents.getEvents()).anyMatch(event ->
-                        "#Card #BondedFlightToggleButton".equals(event.selector)),
-                "Unavailable rows must not retain a stale flight-toggle event binding.");
+            assertCommand(commands, "#Card #BondedHealthText.Text", "90 / 100");
+            assertTrue(events.getEvents().length == 0,
+                    "Live patches must preserve existing input handlers.");
+            if (airborne) {
+                assertCommand(commands, "#Card #BondedFlightToggleButton.TooltipText", "Switch to ground");
+            } else {
+                assertFalse(java.util.Arrays.stream(commands.getCommands()).anyMatch(command ->
+                                command.selector.contains("#BondedFlight")),
+                        "Health updates must leave the flight control untouched.");
+            }
+        }
     }
 
     @Test
@@ -355,13 +359,13 @@ class BondedCompanionCardPresenterTest {
                     Map.of("sessionDurationMs", "80000", "sessionRemainingMs", "40000",
                             "cooldownDurationMs", "80000"), Map.of(), status, null);
             UICommandBuilder commands = new UICommandBuilder();
-            BondedCompanionCardPresenter.refreshDynamicState(commands, "#Card", row, "en-US");
+            BondedCompanionCardPresenter.refreshDynamicState(commands, "#Card", null, row, "en-US");
             assertCommand(commands, "#Card #BondedSessionFrame.Visible", "true");
             assertCommand(commands, "#Card #BondedSessionFill.Anchor", "191");
             assertCommand(commands, "#Card #BondedSessionFill.Visible", "true");
         }
         UICommandBuilder ready = new UICommandBuilder();
-        BondedCompanionCardPresenter.refreshDynamicState(ready, "#Card",
+        BondedCompanionCardPresenter.refreshDynamicState(ready, "#Card", null,
                 presentation(BondedCompanionStateView.STORED,
                         BondedCompanionStatusPresentation.Action.SUMMON, true, Map.of(), null), "en-US");
         assertCommand(ready, "#Card #BondedSessionFrame.Visible", "false");
@@ -377,7 +381,7 @@ class BondedCompanionCardPresenterTest {
         );
         UICommandBuilder commands = new UICommandBuilder();
 
-        BondedCompanionCardPresenter.refreshDynamicState(commands, "#Card", row,
+        BondedCompanionCardPresenter.refreshDynamicState(commands, "#Card", null, row,
                 "en-US");
 
         assertCommand(commands, "#Card #BondedHealthText.Text", "125 / 250");
@@ -491,7 +495,7 @@ class BondedCompanionCardPresenterTest {
                 "Bring this companion to your shoulder");
 
         UICommandBuilder mounted = new UICommandBuilder();
-        BondedCompanionCardPresenter.refreshDynamicState(mounted, "#Card",
+        BondedCompanionCardPresenter.refreshDynamicState(mounted, "#Card", null,
                 presentation(BondedCompanionStateView.ACTIVE,
                         BondedCompanionStatusPresentation.Action.DISMISS,
                         true, Map.of(

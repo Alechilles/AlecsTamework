@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Roster flight controls now keep their input binding and button state during
+  unrelated live card refreshes, matching the normal companion panel.
+
 - Enlarged bonded roster portraits and made them follow role morphs, including
   elemental variants, for active and stored companions.
 

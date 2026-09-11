@@ -79,6 +79,7 @@ final class BondedCompanionCardPresenter {
     static void refreshDynamicState(
             @Nonnull UICommandBuilder commands,
             @Nonnull String entrySelector,
+            @Nullable BondedCompanionPanelPresentation previous,
             @Nonnull BondedCompanionPanelPresentation row,
             @Nullable String language
     ) {
@@ -89,7 +90,11 @@ final class BondedCompanionCardPresenter {
         bindPortrait(commands, entrySelector, row);
         bindTraits(commands, entrySelector, row, language);
         bindSessionProgress(commands, entrySelector, row);
-        bindFlightToggle(commands, entrySelector, row, language);
+        // Keep the flight control stable during health and countdown updates.
+        if (previous == null || flightToggleVisible(previous) != flightToggleVisible(row)
+                || flightToggleAirborne(previous) != flightToggleAirborne(row)) {
+            bindFlightToggle(commands, entrySelector, row, language);
+        }
         bindShoulderRide(commands, entrySelector, row, language);
     }
 
@@ -107,34 +112,6 @@ final class BondedCompanionCardPresenter {
                 ? progressionTooltip(progression, row.attributes(), row.roleId(), language) : LocalizedText.resolve(language,
                 "tamework.ui.linkedPanel.bonded.talents.tooltip"));
     }
-
-    /**
-     * Re-emits card input bindings without recreating any visible controls.
-     *
-     * <p>The linked panel sends lightweight refresh packets while timers are
-     * running. Those packets have a fresh event-binding payload, so a bonded
-     * card must contribute its handlers again even when its visual tree did
-     * not need a rebuild.</p>
-     */
-    static void bindEventBindings(
-            @Nonnull UIEventBuilder events,
-            @Nonnull String entrySelector,
-            @Nonnull UUID cardUuid,
-            @Nonnull BondedCompanionPanelPresentation row,
-            boolean pendingUnlink,
-            @Nonnull LinkedNpcPanelCardBinder.CardBindingConfig config,
-            @Nullable String language
-    ) {
-        bindUnlinkEvents(events, entrySelector, cardUuid, config);
-        bindProgressionEvents(events, entrySelector, cardUuid,
-                progressionSummary(row.attributes(), row.roleId()), row.attributes(),
-                pendingUnlink, config);
-        bindPrimaryActionEvents(events, entrySelector, cardUuid, row,
-                pendingUnlink, config, language);
-        bindFlightToggleEvents(events, entrySelector, cardUuid, row, config);
-        bindShoulderRideEvents(events, entrySelector, cardUuid, row, config);
-    }
-
 
     private static void bindUnlink(
             UICommandBuilder commands,
@@ -551,8 +528,7 @@ final class BondedCompanionCardPresenter {
             @Nullable String language
     ) {
         boolean visible = flightToggleVisible(row);
-        boolean airborne = Boolean.parseBoolean(row.attributes().get(
-                BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE));
+        boolean airborne = flightToggleAirborne(row);
         LinkedNpcPanelIconStyles.visible(commands, entrySelector + " #BondedFlightToggleButton", visible);
         LinkedNpcPanelIconStyles.style(commands, entrySelector + " #BondedFlightToggleButton", airborne ? "FlightAirborne" : "FlightGrounded");
         commands.set(entrySelector + " #BondedFlightModeGroundedIcon.Visible",
@@ -569,6 +545,11 @@ final class BondedCompanionCardPresenter {
         return row.status().state() == BondedCompanionStateView.ACTIVE
                 && Boolean.parseBoolean(row.attributes().get(
                         BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE));
+    }
+
+    private static boolean flightToggleAirborne(BondedCompanionPanelPresentation row) {
+        return Boolean.parseBoolean(row.attributes().get(
+                BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE));
     }
 
     static void bindFlightToggleEvents(

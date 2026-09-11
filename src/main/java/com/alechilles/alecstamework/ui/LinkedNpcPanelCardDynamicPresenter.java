@@ -63,11 +63,10 @@ final class LinkedNpcPanelCardDynamicPresenter {
             String language
     ) {
         BondedCompanionCardPresenter.refreshDynamicState(
-                commands, selector, current.bonded(), language);
+                commands, selector, previous == null ? null : previous.bonded(),
+                current.bonded(), language);
         BondedCompanionCardPresenter.refreshProgressionState(
                 commands, selector, current.bonded(), pendingUnlink, language);
-        BondedCompanionCardPresenter.bindFlightToggleEvents(
-                events, selector, npcUuid, current.bonded(), bindingConfig);
     }
 
     private static boolean vitalsChanged(LinkedNpcEntry previous, LinkedNpcEntry current) {

@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.hypixel.hytale.assetstore.TestItemAssetStore;
@@ -290,13 +292,11 @@ class TameworkCommandSelectionPageRefreshTest {
         build(page); feature.set(feature(5, true)); refresh(page, true);
         CapturedUpdate update = packets.updates.getFirst();
         assertCommand(update, "#TameworkLinkedPanelList[0] #BondedLevelText.Text");
-        assertTrue(java.util.Arrays.stream(update.events.getEvents()).anyMatch(event ->
-                        event.type == com.hypixel.hytale.protocol.packets.interface_
-                                .CustomUIEventBindingType.Activating
-                                && ("#TameworkLinkedPanelList[0] "
-                                + "#BondedFlightToggleButton").equals(event.selector)
-                                && event.data.contains("__bonded_flight_toggle__:" + CARD)),
-                "An unrelated bonded-card refresh must retain the flight-toggle click binding.");
+        assertEquals(0, update.events.getEvents().length,
+                "An unrelated refresh must preserve the existing input handlers.");
+        assertFalse(java.util.Arrays.stream(update.commands.getCommands()).anyMatch(command ->
+                command.selector.contains("#BondedFlight")),
+                "Progression changes must leave the flight button untouched.");
     }
 
     @Test
@@ -309,7 +309,7 @@ class TameworkCommandSelectionPageRefreshTest {
     }
 
     @Test
-    void dynamicFlightRefreshRebindsTheToggleForTheNextClick() throws Exception {
+    void dynamicFlightRefreshPreservesTheExistingToggleBinding() throws Exception {
         CapturedPackets packets = new CapturedPackets();
         AtomicReference<CommandPanelFeaturePresentation> feature =
                 new AtomicReference<>(feature(4, true, false));
@@ -322,13 +322,8 @@ class TameworkCommandSelectionPageRefreshTest {
         CapturedUpdate update = packets.updates.getFirst();
         assertCommand(update,
                 "#TameworkLinkedPanelList[0] #BondedFlightModeAirborneIcon.Visible");
-        assertTrue(java.util.Arrays.stream(update.events.getEvents()).anyMatch(event ->
-                        event.type == com.hypixel.hytale.protocol.packets.interface_
-                                .CustomUIEventBindingType.Activating
-                                && ("#TameworkLinkedPanelList[0] "
-                                + "#BondedFlightToggleButton").equals(event.selector)
-                                && event.data.contains("__bonded_flight_toggle__:" + CARD)),
-                "A dynamic visual refresh must preserve the next flight-toggle click.");
+        assertEquals(0, update.events.getEvents().length,
+                "Flight feedback must preserve the existing input handlers.");
     }
 
     @Test
