@@ -21,6 +21,7 @@ public final class TameworkRuntimeModule implements Comparable<TameworkRuntimeMo
     public static final TameworkRuntimeModule AVATAR_FLIGHT = of("avatar-flight");
     public static final TameworkRuntimeModule COMPANION_MOVEMENT = of("companion-movement");
     public static final TameworkRuntimeModule ATTACHMENTS = of("attachments");
+    public static final TameworkRuntimeModule AMBIENT_HERDS = of("ambient-herds");
     public static final TameworkRuntimeModule NEEDS = of("needs");
     public static final TameworkRuntimeModule HAPPINESS = of("happiness");
     public static final TameworkRuntimeModule FOOD = of("food");
@@ -49,6 +50,7 @@ public final class TameworkRuntimeModule implements Comparable<TameworkRuntimeMo
             AVATAR_FLIGHT,
             COMPANION_MOVEMENT,
             ATTACHMENTS,
+            AMBIENT_HERDS,
             NEEDS,
             HAPPINESS,
             FOOD,

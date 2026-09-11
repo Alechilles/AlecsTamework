@@ -96,6 +96,7 @@ public final class TameworkRuntimeModuleCatalog {
                         TameworkRuntimeModule.ATTACHMENTS,
                         core
                 ),
+                TameworkRuntimeModuleDescriptor.of(TameworkRuntimeModule.AMBIENT_HERDS),
                 TameworkRuntimeModuleDescriptor.of(needs, core),
                 TameworkRuntimeModuleDescriptor.of(
                         happiness,

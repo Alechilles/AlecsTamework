@@ -26,6 +26,17 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private static final int MILLIS_PER_MINUTE = 60_000;
     private static final String DEFAULT_SIMPLE_CLAIMS_DAMAGE_ALLOW_DAMAGE_PERMISSION_KEY =
             "tamework.damage_tamed_claim_npc";
+    private static final BuilderCodec<AmbientHerdsSection> AMBIENT_HERDS_SECTION_CODEC =
+            BuilderCodec.builder(AmbientHerdsSection.class, AmbientHerdsSection::new)
+                    .append(new KeyedCodec<>("Enabled", Codec.BOOLEAN),
+                            (section, value) -> section.enabled = value, section -> section.enabled)
+                    .documentation("Enables nearby wild herd journeys. Defaults to false; omitted inherits.")
+                    .add()
+                    .append(new KeyedCodec<>("RoleIds", Codec.STRING_ARRAY),
+                            (section, value) -> section.roleIds = value, section -> section.roleIds)
+                    .documentation("Eligible NPC roles. Omitted inherits; an explicit array replaces the parent.")
+                    .add().build();
+
     private static final BuilderCodec<GeneralSection> GENERAL_SECTION_CODEC = BuilderCodec.builder(
                     GeneralSection.class, GeneralSection::new
             )
@@ -488,6 +499,13 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
             .documentation("Organized section for command runtime and respawn tuning settings. Inheritance: omitted "
                     + "section inherits from parent; when present, only explicitly defined nested fields override parent.")
             .add()
+            .<AmbientHerdsSection>append(
+                    new KeyedCodec<>("AmbientHerds", AMBIENT_HERDS_SECTION_CODEC),
+                    TwGlobalConfig::applyAmbientHerdsSection, TwGlobalConfig::toAmbientHerdsSection)
+            .documentation("Opt-in wild herd journeys, controlled by the winning global config. Omitted section "
+                    + "inherits; explicit nested fields override and missing nested fields inherit. "
+                    + "RoleIds replaces when explicit. Enabling the runtime module requires a restart.")
+            .add()
             .<AssetSetsSection>append(
                     new KeyedCodec<>("AssetSets", ASSET_SETS_SECTION_CODEC),
                     TwGlobalConfig::applyAssetSetsSection,
@@ -525,6 +543,8 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private AssetExtraInfo.Data data;
     private String id;
     private boolean enabled = true;
+    private boolean ambientHerdsEnabled;
+    private Set<String> ambientHerdRoleIds = Set.of();
     private int priority;
     private boolean blockOwnerDamage;
     private boolean blockAllPlayerDamageIfOwned;
@@ -812,8 +832,74 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         inheritInteractionDefaultsSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
         inheritCommandSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
         inheritAssetSetsSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
+        inheritAmbientHerdsSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
         inheritPopulationSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
         inheritSimpleClaimsSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
+    }
+
+    /** Whether the effective global policy allows ambient herd activities. */
+    public boolean isAmbientHerdsEnabled() {
+        return enabled && ambientHerdsEnabled;
+    }
+
+    /** Immutable eligible role IDs; explicit child lists replace inherited lists. */
+    @Nonnull
+    public Set<String> getAmbientHerdRoleIds() {
+        return ambientHerdRoleIds;
+    }
+
+    /** Constant-time runtime eligibility check, without rebuilding a role list per sensor evaluation. */
+    public boolean allowsAmbientHerdRole(@Nullable String roleId) {
+        return isAmbientHerdsEnabled() && roleId != null && ambientHerdRoleIds.contains(roleId);
+    }
+
+    private void applyAmbientHerdsSection(@Nullable AmbientHerdsSection section) {
+        if (section == null) {
+            return;
+        }
+        if (section.enabled != null) {
+            ambientHerdsEnabled = section.enabled;
+        }
+        if (section.roleIds != null) {
+            var roles = new java.util.LinkedHashSet<String>();
+            for (String role : section.roleIds) {
+                if (role != null && !role.isBlank()) {
+                    roles.add(role.trim());
+                }
+            }
+            ambientHerdRoleIds = Set.copyOf(roles);
+        }
+    }
+
+    private AmbientHerdsSection toAmbientHerdsSection() {
+        var section = new AmbientHerdsSection();
+        section.enabled = ambientHerdsEnabled;
+        section.roleIds = ambientHerdRoleIds.toArray(String[]::new);
+        return section;
+    }
+
+    private void inheritAmbientHerdsSection(TwGlobalConfig parent, Set<String> explicit,
+                                            @Nullable Map<String, Set<String>> nested) {
+        if (!explicit.contains("AmbientHerds")) {
+            ambientHerdsEnabled = parent.ambientHerdsEnabled;
+            ambientHerdRoleIds = parent.ambientHerdRoleIds;
+            return;
+        }
+        Set<String> fields = nested == null ? null : nested.get("AmbientHerds");
+        if (fields == null) {
+            return;
+        }
+        if (!fields.contains("Enabled")) {
+            ambientHerdsEnabled = parent.ambientHerdsEnabled;
+        }
+        if (!fields.contains("RoleIds")) {
+            ambientHerdRoleIds = parent.ambientHerdRoleIds;
+        }
+    }
+
+    private static final class AmbientHerdsSection {
+        private Boolean enabled;
+        private String[] roleIds;
     }
 
     public boolean isEnabled() {
