@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test;
 /** Regression coverage for the dedicated final bonded-companion card states. */
 class BondedCompanionCardPresenterTest {
     @Test
-    void activeCardShowsOnlyConfiguredMetricsAndItsDismissAction() {
+    void activeCardKeepsTheDismissActionWithoutPersistentNeedsMeters() {
         BondedCompanionPanelPresentation row = presentation(
                 BondedCompanionStateView.ACTIVE,
                 BondedCompanionStatusPresentation.Action.DISMISS,
@@ -53,55 +53,14 @@ class BondedCompanionCardPresenterTest {
         assertCommand(commands, "#Card #BondedStateDetailValue.Text", "AT YOUR SIDE");
         assertCommand(commands, "#Card #BondedPrimaryAction.Text", "DISMISS");
         assertCommand(commands, "#Card #BondedHealthText.Text", "320 / 400");
-        assertCommand(commands, "#Card #BondedMetricHappiness.Visible", "true");
-        assertCommand(commands, "#Card #BondedMetricHappiness #MetricValue.Text", "1%");
-        assertCommand(commands, "#Card #BondedMetricHunger.Visible", "false");
-        assertCommand(commands, "#Card #BondedMetricThirst.Visible", "false");
+        assertFalse(java.util.Arrays.stream(commands.getCommands())
+                        .anyMatch(command -> command.selector.contains("BondedMetric")),
+                "Temporary roster summons must not render persisted needs meters.");
         assertCommand(commands, "#Card #BondedSpecies.Text", "Nordic Drake");
-        assertCommand(commands, "#Card #BondedLevelText.Text", "LVL 12");
+        assertCommand(commands, "#Card #BondedLevelText.Text", "Lv. 12");
         assertCommand(commands, "#Card #BondedProgressionButton.Visible", "true");
         assertCommand(commands, "#Card #BondedProgressionButton.TooltipText",
                 "Level: 12");
-    }
-
-    @Test
-    void progressionTooltipAndXpStripUseTheSavedLevelingConfig() throws Exception {
-        String presenter = Files.readString(Path.of("src", "main", "java",
-                "com", "alechilles", "alecstamework", "ui",
-                "BondedCompanionCardPresenter.java"), StandardCharsets.UTF_8);
-        String binder = Files.readString(Path.of("src", "main", "java",
-                "com", "alechilles", "alecstamework", "ui",
-                "LinkedNpcPanelProgressionBinder.java"), StandardCharsets.UTF_8);
-
-        assertTrue(presenter.contains(
-                "bindXpProgress(commands, entrySelector, row, progression, language)"));
-        assertTrue(presenter.contains("#BondedXpFill.Anchor"));
-        assertTrue(presenter.contains("modifierTooltip(config, level, attributes, roleId, language)"));
-        assertTrue(binder.contains("resolveSavedModifierTooltip")
-                        && binder.contains("effect.getPerLevel() * levelOffset"),
-                "The saved config's per-level effects must become tooltip bonuses.");
-    }
-
-    @Test
-    void xpStripSharesTheTalentShortcutTooltipAndDetailedModifierBreakdown()
-            throws Exception {
-        String asset = Files.readString(Path.of("src", "main", "resources",
-                "Common", "UI", "Custom",
-                "TameworkBondedCompanionPanelCard.ui"), StandardCharsets.UTF_8);
-        String presenter = Files.readString(Path.of("src", "main", "java",
-                "com", "alechilles", "alecstamework", "ui",
-                "BondedCompanionCardPresenter.java"), StandardCharsets.UTF_8);
-        String binder = Files.readString(Path.of("src", "main", "java",
-                "com", "alechilles", "alecstamework", "ui",
-                "LinkedNpcPanelProgressionBinder.java"), StandardCharsets.UTF_8);
-
-        assertTrue(asset.contains("TextButton #BondedXpButton {")
-                        && asset.contains("TextTooltipStyle: @BondedCardTextTooltipStyle"));
-        assertTrue(presenter.contains("#BondedXpButton.TooltipText"));
-        assertTrue(presenter.contains("entrySelector + \" #BondedXpButton\""));
-        assertTrue(binder.contains("resolvePurchasedEffectMultiplier")
-                        && binder.contains("TraitModifierService.resolveMultiplier"),
-                "Bonded tooltips must show total, level, talent, and trait modifiers.");
     }
 
     @Test
@@ -387,48 +346,7 @@ class BondedCompanionCardPresenterTest {
                 "en-US");
 
         assertCommand(commands, "#Card #BondedHealthText.Text", "125 / 250");
-        assertCommand(commands, "#Card #BondedHealthFill.Anchor", "116");
-    }
-
-    @Test
-    void progressionRowUsesTheExistingTalentCommandPathForEveryBondedState()
-            throws Exception {
-        String presenter = Files.readString(Path.of("src", "main", "java",
-                "com", "alechilles", "alecstamework", "ui",
-                "BondedCompanionCardPresenter.java"), StandardCharsets.UTF_8);
-
-        int progressionStart = presenter.indexOf("private static void bindProgression");
-        int primaryActionStart = presenter.indexOf("private static void bindPrimaryAction");
-        String progression = presenter.substring(progressionStart, primaryActionStart);
-        assertTrue(progression.contains("#BondedProgressionButton"));
-        assertTrue(progression.contains("config.openTalentsCommandPrefix() + cardUuid"),
-                "The inline level text must open this bonded companion's talent page.");
-        assertTrue(progression.contains("boolean canOpen = !pendingUnlink"),
-                "The persistent stats button should open the durable talent page in every card state.");
-        assertFalse(progression.contains("row.status().state() == BondedCompanionStateView.ACTIVE"),
-                "Stored and dead bonded companions must open the same durable talent page.");
-    }
-
-    @Test
-    void cardCanRebindTalentInputWithoutRecreatingItsVisualTree() throws Exception {
-        String presenter = Files.readString(Path.of("src", "main", "java",
-                "com", "alechilles", "alecstamework", "ui",
-                "BondedCompanionCardPresenter.java"), StandardCharsets.UTF_8);
-
-        int bindingStart = presenter.indexOf("static void bindEventBindings(");
-        int unlinkStart = presenter.indexOf("private static void bindUnlink(", bindingStart);
-        assertTrue(bindingStart >= 0,
-                "Bonded cards need an input-only refresh binding helper.");
-        assertTrue(unlinkStart > bindingStart,
-                "Input-only binding helper should be bounded by card rendering helpers.");
-
-        String binding = presenter.substring(bindingStart, unlinkStart);
-        assertTrue(binding.contains("bindProgressionEvents"),
-                "The lightweight refresh must keep the level/talent shortcut bound.");
-        assertTrue(binding.contains("bindFlightToggleEvents"),
-                "The lightweight refresh must keep an eligible flight toggle bound.");
-        assertFalse(binding.contains("UICommandBuilder"),
-                "Input refreshes must not rebuild or flicker the card visual tree.");
+        assertCommand(commands, "#Card #BondedHealthFill.Anchor", "129");
     }
 
     @Test

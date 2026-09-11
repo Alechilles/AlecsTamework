@@ -53,7 +53,7 @@ final class BondedCompanionCardStatePresentation {
                     remaining(cooldown, language), false);
         }
         if (status.actionEnabled()) {
-            return new StateCopy(text(language, "state.ready"),
+            return new StateCopy(text(language, "state.dead"),
                     text(language, "caption.reviveReady"),
                     text(language, "detail.reviveReady"), true);
         }
