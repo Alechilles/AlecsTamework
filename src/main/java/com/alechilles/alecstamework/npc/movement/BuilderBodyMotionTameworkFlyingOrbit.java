@@ -43,7 +43,7 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
     public BuilderBodyMotionTameworkFlyingOrbit readConfig(@Nonnull JsonElement data) {
         super.readConfig(data);
         getEnum(data, "Mode", mode, Mode.class, Mode.CYCLE, BuilderDescriptorState.WorkInProgress,
-                "Steering mode: Cycle, Orbit, Approach, FaceTarget, WanderTarget, or PassThroughTarget.", null);
+                "Steering mode: Cycle, Orbit, Kettle, Approach, FaceTarget, WanderTarget, or PassThroughTarget.", null);
         getDouble(data, "OrbitRadius", orbitRadius, 18.0, DoubleSingleValidator.greater0(),
                 BuilderDescriptorState.WorkInProgress, "Preferred horizontal orbit radius around the target.", null);
         getDouble(data, "OrbitRadiusTolerance", orbitRadiusTolerance, 4.0, DoubleSingleValidator.greater0(),
@@ -202,6 +202,7 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
     enum Mode implements Supplier<String> {
         CYCLE("Cycle"),
         ORBIT("Orbit"),
+        KETTLE("Kettle"),
         APPROACH("Approach"),
         FACE_TARGET("FaceTarget"),
         WANDER_TARGET("WanderTarget"),

@@ -11,13 +11,45 @@ mod; consuming the shared IDs lets future Tamework fixes apply automatically.
 ### `Component_Tamework_Instruction_Flight_Formation`
 
 Optional ambient flight formation around a native flock leader. Exposes
-`FlightFormation` (`None`, `Loose`, `Chevron`), `FlightFormationSpacing` and
+`FlightFormation` (`None`, `Loose`, `Cluster`, `Chevron`), `FlightFormationSpacing` and
 `FlightFormationTightness`. Uses the `TameworkFormationFly` controller and
 `TameworkFlightFormationReady` to select
 `TameworkFlightFormation` only for eligible airborne followers. Keep landing,
 escape and commands ahead of it, with normal wandering as a fallback.
 See the [Flight Formation Guide](../wiki/Modder-Documentation/System-Integration/Flight-Formation-Guide.md)
 for placement, defaults and runtime limits.
+
+`Cluster` uses compact irregular three-dimensional slots with gentle bounded
+drift. It keeps the same leader eligibility, obstacle avoidance, speed correction,
+and native separation as the other formations.
+
+### `Component_Tamework_Instruction_Flight_Kettle`
+
+Optional daytime thermal circling, separate from travel formations. Place it in
+airborne idle after threat, landing and recovery decisions, before ordinary
+wandering or formation travel. It falls through while inactive. Defaults:
+
+- `KettleEnabled`: `false`.
+- `KettleRadius`: `18` blocks.
+- `KettleAltitudeRange`: `[15, 28]` blocks above the native flock leader's home point.
+- `KettleCooldownRange`: `[60, 120]` seconds between episode starts.
+- `KettleDurationRange`: `[20, 35]` seconds per episode.
+- `DayTimePeriod`: `[6.01, 17.99]`.
+
+Leaders and lone birds start episodes; native flock beacons invite followers.
+`TameworkFlyingOrbit` with `Mode: "Kettle"` circles the leader's home point
+(the bird's own home when alone), using slightly different radii and heights
+for flock members. It rises gradually within the configured altitude range.
+All birds turn in the same direction. This mode resolves its own center and
+does not require a sensor position provider. Existing orbit modes retain their
+target-relative behavior.
+
+Motion state is local and resets on activation. Native flock membership and
+the home point are read on the NPC's owning world thread; there are no global
+scans, background tasks, or saved thermal records. Timers continue to expire
+through interruptions. A follower invitation expires within one second after
+the leader stops kettling. Terrain avoidance can deform the circles. This is
+ambient circling, not a simulation of wind or temperature.
 
 
 ### `Component_Tamework_Instruction_Follow_Large`

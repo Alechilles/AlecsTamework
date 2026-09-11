@@ -4,7 +4,7 @@
   "Parameters": {
     "FlightFormation": {
       "Value": "None",
-      "Description": "Ambient flight formation: None, Loose, or Chevron."
+      "Description": "Ambient flight formation: None, Loose, Cluster, or Chevron."
     },
     "FlightFormationSpacing": {
       "Value": 3,

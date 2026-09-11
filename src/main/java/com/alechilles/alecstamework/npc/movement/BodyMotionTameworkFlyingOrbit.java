@@ -5,9 +5,12 @@ import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.server.core.entity.group.EntityGroup;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.physics.util.PhysicsMath;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.flock.FlockMembership;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.movement.Steering;
 import com.hypixel.hytale.server.npc.movement.controllers.MotionController;
@@ -52,6 +55,8 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
     private final FlyingObstacleAvoidance obstacleAvoidance = new FlyingObstacleAvoidance();
     private final ProbeMoveData obstacleProbeData = new ProbeMoveData();
     private final Vector3d targetPosition = new Vector3d();
+    private final KettleFlightState kettle = new KettleFlightState();
+    private int kettleMemberIndex;
     private final Vector3d wanderDestination = new Vector3d();
     private final Vector3d waypointRoute = new Vector3d();
     private final Vector3d obstacleReference = new Vector3d();
@@ -118,6 +123,7 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
         wanderPreflightGate.reset();
         hasPassThroughDestination = false;
         obstacleAvoidance.reset();
+        kettle.reset();
         if (mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.CYCLE) {
             beginOrbit();
         }
@@ -132,8 +138,10 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
                                    @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         desiredSteering.clear();
         MotionController active = role.getActiveMotionController();
+        boolean kettling = mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.KETTLE;
         if (!(active instanceof MotionControllerFly fly)
-                || sensorInfo == null || !sensorInfo.getPositionProvider().providePosition(targetPosition)) {
+                || (kettling ? !resolveKettleCenter(ref, componentAccessor)
+                : sensorInfo == null || !sensorInfo.getPositionProvider().providePosition(targetPosition))) {
             returningToWanderTarget = updateWanderReturnState(
                     returningToWanderTarget, false, 0.0,
                     wanderRadiusRange[0], wanderRadiusRange[1]);
@@ -156,6 +164,10 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
         NPCMountComponent nativeMount = avoidObstacles
                 ? this.resolveNativeMount(ref, componentAccessor) : null;
         boolean autonomousAvoidance = avoidObstacles && !isRiderControlled(tameworkRide, nativeMount);
+        if (kettling && (fly.onGround() || isRiderControlled(
+                this.tameworkRide(ref, componentAccessor), this.resolveNativeMount(ref, componentAccessor)))) {
+            return false;
+        }
         if (autonomousAvoidance) {
             obstacleAvoidance.beginUpdate(dt);
             bindObstacleProbe(ref, selfPosition, fly, componentAccessor);
@@ -221,9 +233,13 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
             } else if (mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.FACE_TARGET) {
                 translation.zero();
             } else if (!approaching) {
+                if (kettling) {
+                    kettle.advance(dt);
+                }
                 resolveOrbitTranslation(
                         selfPosition.x(), selfPosition.z(), targetPosition.x(), targetPosition.z(),
-                        orbitRadius, orbitRadiusTolerance, orbitDirection, relativeSpeed, translation);
+                        kettling ? KettleFlightState.radius(kettleMemberIndex, orbitRadius) : orbitRadius,
+                        orbitRadiusTolerance, kettling ? 1 : orbitDirection, relativeSpeed, translation);
             } else {
                 resolveApproachTranslation(
                         selfPosition.x(), selfPosition.z(), targetPosition.x(), targetPosition.z(),
@@ -236,6 +252,12 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
                         selfPosition.y(), targetPosition.y(), desiredAltitudeRange,
                         climbRelativeSpeed, sinkRelativeSpeed);
                 translation.y = altitudeCorrection;
+                if (kettling) {
+                    double desiredY = targetPosition.y() + kettle.altitude(
+                            kettleMemberIndex, desiredAltitudeRange[0], desiredAltitudeRange[1]);
+                    translation.y = clamp((desiredY - selfPosition.y()) * 0.15,
+                            -sinkRelativeSpeed, climbRelativeSpeed);
+                }
             }
 
             deferPreflightedWaypointMovement(deferWaypointMovement, translation);
@@ -667,6 +689,38 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
             return output.zero();
         }
         return output.set(moveX / distance * speed, moveY / distance * speed, moveZ / distance * speed);
+    }
+
+    /** Read the native leader's home point on the NPC update thread; never orbit a moving follower. */
+    private boolean resolveKettleCenter(Ref<EntityStore> ref, ComponentAccessor<EntityStore> accessor) {
+        NPCEntity anchor = accessor.getComponent(ref, NPCEntity.getComponentType());
+        kettleMemberIndex = 0;
+        ComponentType<EntityStore, FlockMembership> type = FlockMembership.getComponentType();
+        FlockMembership membership = type == null ? null : accessor.getComponent(ref, type);
+        Ref<EntityStore> flockRef = membership == null ? null : membership.getFlockRef();
+        if (flockRef != null && flockRef.isValid()) {
+            EntityGroup group = accessor.getComponent(flockRef, EntityGroup.getComponentType());
+            Ref<EntityStore> leader = group == null || group.isDissolved() ? null : group.getLeaderRef();
+            if (leader != null && leader.isValid()) {
+                NPCEntity leaderNpc = accessor.getComponent(leader, NPCEntity.getComponentType());
+                if (leaderNpc != null) {
+                    anchor = leaderNpc;
+                    var members = group.getMemberList();
+                    for (int i = 0; i < members.size(); i++) {
+                        if (ref.equals(members.get(i))) {
+                            kettleMemberIndex = i;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        if (anchor == null) {
+            return false;
+        }
+        targetPosition.set(anchor.getLeashPoint());
+        return Double.isFinite(targetPosition.x) && Double.isFinite(targetPosition.y)
+                && Double.isFinite(targetPosition.z);
     }
 
     static Vector3d resolveOrbitTranslation(double selfX,

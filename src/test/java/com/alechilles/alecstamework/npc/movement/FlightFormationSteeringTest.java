@@ -100,6 +100,38 @@ class FlightFormationSteeringTest {
     }
 
     @Test
+    void clusterSlotsStayCompactSeparatedAndGentlyMobile() {
+        Vector3d leader = new Vector3d(100.0, 80.0, -50.0);
+        Vector3d heading = new Vector3d(3.0, 0.0, 4.0);
+        Vector3d[] slots = new Vector3d[12];
+        for (int second = 0; second <= 30; second += 5) {
+            for (int slot = 0; slot < slots.length; slot++) {
+                Vector3d target = FlightFormationSteering.resolveTarget(
+                        BuilderBodyMotionTameworkFlightFormation.Formation.CLUSTER,
+                        slot, 3.0, second, leader, heading, new Vector3d());
+                assertTrue(Double.isFinite(target.x) && Double.isFinite(target.y) && Double.isFinite(target.z));
+                assertTrue(target.distance(leader) < 9.0,
+                        "A cluster follower should remain near its flock leader.");
+                for (int other = 0; other < slot; other++) {
+                    assertTrue(target.distance(slots[other]) > 1.15,
+                            "Cluster followers must retain enough separation to avoid overlapping.");
+                }
+                slots[slot] = target;
+            }
+        }
+
+        Vector3d initial = FlightFormationSteering.resolveTarget(
+                BuilderBodyMotionTameworkFlightFormation.Formation.CLUSTER,
+                4, 3.0, 0.0, leader, heading, new Vector3d());
+        Vector3d later = FlightFormationSteering.resolveTarget(
+                BuilderBodyMotionTameworkFlightFormation.Formation.CLUSTER,
+                4, 3.0, 20.0, leader, heading, new Vector3d());
+        double driftDistance = initial.distance(later);
+        assertTrue(driftDistance > 0.05 && driftDistance < 0.75,
+                "Cluster movement should be visible without breaking its compact spacing.");
+    }
+
+    @Test
     void yawFallbackUsesTheEngineForwardDirectionForRotatedChevronSlots() {
         Vector3d heading = BodyMotionTameworkFlightFormation.resolveHeadingFromYaw(
                 (float) (Math.PI / 2.0), new Vector3d());

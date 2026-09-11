@@ -26,7 +26,7 @@ public final class BuilderBodyMotionTameworkFlightFormation extends BuilderBodyM
         super.readConfig(data);
         getEnum(data, "Formation", formation, Formation.class, Formation.NONE,
                 BuilderDescriptorState.WorkInProgress,
-                "Flight formation: None, Loose, or Chevron.", null);
+                "Flight formation: None, Loose, Cluster, or Chevron.", null);
         getDouble(data, "Spacing", spacing, 3.0, DoubleSingleValidator.greater0(),
                 BuilderDescriptorState.WorkInProgress,
                 "Distance between neighboring formation slots.", null);
@@ -48,7 +48,7 @@ public final class BuilderBodyMotionTameworkFlightFormation extends BuilderBodyM
     @Nonnull
     @Override
     public String getShortDescription() {
-        return "Maintain a loose or chevron flight formation behind the native flock leader.";
+        return "Maintain a loose, cluster, or chevron flight formation behind the native flock leader.";
     }
 
     @Nonnull
@@ -82,6 +82,7 @@ public final class BuilderBodyMotionTameworkFlightFormation extends BuilderBodyM
     public enum Formation implements Supplier<String> {
         NONE("None"),
         LOOSE("Loose"),
+        CLUSTER("Cluster"),
         CHEVRON("Chevron");
 
         private final String name;

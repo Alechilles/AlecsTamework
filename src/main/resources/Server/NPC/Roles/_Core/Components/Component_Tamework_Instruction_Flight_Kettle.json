@@ -1,0 +1,200 @@
+{
+  "Type": "Component",
+  "Class": "Instruction",
+  "Parameters": {
+    "KettleEnabled": {
+      "Value": false,
+      "Description": "Allow occasional ambient thermal circling."
+    },
+    "KettleRadius": {
+      "Value": 18,
+      "Description": "Base thermal orbit radius in blocks."
+    },
+    "KettleAltitudeRange": {
+      "Value": [
+        15,
+        28
+      ],
+      "Description": "Altitude above the native flock leader home point."
+    },
+    "KettleCooldownRange": {
+      "Value": [
+        60,
+        120
+      ],
+      "Description": "Seconds between starts of leader thermal episodes."
+    },
+    "KettleDurationRange": {
+      "Value": [
+        20,
+        35
+      ],
+      "Description": "Seconds spent in a thermal episode."
+    },
+    "DayTimePeriod": {
+      "Value": [
+        6.01,
+        17.99
+      ],
+      "Description": "Active daytime interval for thermal circling."
+    }
+  },
+  "Content": {
+    "Enabled": {
+      "Compute": "KettleEnabled"
+    },
+    "TreeMode": true,
+    "Sensor": {
+      "Type": "And",
+      "Sensors": [
+        {
+          "Type": "MotionController",
+          "MotionController": "Fly"
+        },
+        {
+          "Type": "Not",
+          "Sensor": {
+            "Type": "OnGround"
+          }
+        },
+        {
+          "Type": "Time",
+          "Period": {
+            "Compute": "DayTimePeriod"
+          },
+          "CheckDay": true
+        }
+      ]
+    },
+    "Instructions": [
+      {
+        "Continue": true,
+        "Sensor": {
+          "Type": "Any",
+          "Once": true
+        },
+        "Actions": [
+          {
+            "Type": "TimerStart",
+            "Name": "Tw_Kettle_Cooldown",
+            "StartValueRange": {
+              "Compute": "KettleCooldownRange"
+            },
+            "RestartValueRange": {
+              "Compute": "KettleCooldownRange"
+            }
+          }
+        ]
+      },
+      {
+        "TreeMode": true,
+        "Sensor": {
+          "Type": "Not",
+          "Sensor": {
+            "Type": "Self",
+            "Filters": [
+              {
+                "Type": "Flock",
+                "FlockStatus": "Follower"
+              }
+            ]
+          }
+        },
+        "Instructions": [
+          {
+            "Continue": true,
+            "Sensor": {
+              "Type": "Timer",
+              "Name": "Tw_Kettle_Cooldown",
+              "State": "Stopped"
+            },
+            "Actions": [
+              {
+                "Type": "TimerStart",
+                "Name": "Tw_Kettle_Duration",
+                "StartValueRange": {
+                  "Compute": "KettleDurationRange"
+                },
+                "RestartValueRange": {
+                  "Compute": "KettleDurationRange"
+                }
+              },
+              {
+                "Type": "TimerRestart",
+                "Name": "Tw_Kettle_Duration"
+              },
+              {
+                "Type": "TimerRestart",
+                "Name": "Tw_Kettle_Cooldown"
+              }
+            ]
+          },
+          {
+            "Sensor": {
+              "Type": "Timer",
+              "Name": "Tw_Kettle_Duration",
+              "State": "Running"
+            },
+            "BodyMotion": {
+              "Type": "TameworkFlyingOrbit",
+              "Mode": "Kettle",
+              "OrbitRadius": {
+                "Compute": "KettleRadius"
+              },
+              "RelativeSpeed": 0.35,
+              "DesiredAltitudeRange": {
+                "Compute": "KettleAltitudeRange"
+              },
+              "ClimbRelativeSpeed": 0.12,
+              "SinkRelativeSpeed": 0.12,
+              "AvoidObstacles": true
+            },
+            "Actions": [
+              {
+                "Type": "FlockBeacon",
+                "Message": "Tw_Kettle_Active",
+                "SendToSelf": false,
+                "ExpirationTime": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "Self",
+              "Filters": [
+                {
+                  "Type": "Flock",
+                  "FlockStatus": "Follower"
+                }
+              ]
+            },
+            {
+              "Type": "Beacon",
+              "Message": "Tw_Kettle_Active",
+              "Range": 128
+            }
+          ]
+        },
+        "BodyMotion": {
+          "Type": "TameworkFlyingOrbit",
+          "Mode": "Kettle",
+          "OrbitRadius": {
+            "Compute": "KettleRadius"
+          },
+          "RelativeSpeed": 0.35,
+          "DesiredAltitudeRange": {
+            "Compute": "KettleAltitudeRange"
+          },
+          "ClimbRelativeSpeed": 0.12,
+          "SinkRelativeSpeed": 0.12,
+          "AvoidObstacles": true
+        }
+      }
+    ]
+  }
+}
