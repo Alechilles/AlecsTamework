@@ -27,6 +27,8 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkAttackedTargetSlotRecently;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkAttitudeFromTargetSlot;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkIsOwner;
+import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkInteractionActive;
+import com.alechilles.alecstamework.npc.movement.builders.BuilderBodyMotionTameworkMaintainDistance;
 import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkFlyingOrbit;
 import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkMountedGlide;
 import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkRide;
@@ -202,6 +204,8 @@ public final class TameworkNpcBuilderRegistrar {
                     BuilderEntityFilterTameworkAttackedTargetSlotRecently::new
             );
             filterFactory.add(BuilderEntityFilterTameworkIsOwner.BUILDER_ID, BuilderEntityFilterTameworkIsOwner::new);
+            filterFactory.add(BuilderEntityFilterTameworkInteractionActive.BUILDER_ID,
+                    BuilderEntityFilterTameworkInteractionActive::new);
         }
 
         BuilderFactory<BodyMotion> bodyMotionFactory = npcPlugin.getBuilderManager().getFactory(BodyMotion.class);
@@ -218,6 +222,8 @@ public final class TameworkNpcBuilderRegistrar {
                     BuilderBodyMotionTameworkMountedGlide::new
             );
             bodyMotionFactory.add(BuilderBodyMotionTameworkRide.BUILDER_ID, BuilderBodyMotionTameworkRide::new);
+            bodyMotionFactory.add(BuilderBodyMotionTameworkMaintainDistance.BUILDER_ID,
+                    BuilderBodyMotionTameworkMaintainDistance::new);
         }
 
         BuilderFactory<MotionController> motionControllerFactory =

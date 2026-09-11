@@ -2,6 +2,10 @@
 
 ## Unreleased development changes
 
+- Added `TameworkMaintainDistance` for peaceful target-relative positioning and
+  `TameworkInteractionActive` to select entities running a named root interaction.
+  These support the Alec's Cats teaser wand without combat targeting or stored play state.
+
 - Rebuilt bonded roster cards around portraits, full-width names, health and
   progression, with clear summon, dismiss, revival, and session status. Roster
   companions omit care meters and use one toolbar for state tabs, sorting,
