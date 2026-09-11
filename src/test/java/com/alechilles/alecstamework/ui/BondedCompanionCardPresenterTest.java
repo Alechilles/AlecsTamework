@@ -51,7 +51,7 @@ class BondedCompanionCardPresenterTest {
         assertCommand(commands, "#Card #BondedStateInWorld.Text", "IN WORLD");
         assertCommand(commands, "#Card #BondedStateDetail.Text", "SUMMONED");
         assertCommand(commands, "#Card #BondedStateDetailValue.Text", "AT YOUR SIDE");
-        assertCommand(commands, "#Card #BondedPrimaryAction.Text", "DISMISS");
+        assertCommand(commands, "#Card #BondedActionLabel.Text", "DISMISS");
         assertCommand(commands, "#Card #BondedHealthText.Text", "320 / 400");
         assertFalse(java.util.Arrays.stream(commands.getCommands())
                         .anyMatch(command -> command.selector.contains("BondedMetric")),
@@ -264,8 +264,8 @@ class BondedCompanionCardPresenterTest {
         assertCommand(commands, "#Card #BondedUnlinkButton.Visible", "false");
         assertCommand(commands, "#Card #BondedUnlinkConfirmButton.Visible", "true");
         assertCommand(commands, "#Card #BondedPrimaryAction.Visible", "false");
-        assertCommand(commands, "#Card #BondedStateDetail.Text",
-                "DELETE THIS COMPANION PERMANENTLY");
+        assertCommand(commands, "#Card #BondedUnlinkCancelButton.Visible", "true");
+        assertCommand(commands, "#Card #BondedActionLabel.Text", "DELETE");
     }
 
     @Test
@@ -292,7 +292,7 @@ class BondedCompanionCardPresenterTest {
 
         assertCommand(commands, "#Card #BondedStateDead.Text", "DEAD");
         assertCommand(commands, "#Card #BondedPrimaryActionDisabled.Visible", "true");
-        assertCommand(commands, "#Card #BondedPrimaryActionDisabled.Text", "REVIVE");
+        assertCommand(commands, "#Card #BondedActionLabel.Text", "REVIVE");
         assertCommand(commands, "#Card #BondedHealthText.Text", "0 / 400");
         assertCommand(commands, "#Card #BondedHealthFill.Visible", "false");
         assertCommand(commands, "#Card #BondedPrimaryActionDisabled.TooltipText",
@@ -338,6 +338,33 @@ class BondedCompanionCardPresenterTest {
                         .anyMatch(command -> "#Card #BondedLevelText.Text".equals(command.selector)
                                 && command.data.contains("<color")),
                 "Runtime label text is literal; colored spans must not be sent as markup.");
+    }
+
+    @Test
+    void durationAndCooldownBarsShowRemainingFractionAndHideWhenReady() {
+        for (BondedCompanionStateView state : BondedCompanionStateView.values()) {
+            boolean active = state == BondedCompanionStateView.ACTIVE;
+            var status = new BondedCompanionStatusPresentation(state,
+                    active ? BondedCompanionStatusPresentation.Action.DISMISS
+                            : state == BondedCompanionStateView.DEAD
+                                    ? BondedCompanionStatusPresentation.Action.REVIVE
+                                    : BondedCompanionStatusPresentation.Action.SUMMON,
+                    active, null, active ? 0L : 40_000L);
+            var row = new BondedCompanionPanelPresentation("timer", "roster", "role", 1L,
+                    "Companion", null, null, null,
+                    Map.of("sessionDurationMs", "80000", "sessionRemainingMs", "40000",
+                            "cooldownDurationMs", "80000"), Map.of(), status, null);
+            UICommandBuilder commands = new UICommandBuilder();
+            BondedCompanionCardPresenter.refreshDynamicState(commands, "#Card", row, "en-US");
+            assertCommand(commands, "#Card #BondedSessionFrame.Visible", "true");
+            assertCommand(commands, "#Card #BondedSessionFill.Anchor", "191");
+            assertCommand(commands, "#Card #BondedSessionFill.Visible", "true");
+        }
+        UICommandBuilder ready = new UICommandBuilder();
+        BondedCompanionCardPresenter.refreshDynamicState(ready, "#Card",
+                presentation(BondedCompanionStateView.STORED,
+                        BondedCompanionStatusPresentation.Action.SUMMON, true, Map.of(), null), "en-US");
+        assertCommand(ready, "#Card #BondedSessionFrame.Visible", "false");
     }
 
     @Test

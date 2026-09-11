@@ -5,7 +5,9 @@
 - Rebuilt bonded roster cards around portraits, full-width names, health and
   progression, with clear summon, dismiss, revival, and session status. Roster
   companions omit care meters and use one toolbar for state tabs, sorting,
-  name search, and active-capacity information.
+  name search, and active-capacity information. Action buttons pair icons with
+  labels, duration and cooldown bars span the action section, and permanent
+  deletion can be cancelled directly from the card.
 
 - Regular NPC cards reuse capture images through hidden display-item aliases,
   including configured appearance variants, without copying textures into the UI

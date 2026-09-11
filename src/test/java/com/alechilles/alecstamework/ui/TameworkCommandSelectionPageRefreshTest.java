@@ -443,6 +443,26 @@ class TameworkCommandSelectionPageRefreshTest {
     }
 
     @Test
+    void cancelRosterDeletionRestoresActionsAndIgnoresAnotherCardsCancel() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(feature(4, false)));
+        build(page);
+        event(page, CommandSelectionPageEventBinder.UNLINK_COMMAND_PREFIX + CARD);
+        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #BondedUnlinkConfirmButton.Visible", "true");
+        int beforeStaleCancel = packets.updates.size();
+        event(page, BondedCompanionCardPresenter.CANCEL_UNLINK_COMMAND_PREFIX + UUID.randomUUID());
+        assertEquals(beforeStaleCancel, packets.updates.size());
+        var cancel = java.util.Arrays.stream(packets.updates.getLast().events.getEvents())
+                .filter(binding -> binding.selector.endsWith(" #BondedUnlinkCancelButton"))
+                .findFirst().orElseThrow();
+        page.handleDataEvent(null, null, CommandSelectionEventData.CODEC.decode(
+                BsonDocument.parse(cancel.data), new com.hypixel.hytale.codec.ExtraInfo()));
+        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #BondedUnlinkConfirmButton.Visible", "false");
+        assertCommand(packets.updates.getLast(), "#TameworkLinkedPanelList[0] #BondedPrimaryActionNoTooltip.Visible", "true");
+        page.onDismiss(null, null);
+    }
+
+    @Test
     void availabilityEmblemsPreserveSavedHealthAndRemainVisibleDuringRemoval() throws Exception {
         String[] states = {"Dead", "Unloaded", "Lost", "Captured", "InCoop", "Live"};
         for (String state : states) {

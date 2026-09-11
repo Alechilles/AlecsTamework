@@ -7,7 +7,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /** Applies purchased talent effects to finite bonded-companion summon timers. */
-final class BondedCompanionTalentTimerPolicyModifier {
+public final class BondedCompanionTalentTimerPolicyModifier {
     static final String SESSION_DURATION_MULTIPLIER =
             "SummonSessionDurationMultiplier";
     static final String COOLDOWN_MULTIPLIER = "SummonCooldownMultiplier";
@@ -24,8 +24,9 @@ final class BondedCompanionTalentTimerPolicyModifier {
         return apply(policy, talents, config);
     }
 
+    /** Shares the lifecycle timer calculation with saved-profile presentation. */
     @Nonnull
-    static BondedCompanionPolicy apply(@Nonnull BondedCompanionPolicy policy,
+    public static BondedCompanionPolicy apply(@Nonnull BondedCompanionPolicy policy,
                                        @Nullable TameworkTalentsComponent talents,
                                        @Nullable TwTalentConfig config) {
         if (talents == null || config == null || !config.isEnabled()) {

@@ -64,20 +64,26 @@ Group {
     Group #BondedFlightModeGroundedIcon { Anchor: (Top: 42, Left: 494, Width: 28, Height: 28); Background: (TexturePath: "Tamework/LinkedPanelIcons/FlightMode_Grounded.png"); Visible: false; }
     Group #BondedFlightModeAirborneIcon { Anchor: (Top: 42, Left: 494, Width: 28, Height: 28); Background: (TexturePath: "Tamework/LinkedPanelIcons/FlightMode_Airborne.png"); Visible: false; }
 
-    Group #BondedStateEmblem { Anchor: (Top: 42, Left: 555, Width: 48, Height: 48); Background: "Tamework/StatusEmblems/Captured.png"; HitTestVisible: false; Visible: false; }
-    Label #BondedStateInWorld { Anchor: (Top: 94, Left: 500, Width: 160, Height: 14); Text: ""; Style: (FontSize: 10, RenderBold: true, TextColor: #85b99a, HorizontalAlignment: Center, VerticalAlignment: Center); Visible: false; }
-    Label #BondedStateStored { Anchor: (Top: 94, Left: 500, Width: 160, Height: 14); Text: ""; Style: (FontSize: 10, RenderBold: true, TextColor: #afb6b0, HorizontalAlignment: Center, VerticalAlignment: Center); Visible: false; }
-    Label #BondedStateDead { Anchor: (Top: 94, Left: 500, Width: 160, Height: 14); Text: ""; Style: (FontSize: 10, RenderBold: true, TextColor: #df8177, HorizontalAlignment: Center, VerticalAlignment: Center); Visible: false; }
-    Label #BondedStateReady { Anchor: (Top: 94, Left: 500, Width: 160, Height: 14); Text: ""; Style: (FontSize: 10, RenderBold: true, TextColor: #85b99a, HorizontalAlignment: Center, VerticalAlignment: Center); Visible: false; }
-    Label #BondedStateDetail { Anchor: (Top: 111, Left: 458, Width: 202, Height: 12); Text: ""; Style: (FontSize: 9, RenderBold: true, TextColor: #afb6b0, HorizontalAlignment: Center, VerticalAlignment: Center); }
-    Label #BondedStateDetailValue { Anchor: (Top: 124, Left: 458, Width: 202, Height: 12); Text: ""; Style: (FontSize: 10, TextColor: #e8e4da, HorizontalAlignment: Center, VerticalAlignment: Center); }
-    Group #BondedSessionFrame { Anchor: (Top: 140, Left: 458, Width: 202, Height: 3); Background: #3c443e; Visible: false; Group #BondedSessionFill { Anchor: (Top: 0, Left: 0, Width: 200, Height: 3); Background: #85b99a; } }
+    Group #BondedStateEmblem { Anchor: (Top: 41, Left: 559, Width: 40, Height: 40); Background: "Tamework/StatusEmblems/Captured.png"; HitTestVisible: false; Visible: false; }
+    Label #BondedStateInWorld { Anchor: (Top: 84, Left: 500, Width: 160, Height: 14); Text: ""; Style: (FontSize: 10, RenderBold: true, TextColor: #85b99a, HorizontalAlignment: Center, VerticalAlignment: Center); Visible: false; }
+    Label #BondedStateStored { Anchor: (Top: 84, Left: 500, Width: 160, Height: 14); Text: ""; Style: (FontSize: 10, RenderBold: true, TextColor: #afb6b0, HorizontalAlignment: Center, VerticalAlignment: Center); Visible: false; }
+    Label #BondedStateDead { Anchor: (Top: 84, Left: 500, Width: 160, Height: 14); Text: ""; Style: (FontSize: 10, RenderBold: true, TextColor: #df8177, HorizontalAlignment: Center, VerticalAlignment: Center); Visible: false; }
+    Label #BondedStateReady { Anchor: (Top: 84, Left: 500, Width: 160, Height: 14); Text: ""; Style: (FontSize: 10, RenderBold: true, TextColor: #85b99a, HorizontalAlignment: Center, VerticalAlignment: Center); Visible: false; }
+    Label #BondedStateDetail { Anchor: (Top: 107, Left: 458, Width: 200, Height: 14); Text: ""; Style: (FontSize: 9, RenderBold: true, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Center); }
+    Label #BondedStateDetailValue { Anchor: (Top: 107, Left: 658, Width: 184, Height: 14); Text: ""; Style: (FontSize: 10, TextColor: #e8e4da, HorizontalAlignment: End, VerticalAlignment: Center); }
+    Group #BondedSessionFrame { Anchor: (Top: 124, Left: 458, Width: 384, Height: 14); Background: #3c443e; Visible: false; Group #BondedSessionFill { Anchor: (Top: 0, Left: 0, Width: 382, Height: 12); Background: #85b99a; } }
 
     TextButton #BondedPrimaryAction { Anchor: (Top: 51, Left: 678, Width: 164, Height: 38); Style: @BondedCardButtonStyle; Text: ""; TooltipText: ""; TextTooltipStyle: @BondedCardTextTooltipStyle; Visible: false; }
     TextButton #BondedPrimaryActionNoTooltip { Anchor: (Top: 51, Left: 678, Width: 164, Height: 38); Style: @BondedCardButtonStyle; Text: ""; Visible: false; }
     TextButton #BondedPrimaryActionDisabled { Anchor: (Top: 51, Left: 678, Width: 164, Height: 38); Style: @BondedCardDisabledButtonStyle; Text: ""; TooltipText: ""; TextTooltipStyle: @BondedCardTextTooltipStyle; Visible: false; }
     TextButton #BondedPrimaryActionDisabledNoTooltip { Anchor: (Top: 51, Left: 678, Width: 164, Height: 38); Style: @BondedCardDisabledButtonStyle; Text: ""; Visible: false; }
-    TextButton #BondedUnlinkConfirmButton { Anchor: (Top: 51, Left: 678, Width: 164, Height: 38); Style: @BondedCardDangerButtonStyle; Text: %server.tamework.ui.linkedPanel.bonded.unlink.confirm; Visible: false; }
+    TextButton #BondedUnlinkConfirmButton { Anchor: (Top: 51, Left: 678, Width: 164, Height: 38); Style: @BondedCardDangerButtonStyle; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.bonded.detail.unlinkConfirm; TextTooltipStyle: @BondedCardTextTooltipStyle; Visible: false; }
+
+    Group #BondedActionContent { Anchor: (Top: 51, Left: 678, Width: 164, Height: 38); HitTestVisible: false;
+        Group #BondedActionIcon { Anchor: (Top: 4, Left: 8, Width: 30, Height: 30); Background: "Tamework/PanelActions/Recall_Glyph_Default.png"; HitTestVisible: false; }
+        Label #BondedActionLabel { Anchor: (Top: 0, Left: 44, Right: 6, Height: 38); Text: ""; Style: (FontSize: 12, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Center, VerticalAlignment: Center); HitTestVisible: false; }
+    }
+    TextButton #BondedUnlinkCancelButton { Anchor: (Top: 3, Right: 3, Width: 80, Height: 28); Style: @BondedCardButtonStyle; Text: %server.tamework.ui.shared.button.cancel; Visible: false; }
 
     TextButton #BondedUnlinkButton { Anchor: (Top: 3, Right: 3, Width: 28, Height: 28); Style: $A.@Remove; Text: ""; TooltipText: %server.tamework.ui.linkedPanel.bonded.unlink.tooltip; TextTooltipStyle: @BondedCardTextTooltipStyle; Visible: false; }
     Group #BondedUnlinkButtonGlyph { Anchor: (Top: 3, Right: 3, Width: 28, Height: 28); Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png"); Visible: false; HitTestVisible: false; }

@@ -973,6 +973,15 @@ public final class TameworkCommandSelectionPage
             Ref<EntityStore> ref,
             Store<EntityStore> store
     ) {
+        if (commandId.startsWith(BondedCompanionCardPresenter.CANCEL_UNLINK_COMMAND_PREFIX)) {
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId,
+                    BondedCompanionCardPresenter.CANCEL_UNLINK_COMMAND_PREFIX);
+            if (rosterEventBoundary.bondedRoster() && npcUuid != null && isPendingUnlink(npcUuid)) {
+                pendingUnlinkNpcUuid = null;
+                sendCardRefreshUpdate();
+            }
+            return true;
+        }
         BondedCompanionUnlinkDecision.Decision decision =
                 BondedCompanionUnlinkDecision.resolve(commandId,
                         UNLINK_COMMAND_PREFIX, pendingUnlinkNpcUuid,

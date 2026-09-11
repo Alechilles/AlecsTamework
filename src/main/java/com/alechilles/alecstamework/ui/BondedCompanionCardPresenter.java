@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
  */
 final class BondedCompanionCardPresenter {
     static final String CARD_UI_PATH = "TameworkBondedCompanionPanelCard.ui";
+    static final String CANCEL_UNLINK_COMMAND_PREFIX = "__bonded_cancel_unlink__:";
     private static final int HEALTH_FILL_WIDTH = 258;
     private static final int XP_FILL_WIDTH = 258;
 
@@ -148,12 +149,7 @@ final class BondedCompanionCardPresenter {
                 !pendingUnlink);
         commands.set(entrySelector + " #BondedUnlinkConfirmButton.Visible",
                 pendingUnlink);
-        if (pendingUnlink) {
-            commands.set(entrySelector + " #BondedStateDetail.Text",
-                    LocalizedText.resolve(language,
-                            "tamework.ui.linkedPanel.bonded.detail.unlinkConfirm"));
-            commands.set(entrySelector + " #BondedStateDetailValue.Text", "");
-        }
+        commands.set(entrySelector + " #BondedUnlinkCancelButton.Visible", pendingUnlink);
         bindUnlinkEvents(events, entrySelector, cardUuid, config);
     }
 
@@ -170,6 +166,9 @@ final class BondedCompanionCardPresenter {
         events.addEventBinding(CustomUIEventBindingType.Activating,
                 entrySelector + " #BondedUnlinkConfirmButton",
                 EventData.of(config.eventCommandId(), command), false);
+        events.addEventBinding(CustomUIEventBindingType.Activating,
+                entrySelector + " #BondedUnlinkCancelButton",
+                EventData.of(config.eventCommandId(), CANCEL_UNLINK_COMMAND_PREFIX + cardUuid), false);
     }
 
     private static void bindIdentity(
@@ -344,16 +343,26 @@ final class BondedCompanionCardPresenter {
             String entrySelector,
             BondedCompanionPanelPresentation row
     ) {
-        long duration = nonNegativeLong(row.attributes().get("sessionDurationMs"));
-        long remaining = nonNegativeLong(row.attributes().get("sessionRemainingMs"));
-        boolean visible = row.status().state() == BondedCompanionStateView.ACTIVE
-                && duration > 0L && remaining > 0L;
+        boolean active = row.status().state() == BondedCompanionStateView.ACTIVE;
+        long duration = nonNegativeLong(row.attributes().get(active
+                ? "sessionDurationMs" : "cooldownDurationMs"));
+        long remaining = active ? nonNegativeLong(row.attributes().get("sessionRemainingMs"))
+                : row.status().cooldownRemainingMs();
+        if (row.status().state() == BondedCompanionStateView.DEAD && row.reviveQuote() != null) {
+            remaining = Math.max(remaining, java.util.concurrent.TimeUnit.SECONDS.toMillis(
+                    row.reviveQuote().cooldownRemainingSeconds()));
+        }
+        boolean visible = remaining > 0L;
         commands.set(entrySelector + " #BondedSessionFrame.Visible", visible);
         if (visible) {
-            int width = (int) Math.round(200D * Math.min(1D,
-                    (double) remaining / duration));
+            // Older/custom profile sources may omit the total; retain a visible timer track.
+            int width = duration > 0L ? (int) Math.round(382D * Math.min(1D,
+                    (double) remaining / duration)) : 0;
             commands.setObject(entrySelector + " #BondedSessionFill.Anchor",
-                    fixedWidthAnchor(0, 0, width, 3));
+                    fixedWidthAnchor(1, 1, width, 12));
+            commands.set(entrySelector + " #BondedSessionFill.Visible", width > 0);
+            commands.set(entrySelector + " #BondedSessionFill.Background",
+                    active ? "#85b99a" : "#c5b47b");
         }
     }
 
@@ -455,16 +464,16 @@ final class BondedCompanionCardPresenter {
         boolean tooltipVisible = !tooltip.isBlank();
         commands.set(entrySelector + " #BondedPrimaryAction.Visible",
                 enabled && tooltipVisible);
-        commands.set(entrySelector + " #BondedPrimaryAction.Text", label);
+        commands.set(entrySelector + " #BondedPrimaryAction.Text", "");
         if (tooltipVisible) {
             commands.set(entrySelector + " #BondedPrimaryAction.TooltipText", tooltip);
         }
         commands.set(entrySelector + " #BondedPrimaryActionNoTooltip.Visible",
                 enabled && !tooltipVisible);
-        commands.set(entrySelector + " #BondedPrimaryActionNoTooltip.Text", label);
+        commands.set(entrySelector + " #BondedPrimaryActionNoTooltip.Text", "");
         commands.set(entrySelector + " #BondedPrimaryActionDisabled.Visible",
                 visible && !enabled && !pendingUnlink && tooltipVisible);
-        commands.set(entrySelector + " #BondedPrimaryActionDisabled.Text", label);
+        commands.set(entrySelector + " #BondedPrimaryActionDisabled.Text", "");
         if (tooltipVisible) {
             commands.set(entrySelector + " #BondedPrimaryActionDisabled.TooltipText",
                     tooltip);
@@ -472,7 +481,20 @@ final class BondedCompanionCardPresenter {
         commands.set(entrySelector + " #BondedPrimaryActionDisabledNoTooltip.Visible",
                 visible && !enabled && !pendingUnlink && !tooltipVisible);
         commands.set(entrySelector + " #BondedPrimaryActionDisabledNoTooltip.Text",
-                label);
+                "");
+        commands.set(entrySelector + " #BondedActionContent.Visible", visible || pendingUnlink);
+        commands.set(entrySelector + " #BondedActionLabel.Text", pendingUnlink
+                ? LocalizedText.resolve(language, "tamework.ui.linkedPanel.bonded.unlink.confirm") : label);
+        commands.set(entrySelector + " #BondedActionLabel.Style.TextColor",
+                enabled || pendingUnlink ? "#e8e4da" : "#afb6b0");
+        String glyph = pendingUnlink ? "Remove" : switch (status.action()) {
+            case SUMMON -> "Recall";
+            case DISMISS -> "Release";
+            case REVIVE -> "Revive";
+            case NONE -> "Recall";
+        };
+        commands.set(entrySelector + " #BondedActionIcon.Background",
+                "Tamework/PanelActions/" + glyph + "_Glyph_Default.png");
         bindPrimaryActionEvents(events, entrySelector, cardUuid, row,
                 pendingUnlink, config, language);
     }

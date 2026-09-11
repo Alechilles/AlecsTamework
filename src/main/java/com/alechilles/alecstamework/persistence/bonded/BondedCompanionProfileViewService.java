@@ -4,6 +4,9 @@ import com.alechilles.alecstamework.api.BondedCompanionProfileView;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionPolicy;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionPolicyResolver;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshotCodec;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionTalentTimerPolicyModifier;
+import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
@@ -70,9 +73,27 @@ final class BondedCompanionProfileViewService {
                 reviveConfigured ? reviveQuotes.profileQuote(
                         profile, policy, seconds(reviveCooldownRemaining)) : null,
                 matches
-                        ? BondedCompanionFamilyCapacityPresentation.attributes(
-                                policy, active)
+                        ? presentationAttributes(profile, policy, active)
                         : Map.of());
+    }
+
+    private Map<String, String> presentationAttributes(
+            BondedCompanionRecord.Profile profile, BondedCompanionPolicy policy, int active) {
+        LinkedHashMap<String, String> attributes = new LinkedHashMap<>(
+                BondedCompanionFamilyCapacityPresentation.attributes(policy, active));
+        long cooldownSeconds = policy.reviveCooldownSeconds();
+        if (profile.state() == BondedCompanionState.STORED) {
+            var decoded = new BondedCompanionSnapshotCodec().decode(
+                    new String(profile.snapshot().bytes(), StandardCharsets.UTF_8));
+            var talents = decoded.snapshot() == null ? null : decoded.snapshot().fullState().talents();
+            cooldownSeconds = BondedCompanionTalentTimerPolicyModifier.apply(policy, talents,
+                    TwTalentConfig.resolveForRole(profile.roleId())).summonCooldownSeconds();
+        }
+        if (profile.state() != BondedCompanionState.ACTIVE) {
+            attributes.put("cooldownDurationMs", Long.toString(
+                    java.util.concurrent.TimeUnit.SECONDS.toMillis(cooldownSeconds)));
+        }
+        return attributes;
     }
 
     private Map<String, String> extensions(
