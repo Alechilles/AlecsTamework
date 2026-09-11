@@ -30,6 +30,9 @@ import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTame
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkInteractionActive;
 import com.alechilles.alecstamework.npc.movement.builders.BuilderBodyMotionTameworkMaintainDistance;
 import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkFlyingOrbit;
+import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkFlightFormation;
+import com.alechilles.alecstamework.npc.movement.BuilderMotionControllerTameworkFormationFly;
+import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkFlightFormationReady;
 import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkMountedGlide;
 import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkRide;
 import com.alechilles.alecstamework.npc.movement.BuilderMotionControllerTameworkFly;
@@ -164,6 +167,8 @@ public final class TameworkNpcBuilderRegistrar {
             sensorFactory.add(BuilderSensorTameworkIsOwner.BUILDER_ID, BuilderSensorTameworkIsOwner::new);
             sensorFactory.add(BuilderSensorTameworkHasOwner.BUILDER_ID, BuilderSensorTameworkHasOwner::new);
             sensorFactory.add(BuilderSensorTameworkIsTamed.BUILDER_ID, BuilderSensorTameworkIsTamed::new);
+            sensorFactory.add(BuilderSensorTameworkFlightFormationReady.BUILDER_ID,
+                    BuilderSensorTameworkFlightFormationReady::new);
             sensorFactory.add(BuilderSensorTameworkLifeStage.BUILDER_ID, BuilderSensorTameworkLifeStage::new);
             sensorFactory.add(BuilderSensorTameworkAlarm.BUILDER_ID, BuilderSensorTameworkAlarm::new);
             sensorFactory.add(BuilderSensorTameworkHook.BUILDER_ID, BuilderSensorTameworkHook::new);
@@ -218,6 +223,10 @@ public final class TameworkNpcBuilderRegistrar {
                     BuilderBodyMotionTameworkFlyingOrbit::new
             );
             bodyMotionFactory.add(
+                    BuilderBodyMotionTameworkFlightFormation.BUILDER_ID,
+                    BuilderBodyMotionTameworkFlightFormation::new
+            );
+            bodyMotionFactory.add(
                     BuilderBodyMotionTameworkMountedGlide.BUILDER_ID,
                     BuilderBodyMotionTameworkMountedGlide::new
             );
@@ -232,6 +241,10 @@ public final class TameworkNpcBuilderRegistrar {
             plugin.getLogger().at(Level.WARNING).log("Tamework NPC builder registration: Motion controller factory missing.");
         } else {
             plugin.getLogger().at(Level.INFO).log("Tamework NPC builder registration: Motion controller factory ready.");
+            motionControllerFactory.add(
+                    BuilderMotionControllerTameworkFormationFly.BUILDER_ID,
+                    BuilderMotionControllerTameworkFormationFly::new
+            );
             motionControllerFactory.add(
                     BuilderMotionControllerTameworkFly.BUILDER_ID,
                     BuilderMotionControllerTameworkFly::new

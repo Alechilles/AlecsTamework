@@ -8,6 +8,18 @@ Use these components from downstream role assets with `Reference` and override
 species tuning through `Modify`. Do not copy their instruction bodies into each
 mod; consuming the shared IDs lets future Tamework fixes apply automatically.
 
+### `Component_Tamework_Instruction_Flight_Formation`
+
+Optional ambient flight formation around a native flock leader. Exposes
+`FlightFormation` (`None`, `Loose`, `Chevron`), `FlightFormationSpacing` and
+`FlightFormationTightness`. Uses the `TameworkFormationFly` controller and
+`TameworkFlightFormationReady` to select
+`TameworkFlightFormation` only for eligible airborne followers. Keep landing,
+escape and commands ahead of it, with normal wandering as a fallback.
+See the [Flight Formation Guide](../wiki/Modder-Documentation/System-Integration/Flight-Formation-Guide.md)
+for placement, defaults and runtime limits.
+
+
 ### `Component_Tamework_Instruction_Follow_Large`
 
 Ground follow behavior for large NPCs. It seeks its owner at close range,

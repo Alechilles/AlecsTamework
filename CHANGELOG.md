@@ -2,6 +2,8 @@
 
 ## Unreleased development changes
 
+- Added optional loose and chevron flight formations for native NPC flocks, with configurable spacing and tightness. Formation steering follows the current flying leader and uses existing obstacle avoidance.
+
 - Added `TameworkMaintainDistance` for peaceful target-relative positioning and
   `TameworkInteractionActive` to select entities running a named root interaction.
   These support the Alec's Cats teaser wand without combat targeting or stored play state.

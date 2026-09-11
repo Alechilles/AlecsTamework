@@ -1,0 +1,30 @@
+{
+  "Type": "Component",
+  "Class": "Instruction",
+  "Parameters": {
+    "FlightFormation": {
+      "Value": "None",
+      "Description": "Ambient flight formation: None, Loose, or Chevron."
+    },
+    "FlightFormationSpacing": {
+      "Value": 3,
+      "Description": "Distance between formation positions in blocks. Must be positive."
+    },
+    "FlightFormationTightness": {
+      "Value": 0.6,
+      "Description": "Position correction strength, greater than zero and at most one."
+    }
+  },
+  "Content": {
+    "Sensor": {
+      "Type": "TameworkFlightFormationReady",
+      "Formation": { "Compute": "FlightFormation" }
+    },
+    "BodyMotion": {
+      "Type": "TameworkFlightFormation",
+      "Formation": { "Compute": "FlightFormation" },
+      "Spacing": { "Compute": "FlightFormationSpacing" },
+      "Tightness": { "Compute": "FlightFormationTightness" }
+    }
+  }
+}
