@@ -8,7 +8,7 @@ draft: false
 
 Parent: [System Integration](/mod/alecs-tamework/system-integration) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
-Tamework includes a Blockbench plugin and a Python generator for producing filled spawner icons and spawner icon override entries from model `RandomAttachmentSets`.
+Tamework includes a Blockbench plugin and a Python generator for producing companion icon PNGs and shared `TwDynamicIconConfig` assets from model `RandomAttachmentSets`.
 
 Use the Blockbench wizard for normal single-model work. Use the batch manifest workflow when a mod needs to regenerate a large curated icon set across many models, roles, or upstream archives.
 
@@ -22,34 +22,38 @@ powershell -ExecutionPolicy Bypass -File scripts/tools/blockbench/install_tamewo
 ```
 
 - After installing, open Blockbench and confirm the Tools menu contains:
-  - `Generate + Run Tamework Spawner Batch Wizard`
-  - `Run Tamework Spawner Batch (From Jobs JSON)`
+  - `Generate + Run Tamework Dynamic Icon Wizard`
+  - `Run Tamework Dynamic Icon Batch (From Jobs JSON)`
 
 ## Recommended UI Workflow
 
-Use this flow when generating icons for one model and when you want to preview the camera, choose attachment sets, render PNGs, and optionally write the spawner JSON from one dialog.
+Use this flow when generating icons for one model and when you want to preview the camera, choose attachment sets, render PNGs, and write the dynamic icon JSON from one dialog.
 
 1. Open Blockbench.
-2. Use `Tools -> Generate + Run Tamework Spawner Batch Wizard`.
+2. Use `Tools -> Generate + Run Tamework Dynamic Icon Wizard`.
 3. In `Source`, choose the model JSON path.
-4. Optionally choose a spawner JSON path.
+4. Enter the roles that share this appearance. No spawner JSON is required.
 5. In `Variants`, choose how combinations are generated.
 6. Use `Calculate Combos` before rendering.
 7. In `Camera & Frame`, tune icon size, zoom, rotation, and screen position.
 8. Enable `Auto Frame` when a batch contains differently sized models and the renderer should zoom out and recenter each captured PNG from its visible pixels.
 9. Use `Preview First Combo` to verify framing.
-10. In `Outputs`, choose whether to save jobs/manifest JSON and whether to write spawner overrides.
-11. Enable `Shared Role Group` when multiple selected roles look identical and should share one `IconOverrideGroups` entry and one icon file per attachment combo.
+10. In `Outputs`, choose whether to save jobs/manifest JSON and enable `Write Dynamic Icon Asset`.
+11. Set `Dynamic Icon Asset Path (optional)` to choose the output; by default it uses `Server/Tamework/DynamicIcons/<modelName>.json`. All selected roles share its variants and PNGs.
 12. Click `Run Batch`.
 
-The wizard renders the icons, writes any selected JSON outputs, and shows a completion summary. If `Write Spawner Overrides` is enabled, it merges generated entries into `IconOverridesByRole` by default, or writes `IconOverrideGroups` when `Shared Role Group` is enabled, replacing an existing matching role group or appending a new one.
+The wizard renders the icons, writes the selected outputs, and shows a completion
+summary. Its config contains `RoleIds`, ordered `IconOverrides`, and `IconDefault`
+for a base-only model. It replaces the chosen generated config file, so keep
+hand-authored rules in separate assets or include them in the generation source.
+It does not edit spawner assets.
 
 ## Jobs JSON Workflow
 
 Use this flow when renderer jobs already exist, usually from the Python generator or a previous wizard run.
 
 1. Open Blockbench.
-2. Use `Tools -> Run Tamework Spawner Batch (From Jobs JSON)`.
+2. Use `Tools -> Run Tamework Dynamic Icon Batch (From Jobs JSON)`.
 3. Select the jobs JSON file.
 4. The plugin loads each base model plus selected attachments and writes PNGs to each job's `outputIconFile`.
 
@@ -63,23 +67,24 @@ The Python generator can create override data and renderer jobs without opening 
 python scripts/tools/generate_spawner_icon_overrides.py \
   --asset-root examples/asset-pack \
   --model Server/Models/Livestock/Tamework_Example.json \
-  --spawner-config Server/Tamework/Items/Spawners/TwSpawnerExample.json \
   --roles Mob_Tamework_Example,Mob_Tamework_Example_Baby \
   --include-empty-set Fur \
-  --icon-template "Icons/ItemsGenerated/Tamework_Spawner_{set_fur}.png" \
-  --icon-override-mode group \
+  --icon-template "Icons/ItemsGenerated/Tamework_Spawner_{combo_slug}.png" \
   --camera-auto-frame \
-  --write-spawner .tmp/TwSpawnerExample.generated.json \
+  --dynamic-icon-id TwDynamicIconExample \
+  --dynamic-icons-output-dir Server/Tamework/DynamicIcons \
   --renderer-jobs-out .tmp/sheep_render_jobs.json
 ```
 
 Notes:
 
 - `--include-empty-set <SetName>` adds an explicit empty option for harvested or removed attachment states.
-- Models with no `RandomAttachmentSets` generate one `base` render job. In shared group mode, that base icon is written as `IconOverrideGroups[].IconDefault`.
-- If `--roles` is omitted, roles are derived from `AllowedRoles.Allowlist` when a spawner config is provided.
+- Models with no `RandomAttachmentSets` generate one `base` render job and use that PNG as `IconDefault`.
+- Supply `--roles` explicitly. Roles are no longer inferred from spawner configs.
 - Model sources can be read directly from a zip using `mod.zip!Server/Models/...json`.
-- `--icon-override-mode group` writes one `IconOverrideGroups` entry for all selected roles. In group mode, use an icon template without `{role}` when the roles should reference the same PNG.
+- All selected roles share one asset. `{role}` uses the first supplied role for shared paths.
+- `--write-dynamic-icon <path>` chooses a single output file; otherwise use `--dynamic-icons-output-dir` and `--dynamic-icon-id`.
+- `--icon-default`, `--enabled` / `--no-enabled`, and `--priority` set optional config fields.
 - `--camera-auto-frame` writes renderer metadata that asks the Blockbench plugin to zoom out and recenter each output using screenshot alpha bounds.
 
 ## Batch Manifest Workflow
@@ -92,7 +97,6 @@ Example manifest:
 {
   "defaults": {
     "iconTemplate": "Icons/ItemsGenerated/Spawner_{combo_slug}.png",
-    "iconOverrideMode": "group",
     "rendererName": "Animal Husbandry curated icons",
     "iconSize": 128,
     "cameraScale": 1.0,
@@ -113,6 +117,7 @@ Example manifest:
   "entries": [
     {
       "id": "goat_base",
+      "iconTemplate": "Icons/ItemsGenerated/MyMod/BaseGoat/{combo_slug}.png",
       "source": "baseGame",
       "model": "Livestock/Goat.json",
       "roles": ["Goat", "Goat_Tamed"],
@@ -120,6 +125,7 @@ Example manifest:
     },
     {
       "id": "goat_aures",
+      "iconTemplate": "Icons/ItemsGenerated/MyMod/AuresGoat/{combo_slug}.png",
       "source": "auresLivestock",
       "model": "Livestock/Goat.json",
       "roles": "Goat,Goat_Tamed",
@@ -135,13 +141,13 @@ Run:
 python scripts/tools/generate_spawner_icon_overrides.py \
   --asset-root src/main/resources \
   --batch-manifest tools/animal_husbandry_icons.batch.json \
-  --spawner-config Server/Tamework/Items/Spawners/AHSpawnSoulLantern.json \
-  --write-spawner Server/Tamework/Items/Spawners/AHSpawnSoulLantern.generated.json \
+  --dynamic-icons-output-dir Server/Tamework/DynamicIcons \
+  --dynamic-icon-id-prefix AH_DynamicIcon \
   --manifest-out .tmp/animal_husbandry_icon_manifest.json \
   --renderer-jobs-out .tmp/animal_husbandry_render_jobs.json
 ```
 
-Then open Blockbench and use `Tools -> Run Tamework Spawner Batch (From Jobs JSON)` with the generated jobs file.
+Then open Blockbench and use `Tools -> Run Tamework Dynamic Icon Batch (From Jobs JSON)` with the generated jobs file.
 
 ## Batch Manifest Notes
 
@@ -151,20 +157,26 @@ Then open Blockbench and use `Tools -> Run Tamework Spawner Batch (From Jobs JSO
 - Relative `modelsRoot` values resolve relative to the manifest file.
 - Entry `model` paths are relative to the chosen source's `modelsRoot`; leading slashes are ignored.
 - `keepAttachmentSets` limits generated combinations to the visual attachment sets that should affect icons. Omit it to generate all sets.
-- Entries can override defaults including `iconTemplate`, `iconSize`, `cameraScale`, `cameraRotation`, `cameraTranslation`, `includeEmptySets`, `cameraAutoFrame`, `cameraAutoFramePadding`, `cameraAutoFrameMaxAttempts`, `emptyValueToken`, `iconOverrideMode`, and `maxCombos`.
+- `renderAttachmentDefaults` supplies fixed set-to-option choices for omitted visual details, such as `{"Eyes": "Brown", "Mane": "Short"}`. These details appear in every rendered PNG but do not multiply combinations or constrain the dynamic icon rules. A set cannot be both fixed and generated.
+- Prepare inherited model fields and `DefaultAttachments` before calling the generator. The generator consumes complete model JSON; Animal Husbandry's `prepare_models.py` resolves its pinned sources and patch-provided appearances into temporary render inputs.
+- Entries can override defaults including `iconTemplate`, `iconSize`, `cameraScale`, `cameraRotation`, `cameraTranslation`, `includeEmptySets`, `cameraAutoFrame`, `cameraAutoFramePadding`, `cameraAutoFrameMaxAttempts`, `emptyValueToken`, `iconDefault`, `enabled`, `priority`, and `maxCombos`.
 - `cameraAutoFrame` keeps fixed authored rotation and baseline zoom, then the Blockbench renderer zooms out only when the visible pixels touch the configured padding and recenters the result before applying any explicit screen translation.
-- `iconOverrideMode: "group"` writes shared `IconOverrideGroups` entries and one render job per attachment combo. Entries with the same role set are merged only when their attachment predicates cannot match the same captured NPC.
-- Entries whose model has no `RandomAttachmentSets` should omit `keepAttachmentSets`; they generate a single `{combo_slug}` value of `base`. In group mode, that icon becomes the group's `IconDefault`.
+- Entries with the same normalized role set merge into one dynamic asset in manifest order. Keep more specific attachment predicates before generic ones. The first default is retained.
+- Output IDs use `<dynamic-icon-id-prefix>_<firstRole>`, for example `AH_DynamicIcon_Goat`. The generator rejects asset filename collisions between different role sets. It also rejects conflicting render jobs that target the same PNG path, including entries sharing a role set; identical jobs can share a PNG.
+- Use the same `enabled` and `priority` for entries sharing a role set; they become one config.
+- Generation replaces each output asset; it does not merge with hand edits in existing files.
+- Entries whose model has no `RandomAttachmentSets` should omit `keepAttachmentSets`; they generate a single `{combo_slug}` value of `base`. That icon becomes the asset's `IconDefault`.
 
 ## Output Files
 
 - Icon PNGs are written under the configured output directory relative to `Common/`.
 - Manifest JSON records the generated combinations and role mappings.
 - Jobs JSON records the render instructions consumed by the Blockbench plugin.
-- Spawner JSON output contains merged `IconOverridesByRole` entries in default mode, or replacement/merged `IconOverrideGroups` entries in shared group mode. Shared groups may include `IconDefault` for a base-only role set.
+- Dynamic icon JSON output contains `RoleIds`, ordered `IconOverrides`, and an optional `IconDefault`. Capture items and both command panels discover these assets by role.
 - During rendering, the Blockbench plugin closes each temporary model project after its screenshot is captured so large batches do not accumulate hundreds of open Blockbench tabs.
 
 ## Related Pages
 
 - [Spawner System Guide](/mod/alecs-tamework/spawner-system-guide)
+- [TwDynamicIconConfig Reference](/mod/alecs-tamework/twdynamiciconconfig-reference)
 - [TwSpawnerConfig Reference](/mod/alecs-tamework/twspawnerconfig-reference)

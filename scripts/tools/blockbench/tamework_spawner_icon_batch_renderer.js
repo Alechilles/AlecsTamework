@@ -1293,7 +1293,7 @@
 
   function showError(error) {
     const message = error && error.message ? error.message : String(error);
-    return showTextDialog("Spawner Icon Batch Renderer", message, 980);
+    return showTextDialog("Dynamic Icon Batch Renderer", message, 980);
   }
 
   function parseJobsPayload(payload) {
@@ -1414,75 +1414,16 @@
     return result;
   }
 
-  function discoverRolesFromSpawner(spawnerJson) {
-    const allowed = spawnerJson && spawnerJson.AllowedRoles;
-    if (!allowed || typeof allowed !== "object") {
-      return [];
-    }
-    if (allowed.Mode !== "Allowlist" || !Array.isArray(allowed.Allowlist)) {
-      return [];
-    }
-    return allowed.Allowlist.filter((entry) => typeof entry === "string" && entry.trim().length > 0);
-  }
-
-  function mergeOverridesIntoSpawner(spawnerJson, roleOverrides, iconOverrideGroups, iconDefault) {
-    const output = Object.assign({}, spawnerJson || {});
-    const existing =
-      output.IconOverridesByRole && typeof output.IconOverridesByRole === "object"
-        ? output.IconOverridesByRole
-        : {};
-    const merged = Object.assign({}, existing);
-    Object.keys(roleOverrides).forEach((role) => {
-      merged[role] = roleOverrides[role];
-    });
-    if (Object.keys(merged).length) {
-      output.IconOverridesByRole = merged;
-    } else {
-      delete output.IconOverridesByRole;
-    }
-    const existingGroups = Array.isArray(output.IconOverrideGroups)
-      ? output.IconOverrideGroups.slice()
-      : [];
-    const generatedGroups = Array.isArray(iconOverrideGroups) ? iconOverrideGroups : [];
-    if (generatedGroups.length) {
-      generatedGroups.forEach((group) => {
-        replaceOrAppendIconOverrideGroup(existingGroups, group);
-      });
-      output.IconOverrideGroups = existingGroups;
-    } else if (!existingGroups.length) {
-      delete output.IconOverrideGroups;
-    }
-    if (typeof iconDefault === "string" && iconDefault.trim().length) {
-      output.IconDefault = iconDefault.trim();
+  function buildDynamicIconConfig(roles, overrides, generatedIconDefault, iconDefaultOverride) {
+    const output = {
+      RoleIds: roles.slice(),
+      IconOverrides: overrides.slice()
+    };
+    const iconDefault = String(iconDefaultOverride || "").trim() || generatedIconDefault;
+    if (iconDefault) {
+      output.IconDefault = iconDefault;
     }
     return output;
-  }
-
-  function iconOverrideGroupRoleKey(group) {
-    if (!group || !Array.isArray(group.Roles)) {
-      return "";
-    }
-    return group.Roles
-      .filter((role) => typeof role === "string" && role.trim().length)
-      .map((role) => role.trim().toLowerCase())
-      .sort()
-      .join("\u0000");
-  }
-
-  function replaceOrAppendIconOverrideGroup(groups, group) {
-    const roleKey = iconOverrideGroupRoleKey(group);
-    if (!roleKey) {
-      return;
-    }
-    const replacement = Object.assign({}, group);
-    const existingIndex = groups.findIndex(
-      (existing) => iconOverrideGroupRoleKey(existing) === roleKey
-    );
-    if (existingIndex >= 0) {
-      groups[existingIndex] = replacement;
-      return;
-    }
-    groups.push(replacement);
   }
 
   function composeIconRelativePath(iconRelDir, filename) {
@@ -1504,7 +1445,6 @@
         ? config.assetRoots.slice()
         : [commonRoot];
     const roles = config.roles;
-    const sharedRoleGroup = config.sharedRoleGroup === true && roles.length > 0;
     const sharedIconRole = roles[0];
     const setDefs = extractSetDefinitions(modelJson, config.includeEmptySets, config.excludeSets);
     const optionVisuals = extractOptionVisuals(modelJson);
@@ -1515,12 +1455,6 @@
     const combos = config.previewOnlyFirstCombo
       ? [optionSpace.map((options) => options[0])]
       : cartesianProduct(optionSpace);
-    const roleOverrides = {};
-    roles.forEach((role) => {
-      if (!sharedRoleGroup) {
-        roleOverrides[role] = [];
-      }
-    });
     const sharedOverrides = [];
     let sharedIconDefault = null;
 
@@ -1599,7 +1533,7 @@
         }
       };
 
-      if (sharedRoleGroup) {
+      {
         const placeholders = Object.assign({}, commonPlaceholders, { role: sharedIconRole });
         const filename = formatTemplate(config.filenameTemplate, placeholders);
         const iconRel = composeIconRelativePath(config.iconRelDir, filename);
@@ -1617,22 +1551,6 @@
           sharedIconDefault = iconRel;
         }
         addRenderJob(sharedIconRole, iconRel, iconFile);
-      } else {
-        roles.forEach((role) => {
-          const placeholders = Object.assign({}, commonPlaceholders, { role });
-          const filename = formatTemplate(config.filenameTemplate, placeholders);
-          const iconRel = composeIconRelativePath(config.iconRelDir, filename);
-          const iconFile = resolveCommonAssetFile(commonRoot, iconRel);
-          iconsByRole[role] = iconRel;
-
-          if (Object.keys(attachments).length) {
-            roleOverrides[role].push({
-              Icon: iconRel,
-              Attachments: Object.assign({}, attachments)
-            });
-          }
-          addRenderJob(role, iconRel, iconFile);
-        });
       }
 
       manifestCombos.push({
@@ -1645,23 +1563,14 @@
     });
 
     return {
-      roleOverrides,
-      iconOverrideGroups:
-        sharedRoleGroup && (sharedOverrides.length || sharedIconDefault)
-          ? [
-              Object.assign(
-                { Roles: roles.slice(), Overrides: sharedOverrides },
-                sharedIconDefault ? { IconDefault: sharedIconDefault } : {}
-              )
-            ]
-          : [],
+      dynamicIconConfig: buildDynamicIconConfig(roles, sharedOverrides, sharedIconDefault, config.iconDefaultOverride),
       manifest: {
         schema: "tamework.spawner-icon-manifest.v1",
         generatedAtUtc: new Date().toISOString(),
         modRoot,
         modelPath,
         roles,
-        iconOverrideMode: sharedRoleGroup ? "group" : "byRole",
+        dynamicIconAsset: true,
         randomAttachmentSets: setDefs.map((def) => ({
           set: def.name,
           options: def.options.slice(),
@@ -1812,20 +1721,6 @@
     };
   }
 
-  function isLikelyAttachmentModelPath(modelPath) {
-    if (!modelPath) {
-      return false;
-    }
-    const path = getPathModule();
-    const normalized = String(modelPath).toLowerCase().replace(/\//g, "\\");
-    const attachmentMarker = `\\attachments\\`;
-    if (normalized.includes(attachmentMarker)) {
-      return true;
-    }
-    const baseName = path.basename(modelPath).toLowerCase();
-    return baseName.includes("attachment");
-  }
-
   function hasBaseOverrideHint(asset, modelPath) {
     const path = getPathModule();
     const baseName = modelPath ? path.basename(modelPath).toLowerCase() : "";
@@ -1839,10 +1734,9 @@
     );
   }
 
-  function selectEffectiveBase(job, baseModelPath, baseTexturePath, jobsDir) {
+  async function selectEffectiveBase(job, baseModelPath, baseTexturePath, jobsDir) {
     const assets = Array.isArray(job.selectedOptionAssets) ? job.selectedOptionAssets : [];
     const normalizedBase = normalizeForCompare(baseModelPath);
-    let fallbackCandidate = null;
     for (let i = 0; i < assets.length; i += 1) {
       const asset = assets[i];
       const modelPath = normalizePath(asset && asset.modelFile, jobsDir);
@@ -1853,24 +1747,19 @@
         continue;
       }
       const baseHint = hasBaseOverrideHint(asset, modelPath);
-      if (isLikelyAttachmentModelPath(modelPath) && !baseHint) {
+      if (!baseHint) {
         continue;
       }
-      const texturePath = normalizePath(asset && asset.textureFile, jobsDir) || baseTexturePath;
-      const candidate = {
+      const texturePath = normalizePath(asset && asset.textureFile, jobsDir);
+      // Empty variants and detail meshes must not replace the animal's body.
+      if (!texturePath || !(await textureHasVisiblePixels(texturePath))) {
+        continue;
+      }
+      return {
         modelPath,
         texturePath,
         consumedAssetIndex: i
       };
-      if (baseHint) {
-        return candidate;
-      }
-      if (!fallbackCandidate) {
-        fallbackCandidate = candidate;
-      }
-    }
-    if (fallbackCandidate) {
-      return fallbackCandidate;
     }
     return {
       modelPath: baseModelPath,
@@ -1916,6 +1805,9 @@
         continue;
       }
       const texturePath = normalizePath(asset.textureFile, jobsDir);
+      if (!texturePath) {
+        continue;
+      }
       if (samePath(modelPath, baseModelPath)) {
         if (texturePath && fileExists(texturePath)) {
           sameModelTextureLayers.push({
@@ -2577,7 +2469,7 @@
       [0, 0]
     );
 
-    const effectiveBase = selectEffectiveBase(job, baseModelPath, baseTexturePath, jobsDir);
+    const effectiveBase = await selectEffectiveBase(job, baseModelPath, baseTexturePath, jobsDir);
     const managedProject = await loadBaseModel(codec, effectiveBase.modelPath, effectiveBase.texturePath);
     try {
       const baseTextureRefPath = effectiveBase.texturePath || baseTexturePath;
@@ -2737,7 +2629,10 @@
       const job = payload.jobs[i];
       const label = typeof job.id === "string" ? job.id : `job-${i + 1}`;
       Blockbench.setProgress((i + 1) / total);
-      writeRunDebug({ status: "running", currentJobIndex: i + 1, currentJobId: label });
+      // Rewriting the growing report for every icon makes large batches write gigabytes.
+      if (i % 50 === 0) {
+        writeRunDebug({ status: "running", currentJobIndex: i + 1, currentJobId: label });
+      }
       try {
         await withTimeout(
           renderSingleJob(codec, defaults, job, jobsDir),
@@ -2751,6 +2646,7 @@
           message: error && error.message ? error.message : String(error)
         });
         console.error(`[${PLUGIN_ID}] Failed ${label}`, error);
+        writeRunDebug({ status: "running", currentJobIndex: i + 1, currentJobId: label });
       }
       if (!variantDebugCaptured) {
         const jobId = typeof job.id === "string" ? job.id : null;
@@ -2766,7 +2662,6 @@
           console.error(`[${PLUGIN_ID}] Failed to capture variant debug snapshot`, snapshotError);
         }
       }
-      writeRunDebug({ status: "running", currentJobIndex: i + 1, currentJobId: label });
     }
 
     Blockbench.setProgress();
@@ -2824,7 +2719,7 @@
     const jobsDir = path.dirname(jobsFilePath);
     const payload = parseJobsPayload(readJsonFromDisk(jobsFilePath));
     const summary = await runBatchPayload(payload, jobsDir);
-    await showTextDialog("Spawner Icon Batch Renderer", buildRunSummaryText(summary), 980);
+    await showTextDialog("Dynamic Icon Batch Renderer", buildRunSummaryText(summary), 980);
     return summary;
   }
 
@@ -2844,7 +2739,6 @@
   function getWizardDefaults() {
     const defaults = {
       modelPath: "",
-      spawnerPath: "",
       rolesCsv: "",
       includeEmptySets: "",
       excludeSetsCsv: "",
@@ -2864,10 +2758,8 @@
       saveGeneratedJson: true,
       jobsOutPath: "",
       manifestOutPath: "",
-      writeSpawnerOverrides: true,
-      sharedRoleGroup: false,
-      writeSpawnerInPlace: true,
-      spawnerOutPath: "",
+      writeDynamicIcon: true,
+      dynamicIconPath: "",
       iconDefaultOverride: ""
     };
     if (wizardLastValues && typeof wizardLastValues === "object") {
@@ -3257,26 +3149,8 @@
 
     const modRoot = inferModRootFromServerPath(modelPath);
     const modelName = inferModelName(modelPath);
-    const spawnerPathRaw = typeof values.spawnerPath === "string" ? values.spawnerPath.trim() : "";
-    const spawnerPath = spawnerPathRaw ? resolveUserPath(spawnerPathRaw, modRoot) : null;
-    let spawnerJson = null;
-    if (spawnerPath) {
-      if (!fileExists(spawnerPath)) {
-        throw new Error(`Spawner JSON not found: ${spawnerPath}`);
-      }
-      spawnerJson = readJsonFromDisk(spawnerPath);
-      if (!spawnerJson || typeof spawnerJson !== "object") {
-        throw new Error(`Spawner JSON is invalid: ${spawnerPath}`);
-      }
-    }
-
-    const discoveredRoles = spawnerJson ? discoverRolesFromSpawner(spawnerJson) : [];
     const typedRoles = parseCsv(values.rolesCsv);
-    const roles = typedRoles.length
-      ? typedRoles
-      : discoveredRoles.length
-      ? discoveredRoles
-      : [modelName];
+    const roles = typedRoles.length ? typedRoles : [modelName];
     if (!roles.length) {
       throw new Error("At least one role is required.");
     }
@@ -3292,8 +3166,7 @@
     const filenameUsesRoleToken = filenameTemplate.includes("{role}");
     const templateContainsComboToken =
       filenameTemplate.includes("{combo_slug}") || filenameTemplate.includes("{combo_index}");
-    const sharedRoleGroup = values.sharedRoleGroup === true;
-    const roleMultiplier = filenameUsesRoleToken && !sharedRoleGroup ? BigInt(roles.length) : 1n;
+    const roleMultiplier = filenameUsesRoleToken ? 1n : 1n;
     const estimatedIconCount = comboCount * roleMultiplier;
 
     return buildComboPreviewText({
@@ -3331,27 +3204,9 @@
     const modRoot = inferModRootFromServerPath(modelPath);
     const commonRoot = path.join(modRoot, "Common");
     const modelName = inferModelName(modelPath);
-    const spawnerPathRaw = typeof values.spawnerPath === "string" ? values.spawnerPath.trim() : "";
-    const spawnerPath = spawnerPathRaw ? resolveUserPath(spawnerPathRaw, modRoot) : null;
-    let spawnerJson = null;
-    if (spawnerPath) {
-      if (!fileExists(spawnerPath)) {
-        throw new Error(`Spawner JSON not found: ${spawnerPath}`);
-      }
-      spawnerJson = readJsonFromDisk(spawnerPath);
-      if (!spawnerJson || typeof spawnerJson !== "object") {
-        throw new Error(`Spawner JSON is invalid: ${spawnerPath}`);
-      }
-    }
-
-    const assetRoots = buildAssetSearchRoots(modRoot, [modelPath, spawnerPath].filter(Boolean));
-    const discoveredRoles = spawnerJson ? discoverRolesFromSpawner(spawnerJson) : [];
+    const assetRoots = buildAssetSearchRoots(modRoot, [modelPath]);
     const typedRoles = parseCsv(values.rolesCsv);
-    const roles = typedRoles.length
-      ? typedRoles
-      : discoveredRoles.length
-      ? discoveredRoles
-      : [modelName];
+    const roles = typedRoles.length ? typedRoles : [modelName];
     if (!roles.length) {
       throw new Error("At least one role is required.");
     }
@@ -3402,7 +3257,7 @@
       cameraAutoFrame: values.cameraAutoFrame === true,
       cameraAutoFramePadding: Math.max(0, Math.floor(asNumber(values.cameraAutoFramePadding, 4))),
       cameraAutoFrameMaxAttempts: Math.max(1, Math.floor(asNumber(values.cameraAutoFrameMaxAttempts, 6))),
-      sharedRoleGroup: values.sharedRoleGroup === true,
+      iconDefaultOverride: String(values.iconDefaultOverride || ""),
       previewOnlyFirstCombo: true
     });
     const firstJob = generated.jobsPayload
@@ -3450,7 +3305,7 @@
       ensureWizardDialogStyle();
       dialog = new Dialog({
         id: dialogId,
-        title: "Spawner Icon Batch Wizard",
+        title: "Dynamic Icon Batch Wizard",
         width: 860,
         buttons: ["Run Batch", "Cancel"],
         confirmIndex: 0,
@@ -3478,16 +3333,6 @@
                 this.values.manifestOutPath = derived.manifestOutPath;
               }
             },
-            autoFillSpawnerOut() {
-              const rawSpawner = String(this.values.spawnerPath || "").trim();
-              if (!rawSpawner) {
-                return;
-              }
-              if (String(this.values.spawnerOutPath || "").trim()) {
-                return;
-              }
-              this.values.spawnerOutPath = replaceFileExt(rawSpawner, ".generated.json");
-            },
             async browsePath(fieldKey) {
               const startPath =
                 String(this.values[fieldKey] || "").trim() ||
@@ -3500,9 +3345,6 @@
               this.values[fieldKey] = picked.path;
               if (fieldKey === "modelPath") {
                 this.autoFillFromModelPath();
-              }
-              if (fieldKey === "spawnerPath") {
-                this.autoFillSpawnerOut();
               }
             },
             calculateCombos() {
@@ -3546,16 +3388,9 @@
                 </div>
 
                 <div class="tw-field">
-                  <label>Spawner JSON Path (optional)</label>
-                  <div class="tw-path-row">
-                    <input type="text" v-model="values.spawnerPath" @change="autoFillSpawnerOut" />
-                    <button type="button" class="tool" @click="browsePath('spawnerPath')">Browse</button>
-                  </div>
-                </div>
-                <div class="tw-field">
-                  <label>Roles CSV (blank = auto)</label>
+                  <label>Roles CSV</label>
                   <input type="text" v-model="values.rolesCsv" />
-                  <div class="tw-help">Comma-separated roles. Blank uses spawner allowlist or model name.</div>
+                  <div class="tw-help">Comma-separated roles. Blank uses the model filename.</div>
                 </div>
               </div>
 
@@ -3659,12 +3494,8 @@
                     <label for="tw_save_json">Save Jobs + Manifest JSON</label>
                   </div>
                   <div class="tw-check-row">
-                    <input type="checkbox" id="tw_write_spawner" v-model="values.writeSpawnerOverrides" />
-                    <label for="tw_write_spawner">Write Spawner Overrides</label>
-                  </div>
-                  <div class="tw-check-row">
-                    <input type="checkbox" id="tw_shared_role_group" v-model="values.sharedRoleGroup" />
-                    <label for="tw_shared_role_group">Shared Role Group</label>
+                    <input type="checkbox" id="tw_write_dynamic_icon" v-model="values.writeDynamicIcon" />
+                    <label for="tw_write_dynamic_icon">Write Dynamic Icon Asset</label>
                   </div>
                 </div>
 
@@ -3684,23 +3515,16 @@
                   </div>
                 </div>
 
-                <div class="tw-inline-pair">
-                  <div class="tw-check-row">
-                    <input type="checkbox" id="tw_spawner_in_place" v-model="values.writeSpawnerInPlace" />
-                    <label for="tw_spawner_in_place">Write Spawner In Place</label>
-                  </div>
-                  <div class="tw-field">
-                    <label>IconDefault Override (optional)</label>
-                    <input type="text" v-model="values.iconDefaultOverride" />
+                <div class="tw-field">
+                  <label>Dynamic Icon Asset Path (optional)</label>
+                  <div class="tw-path-row">
+                    <input type="text" v-model="values.dynamicIconPath" />
+                    <button type="button" class="tool" @click="browsePath('dynamicIconPath')">Browse</button>
                   </div>
                 </div>
-
                 <div class="tw-field">
-                  <label>Spawner Output Path (if not in place)</label>
-                  <div class="tw-path-row">
-                    <input type="text" v-model="values.spawnerOutPath" />
-                    <button type="button" class="tool" @click="browsePath('spawnerOutPath')">Browse</button>
-                  </div>
+                  <label>IconDefault Override (optional)</label>
+                  <input type="text" v-model="values.iconDefaultOverride" />
                 </div>
               </div>
             </div>
@@ -3778,29 +3602,10 @@
     const commonRoot = path.join(modRoot, "Common");
     const modelName = inferModelName(modelPath);
 
-    const spawnerPathRaw = typeof formResult.spawnerPath === "string"
-      ? formResult.spawnerPath.trim()
-      : "";
-    const spawnerPath = spawnerPathRaw ? resolveUserPath(spawnerPathRaw, modRoot) : null;
-    let spawnerJson = null;
-    if (spawnerPath) {
-      if (!fileExists(spawnerPath)) {
-        throw new Error(`Spawner JSON not found: ${spawnerPath}`);
-      }
-      spawnerJson = readJsonFromDisk(spawnerPath);
-      if (!spawnerJson || typeof spawnerJson !== "object") {
-        throw new Error(`Spawner JSON is invalid: ${spawnerPath}`);
-      }
-    }
-    const assetRoots = buildAssetSearchRoots(modRoot, [modelPath, spawnerPath].filter(Boolean));
+    const assetRoots = buildAssetSearchRoots(modRoot, [modelPath]);
 
-    const discoveredRoles = spawnerJson ? discoverRolesFromSpawner(spawnerJson) : [];
     const typedRoles = parseCsv(formResult.rolesCsv);
-    const roles = typedRoles.length
-      ? typedRoles
-      : discoveredRoles.length
-      ? discoveredRoles
-      : [modelName];
+    const roles = typedRoles.length ? typedRoles : [modelName];
     if (!roles.length) {
       throw new Error("At least one role is required.");
     }
@@ -3853,7 +3658,7 @@
       cameraAutoFrame: formResult.cameraAutoFrame === true,
       cameraAutoFramePadding: Math.max(0, Math.floor(asNumber(formResult.cameraAutoFramePadding, 4))),
       cameraAutoFrameMaxAttempts: Math.max(1, Math.floor(asNumber(formResult.cameraAutoFrameMaxAttempts, 6))),
-      sharedRoleGroup: formResult.sharedRoleGroup === true
+      iconDefaultOverride: String(formResult.iconDefaultOverride || "")
     });
     const resolvedBaseModelFile = generated.jobsPayload
       && generated.jobsPayload.model
@@ -3883,21 +3688,12 @@
       writeJson(manifestOutPath, generated.manifest);
     }
 
-    let spawnerOutPath = null;
-    if (spawnerJson && formResult.writeSpawnerOverrides !== false) {
-      const mergedSpawner = mergeOverridesIntoSpawner(
-        spawnerJson,
-        generated.roleOverrides,
-        generated.iconOverrideGroups,
-        String(formResult.iconDefaultOverride || "")
-      );
-      if (formResult.writeSpawnerInPlace !== false) {
-        spawnerOutPath = spawnerPath;
-      } else {
-        spawnerOutPath =
-          resolveUserPath(formResult.spawnerOutPath, modRoot) || replaceFileExt(spawnerPath, ".generated.json");
-      }
-      writeJson(spawnerOutPath, mergedSpawner);
+    let dynamicIconOutPath = null;
+    if (formResult.writeDynamicIcon !== false) {
+      dynamicIconOutPath =
+        resolveUserPath(formResult.dynamicIconPath, modRoot)
+        || path.join(modRoot, "Server", "Tamework", "DynamicIcons", `${modelName}.json`);
+      writeJson(dynamicIconOutPath, generated.dynamicIconConfig);
     }
 
     const summary = await runBatchPayload(generated.jobsPayload, modRoot);
@@ -3914,13 +3710,13 @@
         + setSelection.includeIgnoredBecauseExcluded.join(", ");
     }
     message += `\n\nIcon directory:\n- ${iconDirAbs}`;
-    if (jobsOutPath || manifestOutPath || spawnerOutPath) {
+    if (jobsOutPath || manifestOutPath || dynamicIconOutPath) {
       message += "\n\nOutputs:";
       if (jobsOutPath) message += `\n- Jobs: ${jobsOutPath}`;
       if (manifestOutPath) message += `\n- Manifest: ${manifestOutPath}`;
-      if (spawnerOutPath) message += `\n- Spawner: ${spawnerOutPath}`;
+      if (dynamicIconOutPath) message += `\n- Dynamic icon: ${dynamicIconOutPath}`;
     }
-    await showTextDialog("Spawner Icon Wizard", message, 980);
+    await showTextDialog("Dynamic Icon Wizard", message, 980);
   }
 
   async function runWizardFlow() {
@@ -4042,17 +3838,17 @@
   }
 
   BBPlugin.register(PLUGIN_ID, {
-    title: "Tamework Spawner Icon Batch Renderer",
+    title: "Tamework Dynamic Icon Batch Renderer",
     author: "Alec + Codex",
     icon: "view_in_ar",
     description:
-      "Render spawner item icons in bulk from generate_spawner_icon_overrides.py renderer-jobs JSON.",
+      "Render dynamic companion icons in bulk from generate_spawner_icon_overrides.py renderer-jobs JSON.",
     version: "0.2.0",
     variant: "desktop",
     min_version: "5.0.5",
     onload() {
       runAction = new Action(ACTION_ID, {
-        name: "Run Tamework Spawner Batch (From Jobs JSON)",
+        name: "Run Tamework Dynamic Icon Batch (From Jobs JSON)",
         icon: "view_in_ar",
         description: "Select a renderer jobs JSON file and batch-render icons.",
         condition: () => true,
@@ -4061,10 +3857,10 @@
         }
       });
       wizardAction = new Action(ACTION_WIZARD_ID, {
-        name: "Generate + Run Tamework Spawner Batch Wizard",
+        name: "Generate + Run Tamework Dynamic Icon Wizard",
         icon: "tune",
         description:
-          "Pick model/spawner, configure roles and camera, then generate and render icons in one flow.",
+          "Pick a model, configure roles and camera, then generate and render icons in one flow.",
         condition: () => true,
         click() {
           runWizard();

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Generate Tamework spawner icon overrides from model RandomAttachmentSets.
+"""Generate Tamework dynamic icon assets from model RandomAttachmentSets.
 
 This tool expands attachment combinations declared in a model asset JSON,
 generates icon paths from a template, and writes role-scoped
-IconOverridesByRole entries into a TwSpawnerConfig JSON.
+TwDynamicIconConfig assets.
 """
 
 from __future__ import annotations
@@ -65,6 +65,12 @@ def load_json(path: Path) -> object:
         raise ConfigError(f"Failed to parse JSON at {path}: {exc}") from exc
 
 
+def split_archive_reference(value: str) -> Tuple[str, str] | None:
+    """Recognize an archive delimiter without treating folder-name ! as ZIP syntax."""
+    match = re.match(r"^(.*?\.(?:zip|jar))!(.*)$", value, re.IGNORECASE)
+    return (match.group(1), match.group(2)) if match else None
+
+
 def load_json_from_source(asset_root: Path, source: str) -> Tuple[object, str, str]:
     """Load JSON from disk path or zip-entry syntax.
 
@@ -72,8 +78,8 @@ def load_json_from_source(asset_root: Path, source: str) -> Tuple[object, str, s
       C:\\path\\to\\mod.zip!Server/Models/Foo.json
       relative\\mod.zip!Server/Models/Foo.json
     """
-    if "!" in source:
-        zip_part, inner_part = source.split("!", 1)
+    if archive_reference := split_archive_reference(source):
+        zip_part, inner_part = archive_reference
         zip_path = resolve_asset_path(asset_root, zip_part).resolve()
         inner_path = inner_part.replace("\\", "/").lstrip("/")
         if not inner_path:
@@ -213,8 +219,8 @@ def expand_path_variables(value: str, manifest_dir: Path) -> str:
 
 def resolve_manifest_root_path(manifest_dir: Path, raw_value: str) -> str:
     value = expand_path_variables(raw_value, manifest_dir)
-    if "!" in value:
-        zip_part, inner_part = value.split("!", 1)
+    if archive_reference := split_archive_reference(value):
+        zip_part, inner_part = archive_reference
         zip_path = Path(zip_part)
         if not zip_path.is_absolute():
             zip_path = manifest_dir / zip_path
@@ -231,10 +237,10 @@ def join_manifest_model_path(models_root: str, model_path: str) -> str:
     clean_model = model_path.replace("\\", "/").lstrip("/")
     if not clean_model:
         raise ConfigError("Batch manifest entry model path cannot be empty.")
-    if "!" in clean_model:
+    if split_archive_reference(clean_model):
         return clean_model
-    if "!" in models_root:
-        zip_part, inner_part = models_root.split("!", 1)
+    if archive_reference := split_archive_reference(models_root):
+        zip_part, inner_part = archive_reference
         clean_inner = inner_part.replace("\\", "/").strip("/")
         joined_inner = f"{clean_inner}/{clean_model}" if clean_inner else clean_model
         return f"{zip_part}!{joined_inner}"
@@ -242,8 +248,8 @@ def join_manifest_model_path(models_root: str, model_path: str) -> str:
 
 
 def infer_common_root_from_models_root(models_root: str) -> str | None:
-    if "!" in models_root:
-        zip_part, inner_part = models_root.split("!", 1)
+    if archive_reference := split_archive_reference(models_root):
+        zip_part, inner_part = archive_reference
         clean_inner = inner_part.replace("\\", "/").strip("/")
         if clean_inner.endswith("Server/Models"):
             prefix = clean_inner[: -len("Server/Models")].rstrip("/")
@@ -258,7 +264,10 @@ def infer_common_root_from_models_root(models_root: str) -> str | None:
 
 
 def extract_zip_asset(common_root: str, asset_path: str, extract_root: Path) -> str:
-    zip_part, inner_part = common_root.split("!", 1)
+    archive_reference = split_archive_reference(common_root)
+    if archive_reference is None:
+        raise ConfigError(f"Expected ZIP asset source: {common_root}")
+    zip_part, inner_part = archive_reference
     zip_path = Path(zip_part)
     inner_root = inner_part.replace("\\", "/").strip("/")
     clean_asset = asset_path.replace("\\", "/").lstrip("/")
@@ -296,7 +305,7 @@ def resolve_common_asset_file(
         return str(path)
     if common_root is None:
         return to_common_asset_file(asset_root, asset_path)
-    if "!" in common_root:
+    if split_archive_reference(common_root):
         if extract_root is None:
             raise ConfigError("Zip-backed commonRoot requires an extraction directory.")
         return extract_zip_asset(common_root, asset_path, extract_root)
@@ -463,6 +472,43 @@ def exclude_set_options(
     return filtered
 
 
+def parse_render_attachment_defaults(
+    all_set_defs: Sequence[SetDefinition],
+    generated_set_defs: Sequence[SetDefinition],
+    raw_defaults: object,
+    context: str,
+) -> Dict[str, str]:
+    if raw_defaults is None:
+        return {}
+    if not isinstance(raw_defaults, dict):
+        raise ConfigError(f"{context} renderAttachmentDefaults must be an object.")
+
+    known_options = {set_def.name: set(set_def.options) for set_def in all_set_defs}
+    generated_sets = {set_def.name for set_def in generated_set_defs}
+    defaults: Dict[str, str] = {}
+    for set_name, option_name in raw_defaults.items():
+        if not isinstance(set_name, str) or not set_name.strip():
+            raise ConfigError(f"{context} renderAttachmentDefaults keys must be non-empty strings.")
+        if not isinstance(option_name, str) or not option_name.strip():
+            raise ConfigError(
+                f"{context} renderAttachmentDefaults.{set_name} must be a non-empty string."
+            )
+        if set_name not in known_options:
+            raise ConfigError(
+                f"{context} renderAttachmentDefaults references unknown set '{set_name}'."
+            )
+        if set_name in generated_sets:
+            raise ConfigError(
+                f"{context} renderAttachmentDefaults.{set_name} conflicts with a generated attachment set."
+            )
+        if option_name not in known_options[set_name] or option_name == EMPTY_OPTION_SENTINEL:
+            raise ConfigError(
+                f"{context} renderAttachmentDefaults.{set_name} references unknown option '{option_name}'."
+            )
+        defaults[set_name] = option_name
+    return defaults
+
+
 def extract_option_visuals(
     model_json: Mapping[str, object],
 ) -> Dict[str, Dict[str, OptionVisual]]:
@@ -494,31 +540,11 @@ def extract_option_visuals(
     return result
 
 
-def discover_roles(
-    roles_from_args: Sequence[str],
-    spawner_json: Mapping[str, object] | None,
-) -> List[str]:
+def discover_roles(roles_from_args: Sequence[str]) -> List[str]:
     explicit = parse_csv_or_repeat(roles_from_args)
     if explicit:
         return explicit
-    if spawner_json is None:
-        raise ConfigError("No roles provided. Use --roles or provide --spawner-config with Allowlist.")
-
-    allowed = spawner_json.get("AllowedRoles")
-    if not isinstance(allowed, dict):
-        raise ConfigError(
-            "Could not derive roles from spawner config. AllowedRoles is missing or invalid."
-        )
-    mode = allowed.get("Mode")
-    allowlist = allowed.get("Allowlist")
-    if mode != "Allowlist" or not isinstance(allowlist, list):
-        raise ConfigError(
-            "Could not derive roles from spawner config. AllowedRoles must be Mode=Allowlist."
-        )
-    roles = [value for value in allowlist if isinstance(value, str) and value.strip()]
-    if not roles:
-        raise ConfigError("Spawner allowlist did not contain any valid role IDs.")
-    return roles
+    raise ConfigError("No roles provided. Use --roles or define roles in the batch manifest entry.")
 
 
 def set_placeholder_entries(set_name: str, value: str, output: Dict[str, str]) -> None:
@@ -625,9 +651,16 @@ def build_combo_records(
     return role_overrides, combo_manifest, skipped_empty_overrides
 
 
-def build_icon_override_group(roles: Sequence[str], combo_manifest: Sequence[Mapping[str, object]]) -> dict:
+def build_dynamic_icon_config(
+    roles: Sequence[str],
+    combo_manifest: Sequence[Mapping[str, object]],
+    *,
+    icon_default: str | None = None,
+    enabled: bool | None = None,
+    priority: int | None = None,
+) -> dict:
     overrides: List[dict] = []
-    icon_default = None
+    generated_default = None
     for combo in combo_manifest:
         attachments = combo.get("attachments")
         icons_by_role = combo.get("iconsByRole")
@@ -644,8 +677,8 @@ def build_icon_override_group(roles: Sequence[str], combo_manifest: Sequence[Map
         if icon is None:
             continue
         if not attachments:
-            if icon_default is None:
-                icon_default = icon
+            if generated_default is None:
+                generated_default = icon
             continue
         overrides.append(
             {
@@ -653,154 +686,49 @@ def build_icon_override_group(roles: Sequence[str], combo_manifest: Sequence[Map
                 "Attachments": dict(attachments),
             }
         )
-    group = {
-        "Roles": list(roles),
-        "Overrides": overrides,
-    }
+    config = {"RoleIds": list(roles), "IconOverrides": overrides}
     if icon_default is not None:
-        group["IconDefault"] = icon_default
-    return group
+        config["IconDefault"] = icon_default
+    elif generated_default is not None:
+        config["IconDefault"] = generated_default
+    if enabled is not None:
+        config["Enabled"] = enabled
+    if priority is not None:
+        config["Priority"] = priority
+    return config
 
 
-def icon_override_group_role_key(group: Mapping[str, object]) -> Tuple[str, ...]:
-    roles = group.get("Roles")
-    if not isinstance(roles, list):
-        return ()
-    normalized_roles = sorted(
-        {
-            role.strip().lower()
-            for role in roles
-            if isinstance(role, str) and role.strip()
-        }
-    )
-    return tuple(normalized_roles)
+def sanitize_dynamic_icon_asset_id(value: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9_]+", "_", value).strip("_")
+    return cleaned or "DynamicIcon"
 
 
-def icon_override_attachment_predicate(override: Mapping[str, object]) -> Dict[str, str]:
-    attachments = override.get("Attachments")
-    if not isinstance(attachments, dict):
-        return {}
-    return {
-        str(key): str(value)
-        for key, value in attachments.items()
-        if str(key).strip() and str(value).strip()
-    }
+def dynamic_icon_output_path(
+    asset_root: Path,
+    output_dir: str,
+    asset_id: str,
+    explicit_path: str | None = None,
+) -> Path:
+    if explicit_path:
+        return resolve_asset_path(asset_root, explicit_path).resolve()
+    return (resolve_asset_path(asset_root, output_dir) / f"{asset_id}.json").resolve()
 
 
-def icon_override_predicates_overlap(first: Mapping[str, str], second: Mapping[str, str]) -> bool:
-    if not first or not second:
-        return False
-    for key in set(first).intersection(second):
-        if first[key] != second[key]:
-            return False
-    return True
+def dynamic_icon_role_group_key(roles: Sequence[str]) -> Tuple[str, ...]:
+    return tuple(sorted({role.strip().lower() for role in roles if role.strip()}))
 
 
-def validate_icon_override_group_predicates(role_key: Tuple[str, ...], overrides: Sequence[object]) -> None:
-    predicates: List[Tuple[int, Dict[str, str]]] = []
-    for index, override in enumerate(overrides):
-        if not isinstance(override, Mapping):
-            continue
-        predicate = icon_override_attachment_predicate(override)
-        if not predicate:
-            continue
-        for existing_index, existing_predicate in predicates:
-            if icon_override_predicates_overlap(existing_predicate, predicate):
-                roles = ", ".join(role_key)
-                raise ConfigError(
-                    "overlapping IconOverrideGroups for roles "
-                    f"{roles}: overrides {existing_index} and {index} can match the same captured NPC. "
-                    "Generate full attachment combinations or split them into separate role groups."
-                )
-        predicates.append((index, predicate))
-
-
-def merged_icon_override_group_overrides(
-    role_key: Tuple[str, ...],
-    existing_overrides: object,
-    incoming_overrides: object,
-) -> List[dict] | None:
-    if not isinstance(existing_overrides, list) or not isinstance(incoming_overrides, list):
-        return None
-    merged = list(existing_overrides) + list(incoming_overrides)
-    validate_icon_override_group_predicates(role_key, merged)
-    return merged
-
-
-def append_or_merge_icon_override_group(groups: List[dict], group: Mapping[str, object]) -> None:
-    role_key = icon_override_group_role_key(group)
-    if not role_key:
-        return
-
-    for existing in groups:
-        if icon_override_group_role_key(existing) != role_key:
-            continue
-
-        existing_overrides = existing.get("Overrides")
-        incoming_overrides = group.get("Overrides")
-        merged_overrides = merged_icon_override_group_overrides(role_key, existing_overrides, incoming_overrides)
-        if merged_overrides is not None:
-            existing["Overrides"] = merged_overrides
-        if not existing.get("IconDefault") and isinstance(group.get("IconDefault"), str):
-            existing["IconDefault"] = group["IconDefault"]
-        return
-
-    incoming_overrides = group.get("Overrides")
-    if isinstance(incoming_overrides, list):
-        validate_icon_override_group_predicates(role_key, incoming_overrides)
-    groups.append(dict(group))
-
-
-def replace_or_append_icon_override_group(groups: List[dict], group: Mapping[str, object]) -> None:
-    role_key = icon_override_group_role_key(group)
-    if not role_key:
-        return
-    replacement = dict(group)
-    replacement_overrides = replacement.get("Overrides")
-    if isinstance(replacement_overrides, list):
-        validate_icon_override_group_predicates(role_key, replacement_overrides)
-    for index, existing in enumerate(groups):
-        if icon_override_group_role_key(existing) == role_key:
-            groups[index] = replacement
-            return
-    groups.append(replacement)
-
-
-def apply_overrides_to_spawner(
-    spawner_json: Mapping[str, object],
-    role_overrides: Mapping[str, List[dict]],
-    icon_override_groups: Sequence[Mapping[str, object]] = (),
-    icon_default: str | None = None,
-    replace_icon_overrides: bool = False,
-) -> dict:
-    output = dict(spawner_json)
-    if replace_icon_overrides:
-        existing = {}
-        existing_groups = []
-    else:
-        existing = output.get("IconOverridesByRole")
-        if not isinstance(existing, dict):
-            existing = {}
-        raw_groups = output.get("IconOverrideGroups")
-        existing_groups = list(raw_groups) if isinstance(raw_groups, list) else []
-    merged = dict(existing)
-    for role, overrides in role_overrides.items():
-        merged[role] = overrides
-    if merged or replace_icon_overrides:
-        output["IconOverridesByRole"] = merged
-    else:
-        output.pop("IconOverridesByRole", None)
-    groups = list(existing_groups)
-    for group in icon_override_groups:
-        if isinstance(group, Mapping):
-            replace_or_append_icon_override_group(groups, group)
-    if groups or replace_icon_overrides:
-        output["IconOverrideGroups"] = groups
-    else:
-        output.pop("IconOverrideGroups", None)
-    if icon_default is not None:
-        output["IconDefault"] = icon_default
-    return output
+def merge_dynamic_icon_config(existing: dict, incoming: Mapping[str, object], context: str) -> None:
+    for field in ("Enabled", "Priority"):
+        current = existing.get(field)
+        candidate = incoming.get(field)
+        if current is not None and candidate is not None and current != candidate:
+            raise ConfigError(f"{context} has conflicting {field} values for the same role group.")
+        if current is None and candidate is not None:
+            existing[field] = candidate
+    if "IconDefault" not in existing and isinstance(incoming.get("IconDefault"), str):
+        existing["IconDefault"] = incoming["IconDefault"]
+    existing["IconOverrides"].extend(incoming.get("IconOverrides", []))
 
 
 def to_common_asset_file(asset_root: Path, asset_path: str | None) -> str | None:
@@ -810,6 +738,56 @@ def to_common_asset_file(asset_root: Path, asset_path: str | None) -> str | None
     if path.is_absolute():
         return str(path)
     return str((asset_root / "Common" / path).resolve())
+
+
+def normalized_renderer_output_path(job: Mapping[str, object]) -> str:
+    value = job.get("outputIconFile") or job.get("outputIcon")
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError("Renderer job is missing outputIconFile and outputIcon.")
+    return os.path.normcase(os.path.normpath(value))
+
+
+def renderer_job_specification(
+    job: Mapping[str, object],
+    defaults: Mapping[str, object] | None = None,
+) -> str:
+    defaults = defaults or {}
+    default_camera = defaults.get("camera") if isinstance(defaults.get("camera"), dict) else {}
+    specification = {
+        "attachments": job.get("attachments", {}),
+        "setValues": job.get("setValues", {}),
+        "baseModel": job.get("baseModel"),
+        "baseTexture": job.get("baseTexture"),
+        "baseModelFile": job.get("baseModelFile"),
+        "baseTextureFile": job.get("baseTextureFile"),
+        "selectedOptionAssets": job.get("selectedOptionAssets", []),
+        "iconSize": job.get("iconSize", defaults.get("iconSize")),
+        "camera": job.get("camera", default_camera),
+        "translation": job.get("translation", default_camera.get("translation")),
+    }
+    return json.dumps(specification, sort_keys=True, separators=(",", ":"), default=str)
+
+
+def dedupe_or_reject_renderer_job(
+    jobs_by_output_path: Dict[str, Tuple[str, dict]],
+    job: dict,
+    defaults: Mapping[str, object] | None = None,
+) -> bool:
+    output_path = normalized_renderer_output_path(job)
+    specification = renderer_job_specification(job, defaults)
+    existing = jobs_by_output_path.get(output_path)
+    if existing is None:
+        jobs_by_output_path[output_path] = (specification, job)
+        return True
+    if existing[0] == specification:
+        return False
+    first_job = existing[1]
+    first_entry = first_job.get("entryId", first_job.get("id", "first job"))
+    second_entry = job.get("entryId", job.get("id", "second job"))
+    raise ConfigError(
+        f"Renderer output collision at {output_path}: {first_entry} and {second_entry} "
+        "render different specifications to the same PNG."
+    )
 
 
 def build_renderer_jobs(
@@ -830,6 +808,7 @@ def build_renderer_jobs(
     camera_auto_frame: bool,
     camera_auto_frame_padding: int,
     camera_auto_frame_max_attempts: int,
+    render_attachment_defaults: Mapping[str, str] = {},
 ) -> dict:
     base_model = model_json.get("Model") if isinstance(model_json.get("Model"), str) else None
     base_texture = model_json.get("Texture") if isinstance(model_json.get("Texture"), str) else None
@@ -848,7 +827,7 @@ def build_renderer_jobs(
         return resolved
 
     jobs: List[dict] = []
-    jobs_by_output_path: set[str] = set()
+    jobs_by_output_path: Dict[str, Tuple[str, dict]] = {}
     for combo in combo_manifest:
         combo_index = combo.get("index")
         combo_slug = combo.get("comboSlug")
@@ -871,12 +850,9 @@ def build_renderer_jobs(
             if not isinstance(icon_path, str) or not icon_path.strip():
                 continue
             output_icon_file = to_common_asset_file(asset_root, icon_path)
-            output_key = output_icon_file or icon_path
-            if output_key in jobs_by_output_path:
-                continue
-            jobs_by_output_path.add(output_key)
             selected_assets: List[dict] = []
-            for set_name, option_name in attachments.items():
+            render_attachments = list(attachments.items()) + list(render_attachment_defaults.items())
+            for set_name, option_name in render_attachments:
                 if not isinstance(set_name, str) or not isinstance(option_name, str):
                     continue
                 visual = option_visuals.get(set_name, {}).get(option_name)
@@ -891,23 +867,23 @@ def build_renderer_jobs(
                         "textureFile": source_asset_file(visual.texture if visual else None),
                     }
                 )
-            jobs.append(
-                {
-                    "id": f"{combo_slug}__role_{role}",
-                    "role": role,
-                    "comboIndex": combo_index,
-                    "comboSlug": combo_slug,
-                    "attachments": attachments,
-                    "setValues": set_values,
-                    "baseModel": base_model,
-                    "baseTexture": base_texture,
-                    "baseModelFile": source_asset_file(base_model),
-                    "baseTextureFile": source_asset_file(base_texture),
-                    "selectedOptionAssets": selected_assets,
-                    "outputIcon": icon_path,
-                    "outputIconFile": output_icon_file,
-                }
-            )
+            job = {
+                "id": f"{combo_slug}__role_{role}",
+                "role": role,
+                "comboIndex": combo_index,
+                "comboSlug": combo_slug,
+                "attachments": attachments,
+                "setValues": set_values,
+                "baseModel": base_model,
+                "baseTexture": base_texture,
+                "baseModelFile": source_asset_file(base_model),
+                "baseTextureFile": source_asset_file(base_texture),
+                "selectedOptionAssets": selected_assets,
+                "outputIcon": icon_path,
+                "outputIconFile": output_icon_file,
+            }
+            if dedupe_or_reject_renderer_job(jobs_by_output_path, job):
+                jobs.append(job)
 
     return {
         "schema": "tamework.spawner-icon-render-jobs.v1",
@@ -970,6 +946,7 @@ def combine_renderer_payloads(
     source_common_roots: List[str] = []
     source_asset_extract_roots: List[str] = []
     models: List[object] = []
+    jobs_by_output_path: Dict[str, Tuple[str, dict]] = {}
     for payload in payloads:
         model_source = payload.get("modelSource")
         if isinstance(model_source, str):
@@ -987,7 +964,14 @@ def combine_renderer_payloads(
             models.append(model)
         payload_jobs = payload.get("jobs")
         if isinstance(payload_jobs, list):
-            jobs.extend(job for job in payload_jobs if isinstance(job, dict))
+            defaults = payload.get("defaults")
+            if not isinstance(defaults, dict):
+                defaults = {}
+            for job in payload_jobs:
+                if not isinstance(job, dict):
+                    continue
+                if dedupe_or_reject_renderer_job(jobs_by_output_path, job, defaults):
+                    jobs.append(job)
 
     first_model_source = model_sources[0] if model_sources else None
     return {
@@ -1020,7 +1004,7 @@ def combine_renderer_payloads(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Generate TwSpawnerConfig IconOverridesByRole entries from model "
+            "Generate TwDynamicIconConfig assets from model "
             "RandomAttachmentSets."
         )
     )
@@ -1044,39 +1028,29 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--spawner-config",
-        help=(
-            "Path to existing TwSpawnerConfig JSON. If provided, generated overrides "
-            "can be written to this config."
-        ),
+        "--dynamic-icons-output-dir",
+        default="Server/Tamework/DynamicIcons",
+        help="Directory for generated dynamic icon assets, relative to --asset-root.",
     )
     parser.add_argument(
-        "--write-spawner",
-        help=(
-            "Output path for updated spawner config JSON. Defaults to "
-            "<spawner-config>.generated.json when --spawner-config is set."
-        ),
+        "--write-dynamic-icon",
+        help="Explicit output path for a single generated dynamic icon asset.",
     )
     parser.add_argument(
-        "--in-place",
-        action="store_true",
-        help="Write generated overrides back into --spawner-config directly.",
+        "--dynamic-icon-id",
+        help="Single-model dynamic icon asset ID. Defaults to the sanitized model filename.",
     )
     parser.add_argument(
-        "--replace-icon-overrides",
-        action="store_true",
-        help=(
-            "Replace generated icon override sections instead of preserving "
-            "IconOverridesByRole roles or IconOverrideGroups from the existing config."
-        ),
+        "--dynamic-icon-id-prefix",
+        default="DynamicIcon",
+        help="Batch asset ID prefix; merged role groups use <prefix>_<first role>.",
     )
     parser.add_argument(
         "--roles",
         action="append",
         default=[],
         help=(
-            "Role ID(s) to generate IconOverridesByRole for. Can be repeated or "
-            "comma-separated. If omitted, roles are derived from spawner Allowlist."
+            "Role ID(s) for the dynamic icon asset. Can be repeated or comma-separated."
         ),
     )
     parser.add_argument(
@@ -1088,20 +1062,18 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--icon-default",
-        help="Optional IconDefault value to set in the output spawner config.",
+        help="Optional IconDefault value to set instead of a generated base icon.",
     )
     parser.add_argument(
-        "--icon-override-mode",
-        default="byRole",
-        choices=["byRole", "group"],
-        help="Override output mode: byRole writes IconOverridesByRole; group writes IconOverrideGroups.",
+        "--enabled",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Optional Enabled value to write into the generated dynamic icon asset.",
     )
     parser.add_argument(
-        "--icon-role",
-        help=(
-            "Canonical role placeholder value for shared group icon paths. "
-            "Defaults to the first generated role."
-        ),
+        "--priority",
+        type=int,
+        help="Optional Priority value to write into the generated dynamic icon asset.",
     )
     parser.add_argument(
         "--include-empty-set",
@@ -1194,36 +1166,36 @@ def run_single_model(args: argparse.Namespace, asset_root: Path) -> int:
     if not isinstance(model_json, dict):
         raise ConfigError(f"Model JSON must be an object: {model_source}")
 
-    spawner_json = None
-    spawner_path: Path | None = None
-    if args.spawner_config:
-        spawner_path = resolve_asset_path(asset_root, args.spawner_config).resolve()
-        loaded_spawner = load_json(spawner_path)
-        if not isinstance(loaded_spawner, dict):
-            raise ConfigError(f"Spawner config JSON must be an object: {spawner_path}")
-        spawner_json = loaded_spawner
-
     include_empty_sets = parse_csv_or_repeat(args.include_empty_set)
     set_defs = extract_set_definitions(model_json, include_empty_sets)
     option_visuals = extract_option_visuals(model_json)
-    roles = discover_roles(args.roles, spawner_json)
+    roles = discover_roles(args.roles)
     camera_rotation = parse_float_list(args.camera_rotation, 3, "--camera-rotation")
     camera_translation = parse_float_list(args.camera_translation, 2, "--camera-translation")
-    icon_override_mode = normalize_icon_override_mode(args.icon_override_mode, "Single model")
-    icon_role = args.icon_role.strip() if isinstance(args.icon_role, str) and args.icon_role.strip() else roles[0]
 
-    role_overrides, combo_manifest, skipped_empty = build_combo_records(
+    _, combo_manifest, skipped_empty = build_combo_records(
         set_defs=set_defs,
         roles=roles,
         icon_template=args.icon_template,
         empty_value_token=args.empty_value_token,
         max_combos=args.max_combos,
-        icon_role_for_paths=icon_role if icon_override_mode == "group" else None,
+        icon_role_for_paths=roles[0],
     )
-    icon_override_groups = []
-    if icon_override_mode == "group":
-        icon_override_groups.append(build_icon_override_group(roles, combo_manifest))
-        role_overrides = {}
+    asset_id = sanitize_dynamic_icon_asset_id(args.dynamic_icon_id or model_stem)
+    dynamic_icon_config = build_dynamic_icon_config(
+        roles,
+        combo_manifest,
+        icon_default=args.icon_default,
+        enabled=args.enabled,
+        priority=args.priority,
+    )
+    dynamic_icon_path = dynamic_icon_output_path(
+        asset_root,
+        args.dynamic_icons_output_dir,
+        asset_id,
+        args.write_dynamic_icon,
+    )
+    write_json(dynamic_icon_path, dynamic_icon_config)
 
     manifest_path = (
         Path(args.manifest_out).resolve()
@@ -1235,8 +1207,8 @@ def run_single_model(args: argparse.Namespace, asset_root: Path) -> int:
         "assetRoot": str(asset_root),
         "modelPath": model_source,
         "roles": roles,
-        "iconOverrideMode": icon_override_mode,
-        "iconRole": icon_role if icon_override_mode == "group" else None,
+        "dynamicIconAssetId": asset_id,
+        "dynamicIconPath": str(dynamic_icon_path),
         "maxCombos": args.max_combos,
         "randomAttachmentSets": [
             {
@@ -1247,9 +1219,7 @@ def run_single_model(args: argparse.Namespace, asset_root: Path) -> int:
             for set_def in set_defs
         ],
         "comboCount": len(combo_manifest),
-        "overridesGeneratedByRole": {
-            role: len(overrides) for role, overrides in role_overrides.items()
-        },
+        "overridesGenerated": len(dynamic_icon_config["IconOverrides"]),
         "skippedEmptyAttachmentCombos": skipped_empty,
         "combos": combo_manifest,
     }
@@ -1260,31 +1230,13 @@ def run_single_model(args: argparse.Namespace, asset_root: Path) -> int:
         f"Model: {model_source}",
         f"Roles: {', '.join(roles)}",
         f"Attachment combos: {len(combo_manifest)}",
+        f"Dynamic icon asset written: {dynamic_icon_path}",
     ]
 
     if skipped_empty:
         output_lines.append(
-            "Note: Some combos had no attachments. Group mode writes the first one as "
-            "IconOverrideGroups[].IconDefault; byRole mode still needs a separate default."
+            "Note: Some combos had no attachments. The first generated base icon is IconDefault."
         )
-
-    if spawner_json is not None:
-        updated_spawner = apply_overrides_to_spawner(
-            spawner_json=spawner_json,
-            role_overrides=role_overrides,
-            icon_override_groups=icon_override_groups,
-            icon_default=args.icon_default,
-            replace_icon_overrides=args.replace_icon_overrides,
-        )
-        if args.in_place:
-            target_path = spawner_path
-        elif args.write_spawner:
-            target_path = resolve_asset_path(asset_root, args.write_spawner).resolve()
-        else:
-            assert spawner_path is not None
-            target_path = spawner_path.with_suffix(".generated.json")
-        write_json(target_path, updated_spawner)
-        output_lines.append(f"Spawner config written: {target_path}")
 
     if args.renderer_jobs_out:
         renderer_jobs_path = Path(args.renderer_jobs_out).resolve()
@@ -1402,20 +1354,9 @@ def batch_string(
     return value
 
 
-def normalize_icon_override_mode(value: object, context: str) -> str:
-    if value is None:
-        return "byRole"
-    if not isinstance(value, str) or not value.strip():
-        raise ConfigError(f"{context} iconOverrideMode must be 'byRole' or 'group'.")
-    normalized = value.strip().lower().replace("-", "").replace("_", "")
-    if normalized in {"byrole", "role", "roles"}:
-        return "byRole"
-    if normalized in {"group", "shared", "sharedgroup"}:
-        return "group"
-    raise ConfigError(f"{context} iconOverrideMode must be 'byRole' or 'group'.")
-
-
 def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
+    if args.write_dynamic_icon:
+        raise ConfigError("--write-dynamic-icon is only available for single-model generation.")
     manifest_path = Path(args.batch_manifest).resolve()
     raw_manifest = load_json(manifest_path)
     if not isinstance(raw_manifest, dict):
@@ -1464,17 +1405,7 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
         int(defaults.get("cameraAutoFrameMaxAttempts", args.camera_auto_frame_max_attempts)),
     )
 
-    spawner_json = None
-    spawner_path: Path | None = None
-    if args.spawner_config:
-        spawner_path = resolve_asset_path(asset_root, args.spawner_config).resolve()
-        loaded_spawner = load_json(spawner_path)
-        if not isinstance(loaded_spawner, dict):
-            raise ConfigError(f"Spawner config JSON must be an object: {spawner_path}")
-        spawner_json = loaded_spawner
-
-    aggregate_role_overrides: Dict[str, List[dict]] = {}
-    aggregate_icon_override_groups: List[dict] = []
+    dynamic_icon_groups: Dict[Tuple[str, ...], dict] = {}
     aggregate_combo_manifest: List[dict] = []
     renderer_payloads: List[Mapping[str, object]] = []
     report_entries: List[dict] = []
@@ -1497,7 +1428,7 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
 
         roles = parse_string_list_field(entry.get("roles"), f"Batch entry '{entry_id}' roles")
         if not roles:
-            roles = discover_roles([], spawner_json)
+            raise ConfigError(f"Batch entry '{entry_id}' must define roles.")
 
         include_empty_sets = parse_string_list_field(
             batch_value(entry, defaults, "includeEmptySets", []),
@@ -1512,14 +1443,13 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
             f"Batch entry '{entry_id}' excludeAttachmentOptions",
         )
         icon_template = batch_string(entry, defaults, "iconTemplate", f"Batch entry '{entry_id}'")
-        icon_override_mode = normalize_icon_override_mode(
-            batch_value(entry, defaults, "iconOverrideMode", "byRole"),
-            f"Batch entry '{entry_id}'",
-        )
-        icon_role_raw = batch_value(entry, defaults, "iconRole", None)
-        if icon_role_raw is not None and (not isinstance(icon_role_raw, str) or not icon_role_raw.strip()):
-            raise ConfigError(f"Batch entry '{entry_id}' field 'iconRole' must be a non-empty string.")
-        icon_role = icon_role_raw.strip() if isinstance(icon_role_raw, str) else roles[0]
+        icon_default_raw = batch_value(entry, defaults, "iconDefault", None)
+        if icon_default_raw is not None and (not isinstance(icon_default_raw, str) or not icon_default_raw.strip()):
+            raise ConfigError(f"Batch entry '{entry_id}' iconDefault must be a non-empty string.")
+        enabled_raw = batch_value(entry, defaults, "enabled", args.enabled)
+        enabled = None if enabled_raw is None else parse_bool_field(enabled_raw, f"Batch entry '{entry_id}' enabled")
+        priority_raw = batch_value(entry, defaults, "priority", args.priority)
+        priority = None if priority_raw is None else int(priority_raw)
         empty_value_token = batch_string(
             entry,
             defaults,
@@ -1532,6 +1462,12 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
         all_set_defs = extract_set_definitions(model_json, include_empty_sets)
         set_defs = filter_set_definitions(all_set_defs, keep_sets, f"Batch entry '{entry_id}'")
         set_defs = exclude_set_options(set_defs, exclude_options, f"Batch entry '{entry_id}'")
+        render_attachment_defaults = parse_render_attachment_defaults(
+            all_set_defs,
+            set_defs,
+            batch_value(entry, defaults, "renderAttachmentDefaults", {}),
+            f"Batch entry '{entry_id}'",
+        )
         generated_set_names = {set_def.name for set_def in set_defs}
         unused_empty_sets = sorted(set(include_empty_sets).difference(generated_set_names))
         if unused_empty_sets:
@@ -1541,24 +1477,36 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
             )
 
         option_visuals = extract_option_visuals(model_json)
-        role_overrides, combo_manifest, skipped_empty = build_combo_records(
+        _, combo_manifest, skipped_empty = build_combo_records(
             set_defs=set_defs,
             roles=roles,
             icon_template=icon_template,
             empty_value_token=empty_value_token,
             max_combos=max_combos,
-            icon_role_for_paths=icon_role if icon_override_mode == "group" else None,
+            icon_role_for_paths=roles[0],
         )
-
-        icon_override_group = None
-        if icon_override_mode == "group":
-            icon_override_group = build_icon_override_group(roles, combo_manifest)
-            if icon_override_group["Overrides"] or icon_override_group.get("IconDefault"):
-                append_or_merge_icon_override_group(aggregate_icon_override_groups, icon_override_group)
-            role_overrides = {}
+        dynamic_icon_config = build_dynamic_icon_config(
+            roles,
+            combo_manifest,
+            icon_default=icon_default_raw.strip() if isinstance(icon_default_raw, str) else None,
+            enabled=enabled,
+            priority=priority,
+        )
+        role_group_key = dynamic_icon_role_group_key(roles)
+        existing_group = dynamic_icon_groups.get(role_group_key)
+        if existing_group is None:
+            dynamic_icon_groups[role_group_key] = {
+                "roles": list(roles),
+                "config": dynamic_icon_config,
+                "entryIds": [entry_id],
+            }
         else:
-            for role, overrides in role_overrides.items():
-                aggregate_role_overrides.setdefault(role, []).extend(overrides)
+            merge_dynamic_icon_config(
+                existing_group["config"],
+                dynamic_icon_config,
+                f"Batch entries {', '.join(existing_group['entryIds'] + [entry_id])}",
+            )
+            existing_group["entryIds"].append(entry_id)
 
         entry_combo_manifest = []
         for combo in combo_manifest:
@@ -1618,6 +1566,7 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
             camera_auto_frame=entry_camera_auto_frame,
             camera_auto_frame_padding=entry_camera_auto_frame_padding,
             camera_auto_frame_max_attempts=entry_camera_auto_frame_max_attempts,
+            render_attachment_defaults=render_attachment_defaults,
         )
         for job in renderer_payload.get("jobs", []):
             if isinstance(job, dict):
@@ -1650,22 +1599,46 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
                 "source": source_id,
                 "modelPath": model_source,
                 "roles": roles,
-                "iconOverrideMode": icon_override_mode,
-                "iconRole": icon_role if icon_override_mode == "group" else None,
                 "keptAttachmentSets": [set_def.name for set_def in set_defs],
                 "excludedAttachmentOptions": {
                     set_name: list(options) for set_name, options in exclude_options.items()
                 },
+                "renderAttachmentDefaults": render_attachment_defaults,
                 "comboCount": len(combo_manifest),
-                "overridesGeneratedByRole": {
-                    role: len(overrides) for role, overrides in role_overrides.items()
-                },
-                "iconOverrideGroupCount": 1 if icon_override_group is not None and icon_override_group["Overrides"] else 0,
-                "overridesGeneratedByGroup": (
-                    len(icon_override_group["Overrides"]) if icon_override_group is not None else 0
-                ),
+                "overridesGenerated": len(dynamic_icon_config["IconOverrides"]),
                 "skippedEmptyAttachmentCombos": skipped_empty,
                 "modelStem": model_stem,
+            }
+        )
+
+    dynamic_icon_assets: List[dict] = []
+    generated_asset_ids: Dict[str, Tuple[str, ...]] = {}
+    for role_group_key, group in dynamic_icon_groups.items():
+        roles = group["roles"]
+        asset_id = sanitize_dynamic_icon_asset_id(
+            f"{args.dynamic_icon_id_prefix}_{roles[0]}"
+        )
+        previous_role_group = generated_asset_ids.get(asset_id)
+        if previous_role_group is not None and previous_role_group != role_group_key:
+            raise ConfigError(
+                f"Batch role groups {', '.join(previous_role_group)} and {', '.join(role_group_key)} "
+                f"both generate dynamic icon asset ID '{asset_id}'. "
+                "Choose a distinct first role or run the groups with different --dynamic-icon-id-prefix values."
+            )
+        generated_asset_ids[asset_id] = role_group_key
+        target_path = dynamic_icon_output_path(
+            asset_root,
+            args.dynamic_icons_output_dir,
+            asset_id,
+        )
+        write_json(target_path, group["config"])
+        dynamic_icon_assets.append(
+            {
+                "id": asset_id,
+                "path": str(target_path),
+                "roles": roles,
+                "entryIds": group["entryIds"],
+                "overrideCount": len(group["config"]["IconOverrides"]),
             }
         )
 
@@ -1681,13 +1654,8 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
         "sources": {source_id: source.as_report() for source_id, source in sources.items()},
         "entryCount": len(entries),
         "comboCount": len(aggregate_combo_manifest),
-        "overridesGeneratedByRole": {
-            role: len(overrides) for role, overrides in aggregate_role_overrides.items()
-        },
-        "iconOverrideGroupCount": len(aggregate_icon_override_groups),
-        "overridesGeneratedByGroup": sum(
-            len(group.get("Overrides", [])) for group in aggregate_icon_override_groups
-        ),
+        "dynamicIconAssets": dynamic_icon_assets,
+        "dynamicIconAssetCount": len(dynamic_icon_assets),
         "skippedEmptyAttachmentCombos": total_skipped_empty,
         "entries": report_entries,
         "combos": aggregate_combo_manifest,
@@ -1700,23 +1668,7 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
         f"Attachment combos: {len(aggregate_combo_manifest)}",
     ]
 
-    if spawner_json is not None:
-        updated_spawner = apply_overrides_to_spawner(
-            spawner_json=spawner_json,
-            role_overrides=aggregate_role_overrides,
-            icon_override_groups=aggregate_icon_override_groups,
-            icon_default=args.icon_default,
-            replace_icon_overrides=args.replace_icon_overrides,
-        )
-        if args.in_place:
-            target_path = spawner_path
-        elif args.write_spawner:
-            target_path = resolve_asset_path(asset_root, args.write_spawner).resolve()
-        else:
-            assert spawner_path is not None
-            target_path = spawner_path.with_suffix(".generated.json")
-        write_json(target_path, updated_spawner)
-        output_lines.append(f"Spawner config written: {target_path}")
+    output_lines.append(f"Dynamic icon assets written: {len(dynamic_icon_assets)}")
 
     renderer_payload = combine_renderer_payloads(
         asset_root=asset_root,
@@ -1735,8 +1687,7 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
 
     if total_skipped_empty:
         output_lines.append(
-            "Note: Some combos had no attachments. Group mode writes the first one as "
-            "IconOverrideGroups[].IconDefault; byRole mode still needs a separate default."
+            "Note: Some combos had no attachments. The first generated base icon is IconDefault."
         )
 
     print("\n".join(output_lines))
