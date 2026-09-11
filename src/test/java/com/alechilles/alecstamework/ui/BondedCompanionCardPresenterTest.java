@@ -274,7 +274,7 @@ class BondedCompanionCardPresenterTest {
                 BondedCompanionStateView.DEAD,
                 BondedCompanionStatusPresentation.Action.REVIVE,
                 false,
-                Map.of("currentHealth", "0", "maxHealth", "400"),
+                Map.of("currentHealth", "320", "maxHealth", "400"),
                 new BondedCompanionReviveQuote(
                         "profile-7", true, List.of(
                         new BondedCompanionReviveQuote.CostLine(
@@ -293,6 +293,8 @@ class BondedCompanionCardPresenterTest {
         assertCommand(commands, "#Card #BondedStateDead.Text", "DEAD");
         assertCommand(commands, "#Card #BondedPrimaryActionDisabled.Visible", "true");
         assertCommand(commands, "#Card #BondedPrimaryActionDisabled.Text", "REVIVE");
+        assertCommand(commands, "#Card #BondedHealthText.Text", "0 / 400");
+        assertCommand(commands, "#Card #BondedHealthFill.Visible", "false");
         assertCommand(commands, "#Card #BondedPrimaryActionDisabled.TooltipText",
                 "REVIVE COST");
         assertFalse(java.util.Arrays.stream(commands.getCommands())
@@ -318,13 +320,13 @@ class BondedCompanionCardPresenterTest {
                 "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
 
         assertCommand(commands, "#Card #BondedSpecies.Text", "Nordic Drake");
-        assertCommand(commands, "#Card #BondedLevelText.Text", "LVL 1");
+        assertCommand(commands, "#Card #BondedLevelText.Text", "Lv. 1");
         assertCommand(commands, "#Card #BondedGenderFemaleIcon.Visible", "true");
         assertFalse(java.util.Arrays.stream(commands.getCommands())
                         .anyMatch(command -> "#Card #BondedSpecies.Text".equals(command.selector)
                                 && command.data.contains("Female")),
                 "Gender belongs exclusively to the existing gender icon.");
-        assertCommand(commands, "#Card #BondedTalentPointAction.Visible", "true");
+        assertCommand(commands, "#Card #BondedTalentPointAction.Visible", "false");
         assertCommand(commands, "#Card #BondedTalentPointCount.Visible", "false");
         assertFalse(java.util.Arrays.stream(commands.getCommands())
                         .anyMatch(command -> "#Card #BondedLevelText.Text".equals(command.selector)

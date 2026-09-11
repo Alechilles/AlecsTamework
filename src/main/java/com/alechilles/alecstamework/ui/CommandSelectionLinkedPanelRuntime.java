@@ -270,6 +270,9 @@ final class CommandSelectionLinkedPanelRuntime {
                 page.panelFilterInputValueSupplier,
                 page.panelGroupActivationEntriesSupplier,
                 page.panelGroupActivationValueSupplier);
+        // The initial roster chrome overrides generic values; seed those final values too.
+        BondedCompanionPanelChrome.bindToolbar(new UICommandBuilder(), new UIEventBuilder(),
+                page, page.refreshTransaction.values());
     }
 
     void bindCard(UICommandBuilder commands, UIEventBuilder events, int index,
