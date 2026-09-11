@@ -39,6 +39,14 @@ public final class BuilderMotionControllerTameworkFormationFly extends BuilderMo
         return resolvedFormationEnabled ? Math.min(super.getMinAirSpeed(), 0.1) : super.getMinAirSpeed();
     }
 
+    @Override
+    public float getMaxTurnSpeed() {
+        // Native Fly uses this limit for both turning and its obstacle turn-radius prediction.
+        return resolvedFormationEnabled
+                ? Math.min(super.getMaxTurnSpeed(), (float) Math.toRadians(90.0))
+                : super.getMaxTurnSpeed();
+    }
+
     @Nonnull
     @Override
     public MotionControllerTameworkFormationFly build(@Nonnull BuilderSupport builderSupport) {
@@ -57,7 +65,7 @@ public final class BuilderMotionControllerTameworkFormationFly extends BuilderMo
     @Nonnull
     private BuilderMotionControllerTameworkFormationFly resolvedFor(@Nonnull BuilderSupport builderSupport) {
         try {
-            // Native MotionControllerFly captures the final minimum air speed in its constructor. Resolve the
+            // Native MotionControllerFly captures speed and turn limits in its constructor. Resolve the
             // computable flag into a per-build view instead of mutating the shared parsed builder.
             BuilderMotionControllerTameworkFormationFly copy =
                     (BuilderMotionControllerTameworkFormationFly) super.clone();

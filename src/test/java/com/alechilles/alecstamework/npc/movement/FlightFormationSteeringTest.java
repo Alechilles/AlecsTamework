@@ -12,6 +12,48 @@ class FlightFormationSteeringTest {
     private static final double YAW_EPSILON = 1.0E-6;
 
     @Test
+    void outerChevronSlotChangesAreBoundedAndConvergeWithoutDelayingLeaderTravel() {
+        Vector3d offset = new Vector3d(-12.0, 0.0, -12.0);
+        Vector3d desired = new Vector3d(12.0, 0.0, -12.0);
+        Vector3d before = new Vector3d(offset);
+        FlightFormationSteering.smoothOffset(offset, desired, 2.0, 0.05, offset);
+        assertTrue(offset.distance(before) <= 0.1 + EPSILON,
+                "A sharp leader turn must not sweep an outer slot across the flock in one frame.");
+        for (int frame = 0; frame < 400; frame++) {
+            FlightFormationSteering.smoothOffset(offset, desired, 2.0, 0.05, offset);
+        }
+        assertTrue(offset.distance(desired) < 0.001);
+
+        Vector3d movingLeader = new Vector3d(0.0, 40.0, 10.0);
+        Vector3d target = new Vector3d(movingLeader).add(offset);
+        movingLeader.z += 0.2;
+        FlightFormationSteering.smoothOffset(offset, desired, 2.0, 0.05, offset);
+        Vector3d nextTarget = new Vector3d(movingLeader).add(offset);
+        assertEquals(0.2, nextTarget.z - target.z, EPSILON);
+    }
+
+    @Test
+    void looseFormationStaggersAboveAndBelowLeaderThroughoutItsDrift() {
+        Vector3d leader = new Vector3d(0.0, 40.0, 0.0);
+        Vector3d heading = new Vector3d(0.0, 0.0, 1.0);
+        Vector3d target = new Vector3d();
+        for (int second = 0; second < 60; second++) {
+            boolean above = false;
+            boolean below = false;
+            for (int slot = 0; slot < 6; slot++) {
+                FlightFormationSteering.resolveTarget(
+                        BuilderBodyMotionTameworkFlightFormation.Formation.LOOSE,
+                        slot, 3.0, second, leader, heading, target);
+                above |= target.y > leader.y + 0.3;
+                below |= target.y < leader.y - 0.3;
+                assertTrue(Math.abs(target.y - leader.y) < 1.5,
+                        "Height staggering should stay modest at normal spacing.");
+            }
+            assertTrue(above && below, "The flock needs depth above and below its leader.");
+        }
+    }
+
+    @Test
     void formationTurnsSmoothlyWhenLeaderReversesDirection() {
         Vector3d heading = new Vector3d(0.0, 0.0, 1.0);
         Vector3d desired = new Vector3d(0.0, 0.0, -1.0);

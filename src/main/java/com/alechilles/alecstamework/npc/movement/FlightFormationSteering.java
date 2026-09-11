@@ -45,7 +45,9 @@ final class FlightFormationSteering {
             trailing = safeSpacing * 1.2 + radius * (1.0 + Math.cos(slotAngle))
                     + Math.sin(phase * 0.7) * drift;
             sideways = radius * Math.sin(slotAngle) + Math.cos(phase) * drift;
-            vertical = Math.sin(phase * 1.3) * drift * 0.35;
+            double height = safeSpacing * (0.2 + 0.1 * ((index / 2) % 3));
+            vertical = ((index & 1) == 0 ? height : -height)
+                    + Math.sin(phase * 1.3) * safeSpacing * 0.08;
         }
         return output.set(
                 leaderPosition.x - trailing * forwardX + sideways * rightX,
@@ -94,6 +96,25 @@ final class FlightFormationSteering {
             output.mul(safeMaximumSpeed / desiredSpeed);
         }
         return output.div(safeMaximumSpeed);
+    }
+
+    /** Ease slot changes relative to the leader, preserving straight-line travel without added lag. */
+    @Nonnull
+    static Vector3d smoothOffset(@Nonnull Vector3d current,
+                                 @Nonnull Vector3d desired,
+                                 double maximumSpeed,
+                                 double dt,
+                                 @Nonnull Vector3d output) {
+        double distance = current.distance(desired);
+        double stepTime = Math.max(0.0, dt);
+        double blend = 1.0 - Math.exp(-stepTime * 2.0);
+        if (distance > EPSILON) {
+            blend = Math.min(blend, Math.max(0.0, maximumSpeed) * stepTime / distance);
+        }
+        return output.set(
+                current.x + (desired.x - current.x) * blend,
+                current.y + (desired.y - current.y) * blend,
+                current.z + (desired.z - current.z) * blend);
     }
 
     static boolean smoothHeading(@Nonnull Vector3d current,

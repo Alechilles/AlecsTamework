@@ -38,6 +38,7 @@ public final class BodyMotionTameworkFlightFormation extends TameworkBodyMotionB
     private final Vector3d leaderHeading = new Vector3d();
     private final Vector3d sampledHeading = new Vector3d();
     private final Vector3d targetPosition = new Vector3d();
+    private final Vector3d formationOffset = new Vector3d();
     private final Vector3d translation = new Vector3d();
     private final Vector3d obstacleProbeOrigin = new Vector3d();
     private final FlyingObstacleAvoidance.Probe obstacleProbe = this::probeObstacle;
@@ -51,6 +52,7 @@ public final class BodyMotionTameworkFlightFormation extends TameworkBodyMotionB
     @Nullable
     private ComponentAccessor<EntityStore> obstacleProbeAccessor;
     private boolean hasLeaderPosition;
+    private boolean hasFormationOffset;
     private double looseDriftSeconds;
 
     BodyMotionTameworkFlightFormation(@Nonnull BuilderBodyMotionTameworkFlightFormation builder,
@@ -121,6 +123,16 @@ public final class BodyMotionTameworkFlightFormation extends TameworkBodyMotionB
         FlightFormationSteering.resolveTarget(
                 formation, followerIndex, spacing, looseDriftSeconds,
                 leaderTransform.getPosition(), leaderHeading, targetPosition);
+        targetPosition.sub(leaderTransform.getPosition());
+        if (!hasFormationOffset) {
+            formationOffset.set(targetPosition);
+            hasFormationOffset = true;
+        } else {
+            FlightFormationSteering.smoothOffset(
+                    formationOffset, targetPosition,
+                    Math.min(spacing * 0.75, fly.getSteeringSpeedScale() * 0.35), dt, formationOffset);
+        }
+        targetPosition.set(leaderTransform.getPosition()).add(formationOffset);
         FlightFormationSteering.resolveTranslation(
                 selfTransform.getPosition(), targetPosition, leaderVelocity,
                 fly.getSteeringSpeedScale(), relativeSpeed, tightness, dt, translation);
@@ -266,6 +278,8 @@ public final class BodyMotionTameworkFlightFormation extends TameworkBodyMotionB
     private void resetLeaderTracking() {
         trackedLeaderRef = null;
         hasLeaderPosition = false;
+        hasFormationOffset = false;
+        formationOffset.zero();
         looseDriftSeconds = 0.0;
         lastLeaderPosition.zero();
         leaderVelocity.zero();

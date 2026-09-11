@@ -2,6 +2,8 @@
 
 ## Unreleased development changes
 
+- Smoothed flock formation turns and position changes, capped formation flight turning at 90 degrees/second, and staggered loose flock heights above and below the leader.
+
 - Locate now reports recorded coop coordinates and tracks capture items in player
   inventories, standard storage containers, and dropped items. Offline or unloaded
   holders show a last-seen result; tracking uses item events instead of periodic scans.
