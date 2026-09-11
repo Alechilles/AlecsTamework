@@ -1,7 +1,6 @@
 $A = "TameworkPanelActionStyles.ui";
 Group {
- Anchor: (Left: 0, Right: 0, Height: 38);
- Padding: (Bottom: 4);
- TextButton #QuickGroupButton { Anchor: (Top: 0, Left: 0, Right: 0, Height: 34); Text: ""; Style: $A.@PanelButton; Padding: (Left: 14, Right: 6); }
- Group #QuickGroupColor { Anchor: (Top: 5, Left: 4, Width: 4, Height: 24); Background: #55635a; HitTestVisible: false; }
+ Anchor: (Left: 0, Right: 0, Height: 34);
+ TextButton #QuickGroupButton { Anchor: (Top: 0, Left: 0, Right: 0, Height: 32); Text: ""; Style: $A.@GroupRow; Padding: (Left: 25, Right: 4); }
+ Group #QuickGroupColor { Anchor: (Top: 10, Left: 7, Width: 12, Height: 12); Background: "Tamework/PanelControls/GroupDiamond.png"; HitTestVisible: false; }
 }

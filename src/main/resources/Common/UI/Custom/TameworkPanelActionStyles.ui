@@ -64,3 +64,15 @@ $C = "Common.ui";
 @PanelInputFieldPlaceholderStyle = InputFieldStyle(...$C.@DefaultInputFieldPlaceholderStyle, TextColor: #8f9b92);
 
 @PanelColorPicker = (...$C.@DefaultColorPickerDropdownBoxStyle, PanelBackground: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3));
+
+// Group tags use quiet rows and reserve color for the small marker.
+@GroupRowLabel = LabelStyle(FontSize: 12, TextColor: #d6d9d0, HorizontalAlignment: Start, VerticalAlignment: Center);
+@GroupRow = TextButtonStyle(Default: (Background: (Color: #202923), LabelStyle: @GroupRowLabel), Hovered: (Background: (Color: #2d3831), LabelStyle: @GroupRowLabel), Pressed: (Background: (Color: #35423a), LabelStyle: @GroupRowLabel), Sounds: $C.@ButtonSounds);
+@GroupRowSelected = TextButtonStyle(Default: (Background: (Color: #35423a), LabelStyle: (...@GroupRowLabel, TextColor: #f0eee7, RenderBold: true)), Hovered: (Background: (Color: #3e4d43), LabelStyle: @GroupRowLabel), Sounds: $C.@ButtonSounds);
+@GroupDropdown = DropdownBoxStyle(...@PanelDropdown,
+ HorizontalPadding: 6,
+ LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, FontSize: 12, TextColor: #d6d9d0, RenderUppercase: false),
+ EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, FontSize: 12, TextColor: #d6d9d0, RenderUppercase: false),
+ SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, FontSize: 12, TextColor: #f0eee7, RenderUppercase: false),
+ DefaultArrowTexturePath: "Tamework/PanelControls/GroupChevron.png", HoveredArrowTexturePath: "Tamework/PanelControls/GroupChevron.png", PressedArrowTexturePath: "Tamework/PanelControls/GroupChevron.png", ArrowWidth: 10, ArrowHeight: 6
+);

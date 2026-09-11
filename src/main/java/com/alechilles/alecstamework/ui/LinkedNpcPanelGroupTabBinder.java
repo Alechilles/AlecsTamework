@@ -2,9 +2,11 @@ package com.alechilles.alecstamework.ui;
 
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import java.util.Locale;
+import com.hypixel.hytale.server.core.ui.PatchStyle;
+import com.hypixel.hytale.server.core.ui.Value;
 
 /**
- * Applies group color to the inline assignment selector's border.
+ * Applies the shared group marker to inline assignment selectors.
  */
 final class LinkedNpcPanelGroupTabBinder {
     private static final String DEFAULT_GROUP_COLOR = "#454e48";
@@ -19,7 +21,12 @@ final class LinkedNpcPanelGroupTabBinder {
             return;
         }
         String color = normalizeColor(entry.groupColorHex());
-        commandBuilder.set(tabSelector + ".OutlineColor", color);
+        commandBuilder.setObject(tabSelector + "Marker.Background", markerStyle(color, entry.groupId() == null || entry.groupId().isBlank()));
+    }
+
+    static PatchStyle markerStyle(String color, boolean hollow) {
+        return new PatchStyle(Value.of("Tamework/PanelControls/GroupDiamond"
+                + (hollow ? "Outline" : "") + ".png")).setColor(Value.of(color));
     }
 
     private static String normalizeColor(String raw) {

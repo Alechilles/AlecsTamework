@@ -84,14 +84,12 @@ $C.@PageOverlay {
      Background: #202923;
      OutlineColor: #414845;
      OutlineSize: 1;
-     Label { Anchor: (Top: 4, Left: 8, Right: 8, Height: 22); Text: %server.tamework.ui.linkedPanel.manageGroups; Style: (FontSize: 13, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Center, VerticalAlignment: Center); }
-     $C.@SmallSecondaryTextButton #TameworkLinkedPanelManageGroupsButton {
-                    @Sounds = $C.@ButtonSounds;
-                    @Anchor = (Top: 30, Left: 8, Right: 8, Height: 28);
-                    @Text = %server.tamework.ui.shared.button.edit;
-                    Style: $A.@PanelButton;
-                }
-     Group { Anchor: (Top: 62, Left: 8, Right: 8, Bottom: 0); LayoutMode: TopScrolling; KeepScrollPosition: true; ScrollbarStyle: $C.@DefaultScrollbarStyle; Padding: (Left: 12, Right: 0, Top: 4, Bottom: 4);
+     Label { Anchor: (Top: 6, Left: 8, Right: 38, Height: 24); Text: %server.tamework.ui.linkedPanel.manageGroups; Style: (FontSize: 13, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center); }
+     Group { Anchor: (Top: 5, Right: 5, Width: 26, Height: 26);
+      TextButton #TameworkLinkedPanelManageGroupsButton { Anchor: (Full: 0); Text: ""; TooltipText: %server.tamework.ui.shared.button.edit; Style: $A.@GroupRow; }
+      Group { Anchor: (Top: 5, Left: 5, Width: 16, Height: 16); Background: "Tamework/PanelControls/GroupEdit.png"; HitTestVisible: false; }
+     }
+     Group { Anchor: (Top: 36, Left: 4, Right: 4, Bottom: 0); LayoutMode: TopScrolling; KeepScrollPosition: true; ScrollbarStyle: $C.@DefaultScrollbarStyle; Padding: (Top: 2, Bottom: 4);
       Group #TameworkGroupQuickSelectList { Anchor: (Left: 0, Right: 0); LayoutMode: Top; }
      }
     }

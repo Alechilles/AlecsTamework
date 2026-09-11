@@ -281,6 +281,8 @@ final class CommandSelectionLinkedPanelRuntime {
         String selector = "#TameworkLinkedPanelList[" + index + "] #GroupSelector";
         boolean available = canAssignGroup(entry, presentation);
         commands.set(selector + ".Visible", available);
+        commands.set(selector + "Marker.Visible", available);
+        commands.set(selector + "Frame.Visible", available);
         if (!available) return;
         List<DropdownEntryInfo> entries = resolveGroupEntries();
         commands.set(selector + ".Entries", entries.isEmpty()
@@ -343,7 +345,10 @@ final class CommandSelectionLinkedPanelRuntime {
     private List<DropdownEntryInfo> resolveGroupEntries() {
         List<DropdownEntryInfo> entries = page.panelGroupAssignEntriesSupplier == null
                 ? List.of() : page.panelGroupAssignEntriesSupplier.get();
-        return entries == null ? List.of() : entries;
+        return entries == null ? List.of() : entries.stream().map(entry ->
+                LinkedNpcPanelGroupAssignOverlayState.NONE_VALUE.equalsIgnoreCase(entry.value())
+                        ? new DropdownEntryInfo(LinkedNpcPanelGroupAssignOverlayState.fallbackEntries(page.resolveLanguage()).get(0).label(), entry.value())
+                        : entry).toList();
     }
 
     LinkedNpcEntry resolveEntry(UUID npcUuid) {

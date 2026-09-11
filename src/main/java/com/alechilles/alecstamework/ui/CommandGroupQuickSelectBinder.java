@@ -41,12 +41,14 @@ final class CommandGroupQuickSelectBinder {
             String button = LIST + "[" + i + "] #QuickGroupButton";
             String swatch = LIST + "[" + i + "] #QuickGroupColor";
             String color = colorFor(entry, groupColors);
-            String style = entry.value().equals(selection) ? "PanelButtonSelected" : "PanelButton";
+            String style = entry.value().equals(selection) ? "GroupRowSelected" : "GroupRow";
             if (rebuild) {
                 commands.append(LIST, "TameworkCommandGroupQuickSelectRow.ui");
                 commands.setObject(button + ".Text", entry.label());
+                commands.setObject(button + ".TooltipText", entry.label());
                 commands.set(button + ".Style", Value.ref("TameworkPanelActionStyles.ui", style));
-                commands.set(swatch + ".Background", color);
+                commands.setObject(swatch + ".Background", LinkedNpcPanelGroupTabBinder.markerStyle(color, !groupColors.containsKey(normalize(entry.value()))));
+                commands.set(swatch + ".Visible", !"__all__".equalsIgnoreCase(entry.value()));
                 values.remember(button + ".Style", style);
                 values.remember(swatch + ".Background", color);
                 events.addEventBinding(CustomUIEventBindingType.Activating, button,
@@ -54,7 +56,9 @@ final class CommandGroupQuickSelectBinder {
                                 entry.value()), false);
             } else {
                 values.setStyle(commands, button + ".Style", style);
-                values.set(commands, swatch + ".Background", color);
+                if (values.changed(swatch + ".Background", color)) {
+                    commands.setObject(swatch + ".Background", LinkedNpcPanelGroupTabBinder.markerStyle(color, !groupColors.containsKey(normalize(entry.value()))));
+                }
             }
         }
     }

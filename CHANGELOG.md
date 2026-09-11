@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Refined group shortcuts and NPC group selectors with shared color diamonds,
+  neutral borders, wider shortcut rows, and a compact group-edit button.
+
 - Matched the remaining Tamework dialogs, config editor, talent tree, bonded cards,
   and flight/control HUD frames to the shared charcoal style without adding textures.
 
