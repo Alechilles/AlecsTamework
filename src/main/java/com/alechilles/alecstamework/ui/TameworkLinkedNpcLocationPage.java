@@ -30,15 +30,23 @@ public final class TameworkLinkedNpcLocationPage
     private final String title;
     private final String worldName;
     private final String coordinates;
+    private final String status;
 
     public TameworkLinkedNpcLocationPage(@Nonnull PlayerRef playerRef,
                                          @Nonnull String title,
                                          @Nonnull String worldName,
                                          @Nonnull String coordinates) {
+        this(playerRef, title, worldName, coordinates, "");
+    }
+
+    public TameworkLinkedNpcLocationPage(@Nonnull PlayerRef playerRef,
+                                         @Nonnull String title, @Nonnull String worldName,
+                                         @Nonnull String coordinates, @Nonnull String status) {
         super(playerRef, CustomPageLifetime.CanDismiss, EventPayload.CODEC);
         this.title = title;
         this.worldName = worldName;
         this.coordinates = coordinates;
+        this.status = status;
     }
 
     @Override
@@ -49,6 +57,7 @@ public final class TameworkLinkedNpcLocationPage
         try {
             commandBuilder.append(UI_PATH);
             commandBuilder.set("#TameworkLinkedLocationTitle.Text", title);
+            commandBuilder.set("#TameworkLinkedLocationStatus.Text", status);
             commandBuilder.set("#TameworkLinkedLocationWorldValue.Text", worldName);
             commandBuilder.set("#TameworkLinkedLocationCoordinatesInput.Value", coordinates);
             commandBuilder.set("#TameworkLinkedLocationCoordinatesInput.MaxLength", Math.max(64, coordinates.length() + 16));

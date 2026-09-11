@@ -888,8 +888,7 @@ final class CommandSelectionPageService {
                 && (feature == null || !feature.managesPaidRevival());
         if (revive) addGenericRow(catalog, rowId, "RESPAWN", "Respawn",
                 npcId, null, npc.respawn(), context.genericAuthority(), false);
-        if (genericLinkedOrOwned && !entry.dead() && !entry.lost()
-                && (linked || !entry.captured() && !entry.inCoop())) {
+        if (genericLinkedOrOwned && !entry.dead() && !entry.lost()) {
             addGenericRow(catalog, rowId, "LOCATE", "Locate", npcId, null,
                     npc.locate(), context.genericAuthority(), false);
         }

@@ -933,3 +933,11 @@ tamework.ui.talents.saved.changed = Le compagnon a changé ou le talent n’a pa
 tamework.ui.linkedPanel.sort.happiness=Bonheur
 tamework.ui.linkedPanel.sort.hunger=Faim
 tamework.ui.linkedPanel.sort.thirst=Soif
+
+tamework.ui.notifications.command.locate.unavailable=La position du compagnon est indisponible ou a changé. Réessayez Localiser.
+tamework.ui.notifications.command.locate.coop=Dans un enclos à cet emplacement enregistré.
+tamework.ui.notifications.command.locate.captureUnknown=Contenu dans un objet de capture. Sa position actuelle est inconnue.
+tamework.ui.notifications.command.locate.player=Objet de capture dans l’inventaire de {0}.
+tamework.ui.notifications.command.locate.container=Objet de capture dans un conteneur de stockage.
+tamework.ui.notifications.command.locate.dropped=Objet de capture au sol.
+tamework.ui.notifications.command.locate.lastSeen=Dernière observation : {0} Observé le {1}

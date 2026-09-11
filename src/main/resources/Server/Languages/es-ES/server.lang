@@ -76,3 +76,11 @@ tamework.ui.settingsAnnouncement.button.review=Revisar configuración
 # ===== Panel de PNJ vinculados =====
 tamework.ui.linkedPanel.activeHighlight.label=Resaltar activos
 tamework.ui.notifications.command.panel.activeHighlightUpdateFailed=No se pudieron actualizar los resaltados activos.
+
+tamework.ui.notifications.command.locate.unavailable=La ubicación del compañero no está disponible o ha cambiado. Vuelve a localizarlo.
+tamework.ui.notifications.command.locate.coop=En un refugio en esta ubicación registrada.
+tamework.ui.notifications.command.locate.captureUnknown=Contenido en un objeto de captura. Su ubicación actual es desconocida.
+tamework.ui.notifications.command.locate.player=Objeto de captura en el inventario de {0}.
+tamework.ui.notifications.command.locate.container=Objeto de captura en un contenedor de almacenamiento.
+tamework.ui.notifications.command.locate.dropped=Objeto de captura en el suelo.
+tamework.ui.notifications.command.locate.lastSeen=Visto por última vez: {0} Observado el {1}

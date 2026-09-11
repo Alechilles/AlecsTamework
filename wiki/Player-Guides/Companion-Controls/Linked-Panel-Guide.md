@@ -85,6 +85,22 @@ records without a complete saved talent snapshot cannot use offline spending.
   state, cooldowns, and recovery rules still apply. Home and link settings require a link.
   Bonded-companion tools keep their separate roster controls.
 
+## Finding captured animals
+
+Use **Locate** in Linked or Owned mode to find a stored animal. Coop occupants
+show their recorded world and block coordinates. Capture items can show the player
+carrying them, a storage container's coordinates, or their position on the ground.
+
+Locate checks the recorded holder without loading distant chunks. If a player is
+offline or storage is unloaded, it shows **Last seen** and an observation time in
+UTC. **Unknown** means no usable item sighting is available; it does not mean the
+animal died or the item was destroyed. Older capture items without a capture receipt
+and storage provided by other mods may have no known location.
+
+Item sightings survive normal restarts, but are only hints until verified again.
+The tracker uses load and item-change events, with no recurring world or inventory
+scans. It keeps a bounded cache, so older sightings can expire from the cache.
+
 ## Sorting and filtering
 - Sort modes include default order, name, species, group, happiness, hunger, and thirst.
 - Care sorts show the lowest percentage first, including inactive companions. Unknown

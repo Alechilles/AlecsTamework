@@ -32,6 +32,17 @@ final class CommandOwnedActionService {
 
     boolean request(Player player, String toolId, UUID rowId,
             Predicate<Player> authority, BiConsumer<Player, LinkedNpcRecord> action) {
+        return requestInternal(player, toolId, rowId, authority, action, false);
+    }
+
+    boolean requestLocate(Player player, String toolId, UUID rowId,
+            Predicate<Player> authority, BiConsumer<Player, LinkedNpcRecord> action) {
+        return requestInternal(player, toolId, rowId, authority, action, true);
+    }
+
+    private boolean requestInternal(Player player, String toolId, UUID rowId,
+            Predicate<Player> authority, BiConsumer<Player, LinkedNpcRecord> action,
+            boolean locate) {
         if (!ownedMode(player, toolId)) return false;
         if (links.findLinkedNpcRecord(links.readLinkedNpcRecords(
                 inventory.findToolStack(player, toolId)), rowId) != null) return false;
@@ -55,8 +66,14 @@ final class CommandOwnedActionService {
                     Player current = ref == null || !ref.isValid() || store == null
                             ? null : store.getComponent(ref, Player.getComponentType());
                     if (current == null || !authority.test(current) || !ownedMode(current, toolId)) return;
-                    if (!allows(owner, profile, persistence.queries().projectedCommandRosterActions().keySet(),
-                            persistence.queries().projectedLaggingCommandRosterProfiles())) {
+                    boolean allowed = locate
+                            ? allowsLocate(owner, profile,
+                            persistence.queries().projectedCommandRosterActions().keySet(),
+                            persistence.queries().projectedLaggingCommandRosterProfiles())
+                            : allows(owner, profile,
+                            persistence.queries().projectedCommandRosterActions().keySet(),
+                            persistence.queries().projectedLaggingCommandRosterProfiles());
+                    if (!allowed) {
                         warn(current);
                         return;
                     }
@@ -75,14 +92,30 @@ final class CommandOwnedActionService {
     static boolean allows(UUID owner, CompanionProfileReadModel profile,
             java.util.Set<com.alechilles.alecstamework.companion.identity.ProfileId> managed,
             java.util.Set<com.alechilles.alecstamework.companion.identity.ProfileId> lagging) {
-        if (profile == null || owner == null || profile.lifecycle().ownerId() == null
-                || !owner.equals(profile.lifecycle().ownerId().value())) return false;
-        if (managed.contains(profile.identity().profileId()) || lagging.contains(profile.identity().profileId()))
-            return false;
+        if (!allowsOwnedProfile(owner, profile, managed, lagging)) return false;
         return switch (profile.lifecycle().state()) {
             case ACTIVE, UNLOADED, DEAD_REVIVABLE, LOST -> true;
             default -> false;
         };
+    }
+
+    static boolean allowsLocate(UUID owner, CompanionProfileReadModel profile,
+            java.util.Set<com.alechilles.alecstamework.companion.identity.ProfileId> managed,
+            java.util.Set<com.alechilles.alecstamework.companion.identity.ProfileId> lagging) {
+        if (!allowsOwnedProfile(owner, profile, managed, lagging)) return false;
+        return switch (profile.lifecycle().state()) {
+            case ACTIVE, UNLOADED, CAPTURED, COOP, DEAD_REVIVABLE, LOST -> true;
+            default -> false;
+        };
+    }
+
+    private static boolean allowsOwnedProfile(UUID owner, CompanionProfileReadModel profile,
+            java.util.Set<com.alechilles.alecstamework.companion.identity.ProfileId> managed,
+            java.util.Set<com.alechilles.alecstamework.companion.identity.ProfileId> lagging) {
+        if (profile == null || owner == null || profile.lifecycle().ownerId() == null
+                || !owner.equals(profile.lifecycle().ownerId().value())) return false;
+        return !managed.contains(profile.identity().profileId())
+                && !lagging.contains(profile.identity().profileId());
     }
 
     static LinkedNpcRecord record(CompanionProfileReadModel profile, UUID rowId) {

@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OwnedCompanionAbandonPresentationTest {
     /** Owned unlinked cards expose offscreen actions without pretending to be linked. */
-    @Test void ownedUnloadedAnimalOffersRecallAndLocateWithoutLinkControls() {
+    @Test void ownedAnimalsOfferLocateIncludingCapturedAndCoopedWithoutLinkControls() {
         var owned = entry(false).withOwnedActions();
         var commands = render(owned, false);
         assertValue(commands, "RecallButton.Visible", "true");
@@ -17,7 +17,10 @@ class OwnedCompanionAbandonPresentationTest {
         assertValue(commands, "SetHomeButton.Visible", "false");
         assertValue(render(entry(false), false), "RecallButton.Visible", "false");
         assertValue(render(entry(true).withOwnedActions(), false), "RecallButton.Visible", "false");
-        assertValue(render(entry(true).withOwnedActions(), false), "LocateButton.Visible", "false");
+        assertValue(render(entry(true).withOwnedActions(), false), "LocateButton.Visible", "true");
+        var cooped = render(entry(false, false, false, 0L, true).withOwnedActions(), false);
+        assertValue(cooped, "LocateButton.Visible", "true");
+        assertValue(cooped, "RecallButton.Visible", "false");
     }
 
     @Test void ownedRevivalAndRecoveryRespectCooldownAndManagedAuthority() {
@@ -98,8 +101,12 @@ class OwnedCompanionAbandonPresentationTest {
     }
 
     private static LinkedNpcEntry entry(boolean captured, boolean dead, boolean lost, long cooldown) {
+        return entry(captured, dead, lost, cooldown, false);
+    }
+
+    private static LinkedNpcEntry entry(boolean captured, boolean dead, boolean lost, long cooldown, boolean cooped) {
         return new LinkedNpcEntry(UUID.randomUUID(), "Cow", 0, 0, 0, 0, 0, null,
-                0, 0, 0, 0, false, false, dead, captured, false, lost, cooldown,
+                0, 0, 0, 0, false, false, dead, captured, cooped, lost, cooldown,
                 null, null, null, LinkedNpcTraitIndicator.EMPTY,
                 false, false, false, false, false, true,
                 "Cow", "Cow", null, null, null, false, false, 0L, 0.0, false);

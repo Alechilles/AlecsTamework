@@ -84,6 +84,35 @@ at shutdown. Saved card values never authorize a live action or mutate persisten
   jump recreates it. This subsystem registers only on Update 6 because Update
   5 cannot safely clear the effect.
 
+## Captured-animal Locate
+
+`CommandLinkedNpcLocateService` reads the canonical profile on demand. Coop addresses
+come from its `CoopSlotKey`; capture sightings must match the profile and current
+capture snapshot ID. Sightings cannot change ownership, lifecycle, or recovery state.
+Owned-mode authorization permits stored states only for Locate.
+
+The `items.locate` observers scan a player's built-in inventory sections once on
+load and a standard `ItemContainerBlock` once on load. Afterwards they inspect the
+affected transaction's metadata and rescan only a holder whose capture items changed.
+Same-holder notifications are coalesced, with at most 2,048 pending refreshes; excess
+notifications can leave a sighting unknown or stale until another event or Locate.
+Dropped items use add/remove events, with fresh coordinates read only on Locate.
+No periodic ECS, player, inventory, or chunk discovery scan runs.
+
+The index retains at most 8,192 captures and uses reverse holder membership for
+updates. A dirty snapshot is written off-thread at most once a minute to
+`cache/captured-item-locations.json` beneath the runtime data directory. This is a
+disposable advisory cache, not a persistence authority. Restarted sightings are stale;
+corruption or eviction loses only location hints. Shutdown removes container listeners,
+stops the saver, and clears the in-memory index. Ordinary item changes do not write
+the cache. Locate admits one pending request per viewer, up to 256 total, with a
+five-second deadline, and verifies one recorded holder without loading its chunk.
+
+Legacy capture items without a receipt, custom nonstandard storage, and direct
+third-party item mutations that bypass engine events may remain untracked. Standard
+player, block-container, and dropped-item observations are made on the owning world
+thread; deferred work carries only stable IDs and immutable sightings.
+
 ## Related Pages
 - [Persistence, SQLite, and Data Paths](/mod/alecs-tamework/persistence-sqlite-and-data-paths)
 - [Command and Debug Internals](/mod/alecs-tamework/command-and-debug-internals)

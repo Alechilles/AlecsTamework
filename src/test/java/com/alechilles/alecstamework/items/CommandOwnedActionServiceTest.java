@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.companion.identity.*;
 import com.alechilles.alecstamework.companion.lifecycle.*;
+import com.alechilles.alecstamework.companion.coop.CoopSlot;
+import com.alechilles.alecstamework.companion.coop.CoopSlotKey;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import java.util.List;
 import java.util.UUID;
@@ -32,6 +34,25 @@ class CommandOwnedActionServiceTest {
                 java.util.Set.of(profile.identity().profileId()), java.util.Set.of()));
     }
 
+    /** Captured and cooped profiles are addressable by Locate while mutation actions remain closed. */
+    @Test void capturedAndCoopedProfilesAreLocateOnlyAndRetainOwnershipGates() {
+        UUID owner = UUID.randomUUID();
+        for (var profile : new CompanionProfileReadModel[]{
+                profile(owner, LifecycleState.CAPTURED),
+                profile(owner, LifecycleState.COOP)}) {
+            assertFalse(CommandOwnedActionService.allows(owner, profile,
+                    java.util.Set.of(), java.util.Set.of()));
+            assertTrue(CommandOwnedActionService.allowsLocate(owner, profile,
+                    java.util.Set.of(), java.util.Set.of()));
+            assertFalse(CommandOwnedActionService.allowsLocate(UUID.randomUUID(), profile,
+                    java.util.Set.of(), java.util.Set.of()));
+            assertFalse(CommandOwnedActionService.allowsLocate(owner, profile,
+                    java.util.Set.of(profile.identity().profileId()), java.util.Set.of()));
+            assertFalse(CommandOwnedActionService.allowsLocate(owner, profile,
+                    java.util.Set.of(), java.util.Set.of(profile.identity().profileId())));
+        }
+    }
+
     @Test void actionRecordUsesCurrentAliasInsteadOfStaleCardId() {
         var profile = profile(UUID.randomUUID(), LifecycleState.UNLOADED);
         var record = CommandOwnedActionService.record(profile, UUID.randomUUID());
@@ -40,13 +61,22 @@ class CommandOwnedActionServiceTest {
     }
 
     private static CompanionProfileReadModel profile(UUID owner, LifecycleState state) {
+        CoopSlotKey coopKey = state == LifecycleState.COOP
+                ? new CoopSlotKey("world-a", "coop-a", 10, 64, 20, 0) : null;
+        LifecycleLocation location = switch (state) {
+            case CAPTURED -> LifecycleLocation.keyed(LifecycleLocationKind.CAPTURE_ITEM,
+                    "capture-item");
+            case COOP -> LifecycleLocation.keyed(LifecycleLocationKind.COOP_SLOT,
+                    coopKey.toString());
+            default -> LifecycleLocation.none();
+        };
         var id = new ProfileId(UUID.randomUUID());
         return new CompanionProfileReadModel(
                 new CompanionIdentity(id, "Sheep", "Sheep", null, null, "OtherWorld", -3, -2, -1, 0),
                 new CompanionAlias(new NpcAlias(UUID.randomUUID()), id, 0, CompanionAlias.State.CURRENT,
                         null, -1, null),
-                new CompanionLifecycle(id, new OwnerId(owner), state, LifecycleLocation.none(),
+                new CompanionLifecycle(id, new OwnerId(owner), state, location,
                         new LifecycleRevision(0), null, -1, ReconciliationGeneration.INITIAL, null, null),
-                List.of(), List.of(), null);
+                List.of(), List.of(), coopKey == null ? null : CoopSlot.unoccupied(coopKey));
     }
 }

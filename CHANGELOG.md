@@ -2,6 +2,10 @@
 
 ## Unreleased development changes
 
+- Locate now reports recorded coop coordinates and tracks capture items in player
+  inventories, standard storage containers, and dropped items. Offline or unloaded
+  holders show a last-seen result; tracking uses item events instead of periodic scans.
+
 - Added optional loose and chevron flight formations for native NPC flocks, with configurable spacing and tightness. Formation steering follows the current flying leader and uses existing obstacle avoidance.
 
 - Added `TameworkMaintainDistance` for peaceful target-relative positioning and

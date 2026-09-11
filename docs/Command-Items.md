@@ -420,6 +420,10 @@ Loaded flow:
 - `ReturnHome` can use path + deferred teleport behavior.
 - `Recall` can force-relocate distant companions near the player before follow resumes.
 - `/tw settings` can disable recall/return-home teleporting. When disabled, Recall is hidden from the linked panel and command wheel, loaded companions still receive normal move/home command hooks, and unloaded or distant forced relocation is skipped; use `Locate` to open a copyable current or last recorded world-position page.
+- `Locate` also works for captured and cooped animals in Linked and Owned modes.
+  It shows recorded coop coordinates or the observed capture item's holder: a player,
+  standard storage block, or dropped item. Offline/unloaded holders are marked last seen.
+  Unknown item locations do not imply death or destruction. No periodic inventory or world scan runs.
 - A linked panel can remain open across a world or generated-instance transfer. Its Recall and Return Home actions resolve the player's current entity/store from the stable player reference at click time, rather than reusing the source-world entity reference captured when the panel opened.
 - Per-row movement actions validate and repair only the selected companion's canonical profile metadata. An unrelated damaged link on the same command item does not make a healthy selected companion unavailable.
 - Successful loaded Hold, Recall, and Return Home commands publish the state actually applied to the NPC into linked-item metadata. Cross-world following also rechecks the live source NPC against the configured state filter, so stored item metadata alone cannot authorize travel.

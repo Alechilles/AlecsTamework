@@ -924,6 +924,20 @@ public class Tamework extends JavaPlugin {
                 companionProgressionSignalBus
         );
         commandItemFeatureHandler.configureCommandUi(api.commandUi());
+        deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS, "capture-item-player-locations", () -> {
+            var tracker = commandItemFeatureHandler.capturedItemTracker();
+            tracker.start(runtimeDataDirectory.resolve("cache/captured-item-locations.json"));
+            return new com.alechilles.alecstamework.items.locate.CapturedItemPlayerSystems.Lifecycle(tracker);
+        });
+        deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS, "capture-item-inventory-locations",
+                () -> new com.alechilles.alecstamework.items.locate.CapturedItemPlayerSystems.Changes(
+                        commandItemFeatureHandler.capturedItemTracker()));
+        deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS, "capture-item-dropped-locations",
+                () -> new com.alechilles.alecstamework.items.locate.CapturedItemDropSystem(
+                        commandItemFeatureHandler.capturedItemTracker()));
+        deferChunkSystem(TameworkRuntimeModule.COMMAND_ITEMS, "capture-item-container-locations",
+                () -> new com.alechilles.alecstamework.items.locate.CapturedItemContainerSystem(
+                        commandItemFeatureHandler.capturedItemTracker()));
         CommandWorldChangeTravelEventHandler commandWorldChangeTravelEventHandler =
                 new CommandWorldChangeTravelEventHandler(commandItemFeatureHandler);
         deferEntitySystem(TameworkRuntimeModule.COMMAND_ITEMS,

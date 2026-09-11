@@ -146,8 +146,7 @@ final class LinkedNpcPanelCardBinder {
                 && entry.deadRespawnRemainingMs() == 0L
                 && !pendingUnlink;
         boolean showLocate = genericLinkedOrOwned
-                && !entry.dead() && !entry.lost() && !pendingUnlink
-                && (legacyLinked || !entry.captured() && !entry.inCoop());
+                && !entry.dead() && !entry.lost() && !pendingUnlink;
         boolean showRecall = genericLinkedOrOwned
                 && config.recallActionEnabled()
                 && !entry.dead()

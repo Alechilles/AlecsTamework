@@ -933,3 +933,11 @@ tamework.ui.talents.saved.changed = Der Begleiter wurde geändert oder das Talen
 tamework.ui.linkedPanel.sort.happiness=Zufriedenheit
 tamework.ui.linkedPanel.sort.hunger=Hunger
 tamework.ui.linkedPanel.sort.thirst=Durst
+
+tamework.ui.notifications.command.locate.unavailable=Der Standort des Begleiters ist nicht verfügbar oder hat sich geändert. Versuche es erneut.
+tamework.ui.notifications.command.locate.coop=In einem Gehege an diesem gespeicherten Standort.
+tamework.ui.notifications.command.locate.captureUnknown=In einem Fanggegenstand enthalten. Der aktuelle Standort ist unbekannt.
+tamework.ui.notifications.command.locate.player=Fanggegenstand im Inventar von {0}.
+tamework.ui.notifications.command.locate.container=Fanggegenstand in einem Lagerbehälter.
+tamework.ui.notifications.command.locate.dropped=Fanggegenstand auf dem Boden.
+tamework.ui.notifications.command.locate.lastSeen=Zuletzt gesehen: {0} Erfasst: {1}

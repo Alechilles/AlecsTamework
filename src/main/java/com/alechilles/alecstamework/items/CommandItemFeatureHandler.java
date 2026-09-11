@@ -101,6 +101,8 @@ public final class CommandItemFeatureHandler {
     private final CommandOwnerCullService ownerCullService;
     private final CommandMenuMoveService menuMoveService;
     private final CommandLinkedNpcLocateService locateService;
+    private final com.alechilles.alecstamework.items.locate.CapturedItemTracker capturedItemTracker =
+            new com.alechilles.alecstamework.items.locate.CapturedItemTracker();
     private final CommandOwnedActionService ownedActions;
     private final CommandPanelPreferenceService panelPreferenceService;
     private final CommandPanelActionService panelActionService;
@@ -388,7 +390,10 @@ public final class CommandItemFeatureHandler {
                 relocationService,
                 feedbackService,
                 npcNameResolver,
-                toolInventoryService
+                toolInventoryService,
+                persistence,
+                persistenceView,
+                capturedItemTracker
         );
         this.panelActionService = new CommandPanelActionService(
                 linkMutationService,
@@ -545,8 +550,15 @@ public final class CommandItemFeatureHandler {
     }
     /** Stops command panel snapshot caches before durable persistence closes. */
     public void close() {
+        locateService.close();
+        capturedItemTracker.close();
         bondedPanelLifecycle.close();
         if (persistenceView != null) persistenceView.close();
+    }
+
+    /** Internal event observers share the command feature's bounded location cache. */
+    public com.alechilles.alecstamework.items.locate.CapturedItemTracker capturedItemTracker() {
+        return capturedItemTracker;
     }
 
     /** Connects command menu opening to the live public provider registry. */
@@ -946,10 +958,14 @@ public final class CommandItemFeatureHandler {
         if (!callbackAuthority.allowsGeneric(player, toolId, config)) {
             return;
         }
-        if (!ownedActions.request(player, toolId, npcUuid,
+        if (!ownedActions.requestLocate(player, toolId, npcUuid,
                 current -> callbackAuthority.allowsGeneric(current, toolId, config),
-                (current, record) -> locateService.locate(current, toolId, record.npcUuid, record))) {
-            locateService.locate(player, toolId, npcUuid);
+                (current, record) -> locateService.locate(current, toolId, record.npcUuid, record,
+                        viewer -> callbackAuthority.allowsGeneric(viewer, toolId, config)
+                                && panelPreferenceService.readPanelModeOverride(toolInventoryService.findToolStack(viewer, toolId))
+                                == CommandPanelPreferenceService.PanelMode.OwnedMode))) {
+            locateService.locate(player, toolId, npcUuid, null,
+                    viewer -> callbackAuthority.allowsGeneric(viewer, toolId, config));
         }
     }
 

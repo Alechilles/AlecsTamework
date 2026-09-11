@@ -5,7 +5,7 @@ $C.@PageOverlay {
   LayoutMode: Middle;
 
   Group #TameworkLinkedLocationRoot {
-    Anchor: (Width: 540, Height: 260);
+    Anchor: (Width: 600, Height: 340);
     Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
 
     Group #Title {
@@ -29,10 +29,16 @@ $C.@PageOverlay {
       Padding: (Left: 10, Right: 10, Top: 8, Bottom: 8);
 
       Group {
-        Anchor: (Height: 124, Bottom: 14);
+        Anchor: (Height: 212, Bottom: 14);
         Background: #181c1a;
         Padding: (Left: 12, Right: 12, Top: 12, Bottom: 12);
         LayoutMode: Top;
+
+        Label #TameworkLinkedLocationStatus {
+          Anchor: (Height: 76, Bottom: 8);
+          Text: "";
+          Style: (FontSize: 14, TextColor: #f0eee7, Wrap: true, VerticalAlignment: Center);
+        }
 
         Group {
           Anchor: (Height: 32, Bottom: 12);
