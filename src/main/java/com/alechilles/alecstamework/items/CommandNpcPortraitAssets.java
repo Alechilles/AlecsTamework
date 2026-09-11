@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Publishes icon-only item aliases during asset loading, never during a card refresh.
@@ -20,13 +21,12 @@ import java.util.UUID;
  */
 public final class CommandNpcPortraitAssets {
     private static final String SOURCE = "Alechilles:Alec's Tamework!";
-    private boolean reconciling;
+    private final AtomicBoolean reconciling = new AtomicBoolean();
 
-    public synchronized void reconcile(ItemFeatureRegistry registry) {
-        if (reconciling || registry == null || Item.getAssetStore() == null) {
-            return;
+    public int reconcile(ItemFeatureRegistry registry) {
+        if (registry == null || Item.getAssetStore() == null || !reconciling.compareAndSet(false, true)) {
+            return 0;
         }
-        reconciling = true;
         try {
             List<Item> missing = missingAliases(registry.snapshot().values(),
                     Item.getAssetMap().getAssetMap());
@@ -36,9 +36,11 @@ public final class CommandNpcPortraitAssets {
                     throw new IllegalStateException("Portrait item load failed: "
                             + result.getFailedToLoadKeys().stream().limit(5).toList());
                 }
+                return result.getLoadedAssets().size();
             }
+            return 0;
         } finally {
-            reconciling = false;
+            reconciling.set(false);
         }
     }
 

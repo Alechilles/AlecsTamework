@@ -2790,7 +2790,11 @@ public class Tamework extends JavaPlugin {
 
     private void reconcileNpcPortraitAssets() {
         try {
-            commandNpcPortraitAssets.reconcile(itemFeatureRegistry);
+            int registered = commandNpcPortraitAssets.reconcile(itemFeatureRegistry);
+            if (registered > 0) {
+                getLogger().at(Level.INFO).log("Registered " + registered
+                        + " companion portrait icons using existing capture textures.");
+            }
         } catch (RuntimeException failure) {
             getLogger().at(Level.WARNING).withCause(failure).log(
                     "Could not register companion portrait icons; affected images will remain hidden.");
