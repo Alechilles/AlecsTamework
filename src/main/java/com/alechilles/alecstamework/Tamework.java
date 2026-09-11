@@ -39,6 +39,7 @@ import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.NameItemRegistry;
 import com.alechilles.alecstamework.config.SpawnerItemConfigReloadService;
+import com.alechilles.alecstamework.items.CommandNpcPortraitAssets;
 import com.alechilles.alecstamework.config.bonded.BondedCompanionConfigReloadService;
 import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
@@ -260,6 +261,7 @@ public class Tamework extends JavaPlugin {
 
     private ItemFeatureRegistry itemFeatureRegistry;
     private SpawnerItemConfigReloadService spawnerItemConfigReloadService;
+    private final CommandNpcPortraitAssets commandNpcPortraitAssets = new CommandNpcPortraitAssets();
     private NameItemRegistry nameItemRegistry;
     private CommandItemRegistry commandItemRegistry;
     private TameworkAssetEditorPackService assetEditorPackService;
@@ -2783,6 +2785,16 @@ public class Tamework extends JavaPlugin {
                 );
             }
         }
+        reconcileNpcPortraitAssets();
+    }
+
+    private void reconcileNpcPortraitAssets() {
+        try {
+            commandNpcPortraitAssets.reconcile(itemFeatureRegistry);
+        } catch (RuntimeException failure) {
+            getLogger().at(Level.WARNING).withCause(failure).log(
+                    "Could not register companion portrait icons; affected images will remain hidden.");
+        }
     }
 
     private void onItemDropListAssetsLoaded(
@@ -3204,6 +3216,7 @@ public class Tamework extends JavaPlugin {
             return 0;
         }
         spawnerReloadPendingOnItemAssets = false;
+        reconcileNpcPortraitAssets();
         return result.loadedCount();
     }
 

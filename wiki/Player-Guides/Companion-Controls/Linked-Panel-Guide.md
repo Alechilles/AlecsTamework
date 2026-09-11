@@ -29,10 +29,11 @@ recall timer do not override that status.
 
 ## Animal images
 
-Regular NPC cards can reuse an existing item icon that matches their capture-image
-rules and current or saved appearance. Capture-only images that require item
-metadata are not supported by Custom UI and stay hidden. These are static images,
-not live model previews. The separate bonded-roster cards keep their existing layout.
+Regular NPC cards reuse capture-image rules for current or saved appearance.
+Tamework registers hidden display-item aliases for these existing images so the
+panel can show them without captured-item metadata or duplicate textures.
+These are static images, not live model previews; available variants depend on
+the animal pack. The separate bonded-roster cards keep their existing layout.
 
 ## Live bonded progression
 
