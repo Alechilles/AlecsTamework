@@ -99,6 +99,29 @@ public final class AmbientHerdCoordinator implements AutoCloseable {
     private final Map<UUID, UUID> admittedActivities = new ConcurrentHashMap<>();
     private volatile boolean closed;
 
+    /** On-demand world-thread diagnosis; never scans outside the targeted native flock. */
+    public String describe(Store<EntityStore> store, Ref<EntityStore> ref) {
+        if (closed) return "Ambient herd: runtime closed";
+        NPCEntity npc = store.getComponent(ref, NPCEntity.getComponentType());
+        if (npc == null) return "Ambient herd: target is not an NPC";
+        if (!allowsAmbientRole(npc)) return "Ambient herd: role disabled by global policy";
+        if (TamedStateResolver.isTamed(ref, store)) return "Ambient herd: tamed animals are excluded";
+        NativeFlock flock = resolveNativeFlock(store, ref);
+        if (flock == null) return "Ambient herd: no valid native flock/leader";
+        WorldState world = statesByStore.get(store);
+        LeaderRecord record = world.leaders.get(flock.leaderId());
+        String prefix = "Ambient herd: nativeMembers=" + flock.group().size()
+                + ", eligibleMembers=" + snapshotRoster(store, flock).size()
+                + ", leader=" + flock.leaderId();
+        if (record == null) return prefix + ", leader has not reached the READY sensor";
+        long now = monotonicMillis();
+        Activity activity = world.activities.get(record.activityId);
+        return prefix + ", sensorAgeMs=" + Math.max(0L, now - record.lastObservedAt)
+                + ", retryInMs=" + Math.max(0L, record.nextOfferAt - now)
+                + ", status=" + (activity == null ? record.lastOutcome : activity.phase)
+                + (activity == null ? "" : ", size=" + activity.width + "x" + activity.height);
+    }
+
     /**
      * Records an eligible leader heartbeat. It is deliberately constant-time between offers and
      * never scans the world: only this leader's existing native flock is inspected.
@@ -266,11 +289,13 @@ public final class AmbientHerdCoordinator implements AutoCloseable {
             long now) {
         List<UUID> roster = snapshotRoster(store, flock);
         if (roster.size() < 2 || roster.size() > 16) {
+            record.lastOutcome = "INELIGIBLE_ROSTER";
             record.nextOfferAt = now + failureDelay(record.leaderId);
             return;
         }
         AmbientHerdPoint origin = point(store, flock.leaderRef());
         if (origin == null) {
+            record.lastOutcome = "MISSING_POSITION";
             record.nextOfferAt = now + failureDelay(record.leaderId);
             return;
         }
@@ -281,6 +306,7 @@ public final class AmbientHerdCoordinator implements AutoCloseable {
                 || dimensions.height <= 0.0
                 || dimensions.width > 4.0
                 || dimensions.height > 4.0) {
+            record.lastOutcome = "UNSUPPORTED_BODY_SIZE " + dimensions.width + "x" + dimensions.height;
             record.nextOfferAt = now + failureDelay(record.leaderId);
             return;
         }
@@ -290,6 +316,7 @@ public final class AmbientHerdCoordinator implements AutoCloseable {
                                 .getBytes(StandardCharsets.UTF_8));
         UUID worldId = worldId(store);
         if (!budget.tryAdmitActivity(worldId, activityId, roster.size())) {
+            record.lastOutcome = "ACTIVITY_BUDGET_FULL";
             record.nextOfferAt = now + failureDelay(record.leaderId);
             return;
         }
@@ -602,6 +629,7 @@ public final class AmbientHerdCoordinator implements AutoCloseable {
         LeaderRecord record = world.leaders.get(activity.leaderId);
         if (record != null) {
             record.activityId = null;
+            record.lastOutcome = reason + " during " + activity.phase;
             record.nextOfferAt =
                     now
                             + (reason == Exit.COMPLETE
@@ -866,6 +894,7 @@ public final class AmbientHerdCoordinator implements AutoCloseable {
         final UUID leaderId;
         @Nullable UUID flockId;
         long nextOfferAt, lastObservedAt;
+        String lastOutcome = "INITIAL_DELAY";
         @Nullable UUID activityId;
 
         LeaderRecord(UUID leaderId, long nextOfferAt) {
