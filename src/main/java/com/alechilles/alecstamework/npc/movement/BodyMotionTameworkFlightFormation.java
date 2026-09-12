@@ -39,6 +39,8 @@ public final class BodyMotionTameworkFlightFormation extends TameworkBodyMotionB
     private final Vector3d sampledHeading = new Vector3d();
     private final Vector3d targetPosition = new Vector3d();
     private final Vector3d formationOffset = new Vector3d();
+    private final Vector3d previousFormationOffset = new Vector3d();
+    private final Vector3d slotVelocity = new Vector3d();
     private final Vector3d translation = new Vector3d();
     private final Vector3d obstacleProbeOrigin = new Vector3d();
     private final FlyingObstacleAvoidance.Probe obstacleProbe = this::probeObstacle;
@@ -124,17 +126,21 @@ public final class BodyMotionTameworkFlightFormation extends TameworkBodyMotionB
                 formation, followerIndex, spacing, looseDriftSeconds,
                 leaderTransform.getPosition(), leaderHeading, targetPosition);
         targetPosition.sub(leaderTransform.getPosition());
+        slotVelocity.set(leaderVelocity);
         if (!hasFormationOffset) {
             formationOffset.set(targetPosition);
             hasFormationOffset = true;
         } else {
+            previousFormationOffset.set(formationOffset);
             FlightFormationSteering.smoothOffset(
                     formationOffset, targetPosition,
                     Math.min(spacing * 0.75, fly.getSteeringSpeedScale() * 0.35), dt, formationOffset);
+            FlightFormationSteering.resolveSlotVelocity(
+                    previousFormationOffset, formationOffset, leaderVelocity, dt, slotVelocity);
         }
         targetPosition.set(leaderTransform.getPosition()).add(formationOffset);
         FlightFormationSteering.resolveTranslation(
-                selfTransform.getPosition(), targetPosition, leaderVelocity,
+                selfTransform.getPosition(), targetPosition, slotVelocity,
                 fly.getSteeringSpeedScale(), relativeSpeed, tightness, dt, translation);
 
         bindObstacleProbe(ref, selfTransform.getPosition(), fly, componentAccessor);
@@ -280,6 +286,8 @@ public final class BodyMotionTameworkFlightFormation extends TameworkBodyMotionB
         hasLeaderPosition = false;
         hasFormationOffset = false;
         formationOffset.zero();
+        previousFormationOffset.zero();
+        slotVelocity.zero();
         looseDriftSeconds = 0.0;
         lastLeaderPosition.zero();
         leaderVelocity.zero();

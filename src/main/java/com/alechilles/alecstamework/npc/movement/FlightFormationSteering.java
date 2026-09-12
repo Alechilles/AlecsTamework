@@ -7,6 +7,7 @@ import org.joml.Vector3d;
 final class FlightFormationSteering {
     private static final double EPSILON = 1.0E-6;
     private static final double CORRECTION_RESPONSE_PER_SECOND = 1.5;
+    private static final double SLOT_MOTION_MATCH = 0.85;
     private static final double LOOSE_DRIFT_FREQUENCY = 0.35;
     private static final double LOOSE_DRIFT_SCALE = 0.18;
     private static final double CLUSTER_DRIFT_FREQUENCY = 0.28;
@@ -112,6 +113,27 @@ final class FlightFormationSteering {
             output.mul(safeMaximumSpeed / desiredSpeed);
         }
         return output.div(safeMaximumSpeed);
+    }
+
+    /**
+     * Match most of the slot's relative movement before position error builds up during a turn.
+     * Leaving a small amount to position correction keeps the flock elastic rather than rigid.
+     * Activation has no previous offset and should use the leader velocity directly.
+     */
+    @Nonnull
+    static Vector3d resolveSlotVelocity(@Nonnull Vector3d previousOffset,
+                                       @Nonnull Vector3d currentOffset,
+                                       @Nonnull Vector3d leaderVelocity,
+                                       double dt,
+                                       @Nonnull Vector3d output) {
+        if (!Double.isFinite(dt) || dt <= EPSILON) {
+            return output.set(leaderVelocity);
+        }
+        double scale = SLOT_MOTION_MATCH / dt;
+        return output.set(
+                leaderVelocity.x + (currentOffset.x - previousOffset.x) * scale,
+                leaderVelocity.y + (currentOffset.y - previousOffset.y) * scale,
+                leaderVelocity.z + (currentOffset.z - previousOffset.z) * scale);
     }
 
     /** Ease slot changes relative to the leader, preserving straight-line travel without added lag. */

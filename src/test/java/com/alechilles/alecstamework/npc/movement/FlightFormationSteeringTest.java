@@ -12,6 +12,74 @@ class FlightFormationSteeringTest {
     private static final double YAW_EPSILON = 1.0E-6;
 
     @Test
+    void matchingSlotMotionReducesTurnLagWithoutLockingFollowersToTheirSlots() {
+        double dt = 0.05;
+        double maximumSpeed = 10.0;
+        Vector3d leader = new Vector3d();
+        Vector3d leaderVelocity = new Vector3d(0.0, 0.0, 4.0);
+        double coordinatedError = 0.0;
+        double reactiveError = 0.0;
+        for (int slot = 0; slot < 2; slot++) {
+            leader.zero();
+            Vector3d offset = FlightFormationSteering.resolveTarget(
+                    BuilderBodyMotionTameworkFlightFormation.Formation.CHEVRON,
+                    slot, 3.0, 0.0, leader, new Vector3d(0, 0, 1), new Vector3d());
+            Vector3d coordinated = new Vector3d(offset);
+            Vector3d reactive = new Vector3d(offset);
+            Vector3d previous = new Vector3d();
+            Vector3d desired = new Vector3d();
+            Vector3d target = new Vector3d();
+            Vector3d velocity = new Vector3d();
+            Vector3d steering = new Vector3d();
+            for (int frame = 1; frame <= 100; frame++) {
+                double angle = frame * dt * 0.15;
+                Vector3d heading = new Vector3d(Math.sin(angle), 0, Math.cos(angle));
+                leaderVelocity.set(heading).mul(4.0);
+                leader.fma(dt, leaderVelocity);
+                FlightFormationSteering.resolveTarget(
+                        BuilderBodyMotionTameworkFlightFormation.Formation.CHEVRON,
+                        slot, 3.0, 0.0, new Vector3d(), heading, desired);
+                previous.set(offset);
+                FlightFormationSteering.smoothOffset(offset, desired, 2.25, dt, offset);
+                target.set(leader).add(offset);
+                // Both birds already share the leader's translation; measure only their turn correction.
+                coordinated.fma(dt, leaderVelocity);
+                reactive.fma(dt, leaderVelocity);
+                FlightFormationSteering.resolveSlotVelocity(previous, offset, leaderVelocity, dt, velocity);
+                FlightFormationSteering.resolveTranslation(
+                        coordinated, target, velocity, maximumSpeed, 0.8, 0.6, dt, steering);
+                coordinated.fma(dt * maximumSpeed, steering).fma(-dt, leaderVelocity);
+                FlightFormationSteering.resolveTranslation(
+                        reactive, target, leaderVelocity, maximumSpeed, 0.8, 0.6, dt, steering);
+                reactive.fma(dt * maximumSpeed, steering).fma(-dt, leaderVelocity);
+                coordinatedError += coordinated.distance(target);
+                reactiveError += reactive.distance(target);
+            }
+        }
+        assertTrue(coordinatedError < reactiveError * 0.5,
+                "Turn movement should reduce the slot lag on both arms of the chevron.");
+        assertTrue(coordinatedError > 0.01,
+                "Followers should retain some elastic drift rather than snap to their slots.");
+    }
+
+    @Test
+    void slotMotionPreservesCruiseAndRespectsFlightSpeedDuringSharpTurns() {
+        Vector3d leaderVelocity = new Vector3d(0, 0, 4);
+        Vector3d offset = new Vector3d(-3, 0, -3);
+        Vector3d velocity = FlightFormationSteering.resolveSlotVelocity(
+                offset, offset, leaderVelocity, 0.05, new Vector3d());
+        assertEquals(leaderVelocity, velocity);
+        FlightFormationSteering.resolveSlotVelocity(offset, new Vector3d(3, 0, -3),
+                leaderVelocity, 0.05, velocity);
+        Vector3d steering = FlightFormationSteering.resolveTranslation(
+                new Vector3d(), new Vector3d(), velocity, 8, 0.8, 0.6, 0.05, new Vector3d());
+        assertTrue(steering.x > 0, "The bird should move with its turning slot even without position error.");
+        assertTrue(steering.length() <= 1.0 + EPSILON);
+        FlightFormationSteering.resolveSlotVelocity(offset, new Vector3d(), leaderVelocity, 0, velocity);
+        assertEquals(leaderVelocity, velocity, "A paused update must not produce a turn impulse.");
+    }
+
+    @Test
     void groundSlotsStaySpreadHorizontallyAndUseTheFollowersTerrainHeight() {
         Vector3d leader = new Vector3d(0, 40, 0);
         Vector3d heading = new Vector3d(0, 0, 1);

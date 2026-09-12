@@ -14,7 +14,7 @@
 - Updated embedded Beacon to 2.0.2, reducing its consent and report header
   texture footprint to save UI atlas space.
 
-- Smoothed flock formation turns and position changes, capped formation flight turning at 90 degrees/second, and staggered loose flock heights above and below the leader.
+- Smoothed flock formation turns and position changes, capped formation flight turning at 90 degrees/second, and staggered loose flock heights above and below the leader. Followers also match most of their formation slot's turn movement, reducing catch-up lag while retaining some flexibility.
 
 - Locate now reports recorded coop coordinates and tracks capture items in player
   inventories, standard storage containers, and dropped items. Offline or unloaded
