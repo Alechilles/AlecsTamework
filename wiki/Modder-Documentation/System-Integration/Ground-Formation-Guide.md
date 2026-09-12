@@ -28,7 +28,10 @@ allow slot error up to 30% of spacing and limit lateral corrections to 20
 degrees while their leader moves. Steering turns at up to 45 degrees per second.
 
 Both modes check at most three short (1.5 block) terrain probes every quarter
-second. When blocked, they try local detours and hold a clear detour for two
+second. A direction must clear nearly the full probe distance; short movement
+ending at a wall or edge triggers a detour instead of being treated as clear.
+Obstacle turns align within two degrees before walking to avoid cutting corners.
+When blocked, they try local detours and hold a clear detour for two
 seconds before returning toward travel. Lack of physical progress also triggers
 recovery, even when terrain probes report a clear route. Large turns happen in
 place. This is local steering, not long-distance pathfinding around fences or

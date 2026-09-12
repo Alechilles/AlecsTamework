@@ -117,6 +117,7 @@ class FlightFormationEligibilityTest {
             GroundWalk walk = (GroundWalk) unsafe().allocateInstance(GroundWalk.class);
             walk.walkable = true;
             walk.blockForward = true;
+            walk.blockedTravel = 0.75;
             setField(Role.class, fixture.followerRole, "activeMotionController", walk);
             TransformComponent self = new TransformComponent();
             fixture.store.put(fixture.followerRef, TransformComponent.getComponentType(), self);
@@ -132,6 +133,11 @@ class FlightFormationEligibilityTest {
                     double change = steering.getYaw() - previousYaw;
                     assertTrue(Math.abs(Math.atan2(Math.sin(change), Math.cos(change))) <= Math.toRadians(45) * 0.05 + 0.001, "Yaw change at tick " + tick + ": " + change);
                     previousYaw = steering.getYaw();
+                }
+                if (tick < 80 && steering.getTranslation().length() > 0) {
+                    double direction = Math.atan2(steering.getTranslation().x, -steering.getTranslation().z);
+                    assertEquals(Math.toRadians(45), direction, Math.toRadians(2.1),
+                            "Obstacle recovery must finish turning before walking across the corner.");
                 }
                 if (tick > 25 && tick < 80) {
                     assertTrue(steering.getTranslation().x > 0.1,
@@ -216,6 +222,7 @@ class FlightFormationEligibilityTest {
     private static final class GroundWalk extends MotionControllerWalk {
         private boolean walkable;
         private boolean blockForward;
+        private double blockedTravel;
         private int probes;
 
         private GroundWalk() { super(null, null); }
@@ -227,7 +234,7 @@ class FlightFormationEligibilityTest {
         public double probeMove(Ref<EntityStore> ref, Vector3dc position, Vector3dc direction,
                                 ProbeMoveData data, ComponentAccessor<EntityStore> accessor) {
             probes++;
-            return walkable && (!blockForward || Math.abs(direction.x()) > 0.5) ? direction.length() : 0.0;
+            return walkable ? (!blockForward || Math.abs(direction.x()) > 0.5 ? direction.length() : blockedTravel) : 0.0;
         }
     }
 

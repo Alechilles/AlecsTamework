@@ -25,9 +25,11 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
     private static final double EPSILON = 1.0E-6;
     private static final double PROBE_INTERVAL_SECONDS = 0.25;
     private static final double PROBE_LOOKAHEAD = 1.5;
-    private static final double MIN_PROBE_TRAVEL = 0.5;
+    // A partial move ends at an obstacle; it is not a clear direction for continued travel.
+    private static final double MIN_PROBE_TRAVEL = PROBE_LOOKAHEAD - 0.05;
     private static final double TURN_RATE = Math.toRadians(45);
     private static final double WALK_ALIGNMENT = Math.cos(Math.toRadians(15));
+    private static final double DETOUR_ALIGNMENT = Math.cos(Math.toRadians(2));
     private static final double[] DETOUR_ANGLES = {45, -45, 90, -90, 135, -135, 180};
 
     private final double spacing;
@@ -194,7 +196,8 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
         desiredSteering.setYaw(PhysicsMath.headingFromDirection(steeringHeading.x, steeringHeading.z));
         desiredSteering.setRelativeTurnSpeed(1.0);
         // Turn in place for a substantial detour; ordinary small corrections keep walking.
-        if (steeringHeading.dot(cachedDirection) >= WALK_ALIGNMENT) {
+        double alignment = detourDirection.lengthSquared() > EPSILON ? DETOUR_ALIGNMENT : WALK_ALIGNMENT;
+        if (steeringHeading.dot(cachedDirection) >= alignment) {
             probeDirection.set(steeringHeading).mul(Math.min(1.0, speedScale));
             desiredSteering.setTranslation(probeDirection);
             requestedMovement = speedScale * walk.getMaximumSpeed() >= 0.25;
