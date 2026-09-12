@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.npc.sensors.SensorTameworkFollowFormation;
 import com.google.gson.JsonElement;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderDescriptorState;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
+import com.hypixel.hytale.server.npc.asset.builder.Feature;
 import com.hypixel.hytale.server.npc.asset.builder.holder.DoubleHolder;
 import com.hypixel.hytale.server.npc.asset.builder.holder.StringHolder;
 import com.hypixel.hytale.server.npc.asset.builder.validators.DoubleSingleValidator;
@@ -34,6 +35,7 @@ public final class BuilderSensorTameworkFollowFormation extends TameworkSensorBu
                 BuilderDescriptorState.WorkInProgress, "Minimum formation spacing; grows for larger companions.", null);
         getDouble(data, "Altitude", altitude, 5, DoubleSingleValidator.greaterEqual0(),
                 BuilderDescriptorState.WorkInProgress, "Flying slot height above the owner; ignored while walking.", null);
+        provideFeature(Feature.Position);
         return this;
     }
     @Nonnull @Override public String getShortDescription() {
