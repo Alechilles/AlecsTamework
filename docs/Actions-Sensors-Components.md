@@ -45,9 +45,13 @@ recovery priority.
 
 Leaders and lone birds start episodes; native flock beacons invite followers.
 `TameworkFlyingOrbit` with `Mode: "Kettle"` circles the leader's home point
-(the bird's own home when alone), using slightly different radii and heights
-for flock members. It rises gradually within the configured altitude range.
-All birds turn in the same direction. Kettle alternates `Tw_Kettle_Glide` for
+(the bird's own home when alone). Each member keeps a deterministic orbit: its
+radius ranges from roughly 65% to 150% of `KettleRadius`, its altitude lane
+spans 5% to 95% of `KettleAltitudeRange`, and its flight speed ranges from 70%
+to 115% of `KettleRelativeSpeed` without exceeding full flight speed. Birds
+climb toward their separate lanes at the configured motion limit, so long
+episodes do not converge into one circle or altitude. All birds turn in the
+same direction. Kettle alternates `Tw_Kettle_Glide` for
 10.5 seconds and `Tw_Kettle_Flap` for 1.5 seconds, with member offsets. Models
 using Kettle should provide these two animation sets. The movement-slot
 override is released on motion deactivation or loss of eligible airborne
