@@ -223,7 +223,8 @@ public final class CompanionFollowFlockService {
     static boolean hasFollowAuthority(boolean tamed, UUID ownerId, UUID playerId,
                                       GameMode mode, String state, boolean targetMatches) {
         return tamed && ownerId != null && ownerId.equals(playerId) && mode == GameMode.Adventure
-                && targetMatches && state != null && (state.equals("Follow") || state.startsWith("Follow."));
+                && targetMatches && state != null && (state.equals("Follow") || state.startsWith("Follow.")
+                || state.equals("Defend") || state.equals("Defend.Default"));
     }
 
     @Nullable

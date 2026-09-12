@@ -18,7 +18,7 @@ final class CommandHotswapHudIconResolver {
             return explicit;
         }
         return switch (normalize(commandId).toUpperCase(Locale.ROOT)) {
-            case "FOLLOW" -> ICON_ROOT + "Follow.png";
+            case "FOLLOW", "FOLLOWCLOSE" -> ICON_ROOT + "Follow.png";
             case "HOLD" -> ICON_ROOT + "Hold.png";
             case "RECALL" -> ICON_ROOT + "Recall.png";
             case "MOVETOPING" -> ICON_ROOT + "MoveToPing.png";

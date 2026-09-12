@@ -20,6 +20,15 @@ class CompanionFollowFlockServiceTest {
     }
 
     @Test
+    void defendFormsUpBetweenFightsWhileCloseFollowAndCombatStayIndependent() {
+        assertTrue(allowed(OWNER, GameMode.Adventure, "Defend.Default", true, true));
+        assertFalse(allowed(OWNER, GameMode.Adventure, "Defend.Combat", true, true));
+        assertFalse(allowed(OWNER, GameMode.Adventure, "FollowClose.Default", true, true));
+        assertFalse(allowed(OWNER, GameMode.Adventure, "FollowClose.90", true, true));
+        assertFalse(allowed(UUID.randomUUID(), GameMode.Adventure, "Defend.Default", true, true));
+    }
+
+    @Test
     void staleTargetsAndLostOwnershipCannotAdmitACompanionToTheFlock() {
         assertFalse(allowed(UUID.randomUUID(), GameMode.Adventure, "Follow.Default", true, true));
         assertFalse(allowed(OWNER, GameMode.Adventure, "Follow.Default", false, true));

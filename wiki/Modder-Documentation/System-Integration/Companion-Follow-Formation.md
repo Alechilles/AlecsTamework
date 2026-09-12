@@ -15,7 +15,7 @@ The existing owner target and teleport thresholds remain in use.
 
 ## Conditions and fallback
 
-The NPC must be tamed, in the root `Follow` state, and have its configured
+The NPC must be tamed, in `Follow` or non-combat `Defend.Default`, and have its configured
 `MasterTargetSlot` pointing to its actual owner. Native player flocks require
 Adventure mode. Other game modes retain ordinary following. Mounted NPCs do not
 use formation positioning.
@@ -42,6 +42,12 @@ This is preferred target spacing; terrain and movement can still distort it.
 The group moves closer to the player when its footprint needs more recovery room.
 Hitbox spacing is not shrunk to force a large group into a small recovery range.
 If the footprint itself cannot fit, ordinary follow recovery remains the fallback.
+
+## Close follow and defending
+
+Animal Husbandry's flutes offer a separate `FollowClose` command state. Role templates accept it in the same follow branch; the formation sensor declines it, so the existing seek/orbit and teleport behavior runs. Internal follow substates remain available. The direct interaction cycle and Recall still select `Follow`.
+
+Defend's existing non-combat follow component uses formation slots in `Defend.Default`. `Defend.Combat` has no formation authority and keeps its normal combat movement. Ownership and owner-target checks apply to both formation modes.
 
 ## Flexible slot assignment
 
