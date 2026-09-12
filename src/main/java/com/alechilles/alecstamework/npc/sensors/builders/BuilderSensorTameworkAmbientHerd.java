@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.npc.sensors.SensorTameworkAmbientHerd;
 import com.google.gson.JsonElement;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderDescriptorState;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
+import com.hypixel.hytale.server.npc.asset.builder.Feature;
 import com.hypixel.hytale.server.npc.asset.builder.holder.BooleanHolder;
 import com.hypixel.hytale.server.npc.asset.builder.holder.EnumHolder;
 import com.hypixel.hytale.server.npc.instructions.Sensor;
@@ -12,7 +13,6 @@ import com.hypixel.hytale.server.npc.instructions.Sensor;
 /** Passive builder; constructing a sensor does not install the ambient runtime. */
 public final class BuilderSensorTameworkAmbientHerd extends TameworkSensorBuilderBase {
     public static final String BUILDER_ID = "TameworkAmbientHerd";
-    private final BooleanHolder enabled = new BooleanHolder();
     private final BooleanHolder canLead = new BooleanHolder();
     private final EnumHolder<SensorPhase> phase = new EnumHolder<>();
 
@@ -22,18 +22,17 @@ public final class BuilderSensorTameworkAmbientHerd extends TameworkSensorBuilde
     @Override
     public BuilderSensorTameworkAmbientHerd readConfig(JsonElement data) {
         super.readConfig(data);
-        getBoolean(data, "Enabled", enabled, false, BuilderDescriptorState.WorkInProgress,
-                "Allows this wild role to participate; the effective global policy must also opt in.", null);
         getBoolean(data, "CanLead", canLead, false, BuilderDescriptorState.WorkInProgress,
                 "Allows an adult flock leader to initiate a journey.", null);
         getEnum(data, "Phase", phase, SensorPhase.class, SensorPhase.READY,
                 BuilderDescriptorState.WorkInProgress, "Ambient phase to match.", null);
+        provideFeature(Feature.Position);
         return this;
     }
 
     @Override
     public Sensor build(BuilderSupport support) {
-        return new SensorTameworkAmbientHerd(this, enabled.get(support.getExecutionContext()),
+        return new SensorTameworkAmbientHerd(this, isEnabled(support.getExecutionContext()),
                 canLead.get(support.getExecutionContext()), phase.get(support.getExecutionContext()));
     }
 
