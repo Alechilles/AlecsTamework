@@ -56,6 +56,10 @@ public final class TameworkCompanionRuntimeParticipants {
     }
 
     private static void addCore(Tamework plugin, TameworkRuntimeParticipantRegistry participants) {
+        participants.entitySystem(TameworkRuntimeModule.CORE_OWNERSHIP, "companionfollowflockentitysystem",
+                CompanionFollowFlockMembershipSystems.EntityRef::new);
+        participants.entitySystem(TameworkRuntimeModule.CORE_OWNERSHIP, "companionfollowflockmembershipsystem",
+                CompanionFollowFlockMembershipSystems.MembershipChange::new);
         participants.entitySystem(TameworkRuntimeModule.CORE_OWNERSHIP, "companionfollowflocksystem",
                 CompanionFollowFlockSystem::new);
         participants.entitySystem(TameworkRuntimeModule.CORE_OWNERSHIP, "ownerpopulationentitysystem",

@@ -18,9 +18,12 @@ import com.hypixel.hytale.server.flock.FlockMembershipSystems;
 import com.hypixel.hytale.server.flock.FlockPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Map;
 import java.util.UUID;
 import javax.annotation.Nullable;
+import javax.annotation.Nonnull;
 import org.joml.Vector3d;
 
 /** Runtime-only follow intents. Native flocks remain the membership authority.
@@ -83,11 +86,20 @@ public final class CompanionFollowFlockService {
 
     }
 
-    /** Only visits active follow intents, twice per second; idle worlds do no entity scan. */
+    /** Membership events also cover restored native flocks that have no runtime follow intent. */
+    public void observeMembership(@Nonnull UUID id, @Nonnull Store<EntityStore> store) {
+        states.get(store).memberships.add(id);
+    }
+
+    public void forgetMembership(@Nonnull UUID id, @Nonnull Store<EntityStore> store) {
+        states.get(store).memberships.remove(id);
+    }
+
+    /** Visits recorded intents and player-led memberships twice per second; no world scan. */
     public void tick(float dt, Store<EntityStore> store) {
         State state = states.get(store);
         state.elapsed += dt;
-        if (state.elapsed < 0.5f || state.members.isEmpty()) return;
+        if (state.elapsed < 0.5f || (state.members.isEmpty() && state.memberships.isEmpty())) return;
         state.elapsed = 0;
         queue(store, state);
     }
@@ -106,6 +118,12 @@ public final class CompanionFollowFlockService {
         State state = states.get(store);
         state.queued = false;
         long now = System.currentTimeMillis();
+        // Native load/join callbacks have completed by this periodic world callback. Removal
+        // fires membership events synchronously, so iterate a snapshot of the small ID set.
+        for (UUID id : state.memberships.toArray(UUID[]::new)) {
+            Ref<EntityStore> ref = world.getEntityRef(id);
+            if (!valid(ref) || !retainPlayerFlockMembership(ref, store)) state.memberships.remove(id);
+        }
         var iterator = state.members.entrySet().iterator();
         while (iterator.hasNext()) {
             var entry = iterator.next();
@@ -194,9 +212,51 @@ public final class CompanionFollowFlockService {
     }
 
     private static void leave(Ref<EntityStore> self, Member member, Store<EntityStore> store) {
-        if (valid(self) && sameFlock(flockOf(self, store), member.flockId, store)) {
+        if (valid(self) && (sameFlock(flockOf(self, store), member.flockId, store)
+                || playerFlockLeader(self, store) != null)) {
             store.tryRemoveComponent(self, FlockMembership.getComponentType());
         }
+    }
+
+    /** Repairs restored/orphaned membership without requiring a remembered follow intent. */
+    static boolean retainPlayerFlockMembership(Ref<EntityStore> self, Store<EntityStore> store) {
+        if (store.getComponent(self, FlockMembership.getComponentType()) == null) return false;
+        Ref<EntityStore> flock = flockOf(self, store);
+        if (flock == null) return true; // Native load resolution may still be pending.
+        var group = store.getComponent(flock, EntityGroup.getComponentType());
+        if (group == null || !valid(group.getLeaderRef())) return true;
+        Ref<EntityStore> leader = playerFlockLeader(self, store);
+        if (leader == null) {
+            // A saved player leader can load after its NPCs. Hytale promotes an NPC to
+            // INTERIM_LEADER until that happens; do not forget the group's cleanup watch.
+            var leaderMembership = store.getComponent(group.getLeaderRef(), FlockMembership.getComponentType());
+            return leaderMembership != null
+                    && leaderMembership.getMembershipType() == FlockMembership.Type.INTERIM_LEADER;
+        }
+        var npc = store.getComponent(self, NPCEntity.getComponentType());
+        if (npc == null || npc.getRole() == null) return true;
+        var state = NpcSupportAccess.state(npc.getRole(), self, store);
+        if (state == null) return true;
+        var owner = store.getComponent(self, TameworkOwnerComponent.getComponentType());
+        var tamed = store.getComponent(self, TameworkTamedComponent.getComponentType());
+        var leaderId = store.getComponent(leader, UUIDComponent.getComponentType());
+        var player = store.getComponent(leader, Player.getComponentType());
+        if (owner != null && tamed != null && leaderId != null && player != null
+                && hasFollowAuthority(tamed.isTamed(), owner.getOwnerId(), leaderId.getUuid(),
+                        player.getGameMode(), state.getStateName(), true)) {
+            return true;
+        }
+        // Removing the native component cancels JOINING or invokes native doLeave for members.
+        store.tryRemoveComponent(self, FlockMembership.getComponentType());
+        return false;
+    }
+
+    @Nullable
+    private static Ref<EntityStore> playerFlockLeader(Ref<EntityStore> self, Store<EntityStore> store) {
+        Ref<EntityStore> flock = flockOf(self, store);
+        var group = flock == null ? null : store.getComponent(flock, EntityGroup.getComponentType());
+        Ref<EntityStore> leader = group == null ? null : group.getLeaderRef();
+        return valid(leader) && store.getComponent(leader, Player.getComponentType()) != null ? leader : null;
     }
 
     private static boolean eligible(Ref<EntityStore> self, Ref<EntityStore> owner,
@@ -223,7 +283,11 @@ public final class CompanionFollowFlockService {
     static boolean hasFollowAuthority(boolean tamed, UUID ownerId, UUID playerId,
                                       GameMode mode, String state, boolean targetMatches) {
         return tamed && ownerId != null && ownerId.equals(playerId) && mode == GameMode.Adventure
-                && targetMatches && state != null && (state.equals("Follow") || state.startsWith("Follow.")
+                && targetMatches && usesFormation(state);
+    }
+
+    private static boolean usesFormation(String state) {
+        return state != null && (state.equals("Follow") || state.startsWith("Follow.")
                 || state.equals("Defend") || state.equals("Defend.Default"));
     }
 
@@ -262,6 +326,7 @@ public final class CompanionFollowFlockService {
     }
 
     private static final class State {
+        final Set<UUID> memberships = new HashSet<>();
         final Map<UUID, Member> members = new HashMap<>();
         final Map<GroupKey, FollowGroup> groups = new HashMap<>();
         boolean queued;

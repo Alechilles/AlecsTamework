@@ -96,18 +96,11 @@ resolving entity IDs again before checking current ownership, state and target.
 Tamework's admission checks replace wild-flock allowed-role/size checks for
 these explicitly commanded companions.
 
-The maintenance system visits only recorded active followers twice per second.
-It checks current follow authority and expires intents after two seconds without
-sensor evaluation. There is no global player/entity scan or new saved companion
-state. Runtime records contain IDs and position snapshots, scoped to weakly held stores. Native
-flock handling owns leader removal, dissolution and unload behavior. Leaving a
-companion flock never changes ownership. Following transfers an animal out of
-its previous native herd; there is no automatic restoration of that herd.
+The maintenance system checks recorded follow intents and observed native memberships twice per second. Entity load/add and membership change events register owned, tamed NPC IDs, including restored memberships with no runtime follow intent. Ordinary animal-led flocks stop being watched after resolution. An interim NPC leader remains watched because the saved player leader may load later.
 
-Native membership is saved by Hytale. If a following companion unloads before
-cleanup, it can restore its former flock on reload even if the owner is absent.
-This prototype does not yet reconcile that unloaded membership; verify this
-boundary before relying on it in a persistent server.
+Cleanup removes player-led membership when the animal is no longer in a formation command or no longer belongs to that player. Removing the native component cancels a pending join or invokes Hytale's normal flock departure. Native dissolution clears the remaining player membership when the flock becomes empty. Unresolved load references are deferred until Hytale reconstructs them.
+
+Follow intents still expire after two seconds without sensor evaluation. All checks and writes run on the owning world after ECS processing; callbacks retain only IDs. There is no global player/entity scan or new saved companion state. Runtime records are scoped to weakly held stores, and unload/removal events forget watched IDs. Leaving a companion flock never changes ownership or restores its previous herd.
 
 ## Live checks before release
 
