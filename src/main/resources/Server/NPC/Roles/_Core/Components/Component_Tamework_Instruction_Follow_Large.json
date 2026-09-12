@@ -16,6 +16,20 @@
     "Sensor": { "Type": "Any" },
     "Instructions": [
       {
+        "Reference": "Component_Tamework_Instruction_Follow_Formation",
+        "Modify": {
+          "MasterTargetSlot": {
+            "Compute": "MasterTargetSlot"
+          },
+          "FormationRange": {
+            "Compute": "FollowTeleportThresholdRange"
+          },
+          "FormationRelativeSpeed": {
+            "Compute": "FollowRelativeSpeed"
+          }
+        }
+      },
+      {
         "Sensor": {
           "Type": "Target",
           "TargetSlot": { "Compute": "MasterTargetSlot" },

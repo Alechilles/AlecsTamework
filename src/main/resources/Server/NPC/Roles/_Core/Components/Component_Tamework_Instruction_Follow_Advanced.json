@@ -104,6 +104,20 @@
     },
     "Instructions": [
       {
+        "Reference": "Component_Tamework_Instruction_Follow_Formation",
+        "Modify": {
+          "MasterTargetSlot": {
+            "Compute": "MasterTargetSlot"
+          },
+          "FormationRange": {
+            "Compute": "FollowSeekRange"
+          },
+          "FormationRelativeSpeed": {
+            "Compute": "FollowSeekRelativeSpeed"
+          }
+        }
+      },
+      {
         "Sensor": {
           "Type": "State",
           "State": ".Default"

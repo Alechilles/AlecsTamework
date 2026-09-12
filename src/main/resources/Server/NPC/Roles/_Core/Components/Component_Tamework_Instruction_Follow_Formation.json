@@ -1,0 +1,60 @@
+{
+  "$Comment": "Optional player-led native flock slots; unmatched cases retain the caller's normal follow behavior.",
+  "Type": "Component",
+  "Class": "Instruction",
+  "Parameters": {
+    "MasterTargetSlot": { "Value": "MasterTarget", "Description": "Verified owner target." },
+    "FormationRange": { "Value": 25, "Description": "Owner range before normal catch-up or teleport takes over." },
+    "FormationSpacing": { "Value": 4, "Description": "Minimum spacing, enlarged for companion hitboxes." },
+    "FormationRelativeSpeed": { "Value": 1, "Description": "Speed used to approach a formation position." },
+    "FormationAltitude": { "Value": 5, "Description": "Flying height above the owner." }
+  },
+  "Content": {
+    "TreeMode": true,
+    "Instructions": [
+      {
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            { "Type": "MotionController", "MotionController": "Walk" },
+            {
+              "Type": "TameworkFollowFormation",
+              "TargetSlot": { "Compute": "MasterTargetSlot" },
+              "Range": { "Compute": "FormationRange" },
+              "Spacing": { "Compute": "FormationSpacing" }
+            }
+          ]
+        },
+        "BodyMotion": {
+          "Type": "Seek",
+          "StopDistance": 0.8,
+          "SlowDownDistance": 3,
+          "RelativeSpeed": { "Compute": "FormationRelativeSpeed" }
+        }
+      },
+      {
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            { "Type": "MotionController", "MotionController": "Fly" },
+            {
+              "Type": "TameworkFollowFormation",
+              "TargetSlot": { "Compute": "MasterTargetSlot" },
+              "Range": { "Compute": "FormationRange" },
+              "Spacing": { "Compute": "FormationSpacing" },
+              "Altitude": { "Compute": "FormationAltitude" }
+            }
+          ]
+        },
+        "BodyMotion": {
+          "Type": "TameworkFlyingOrbit",
+          "Mode": "Approach",
+          "ApproachStopDistance": 0.8,
+          "ApproachSlowDownDistance": 3,
+          "RelativeSpeed": { "Compute": "FormationRelativeSpeed" },
+          "DesiredAltitudeRange": [0, 0]
+        }
+      }
+    ]
+  }
+}

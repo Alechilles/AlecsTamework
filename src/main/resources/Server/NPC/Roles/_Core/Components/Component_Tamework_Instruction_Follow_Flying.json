@@ -97,6 +97,20 @@
         }
       },
       {
+        "Reference": "Component_Tamework_Instruction_Follow_Formation",
+        "Modify": {
+          "MasterTargetSlot": {
+            "Compute": "MasterTargetSlot"
+          },
+          "FormationRange": {
+            "Compute": "FollowTeleportThresholdRange"
+          },
+          "FormationRelativeSpeed": {
+            "Compute": "FollowOrbitRelativeSpeed"
+          }
+        }
+      },
+      {
         "$Comment": "Wander through a broad orbit around the owner instead of directly seeking their position.",
         "Continue": true,
         "Sensor": {

@@ -56,6 +56,8 @@ public final class TameworkCompanionRuntimeParticipants {
     }
 
     private static void addCore(Tamework plugin, TameworkRuntimeParticipantRegistry participants) {
+        participants.entitySystem(TameworkRuntimeModule.CORE_OWNERSHIP, "companionfollowflocksystem",
+                CompanionFollowFlockSystem::new);
         participants.entitySystem(TameworkRuntimeModule.CORE_OWNERSHIP, "ownerpopulationentitysystem",
                 () -> new OwnerPopulationEntitySystem(plugin.getOwnerPopulationLiveIndex(),
                         NPCEntity.getComponentType(), plugin.getOwnerComponentType()));

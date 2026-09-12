@@ -1,5 +1,7 @@
 # Ground formation
 
+For tamed animals following a player, see [Companion follow formation](Companion-Follow-Formation.md).
+
 `TameworkGroundFormation` is a body motion for native walking flocks.
 It reuses the bird formation's loose horizontal layout, giving each member a
 separate slot behind and beside its native flock leader. The native Walk
