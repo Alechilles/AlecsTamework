@@ -49,7 +49,9 @@ public final class AmbientHerdCoordinator implements AutoCloseable {
     static final long SUCCESS_COOLDOWN_MAX_MS = 300_000L;
     static final long FAILURE_COOLDOWN_MIN_MS = 60_000L;
     static final long FAILURE_COOLDOWN_MAX_MS = 120_000L;
-    static final long DISCOVERY_TIMEOUT_MS = 20_000L;
+    // Four 4,096-unit searches sharing 32 units per 50 ms need up to 25.6 seconds,
+    // before bank/path validation. Keep the deadline above that bounded workload.
+    static final long DISCOVERY_TIMEOUT_MS = 40_000L;
     static final long GATHER_TIMEOUT_MS = 12_000L;
     static final long TRAVEL_TIMEOUT_MS = 90_000L;
     static final long ACTIVITY_TIMEOUT_MS = 240_000L;
@@ -824,7 +826,8 @@ public final class AmbientHerdCoordinator implements AutoCloseable {
     }
 
     static boolean isTickDue(long previousTick, long nowMillis) {
-        return previousTick == Long.MIN_VALUE || nowMillis - previousTick >= 250L;
+        return previousTick == Long.MIN_VALUE
+                || nowMillis - previousTick >= AmbientHerdWorkBudget.WINDOW_MS;
     }
 
     private static double distanceSquared(AmbientHerdPoint left, AmbientHerdPoint right) {

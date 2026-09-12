@@ -146,8 +146,8 @@ final class AmbientHerdCoordinatorTest {
     @Test
     void coordinatorCadenceAcceptsSignedMonotonicTimeWithoutCatchUp() {
         assertTrue(AmbientHerdCoordinator.isTickDue(Long.MIN_VALUE, -500L));
-        assertFalse(AmbientHerdCoordinator.isTickDue(-500L, -251L));
-        assertTrue(AmbientHerdCoordinator.isTickDue(-500L, -250L));
+        assertFalse(AmbientHerdCoordinator.isTickDue(-500L, -451L));
+        assertTrue(AmbientHerdCoordinator.isTickDue(-500L, -450L));
     }
 
     private static AmbientHerdCoordinator.Activity activity(UUID leader, UUID follower, long now) {

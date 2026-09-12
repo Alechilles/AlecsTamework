@@ -18,7 +18,7 @@ public final class AmbientHerdWorkBudget {
         ASTAR_INITIALIZATION
     }
 
-    private static final long WINDOW_MS = 50L;
+    static final long WINDOW_MS = 50L;
     private static final int WORLD_ACTIVITIES = 4, PROCESS_ACTIVITIES = 8;
     private static final int WORLD_PARTICIPANTS = 64, PROCESS_PARTICIPANTS = 128;
     private static final int WORLD_REGISTERED = 128, PROCESS_REGISTERED = 512;

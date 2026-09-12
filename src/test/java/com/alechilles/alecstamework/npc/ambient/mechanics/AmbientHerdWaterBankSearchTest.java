@@ -13,6 +13,37 @@ import java.util.UUID;
 /** Catches discovery regressions that turn unloaded/no-water terrain into an unbounded scan. */
 class AmbientHerdWaterBankSearchTest {
     @Test
+    void concurrentDistantBankSearchesFinishBeforeTheCoordinatorDeadline() {
+        Terrain terrain = new Terrain();
+        for (int x = 58; x < 72; x++) for (int z = -8; z < 9; z++) terrain.ground(x, 0, z);
+        terrain.water(64, 0, 0);
+        var search = new AmbientHerdWaterBankSearch();
+        var cursors = new AmbientHerdWaterBankSearch.SearchCursor[4];
+        var completed = new boolean[4];
+        for (int i = 0; i < cursors.length; i++) {
+            cursors[i] = search.newCursor(new AmbientHerdPoint(.5, 0, .5), 0L, 1.9, 2.04);
+        }
+        var budget = new AmbientHerdWorkBudget();
+        UUID world = UUID.randomUUID();
+        long previousTick = Long.MIN_VALUE;
+        int found = 0;
+        for (long now = 0; now < AmbientHerdCoordinator.DISCOVERY_TIMEOUT_MS && found < 4; now += 10) {
+            if (!AmbientHerdCoordinator.isTickDue(previousTick, now)) continue;
+            previousTick = now;
+            for (int i = 0; i < cursors.length; i++) {
+                if (completed[i]) continue;
+                var result = search.step(cursors[i], terrain, budget, world, now);
+                if (result.status() == AmbientHerdWaterBankSearch.SearchStatus.FOUND) {
+                    completed[i] = true;
+                    found++;
+                }
+            }
+        }
+        assertEquals(4, found, "Admitted herds must be able to finish bounded discovery before timing out");
+        assertTrue(terrain.reads * 2 <= 4 * 4_096);
+    }
+
+    @Test
     void findsAUsableDryBankWithoutScanningPastTheFiniteCursor() {
         Terrain terrain = new Terrain();
         terrain.water(16, 0, 0);
