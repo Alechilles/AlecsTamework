@@ -246,11 +246,13 @@
                   {
                     "Type": "Beacon",
                     "Message": "Tw_Kettle_Active",
+                    "ConsumeMessage": false,
                     "Range": 160
                   },
                   {
                     "Type": "Beacon",
                     "Message": "Tw_Kettle_Ending",
+                    "ConsumeMessage": false,
                     "Range": 160
                   }
                 ]
@@ -282,6 +284,7 @@
                 {
                   "Type": "Beacon",
                   "Message": "Tw_Kettle_Ending",
+                  "ConsumeMessage": false,
                   "Range": 160
                 },
                 {
@@ -307,6 +310,7 @@
                 {
                   "Type": "Beacon",
                   "Message": "Tw_Kettle_Active",
+                  "ConsumeMessage": false,
                   "Range": 160
                 },
                 {
@@ -314,6 +318,7 @@
                   "Sensor": {
                     "Type": "Beacon",
                     "Message": "Tw_Kettle_Ending",
+                    "ConsumeMessage": false,
                     "Range": 160
                   }
                 },
@@ -361,6 +366,7 @@
                 {
                   "Type": "Beacon",
                   "Message": "Tw_Kettle_Ending",
+                  "ConsumeMessage": false,
                   "Range": 160
                 },
                 {
@@ -391,6 +397,7 @@
                 {
                   "Type": "Beacon",
                   "Message": "Tw_Kettle_Ending",
+                  "ConsumeMessage": false,
                   "Range": 160
                 },
                 {
@@ -474,11 +481,13 @@
                     {
                       "Type": "Beacon",
                       "Message": "Tw_Kettle_Active",
+                      "ConsumeMessage": false,
                       "Range": 160
                     },
                     {
                       "Type": "Beacon",
                       "Message": "Tw_Kettle_Ending",
+                      "ConsumeMessage": false,
                       "Range": 160
                     }
                   ]
