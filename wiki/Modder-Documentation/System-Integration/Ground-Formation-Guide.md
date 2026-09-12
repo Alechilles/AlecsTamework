@@ -27,12 +27,13 @@ this motion deactivates, using `RelativeSpeed` as its walking speed. Followers
 allow slot error up to 30% of spacing and limit lateral corrections to 20
 degrees while their leader moves. Steering turns at up to 45 degrees per second.
 
-Both modes check at most three short (1.5 block) terrain probes every quarter
+Both modes check at most three short (3 block) terrain probes every quarter
 second. A direction must clear nearly the full probe distance; short movement
 ending at a wall or edge triggers a detour instead of being treated as clear.
 Obstacle turns align within two degrees before walking to avoid cutting corners.
-When blocked, they try local detours and hold a clear detour for two
-seconds before returning toward travel. Lack of physical progress also triggers
+When blocked, they try 15- and 30-degree detours before larger recovery turns,
+restarting with shallow turns after the route clears. Successful detours are held
+for two seconds, then kept if the original route is still blocked. Lack of physical progress also triggers
 recovery, even when terrain probes report a clear route. Large turns happen in
 place. This is local steering, not long-distance pathfinding around fences or
 mountains. No world scan, scheduler, or saved herd state is added.

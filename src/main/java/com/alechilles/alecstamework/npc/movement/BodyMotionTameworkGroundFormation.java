@@ -24,13 +24,13 @@ import org.joml.Vector3d;
 public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionBase {
     private static final double EPSILON = 1.0E-6;
     private static final double PROBE_INTERVAL_SECONDS = 0.25;
-    private static final double PROBE_LOOKAHEAD = 1.5;
+    private static final double PROBE_LOOKAHEAD = 3.0;
     // A partial move ends at an obstacle; it is not a clear direction for continued travel.
     private static final double MIN_PROBE_TRAVEL = PROBE_LOOKAHEAD - 0.05;
     private static final double TURN_RATE = Math.toRadians(45);
     private static final double WALK_ALIGNMENT = Math.cos(Math.toRadians(15));
     private static final double DETOUR_ALIGNMENT = Math.cos(Math.toRadians(2));
-    private static final double[] DETOUR_ANGLES = {45, -45, 90, -90, 135, -135, 180};
+    private static final double[] DETOUR_ANGLES = {15, -15, 30, -30, 45, -45, 90, -90, 135, -135, 180};
 
     private final double spacing;
     private final double tightness;
@@ -209,6 +209,8 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
                                             @Nonnull MotionControllerWalk walk,
                                             @Nonnull ComponentAccessor<EntityStore> accessor,
                                             boolean stalled) {
+        // Shallow turns are preventive; an actual stall still needs a decisive escape turn.
+        if (stalled) detourIndex = Math.max(detourIndex, 4);
         int probes = 0;
         if (detourSeconds > 0 && !stalled) {
             probes++;
@@ -223,6 +225,7 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
             probes++;
             if (canWalk(ref, position, translation, walk, accessor)) {
                 detourDirection.zero();
+                detourIndex = 0;
                 return normalizeHorizontal(translation, cachedDirection);
             }
         }

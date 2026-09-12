@@ -139,7 +139,7 @@ class FlightFormationEligibilityTest {
                     assertEquals(Math.toRadians(45), direction, Math.toRadians(2.1),
                             "Obstacle recovery must finish turning before walking across the corner.");
                 }
-                if (tick > 25 && tick < 80) {
+                if (tick > 40 && tick < 80) {
                     assertTrue(steering.getTranslation().x > 0.1,
                             "Keep making progress along the clear side instead of reversing the detour.");
                 }
@@ -149,6 +149,36 @@ class FlightFormationEligibilityTest {
             assertTrue(movedSideways, "A blocked leader must take an available local detour.");
             assertEquals(0, steering.getTranslation().x, 1e-6);
             assertTrue(steering.getTranslation().z < -0.1, "Clear ground must restore the original travel direction.");
+        }
+    }
+
+    @Test
+    void groundLeaderTakesShallowDetourBeforeReachingNearbyObstacle() throws Exception {
+        try (HytaleModuleScope ignored = HytaleModuleScope.install();
+             FlockFixtureScope scope = FlockFixtureScope.install();
+             FlightFixture fixture = new FlightFixture(scope)) {
+            GroundWalk walk = (GroundWalk) unsafe().allocateInstance(GroundWalk.class);
+            walk.walkable = true;
+            walk.blockForward = true;
+            walk.blockedTravel = 2.0;
+            walk.shallowClearance = true;
+            setField(Role.class, fixture.followerRole, "activeMotionController", walk);
+            TransformComponent self = new TransformComponent();
+            fixture.store.put(fixture.followerRef, TransformComponent.getComponentType(), self);
+            BodyMotionTameworkGroundFormation motion = groundMotion(true);
+            Steering steering = new Steering();
+            boolean avoidedEarly = false;
+            for (int tick = 0; tick < 20; tick++) {
+                motion.computeSteering(fixture.followerRef, fixture.followerRole, null, 0.05, steering, fixture.store);
+                if (steering.getTranslation().length() > 0) {
+                    double angle = Math.abs(Math.atan2(steering.getTranslation().x, -steering.getTranslation().z));
+                    assertTrue(angle < Math.toRadians(30), "Use the available shallow route before a sharp recovery turn.");
+                    avoidedEarly |= angle > Math.toRadians(10);
+                }
+                self.getPosition().add(new Vector3d(steering.getTranslation()).mul(0.2));
+            }
+            assertTrue(avoidedEarly, "Detect the obstruction two blocks ahead before walking up to it.");
+            assertTrue(walk.probes <= 12, "Earlier avoidance retains the bounded probe cadence.");
         }
     }
 
@@ -222,6 +252,7 @@ class FlightFormationEligibilityTest {
     private static final class GroundWalk extends MotionControllerWalk {
         private boolean walkable;
         private boolean blockForward;
+        private boolean shallowClearance;
         private double blockedTravel;
         private int probes;
 
@@ -234,7 +265,8 @@ class FlightFormationEligibilityTest {
         public double probeMove(Ref<EntityStore> ref, Vector3dc position, Vector3dc direction,
                                 ProbeMoveData data, ComponentAccessor<EntityStore> accessor) {
             probes++;
-            return walkable ? (!blockForward || Math.abs(direction.x()) > 0.5 ? direction.length() : blockedTravel) : 0.0;
+            return walkable ? (!blockForward || Math.abs(direction.x()) / direction.length() > (shallowClearance ? 0.2 : 0.6)
+                    ? direction.length() : Math.min(blockedTravel, direction.length())) : 0.0;
         }
     }
 
