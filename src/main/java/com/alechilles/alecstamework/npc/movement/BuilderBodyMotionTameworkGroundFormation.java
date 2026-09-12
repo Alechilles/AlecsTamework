@@ -15,6 +15,7 @@ public final class BuilderBodyMotionTameworkGroundFormation extends BuilderBodyM
     public static final String BUILDER_ID = "TameworkGroundFormation";
 
     private final DoubleHolder spacing = new DoubleHolder();
+    private final DoubleHolder slotTolerance = new DoubleHolder();
     private final DoubleHolder tightness = new DoubleHolder();
     private final DoubleHolder relativeSpeed = new DoubleHolder();
     private final DoubleHolder homeRange = new DoubleHolder();
@@ -32,6 +33,9 @@ public final class BuilderBodyMotionTameworkGroundFormation extends BuilderBodyM
         getDouble(data, "Spacing", spacing, 5.0, DoubleSingleValidator.greater0(),
                 BuilderDescriptorState.WorkInProgress,
                 "Distance between neighboring ground formation slots.", null);
+        getDouble(data, "SlotTolerance", slotTolerance, 0.0, DoubleSingleValidator.greaterEqual0(),
+                BuilderDescriptorState.WorkInProgress,
+                "Allowed slot drift in blocks; zero uses 30 percent of spacing.", null);
         getDouble(data, "Tightness", tightness, 0.35,
                 DoubleRangeValidator.fromExclToIncl(0.0, 1.0),
                 BuilderDescriptorState.WorkInProgress,
@@ -69,6 +73,10 @@ public final class BuilderBodyMotionTameworkGroundFormation extends BuilderBodyM
 
     double getSpacing(@Nonnull BuilderSupport support) {
         return spacing.get(support.getExecutionContext());
+    }
+
+    double getSlotTolerance(@Nonnull BuilderSupport support) {
+        return slotTolerance.get(support.getExecutionContext());
     }
 
     double getTightness(@Nonnull BuilderSupport support) {

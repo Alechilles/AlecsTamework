@@ -66,15 +66,19 @@ class FlightFormationEligibilityTest {
             Steering steering = new Steering();
             BodyMotionTameworkGroundFormation.resolveGroundTarget(0, 5, 0.05,
                     leader.getPosition(), heading, 0, self.getPosition());
+            self.getPosition().x += 2.0;
             motion.computeSteering(fixture.followerRef, fixture.followerRole, null, 0.05, steering, fixture.store);
             leader.getPosition().z -= 0.05;
             leader.getPosition().y += 0.5;
             BodyMotionTameworkGroundFormation.resolveGroundTarget(0, 5, 0.1,
                     leader.getPosition(), heading, 0, self.getPosition());
+            self.getPosition().x += 2.0;
             assertTrue(motion.computeSteering(fixture.followerRef, fixture.followerRole,
                     null, 0.05, steering, fixture.store));
             assertEquals(1.0, steering.getTranslation().length() * walk.getMaximumSpeed(), 0.03,
                     "Ground formation must preserve the leader's slow walking speed.");
+            assertEquals(0.0, steering.getTranslation().x, 1.0E-6,
+                    "The configured 2.5-block tolerance should ignore a two-block lateral slot error.");
             assertEquals(0.0, steering.getTranslation().y, 1.0E-9,
                     "Climbing by the leader must not inject vertical flight steering.");
         }
@@ -217,6 +221,24 @@ class FlightFormationEligibilityTest {
     }
 
     @Test
+    void groundLeaderSmoothingRejectsBriefDodgesButFollowsSustainedTurns() {
+        Vector3d velocity = new Vector3d(0, 0, 1);
+        Vector3d sideways = new Vector3d(1, 0, 0);
+        BodyMotionTameworkGroundFormation.smoothGroundLeaderVelocity(velocity, sideways, 0.25);
+        assertTrue(velocity.x < 0.2);
+        assertTrue(velocity.z > 0.8);
+        for (int i = 0; i < 120; i++) {
+            BodyMotionTameworkGroundFormation.smoothGroundLeaderVelocity(velocity, sideways, 0.05);
+        }
+        assertTrue(velocity.x > 0.98);
+        assertTrue(velocity.z < 0.02);
+        for (int i = 0; i < 120; i++) {
+            BodyMotionTameworkGroundFormation.smoothGroundLeaderVelocity(velocity, new Vector3d(), 0.05);
+        }
+        assertTrue(velocity.length() < 0.02, "Followers settle after their leader stops.");
+    }
+
+    @Test
     void groundFollowerToleratesSlotErrorAndLimitsLateralCorrection() {
         Vector3d output = new Vector3d();
         BodyMotionTameworkGroundFormation.resolveGroundTranslation(new Vector3d(), new Vector3d(1, 0, 0),
@@ -238,6 +260,7 @@ class FlightFormationEligibilityTest {
         List<String> errors = new ArrayList<>();
         JsonObject config = new JsonObject();
         config.addProperty("Lead", lead);
+        config.addProperty("SlotTolerance", 2.5);
         builder.readConfig(null, config, new BuilderManager(), formationParameters(),
                 new BuilderValidationHelper("ground-formation-test", null, null, null,
                         new InstructionContextHelper(InstructionType.Default),

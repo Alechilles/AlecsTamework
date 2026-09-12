@@ -49,3 +49,10 @@ Animal Husbandry starts inward journeys at 200 blocks and retains its native
 animals graze where they stopped instead of seeking their original leash point.
 Existing herds use their current leash as home; this does not recover an older
 spawn location or impose strict biome boundaries.
+
+`SlotTolerance` sets allowed drift in blocks before slot correction begins.
+Its default, zero, uses 30% of `Spacing`. Animal Husbandry uses `Tightness: 0.15`
+and `SlotTolerance: 2.5` for relaxed ground herds. Followers filter leader
+velocity with a 1.5-second response time before using it for slot orientation
+and forward movement. Brief dodges have less influence than sustained turns.
+This filtering applies only to ground formation.

@@ -34,11 +34,14 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
 
     private final double spacing;
     private final double tightness;
+    private final double slotTolerance;
     private final double relativeSpeed;
     private final boolean lead;
     private final double homeRange;
     private final ProbeMoveData probeMoveData = new ProbeMoveData();
     private final Vector3d lastLeaderPosition = new Vector3d();
+    private final Vector3d measuredLeaderVelocity = new Vector3d();
+    private boolean hasLeaderVelocity;
     private final Vector3d leaderVelocity = new Vector3d();
     private final Vector3d leaderHeading = new Vector3d();
     private final Vector3d sampledHeading = new Vector3d();
@@ -73,6 +76,8 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
         super(builder);
         spacing = builder.getSpacing(support);
         tightness = builder.getTightness(support);
+        double configuredTolerance = builder.getSlotTolerance(support);
+        slotTolerance = configuredTolerance > 0 ? configuredTolerance : spacing * 0.3;
         relativeSpeed = builder.getRelativeSpeed(support);
         lead = builder.isLead(support);
         homeRange = builder.getHomeRange(support);
@@ -148,7 +153,7 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
         targetPosition.set(leader.getPosition()).add(formationOffset);
         targetPosition.y = self.getPosition().y;
         resolveGroundTranslation(self.getPosition(), targetPosition, leaderVelocity,
-                walk.getMaximumSpeed(), relativeSpeed, tightness, spacing * 0.3, dt, translation);
+                walk.getMaximumSpeed(), relativeSpeed, tightness, slotTolerance, dt, translation);
         return steer(ref, self, walk, dt, desiredSteering, componentAccessor);
     }
 
@@ -346,18 +351,31 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
 
     private void sampleLeaderMotion(@Nonnull TransformComponent leader, double dt) {
         Vector3d position = leader.getPosition();
-        BodyMotionTameworkFlightFormation.resolveHeadingFromYaw(leader.getRotation().yaw(), sampledHeading);
-        leaderVelocity.zero();
-        if (hasLeaderPosition && dt > EPSILON) {
-            leaderVelocity.set(position).sub(lastLeaderPosition).div(dt);
-            leaderVelocity.y = 0.0;
-            if (leaderVelocity.lengthSquared() > EPSILON * EPSILON) {
-                sampledHeading.set(leaderVelocity);
+        if (!hasLeaderPosition) {
+            BodyMotionTameworkFlightFormation.resolveHeadingFromYaw(leader.getRotation().yaw(), sampledHeading);
+            leaderHeading.set(sampledHeading);
+        } else if (dt > EPSILON) {
+            measuredLeaderVelocity.set(position).sub(lastLeaderPosition).div(dt);
+            measuredLeaderVelocity.y = 0;
+            if (!hasLeaderVelocity) {
+                leaderVelocity.set(measuredLeaderVelocity);
+                hasLeaderVelocity = true;
+            } else {
+                smoothGroundLeaderVelocity(leaderVelocity, measuredLeaderVelocity, dt);
+            }
+            // Use the same filtered movement for both slot orientation and forward matching.
+            if (leaderVelocity.lengthSquared() > 0.05 * 0.05) {
+                FlightFormationSteering.smoothHeading(leaderHeading, leaderVelocity, dt, leaderHeading);
             }
         }
-        FlightFormationSteering.smoothHeading(leaderHeading, sampledHeading, dt, leaderHeading);
         lastLeaderPosition.set(position);
         hasLeaderPosition = true;
+    }
+
+    static void smoothGroundLeaderVelocity(Vector3d current, Vector3d measured, double dt) {
+        double blend = -Math.expm1(-dt / 1.5);
+        current.lerp(measured, blend);
+        current.y = 0;
     }
 
     private static int resolveFollowerIndex(@Nonnull EntityGroup group, @Nonnull Ref<EntityStore> self,
@@ -390,6 +408,7 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
     private void reset() {
         trackedLeaderRef = null;
         hasLeaderPosition = false;
+        hasLeaderVelocity = false;
         hasFormationOffset = false;
         hasCachedDirection = false;
         hasProbedDirection = false;
