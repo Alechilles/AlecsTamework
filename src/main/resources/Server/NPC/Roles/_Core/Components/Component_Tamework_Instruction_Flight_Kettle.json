@@ -19,15 +19,15 @@
     },
     "KettleCooldownRange": {
       "Value": [
-        60,
-        120
+        120,
+        240
       ],
-      "Description": "Seconds between starts of leader thermal episodes."
+      "Description": "Seconds of cooldown after a thermal episode finishes."
     },
     "KettleDurationRange": {
       "Value": [
-        20,
-        35
+        180,
+        420
       ],
       "Description": "Seconds spent in a thermal episode."
     },
@@ -77,9 +77,10 @@
           {
             "Type": "TimerStart",
             "Name": "Tw_Kettle_Cooldown",
-            "StartValueRange": {
-              "Compute": "KettleCooldownRange"
-            },
+            "StartValueRange": [
+              60,
+              120
+            ],
             "RestartValueRange": {
               "Compute": "KettleCooldownRange"
             }
@@ -105,6 +106,20 @@
             "Continue": true,
             "Sensor": {
               "Type": "Timer",
+              "Name": "Tw_Kettle_Duration",
+              "State": "Stopped"
+            },
+            "Actions": [
+              {
+                "Type": "TimerContinue",
+                "Name": "Tw_Kettle_Cooldown"
+              }
+            ]
+          },
+          {
+            "Continue": true,
+            "Sensor": {
+              "Type": "Timer",
               "Name": "Tw_Kettle_Cooldown",
               "State": "Stopped"
             },
@@ -125,6 +140,10 @@
               },
               {
                 "Type": "TimerRestart",
+                "Name": "Tw_Kettle_Cooldown"
+              },
+              {
+                "Type": "TimerPause",
                 "Name": "Tw_Kettle_Cooldown"
               }
             ]

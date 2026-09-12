@@ -32,9 +32,15 @@ wandering or formation travel. It falls through while inactive. Defaults:
 - `KettleEnabled`: `false`.
 - `KettleRadius`: `18` blocks.
 - `KettleAltitudeRange`: `[15, 28]` blocks above the native flock leader's home point.
-- `KettleCooldownRange`: `[60, 120]` seconds between episode starts.
-- `KettleDurationRange`: `[20, 35]` seconds per episode.
+- `KettleCooldownRange`: `[120, 240]` seconds of cooldown after an episode.
+- `KettleDurationRange`: `[180, 420]` seconds per episode.
 - `DayTimePeriod`: `[6.01, 17.99]`.
+
+The first cooldown is 60–120 seconds; subsequent cooldowns use
+`KettleCooldownRange`. The cooldown pauses during an episode and resumes when
+eligible idle flight next observes the duration timer stopped. Hosts with timed idle landing should defer
+that landing while `Tw_Kettle_Duration` is running, while retaining threat and
+recovery priority.
 
 Leaders and lone birds start episodes; native flock beacons invite followers.
 `TameworkFlyingOrbit` with `Mode: "Kettle"` circles the leader's home point
@@ -46,8 +52,9 @@ target-relative behavior.
 
 Motion state is local and resets on activation. Native flock membership and
 the home point are read on the NPC's owning world thread; there are no global
-scans, background tasks, or saved thermal records. Timers continue to expire
-through interruptions. A follower invitation expires within one second after
+scans, background tasks, or saved thermal records. Episode duration continues
+to expire through interruptions; the cooldown stays paused until eligible idle
+flight observes the episode has ended. A follower invitation expires within one second after
 the leader stops kettling. Terrain avoidance can deform the circles. This is
 ambient circling, not a simulation of wind or temperature.
 
