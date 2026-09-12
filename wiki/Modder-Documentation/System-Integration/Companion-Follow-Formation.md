@@ -1,9 +1,11 @@
 # Companion follow formation
 
 The development follow prototype uses a native flock led by the owner player.
-Ground companions seek separate positions behind and beside the player. Flying
-companions approach separate positions above the player, with staggered heights.
-Turning the camera while standing still does not rotate the formation.
+Ground companions seek separate positions around the player. Flying companions
+use the same arrangement above the player, with staggered heights. Positions do
+not rotate with the player's facing or travel direction. Each follower's resting
+area allows half its spacing in horizontal player movement before shifting toward
+the player, so turning and taking a small step leaves its target in place.
 
 The shared Simple, Simple TP, Advanced, Large, and Flying follow components try
 `Component_Tamework_Instruction_Follow_Formation` before their normal movement.

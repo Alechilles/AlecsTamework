@@ -2,7 +2,7 @@
 
 ## Unreleased development changes
 
-- Added a development prototype for player-led companion formations in Adventure mode, with separate ground/flying positions and ordinary follow recovery as fallback.
+- Added a development prototype for player-led companion formations in Adventure mode, with spaced ground/flying positions around the player, slack for small movements, and ordinary follow recovery as fallback.
 
 - Restyled command HUD icons as cream glyphs, with distinct Follow and Recall
   symbols, while preserving their existing texture sizes.
