@@ -2,57 +2,50 @@ package com.alechilles.alecstamework.npc.movement;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
 
 class CompanionFollowFormationTest {
     @Test
-    void turningAndTakingASmallReverseStepLeavesTargetInPlace() {
-        var formation = new CompanionFollowFormation();
-        var first = formation.update(new Vector3d(), 0, 0, 4, 5, 0.05, new Vector3d());
-        var afterStep = formation.update(new Vector3d(0, 0, -0.2), (float) Math.PI,
-                0, 4, 5, 0.05, new Vector3d());
-        for (int i = 0; i < 100; i++) {
-            formation.update(new Vector3d(0, 0, -0.2), (float) Math.PI,
-                    0, 4, 5, 0.05, afterStep);
-        }
-        assertEquals(first, afterStep, "A small reversal must not send companions around the player.");
+    void playerApproachingGroupDoesNotMoveOrRotateFormation() {
+        var group = new CompanionFollowFormation();
+        group.configure(new Vector3d(10, 0, 0), 4, 4, 40);
+        var before = group.target(new Vector3d(2, 0, 0), 0, new Vector3d());
+        var after = group.target(new Vector3d(2.2, 0, 0), 0, new Vector3d());
+        assertEquals(before, after);
+        assertTrue(after.x > 5, "The group stays beside its own center, not around the player.");
     }
 
     @Test
-    void sustainedTravelMovesTargetTowardPlayerWithoutRotatingItsOffset() {
-        var formation = new CompanionFollowFormation();
-        var initial = formation.update(new Vector3d(), 0, 0, 4, 0, 0.05, new Vector3d());
-        var moved = formation.update(new Vector3d(0, 0, 12), 1, 0, 4, 0, 0.05, new Vector3d());
-        assertEquals(initial.x, moved.x, 1e-9);
-        assertTrue(moved.z > initial.z + 8, "Followers must catch up during sustained travel.");
-        assertTrue(moved.distance(new Vector3d(0, 0, 12)) <= 6);
+    void travellingAwayTranslatesWholeFormationWithoutChangingOffsets() {
+        var group = new CompanionFollowFormation();
+        group.configure(new Vector3d(10, 0, 0), 4, 4, 40);
+        var a = group.target(new Vector3d(), 0, new Vector3d());
+        var b = group.target(new Vector3d(), 3, new Vector3d());
+        var movedA = group.target(new Vector3d(-10, 0, 0), 0, new Vector3d());
+        var movedB = group.target(new Vector3d(-10, 0, 0), 3, new Vector3d());
+        assertTrue(movedA.x < a.x - 5);
+        assertEquals(new Vector3d(b).sub(a), new Vector3d(movedB).sub(movedA));
     }
 
     @Test
-    void slotsSpreadAroundPlayerWithClearanceAndCallerAltitude() {
+    void membershipRefreshDoesNotDragRestingGroupToPlayer() {
+        var group = new CompanionFollowFormation();
+        group.configure(new Vector3d(10, 0, 0), 4, 4, 40);
+        var before = group.target(new Vector3d(2, 0, 0), 0, new Vector3d());
+        group.configure(new Vector3d(8, 0, 0), 4, 4, 40);
+        assertEquals(before, group.target(new Vector3d(2, 0, 0), 0, new Vector3d()));
+    }
+
+    @Test
+    void compactSlotsKeepClearanceAndStayWithinRecoveryEnvelope() {
+        var group = new CompanionFollowFormation();
+        group.configure(new Vector3d(30, 0, 0), 6, 4, 40);
         var targets = new Vector3d[6];
-        for (int slot = 0; slot < targets.length; slot++) {
-            targets[slot] = new CompanionFollowFormation().update(
-                    new Vector3d(), 0, slot, 4, 7, 0.05, new Vector3d());
-            assertEquals(7, targets[slot].y, 1e-9);
-            for (int previous = 0; previous < slot; previous++) {
-                assertTrue(targets[slot].distance(targets[previous]) >= 4 - 1e-9);
-            }
+        for (int i=0; i<6; i++) {
+            targets[i] = group.target(new Vector3d(), i, new Vector3d());
+            assertTrue(targets[i].length() < 40);
+            for (int j=0; j<i; j++) assertTrue(targets[i].distance(targets[j]) >= 4 - 1e-9);
         }
-        assertTrue(java.util.Arrays.stream(targets).anyMatch(target -> target.z > 1));
-        assertTrue(java.util.Arrays.stream(targets).anyMatch(target -> target.z < -1));
-    }
-
-    @Test
-    void teleportReanchorsNearThePlayerWithoutUsingFacing() {
-        var formation = new CompanionFollowFormation();
-        var initial = formation.update(new Vector3d(), 0, 0, 4, 1, 0.05, new Vector3d());
-        var moved = formation.update(new Vector3d(100, 40, -20), (float) Math.PI,
-                0, 4, 41, 0.05, new Vector3d());
-        assertEquals(initial.x + 100, moved.x, 1e-9);
-        assertEquals(initial.z - 20, moved.z, 1e-9);
-        assertEquals(41, moved.y, 1e-9);
     }
 }

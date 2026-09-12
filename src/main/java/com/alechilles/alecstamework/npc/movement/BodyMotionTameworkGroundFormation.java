@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.movement;
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.group.EntityGroup;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.physics.util.PhysicsMath;
@@ -16,6 +17,7 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.List;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
@@ -48,6 +50,8 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
     private final Vector3d desiredOffset = new Vector3d();
     private final Vector3d formationOffset = new Vector3d();
     private final Vector3d targetPosition = new Vector3d();
+    private final Vector3d slotPosition = new Vector3d();
+    private final Vector3d slotTarget = new Vector3d();
     private final Vector3d translation = new Vector3d();
     private final Vector3d cachedDirection = new Vector3d();
     private final Vector3d leaderDirection = new Vector3d();
@@ -59,8 +63,11 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
 
     @Nullable
     private Ref<EntityStore> trackedLeaderRef;
+    @Nullable
+    private NativeFormationSlots.GroupKey formationSlotGroup;
     private boolean hasLeaderPosition;
     private boolean hasFormationOffset;
+    private int lastFormationSlot = -1;
     private boolean hasCachedDirection;
     private boolean hasProbedDirection;
     private double looseDriftSeconds;
@@ -138,8 +145,37 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
 
         sampleLeaderMotion(leader, dt);
         looseDriftSeconds += dt;
-        resolveGroundTarget(resolveFollowerIndex(group, ref, leaderRef), spacing, looseDriftSeconds,
+        int followerIndex = 0;
+        long nowMillis = System.currentTimeMillis();
+        UUIDComponent identity = componentAccessor.getComponent(ref, UUIDComponent.getComponentType());
+        UUID memberId = identity == null ? null : identity.getUuid();
+        NativeFormationSlots.GroupKey slotGroup = NativeFormationSlots.get().resolveGroup(
+                formationSlotGroup, ref, leaderRef, "Ground", "Loose", spacing, componentAccessor);
+        if (slotGroup != null && memberId != null) {
+            int assignedSlot = NativeFormationSlots.get().claim(
+                    ref, slotGroup, memberId, followerIndex, nowMillis);
+            if (assignedSlot != lastFormationSlot) {
+                hasFormationOffset = false;
+            }
+            formationSlotGroup = slotGroup;
+            lastFormationSlot = assignedSlot;
+            followerIndex = assignedSlot;
+        } else {
+            followerIndex = resolveFollowerIndex(group, ref, leaderRef);
+            formationSlotGroup = null;
+            if (lastFormationSlot >= 0) {
+                hasFormationOffset = false;
+            }
+            lastFormationSlot = -1;
+        }
+        resolveGroundTarget(followerIndex, spacing, looseDriftSeconds,
                 leader.getPosition(), leaderHeading, self.getPosition().y, targetPosition);
+        if (formationSlotGroup != null && memberId != null) {
+            slotPosition.set(self.getPosition().x, 0.0, self.getPosition().z);
+            slotTarget.set(targetPosition.x, 0.0, targetPosition.z);
+            NativeFormationSlots.get().report(ref, formationSlotGroup, memberId,
+                    slotPosition, slotTarget, spacing, nowMillis);
+        }
         desiredOffset.set(targetPosition).sub(leader.getPosition());
         desiredOffset.y = 0.0;
         if (!hasFormationOffset) {
@@ -407,9 +443,11 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
 
     private void reset() {
         trackedLeaderRef = null;
+        formationSlotGroup = null;
         hasLeaderPosition = false;
         hasLeaderVelocity = false;
         hasFormationOffset = false;
+        lastFormationSlot = -1;
         hasCachedDirection = false;
         hasProbedDirection = false;
         looseDriftSeconds = 0.0;

@@ -1,11 +1,12 @@
 # Companion follow formation
 
 The development follow prototype uses a native flock led by the owner player.
-Ground companions seek separate positions around the player. Flying companions
-use the same arrangement above the player, with staggered heights. Positions do
-not rotate with the player's facing or travel direction. Each follower's resting
-area allows half its spacing in horizontal player movement before shifting toward
-the player, so turning and taking a small step leaves its target in place.
+Companions form compact staggered rows around their own group center, initially
+placed at the animals' average position. The group moves toward the player only
+when it is too far away. The player is not a formation slot or the shape's center.
+Turning or walking toward the group does not rotate it or make it move behind the
+player. Flying companions use a separate group with staggered heights above the
+player's altitude.
 
 The shared Simple, Simple TP, Advanced, Large, and Flying follow components try
 `Component_Tamework_Instruction_Follow_Formation` before their normal movement.
@@ -24,11 +25,32 @@ normal follow instructions to run. Ground followers also fall back when a short
 terrain probe detects an obstruction. This allows the group to compress at gates
 and spread out after passing through. It does not add a new pathfinder.
 
-Slots remain assigned while each follower is active; removing one does not
-renumber the others. Ground and flying members have separate slot sequences in
-the same native flock. Spacing uses the largest active hitbox in each sequence.
-Positions are limited to 65% of the caller's recovery range, so very large or
-crowded groups can have less than their preferred spacing.
+Ground and flying members use separate groups in the same native flock. Spacing
+uses the largest active hitbox in each group. The group center stops at its
+footprint radius plus 1.25 times spacing from the player. Its horizontal footprint
+is capped at 30% of the smallest active recovery range, and the center's stopping
+distance at 55%, so very large groups may compress to stay inside recovery range.
+
+## Flexible slot assignment
+
+Companion follow groups, autonomous ground herds, and flying formations share
+bounded slot exchanges. Only animals actively using that formation reserve slots.
+They keep assignments unless exchanging two slots saves at least 20% of their
+combined travel distance and at least half the larger spacing (minimum 0.5 blocks).
+Both animals then have a two-second swap cooldown. This reduces crossing after a
+group becomes mixed up without demanding constant reshuffling. It is a local
+improvement, not a search for a globally optimal assignment.
+
+Each active group checks at most 128 pairs every 500 ms, resuming through larger
+groups across checks. Ground comparisons use horizontal distance; flying groups
+use three-dimensional distance. Ordinary updates copy position snapshots and look
+up the current assignment. They add no pathfinding queries, world scans, or
+background workers. Inactive slot reservations expire after two seconds, and surviving slots compact
+to keep the group from remaining stretched out after departures. Native formation
+caches are scoped to the world store and cleaned opportunistically in bounded
+batches. A native flock shares unique slot numbers within each movement type;
+only animals with matching formation geometry and spacing can exchange them.
+The existing non-follow formation shapes and leader movement remain unchanged.
 
 ## Parameters
 
@@ -56,7 +78,7 @@ these explicitly commanded companions.
 The maintenance system visits only recorded active followers twice per second.
 It checks current follow authority and expires intents after two seconds without
 sensor evaluation. There is no global player/entity scan or new saved companion
-state. Runtime records contain IDs and are scoped to weakly held stores. Native
+state. Runtime records contain IDs and position snapshots, scoped to weakly held stores. Native
 flock handling owns leader removal, dissolution and unload behavior. Leaving a
 companion flock never changes ownership. Following transfers an animal out of
 its previous native herd; there is no automatic restoration of that herd.

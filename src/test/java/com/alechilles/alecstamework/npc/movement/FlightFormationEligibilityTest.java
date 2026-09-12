@@ -15,6 +15,7 @@ import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.TestEntityComponentStore;
 import com.hypixel.hytale.server.core.entity.group.EntityGroup;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.modules.entity.EntityModule;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -43,6 +44,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 import org.junit.jupiter.api.Test;
 import org.joml.Vector3d;
@@ -50,6 +52,35 @@ import org.joml.Vector3dc;
 import sun.misc.Unsafe;
 
 class FlightFormationEligibilityTest {
+    @Test
+    void mixedNativeFormationProfilesReserveDifferentSlotsInTheSameFlock() throws Exception {
+        try (HytaleModuleScope ignored = HytaleModuleScope.install();
+             FlockFixtureScope scope = FlockFixtureScope.install();
+             FlightFixture fixture = new FlightFixture(scope)) {
+            UUID flockId = UUID.randomUUID();
+            UUID firstId = UUID.randomUUID(), secondId = UUID.randomUUID();
+            fixture.store.put(fixture.leaderRef, UUIDComponent.getComponentType(), new UUIDComponent(UUID.randomUUID()));
+            fixture.store.getComponent(fixture.followerRef, scope.flockMembershipType).setFlockId(flockId);
+            var secondMembership = fixture.membership();
+            secondMembership.setFlockId(flockId);
+            fixture.store.put(fixture.replacementLeaderRef, scope.flockMembershipType, secondMembership);
+            var slots = NativeFormationSlots.get();
+            var chevron = slots.resolveGroup(null, fixture.followerRef, fixture.leaderRef,
+                    "Flight", "CHEVRON", 4, fixture.store);
+            var loose = slots.resolveGroup(null, fixture.replacementLeaderRef, fixture.leaderRef,
+                    "Flight", "LOOSE", 6, fixture.store);
+
+            assertEquals(0, slots.claim(fixture.followerRef, chevron, firstId, 0, 10000));
+            assertEquals(1, slots.claim(fixture.replacementLeaderRef, loose, secondId, 0, 10000));
+            slots.report(fixture.followerRef, chevron, firstId,
+                    new Vector3d(-10, 0, 0), new Vector3d(10, 0, 0), 4, 10000);
+            slots.report(fixture.replacementLeaderRef, loose, secondId,
+                    new Vector3d(10, 0, 0), new Vector3d(-10, 0, 0), 6, 10000);
+            assertEquals(0, slots.claim(fixture.followerRef, chevron, firstId, 0, 10001));
+            assertEquals(1, slots.claim(fixture.replacementLeaderRef, loose, secondId, 0, 10001));
+        }
+    }
+
     @Test
     void groundFollowerMatchesSlowLeaderInsteadOfNormalizingToFullSpeed() throws Exception {
         try (HytaleModuleScope ignored = HytaleModuleScope.install();

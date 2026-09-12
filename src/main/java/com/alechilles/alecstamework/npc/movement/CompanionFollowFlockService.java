@@ -8,6 +8,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.GameMode;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.group.EntityGroup;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -20,6 +21,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import javax.annotation.Nullable;
+import org.joml.Vector3d;
 
 /** Runtime-only follow intents. Native flocks remain the membership authority.
  * All access is on the owning world thread; values contain IDs, never live refs/components.
@@ -34,17 +36,21 @@ public final class CompanionFollowFlockService {
     /** Called by the follow sensor. Structural writes are deferred out of sensor evaluation. */
     @Nullable
     public Slot request(Ref<EntityStore> self, Ref<EntityStore> master, int targetSlot,
-                        boolean flying, double clearance, Store<EntityStore> store) {
+                        boolean flying, double clearance, double range, double altitude, Store<EntityStore> store) {
         UUIDComponent identity = store.getComponent(self, UUIDComponent.getComponentType());
         UUIDComponent masterIdentity = store.getComponent(master, UUIDComponent.getComponentType());
         if (identity == null || masterIdentity == null
                 || !eligible(self, master, targetSlot, store)) return null;
+        var selfTransform = store.getComponent(self, TransformComponent.getComponentType());
+        var ownerTransform = store.getComponent(master, TransformComponent.getComponentType());
+        if (selfTransform == null || ownerTransform == null) return null;
         State state = states.get(store);
         UUID id = identity.getUuid();
         UUID ownerId = masterIdentity.getUuid();
         Member member = state.members.get(id);
         if (member == null) {
             member = new Member(ownerId, targetSlot, flying);
+            member.group = state.groups.computeIfAbsent(new GroupKey(ownerId, flying), ignored -> new FollowGroup());
             state.members.put(id, member);
             queue(store, state);
         }
@@ -55,20 +61,27 @@ public final class CompanionFollowFlockService {
         }
         member.lastSeen = System.currentTimeMillis();
         member.clearance = clearance;
+        member.range = range;
+        member.position.set(selfTransform.getPosition());
+        int index = member.group.assignments.claim(id, 0, member.lastSeen);
         Ref<EntityStore> flockRef = flockOf(self, store);
         EntityGroup group = flockRef == null ? null : store.getComponent(flockRef, EntityGroup.getComponentType());
-        if (member.slot < 0 || group == null || !master.equals(group.getLeaderRef())
+        if (!member.group.ready || index > member.group.maxSlot || group == null || !master.equals(group.getLeaderRef())
                 || !group.isMember(self) || !sameFlock(flockRef, member.flockId, store)) {
             queue(store, state);
             return null;
         }
-        double spacing = clearance;
-        for (Member other : state.members.values()) {
-            if (other.ownerId.equals(ownerId) && other.flying == flying && other.slot >= 0) {
-                spacing = Math.max(spacing, other.clearance);
-            }
-        }
-        return new Slot(member.slot, spacing);
+        FollowGroup follow = member.group;
+        follow.formation.target(ownerTransform.getPosition(), index, follow.target);
+        double height = flying ? ownerTransform.getPosition().y + altitude + (index % 3) * 1.5 : 0;
+        follow.target.y = height;
+        follow.position.set(member.position);
+        if (!flying) follow.position.y = 0;
+        follow.assignments.report(id, follow.position, follow.target, follow.spacing, member.lastSeen);
+        // A swap is consumed on the next sensor update; no slot can have two owners.
+        follow.assignments.rebalance(member.lastSeen);
+        return new Slot(index, follow.spacing, follow.target.x, follow.target.z);
+
     }
 
     /** Only visits active follow intents, twice per second; idle worlds do no entity scan. */
@@ -120,25 +133,42 @@ public final class CompanionFollowFlockService {
                 // join handles leaving the former herd and defers rejoining when needed.
                 FlockMembershipSystems.join(self, flockRef, store);
             }
-            if (!flockId.equals(member.flockId)) member.slot = -1;
             member.flockId = flockId;
-            if (member.slot < 0) member.slot = availableSlot(state, member);
+
         }
+        refreshGroups(state);
     }
 
-    private static int availableSlot(State state, Member member) {
-        int slot = 0;
-        while (true) {
-            boolean used = false;
-            for (Member other : state.members.values()) {
-                if (other != member && other.flying == member.flying
-                        && other.ownerId.equals(member.ownerId) && other.slot == slot) {
-                    used = true;
-                    break;
-                }
+    /** Refresh group geometry from active intent snapshots, never by scanning world entities. */
+    private static void refreshGroups(State state) {
+        for (FollowGroup group : state.groups.values()) {
+            group.count = 0;
+            group.maxSlot = -1;
+            group.spacing = 0;
+            group.range = Double.MAX_VALUE;
+            group.centroid.zero();
+        }
+        for (var entry : state.members.entrySet()) {
+            Member member = entry.getValue();
+            FollowGroup group = member.group;
+            int slot = group.assignments.slot(entry.getKey());
+            if (slot < 0) continue;
+            group.count++;
+            group.maxSlot = Math.max(group.maxSlot, slot);
+            group.spacing = Math.max(group.spacing, member.clearance);
+            group.range = Math.min(group.range, member.range);
+            group.centroid.add(member.position);
+        }
+        var iterator = state.groups.values().iterator();
+        while (iterator.hasNext()) {
+            FollowGroup group = iterator.next();
+            if (group.count == 0) {
+                iterator.remove();
+                continue;
             }
-            if (!used) return slot;
-            slot++;
+            group.centroid.div(group.count);
+            group.formation.configure(group.centroid, group.maxSlot + 1, group.spacing, group.range);
+            group.ready = true;
         }
     }
 
@@ -190,10 +220,26 @@ public final class CompanionFollowFlockService {
 
     private static boolean valid(Ref<EntityStore> ref) { return ref != null && ref.isValid(); }
 
-    public record Slot(int index, double spacing) { }
+    public record Slot(int index, double spacing, double x, double z) { }
+
+    private record GroupKey(UUID owner, boolean flying) { }
+
+    private static final class FollowGroup {
+        final FormationSlotAssignments assignments = new FormationSlotAssignments();
+        final CompanionFollowFormation formation = new CompanionFollowFormation();
+        final Vector3d centroid = new Vector3d();
+        final Vector3d target = new Vector3d();
+        final Vector3d position = new Vector3d();
+        int count;
+        int maxSlot;
+        double spacing;
+        double range;
+        boolean ready;
+    }
 
     private static final class State {
         final Map<UUID, Member> members = new HashMap<>();
+        final Map<GroupKey, FollowGroup> groups = new HashMap<>();
         boolean queued;
         float elapsed;
     }
@@ -203,7 +249,9 @@ public final class CompanionFollowFlockService {
         final int targetSlot;
         final boolean flying;
         UUID flockId;
-        int slot = -1;
+        FollowGroup group;
+        final Vector3d position = new Vector3d();
+        double range;
         double clearance;
         long lastSeen;
         Member(UUID ownerId, int targetSlot, boolean flying) {

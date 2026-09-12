@@ -1,78 +1,71 @@
 package com.alechilles.alecstamework.npc.movement;
 
-import javax.annotation.Nonnull;
 import org.joml.Vector3d;
 
-/**
- * Spaced positions around a following player's resting area, independent of facing or travel heading.
- * The caller owns this short-lived, entity-free state. Small player movements leave targets at rest.
- */
+/** Pure shared group geometry. The player is a destination, never a slot or an orientation. */
 public final class CompanionFollowFormation {
-    private static final double TELEPORT_DISTANCE = 32.0;
-    private final Vector3d anchor = new Vector3d();
-    private final Vector3d lastLeaderPosition = new Vector3d();
+    private final Vector3d center = new Vector3d();
+    private double[] offsetX = new double[0];
+    private double[] offsetZ = new double[0];
+    private int count;
+    private double spacing;
+    private double range;
+    private double stoppingDistance;
     private boolean initialized;
 
-    /** Clears the resting area before the helper is reused for another player. */
-    public void reset() {
-        initialized = false;
-        anchor.zero();
-        lastLeaderPosition.zero();
-    }
-
-    /**
-     * Computes a stable position around the player. The anchor follows only after the player
-     * leaves a half-spacing horizontal dead zone, and moves only far enough to keep up.
-     *
-     * @param leaderPosition current player position
-     * @param leaderYaw retained for caller compatibility; facing never affects follow positions
-     * @param slot stable zero-based follower slot assigned by the caller
-     * @param spacing minimum horizontal spacing between slots
-     * @param altitude desired absolute world Y coordinate
-     * @param dt elapsed seconds; retained for caller compatibility
-     * @param output vector receiving the target
-     * @return the target, or zero for invalid input
-     */
-    @Nonnull
-    public Vector3d update(@Nonnull Vector3d leaderPosition, float leaderYaw, int slot,
-                           double spacing, double altitude, double dt, @Nonnull Vector3d output) {
-        Vector3d result = output == null ? new Vector3d() : output;
-        if (leaderPosition == null || !isFinite(leaderPosition) || !Double.isFinite(spacing)
-                || spacing <= 0 || !Double.isFinite(altitude) || !Double.isFinite(dt) || dt < 0) {
-            reset();
-            return result.zero();
-        }
-        if (!initialized || lastLeaderPosition.distanceSquared(leaderPosition)
-                > TELEPORT_DISTANCE * TELEPORT_DISTANCE) {
-            anchor.set(leaderPosition);
+    /** Membership/size refresh at the service's half-second cadence. */
+    public void configure(Vector3d groupPosition, int slotCount, double requestedSpacing, double recoveryRange) {
+        if (!initialized) {
+            center.set(groupPosition.x, 0, groupPosition.z);
             initialized = true;
         }
-        lastLeaderPosition.set(leaderPosition);
-        double dx = leaderPosition.x - anchor.x;
-        double dz = leaderPosition.z - anchor.z;
-        double distance = Math.hypot(dx, dz);
-        double slack = spacing * 0.5;
-        if (distance > slack) {
-            double fraction = (distance - slack) / distance;
-            anchor.x += dx * fraction;
-            anchor.z += dz * fraction;
+        int size = Math.max(1, slotCount);
+        if (size == count && requestedSpacing == spacing && recoveryRange == range) return;
+        count = size;
+        spacing = requestedSpacing;
+        range = recoveryRange;
+        if (offsetX.length < count) {
+            offsetX = new double[count];
+            offsetZ = new double[count];
         }
-
-        // Six places in the first ring, twelve in the second, and so on. Ring radii
-        // differ by one spacing, keeping separate slots apart without heading-based rotation.
-        int ring = 1;
-        long index = Math.max(0, slot);
-        while (index >= 6L * ring) {
-            index -= 6L * ring;
-            ring++;
+        int columns = (int) Math.ceil(Math.sqrt(count));
+        double meanX = 0, meanZ = 0;
+        for (int i = 0; i < count; i++) {
+            int row = i / columns;
+            offsetX[i] = (i % columns + (row % 2) * 0.5) * spacing;
+            offsetZ[i] = row * spacing * Math.sqrt(3) / 2;
+            meanX += offsetX[i];
+            meanZ += offsetZ[i];
         }
-        double angle = 2 * Math.PI * index / (6L * ring);
-        double radius = spacing * ring;
-        return result.set(anchor.x + Math.cos(angle) * radius, altitude,
-                anchor.z + Math.sin(angle) * radius);
+        meanX /= count;
+        meanZ /= count;
+        double radius = 0;
+        for (int i = 0; i < count; i++) {
+            offsetX[i] -= meanX;
+            offsetZ[i] -= meanZ;
+            radius = Math.max(radius, Math.hypot(offsetX[i], offsetZ[i]));
+        }
+        // Keep the whole group inside its normal follow recovery envelope. Huge groups
+        // may compress, as they did in the prototype; normal groups retain full spacing.
+        double scale = radius > range * 0.3 ? range * 0.3 / radius : 1;
+        for (int i = 0; i < count; i++) {
+            offsetX[i] *= scale;
+            offsetZ[i] *= scale;
+        }
+        stoppingDistance = Math.min(radius * scale + spacing * 1.25, range * 0.55);
     }
 
-    private static boolean isFinite(Vector3d vector) {
-        return Double.isFinite(vector.x) && Double.isFinite(vector.y) && Double.isFinite(vector.z);
+    /** Translates all slots equally toward the player only when the group is too far away. */
+    public Vector3d target(Vector3d player, int slot, Vector3d output) {
+        if (!initialized || slot < 0 || slot >= count) return output.set(player);
+        double dx = player.x - center.x;
+        double dz = player.z - center.z;
+        double distance = Math.hypot(dx, dz);
+        if (distance > stoppingDistance) {
+            double fraction = (distance - stoppingDistance) / distance;
+            center.x += dx * fraction;
+            center.z += dz * fraction;
+        }
+        return output.set(center.x + offsetX[slot], 0, center.z + offsetZ[slot]);
     }
 }

@@ -58,3 +58,11 @@ and `SlotTolerance: 2.5` for relaxed ground herds. Followers filter leader
 velocity with a 1.5-second response time before using it for slot orientation
 and forward movement. Brief dodges have less influence than sustained turns.
 This filtering applies only to ground formation.
+
+
+## Flexible slots
+
+Active herd followers can exchange slots when doing so materially reduces travel.
+Assignments have a cooldown and comparisons run at a bounded half-second cadence.
+The herd's shape and leader movement are unchanged. See
+[flexible slot assignment](Companion-Follow-Formation.md#flexible-slot-assignment).

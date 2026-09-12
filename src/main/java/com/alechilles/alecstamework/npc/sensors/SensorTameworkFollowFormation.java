@@ -3,7 +3,6 @@ package com.alechilles.alecstamework.npc.sensors;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.movement.CompanionFollowFlockService;
-import com.alechilles.alecstamework.npc.movement.CompanionFollowFormation;
 import com.alechilles.alecstamework.npc.sensorinfo.TameworkTargetPositionInfo;
 import com.alechilles.alecstamework.npc.sensorinfo.TameworkTargetPositionInfoProvider;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkFollowFormation;
@@ -29,7 +28,6 @@ public final class SensorTameworkFollowFormation extends TameworkSensorBase {
     private final double range;
     private final double spacing;
     private final double altitude;
-    private final CompanionFollowFormation formation = new CompanionFollowFormation();
     private final TameworkTargetPositionInfo position = new TameworkTargetPositionInfo();
     private final InfoProvider info = new TameworkTargetPositionInfoProvider(null, position);
     private final Vector3d target = new Vector3d();
@@ -70,22 +68,15 @@ public final class SensorTameworkFollowFormation extends TameworkSensorBase {
             var box = bounds.getBoundingBox();
             clearance = Math.max(clearance, Math.max(box.width(), box.depth()) * 2 + 2);
         }
-        var slot = CompanionFollowFlockService.get().request(self, master, targetSlot, flying, clearance, store);
+        var slot = CompanionFollowFlockService.get().request(self, master, targetSlot, flying, clearance, range, altitude, store);
         if (slot == null || selfTransform.getPosition().distanceSquared(masterTransform.getPosition()) > range * range) return false;
         if (!identity.getUuid().equals(masterId)) {
             masterId = identity.getUuid();
-            formation.reset();
             probeRemaining = 0;
         }
         double height = flying ? altitude + (slot.index() % 3) * 1.5 : 0;
-        formation.update(masterTransform.getPosition(), masterTransform.getRotation().yaw(), slot.index(),
-                slot.spacing(), masterTransform.getPosition().y + height, dt, target);
-        // Large groups must not choose a position beyond their own teleport/catch-up envelope.
-        probeDirection.set(target).sub(masterTransform.getPosition());
-        double offsetLength = probeDirection.length();
-        if (offsetLength > range * 0.65) {
-            target.set(masterTransform.getPosition()).add(probeDirection.mul(range * 0.65 / offsetLength));
-        }
+        target.set(slot.x(), flying ? masterTransform.getPosition().y + height
+                : selfTransform.getPosition().y, slot.z());
         if (controller instanceof MotionControllerWalk walk) {
             probeRemaining -= dt;
             if (probeRemaining <= 0) {

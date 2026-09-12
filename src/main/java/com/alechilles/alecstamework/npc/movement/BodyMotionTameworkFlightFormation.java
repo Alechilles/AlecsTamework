@@ -5,6 +5,7 @@ import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.group.EntityGroup;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.physics.util.PhysicsMath;
@@ -19,6 +20,7 @@ import com.hypixel.hytale.server.npc.movement.controllers.ProbeMoveData;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.List;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
@@ -48,6 +50,8 @@ public final class BodyMotionTameworkFlightFormation extends TameworkBodyMotionB
     @Nullable
     private Ref<EntityStore> trackedLeaderRef;
     @Nullable
+    private NativeFormationSlots.GroupKey formationSlotGroup;
+    @Nullable
     private Ref<EntityStore> obstacleProbeRef;
     @Nullable
     private MotionControllerFly obstacleProbeController;
@@ -55,6 +59,7 @@ public final class BodyMotionTameworkFlightFormation extends TameworkBodyMotionB
     private ComponentAccessor<EntityStore> obstacleProbeAccessor;
     private boolean hasLeaderPosition;
     private boolean hasFormationOffset;
+    private int lastFormationSlot = -1;
     private double looseDriftSeconds;
 
     BodyMotionTameworkFlightFormation(@Nonnull BuilderBodyMotionTameworkFlightFormation builder,
@@ -121,10 +126,36 @@ public final class BodyMotionTameworkFlightFormation extends TameworkBodyMotionB
         }
         sampleLeaderMotion(leaderTransform, dt);
         looseDriftSeconds += Math.max(0.0, dt);
-        int followerIndex = resolveFollowerIndex(group, ref, leaderRef);
+        int followerIndex = 0;
+        long nowMillis = System.currentTimeMillis();
+        UUIDComponent identity = componentAccessor.getComponent(ref, UUIDComponent.getComponentType());
+        UUID memberId = identity == null ? null : identity.getUuid();
+        NativeFormationSlots.GroupKey slotGroup = NativeFormationSlots.get().resolveGroup(
+                formationSlotGroup, ref, leaderRef, "Flight", formation.name(), spacing, componentAccessor);
+        if (slotGroup != null && memberId != null) {
+            int assignedSlot = NativeFormationSlots.get().claim(
+                    ref, slotGroup, memberId, followerIndex, nowMillis);
+            if (assignedSlot != lastFormationSlot) {
+                hasFormationOffset = false;
+            }
+            formationSlotGroup = slotGroup;
+            lastFormationSlot = assignedSlot;
+            followerIndex = assignedSlot;
+        } else {
+            followerIndex = resolveFollowerIndex(group, ref, leaderRef);
+            formationSlotGroup = null;
+            if (lastFormationSlot >= 0) {
+                hasFormationOffset = false;
+            }
+            lastFormationSlot = -1;
+        }
         FlightFormationSteering.resolveTarget(
                 formation, followerIndex, spacing, looseDriftSeconds,
                 leaderTransform.getPosition(), leaderHeading, targetPosition);
+        if (formationSlotGroup != null && memberId != null) {
+            NativeFormationSlots.get().report(ref, formationSlotGroup, memberId,
+                    selfTransform.getPosition(), targetPosition, spacing, nowMillis);
+        }
         targetPosition.sub(leaderTransform.getPosition());
         slotVelocity.set(leaderVelocity);
         if (!hasFormationOffset) {
@@ -283,8 +314,10 @@ public final class BodyMotionTameworkFlightFormation extends TameworkBodyMotionB
 
     private void resetLeaderTracking() {
         trackedLeaderRef = null;
+        formationSlotGroup = null;
         hasLeaderPosition = false;
         hasFormationOffset = false;
+        lastFormationSlot = -1;
         formationOffset.zero();
         previousFormationOffset.zero();
         slotVelocity.zero();
