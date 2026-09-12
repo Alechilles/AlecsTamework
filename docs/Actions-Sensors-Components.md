@@ -44,6 +44,12 @@ that landing while `Tw_Kettle_Duration` is running, while retaining threat and
 recovery priority.
 
 Leaders and lone birds start episodes; native flock beacons invite followers.
+`TameworkSetLeashToTargetHome` copies an NPC sensor target's home leash point,
+heading, and pitch to the acting NPC. Use an entity-producing sensor such as
+`FlockLeader`. For target-based `TameworkFlyingOrbit` movement,
+`UseTargetLeashPoint: true` anchors movement to that target NPC's home point
+instead of its live position; it defaults to `false`.
+
 `TameworkFlyingOrbit` with `Mode: "Kettle"` circles the leader's home point
 (the bird's own home when alone). Each member keeps a deterministic orbit: its
 radius ranges from roughly 65% to 150% of `KettleRadius`, its altitude lane

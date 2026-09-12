@@ -53,6 +53,7 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
     private final double climbRelativeSpeed;
     private final double sinkRelativeSpeed;
     private final boolean avoidObstacles;
+    private final boolean useTargetLeashPoint;
     private final FlyingObstacleAvoidance obstacleAvoidance = new FlyingObstacleAvoidance();
     private final ProbeMoveData obstacleProbeData = new ProbeMoveData();
     private final Vector3d targetPosition = new Vector3d();
@@ -112,6 +113,7 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
         climbRelativeSpeed = builder.getClimbRelativeSpeed(support);
         sinkRelativeSpeed = builder.getSinkRelativeSpeed(support);
         avoidObstacles = builder.isAvoidObstacles(support);
+        useTargetLeashPoint = builder.usesTargetLeashPoint(support);
         beginOrbit();
     }
 
@@ -150,7 +152,7 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
         boolean kettling = mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.KETTLE;
         if (!(active instanceof MotionControllerFly fly)
                 || (kettling ? !resolveKettleCenter(ref, componentAccessor)
-                : sensorInfo == null || !sensorInfo.getPositionProvider().providePosition(targetPosition))) {
+                : !resolveTargetPosition(sensorInfo, componentAccessor))) {
             clearKettleAnimation(ref, componentAccessor);
             returningToWanderTarget = updateWanderReturnState(
                     returningToWanderTarget, false, 0.0,
@@ -761,6 +763,36 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
         targetPosition.set(anchor.getLeashPoint());
         return Double.isFinite(targetPosition.x) && Double.isFinite(targetPosition.y)
                 && Double.isFinite(targetPosition.z);
+    }
+
+    /** Resolves either the live sensor target position or the target NPC's persistent home point. */
+    private boolean resolveTargetPosition(@Nullable InfoProvider sensorInfo,
+                                          @Nonnull ComponentAccessor<EntityStore> accessor) {
+        if (sensorInfo == null || !sensorInfo.hasPosition() || sensorInfo.getPositionProvider() == null) {
+            return false;
+        }
+        if (!useTargetLeashPoint) {
+            return sensorInfo.getPositionProvider().providePosition(targetPosition);
+        }
+        Ref<EntityStore> targetRef = sensorInfo.getPositionProvider().getTarget();
+        if (targetRef == null || !targetRef.isValid()) {
+            return false;
+        }
+        NPCEntity targetNpc = accessor.getComponent(targetRef, NPCEntity.getComponentType());
+        return copyTargetLeashPoint(targetNpc, targetPosition);
+    }
+
+    static boolean copyTargetLeashPoint(@Nullable NPCEntity targetNpc, @Nonnull Vector3d output) {
+        if (targetNpc == null) {
+            return false;
+        }
+        Vector3d leashPoint = targetNpc.getLeashPoint();
+        if (leashPoint == null || !Double.isFinite(leashPoint.x) || !Double.isFinite(leashPoint.y)
+                || !Double.isFinite(leashPoint.z)) {
+            return false;
+        }
+        output.set(leashPoint);
+        return true;
     }
 
     static Vector3d resolveOrbitTranslation(double selfX,

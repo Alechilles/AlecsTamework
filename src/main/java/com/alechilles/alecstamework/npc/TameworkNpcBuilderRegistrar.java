@@ -22,6 +22,7 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkNeedsResour
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkNeedsResourceReleaseTarget;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkRejectPositionTarget;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetFlyingCompanionMode;
+import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetLeashToTargetHome;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetOwner;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkAttackedTargetSlotRecently;
@@ -155,6 +156,10 @@ public final class TameworkNpcBuilderRegistrar {
             actionFactory.add(
                     BuilderActionTameworkSetFlyingCompanionMode.BUILDER_ID,
                     BuilderActionTameworkSetFlyingCompanionMode::new
+            );
+            actionFactory.add(
+                    BuilderActionTameworkSetLeashToTargetHome.BUILDER_ID,
+                    BuilderActionTameworkSetLeashToTargetHome::new
             );
             actionFactory.add(BuilderActionTameworkSetTamed.BUILDER_ID, BuilderActionTameworkSetTamed::new);
             actionFactory.add(BuilderActionTameworkSetOwner.BUILDER_ID, BuilderActionTameworkSetOwner::new);

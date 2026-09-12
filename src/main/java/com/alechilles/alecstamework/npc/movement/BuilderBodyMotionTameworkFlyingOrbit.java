@@ -37,6 +37,7 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
     private final DoubleHolder climbRelativeSpeed = new DoubleHolder();
     private final DoubleHolder sinkRelativeSpeed = new DoubleHolder();
     private final BooleanHolder avoidObstacles = new BooleanHolder();
+    private final BooleanHolder useTargetLeashPoint = new BooleanHolder();
 
     @Nonnull
     @Override
@@ -96,6 +97,9 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
         getBoolean(data, "AvoidObstacles", avoidObstacles, true,
                 BuilderDescriptorState.WorkInProgress,
                 "Whether autonomous flight probes blocks and steers around obstructions.", null);
+        getBoolean(data, "UseTargetLeashPoint", useTargetLeashPoint, false,
+                BuilderDescriptorState.WorkInProgress,
+                "Whether target-relative steering uses the target NPC's home leash point instead of its live position.", null);
         return this;
     }
 
@@ -197,6 +201,10 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
 
     boolean isAvoidObstacles(BuilderSupport support) {
         return avoidObstacles.get(support.getExecutionContext());
+    }
+
+    boolean usesTargetLeashPoint(BuilderSupport support) {
+        return useTargetLeashPoint.get(support.getExecutionContext());
     }
 
     enum Mode implements Supplier<String> {
