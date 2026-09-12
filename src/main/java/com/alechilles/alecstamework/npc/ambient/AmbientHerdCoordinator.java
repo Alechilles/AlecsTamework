@@ -356,8 +356,14 @@ public final class AmbientHerdCoordinator implements AutoCloseable {
         if (record != null) {
             record.lastObservedAt = now;
         }
-        if (!refreshRoster(store, activity)) {
+        String rosterFailure = rosterFailure(store, activity);
+        if (rosterFailure != null) {
             cancelActivity(store, world, activity.id, Exit.MEMBER_CHANGED, now);
+            if (record != null) record.lastOutcome += ": " + rosterFailure;
+            var plugin = com.alechilles.alecstamework.Tamework.getInstance();
+            if (plugin != null) plugin.getLogger().at(java.util.logging.Level.INFO).log(
+                    "Ambient herd cancelled: leader=%s phase=%s reason=%s",
+                    activity.leaderId, activity.phase, rosterFailure);
             return;
         }
         Ref<EntityStore> leaderRef = flock.leaderRef();
@@ -751,8 +757,8 @@ public final class AmbientHerdCoordinator implements AutoCloseable {
         return List.copyOf(roster);
     }
 
-    private static boolean refreshRoster(Store<EntityStore> store, Activity activity) {
-        int valid = 0;
+    @Nullable
+    private static String rosterFailure(Store<EntityStore> store, Activity activity) {
         for (UUID member : activity.roster) {
             Ref<EntityStore> ref = resolveRef(store, member);
             NPCEntity npc =
@@ -761,16 +767,20 @@ public final class AmbientHerdCoordinator implements AutoCloseable {
                     ref == null
                             ? null
                             : store.getComponent(ref, FlockMembership.getComponentType());
-            if (ref != null
-                    && npc != null
-                    && allowsAmbientRole(npc)
-                    && nativeStateAllowsAmbient(store, ref)
-                    && !TamedStateResolver.isTamed(ref, store)
-                    && point(store, ref) != null
-                    && membership != null
-                    && activity.flockId.equals(membership.getFlockId())) valid++;
+            String reason = null;
+            if (ref == null) reason = "entity unloaded";
+            else if (npc == null) reason = "NPC component missing";
+            else if (!allowsAmbientRole(npc)) reason = "role no longer eligible: " + npc.getRoleName();
+            else if (!nativeStateAllowsAmbient(store, ref)) {
+                StateSupport state = store.getComponent(ref, StateSupport.getComponentType());
+                reason = "native state=" + (state == null ? "<missing>" : state.getStateName());
+            } else if (TamedStateResolver.isTamed(ref, store)) reason = "animal became tamed";
+            else if (point(store, ref) == null) reason = "position missing";
+            else if (membership == null) reason = "flock membership missing";
+            else if (!activity.flockId.equals(membership.getFlockId())) reason = "flock changed";
+            if (reason != null) return "member=" + member + " " + reason;
         }
-        return valid == activity.roster.size() && valid >= 2;
+        return activity.roster.size() >= 2 ? null : "fewer than two participants";
     }
 
     private static boolean nativeStateAllowsAmbient(
