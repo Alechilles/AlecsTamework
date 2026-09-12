@@ -13,6 +13,18 @@ class BodyMotionTameworkFlyingOrbitTest {
     private static final double EPSILON = 1.0E-9;
 
     @Test
+    void kettleMembersCircleInOppositeDirectionsWithoutChangingSpeed() {
+        Vector3d first = BodyMotionTameworkFlyingOrbit.resolveOrbitTranslation(
+                18, 0, 0, 0, 18, 4, KettleFlightState.direction(0), 0.8, new Vector3d());
+        Vector3d second = BodyMotionTameworkFlyingOrbit.resolveOrbitTranslation(
+                18, 0, 0, 0, 18, 4, KettleFlightState.direction(1), 0.8, new Vector3d());
+
+        assertTrue(first.z * second.z < 0, "Kettle participants should circle in both directions");
+        assertEquals(0.8, first.length(), EPSILON);
+        assertEquals(0.8, second.length(), EPSILON);
+    }
+
+    @Test
     void orbitAtPreferredRadiusMovesTangentiallyAtConfiguredSpeed() {
         Vector3d result = BodyMotionTameworkFlyingOrbit.resolveOrbitTranslation(
                 20.0, 0.0, 0.0, 0.0, 20.0, 4.0, 1, 0.36, new Vector3d());

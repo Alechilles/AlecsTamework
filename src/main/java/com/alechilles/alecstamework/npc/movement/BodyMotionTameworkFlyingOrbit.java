@@ -251,7 +251,7 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
                 resolveOrbitTranslation(
                         selfPosition.x(), selfPosition.z(), targetPosition.x(), targetPosition.z(),
                         kettling ? KettleFlightState.radius(kettleMemberIndex, orbitRadius) : orbitRadius,
-                        orbitRadiusTolerance, kettling ? 1 : orbitDirection,
+                        orbitRadiusTolerance, kettling ? KettleFlightState.direction(kettleMemberIndex) : orbitDirection,
                         kettling ? KettleFlightState.relativeSpeed(kettleMemberIndex, relativeSpeed) : relativeSpeed,
                         translation);
             } else {

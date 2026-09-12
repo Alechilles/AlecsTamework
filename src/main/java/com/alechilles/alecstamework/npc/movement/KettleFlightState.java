@@ -35,6 +35,10 @@ final class KettleFlightState {
                 MIN_ALTITUDE_FRACTION, MAX_ALTITUDE_FRACTION, memberFraction(memberIndex, 0.17));
     }
 
+    static int direction(int memberIndex) {
+        return (memberIndex & 1) == 0 ? 1 : -1;
+    }
+
     static double radius(int memberIndex, double baseRadius) {
         return Math.max(1.0, baseRadius * interpolate(
                 MIN_RADIUS_MULTIPLIER, MAX_RADIUS_MULTIPLIER, memberFraction(memberIndex, 0.43)));
