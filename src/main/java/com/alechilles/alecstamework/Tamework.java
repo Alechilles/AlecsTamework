@@ -616,6 +616,7 @@ public class Tamework extends JavaPlugin {
         feedTroughWaterChargesComponentType = components.feedTroughWaterCharges();
 
         spawnMarkerEntityType = TameworkCompanionRuntimeParticipants.add(this, runtimeParticipants);
+        TameworkAmbientHerdRuntimeParticipants.add(this, runtimeParticipants);
         deferPersistenceIndependentRuntimeParticipants();
 
         runtimeServiceInitializer = () -> {
@@ -1588,6 +1589,7 @@ public class Tamework extends JavaPlugin {
     }
     @Override
     protected void shutdown() {
+        TameworkAmbientHerdRuntimeParticipants.closeInstalled();
         TameworkShutdownSequence.run(
                 this::closeRuntimeParticipants,
                 this::closeRuntimeApiDependents,

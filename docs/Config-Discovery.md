@@ -186,3 +186,11 @@ capability availability are separate integration checks.
 
 ## Player-facing text
 Player-facing string fields such as talent names/descriptions/branches, trait display names, command labels/messages, interaction messages, and happiness labels may be raw text or `server.lang` keys. Prefer language keys for built-in packs and public integrations so translations can be provided under `Server/Languages/*/server.lang` without editing behavior assets.
+
+### Ambient wild herds
+
+`TwGlobalConfig.AmbientHerds` uses the single highest-priority effective global,
+with normal nested-field inheritance and explicit role-list replacement.
+It does not combine opt-ins across global assets like `AssetSets`.
+See the [global reference](../wiki/Modder-Documentation/Config-Reference/TwGlobalConfig-Reference.md)
+for the role opt-in and restart contract.
