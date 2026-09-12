@@ -47,33 +47,6 @@ Population caps, ownership requirements/protection, revive enablement, claim-int
 ```
 
 ## Section Reference
-### `AmbientHerds`
-
-Opts wild roles into short group journeys to natural water. This section defaults
-to disabled and uses the single winning global config.
-
-```json
-"AmbientHerds": {
-  "Enabled": true,
-  "RoleIds": ["Bison", "Bison_Calf"]
-}
-```
-
-- `Enabled`: permits journeys for eligible native flocks.
-- `RoleIds`: eligible wild role IDs. An explicit list replaces the parent list.
-- Omitted sections and nested fields inherit normally.
-- The role must also use the ambient instruction component and enable participation.
-  Only adult leaders should receive `CanLead: true`.
-- A higher-priority global must inherit the participating pack's global config
-  or explicitly opt in; losing global assets do not enable this feature.
-- Restart after enabling the runtime module. While installed, an effective
-  disable or role removal stops new journeys and cancels affected activity.
-  Global assets refresh through the normal asset load/remove flow.
-
-Journeys use loaded terrain only, share limited search/path work, and return to
-ordinary behavior when a suitable bank or route cannot be found. They do not
-spawn wildlife or simulate migration through unloaded areas.
-
 ### `General`
 - `Enabled`: disables the asset entirely when `false`.
 - `Priority`: used to select the active global config.

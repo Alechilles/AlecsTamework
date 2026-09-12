@@ -31,12 +31,6 @@ public final class TameworkRuntimeActivationEvidenceSource {
     /** Collects current effective assets without starting runtime work. */
     public static List<TameworkEffectiveAssetFact> collect() {
         List<TameworkEffectiveAssetFact> facts = new ArrayList<>();
-        TwGlobalConfig global = TwGlobalConfig.resolveActive();
-        facts.add(TameworkAssetActivationEvidenceAdapter.roleConfigs(
-                TameworkRuntimeModule.AMBIENT_HERDS, "Tamework/Global/AmbientHerds",
-                List.of(global), TwGlobalConfig::isAmbientHerdsEnabled,
-                TwGlobalConfig::getAmbientHerdRoleIds,
-                TameworkRuntimeActivationEvidenceSource::roleExists));
         addEnabledFact(facts, TameworkRuntimeModule.NPC_LOAD_BOOTSTRAP,
                 "Model/RandomAttachmentSets", ModelAsset.getAssetMap(), ignored -> true,
                 model -> model.getRandomAttachmentSets() != null && !model.getRandomAttachmentSets().isEmpty());

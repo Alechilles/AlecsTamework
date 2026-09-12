@@ -23,14 +23,6 @@ class TameworkRuntimeActivationPlannerTest {
     }
 
     @Test
-    void ambientWildHerdsDoNotActivateCompanionPersistenceOrNeeds() {
-        var plan = new TameworkRuntimeActivationPlanner(TameworkRuntimeModuleCatalog.standard())
-                .plan(TameworkActivationEvidence.builder()
-                        .content(TameworkRuntimeModule.AMBIENT_HERDS, "wild-herd-roles").build());
-        assertEquals(Set.of(TameworkRuntimeModule.AMBIENT_HERDS), plan.activeModules());
-    }
-
-    @Test
     void emptyEvidenceLeavesEveryStandardModuleDormant() {
         TameworkRuntimeModuleCatalog catalog = TameworkRuntimeModuleCatalog.standard();
         TameworkRuntimeActivationPlan plan = new TameworkRuntimeActivationPlanner(catalog)

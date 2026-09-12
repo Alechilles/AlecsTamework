@@ -1,8 +1,6 @@
 package com.alechilles.alecstamework.npc;
 
 import java.util.logging.Level;
-import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkAmbientHerdCancel;
-import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkAmbientHerd;
 
 import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureOwner;
@@ -117,7 +115,6 @@ public final class TameworkNpcBuilderRegistrar {
             plugin.getLogger().at(Level.WARNING).log("Tamework NPC builder registration: Action factory missing.");
         } else {
             plugin.getLogger().at(Level.INFO).log("Tamework NPC builder registration: Action factory ready.");
-            actionFactory.add(BuilderActionTameworkAmbientHerdCancel.BUILDER_ID, BuilderActionTameworkAmbientHerdCancel::new);
             actionFactory.add(BuilderActionTameworkCaptureOwner.BUILDER_ID, BuilderActionTameworkCaptureOwner::new);
             actionFactory.add(BuilderActionTameworkCaptureStranger.BUILDER_ID, BuilderActionTameworkCaptureStranger::new);
             actionFactory.add(BuilderActionTameworkCaptureWild.BUILDER_ID, BuilderActionTameworkCaptureWild::new);
@@ -173,7 +170,6 @@ public final class TameworkNpcBuilderRegistrar {
             sensorFactory.add(BuilderSensorTameworkFlightFormationReady.BUILDER_ID,
                     BuilderSensorTameworkFlightFormationReady::new);
             sensorFactory.add(BuilderSensorTameworkLifeStage.BUILDER_ID, BuilderSensorTameworkLifeStage::new);
-            sensorFactory.add(BuilderSensorTameworkAmbientHerd.BUILDER_ID, BuilderSensorTameworkAmbientHerd::new);
             sensorFactory.add(BuilderSensorTameworkAlarm.BUILDER_ID, BuilderSensorTameworkAlarm::new);
             sensorFactory.add(BuilderSensorTameworkHook.BUILDER_ID, BuilderSensorTameworkHook::new);
             sensorFactory.add(BuilderSensorTameworkEffectActive.BUILDER_ID, BuilderSensorTameworkEffectActive::new);

@@ -40,21 +40,6 @@ Each module has one state:
 - `UNAVAILABLE`: Content or state requires the module, but a required
   capability or writable persistence authority is not ready.
 
-## Ambient wild herds
-
-`ambient-herds` uses the winning effective `TwGlobalConfig.AmbientHerds` policy
-and existing NPC roles as startup evidence. It has no needs, ownership, or
-persistence dependencies. Its passive sensor/action builders are always
-available; only an active module constructs the coordinator, tick system and
-world-removal listener.
-
-The coordinator advances a bounded registry of leaders offered by opted-in NPC
-sensors. Continuous movement and phase deadlines require ticks; discovery never
-queries every entity. Terrain and path work have shared per-world and process
-allowances, failed attempts back off, and world removal/plugin shutdown releases
-state. Numeric defaults are internal until live profiling establishes useful
-tuning ranges.
-
 ## Persistence boundary
 
 Generic and bonded persistence are separate authorities. Before either

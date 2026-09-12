@@ -65,12 +65,6 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
         }
 
         String roleId = CompanionRoleIdResolver.resolveRoleId(candidate.ref, store);
-        var ambient = com.alechilles.alecstamework.TameworkAmbientHerdRuntimeParticipants.current();
-        String ambientStatus = ambient == null ? "Ambient herd: runtime inactive"
-                : ambient.describe(store, candidate.ref);
-        commandContext.sender().sendMessage(Message.raw(ambientStatus));
-        var plugin = com.alechilles.alecstamework.Tamework.getInstance();
-        if (plugin != null) plugin.getLogger().at(java.util.logging.Level.INFO).log("%s", ambientStatus);
         String stage = CompanionLifeStageService.resolveCurrentStage(candidate.ref, store, roleId);
         StageGateSnapshot stageGate = resolveStageGate(candidate.ref, store, roleId, stage);
         String currentState = resolveStateName(candidate.ref, npc, store);
