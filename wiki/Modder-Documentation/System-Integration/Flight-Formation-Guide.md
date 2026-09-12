@@ -47,7 +47,7 @@ Followers also match 85% of their smoothed slot's movement relative to the leade
 
 The body motion `TameworkFlightFormation` accepts `Formation`, `Spacing`, `Tightness`, and `RelativeSpeed`. `RelativeSpeed` defaults to `0.8` and caps the additional position correction as a fraction of the follower's speed limit at its current pitch; total requested speed, including slot movement, is capped at that limit. It is not a speed multiplier for the leader. A follower cannot catch a leader that is already moving at the follower's maximum speed.
 
-Obstacle probes use Tamework's existing autonomous flight avoidance. Formation is a preferred position, not a guarantee of exact spacing around terrain. Keep normal landing and command behavior outside this instruction. AH uses it for wild cruising and tamed airborne idle; wild landing intent switches back to the existing descent and landing behavior.
+Obstacle probes use Tamework's existing autonomous flight avoidance. Formation is a preferred position, not a guarantee of exact spacing around terrain. Keep normal landing and command behavior outside this instruction. AH uses it for wild cruising and tamed airborne idle. Wild followers also retain formation slots while the leader descends; the existing touchdown landing instruction takes priority after the leader lands. This avoids switching the airborne group to shared-point catch-up during descent.
 
 ## Runtime and verification
 
