@@ -33,3 +33,15 @@ seconds before returning toward travel. Lack of physical progress also triggers
 recovery, even when terrain probes report a clear route. Large turns happen in
 place. This is local steering, not long-distance pathfinding around fences or
 mountains. No world scan, scheduler, or saved herd state is added.
+
+Leaders can optionally set `HomeRange` (blocks, default `0` disables it). When
+starting a journey at or beyond that horizontal distance from their native leash
+point, they choose a heading toward home. That heading remains fixed for the
+journey, with the same local obstacle recovery. Keep the leader's leash point
+anchored; resetting it after travel would move the home range. This uses one
+component read at journey start and introduces no new saved state or scans.
+Animal Husbandry starts inward journeys at 200 blocks and retains its native
+300-block return-home fallback. Herd rest uses short native wander steps so
+animals graze where they stopped instead of seeking their original leash point.
+Existing herds use their current leash as home; this does not recover an older
+spawn location or impose strict biome boundaries.

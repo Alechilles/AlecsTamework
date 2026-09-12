@@ -167,6 +167,20 @@ class FlightFormationEligibilityTest {
     }
 
     @Test
+    void homeRangeTurnsDistantJourneysInwardWithoutRestrictingNearbyTravel() {
+        Vector3d home = new Vector3d(1000, 50, 1000);
+        Vector3d heading = new Vector3d(1, 0, 0);
+        BodyMotionTameworkGroundFormation.biasHeadingTowardHome(new Vector3d(1100, 300, 1000), home, 200, heading);
+        assertEquals(new Vector3d(1, 0, 0), heading);
+        BodyMotionTameworkGroundFormation.biasHeadingTowardHome(new Vector3d(1200, 300, 1000), home, 200, heading);
+        assertEquals(new Vector3d(-1, 0, 0), heading);
+        assertEquals(new Vector3d(1000, 50, 1000), home, "Choosing a heading must never move the home anchor.");
+        heading.set(1, 0, 0);
+        BodyMotionTameworkGroundFormation.biasHeadingTowardHome(new Vector3d(1400, 50, 1000), home, 0, heading);
+        assertEquals(new Vector3d(1, 0, 0), heading, "Existing users without HomeRange keep unrestricted travel.");
+    }
+
+    @Test
     void groundFollowerToleratesSlotErrorAndLimitsLateralCorrection() {
         Vector3d output = new Vector3d();
         BodyMotionTameworkGroundFormation.resolveGroundTranslation(new Vector3d(), new Vector3d(1, 0, 0),

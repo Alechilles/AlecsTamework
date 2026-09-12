@@ -13,6 +13,7 @@ import com.hypixel.hytale.server.npc.movement.Steering;
 import com.hypixel.hytale.server.npc.movement.controllers.MotionControllerWalk;
 import com.hypixel.hytale.server.npc.movement.controllers.ProbeMoveData;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.List;
 import javax.annotation.Nonnull;
@@ -33,6 +34,7 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
     private final double tightness;
     private final double relativeSpeed;
     private final boolean lead;
+    private final double homeRange;
     private final ProbeMoveData probeMoveData = new ProbeMoveData();
     private final Vector3d lastLeaderPosition = new Vector3d();
     private final Vector3d leaderVelocity = new Vector3d();
@@ -71,6 +73,7 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
         tightness = builder.getTightness(support);
         relativeSpeed = builder.getRelativeSpeed(support);
         lead = builder.isLead(support);
+        homeRange = builder.getHomeRange(support);
     }
 
     @Override
@@ -103,6 +106,10 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
         if (lead) {
             if (travelHeading.lengthSquared() < EPSILON) {
                 BodyMotionTameworkFlightFormation.resolveHeadingFromYaw(self.getRotation().yaw(), travelHeading);
+                if (homeRange > 0) {
+                    NPCEntity npc = componentAccessor.getComponent(ref, NPCEntity.getComponentType());
+                    if (npc != null) biasHeadingTowardHome(self.getPosition(), npc.getLeashPoint(), homeRange, travelHeading);
+                }
             }
             leaderHeading.set(travelHeading);
             translation.set(travelHeading).mul(relativeSpeed);
@@ -241,6 +248,15 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
         }
         cachedDirection.zero();
         return false;
+    }
+
+    // Choose once per activation so the boundary never produces mid-journey course corrections.
+    static void biasHeadingTowardHome(Vector3d position, Vector3d home, double range, Vector3d heading) {
+        if (range <= 0 || !isFinite(home)) return;
+        double dx = home.x - position.x;
+        double dz = home.z - position.z;
+        double distance = Math.hypot(dx, dz);
+        if (distance >= range && distance > EPSILON) heading.set(dx / distance, 0, dz / distance);
     }
 
     @Nonnull

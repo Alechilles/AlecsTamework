@@ -17,6 +17,7 @@ public final class BuilderBodyMotionTameworkGroundFormation extends BuilderBodyM
     private final DoubleHolder spacing = new DoubleHolder();
     private final DoubleHolder tightness = new DoubleHolder();
     private final DoubleHolder relativeSpeed = new DoubleHolder();
+    private final DoubleHolder homeRange = new DoubleHolder();
     private final BooleanHolder lead = new BooleanHolder();
 
     @Nonnull
@@ -25,6 +26,9 @@ public final class BuilderBodyMotionTameworkGroundFormation extends BuilderBodyM
         super.readConfig(data);
         getBoolean(data, "Lead", lead, false, BuilderDescriptorState.WorkInProgress,
                 "Hold an initial travel heading instead of following a flock slot.", null);
+        getDouble(data, "HomeRange", homeRange, 0.0, DoubleSingleValidator.greaterEqual0(),
+                BuilderDescriptorState.WorkInProgress,
+                "Start journeys toward the leash point beyond this distance; zero disables the home bias.", null);
         getDouble(data, "Spacing", spacing, 5.0, DoubleSingleValidator.greater0(),
                 BuilderDescriptorState.WorkInProgress,
                 "Distance between neighboring ground formation slots.", null);
@@ -73,6 +77,10 @@ public final class BuilderBodyMotionTameworkGroundFormation extends BuilderBodyM
 
     double getRelativeSpeed(@Nonnull BuilderSupport support) {
         return relativeSpeed.get(support.getExecutionContext());
+    }
+
+    double getHomeRange(@Nonnull BuilderSupport support) {
+        return homeRange.get(support.getExecutionContext());
     }
 
     boolean isLead(@Nonnull BuilderSupport support) {
