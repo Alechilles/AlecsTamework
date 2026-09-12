@@ -37,6 +37,10 @@
         17.99
       ],
       "Description": "Active daytime interval for thermal circling."
+    },
+    "KettleRelativeSpeed": {
+      "Value": 0.8,
+      "Description": "Flight speed during thermal circling as a fraction of maximum flight speed."
     }
   },
   "Content": {
@@ -160,7 +164,9 @@
               "OrbitRadius": {
                 "Compute": "KettleRadius"
               },
-              "RelativeSpeed": 0.35,
+              "RelativeSpeed": {
+                "Compute": "KettleRelativeSpeed"
+              },
               "DesiredAltitudeRange": {
                 "Compute": "KettleAltitudeRange"
               },
@@ -205,7 +211,9 @@
           "OrbitRadius": {
             "Compute": "KettleRadius"
           },
-          "RelativeSpeed": 0.35,
+          "RelativeSpeed": {
+            "Compute": "KettleRelativeSpeed"
+          },
           "DesiredAltitudeRange": {
             "Compute": "KettleAltitudeRange"
           },

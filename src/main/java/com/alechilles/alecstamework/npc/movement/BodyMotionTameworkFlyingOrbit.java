@@ -5,6 +5,7 @@ import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.protocol.AnimationSlot;
 import com.hypixel.hytale.server.core.entity.group.EntityGroup;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.physics.util.PhysicsMath;
@@ -57,6 +58,7 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
     private final Vector3d targetPosition = new Vector3d();
     private final KettleFlightState kettle = new KettleFlightState();
     private int kettleMemberIndex;
+    private String kettleAnimation;
     private final Vector3d wanderDestination = new Vector3d();
     private final Vector3d waypointRoute = new Vector3d();
     private final Vector3d obstacleReference = new Vector3d();
@@ -130,6 +132,13 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
     }
 
     @Override
+    public void deactivate(@Nonnull Ref<EntityStore> ref,
+                           @Nonnull Role role,
+                           @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
+        clearKettleAnimation(ref, componentAccessor);
+    }
+
+    @Override
     public boolean computeSteering(@Nonnull Ref<EntityStore> ref,
                                    @Nonnull Role role,
                                    @Nullable InfoProvider sensorInfo,
@@ -142,6 +151,7 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
         if (!(active instanceof MotionControllerFly fly)
                 || (kettling ? !resolveKettleCenter(ref, componentAccessor)
                 : sensorInfo == null || !sensorInfo.getPositionProvider().providePosition(targetPosition))) {
+            clearKettleAnimation(ref, componentAccessor);
             returningToWanderTarget = updateWanderReturnState(
                     returningToWanderTarget, false, 0.0,
                     wanderRadiusRange[0], wanderRadiusRange[1]);
@@ -151,6 +161,7 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
 
         TransformComponent transform = componentAccessor.getComponent(ref, TransformComponent.getComponentType());
         if (transform == null) {
+            clearKettleAnimation(ref, componentAccessor);
             returningToWanderTarget = updateWanderReturnState(
                     returningToWanderTarget, false, 0.0,
                     wanderRadiusRange[0], wanderRadiusRange[1]);
@@ -164,8 +175,9 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
         NPCMountComponent nativeMount = avoidObstacles
                 ? this.resolveNativeMount(ref, componentAccessor) : null;
         boolean autonomousAvoidance = avoidObstacles && !isRiderControlled(tameworkRide, nativeMount);
-        if (kettling && (fly.onGround() || isRiderControlled(
+        if (kettling && (fly.onGround() || fly.inWater() || isRiderControlled(
                 this.tameworkRide(ref, componentAccessor), this.resolveNativeMount(ref, componentAccessor)))) {
+            clearKettleAnimation(ref, componentAccessor);
             return false;
         }
         if (autonomousAvoidance) {
@@ -292,10 +304,36 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
                         altitudeCorrection > 0.0 ? fly.getMaxClimbAngle() : -fly.getMaxSinkAngle());
             }
             desiredSteering.setRelativeTurnSpeed(1.0);
+            if (kettling) {
+                updateKettleAnimation(ref, componentAccessor);
+            }
             return true;
         } finally {
             clearObstacleProbeContext();
         }
+    }
+
+    private void updateKettleAnimation(Ref<EntityStore> ref, ComponentAccessor<EntityStore> accessor) {
+        String animation = kettle.shouldGlide(kettleMemberIndex) ? "Tw_Kettle_Glide" : "Tw_Kettle_Flap";
+        if (animation.equals(kettleAnimation)) {
+            return;
+        }
+        NPCEntity npc = accessor.getComponent(ref, NPCEntity.getComponentType());
+        if (npc != null) {
+            npc.playAnimation(ref, AnimationSlot.Movement, animation, accessor);
+            kettleAnimation = animation;
+        }
+    }
+
+    private void clearKettleAnimation(Ref<EntityStore> ref, ComponentAccessor<EntityStore> accessor) {
+        if (kettleAnimation == null) {
+            return;
+        }
+        NPCEntity npc = ref.isValid() ? accessor.getComponent(ref, NPCEntity.getComponentType()) : null;
+        if (npc != null) {
+            npc.playAnimation(ref, AnimationSlot.Movement, null, accessor);
+        }
+        kettleAnimation = null;
     }
 
     private boolean updateWanderDestination(@Nonnull Vector3d selfPosition,

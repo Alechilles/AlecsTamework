@@ -31,6 +31,7 @@ wandering or formation travel. It falls through while inactive. Defaults:
 
 - `KettleEnabled`: `false`.
 - `KettleRadius`: `18` blocks.
+- `KettleRelativeSpeed`: `0.8` of maximum flight speed.
 - `KettleAltitudeRange`: `[15, 28]` blocks above the native flock leader's home point.
 - `KettleCooldownRange`: `[120, 240]` seconds of cooldown after an episode.
 - `KettleDurationRange`: `[180, 420]` seconds per episode.
@@ -46,7 +47,11 @@ Leaders and lone birds start episodes; native flock beacons invite followers.
 `TameworkFlyingOrbit` with `Mode: "Kettle"` circles the leader's home point
 (the bird's own home when alone), using slightly different radii and heights
 for flock members. It rises gradually within the configured altitude range.
-All birds turn in the same direction. This mode resolves its own center and
+All birds turn in the same direction. Kettle alternates `Tw_Kettle_Glide` for
+10.5 seconds and `Tw_Kettle_Flap` for 1.5 seconds, with member offsets. Models
+using Kettle should provide these two animation sets. The movement-slot
+override is released on motion deactivation or loss of eligible airborne
+movement, restoring normal flight, landing, and walking animation selection. This mode resolves its own center and
 does not require a sensor position provider. Existing orbit modes retain their
 target-relative behavior.
 
