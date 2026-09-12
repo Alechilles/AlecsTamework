@@ -5,7 +5,8 @@
   "Parameters": {
     "MasterTargetSlot": { "Value": "MasterTarget", "Description": "Verified owner target." },
     "FormationRange": { "Value": 25, "Description": "Owner range before normal catch-up or teleport takes over." },
-    "FormationSpacing": { "Value": 4, "Description": "Minimum spacing, enlarged for companion hitboxes." },
+    "FormationSpacing": { "Value": 4, "Description": "Fallback center spacing for companions without a usable hitbox." },
+    "FormationGap": { "Value": 0.75, "Description": "Desired empty gap between neighboring hitboxes." },
     "FormationRelativeSpeed": { "Value": 1, "Description": "Speed used to approach a formation position." },
     "FormationAltitude": { "Value": 5, "Description": "Flying height above the owner." }
   },
@@ -21,13 +22,14 @@
               "Type": "TameworkFollowFormation",
               "TargetSlot": { "Compute": "MasterTargetSlot" },
               "Range": { "Compute": "FormationRange" },
+              "Gap": { "Compute": "FormationGap" },
               "Spacing": { "Compute": "FormationSpacing" }
             }
           ]
         },
         "BodyMotion": {
           "Type": "Seek",
-          "StopDistance": 0.8,
+          "StopDistance": 0.25,
           "SlowDownDistance": 3,
           "RelativeSpeed": { "Compute": "FormationRelativeSpeed" }
         }
@@ -41,6 +43,7 @@
               "Type": "TameworkFollowFormation",
               "TargetSlot": { "Compute": "MasterTargetSlot" },
               "Range": { "Compute": "FormationRange" },
+              "Gap": { "Compute": "FormationGap" },
               "Spacing": { "Compute": "FormationSpacing" },
               "Altitude": { "Compute": "FormationAltitude" }
             }
@@ -49,7 +52,7 @@
         "BodyMotion": {
           "Type": "TameworkFlyingOrbit",
           "Mode": "Approach",
-          "ApproachStopDistance": 0.8,
+          "ApproachStopDistance": 0.25,
           "ApproachSlowDownDistance": 3,
           "RelativeSpeed": { "Compute": "FormationRelativeSpeed" },
           "DesiredAltitudeRange": [0, 0]

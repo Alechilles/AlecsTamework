@@ -5,7 +5,7 @@
 - Linking and admin spawning now save full companion checkpoints for offline
   card details and Recall recovery. Recall progress no longer overlaps action captions.
 
-- Added a development prototype for companion groups that follow the player without rotating or surrounding them, plus bounded slot exchanges for companion, ground, and flying formations to reduce crossing after animals become mixed up.
+- Added a development prototype for companion groups that follow the player without rotating or surrounding them, plus bounded slot exchanges for companion, ground, and flying formations to reduce crossing after animals become mixed up. Companion follow spacing now uses individual hitbox sizes with a small gap, keeping mixed-size groups more compact.
 
 - Restyled command HUD icons as cream glyphs, with distinct Follow and Recall
   symbols, while preserving their existing texture sizes.

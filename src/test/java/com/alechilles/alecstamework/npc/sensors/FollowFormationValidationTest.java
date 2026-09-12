@@ -31,12 +31,14 @@ class FollowFormationValidationTest {
         constructor.setAccessible(true);
         var parameters = constructor.newInstance(new StdScope(null), "follow-formation-test", null);
         var manager = new BuilderManager();
+        var sensor = new JsonObject();
+        sensor.addProperty("Gap", 0.75);
         new BuilderSensorTameworkFollowFormation().readConfig(
-                null, new JsonObject(), manager, parameters, validation);
+                null, sensor, manager, parameters, validation);
         features.lock();
 
         var seek = new JsonObject();
-        seek.addProperty("StopDistance", 0.8);
+        seek.addProperty("StopDistance", 0.25);
         seek.addProperty("SlowDownDistance", 3);
         // NPCPlugin registers BuilderBodyMotionFind as the native "Seek" motion.
         new BuilderBodyMotionFind().readConfig(null, seek, manager, parameters, validation);

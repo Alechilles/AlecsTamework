@@ -36,7 +36,7 @@ public final class CompanionFollowFlockService {
     /** Called by the follow sensor. Structural writes are deferred out of sensor evaluation. */
     @Nullable
     public Slot request(Ref<EntityStore> self, Ref<EntityStore> master, int targetSlot,
-                        boolean flying, double clearance, double range, double altitude, Store<EntityStore> store) {
+                        boolean flying, double radius, double gap, double range, double altitude, Store<EntityStore> store) {
         UUIDComponent identity = store.getComponent(self, UUIDComponent.getComponentType());
         UUIDComponent masterIdentity = store.getComponent(master, UUIDComponent.getComponentType());
         if (identity == null || masterIdentity == null
@@ -60,7 +60,8 @@ public final class CompanionFollowFlockService {
             return null;
         }
         member.lastSeen = System.currentTimeMillis();
-        member.clearance = clearance;
+        member.radius = radius;
+        member.gap = gap;
         member.range = range;
         member.position.set(selfTransform.getPosition());
         int index = member.group.assignments.claim(id, 0, member.lastSeen);
@@ -78,8 +79,6 @@ public final class CompanionFollowFlockService {
         follow.position.set(member.position);
         if (!flying) follow.position.y = 0;
         follow.assignments.report(id, follow.position, follow.target, follow.spacing, member.lastSeen);
-        // A swap is consumed on the next sensor update; no slot can have two owners.
-        follow.assignments.rebalance(member.lastSeen);
         return new Slot(index, follow.spacing, follow.target.x, follow.target.z);
 
     }
@@ -136,12 +135,15 @@ public final class CompanionFollowFlockService {
             member.flockId = flockId;
 
         }
-        refreshGroups(state);
+        refreshGroups(state, now);
     }
 
     /** Refresh group geometry from active intent snapshots, never by scanning world entities. */
-    private static void refreshGroups(State state) {
+    private static void refreshGroups(State state, long now) {
         for (FollowGroup group : state.groups.values()) {
+            // Assignments and their new occupant sizes change together in this world callback.
+            // Sensors only report targets; they never publish a swap against the old layout.
+            group.assignments.rebalance(now);
             group.count = 0;
             group.maxSlot = -1;
             group.spacing = 0;
@@ -155,7 +157,7 @@ public final class CompanionFollowFlockService {
             if (slot < 0) continue;
             group.count++;
             group.maxSlot = Math.max(group.maxSlot, slot);
-            group.spacing = Math.max(group.spacing, member.clearance);
+            group.spacing += member.radius * 2 + member.gap;
             group.range = Math.min(group.range, member.range);
             group.centroid.add(member.position);
         }
@@ -166,8 +168,27 @@ public final class CompanionFollowFlockService {
                 iterator.remove();
                 continue;
             }
+            int capacity = group.maxSlot + 1;
+            if (group.radii.length < capacity) {
+                group.radii = new double[capacity];
+                group.gaps = new double[capacity];
+            } else {
+                java.util.Arrays.fill(group.radii, 0, capacity, 0);
+                java.util.Arrays.fill(group.gaps, 0, capacity, 0);
+            }
             group.centroid.div(group.count);
-            group.formation.configure(group.centroid, group.maxSlot + 1, group.spacing, group.range);
+            group.spacing /= group.count;
+        }
+        for (var entry : state.members.entrySet()) {
+            Member member = entry.getValue();
+            FollowGroup group = member.group;
+            int slot = group.assignments.slot(entry.getKey());
+            if (slot < 0) continue;
+            group.radii[slot] = member.radius;
+            group.gaps[slot] = member.gap;
+        }
+        for (FollowGroup group : state.groups.values()) {
+            group.formation.configure(group.centroid, group.maxSlot + 1, group.radii, group.gaps, group.range);
             group.ready = true;
         }
     }
@@ -230,6 +251,8 @@ public final class CompanionFollowFlockService {
         final Vector3d centroid = new Vector3d();
         final Vector3d target = new Vector3d();
         final Vector3d position = new Vector3d();
+        double[] radii = new double[0];
+        double[] gaps = new double[0];
         int count;
         int maxSlot;
         double spacing;
@@ -252,7 +275,8 @@ public final class CompanionFollowFlockService {
         FollowGroup group;
         final Vector3d position = new Vector3d();
         double range;
-        double clearance;
+        double radius;
+        double gap;
         long lastSeen;
         Member(UUID ownerId, int targetSlot, boolean flying) {
             this.ownerId = ownerId;

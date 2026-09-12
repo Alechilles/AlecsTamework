@@ -1,7 +1,7 @@
 # Companion follow formation
 
 The development follow prototype uses a native flock led by the owner player.
-Companions form compact staggered rows around their own group center, initially
+Companions form compact rows around their own group center, initially
 placed at the animals' average position. The group moves toward the player only
 when it is too far away. The player is not a formation slot or the shape's center.
 Turning or walking toward the group does not rotate it or make it move behind the
@@ -25,18 +25,32 @@ normal follow instructions to run. Ground followers also fall back when a short
 terrain probe detects an obstruction. This allows the group to compress at gates
 and spread out after passing through. It does not add a new pathfinder.
 
-Ground and flying members use separate groups in the same native flock. Spacing
-uses the largest active hitbox in each group. The group center stops at its
-footprint radius plus 1.25 times spacing from the player. Its horizontal footprint
-is capped at 30% of the smallest active recovery range, and the center's stopping
-distance at 55%, so very large groups may compress to stay inside recovery range.
+Ground and flying members use separate groups in the same native flock. Each
+animal reserves half its larger horizontal hitbox dimension as a body radius.
+Neighbors in a row use the sum of their radii plus a default 0.75-block empty gap.
+For example, two animals with 2-block-wide hitboxes target centers 2.75 blocks
+apart instead of the previous 6. Small neighbors no longer inherit the largest
+animal's spacing. Rows use their largest radius for depth clearance, so a large
+animal can still widen the space between its row and the next one.
+
+The layout updates at the existing half-second cadence using linear row packing,
+not an all-pairs collision solver. A swap and its new occupant radii are applied
+in the same group refresh before sensors can publish the new targets. Arrival
+tolerance is 0.25 blocks, leaving room within the default gap for small errors.
+This is preferred target spacing; terrain and movement can still distort it.
+
+The group moves closer to the player when its footprint needs more recovery room.
+Hitbox spacing is not shrunk to force a large group into a small recovery range.
+If the footprint itself cannot fit, ordinary follow recovery remains the fallback.
 
 ## Flexible slot assignment
 
 Companion follow groups, autonomous ground herds, and flying formations share
 bounded slot exchanges. Only animals actively using that formation reserve slots.
 They keep assignments unless exchanging two slots saves at least 20% of their
-combined travel distance and at least half the larger spacing (minimum 0.5 blocks).
+combined travel distance and at least half the comparison spacing (minimum 0.5 blocks). Companion groups use
+the mean body diameter plus gap for this threshold; it does not set their layout
+spacing. Native ground/flying formations keep their configured spacing.
 Both animals then have a two-second swap cooldown. This reduces crossing after a
 group becomes mixed up without demanding constant reshuffling. It is a local
 improvement, not a search for a globally optimal assignment.
@@ -58,12 +72,13 @@ The existing non-follow formation shapes and leader movement remain unchanged.
 | --- | --- | --- |
 | `MasterTargetSlot` | `MasterTarget` | Target slot containing the owner |
 | `FormationRange` | `25` | Owner range before ordinary recovery takes over |
-| `FormationSpacing` | `4` | Minimum spacing, enlarged for companion hitboxes |
+| `FormationSpacing` | `4` | Fallback center spacing when a hitbox is unavailable |
+| `FormationGap` | `0.75` | Desired empty gap between neighboring hitboxes |
 | `FormationRelativeSpeed` | `1` | Speed while approaching the assigned position |
 | `FormationAltitude` | `5` | Flying height above the owner, before height staggering |
 
 The internal `TameworkFollowFormation` sensor exposes a position-only target.
-It takes `TargetSlot`, `Range`, `Spacing`, and `Altitude`. It does not replace
+It takes `TargetSlot`, `Range`, `Spacing`, `Gap`, and `Altitude`. It does not replace
 `MasterTarget` with a synthetic entity. The ground motion uses native `Seek`;
 the flying motion uses `TameworkFlyingOrbit` in `Approach` mode.
 

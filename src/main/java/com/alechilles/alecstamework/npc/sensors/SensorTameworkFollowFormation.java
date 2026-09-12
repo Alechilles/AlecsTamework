@@ -27,6 +27,7 @@ public final class SensorTameworkFollowFormation extends TameworkSensorBase {
     private final int targetSlot;
     private final double range;
     private final double spacing;
+    private final double gap;
     private final double altitude;
     private final TameworkTargetPositionInfo position = new TameworkTargetPositionInfo();
     private final InfoProvider info = new TameworkTargetPositionInfoProvider(null, position);
@@ -38,11 +39,12 @@ public final class SensorTameworkFollowFormation extends TameworkSensorBase {
     private boolean accessible = true;
 
     public SensorTameworkFollowFormation(BuilderSensorTameworkFollowFormation builder, int targetSlot,
-                                         double range, double spacing, double altitude) {
+                                         double range, double spacing, double altitude, double gap) {
         super(builder);
         this.targetSlot = targetSlot;
         this.range = range;
         this.spacing = spacing;
+        this.gap = gap;
         this.altitude = altitude;
     }
 
@@ -63,12 +65,16 @@ public final class SensorTameworkFollowFormation extends TameworkSensorBase {
         if (selfTransform == null || masterTransform == null || identity == null) return false;
         boolean flying = controller instanceof MotionControllerFly;
         var bounds = store.getComponent(self, BoundingBox.getComponentType());
-        double clearance = spacing;
+        // Spacing remains a fallback for NPCs without a usable hitbox. Actual animals
+        // reserve their own half-width/depth plus a separate edge-to-edge comfort gap.
+        double radius = Math.max(0.1, (spacing - gap) * 0.5);
         if (bounds != null) {
             var box = bounds.getBoundingBox();
-            clearance = Math.max(clearance, Math.max(box.width(), box.depth()) * 2 + 2);
+            double dimension = Math.max(box.width(), box.depth());
+            if (Double.isFinite(dimension) && dimension > 0) radius = dimension * 0.5;
         }
-        var slot = CompanionFollowFlockService.get().request(self, master, targetSlot, flying, clearance, range, altitude, store);
+        var slot = CompanionFollowFlockService.get().request(self, master, targetSlot,
+                flying, radius, gap, range, altitude, store);
         if (slot == null || selfTransform.getPosition().distanceSquared(masterTransform.getPosition()) > range * range) return false;
         if (!identity.getUuid().equals(masterId)) {
             masterId = identity.getUuid();
@@ -84,7 +90,7 @@ public final class SensorTameworkFollowFormation extends TameworkSensorBase {
                 probeDirection.set(target).sub(selfTransform.getPosition());
                 probeDirection.y = 0;
                 double distance = probeDirection.length();
-                if (distance > 0.8) {
+                if (distance > 0.25) {
                     double lookahead = Math.min(distance, 3);
                     probeDirection.mul(lookahead / distance);
                     accessible = walk.probeMove(self, selfTransform.getPosition(), probeDirection, probe, store)

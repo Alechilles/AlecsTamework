@@ -19,12 +19,13 @@ public final class BuilderSensorTameworkFollowFormation extends TameworkSensorBu
     private final DoubleHolder range = new DoubleHolder();
     private final DoubleHolder spacing = new DoubleHolder();
     private final DoubleHolder altitude = new DoubleHolder();
+    private final DoubleHolder gap = new DoubleHolder();
 
     @Override public String getBuilderId() { return BUILDER_ID; }
     @Nonnull @Override public Sensor build(@Nonnull BuilderSupport support) {
         return new SensorTameworkFollowFormation(this, support.getTargetSlot(targetSlot.get(support.getExecutionContext())),
                 range.get(support.getExecutionContext()), spacing.get(support.getExecutionContext()),
-                altitude.get(support.getExecutionContext()));
+                altitude.get(support.getExecutionContext()), gap.get(support.getExecutionContext()));
     }
     @Nonnull @Override public BuilderSensorTameworkFollowFormation readConfig(@Nonnull JsonElement data) {
         getString(data, "TargetSlot", targetSlot, "MasterTarget", StringNotEmptyValidator.get(),
@@ -32,9 +33,11 @@ public final class BuilderSensorTameworkFollowFormation extends TameworkSensorBu
         getDouble(data, "Range", range, 25, DoubleSingleValidator.greater0(),
                 BuilderDescriptorState.WorkInProgress, "Owner distance beyond which ordinary catch-up takes over.", null);
         getDouble(data, "Spacing", spacing, 4, DoubleSingleValidator.greater0(),
-                BuilderDescriptorState.WorkInProgress, "Minimum formation spacing; grows for larger companions.", null);
+                BuilderDescriptorState.WorkInProgress, "Fallback center spacing when the companion has no usable hitbox.", null);
         getDouble(data, "Altitude", altitude, 5, DoubleSingleValidator.greaterEqual0(),
                 BuilderDescriptorState.WorkInProgress, "Flying slot height above the owner; ignored while walking.", null);
+        getDouble(data, "Gap", gap, 0.75, DoubleSingleValidator.greaterEqual0(),
+                BuilderDescriptorState.WorkInProgress, "Desired gap between neighboring companion hitboxes.", null);
         provideFeature(Feature.Position);
         return this;
     }
