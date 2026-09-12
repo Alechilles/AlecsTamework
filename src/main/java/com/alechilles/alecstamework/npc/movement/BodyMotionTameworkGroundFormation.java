@@ -10,7 +10,6 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.flock.FlockMembership;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.movement.Steering;
-import com.hypixel.hytale.server.npc.movement.controllers.MotionController;
 import com.hypixel.hytale.server.npc.movement.controllers.MotionControllerWalk;
 import com.hypixel.hytale.server.npc.movement.controllers.ProbeMoveData;
 import com.hypixel.hytale.server.npc.role.Role;
@@ -20,16 +19,20 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
-/** Holds a walking flock member in a loose, horizontal slot behind its native flock leader. */
+/** Steady herd travel with tolerant follower slots and bounded local obstacle recovery. */
 public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionBase {
     private static final double EPSILON = 1.0E-6;
     private static final double PROBE_INTERVAL_SECONDS = 0.25;
     private static final double PROBE_LOOKAHEAD = 1.5;
     private static final double MIN_PROBE_TRAVEL = 0.5;
+    private static final double TURN_RATE = Math.toRadians(45);
+    private static final double WALK_ALIGNMENT = Math.cos(Math.toRadians(15));
+    private static final double[] DETOUR_ANGLES = {45, -45, 90, -90, 135, -135, 180};
 
     private final double spacing;
     private final double tightness;
     private final double relativeSpeed;
+    private final boolean lead;
     private final ProbeMoveData probeMoveData = new ProbeMoveData();
     private final Vector3d lastLeaderPosition = new Vector3d();
     private final Vector3d leaderVelocity = new Vector3d();
@@ -42,6 +45,10 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
     private final Vector3d cachedDirection = new Vector3d();
     private final Vector3d leaderDirection = new Vector3d();
     private final Vector3d probeDirection = new Vector3d();
+    private final Vector3d travelHeading = new Vector3d();
+    private final Vector3d steeringHeading = new Vector3d();
+    private final Vector3d detourDirection = new Vector3d();
+    private final Vector3d progressPosition = new Vector3d();
 
     @Nullable
     private Ref<EntityStore> trackedLeaderRef;
@@ -51,6 +58,11 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
     private boolean hasProbedDirection;
     private double looseDriftSeconds;
     private double probeCooldown;
+    private double detourSeconds;
+    private double progressSeconds;
+    private int detourIndex;
+    private boolean requestedMovement;
+    private boolean needsRecovery;
 
     BodyMotionTameworkGroundFormation(@Nonnull BuilderBodyMotionTameworkGroundFormation builder,
                                       @Nonnull BuilderSupport support) {
@@ -58,6 +70,7 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
         spacing = builder.getSpacing(support);
         tightness = builder.getTightness(support);
         relativeSpeed = builder.getRelativeSpeed(support);
+        lead = builder.isLead(support);
     }
 
     @Override
@@ -82,9 +95,21 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
             reset();
             return false;
         }
+        TransformComponent self = componentAccessor.getComponent(ref, TransformComponent.getComponentType());
+        if (self == null || !isFinite(self.getPosition())) {
+            reset();
+            return false;
+        }
+        if (lead) {
+            if (travelHeading.lengthSquared() < EPSILON) {
+                BodyMotionTameworkFlightFormation.resolveHeadingFromYaw(self.getRotation().yaw(), travelHeading);
+            }
+            leaderHeading.set(travelHeading);
+            translation.set(travelHeading).mul(relativeSpeed);
+            return steer(ref, self, walk, dt, desiredSteering, componentAccessor);
+        }
         EntityGroup group = resolveGroup(ref, componentAccessor);
         Ref<EntityStore> leaderRef = resolveLeader(ref, group);
-        TransformComponent self = componentAccessor.getComponent(ref, TransformComponent.getComponentType());
         TransformComponent leader = leaderRef == null ? null
                 : componentAccessor.getComponent(leaderRef, TransformComponent.getComponentType());
         if (group == null || leaderRef == null || self == null || leader == null
@@ -114,38 +139,105 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
         targetPosition.set(leader.getPosition()).add(formationOffset);
         targetPosition.y = self.getPosition().y;
         resolveGroundTranslation(self.getPosition(), targetPosition, leaderVelocity,
-                walk.getMaximumSpeed(), relativeSpeed, tightness, dt, translation);
+                walk.getMaximumSpeed(), relativeSpeed, tightness, spacing * 0.3, dt, translation);
+        return steer(ref, self, walk, dt, desiredSteering, componentAccessor);
+    }
+
+    private boolean steer(Ref<EntityStore> ref, TransformComponent self, MotionControllerWalk walk,
+                          double dt, Steering desiredSteering, ComponentAccessor<EntityStore> accessor) {
+        if (steeringHeading.lengthSquared() < EPSILON) {
+            BodyMotionTameworkFlightFormation.resolveHeadingFromYaw(self.getRotation().yaw(), steeringHeading);
+        }
+        boolean stalled = false;
+        if (requestedMovement) {
+            progressSeconds += dt;
+            if (progressSeconds >= 1.0) {
+                double dx = self.getPosition().x - progressPosition.x;
+                double dz = self.getPosition().z - progressPosition.z;
+                stalled = dx * dx + dz * dz < 0.15 * 0.15;
+                progressSeconds = 0;
+                progressPosition.set(self.getPosition());
+            }
+        } else {
+            progressSeconds = 0;
+            progressPosition.set(self.getPosition());
+        }
+        requestedMovement = false;
+        needsRecovery |= stalled;
+        probeCooldown -= dt;
+        detourSeconds = Math.max(0, detourSeconds - dt);
         double speedScale = horizontalLength(translation);
         if (speedScale <= EPSILON) {
+            hasProbedDirection = false;
+            detourSeconds = 0;
+            needsRecovery = false;
             return false;
         }
 
-        probeCooldown -= dt;
         if (!hasProbedDirection || probeCooldown <= 0.0) {
-            hasCachedDirection = selectWalkableDirection(ref, self.getPosition(), walk, componentAccessor);
+            hasCachedDirection = selectWalkableDirection(ref, self.getPosition(), walk, accessor, needsRecovery);
+            needsRecovery = false;
             hasProbedDirection = true;
             probeCooldown = PROBE_INTERVAL_SECONDS;
         }
         if (!hasCachedDirection) {
             return false;
         }
-        probeDirection.set(cachedDirection).mul(Math.min(1.0, speedScale));
-        desiredSteering.setTranslation(probeDirection);
-        desiredSteering.setYaw(PhysicsMath.headingFromDirection(cachedDirection.x, cachedDirection.z));
+        turnToward(steeringHeading, cachedDirection, TURN_RATE * dt, steeringHeading);
+        desiredSteering.setYaw(PhysicsMath.headingFromDirection(steeringHeading.x, steeringHeading.z));
         desiredSteering.setRelativeTurnSpeed(1.0);
+        // Turn in place for a substantial detour; ordinary small corrections keep walking.
+        if (steeringHeading.dot(cachedDirection) >= WALK_ALIGNMENT) {
+            probeDirection.set(steeringHeading).mul(Math.min(1.0, speedScale));
+            desiredSteering.setTranslation(probeDirection);
+            requestedMovement = speedScale * walk.getMaximumSpeed() >= 0.25;
+        }
         return true;
     }
 
     private boolean selectWalkableDirection(@Nonnull Ref<EntityStore> ref, @Nonnull Vector3d position,
                                             @Nonnull MotionControllerWalk walk,
-                                            @Nonnull ComponentAccessor<EntityStore> accessor) {
-        if (canWalk(ref, position, translation, walk, accessor)) {
-            return normalizeHorizontal(translation, cachedDirection);
+                                            @Nonnull ComponentAccessor<EntityStore> accessor,
+                                            boolean stalled) {
+        int probes = 0;
+        if (detourSeconds > 0 && !stalled) {
+            probes++;
+            if (canWalk(ref, position, detourDirection, walk, accessor)) {
+                cachedDirection.set(detourDirection);
+                return true;
+            }
         }
-        if (normalizeHorizontal(leaderHeading, leaderDirection)
-                && canWalk(ref, position, leaderDirection, walk, accessor)) {
-            cachedDirection.set(leaderDirection);
-            return true;
+        boolean retryDetour = detourSeconds <= 0 && detourDirection.lengthSquared() > EPSILON;
+        detourSeconds = 0;
+        if (!stalled) {
+            probes++;
+            if (canWalk(ref, position, translation, walk, accessor)) {
+                detourDirection.zero();
+                return normalizeHorizontal(translation, cachedDirection);
+            }
+        }
+        if (!stalled && retryDetour && probes < 3) {
+            probes++;
+            if (canWalk(ref, position, detourDirection, walk, accessor)) {
+                cachedDirection.set(detourDirection);
+                detourSeconds = 2;
+                return true;
+            }
+        }
+        detourDirection.zero();
+        // Explore a small fan over successive checks, rather than retrying the same blocked line.
+        while (probes++ < 3) {
+            double angle = Math.toRadians(DETOUR_ANGLES[detourIndex++ % DETOUR_ANGLES.length]);
+            double sin = Math.sin(angle);
+            double cos = Math.cos(angle);
+            leaderDirection.set(leaderHeading.x * cos - leaderHeading.z * sin, 0,
+                    leaderHeading.x * sin + leaderHeading.z * cos);
+            if (canWalk(ref, position, leaderDirection, walk, accessor)) {
+                normalizeHorizontal(leaderDirection, cachedDirection);
+                detourDirection.set(cachedDirection);
+                detourSeconds = 2;
+                return true;
+            }
         }
         cachedDirection.zero();
         return false;
@@ -166,17 +258,41 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
                                              @Nonnull Vector3d targetPosition,
                                              @Nonnull Vector3d leaderVelocity,
                                              double maximumSpeed, double relativeSpeed, double tightness,
-                                             double dt, @Nonnull Vector3d output) {
-        leaderDirectionForGround(leaderVelocity, output);
-        FlightFormationSteering.resolveTranslation(selfPosition, targetPosition, output,
-                maximumSpeed, relativeSpeed, tightness, dt, output);
-        output.y = 0.0;
-        return output;
+                                             double tolerance, double dt, @Nonnull Vector3d output) {
+        if (!Double.isFinite(maximumSpeed) || maximumSpeed <= EPSILON) return output.zero();
+        double dx = targetPosition.x - selfPosition.x;
+        double dz = targetPosition.z - selfPosition.z;
+        double distance = Math.hypot(dx, dz);
+        double response = distance > tolerance ? (distance - tolerance) / distance * 1.5 * tightness : 0;
+        double correctionCap = maximumSpeed * relativeSpeed;
+        if (distance > EPSILON) {
+            response = Math.min(response, correctionCap / distance);
+            if (dt > EPSILON) response = Math.min(response, 1 / dt);
+        }
+        double leaderSpeed = Math.min(maximumSpeed, Math.hypot(leaderVelocity.x, leaderVelocity.z));
+        if (leaderSpeed > 0.05) {
+            double length = Math.hypot(leaderVelocity.x, leaderVelocity.z);
+            double fx = leaderVelocity.x / length;
+            double fz = leaderVelocity.z / length;
+            double forward = Math.max(0, leaderSpeed + (dx * fx + dz * fz) * response);
+            double lateral = (-dx * fz + dz * fx) * response;
+            double lateralCap = forward * Math.tan(Math.toRadians(20));
+            lateral = Math.max(-lateralCap, Math.min(lateralCap, lateral));
+            output.set(fx * forward - fz * lateral, 0, fz * forward + fx * lateral);
+        } else {
+            output.set(dx * response, 0, dz * response);
+        }
+        double speed = output.length();
+        if (speed > maximumSpeed) output.mul(maximumSpeed / speed);
+        return output.div(maximumSpeed);
     }
 
-    private static void leaderDirectionForGround(@Nonnull Vector3d leaderVelocity, @Nonnull Vector3d output) {
-        output.set(leaderVelocity);
-        output.y = 0.0;
+    static Vector3d turnToward(Vector3d current, Vector3d target, double maximumTurn, Vector3d output) {
+        double angle = Math.atan2(current.z, current.x);
+        double difference = Math.atan2(target.z, target.x) - angle;
+        double turn = Math.atan2(Math.sin(difference), Math.cos(difference));
+        angle += Math.max(-maximumTurn, Math.min(maximumTurn, turn));
+        return output.set(Math.cos(angle), 0, Math.sin(angle));
     }
 
     private boolean canWalk(@Nonnull Ref<EntityStore> ref, @Nonnull Vector3d position,
@@ -262,5 +378,13 @@ public final class BodyMotionTameworkGroundFormation extends TameworkBodyMotionB
         leaderHeading.zero();
         formationOffset.zero();
         cachedDirection.zero();
+        detourDirection.zero();
+        travelHeading.zero();
+        steeringHeading.zero();
+        detourSeconds = 0;
+        detourIndex = 0;
+        progressSeconds = 0;
+        requestedMovement = false;
+        needsRecovery = false;
     }
 }

@@ -4,6 +4,7 @@ import com.google.gson.JsonElement;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderDescriptorState;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.asset.builder.holder.DoubleHolder;
+import com.hypixel.hytale.server.npc.asset.builder.holder.BooleanHolder;
 import com.hypixel.hytale.server.npc.asset.builder.validators.DoubleRangeValidator;
 import com.hypixel.hytale.server.npc.asset.builder.validators.DoubleSingleValidator;
 import com.hypixel.hytale.server.npc.corecomponents.builders.BuilderBodyMotionBase;
@@ -16,11 +17,14 @@ public final class BuilderBodyMotionTameworkGroundFormation extends BuilderBodyM
     private final DoubleHolder spacing = new DoubleHolder();
     private final DoubleHolder tightness = new DoubleHolder();
     private final DoubleHolder relativeSpeed = new DoubleHolder();
+    private final BooleanHolder lead = new BooleanHolder();
 
     @Nonnull
     @Override
     public BuilderBodyMotionTameworkGroundFormation readConfig(@Nonnull JsonElement data) {
         super.readConfig(data);
+        getBoolean(data, "Lead", lead, false, BuilderDescriptorState.WorkInProgress,
+                "Hold an initial travel heading instead of following a flock slot.", null);
         getDouble(data, "Spacing", spacing, 5.0, DoubleSingleValidator.greater0(),
                 BuilderDescriptorState.WorkInProgress,
                 "Distance between neighboring ground formation slots.", null);
@@ -31,7 +35,7 @@ public final class BuilderBodyMotionTameworkGroundFormation extends BuilderBodyM
         getDouble(data, "RelativeSpeed", relativeSpeed, 0.25,
                 DoubleRangeValidator.fromExclToIncl(0.0, 1.0),
                 BuilderDescriptorState.WorkInProgress,
-                "Maximum additive catch-up speed relative to maximum walking speed.", null);
+                "Leader walking speed, or maximum follower catch-up speed, relative to maximum walking speed.", null);
         return this;
     }
 
@@ -69,5 +73,9 @@ public final class BuilderBodyMotionTameworkGroundFormation extends BuilderBodyM
 
     double getRelativeSpeed(@Nonnull BuilderSupport support) {
         return relativeSpeed.get(support.getExecutionContext());
+    }
+
+    boolean isLead(@Nonnull BuilderSupport support) {
+        return lead.get(support.getExecutionContext());
     }
 }

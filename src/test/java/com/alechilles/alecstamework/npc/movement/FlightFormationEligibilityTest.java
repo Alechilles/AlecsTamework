@@ -96,20 +96,99 @@ class FlightFormationEligibilityTest {
                 motion.computeSteering(fixture.followerRef, fixture.followerRole, null, 0.05, steering, fixture.store);
                 assertEquals(0.0, steering.getTranslation().length(), 1.0E-9);
             }
-            assertTrue(walk.probes <= 10, "Blocked followers must not probe twice every frame.");
+            assertTrue(walk.probes <= 12, "Blocked followers must not probe twice every frame.");
             walk.walkable = true;
-            for (int tick = 0; tick < 7; tick++) {
+            boolean resumed = false;
+            for (int tick = 0; tick < 80; tick++) {
                 motion.computeSteering(fixture.followerRef, fixture.followerRole, null, 0.05, steering, fixture.store);
+                resumed |= steering.getTranslation().length() > 0;
+                self.getPosition().add(new Vector3d(steering.getTranslation()).mul(0.2));
             }
-            assertTrue(steering.getTranslation().length() > 0.0);
+            assertTrue(resumed);
             assertTrue(steering.getTranslation().length() <= 1.0);
         }
     }
 
+    @Test
+    void groundLeaderDetoursAndReturnsToItsTravelHeading() throws Exception {
+        try (HytaleModuleScope ignored = HytaleModuleScope.install();
+             FlockFixtureScope scope = FlockFixtureScope.install();
+             FlightFixture fixture = new FlightFixture(scope)) {
+            GroundWalk walk = (GroundWalk) unsafe().allocateInstance(GroundWalk.class);
+            walk.walkable = true;
+            walk.blockForward = true;
+            setField(Role.class, fixture.followerRole, "activeMotionController", walk);
+            TransformComponent self = new TransformComponent();
+            fixture.store.put(fixture.followerRef, TransformComponent.getComponentType(), self);
+            fixture.store.put(fixture.followerRef, scope.flockMembershipType, null);
+            BodyMotionTameworkGroundFormation motion = groundMotion(true);
+            Steering steering = new Steering();
+            boolean movedSideways = false;
+            double previousYaw = 0;
+            for (int tick = 0; tick < 200; tick++) {
+                if (tick == 80) walk.blockForward = false;
+                motion.computeSteering(fixture.followerRef, fixture.followerRole, null, 0.05, steering, fixture.store);
+                if (steering.hasYaw()) {
+                    double change = steering.getYaw() - previousYaw;
+                    assertTrue(Math.abs(Math.atan2(Math.sin(change), Math.cos(change))) <= Math.toRadians(45) * 0.05 + 0.001, "Yaw change at tick " + tick + ": " + change);
+                    previousYaw = steering.getYaw();
+                }
+                if (tick > 25 && tick < 80) {
+                    assertTrue(steering.getTranslation().x > 0.1,
+                            "Keep making progress along the clear side instead of reversing the detour.");
+                }
+                movedSideways |= Math.abs(steering.getTranslation().x) > 0.1;
+                self.getPosition().add(new Vector3d(steering.getTranslation()).mul(4 * 0.05));
+            }
+            assertTrue(movedSideways, "A blocked leader must take an available local detour.");
+            assertEquals(0, steering.getTranslation().x, 1e-6);
+            assertTrue(steering.getTranslation().z < -0.1, "Clear ground must restore the original travel direction.");
+        }
+    }
+
+    @Test
+    void groundLeaderRecoversWhenClearProbesStillProduceNoProgress() throws Exception {
+        try (HytaleModuleScope ignored = HytaleModuleScope.install();
+             FlockFixtureScope scope = FlockFixtureScope.install();
+             FlightFixture fixture = new FlightFixture(scope)) {
+            GroundWalk walk = (GroundWalk) unsafe().allocateInstance(GroundWalk.class);
+            walk.walkable = true;
+            setField(Role.class, fixture.followerRole, "activeMotionController", walk);
+            fixture.store.put(fixture.followerRef, TransformComponent.getComponentType(), new TransformComponent());
+            BodyMotionTameworkGroundFormation motion = groundMotion(true);
+            Steering steering = new Steering();
+            boolean recovered = false;
+            for (int tick = 0; tick < 60; tick++) {
+                motion.computeSteering(fixture.followerRef, fixture.followerRole, null, 0.05, steering, fixture.store);
+                recovered |= Math.abs(steering.getTranslation().x) > 0.1;
+            }
+            assertTrue(recovered, "Physical obstruction must trigger a detour even if terrain probes are clear.");
+        }
+    }
+
+    @Test
+    void groundFollowerToleratesSlotErrorAndLimitsLateralCorrection() {
+        Vector3d output = new Vector3d();
+        BodyMotionTameworkGroundFormation.resolveGroundTranslation(new Vector3d(), new Vector3d(1, 0, 0),
+                new Vector3d(0, 0, 1), 4, 0.25, 0.35, 1.5, 0.05, output);
+        assertEquals(0, output.x, 1e-9);
+        assertEquals(0.25, output.z, 1e-9);
+        BodyMotionTameworkGroundFormation.resolveGroundTranslation(new Vector3d(), new Vector3d(10, 0, 0),
+                new Vector3d(0, 0, 1), 4, 0.25, 0.35, 1.5, 0.05, output);
+        assertTrue(output.x > 0);
+        assertTrue(Math.atan2(output.x, output.z) <= Math.toRadians(20) + 1e-9);
+    }
+
     private static BodyMotionTameworkGroundFormation groundMotion() throws Exception {
+        return groundMotion(false);
+    }
+
+    private static BodyMotionTameworkGroundFormation groundMotion(boolean lead) throws Exception {
         BuilderBodyMotionTameworkGroundFormation builder = new BuilderBodyMotionTameworkGroundFormation();
         List<String> errors = new ArrayList<>();
-        builder.readConfig(null, new JsonObject(), new BuilderManager(), formationParameters(),
+        JsonObject config = new JsonObject();
+        config.addProperty("Lead", lead);
+        builder.readConfig(null, config, new BuilderManager(), formationParameters(),
                 new BuilderValidationHelper("ground-formation-test", null, null, null,
                         new InstructionContextHelper(InstructionType.Default),
                         new ExtraInfo(), null, errors));
@@ -122,6 +201,7 @@ class FlightFormationEligibilityTest {
 
     private static final class GroundWalk extends MotionControllerWalk {
         private boolean walkable;
+        private boolean blockForward;
         private int probes;
 
         private GroundWalk() { super(null, null); }
@@ -133,7 +213,7 @@ class FlightFormationEligibilityTest {
         public double probeMove(Ref<EntityStore> ref, Vector3dc position, Vector3dc direction,
                                 ProbeMoveData data, ComponentAccessor<EntityStore> accessor) {
             probes++;
-            return walkable ? direction.length() : 0.0;
+            return walkable && (!blockForward || Math.abs(direction.x()) > 0.5) ? direction.length() : 0.0;
         }
     }
 
