@@ -12,6 +12,20 @@ class FlightFormationSteeringTest {
     private static final double YAW_EPSILON = 1.0E-6;
 
     @Test
+    void groundSlotsStaySpreadHorizontallyAndUseTheFollowersTerrainHeight() {
+        Vector3d leader = new Vector3d(0, 40, 0);
+        Vector3d heading = new Vector3d(0, 0, 1);
+        Vector3d first = BodyMotionTameworkGroundFormation.resolveGroundTarget(
+                0, 5, 0, leader, heading, 12, new Vector3d());
+        Vector3d second = BodyMotionTameworkGroundFormation.resolveGroundTarget(
+                1, 5, 0, leader, heading, 12, new Vector3d());
+        assertEquals(12, first.y, EPSILON);
+        assertEquals(12, second.y, EPSILON);
+        assertTrue(first.x * second.x < 0, "Followers should occupy both sides of the travel direction.");
+        assertTrue(first.distance(second) > 3, "Distinct ground slots must not collapse into one trail.");
+    }
+
+    @Test
     void outerChevronSlotChangesAreBoundedAndConvergeWithoutDelayingLeaderTravel() {
         Vector3d offset = new Vector3d(-12.0, 0.0, -12.0);
         Vector3d desired = new Vector3d(12.0, 0.0, -12.0);

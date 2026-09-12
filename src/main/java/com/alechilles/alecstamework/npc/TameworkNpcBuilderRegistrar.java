@@ -31,6 +31,7 @@ import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTame
 import com.alechilles.alecstamework.npc.movement.builders.BuilderBodyMotionTameworkMaintainDistance;
 import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkFlyingOrbit;
 import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkFlightFormation;
+import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkGroundFormation;
 import com.alechilles.alecstamework.npc.movement.BuilderMotionControllerTameworkFormationFly;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkFlightFormationReady;
 import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkMountedGlide;
@@ -225,6 +226,10 @@ public final class TameworkNpcBuilderRegistrar {
             bodyMotionFactory.add(
                     BuilderBodyMotionTameworkFlightFormation.BUILDER_ID,
                     BuilderBodyMotionTameworkFlightFormation::new
+            );
+            bodyMotionFactory.add(
+                    BuilderBodyMotionTameworkGroundFormation.BUILDER_ID,
+                    BuilderBodyMotionTameworkGroundFormation::new
             );
             bodyMotionFactory.add(
                     BuilderBodyMotionTameworkMountedGlide.BUILDER_ID,

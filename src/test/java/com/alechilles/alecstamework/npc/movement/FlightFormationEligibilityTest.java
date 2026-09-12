@@ -11,6 +11,7 @@ import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.builtin.mounts.MountPlugin;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.TestEntityComponentStore;
 import com.hypixel.hytale.server.core.entity.group.EntityGroup;
@@ -24,9 +25,14 @@ import com.hypixel.hytale.server.npc.asset.builder.BuilderManager;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderParameters;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderValidationHelper;
+import com.hypixel.hytale.server.npc.asset.builder.InstructionContextHelper;
+import com.hypixel.hytale.server.npc.asset.builder.InstructionType;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.movement.controllers.MotionControllerBase;
 import com.hypixel.hytale.server.npc.movement.controllers.MotionControllerFly;
+import com.hypixel.hytale.server.npc.movement.controllers.MotionControllerWalk;
+import com.hypixel.hytale.server.npc.movement.controllers.ProbeMoveData;
+import com.hypixel.hytale.server.npc.movement.Steering;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.RoleStats;
 import com.hypixel.hytale.server.npc.util.PositionProbeAir;
@@ -40,9 +46,97 @@ import java.util.List;
 import javax.annotation.Nonnull;
 import org.junit.jupiter.api.Test;
 import org.joml.Vector3d;
+import org.joml.Vector3dc;
 import sun.misc.Unsafe;
 
 class FlightFormationEligibilityTest {
+    @Test
+    void groundFollowerMatchesSlowLeaderInsteadOfNormalizingToFullSpeed() throws Exception {
+        try (HytaleModuleScope ignored = HytaleModuleScope.install();
+             FlockFixtureScope scope = FlockFixtureScope.install();
+             FlightFixture fixture = new FlightFixture(scope)) {
+            GroundWalk walk = (GroundWalk) unsafe().allocateInstance(GroundWalk.class);
+            walk.walkable = true;
+            setField(Role.class, fixture.followerRole, "activeMotionController", walk);
+            TransformComponent self = new TransformComponent();
+            fixture.store.put(fixture.followerRef, TransformComponent.getComponentType(), self);
+            TransformComponent leader = fixture.store.getComponent(fixture.leaderRef, TransformComponent.getComponentType());
+            Vector3d heading = new Vector3d(0, 0, -1);
+            BodyMotionTameworkGroundFormation motion = groundMotion();
+            Steering steering = new Steering();
+            BodyMotionTameworkGroundFormation.resolveGroundTarget(0, 5, 0.05,
+                    leader.getPosition(), heading, 0, self.getPosition());
+            motion.computeSteering(fixture.followerRef, fixture.followerRole, null, 0.05, steering, fixture.store);
+            leader.getPosition().z -= 0.05;
+            leader.getPosition().y += 0.5;
+            BodyMotionTameworkGroundFormation.resolveGroundTarget(0, 5, 0.1,
+                    leader.getPosition(), heading, 0, self.getPosition());
+            assertTrue(motion.computeSteering(fixture.followerRef, fixture.followerRole,
+                    null, 0.05, steering, fixture.store));
+            assertEquals(1.0, steering.getTranslation().length() * walk.getMaximumSpeed(), 0.03,
+                    "Ground formation must preserve the leader's slow walking speed.");
+            assertEquals(0.0, steering.getTranslation().y, 1.0E-9,
+                    "Climbing by the leader must not inject vertical flight steering.");
+        }
+    }
+
+    @Test
+    void blockedGroundFollowerLimitsProbesAndResumesWhenGroundClears() throws Exception {
+        try (HytaleModuleScope ignored = HytaleModuleScope.install();
+             FlockFixtureScope scope = FlockFixtureScope.install();
+             FlightFixture fixture = new FlightFixture(scope)) {
+            GroundWalk walk = (GroundWalk) unsafe().allocateInstance(GroundWalk.class);
+            setField(Role.class, fixture.followerRole, "activeMotionController", walk);
+            TransformComponent self = new TransformComponent();
+            self.getPosition().set(20, 0, 20);
+            fixture.store.put(fixture.followerRef, TransformComponent.getComponentType(), self);
+            BodyMotionTameworkGroundFormation motion = groundMotion();
+            Steering steering = new Steering();
+            for (int tick = 0; tick < 20; tick++) {
+                motion.computeSteering(fixture.followerRef, fixture.followerRole, null, 0.05, steering, fixture.store);
+                assertEquals(0.0, steering.getTranslation().length(), 1.0E-9);
+            }
+            assertTrue(walk.probes <= 10, "Blocked followers must not probe twice every frame.");
+            walk.walkable = true;
+            for (int tick = 0; tick < 7; tick++) {
+                motion.computeSteering(fixture.followerRef, fixture.followerRole, null, 0.05, steering, fixture.store);
+            }
+            assertTrue(steering.getTranslation().length() > 0.0);
+            assertTrue(steering.getTranslation().length() <= 1.0);
+        }
+    }
+
+    private static BodyMotionTameworkGroundFormation groundMotion() throws Exception {
+        BuilderBodyMotionTameworkGroundFormation builder = new BuilderBodyMotionTameworkGroundFormation();
+        List<String> errors = new ArrayList<>();
+        builder.readConfig(null, new JsonObject(), new BuilderManager(), formationParameters(),
+                new BuilderValidationHelper("ground-formation-test", null, null, null,
+                        new InstructionContextHelper(InstructionType.Default),
+                        new ExtraInfo(), null, errors));
+        assertTrue(errors.isEmpty(), () -> "Ground formation config errors: " + errors);
+        BuilderSupport support = new BuilderSupport(new BuilderManager(), null,
+                new ExecutionContext(), builder, new RoleStats());
+        support.setScope(new StdScope(null));
+        return builder.build(support);
+    }
+
+    private static final class GroundWalk extends MotionControllerWalk {
+        private boolean walkable;
+        private int probes;
+
+        private GroundWalk() { super(null, null); }
+
+        @Override
+        public double getMaximumSpeed() { return 4.0; }
+
+        @Override
+        public double probeMove(Ref<EntityStore> ref, Vector3dc position, Vector3dc direction,
+                                ProbeMoveData data, ComponentAccessor<EntityStore> accessor) {
+            probes++;
+            return walkable ? direction.length() : 0.0;
+        }
+    }
+
     @Test
     void flyingFollowerResolvesItsNativeFlockLeaderAndTracksLeaderReplacement() throws Exception {
         try (HytaleModuleScope ignored = HytaleModuleScope.install();
