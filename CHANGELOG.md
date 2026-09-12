@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Restyled command HUD icons as cream glyphs, with distinct Follow and Recall
+  symbols, while preserving their existing texture sizes.
+
 - Roster flight controls now keep their input binding and button state during
   unrelated live card refreshes, matching the normal companion panel.
 
