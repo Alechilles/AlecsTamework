@@ -162,7 +162,10 @@ public final class CommandLinkedNpcStateSnapshotService {
             snapshotsByNpc.remove(npcUuid);
             return;
         }
-        refreshFromEntity(reference, store);
+        // beginNpcRemoval already froze and published the terminal checkpoint.
+        // Retain the final presentation refresh without admitting another
+        // routine capture for the same unload boundary.
+        refreshFromEntityStage(reference, store);
     }
 
     @Nonnull
@@ -256,7 +259,18 @@ public final class CommandLinkedNpcStateSnapshotService {
     }
 
     public void refreshFromEntity(Ref<EntityStore> reference, Store<EntityStore> store) {
-        refreshFromEntityStage(reference, store);
+        if (reference == null || store == null) {
+            return;
+        }
+        CompletionStage<Void> profile = refreshFromEntityStage(reference, store);
+        CompanionEntityCheckpointCapture checkpoint = hasCurrentSnapshot(
+                reference, store
+        ) ? checkpointCaptures.capture(
+                reference,
+                store,
+                CompanionEntityCheckpoint.CaptureBoundary.LOADED
+        ) : null;
+        publishCheckpointAfterProfile(profile, checkpoint);
     }
 
     /** Publishes the profile created by one admitted admin spawn. */
@@ -284,9 +298,18 @@ public final class CommandLinkedNpcStateSnapshotService {
         }
         snapshotsByNpc.put(npcUuid, snapshot);
         CompletionStage<Void> publication = profileSnapshots.publish(snapshot, worldKey);
-        return publication == null
-                ? failedRequiredAdminCapture("profile sink returned no publication stage")
-                : publication;
+        if (publication == null) {
+            return failedRequiredAdminCapture("profile sink returned no publication stage");
+        }
+        CompanionEntityCheckpointCapture checkpoint = checkpointCaptures.capture(
+                reference,
+                store,
+                CompanionEntityCheckpoint.CaptureBoundary.LOADED
+        );
+        publishCheckpointAfterProfile(publication, checkpoint);
+        // Checkpoints remain best-effort maintenance; their failure must not
+        // roll back a successfully published admin profile/population admission.
+        return publication;
     }
 
     private CompletionStage<Void> refreshFromEntityStage(
@@ -313,6 +336,22 @@ public final class CommandLinkedNpcStateSnapshotService {
             return upsertProfile(snapshot, worldKey(store));
         }
         return CompletableFuture.completedFuture(null);
+    }
+
+    /**
+     * A routine checkpoint belongs only to the snapshot captured by this exact
+     * refresh. Unlinked NPCs intentionally leave no snapshot and no checkpoint.
+     */
+    private boolean hasCurrentSnapshot(
+            @Nonnull Ref<EntityStore> reference,
+            @Nonnull Store<EntityStore> store
+    ) {
+        if (!reference.isValid()) {
+            return false;
+        }
+        NPCEntity npc = store.getComponent(reference, NPCEntity.getComponentType());
+        UUID npcUuid = npc == null ? null : npc.getUuid();
+        return npcUuid != null && snapshotsByNpc.containsKey(npcUuid);
     }
 
     @Nonnull

@@ -16,7 +16,7 @@ import javax.annotation.Nullable;
  * <p>The production ECS store constructor is package-private, so this test helper lives beside it
  * and overrides only the read operations exercised by the damage adapters.</p>
  */
-public final class TestEntityComponentStore extends Store<EntityStore> implements AutoCloseable {
+public class TestEntityComponentStore extends Store<EntityStore> implements AutoCloseable {
     private final Map<Ref<EntityStore>, Map<ComponentType<EntityStore, ?>, Component<EntityStore>>> components =
             new IdentityHashMap<>();
 

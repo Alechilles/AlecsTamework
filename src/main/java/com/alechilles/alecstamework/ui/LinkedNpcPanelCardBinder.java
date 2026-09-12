@@ -321,7 +321,7 @@ final class LinkedNpcPanelCardBinder {
             commandBuilder.setObject(statusUnloadedSelector + ".Anchor",
                     fixedAnchor(compact ? 74 : 82, statusLeft, statusWidth, 16));
             commandBuilder.setObject(recallCountdownSelector + ".Anchor",
-                    fixedAnchor(compact ? 90 : 98, statusLeft, statusWidth, 12));
+                    fixedAnchor(98, statusLeft, statusWidth, 12));
         }
         commandBuilder.set(flightToggleSelector + "Caption.Text", LocalizedText.resolve(language,
                 "tamework.ui.linkedPanel.action." + (entry.flightToggleAirborne() ? "flightAirborne" : "flightGrounded")));

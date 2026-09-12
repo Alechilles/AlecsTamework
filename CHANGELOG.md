@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Linking and admin spawning now save full companion checkpoints for offline
+  card details and Recall recovery. Recall progress no longer overlaps action captions.
+
 - Added a development prototype for player-led companion formations in Adventure mode, with spaced ground/flying positions around the player, slack for small movements, and ordinary follow recovery as fallback.
 
 - Restyled command HUD icons as cream glyphs, with distinct Follow and Recall
