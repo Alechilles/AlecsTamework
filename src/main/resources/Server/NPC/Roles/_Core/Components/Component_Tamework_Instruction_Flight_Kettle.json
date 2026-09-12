@@ -158,6 +158,348 @@
               "Name": "Tw_Kettle_Duration",
               "State": "Running"
             },
+            "Instructions": [
+              {
+                "Continue": true,
+                "Sensor": {
+                  "Type": "Timer",
+                  "Name": "Tw_Kettle_Duration",
+                  "State": "Running",
+                  "TimeRemainingRange": [
+                    0,
+                    30
+                  ]
+                },
+                "Actions": [
+                  {
+                    "Type": "FlockBeacon",
+                    "Message": "Tw_Kettle_Ending",
+                    "SendToSelf": false,
+                    "ExpirationTime": 2
+                  }
+                ]
+              },
+              {
+                "Continue": true,
+                "Sensor": {
+                  "Type": "Not",
+                  "Sensor": {
+                    "Type": "Timer",
+                    "Name": "Tw_Kettle_Duration",
+                    "State": "Running",
+                    "TimeRemainingRange": [
+                      0,
+                      30
+                    ]
+                  }
+                },
+                "Actions": [
+                  {
+                    "Type": "FlockBeacon",
+                    "Message": "Tw_Kettle_Active",
+                    "SendToSelf": false,
+                    "ExpirationTime": 2
+                  }
+                ]
+              },
+              {
+                "BodyMotion": {
+                  "Type": "TameworkFlyingOrbit",
+                  "Mode": "Kettle",
+                  "OrbitRadius": {
+                    "Compute": "KettleRadius"
+                  },
+                  "RelativeSpeed": {
+                    "Compute": "KettleRelativeSpeed"
+                  },
+                  "DesiredAltitudeRange": {
+                    "Compute": "KettleAltitudeRange"
+                  },
+                  "ClimbRelativeSpeed": 0.12,
+                  "SinkRelativeSpeed": 0.12,
+                  "AvoidObstacles": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "TreeMode": true,
+        "Sensor": {
+          "Type": "Self",
+          "Filters": [
+            {
+              "Type": "Flock",
+              "FlockStatus": "Follower"
+            }
+          ]
+        },
+        "Instructions": [
+          {
+            "Continue": true,
+            "Sensor": {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Or",
+                "Sensors": [
+                  {
+                    "Type": "Beacon",
+                    "Message": "Tw_Kettle_Active",
+                    "Range": 160
+                  },
+                  {
+                    "Type": "Beacon",
+                    "Message": "Tw_Kettle_Ending",
+                    "Range": 160
+                  }
+                ]
+              }
+            },
+            "Actions": [
+              {
+                "Type": "SetFlag",
+                "Name": "Tw_Kettle_Seen",
+                "SetTo": false
+              },
+              {
+                "Type": "SetFlag",
+                "Name": "Tw_Kettle_Leaving",
+                "SetTo": false
+              },
+              {
+                "Type": "SetFlag",
+                "Name": "Tw_Kettle_Departed",
+                "SetTo": false
+              }
+            ]
+          },
+          {
+            "Continue": true,
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Beacon",
+                  "Message": "Tw_Kettle_Ending",
+                  "Range": 160
+                },
+                {
+                  "Type": "Flag",
+                  "Name": "Tw_Kettle_Seen",
+                  "Set": false
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "SetFlag",
+                "Name": "Tw_Kettle_Departed",
+                "SetTo": true
+              }
+            ]
+          },
+          {
+            "Continue": true,
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Beacon",
+                  "Message": "Tw_Kettle_Active",
+                  "Range": 160
+                },
+                {
+                  "Type": "Not",
+                  "Sensor": {
+                    "Type": "Beacon",
+                    "Message": "Tw_Kettle_Ending",
+                    "Range": 160
+                  }
+                },
+                {
+                  "Type": "Flag",
+                  "Name": "Tw_Kettle_Seen",
+                  "Set": false
+                },
+                {
+                  "Type": "Flag",
+                  "Name": "Tw_Kettle_Departed",
+                  "Set": false
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "TimerStart",
+                "Name": "Tw_Kettle_JoinDelay",
+                "StartValueRange": [
+                  2,
+                  20
+                ],
+                "RestartValueRange": [
+                  2,
+                  20
+                ]
+              },
+              {
+                "Type": "TimerRestart",
+                "Name": "Tw_Kettle_JoinDelay"
+              },
+              {
+                "Type": "SetFlag",
+                "Name": "Tw_Kettle_Seen",
+                "SetTo": true
+              }
+            ]
+          },
+          {
+            "Continue": true,
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Beacon",
+                  "Message": "Tw_Kettle_Ending",
+                  "Range": 160
+                },
+                {
+                  "Type": "Flag",
+                  "Name": "Tw_Kettle_Seen",
+                  "Set": true
+                },
+                {
+                  "Type": "Timer",
+                  "Name": "Tw_Kettle_JoinDelay",
+                  "State": "Running"
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "SetFlag",
+                "Name": "Tw_Kettle_Departed",
+                "SetTo": true
+              }
+            ]
+          },
+          {
+            "Continue": true,
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Beacon",
+                  "Message": "Tw_Kettle_Ending",
+                  "Range": 160
+                },
+                {
+                  "Type": "Flag",
+                  "Name": "Tw_Kettle_Seen",
+                  "Set": true
+                },
+                {
+                  "Type": "Flag",
+                  "Name": "Tw_Kettle_Leaving",
+                  "Set": false
+                },
+                {
+                  "Type": "Flag",
+                  "Name": "Tw_Kettle_Departed",
+                  "Set": false
+                },
+                {
+                  "Type": "Timer",
+                  "Name": "Tw_Kettle_JoinDelay",
+                  "State": "Stopped"
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "TimerStart",
+                "Name": "Tw_Kettle_LeaveDelay",
+                "StartValueRange": [
+                  2,
+                  25
+                ],
+                "RestartValueRange": [
+                  2,
+                  25
+                ]
+              },
+              {
+                "Type": "TimerRestart",
+                "Name": "Tw_Kettle_LeaveDelay"
+              },
+              {
+                "Type": "SetFlag",
+                "Name": "Tw_Kettle_Leaving",
+                "SetTo": true
+              }
+            ]
+          },
+          {
+            "Continue": true,
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Flag",
+                  "Name": "Tw_Kettle_Leaving",
+                  "Set": true
+                },
+                {
+                  "Type": "Timer",
+                  "Name": "Tw_Kettle_LeaveDelay",
+                  "State": "Stopped"
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "SetFlag",
+                "Name": "Tw_Kettle_Departed",
+                "SetTo": true
+              }
+            ]
+          },
+          {
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Or",
+                  "Sensors": [
+                    {
+                      "Type": "Beacon",
+                      "Message": "Tw_Kettle_Active",
+                      "Range": 160
+                    },
+                    {
+                      "Type": "Beacon",
+                      "Message": "Tw_Kettle_Ending",
+                      "Range": 160
+                    }
+                  ]
+                },
+                {
+                  "Type": "Flag",
+                  "Name": "Tw_Kettle_Seen",
+                  "Set": true
+                },
+                {
+                  "Type": "Timer",
+                  "Name": "Tw_Kettle_JoinDelay",
+                  "State": "Stopped"
+                },
+                {
+                  "Type": "Flag",
+                  "Name": "Tw_Kettle_Departed",
+                  "Set": false
+                }
+              ]
+            },
             "BodyMotion": {
               "Type": "TameworkFlyingOrbit",
               "Mode": "Kettle",
@@ -173,54 +515,9 @@
               "ClimbRelativeSpeed": 0.12,
               "SinkRelativeSpeed": 0.12,
               "AvoidObstacles": true
-            },
-            "Actions": [
-              {
-                "Type": "FlockBeacon",
-                "Message": "Tw_Kettle_Active",
-                "SendToSelf": false,
-                "ExpirationTime": 1
-              }
-            ]
+            }
           }
         ]
-      },
-      {
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "Self",
-              "Filters": [
-                {
-                  "Type": "Flock",
-                  "FlockStatus": "Follower"
-                }
-              ]
-            },
-            {
-              "Type": "Beacon",
-              "Message": "Tw_Kettle_Active",
-              "Range": 128
-            }
-          ]
-        },
-        "BodyMotion": {
-          "Type": "TameworkFlyingOrbit",
-          "Mode": "Kettle",
-          "OrbitRadius": {
-            "Compute": "KettleRadius"
-          },
-          "RelativeSpeed": {
-            "Compute": "KettleRelativeSpeed"
-          },
-          "DesiredAltitudeRange": {
-            "Compute": "KettleAltitudeRange"
-          },
-          "ClimbRelativeSpeed": 0.12,
-          "SinkRelativeSpeed": 0.12,
-          "AvoidObstacles": true
-        }
       }
     ]
   }
