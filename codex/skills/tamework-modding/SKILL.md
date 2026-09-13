@@ -109,3 +109,15 @@ Load more than one focused skill when a change crosses boundaries.
    current guard checks.
 6. If base-game evidence was used, cite the Workshop corpus/version plus FQCN,
    method, asset path, or UI path that drove the Tamework decision.
+
+## Localize Player-Facing Text
+
+Follow `AGENTS.md` → **Player-Facing Localization** for every UI, HUD, tooltip,
+notification, prompt, command response, help description, and validation message.
+Use language keys and whole-sentence placeholders, resolve for the recipient,
+and supply actual translations in every supported locale in the same change
+(`en-US`, `de-DE`, `es-ES`, `fr-FR`, `fr-CA`, `pt-BR`). English fallback copies
+and key parity alone do not complete localization. Preserve player names,
+command syntax, IDs, and placeholders. Check the current language directories
+when adding support; do not assume Spanish is exempt because legacy content
+was partial.
