@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
+import com.alechilles.alecstamework.ui.TraitDescriptionFormatter;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -210,15 +211,16 @@ final class CommandLinkedPanelProgressionPresentationService {
                     ? ratioToLowerBound(value, min, defaultValue)
                     : ratioToUpperBound(value, defaultValue, max);
             String label = resolveLabel(definition, language);
+            Double flatOffset = flatDisposition && "HappinessGainMultiplier".equalsIgnoreCase(definition.getEffectKey())
+                    ? CompanionHappinessModifierService.resolveFlatDispositionOffset(value, happinessConfig.getDisposition())
+                    : null;
             indicators.add(new LinkedNpcTraitIndicator(
                     resolveIconGlyph(label),
                     resolveIconTexturePath(definition),
                     label,
-                    buildTraitTooltip(language, label, value, min, defaultValue, max,
-                            flatDisposition && "HappinessGainMultiplier".equalsIgnoreCase(definition.getEffectKey())
-                                    ? CompanionHappinessModifierService.resolveFlatDispositionOffset(
-                                            value, happinessConfig.getDisposition())
-                                    : null),
+                    TraitDescriptionFormatter.append(
+                            buildTraitTooltip(language, label, value, min, defaultValue, max, flatOffset),
+                            definition, value, flatOffset, language),
                     fillRatio,
                     !belowDefault,
                     belowDefault

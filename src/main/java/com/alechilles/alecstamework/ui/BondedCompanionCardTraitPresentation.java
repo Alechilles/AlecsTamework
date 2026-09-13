@@ -1,7 +1,9 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
+import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -28,6 +30,7 @@ final class BondedCompanionCardTraitPresentation {
         }
         ArrayList<LinkedNpcTraitIndicator> indicators = new ArrayList<>(
                 LinkedNpcTraitIndicatorBinder.MAX_VISIBLE_TRAIT_INDICATORS);
+        TwHappinessConfig happinessConfig = TwHappinessConfig.resolveForRole(row.roleId());
         for (TwTraitConfig.TraitDefinition definition : config.getTraits()) {
             if (definition == null || definition.getId() == null) {
                 continue;
@@ -43,9 +46,16 @@ final class BondedCompanionCardTraitPresentation {
             boolean belowDefault = current < baseline;
             String label = LocalizedText.resolveConfigValue(language,
                     definition.getDisplayName(), definition.getId());
+            Double flatOffset = happinessConfig != null
+                    && happinessConfig.getDisposition().getMode() == TwHappinessConfig.DispositionMode.FLAT
+                    && "HappinessGainMultiplier".equalsIgnoreCase(definition.getEffectKey())
+                    ? CompanionHappinessModifierService.resolveFlatDispositionOffset(value, happinessConfig.getDisposition())
+                    : null;
             indicators.add(new LinkedNpcTraitIndicator(iconGlyph(label),
                     definition.getIconPath(), label,
-                    tooltip(label, current, minimum, baseline, maximum, belowDefault),
+                    TraitDescriptionFormatter.append(
+                            tooltip(language, label, current, minimum, baseline, maximum, belowDefault),
+                            definition, value, flatOffset, language),
                     belowDefault ? ratio(baseline - current, baseline - minimum)
                             : ratio(current - baseline, maximum - baseline),
                     !belowDefault, belowDefault));
@@ -79,16 +89,18 @@ final class BondedCompanionCardTraitPresentation {
         return values;
     }
 
-    private static String tooltip(String label, double value, double minimum,
+    private static String tooltip(String language, String label, double value, double minimum,
                                   double baseline, double maximum,
                                   boolean belowDefault) {
         double bound = belowDefault ? minimum : maximum;
         int distance = (int) Math.round(100D * (belowDefault
                 ? ratio(baseline - value, baseline - minimum)
                 : ratio(value - baseline, maximum - baseline)));
-        return label + ": " + format(value) + " / " + format(bound)
-                + (belowDefault ? " min" : " max") + " ("
-                + (belowDefault && distance > 0 ? "-" : "") + distance + "%)";
+        return LocalizedText.format(language, "tamework.ui.linkedPanel.trait.tooltip",
+                label, format(value), format(bound),
+                LocalizedText.resolve(language, belowDefault
+                        ? "tamework.ui.linkedPanel.trait.minimum" : "tamework.ui.linkedPanel.trait.maximum"),
+                (belowDefault && distance > 0 ? "-" : "") + distance + "%");
     }
 
     private static String iconGlyph(String label) {

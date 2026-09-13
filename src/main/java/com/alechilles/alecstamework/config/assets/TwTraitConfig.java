@@ -161,6 +161,15 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
         .documentation("Display name shown to players. May be raw text or a server.lang key.")
         .add()
         .<String>append(
+            new KeyedCodec<>("Description", Codec.STRING),
+            (definition, value) -> definition.description = value,
+            definition -> definition.description
+        )
+        .documentation("Optional tooltip description language key. Supports {value}, {percent}, {signedPercent}, "
+                + "{points}, and {direction} (localized increase/decrease/change). Omitted uses the built-in effect description. "
+                + "Inherited with the Traits array; explicit Traits replaces the parent array.")
+        .add()
+        .<String>append(
             new KeyedCodec<>("EffectKey", Codec.STRING),
             (definition, value) -> definition.effectKey = value,
             definition -> definition.effectKey
@@ -706,6 +715,7 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
     public static final class TraitDefinition {
         private String id;
         private String displayName;
+        private String description;
         private String effectKey;
         private String iconPath;
         private double weight = 1.0;
@@ -725,6 +735,12 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public String getDisplayName() {
             return displayName;
+        }
+
+        /** Optional localized description template; null selects the built-in effect description. */
+        @Nullable
+        public String getDescription() {
+            return description;
         }
 
         public String getEffectKey() {

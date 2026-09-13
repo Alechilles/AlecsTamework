@@ -75,6 +75,9 @@ Each entry in `Traits` defines one trait type.
 Fields:
 - `Id`: stable internal trait id.
 - `DisplayName`: user-facing name.
+- `Description`: optional language key for the next line of the trait tooltip.
+  Omitted or blank descriptions use the built-in description for known effect keys.
+  Custom effects without a description keep the existing tooltip header.
 - `EffectKey`: runtime effect this trait modifies.
 - `IconPath`: icon asset used by the linked panel and related UI.
 - `Weight`: chance to appear in natural rolls.
@@ -95,6 +98,38 @@ Authoring guidance:
 - `NaturalMin` and `NaturalMax` define the normal wild or non-breeding range.
 - `BreedingMin` and `BreedingMax` define the larger inherited or bred range.
 - `IconPath` should point at a real asset if you want icon rendering instead of glyph fallback.
+
+### Description placeholders
+
+Put the template in your language files and reference its key from `Description`.
+For example, `"Description": "mymod.traits.strength.description"` can refer to:
+
+```text
+mymod.traits.strength.description = {direction} attack damage by {percent}%.
+```
+
+A value of `1.2` displays “Increases attack damage by 20%.”; `0.8` displays
+“Decreases attack damage by 20%.” The template is resolved in the viewer's language.
+
+| Placeholder | Meaning |
+| --- | --- |
+| `{direction}` | Localized “Increases”, “Decreases”, or “Changes” for a neutral effect. |
+| `{percent}` | Absolute effect change in percent, without the `%` symbol. |
+| `{signedPercent}` | The same percentage with a positive or negative sign. |
+| `{value}` | The trait's stored numeric value. |
+| `{points}` | Absolute happiness offset in FLAT disposition mode; zero otherwise. |
+
+Numbers use the viewer's locale and up to two decimal places. Percentage changes
+are relative to the neutral multiplier `1`, not the configured `Default` or the
+breeding-range bar. `DamageTakenMultiplier` uses the inverse: `1.2` means 16.67%
+less damage received. Harvest uses its clamped 0–100% bonus chance. FLAT
+disposition selects direction from its resolved happiness offset and uses points.
+Descriptions explain this trait's contribution; other modifiers can affect the final result.
+
+`Description` follows the existing `Traits` array inheritance: omitting `Traits`
+inherits it, while an explicit array replaces the parent's entries. Existing
+assets need no edits to receive built-in descriptions. The config editor discovers
+the field from the codec, and normal asset load/remove events refresh it.
 
 ## Defaults and Cross-System Notes
 - The optional `Alec's Tamework! Examples` pack includes

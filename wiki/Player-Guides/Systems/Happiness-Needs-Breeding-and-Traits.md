@@ -41,6 +41,9 @@ Many Tamework-powered mods share a cluster of long-term progression systems. The
 - Life stage can affect what interactions or systems are available
 
 ## Traits
+- Hover over a trait in the command panel to see a description below its value.
+  Descriptions explain the effect and its amount, including increases, decreases,
+  and flat happiness points. The effect percentage differs from the breeding-range bar.
 - Traits are inherited or rolled attributes that can change stats or gameplay behavior
 - Mods may expose trait icons, labels, or debug commands for them
 - The exact trait pool comes from the mod's trait config
