@@ -176,6 +176,37 @@ class TameworkCommandSelectionPageRefreshTest {
     }
 
     @Test
+    void guideBlocksUnderlyingCommandsAndReturnsToBothRosterKinds() throws Exception {
+        for (String roster : List.of("",
+                "\"RosterStorage\":\"OwnerCommandFamily\",\"CommandFamilyId\":\"test:family\",",
+                "\"RosterStorage\":\"BondedCompanions\",\"BondedRosterId\":\"test:roster\",")) {
+            TwCommandItemConfig config = TwCommandItemConfig.CODEC.decode(BsonDocument.parse(
+                    "{" + roster + "\"CommandList\":[{\"Id\":\"Follow\",\"ShowInRadial\":true}]}"),
+                    new com.hypixel.hytale.codec.ExtraInfo());
+            NavigationFixture fixture = new NavigationFixture();
+            CapturedPackets packets = new CapturedPackets();
+            TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(), fixture, config);
+            build(page);
+            page.handleDataEvent(null, null, guideEvent("guide:open"));
+            CommandSelectionEventData assignment = new CommandSelectionEventData();
+            assignment.primaryCommandValue = "Follow";
+            page.handleDataEvent(null, null, assignment);
+            assertTrue(fixture.selections.isEmpty(), "Reading help must not change a command assignment.");
+            page.handleDataEvent(null, null, guideEvent("guide:close"));
+            assertEquals(0, fixture.source.closes, "Returning from help must keep the roster session alive.");
+            page.handleDataEvent(null, null, assignment);
+            assertEquals(List.of("Follow"), fixture.selections);
+            page.onDismiss(null, null);
+        }
+    }
+
+    private static CommandSelectionEventData guideEvent(String action) {
+        return CommandSelectionEventData.CODEC.decode(
+                new BsonDocument("CommandId", new org.bson.BsonString(action)),
+                new com.hypixel.hytale.codec.ExtraInfo());
+    }
+
+    @Test
     void initialBuildSeedsDedupAndUnchangedSafetyRefreshSendsNothing() throws Exception {
         CapturedPackets packets = new CapturedPackets();
         AtomicReference<CommandPanelFeaturePresentation> feature = new AtomicReference<>(feature(4, false));

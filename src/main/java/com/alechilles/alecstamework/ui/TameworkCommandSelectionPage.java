@@ -57,6 +57,8 @@ public final class TameworkCommandSelectionPage
     final TwCommandItemConfig config;
     final LinkedNpcPanelCardBinder.CardBindingConfig cardBindingConfig;
     private final CommandSelectionRosterEventBoundary rosterEventBoundary;
+    private final TameworkCompanionGuide companionGuide =
+            new TameworkCompanionGuide(this::resolveLanguage);
     private final boolean requireUnlinkConfirm;
     private final UUID playerUuid;
     private final long linkedPanelGeneration;
@@ -458,6 +460,10 @@ public final class TameworkCommandSelectionPage
             BondedCompanionPanelChrome.bindToolbar(commandBuilder, eventBuilder, this, null);
             CommandSelectionPageEventBinder.bindClose(eventBuilder);
             CommandSelectionPageEventBinder.bindHotswapControls(eventBuilder);
+            companionGuide.build(commandBuilder, eventBuilder);
+            eventBuilder.addEventBinding(
+                    com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType.Activating,
+                    "#CommandMenuHelpButton", EventData.of(EVENT_COMMAND_ID, "guide:open"), false);
             seedRefreshValues();
             refreshTransaction.seedOverlayRevisions(groupAssignOverlay.revision(), featureController.reviveOverlayRevision());
             linkedPanelRuntime.seedRemovalConfirmOverlayRevision();
@@ -485,6 +491,16 @@ public final class TameworkCommandSelectionPage
     public void handleDataEvent(@Nonnull Ref<EntityStore> ref,
                                 @Nonnull Store<EntityStore> store,
                                 @Nonnull CommandSelectionEventData data) {
+        if (dismissed || navigationPending || !isCurrentLinkedPanelOwner()) return;
+        String guideAction = data.commandId == null ? "" : data.commandId.trim();
+        if (guideAction.startsWith("guide:")) {
+            UICommandBuilder commands = new UICommandBuilder();
+            companionGuide.handle(guideAction, commands);
+            packetSender.send(commands, new UIEventBuilder());
+            return;
+        }
+        // The guide has no companion authority; ignore queued controls behind it.
+        if (companionGuide.isVisible()) return;
         if (removalConfirmOverlay.isVisible()
                 && (data.primaryCommandValue != null || data.hotswapQValue != null
                 || data.hotswapEValue != null || data.hotswapRValue != null)) {
@@ -510,15 +526,6 @@ public final class TameworkCommandSelectionPage
             return;
         }
         String receivedCommandId = data.commandId == null ? "" : data.commandId.trim();
-        if (dismissed && !navigationPending) {
-            return;
-        }
-        if (navigationPending) {
-            return;
-        }
-        if (!isCurrentLinkedPanelOwner()) {
-            return;
-        }
         String commandId = receivedCommandId;
         if (handleRemovalConfirmation(commandId)) {
             return;

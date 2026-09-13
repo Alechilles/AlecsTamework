@@ -31,6 +31,22 @@ Parent: [Runtime Subsystems](/mod/alecs-tamework/runtime-subsystems) | [Develope
 - `LinkedNpcPanelStatusTextService`
 - `LinkedNpcTraitIndicatorBinder`
 
+## Companion guide
+
+The standard command page owns a `TameworkCompanionGuide` overlay for both
+ordinary and bonded panels. Its `guide:` events only change local presentation;
+they do not enter companion action routing. While the guide is visible, the
+page ignores underlying command and assignment events. Closing it hides the
+overlay and keeps the mounted panel and its session intact.
+
+Guide examples are read-only UI with sample values. They do not create NPCs,
+resolve live companions, issue commands, or save state. The guide has no
+executor, listener, or persistence owner; its lifetime is the command page's.
+
+All guide copy, including sample labels and page navigation, uses
+`tamework.ui.guide.*` language keys. Each supported locale includes English
+fallback copy for translation. The UI document contains no literal guide text.
+
 ## Persistence model
 Legacy command tools persist their link list, group metadata, panel
 preferences, and active or inactive selection on item metadata. A link record

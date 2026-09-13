@@ -13,6 +13,17 @@ The linked panel is the side panel that appears with Tamework command tools. It 
 ![Tamework UI Showcase](https://wiki.hytalemodding.dev/storage/mods/019d3092-1857-713f-86a6-60f15c4e0a9e/files/9d39db03-a1d0-4805-8ded-d1a84d8278e8.jpg)
 
 ## What the panel shows
+Use **? Help** at the top of the command menu to open the **Companion Guide**.
+Choose a topic on the left to learn about cards, commands and groups, care,
+breeding, traits and talents, capture and coops, finding and recovery, bonded
+companions, travel and flight, or world utilities. The guide also covers taming,
+ownership, linking, and naming for new players.
+
+Example cards use sample values and cannot issue commands or change your
+companions. Features, controls, and requirements depend on the animal pack and
+server settings. Use the guide's Back or close button to return to the existing
+panel without changing its filters or selection.
+
 - Linked companions for the current tool
 - Active and inactive status
 - Loaded, unloaded, captured, housed in a coop, roster-stored,

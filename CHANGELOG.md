@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Added a Companion Guide through the command menu's Help button, with eleven
+  topics, read-only example cards, and language keys for all supported locales.
+
 - Captured, cooped, and unloaded companions now show location details directly
   on Linked and Owned cards. Capture sightings name their item and storage
   container when known, with last-seen details and generic labels for older sightings.
