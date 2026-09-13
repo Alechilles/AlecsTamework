@@ -24,7 +24,7 @@ public final class TameworkGetAlarmCommand extends AbstractWorldCommand {
     private static final String DEFAULT_ALARM_NAME = "Harvest_Ready";
 
     public TameworkGetAlarmCommand() {
-        super("alarm", "Get alarm status of the NPC you are looking at.");
+        super("alarm", "server.tamework.commands.getAlarm.description");
         setAllowsExtraArguments(true);
     }
 
@@ -36,15 +36,13 @@ public final class TameworkGetAlarmCommand extends AbstractWorldCommand {
         Ref<EntityStore> senderRef = commandContext.isPlayer() ? commandContext.senderAsPlayerRef() : null;
         Ref<EntityStore> npcRef = resolveTarget(store, senderRef, world, args);
         if (npcRef == null || !npcRef.isValid()) {
-            commandContext.sender().sendMessage(Message.raw(commandContext.isPlayer()
-                    ? "No NPC found in view."
-                    : "No NPC resolved. Console usage requires an NPC UUID."));
+            commandContext.sender().sendMessage(commandContext.isPlayer() ? Message.translation("server.tamework.commands.getAlarm.no.npc.found.in.view") : Message.translation("server.tamework.commands.getAlarm.no.npc.resolved.console.usage.requires.an"));
             return;
         }
 
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
         if (npc == null) {
-            commandContext.sender().sendMessage(Message.raw("Target is not an NPC."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getAlarm.target.is.not.an.npc"));
             return;
         }
 
@@ -53,7 +51,7 @@ public final class TameworkGetAlarmCommand extends AbstractWorldCommand {
                 : DEFAULT_ALARM_NAME;
         Alarm alarm = NpcAlarmAccess.resolveAlarm(npcRef, store, alarmName);
         if (alarm == null) {
-            commandContext.sender().sendMessage(Message.raw("NPC has no alarm store."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getAlarm.npc.has.no.alarm.store"));
             return;
         }
         Instant now = resolveGameTime(store);
@@ -77,9 +75,7 @@ public final class TameworkGetAlarmCommand extends AbstractWorldCommand {
                 }
             }
         }
-        commandContext.sender().sendMessage(Message.raw(
-                "Alarm " + alarmName + " for NPC " + npcUuid + " is " + status + "." + remainingText
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getAlarm.alarm.for.npc.is").param("0", String.valueOf(alarmName)).param("1", String.valueOf(npcUuid)).param("2", String.valueOf(status)).param("3", String.valueOf(remainingText)));
     }
 
     private static Ref<EntityStore> resolveTarget(Store<EntityStore> store,

@@ -5,7 +5,7 @@ import com.hypixel.hytale.server.core.command.system.basecommands.AbstractComman
 /** Groups NPC spawn commands. */
 public final class TameworkNpcSpawnCommand extends AbstractCommandCollection {
     public TameworkNpcSpawnCommand() {
-        super("spawn", "Spawn Tamework NPCs.");
+        super("spawn", "server.tamework.commands.npcSpawn.description");
         addSubCommand(new TameworkNpcSpawnTamedCommand());
     }
 }

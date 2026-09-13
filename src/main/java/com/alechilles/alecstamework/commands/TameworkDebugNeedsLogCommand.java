@@ -5,7 +5,7 @@ import com.hypixel.hytale.server.core.command.system.basecommands.AbstractComman
 /** Groups needs debug logging switches. */
 public final class TameworkDebugNeedsLogCommand extends AbstractCommandCollection {
     public TameworkDebugNeedsLogCommand() {
-        super("needs", "Needs debug logging commands.");
+        super("needs", "server.tamework.commands.debugNeedsLog.description");
         addSubCommand(new TameworkDebugNeedsConsumeCommand());
         addSubCommand(new TameworkDebugNeedsDamageCommand());
         addSubCommand(new TameworkDebugNeedsSeekCommand());

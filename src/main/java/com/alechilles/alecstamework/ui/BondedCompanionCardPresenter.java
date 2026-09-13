@@ -155,8 +155,8 @@ final class BondedCompanionCardPresenter {
             ProgressionSummary progression,
             @Nullable String language
     ) {
-        commands.set(entrySelector + " #BondedName.Text", displayName(row));
-        commands.set(entrySelector + " #BondedName.TooltipText", displayName(row));
+        commands.set(entrySelector + " #BondedName.Text", displayName(row, language));
+        commands.set(entrySelector + " #BondedName.TooltipText", displayName(row, language));
         commands.set(entrySelector + " #BondedSpecies.Text",
                 identityLine(row));
         String levelLabel = progression.visible() ? LocalizedText.format(language,
@@ -720,14 +720,14 @@ final class BondedCompanionCardPresenter {
         return anchor;
     }
 
-    private static String displayName(BondedCompanionPanelPresentation row) {
+    private static String displayName(BondedCompanionPanelPresentation row, @Nullable String language) {
         if (row.displayName() != null) {
             return row.displayName();
         }
         if (row.species() != null) {
             return row.species();
         }
-        return LocalizedText.resolve((String) null,
+        return LocalizedText.resolve(language,
                 "tamework.ui.linkedPanel.subtitle.defaultNpcName");
     }
 
@@ -744,15 +744,15 @@ final class BondedCompanionCardPresenter {
         TwLevelingConfig config = TwLevelingConfig.resolveById(
                 attributes.get("levelingConfigId"));
         if (config == null || !config.isEnabled()) {
-            return "Level: " + progression.level();
+            return LocalizedText.format(language, "tamework.ui.roster.progression.level", progression.level());
         }
         int maxLevel = Math.max(1, config.getLevels().getMaxLevel());
         int level = Math.min(progression.level(), maxLevel);
         if (level >= maxLevel) {
             return LinkedNpcPanelProgressionBinder.resolveXpTooltip(
-                    new LinkedNpcEntry.FutureStat("Level " + level + " MAX",
+                    new LinkedNpcEntry.FutureStat(LocalizedText.format(language, "tamework.ui.talents.levelSummary.max", level),
                             1, 1,
-                            "Level: " + level + "/" + maxLevel + " - MAX XP",
+                            LocalizedText.format(language, "tamework.ui.roster.progression.max", level, maxLevel),
                             modifierTooltip(config, level, attributes, roleId, language)));
         }
         int currentXp = nonNegativeRoundedInt(attributes.get("currentXp"));
@@ -760,10 +760,9 @@ final class BondedCompanionCardPresenter {
                 config.getLevels().getBaseXp()
                         * Math.pow(config.getLevels().getGrowthFactor(), level - 1)));
         return LinkedNpcPanelProgressionBinder.resolveXpTooltip(
-                new LinkedNpcEntry.FutureStat("Level " + level + " XP",
+                new LinkedNpcEntry.FutureStat(LocalizedText.format(language, "tamework.ui.roster.progression.level", level),
                         currentXp, requiredXp,
-                        "Level: " + level + "/" + maxLevel + " - "
-                                + currentXp + "/" + requiredXp + " XP",
+                        LocalizedText.format(language, "tamework.ui.roster.progression.xp", level, maxLevel, currentXp, requiredXp),
                         modifierTooltip(config, level, attributes, roleId, language)));
     }
 

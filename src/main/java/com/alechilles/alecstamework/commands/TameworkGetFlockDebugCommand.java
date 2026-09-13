@@ -43,7 +43,7 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
     private static final String DIRECT_FOLLOW_ALARM = "Tamework_Baby_DirectFollow_Window";
 
     public TameworkGetFlockDebugCommand() {
-        super("flock", "Get flock direct-follow debug state for the NPC you are looking at.");
+        super("flock", "server.tamework.commands.getFlockDebug.description");
     }
 
     @Override
@@ -54,13 +54,13 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
                            @Nonnull World world) {
         TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
         if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.raw("No NPC found in view."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getFlockDebug.no.npc.found.in.view"));
             return;
         }
 
         NPCEntity npc = store.getComponent(candidate.ref, NPCEntity.getComponentType());
         if (npc == null) {
-            commandContext.sender().sendMessage(Message.raw("Target is not an NPC."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getFlockDebug.target.is.not.an.npc"));
             return;
         }
 
@@ -77,7 +77,7 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
         LeashDebugSnapshot leash = resolveLeashSnapshot(candidate.ref, npc, store, stageGate, currentState);
 
         StringBuilder message = new StringBuilder();
-        message.append("Flock debug for NPC ")
+        message.append(com.alechilles.alecstamework.localization.LocalizedText.resolve(playerRef, "tamework.commands.getFlockDebug.heading")).append(" ")
                 .append(npc.getUuid())
                 .append(": role=")
                 .append(roleId != null ? roleId : "<unknown>")
@@ -127,7 +127,7 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
         commandContext.sender().sendMessage(Message.raw(message.toString()));
 
         StringBuilder leashMessage = new StringBuilder();
-        leashMessage.append("Flock leash debug: stateDefault=")
+        leashMessage.append(com.alechilles.alecstamework.localization.LocalizedText.resolve(playerRef, "tamework.commands.getFlockDebug.leashHeading")).append(" stateDefault=")
                 .append(leash.stateDefault)
                 .append(", leashEnabled=")
                 .append(leash.leashEnabled)

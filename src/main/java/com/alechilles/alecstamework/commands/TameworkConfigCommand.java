@@ -21,7 +21,7 @@ import javax.annotation.Nonnull;
 public final class TameworkConfigCommand extends AbstractPlayerCommand {
 
     public TameworkConfigCommand() {
-        super("open", "Open the Tamework config editor.");
+        super("open", "server.tamework.commands.config.description");
         requirePermission(TameworkConfigPermission.NODE);
         setPermissionGroups(TameworkConfigPermission.adminPermissionGroups());
         setAllowsExtraArguments(true);
@@ -35,22 +35,22 @@ public final class TameworkConfigCommand extends AbstractPlayerCommand {
                            @Nonnull World world) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null || plugin.getConfigOverrideManager() == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework config editor is not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.config.tamework.config.editor.is.not.available"));
             return;
         }
         if (!TameworkConfigPermission.hasAccess(commandContext.sender())) {
-            commandContext.sender().sendMessage(Message.raw("You do not have permission to use /tw config."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.config.you.do.not.have.permission.to.use"));
             return;
         }
 
         Player player = store.getComponent(ref, Player.getComponentType());
         if (player == null || player.getPageManager() == null) {
-            commandContext.sender().sendMessage(Message.raw("Unable to open the config editor right now."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.config.unable.to.open.the.config.editor.right"));
             return;
         }
         PlayerRef uiPlayerRef = player.getPlayerRef();
         if (uiPlayerRef == null || !uiPlayerRef.isValid()) {
-            commandContext.sender().sendMessage(Message.raw("Unable to open the config editor right now."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.config.unable.to.open.the.config.editor.right"));
             return;
         }
 
@@ -76,7 +76,7 @@ public final class TameworkConfigCommand extends AbstractPlayerCommand {
                             "Failed to open Tamework config editor page."
                     ).build()
             );
-            commandContext.sender().sendMessage(Message.raw("Unable to open the config editor right now."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.config.unable.to.open.the.config.editor.right"));
         }
     }
 }

@@ -413,7 +413,7 @@ public final class TameworkCommandSelectionPage
             String runningVersion = plugin == null || plugin.getManifest().getVersion() == null
                     ? "unknown" : plugin.getManifest().getVersion().toString();
             commandBuilder.set("#TameworkCommandMenuLogo.TooltipText",
-                    "Alec's Tamework! v" + runningVersion + "\nby Alec (Alechilles)");
+                    LocalizedText.format(resolveLanguage(), "tamework.ui.shared.brandTooltip", runningVersion));
             commandBuilder.set("#CommandMenuSettings.Visible", canOpenSettings(ref, store));
             commandBuilder.append("#TameworkCommandMenuWheel", LINKED_PANEL_UI_PATH);
             BondedCompanionPanelChrome.bind(commandBuilder, rosterEventBoundary.bondedRoster());

@@ -31,19 +31,19 @@ import static com.hypixel.hytale.server.npc.commands.NPCCommand.NPC_ROLE;
  */
 public final class TameworkNpcSpawnTamedCommand extends AbstractPlayerCommand {
     /** Uses Hytale's native role type so tab completion mirrors {@code /npc spawn}. */
-    private final RequiredArg<BuilderInfo> roleArg = withRequiredArg("role", "NPC role to spawn.", NPC_ROLE);
+    private final RequiredArg<BuilderInfo> roleArg = withRequiredArg("role", "server.tamework.commands.npcSpawnTamed.argument.role", NPC_ROLE);
     private final DefaultArg<Integer> countArg = withDefaultArg(
-            "count", "Number of NPCs to spawn.", INTEGER, 1, "1"
+            "count", "server.tamework.commands.npcSpawnTamed.argument.count", INTEGER, 1, "1"
     );
     private final OptionalArg<Double> radiusArg = withOptionalArg(
-            "radius", "Maximum radius for the batch spawn formation.", DOUBLE
+            "radius", "server.tamework.commands.npcSpawnTamed.argument.radius", DOUBLE
     );
     private final OptionalArg<String> attachmentArg = withOptionalArg(
-            "attachment", "Attachment override formatted as slot:value.", STRING
+            "attachment", "server.tamework.commands.npcSpawnTamed.argument.attachment", STRING
     );
 
     public TameworkNpcSpawnTamedCommand() {
-        super("tamed", "Spawn owned and tamed NPCs from a role id.");
+        super("tamed", "server.tamework.commands.npcSpawnTamed.description");
     }
 
     @Override
@@ -54,12 +54,12 @@ public final class TameworkNpcSpawnTamedCommand extends AbstractPlayerCommand {
                            @Nonnull World world) {
         int count = countArg.get(commandContext);
         if (count <= 0) {
-            commandContext.sender().sendMessage(Message.raw("--count must be greater than zero."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.npcSpawnTamed.count.must.be.greater.than.zero"));
             return;
         }
         Double radius = radiusArg.provided(commandContext) ? radiusArg.get(commandContext) : null;
         if (radius != null && (!Double.isFinite(radius) || radius <= 0.0)) {
-            commandContext.sender().sendMessage(Message.raw("--radius must be a positive number."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.npcSpawnTamed.radius.must.be.a.positive.number"));
             return;
         }
         Map<String, String> attachments = parseAttachment(
@@ -74,13 +74,15 @@ public final class TameworkNpcSpawnTamedCommand extends AbstractPlayerCommand {
         BuilderInfo roleInfo = roleArg.get(commandContext);
         String roleId = npcPlugin.getName(roleInfo.getIndex());
         if (roleId == null || roleId.isBlank()) {
-            commandContext.sender().sendMessage(Message.raw("Unable to resolve NPC role id."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.npcSpawnTamed.unable.to.resolve.npc.role.id"));
             return;
         }
         Player player = store.getComponent(ref, Player.getComponentType());
         Tamework plugin = Tamework.getInstance();
         if (player == null || plugin == null) {
-            commandContext.sender().sendMessage(Message.raw(player == null ? "No player context." : "Tamework plugin not available."));
+            commandContext.sender().sendMessage(Message.translation(player == null
+                    ? "server.tamework.commands.npcSpawnTamed.playerContextUnavailable"
+                    : "server.tamework.commands.npcSpawnTamed.pluginUnavailable"));
             return;
         }
         new NpcSpawnCommandService(plugin).spawnTamedOwnedBatch(
@@ -98,9 +100,7 @@ public final class TameworkNpcSpawnTamedCommand extends AbstractPlayerCommand {
         if (separator <= 0 || separator == raw.length() - 1
                 || raw.substring(0, separator).trim().isBlank()
                 || raw.substring(separator + 1).trim().isBlank()) {
-            context.sender().sendMessage(Message.raw(
-                    "--attachment must use slot:value, for example --attachment=coat:browntabby."
-            ));
+            context.sender().sendMessage(Message.translation("server.tamework.commands.npcSpawnTamed.attachment.must.use.slot.value.for.example"));
             return null;
         }
         Map<String, String> attachments = new LinkedHashMap<>();
@@ -112,28 +112,47 @@ public final class TameworkNpcSpawnTamedCommand extends AbstractPlayerCommand {
                                         @Nonnull String roleId,
                                         @Nonnull NpcSpawnCommandService.SpawnBatchResult result) {
         if (result.getFailureMessage() != null) {
-            context.sendMessage(Message.raw(result.getFailureMessage()));
+            context.sendMessage(resultMessage(
+                    result.getFailureMessageKey(), result.getFailureMessage(), roleId));
             return;
         }
-        StringBuilder message = new StringBuilder("Spawned ");
-        message.append(result.getSpawnedCount()).append('/').append(result.getRequestedCount())
-                .append(" tamed NPC(s) with role '").append(roleId).append("'.");
+        Message message = Message.translation("server.tamework.commands.npcSpawnTamed.result.summary")
+                .param("spawned", result.getSpawnedCount())
+                .param("requested", result.getRequestedCount())
+                .param("role", roleId);
         if (result.hadHeldCommandItem()) {
-            message.append(" Auto-linked ").append(result.getLinkedCount()).append(" to the held command item.");
+            message.insert(" ").insert(Message.translation(
+                    "server.tamework.commands.npcSpawnTamed.result.autoLinked")
+                    .param("linked", result.getLinkedCount()));
         } else {
-            message.append(" No command item was held for auto-linking.");
+            message.insert(" ").insert(Message.translation(
+                    "server.tamework.commands.npcSpawnTamed.result.noHeldCommandItem"));
         }
         if (result.getAppliedAttachments() != null && !result.getAppliedAttachments().isEmpty()) {
-            message.append(" Applied attachments: ").append(formatAttachments(result.getAppliedAttachments())).append('.');
+            message.insert(" ").insert(Message.translation(
+                    "server.tamework.commands.npcSpawnTamed.result.appliedAttachments")
+                    .param("attachments", formatAttachments(result.getAppliedAttachments())));
         }
         if (!result.getInvalidAttachments().isEmpty()) {
-            message.append(" Ignored invalid attachments: ")
-                    .append(String.join(", ", result.getInvalidAttachments())).append('.');
+            message.insert(" ").insert(Message.translation(
+                    "server.tamework.commands.npcSpawnTamed.result.invalidAttachments")
+                    .param("attachments", String.join(", ", result.getInvalidAttachments())));
         }
         if (result.getStoppedReason() != null) {
-            message.append(' ').append(result.getStoppedReason());
+            message.insert(" ").insert(resultMessage(
+                    result.getStoppedReasonKey(), result.getStoppedReason(), roleId));
         }
-        context.sendMessage(Message.raw(message.toString()));
+        context.sendMessage(message);
+    }
+
+    @Nonnull
+    private static Message resultMessage(@Nullable String key,
+                                         @Nonnull String fallback,
+                                         @Nonnull String roleId) {
+        if (key == null || key.isBlank()) {
+            return Message.raw(fallback);
+        }
+        return Message.translation("server." + key).param("role", roleId);
     }
 
     private static String formatAttachments(@Nonnull Map<String, String> attachments) {

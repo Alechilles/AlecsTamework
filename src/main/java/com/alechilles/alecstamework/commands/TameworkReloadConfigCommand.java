@@ -24,7 +24,7 @@ public final class TameworkReloadConfigCommand extends AbstractWorldCommand {
     private static final String COMMAND_NAME = "/tw config reload";
 
     public TameworkReloadConfigCommand() {
-        super("reload", "Reload Tamework item feature configs.");
+        super("reload", "server.tamework.commands.reloadConfig.description");
         setAllowsExtraArguments(true);
     }
 
@@ -34,7 +34,7 @@ public final class TameworkReloadConfigCommand extends AbstractWorldCommand {
                            @Nonnull Store<EntityStore> store) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.reloadConfig.tamework.plugin.not.available"));
             return;
         }
         TameworkTelemetryEvents telemetryEvents = plugin.getTelemetryEvents();
@@ -45,7 +45,7 @@ public final class TameworkReloadConfigCommand extends AbstractWorldCommand {
                         .detail("source", "command")
                         .build()
         );
-        commandContext.sender().sendMessage(Message.raw("Reloading Tamework configs..."));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.reloadConfig.reloading.tamework.configs"));
         CompletableFuture.supplyAsync(() -> {
             plugin.beginItemFeatureAssetReloadSuppression();
             boolean suppressionEnded = false;
@@ -105,7 +105,7 @@ public final class TameworkReloadConfigCommand extends AbstractWorldCommand {
                                 .detail("result", "failed")
                                 .build()
                 );
-                commandContext.sender().sendMessage(Message.raw("Reload failed. See server log for details."));
+                commandContext.sender().sendMessage(Message.translation("server.tamework.commands.reloadConfig.reload.failed.see.server.log.for.details"));
                 return;
             }
             if (summary.topologyReport() == null || !summary.topologyReport().restartRequired()) {
@@ -143,28 +143,14 @@ public final class TameworkReloadConfigCommand extends AbstractWorldCommand {
                                 .build()
                 );
             }
-            commandContext.sender().sendMessage(Message.raw(
-                    "Reloaded Tamework configs. OverridePacks=" + summary.reloadResult().getLoadedPacks()
-                            + " OverrideDirs=" + summary.reloadResult().getLoadedDirectories()
-                            + " ItemLoaded=" + summary.itemLoaded()
-                            + " Spawners=" + summary.totalSpawners()
-                            + " Naming=" + summary.totalNaming()
-                            + " DebugDefaults="
-                            + (summary.topologyReport() != null && summary.topologyReport().restartRequired()
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.reloadConfig.reloaded.tamework.configs.overridepacks.overridedirs.itemloaded.spawners").param("0", String.valueOf(summary.reloadResult().getLoadedPacks())).param("1", String.valueOf(summary.reloadResult().getLoadedDirectories())).param("2", String.valueOf(summary.itemLoaded())).param("3", String.valueOf(summary.totalSpawners())).param("4", String.valueOf(summary.totalNaming())).param("5", String.valueOf((summary.topologyReport() != null && summary.topologyReport().restartRequired()
                             ? "unchanged"
-                            : "applied")
-            ));
+                            : "applied"))));
             if (summary.topologyReport() != null && summary.topologyReport().restartRequired()) {
-                commandContext.sender().sendMessage(Message.raw(
-                        "Runtime topology changed; restart required. "
-                                + summary.topologyReport().summary()
-                ));
+                commandContext.sender().sendMessage(Message.translation("server.tamework.commands.reloadConfig.runtime.topology.changed.restart.required").param("0", String.valueOf(summary.topologyReport().summary())));
             }
             if (summary.reloadResult().hasErrors()) {
-                commandContext.sender().sendMessage(Message.raw(
-                        "Override reload reported " + summary.reloadResult().getErrors().size()
-                                + " error(s). See server log."
-                ));
+                commandContext.sender().sendMessage(Message.translation("server.tamework.commands.reloadConfig.override.reload.reported.error.s.see.server").param("0", String.valueOf(summary.reloadResult().getErrors().size())));
             }
         }));
     }

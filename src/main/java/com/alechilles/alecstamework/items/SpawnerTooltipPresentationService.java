@@ -4,7 +4,6 @@ import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
-import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.npc.attachments.ResolvedAttachmentDisplay;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
@@ -35,7 +34,6 @@ final class SpawnerTooltipPresentationService {
     private static final int NEGATIVE_GREEN = 0x5C;
     private static final int NEGATIVE_BLUE = 0x5C;
 
-    private final TranslationRegistry translationRegistry;
     private final Function<String, TwTraitConfig> traitConfigById;
     private final Function<String, TwTraitConfig> traitConfigByRole;
     private final Function<String, TwLevelingConfig> levelingConfigById;
@@ -56,7 +54,6 @@ final class SpawnerTooltipPresentationService {
                                       Function<String, TwTraitConfig> traitConfigByRole,
                                       Function<String, TwLevelingConfig> levelingConfigById,
                                       Function<String, TwLevelingConfig> levelingConfigByRole) {
-        this.translationRegistry = translationRegistry;
         this.traitConfigById = traitConfigById;
         this.traitConfigByRole = traitConfigByRole;
         this.levelingConfigById = levelingConfigById;
@@ -106,11 +103,15 @@ final class SpawnerTooltipPresentationService {
         List<Message> sections = new ArrayList<>();
         List<Message> traitLines = buildTraitLines(roleId, metadata);
         if (!traitLines.isEmpty()) {
-            sections.add(buildSection("-- Traits --", TRAITS_HEADER, traitLines));
+            sections.add(buildSection(
+                    Message.translation("server.tamework.ui.spawnerTooltip.traits").color(TRAITS_HEADER),
+                    traitLines));
         }
         List<Message> appearanceLines = buildAppearanceLines(attachments);
         if (!appearanceLines.isEmpty()) {
-            sections.add(buildSection("-- Appearance --", APPEARANCE_HEADER, appearanceLines));
+            sections.add(buildSection(
+                    Message.translation("server.tamework.ui.spawnerTooltip.appearance").color(APPEARANCE_HEADER),
+                    appearanceLines));
         }
         if (sections.isEmpty()) {
             return summary;
@@ -150,15 +151,16 @@ final class SpawnerTooltipPresentationService {
             parts.add(Message.raw(genderDisplay.abbreviation()).color(genderDisplay.color()));
             parts.add(white(")"));
         }
-        String level = resolveLevel(roleId, metadata);
+        Message level = resolveLevel(roleId, metadata);
         if (level != null) {
-            parts.add(white(" - " + level));
+            parts.add(white(" - "));
+            parts.add(level);
         }
         return join(parts);
     }
 
     @Nullable
-    private String resolveLevel(@Nullable String roleId, BsonDocument metadata) {
+    private Message resolveLevel(@Nullable String roleId, BsonDocument metadata) {
         Integer level = readInteger(metadata, TameworkMetadataKeys.LEVELING_LEVEL);
         if (level == null) {
             return null;
@@ -168,10 +170,13 @@ final class SpawnerTooltipPresentationService {
                 roleId
         );
         if (config == null) {
-            return "Level " + Math.max(1, level);
+            return Message.translation("server.tamework.ui.spawnerTooltip.level")
+                    .param("level", Math.max(1, level));
         }
         int maxLevel = config.getLevels().getMaxLevel();
-        return "Level " + Math.max(1, Math.min(level, maxLevel)) + "/" + maxLevel;
+        return Message.translation("server.tamework.ui.spawnerTooltip.levelWithMax")
+                .param("level", Math.max(1, Math.min(level, maxLevel)))
+                .param("max", maxLevel);
     }
 
     private List<Message> buildTraitLines(@Nullable String roleId, BsonDocument metadata) {
@@ -198,10 +203,10 @@ final class SpawnerTooltipPresentationService {
 
     private Message buildTraitLine(TameworkTraitsComponent.TraitValue traitValue,
                                    @Nullable TwTraitConfig.TraitDefinition definition) {
-        String label = resolveTraitLabel(traitValue.getId(), definition);
+        Message label = resolveTraitLabel(traitValue.getId(), definition);
         String formattedValue = formatDecimal(traitValue.getValue());
         if (definition == null) {
-            return white(label + ": " + formattedValue);
+            return Message.join(label, white(": " + formattedValue));
         }
         double min = Math.min(definition.getBreedingMin(), definition.getBreedingMax());
         double max = Math.max(definition.getBreedingMin(), definition.getBreedingMax());
@@ -211,7 +216,8 @@ final class SpawnerTooltipPresentationService {
         int percent = (int) Math.round(ratio * 100.0) * (negative ? -1 : 1);
         String valueColor = gradientColor(ratio, negative);
         return Message.join(
-                white(label + ": "),
+                label,
+                white(": "),
                 Message.raw(formattedValue).color(valueColor),
                 white("/" + formatDecimal(max) + " ("),
                 Message.raw(formatPercent(percent)).color(valueColor),
@@ -236,9 +242,9 @@ final class SpawnerTooltipPresentationService {
         return lines;
     }
 
-    private static Message buildSection(String header, String headerColor, List<Message> lines) {
+    private static Message buildSection(Message header, List<Message> lines) {
         List<Message> parts = new ArrayList<>(lines.size() * 2 + 1);
-        parts.add(Message.raw(header).color(headerColor));
+        parts.add(header);
         for (Message line : lines) {
             parts.add(Message.raw("\n"));
             parts.add(line);
@@ -277,19 +283,26 @@ final class SpawnerTooltipPresentationService {
         return null;
     }
 
-    private String resolveTraitLabel(String traitId, @Nullable TwTraitConfig.TraitDefinition definition) {
+    private Message resolveTraitLabel(String traitId, @Nullable TwTraitConfig.TraitDefinition definition) {
         String fallback = prettifyId(definition != null ? definition.getId() : traitId);
         if (definition == null) {
-            return fallback;
+            return white(fallback);
         }
         String configured = normalize(definition.getDisplayName());
-        if (configured != null && translationRegistry != null) {
-            String translated = translationRegistry.get(configured);
-            if (translated != null && !translated.isBlank() && !translated.equals(configured)) {
-                return translated;
-            }
+        if (configured != null && looksLikeTranslationKey(configured)) {
+            return Message.translation(serverTranslationKey(configured));
         }
-        return LocalizedText.resolveConfigValue(DEFAULT_LANGUAGE, configured, fallback);
+        return white(configured == null ? fallback : configured);
+    }
+
+    private static boolean looksLikeTranslationKey(String value) {
+        return value.indexOf('.') > 0 && value.indexOf(' ') < 0
+                && value.chars().allMatch(character -> Character.isLetterOrDigit(character)
+                || character == '.' || character == '_' || character == '-');
+    }
+
+    private static String serverTranslationKey(String key) {
+        return key.startsWith("server.") ? key : "server." + key;
     }
 
     @Nullable

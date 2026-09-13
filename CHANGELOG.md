@@ -2,6 +2,10 @@
 
 ## Unreleased development changes
 
+- Completed translations for menus, HUDs, tooltips, command help and responses
+  across all six supported languages. Captured-item labels now retain language
+  keys so each viewer can see their own translation.
+
 - Polished inline location details with a World label, named coordinate axes,
   and a copy icon that reveals selectable coordinates; removed observation timestamps.
 

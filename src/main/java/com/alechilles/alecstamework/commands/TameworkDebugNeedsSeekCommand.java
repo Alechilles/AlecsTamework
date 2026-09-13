@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
 public final class TameworkDebugNeedsSeekCommand extends AbstractTameworkServerCommand {
 
     public TameworkDebugNeedsSeekCommand() {
-        super("seek", "Toggle Tamework needs seek diagnostics logging.");
+        super("seek", "server.tamework.commands.debugNeedsSeek.description");
         setAllowsExtraArguments(true);
     }
 
@@ -19,7 +19,7 @@ public final class TameworkDebugNeedsSeekCommand extends AbstractTameworkServerC
     protected void executeServer(@Nonnull CommandContext commandContext) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugNeedsSeek.tamework.plugin.not.available"));
             return;
         }
         String raw = getFirstArg(commandContext);
@@ -27,9 +27,7 @@ public final class TameworkDebugNeedsSeekCommand extends AbstractTameworkServerC
         boolean enabled = explicit != null
                 ? plugin.setDebugNeedsSeekDiagnosticsEnabled(explicit)
                 : plugin.toggleDebugNeedsSeekDiagnosticsEnabled();
-        commandContext.sender().sendMessage(Message.raw(
-                "Tamework needs seek diagnostics logging: " + (enabled ? "enabled" : "disabled")
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugNeedsSeek.tamework.needs.seek.diagnostics.logging").param("0", String.valueOf((enabled ? "enabled" : "disabled"))));
     }
 
     private static String getFirstArg(CommandContext commandContext) {

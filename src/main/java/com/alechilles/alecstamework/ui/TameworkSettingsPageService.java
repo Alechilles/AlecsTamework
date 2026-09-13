@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.commands.TameworkConfigPermission;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
@@ -40,22 +41,22 @@ public final class TameworkSettingsPageService {
     public static String openSettingsPage(@Nonnull PlayerRef playerRef) {
         Ref<EntityStore> ref = playerRef.getReference();
         if (ref == null || !ref.isValid()) {
-            return "Unable to open settings right now.";
+            return LocalizedText.resolve(playerRef, "tamework.ui.settings.openUnavailable");
         }
         Store<EntityStore> store = ref.getStore();
         if (store == null || store.getExternalData() == null) {
-            return "Unable to open settings right now.";
+            return LocalizedText.resolve(playerRef, "tamework.ui.settings.openUnavailable");
         }
         World world = store.getExternalData().getWorld();
         if (world == null) {
-            return "Unable to open settings right now.";
+            return LocalizedText.resolve(playerRef, "tamework.ui.settings.openUnavailable");
         }
         Player player = store.getComponent(ref, Player.getComponentType());
         if (player == null) {
-            return "Unable to open settings right now.";
+            return LocalizedText.resolve(playerRef, "tamework.ui.settings.openUnavailable");
         }
         if (!hasAccess(playerRef, playerRef)) {
-            return "You do not have permission to use /tw settings.";
+            return LocalizedText.resolve(playerRef, "tamework.ui.settings.permissionDenied");
         }
         return openSettingsPage(player, ref, store, world, "api", "settings_api");
     }
@@ -72,11 +73,11 @@ public final class TameworkSettingsPageService {
                                           @Nonnull String telemetrySource,
                                           @Nonnull String entryPoint) {
         if (store.getExternalData() == null) {
-            return "Unable to open settings right now.";
+            return LocalizedText.resolve(ref.isValid() ? store.getComponent(ref, PlayerRef.getComponentType()) : (PlayerRef) null, "tamework.ui.settings.openUnavailable");
         }
         World world = store.getExternalData().getWorld();
         if (world == null) {
-            return "Unable to open settings right now.";
+            return LocalizedText.resolve(ref.isValid() ? store.getComponent(ref, PlayerRef.getComponentType()) : (PlayerRef) null, "tamework.ui.settings.openUnavailable");
         }
         return openSettingsPage(ref, store, world, telemetrySource, entryPoint);
     }
@@ -96,7 +97,7 @@ public final class TameworkSettingsPageService {
                                           @Nonnull String entryPoint) {
         Player player = store.getComponent(ref, Player.getComponentType());
         if (player == null) {
-            return "Unable to open settings right now.";
+            return LocalizedText.resolve(ref.isValid() ? store.getComponent(ref, PlayerRef.getComponentType()) : (PlayerRef) null, "tamework.ui.settings.openUnavailable");
         }
         return openSettingsPage(player, ref, store, world, telemetrySource, entryPoint);
     }
@@ -110,17 +111,17 @@ public final class TameworkSettingsPageService {
                                            @Nonnull String entryPoint) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
-            return "Tamework settings are not available.";
+            return LocalizedText.resolve(player, "tamework.ui.settings.notAvailable");
         }
         if (player.getPageManager() == null) {
-            return "Unable to open settings right now.";
+            return LocalizedText.resolve(player, "tamework.ui.settings.openUnavailable");
         }
         PlayerRef uiPlayerRef = player.getPlayerRef();
         if (uiPlayerRef == null || !uiPlayerRef.isValid()) {
-            return "Unable to open settings right now.";
+            return LocalizedText.resolve(player, "tamework.ui.settings.openUnavailable");
         }
         if (!hasAccess(uiPlayerRef, uiPlayerRef)) {
-            return "You do not have permission to use /tw settings.";
+            return LocalizedText.resolve(player, "tamework.ui.settings.permissionDenied");
         }
         try {
             TameworkSettingsPage page = new TameworkSettingsPage(uiPlayerRef, plugin, world);
@@ -135,7 +136,7 @@ public final class TameworkSettingsPageService {
             } catch (RuntimeException | LinkageError telemetryFailure) {
                 // The local warning already preserves the original page failure.
             }
-            return "Unable to open settings right now.";
+            return LocalizedText.resolve(player, "tamework.ui.settings.openUnavailable");
         }
         try {
             plugin.getTelemetryEvents().recordUsage(

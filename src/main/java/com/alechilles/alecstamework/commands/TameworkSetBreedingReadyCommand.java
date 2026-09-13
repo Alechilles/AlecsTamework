@@ -31,7 +31,7 @@ import static com.hypixel.hytale.server.core.command.system.arguments.types.ArgT
 public final class TameworkSetBreedingReadyCommand extends NPCMultiSelectCommandBase {
     private static final double READY_HAPPINESS = 100.0;
     private final OptionalArg<String> modeArg = withOptionalArg(
-            "mode", "Readiness mode: true, false, or toggle.", STRING
+            "mode", "server.tamework.commands.setBreedingReady.argument.mode", STRING
     ).suggest((sender, entered, parameters, suggestions) -> {
         suggestions.suggest("true");
         suggestions.suggest("false");
@@ -40,7 +40,7 @@ public final class TameworkSetBreedingReadyCommand extends NPCMultiSelectCommand
     private final BreedingCooldownResetService cooldownResetService = new BreedingCooldownResetService();
 
     public TameworkSetBreedingReadyCommand() {
-        super("breedingready", "Set breeding readiness for selected NPCs.");
+        super("breedingready", "server.tamework.commands.setBreedingReady.description");
     }
 
     @Override
@@ -51,12 +51,12 @@ public final class TameworkSetBreedingReadyCommand extends NPCMultiSelectCommand
                            @Nonnull Ref<EntityStore> npcRef) {
         ReadyMode mode = parseMode(modeArg.provided(context) ? modeArg.get(context) : "true");
         if (mode == null) {
-            context.sendMessage(Message.raw("--mode must be true, false, or toggle."));
+            context.sendMessage(Message.translation("server.tamework.commands.setBreedingReady.mode.must.be.true.false.or.toggle"));
             return;
         }
         ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
         if (breedingType == null) {
-            context.sendMessage(Message.raw("Breeding component is not available."));
+            context.sendMessage(Message.translation("server.tamework.commands.setBreedingReady.breeding.component.is.not.available"));
             return;
         }
         applyReadyHappiness(npcRef, store);
@@ -144,17 +144,14 @@ public final class TameworkSetBreedingReadyCommand extends NPCMultiSelectCommand
                                    @Nonnull NPCEntity npc,
                                    @Nonnull MutationResult result) {
         if (result.status == MutationStatus.SKIPPED) {
-            context.sendMessage(Message.raw("NPC " + npc.getUuid() + " has no enabled breeding state."));
+            context.sendMessage(Message.translation("server.tamework.commands.setBreedingReady.npc.has.no.enabled.breeding.state").param("0", String.valueOf(npc.getUuid())));
             return;
         }
         if (result.status == MutationStatus.ALARM_CLEAR_FAILED) {
-            context.sendMessage(Message.raw("Could not clear the breeding cooldown alarm for NPC " + npc.getUuid() + "."));
+            context.sendMessage(Message.translation("server.tamework.commands.setBreedingReady.could.not.clear.the.breeding.cooldown.alarm").param("0", String.valueOf(npc.getUuid())));
             return;
         }
-        context.sendMessage(Message.raw(
-                "Set breeding readiness for NPC " + npc.getUuid() + ": readyNow "
-                        + result.readyBefore + " -> " + result.readyAfter + "."
-        ));
+        context.sendMessage(Message.translation("server.tamework.commands.setBreedingReady.set.breeding.readiness.for.npc.readynow").param("0", String.valueOf(npc.getUuid())).param("1", String.valueOf(result.readyBefore)).param("2", String.valueOf(result.readyAfter)));
     }
 
     private static ReadyMode parseMode(String raw) {

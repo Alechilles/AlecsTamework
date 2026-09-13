@@ -19,10 +19,10 @@ import static com.hypixel.hytale.server.core.command.system.arguments.types.ArgT
 
 /** Sets thirst for NPCs selected with the standard NPC debug selectors. */
 public final class TameworkSetThirstCommand extends NPCMultiSelectCommandBase {
-    private final RequiredArg<Double> valueArg = withRequiredArg("value", "Thirst value to apply.", DOUBLE);
+    private final RequiredArg<Double> valueArg = withRequiredArg("value", "server.tamework.commands.setThirst.argument.value", DOUBLE);
 
     public TameworkSetThirstCommand() {
-        super("thirst", "Set thirst for selected NPCs.");
+        super("thirst", "server.tamework.commands.setThirst.description");
     }
 
     @Override
@@ -32,7 +32,7 @@ public final class TameworkSetThirstCommand extends NPCMultiSelectCommandBase {
         TameworkNeedsCommandSupport.NeedsContext needsContext =
                 needsType == null ? null : TameworkNeedsCommandSupport.resolveContext(npcRef, store);
         if (needsContext == null) {
-            context.sendMessage(Message.raw("No enabled needs config resolved for NPC " + npc.getUuid() + "."));
+            context.sendMessage(Message.translation("server.tamework.commands.setThirst.no.enabled.needs.config.resolved.for.npc").param("0", String.valueOf(npc.getUuid())));
             return;
         }
         TwNeedsConfig.ValueSettings values = needsContext.config() != null ? needsContext.config().getValues() : null;
@@ -48,7 +48,6 @@ public final class TameworkSetThirstCommand extends NPCMultiSelectCommandBase {
         needs.setLastPassiveSweepMs(now);
         store.putComponent(npcRef, needsType, needs);
         CompanionNeedsService.tickNeeds(npcRef, store, needsContext.roleId());
-        context.sendMessage(Message.raw("Set thirst for NPC " + npc.getUuid() + ": "
-                + TameworkNeedsCommandSupport.format(thirst) + "."));
+        context.sendMessage(Message.translation("server.tamework.commands.setThirst.set.thirst.for.npc").param("0", String.valueOf(npc.getUuid())).param("1", String.valueOf(TameworkNeedsCommandSupport.format(thirst))));
     }
 }

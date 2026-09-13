@@ -21,7 +21,7 @@ import javax.annotation.Nonnull;
 public final class TameworkSetOwnerCommand extends AbstractPlayerCommand {
 
     public TameworkSetOwnerCommand() {
-        super("owner", "Set owner of the NPC you are looking at.");
+        super("owner", "server.tamework.commands.setOwner.description");
         setAllowsExtraArguments(true);
     }
 
@@ -33,7 +33,7 @@ public final class TameworkSetOwnerCommand extends AbstractPlayerCommand {
                            @Nonnull World world) {
         Player player = store.getComponent(ref, Player.getComponentType());
         if (player == null) {
-            commandContext.sender().sendMessage(Message.raw("No player context."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setOwner.no.player.context"));
             return;
         }
 
@@ -41,13 +41,13 @@ public final class TameworkSetOwnerCommand extends AbstractPlayerCommand {
         String raw = getFirstArg(commandContext);
         UUID newOwner = parseOwner(raw, player.getUuid());
         if (newOwner == null && raw != null && !raw.isBlank() && !isClear(raw)) {
-            commandContext.sender().sendMessage(Message.raw("Invalid UUID. Use 'clear' or a valid UUID."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setOwner.invalid.uuid.use.clear.or.a.valid"));
             return;
         }
 
         TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
         if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.raw("No NPC found in view."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setOwner.no.npc.found.in.view"));
             return;
         }
 
@@ -66,9 +66,7 @@ public final class TameworkSetOwnerCommand extends AbstractPlayerCommand {
             );
         }
         String ownerText = newOwner == null ? "null" : newOwner.toString();
-        commandContext.sender().sendMessage(Message.raw(
-                "Set owner for NPC " + candidate.npcUuid + " to " + ownerText
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setOwner.set.owner.for.npc.to").param("0", String.valueOf(candidate.npcUuid)).param("1", String.valueOf(ownerText)));
     }
 
     static UUID parseOwner(String raw, UUID defaultOwner) {

@@ -37,7 +37,7 @@ public final class TameworkDebugPersistenceCommand extends AbstractCommandCollec
             @Nullable PublicPersistenceOperations persistenceOperations,
             @Nullable Consumer<PersistenceFailureSignal> failureSink
     ) {
-        super("persistence", "Tamework persistence diagnostics.");
+        super("persistence", "server.tamework.commands.debugPersistence.description");
         addSubCommand(diagnostic(
                 TameworkDebugDbCommand.Action.STATUS,
                 persistenceDiagnostics,

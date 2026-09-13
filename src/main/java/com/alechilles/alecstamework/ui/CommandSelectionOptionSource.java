@@ -52,7 +52,7 @@ final class CommandSelectionOptionSource {
         String commandId = entry.getId().trim().toUpperCase(Locale.ROOT);
         if ("TOGGLEAIRBORNEMODE".equals(commandId)
                 || "TOGGLEFROSTDRAGONAIRBORNEMODE".equals(commandId)) {
-            return "Flight Toggle";
+            return LocalizedText.resolve(language, "tamework.ui.commandMenu.flightToggle");
         }
         return LocalizedText.resolveConfigValue(language, entry.getDisplayName(), entry.getId());
     }

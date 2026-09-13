@@ -23,7 +23,7 @@ import javax.annotation.Nonnull;
  */
 public final class TameworkAddTraitCommand extends AbstractPlayerCommand {
     public TameworkAddTraitCommand() {
-        super("trait", "Append one trait to the NPC you are looking at.");
+        super("trait", "server.tamework.commands.addTrait.description");
         setAllowsExtraArguments(true);
     }
 
@@ -36,51 +36,42 @@ public final class TameworkAddTraitCommand extends AbstractPlayerCommand {
         TameworkTraitCommandInputParser.ParseResult parseResult =
                 TameworkTraitCommandInputParser.parseAddTrait(commandContext.getInputString());
         if (!parseResult.isSuccess()) {
-            commandContext.sender().sendMessage(Message.raw(parseResult.errorMessage()));
+            commandContext.sender().sendMessage(TameworkTraitCommandSupport.parseErrorMessage(parseResult.errorMessage()));
             return;
         }
 
         TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
         if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.raw("No NPC found in view."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.addTrait.no.npc.found.in.view"));
             return;
         }
 
         ComponentType<EntityStore, TameworkTraitsComponent> traitsType = TameworkTraitsComponent.getComponentType();
         if (traitsType == null) {
-            commandContext.sender().sendMessage(Message.raw("Traits component is not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.addTrait.traits.component.is.not.available"));
             return;
         }
         TameworkTraitsComponent existing = store.getComponent(candidate.ref, traitsType);
         TwTraitConfig config = TameworkTraitCommandSupport.resolveTraitConfig(candidate.ref, store, existing);
         if (config == null || !config.isEnabled()) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "No enabled trait config resolved for this NPC (role/config lookup failed)."
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.addTrait.no.enabled.trait.config.resolved.for.this"));
             return;
         }
         Map<String, TwTraitConfig.TraitDefinition> definitions = TameworkTraitCommandSupport.definitionMap(config);
         if (definitions.isEmpty()) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "Trait config '" + config.getId() + "' has no trait definitions."
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.addTrait.trait.config.has.no.trait.definitions").param("0", String.valueOf(config.getId())));
             return;
         }
 
         TameworkTraitCommandInputParser.TraitRequest request = parseResult.requests().getFirst();
         String normalizedId = TameworkTraitCommandSupport.normalize(request.traitId());
         if (normalizedId == null) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "Trait id '" + request.traitId() + "' is invalid."
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.addTrait.trait.id.is.invalid").param("0", String.valueOf(request.traitId())));
             return;
         }
         TwTraitConfig.TraitDefinition definition = definitions.get(normalizedId);
         if (definition == null) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "Unknown trait '" + request.traitId() + "'. Known traits: "
-                            + TameworkTraitCommandSupport.buildKnownTraitsText(definitions)
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.addTrait.unknown.trait.known.traits").param("0", String.valueOf(request.traitId())).param("1", String.valueOf(TameworkTraitCommandSupport.buildKnownTraitsText(definitions))));
             return;
         }
 
@@ -117,21 +108,19 @@ public final class TameworkAddTraitCommand extends AbstractPlayerCommand {
                 nextSizeMultiplier
         );
 
-        StringBuilder message = new StringBuilder();
-        message.append("Added trait for NPC ")
-                .append(candidate.npcUuid)
-                .append(": ")
-                .append(definition.getId())
-                .append("=")
-                .append(TameworkTraitCommandSupport.formatDouble(applied))
-                .append(", count=")
-                .append(updated.getTraitValues().length);
         if (TameworkTraitCommandSupport.wasClamped(request.value(), applied)) {
-            message.append(" (requested ")
-                    .append(TameworkTraitCommandSupport.formatDouble(request.value()))
-                    .append(", clamped to breeding range)");
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.addTrait.result.clamped")
+                    .param("0", String.valueOf(candidate.npcUuid))
+                    .param("1", definition.getId())
+                    .param("2", TameworkTraitCommandSupport.formatDouble(applied))
+                    .param("3", String.valueOf(updated.getTraitValues().length))
+                    .param("4", TameworkTraitCommandSupport.formatDouble(request.value())));
+            return;
         }
-        message.append(".");
-        commandContext.sender().sendMessage(Message.raw(message.toString()));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.addTrait.result")
+                .param("0", String.valueOf(candidate.npcUuid))
+                .param("1", definition.getId())
+                .param("2", TameworkTraitCommandSupport.formatDouble(applied))
+                .param("3", String.valueOf(updated.getTraitValues().length)));
     }
 }

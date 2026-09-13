@@ -24,7 +24,7 @@ public final class TameworkShowSpawnBeaconsCommand extends AbstractPlayerCommand
     public TameworkShowSpawnBeaconsCommand(
             @Nonnull SpawnBeaconVisualizationService visualizationService
     ) {
-        super("spawn-beacons", "Toggle natural spawn beacon visualization.");
+        super("spawn-beacons", "server.tamework.commands.showSpawnBeacons.description");
         this.visualizationService = visualizationService;
         setAllowsExtraArguments(true);
     }
@@ -37,43 +37,28 @@ public final class TameworkShowSpawnBeaconsCommand extends AbstractPlayerCommand
                            @Nonnull World world) {
         UUID playerUuid = playerRef.getUuid();
         if (playerUuid == null) {
-            commandContext.sender().sendMessage(Message.raw("Unable to resolve your player UUID."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.showSpawnBeacons.unable.to.resolve.your.player.uuid"));
             return;
         }
 
         TameworkShowSpawnMarkersCommandSupport.ParseResult parse =
                 TameworkShowSpawnMarkersCommandSupport.parse(commandContext.getInputString());
         if (parse.mode() == TameworkShowSpawnMarkersCommandSupport.Mode.INVALID) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "Usage: /tw showspawnbeacons [radius|off]"
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.showSpawnBeacons.usage.tw.showspawnbeacons.radius.off"));
             return;
         }
         if (parse.mode() == TameworkShowSpawnMarkersCommandSupport.Mode.OFF) {
             SpawnBeaconVisualizationService.DisableResult result =
                     visualizationService.disable(playerUuid, world, store);
-            commandContext.sender().sendMessage(Message.raw(
-                    result.wasActive()
-                            ? "Spawn beacon visualization disabled."
-                            : "Spawn beacon visualization was not active."
-            ));
+            commandContext.sender().sendMessage(result.wasActive() ? Message.translation("server.tamework.commands.showSpawnBeacons.spawn.beacon.visualization.disabled") : Message.translation("server.tamework.commands.showSpawnBeacons.spawn.beacon.visualization.was.not.active"));
             return;
         }
 
         SpawnBeaconVisualizationService.EnableResult result =
                 visualizationService.enable(world, store, playerRef, parse.radius());
-        commandContext.sender().sendMessage(Message.raw(
-                "Spawn beacon visualization enabled within "
-                        + formatNumber(result.radius())
-                        + " blocks. Showing "
-                        + result.visibleCount()
-                        + " loaded natural beacon"
-                        + (result.visibleCount() == 1 ? "" : "s")
-                        + (result.skippedCount() == 0
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.showSpawnBeacons.spawn.beacon.visualization.enabled.within.blocks.showing").param("0", String.valueOf(formatNumber(result.radius()))).param("1", String.valueOf(result.visibleCount())).param("2", String.valueOf((result.visibleCount() == 1 ? "" : "s"))).param("3", String.valueOf((result.skippedCount() == 0
                         ? "."
-                        : "; skipped " + result.skippedCount() + " without usable visuals.")
-                        + " Run /tw showspawnbeacons off to disable."
-        ));
+                        : "; skipped " + result.skippedCount() + " without usable visuals."))));
         sendSummaries(commandContext, result.summaries(), result.visibleCount());
     }
 
@@ -81,14 +66,10 @@ public final class TameworkShowSpawnBeaconsCommand extends AbstractPlayerCommand
                                       @Nonnull List<SpawnBeaconVisualizationService.BeaconSummary> summaries,
                                       int visibleCount) {
         for (SpawnBeaconVisualizationService.BeaconSummary summary : summaries) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "  " + displayConfigId(summary.configId()) + " at " + formatPosition(summary.position())
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.showSpawnBeacons.at").param("0", String.valueOf(displayConfigId(summary.configId()))).param("1", String.valueOf(formatPosition(summary.position()))));
         }
         if (visibleCount > summaries.size()) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "  ...and " + (visibleCount - summaries.size()) + " more loaded beacon(s)."
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.showSpawnBeacons.and.more.loaded.beacon.s").param("0", String.valueOf((visibleCount - summaries.size()))));
         }
     }
 

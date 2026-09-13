@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
 public final class TameworkDebugDespawnCommand extends AbstractTameworkServerCommand {
 
     public TameworkDebugDespawnCommand() {
-        super("despawn", "Toggle Tamework companion despawn diagnostics logging (optional role filter).");
+        super("despawn", "server.tamework.commands.debugDespawn.description");
         setAllowsExtraArguments(true);
     }
 
@@ -19,7 +19,7 @@ public final class TameworkDebugDespawnCommand extends AbstractTameworkServerCom
     protected void executeServer(@Nonnull CommandContext commandContext) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugDespawn.tamework.plugin.not.available"));
             return;
         }
         String[] args = getArgs(commandContext.getInputString());
@@ -43,10 +43,7 @@ public final class TameworkDebugDespawnCommand extends AbstractTameworkServerCom
         }
         String roleFilter = plugin.getDebugDespawnRoleFilter();
         String roleSummary = roleFilter == null || roleFilter.isBlank() ? "all tamed roles" : roleFilter;
-        commandContext.sender().sendMessage(Message.raw(
-                "Tamework despawn diagnostics logging: " + (enabled ? "enabled" : "disabled")
-                        + " (role filter: " + roleSummary + ")"
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugDespawn.tamework.despawn.diagnostics.logging.role.filter").param("0", String.valueOf((enabled ? "enabled" : "disabled"))).param("1", String.valueOf(roleSummary)));
     }
 
     static String[] getArgs(String input) {

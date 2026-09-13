@@ -26,7 +26,7 @@ public final class TameworkDebugReviveReadyCommand extends AbstractPlayerCommand
     ) {
         super(
                 "reviveready",
-                "Make all your dead linked companions ready to revive."
+                "server.tamework.commands.debugReviveReady.description"
         );
         service = queries == null || operations == null
                 ? null
@@ -42,33 +42,28 @@ public final class TameworkDebugReviveReadyCommand extends AbstractPlayerCommand
             @Nonnull World world
     ) {
         if (service == null) {
-            send(context, "Generic persistence is not available.");
+            send(context, Message.translation("server.tamework.commands.debugReviveReady.generic.persistence.is.not.available"));
             return;
         }
         UUID playerUuid = playerRef.getUuid();
         if (playerUuid == null) {
-            send(context, "Could not resolve your player UUID.");
+            send(context, Message.translation("server.tamework.commands.debugReviveReady.could.not.resolve.your.player.uuid"));
             return;
         }
         ReviveReadyOwnerBatchService.UpdateResult result =
                 service.markAll(new OwnerId(playerUuid));
         if (result.projectionLagging()) {
-            send(context, "Linked companion data is still updating. Retry the command.");
+            send(context, Message.translation("server.tamework.commands.debugReviveReady.linked.companion.data.is.still.updating.retry"));
             return;
         }
         if (result.total() == 0) {
-            send(context, "No dead linked companions were found for your player.");
+            send(context, Message.translation("server.tamework.commands.debugReviveReady.no.dead.linked.companions.were.found.for"));
             return;
         }
-        send(context, "Dead linked companion revive-ready update: total="
-                + result.total()
-                + ", accepted=" + result.accepted()
-                + ", alreadyReady=" + result.alreadyReady()
-                + ", rejected=" + result.rejected()
-                + ".");
+        send(context, Message.translation("server.tamework.commands.debugReviveReady.dead.linked.companion.revive.ready.update.total").param("0", String.valueOf(result.total())).param("1", String.valueOf(result.accepted())).param("2", String.valueOf(result.alreadyReady())).param("3", String.valueOf(result.rejected())));
     }
 
-    private void send(@Nonnull CommandContext context, @Nonnull String message) {
-        context.sender().sendMessage(Message.raw(message));
+    private void send(@Nonnull CommandContext context, @Nonnull Message message) {
+        context.sender().sendMessage(message);
     }
 }

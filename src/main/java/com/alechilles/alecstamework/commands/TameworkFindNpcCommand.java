@@ -25,7 +25,7 @@ public final class TameworkFindNpcCommand extends AbstractWorldCommand {
     private static final String DEFAULT_MARKER_PARTICLE = "Hearts";
 
     public TameworkFindNpcCommand() {
-        super("find", "Find an NPC by UUID and print its current world state.");
+        super("find", "server.tamework.commands.findNpc.description");
         setAllowsExtraArguments(true);
     }
 
@@ -36,19 +36,19 @@ public final class TameworkFindNpcCommand extends AbstractWorldCommand {
         String uuidArg = getArg(commandContext, 2);
         UUID targetUuid = parseUuid(uuidArg);
         if (targetUuid == null) {
-            commandContext.sender().sendMessage(Message.raw("Usage: /tw findnpc <uuid> [mark:on|off]"));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.findNpc.usage.tw.findnpc.uuid.mark.on.off"));
             return;
         }
 
         Ref<EntityStore> targetRef = world.getEntityRef(targetUuid);
         if (targetRef == null || !targetRef.isValid()) {
-            commandContext.sender().sendMessage(Message.raw("NPC " + targetUuid + " is not currently valid in-world."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.findNpc.npc.is.not.currently.valid.in.world").param("0", String.valueOf(targetUuid)));
             return;
         }
 
         NPCEntity npc = store.getComponent(targetRef, NPCEntity.getComponentType());
         if (npc == null) {
-            commandContext.sender().sendMessage(Message.raw("Entity " + targetUuid + " exists but has no NPC component."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.findNpc.entity.exists.but.has.no.npc.component").param("0", String.valueOf(targetUuid)));
             return;
         }
 
@@ -79,16 +79,7 @@ public final class TameworkFindNpcCommand extends AbstractWorldCommand {
         String distanceText = Double.isFinite(distance) ? String.format(Locale.ROOT, "%.2f", distance) : "n/a";
         String roleText = roleId != null && !roleId.isBlank() ? roleId : "(unknown)";
 
-        commandContext.sender().sendMessage(Message.raw(
-                "NPC " + targetUuid
-                        + " found: role=" + roleText
-                        + ", pos=" + positionText
-                        + ", distance=" + distanceText
-                        + ", stage=" + lifeStage
-                        + ", scale=" + String.format(Locale.ROOT, "%.2f", scale)
-                        + ", marked=" + shouldMark
-                        + "."
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.findNpc.npc.found.role.pos.distance.stage.scale").param("0", String.valueOf(targetUuid)).param("1", String.valueOf(roleText)).param("2", String.valueOf(positionText)).param("3", String.valueOf(distanceText)).param("4", String.valueOf(lifeStage)).param("5", String.valueOf(String.format(Locale.ROOT, "%.2f", scale))).param("6", String.valueOf(shouldMark)));
     }
 
     private static void spawnMarker(Vector3d basePosition, Store<EntityStore> store) {

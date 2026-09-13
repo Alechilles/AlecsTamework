@@ -7,7 +7,7 @@ import com.hypixel.hytale.server.core.command.system.basecommands.AbstractComman
  */
 public final class TameworkApiTestCommandCollection extends AbstractCommandCollection {
     public TameworkApiTestCommandCollection() {
-        super("test", "Run or manage Tamework API self-tests.");
+        super("test", "server.tamework.commands.apiTest.description");
         addSubCommand(new TameworkApiTestPrepareCommand());
         addSubCommand(new TameworkApiTestStatusCommand());
         addSubCommand(new TameworkApiTestRunCommand());

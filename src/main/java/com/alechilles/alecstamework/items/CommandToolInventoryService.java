@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.localization.LocalizedText;
+
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
@@ -352,7 +354,8 @@ final class CommandToolInventoryService {
 
     List<DropdownEntryInfo> resolveGroupDropdownEntriesForTool(Player player, String toolId) {
         ArrayList<DropdownEntryInfo> entries = new ArrayList<>();
-        entries.add(new DropdownEntryInfo(LocalizableString.fromString("None"), GROUP_NONE_VALUE));
+        entries.add(new DropdownEntryInfo(LocalizableString.fromString(
+                LocalizedText.resolve(player, "tamework.ui.linkedPanel.groupAssign.none")), GROUP_NONE_VALUE));
         ItemStack stack = findToolStack(player, toolId);
         if (stack == null || stack.isEmpty()) {
             return entries;

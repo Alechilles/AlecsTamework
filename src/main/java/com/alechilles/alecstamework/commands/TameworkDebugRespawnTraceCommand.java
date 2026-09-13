@@ -13,7 +13,7 @@ public final class TameworkDebugRespawnTraceCommand extends AbstractTameworkServ
     public TameworkDebugRespawnTraceCommand() {
         super(
                 "respawn-trace",
-                "Toggle Tamework capture, release, and revival health trace logging."
+                "server.tamework.commands.debugRespawnTrace.description"
         );
         setAllowsExtraArguments(true);
     }
@@ -22,7 +22,7 @@ public final class TameworkDebugRespawnTraceCommand extends AbstractTameworkServ
     protected void executeServer(@Nonnull CommandContext commandContext) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugRespawnTrace.tamework.plugin.not.available"));
             return;
         }
         String raw = getFirstArg(commandContext.getInputString());
@@ -30,9 +30,7 @@ public final class TameworkDebugRespawnTraceCommand extends AbstractTameworkServ
         boolean enabled = explicit != null
                 ? plugin.setDebugRespawnTraceEnabled(explicit)
                 : plugin.toggleDebugRespawnTraceEnabled();
-        commandContext.sender().sendMessage(Message.raw(
-                "Tamework respawn trace diagnostics logging: " + (enabled ? "enabled" : "disabled")
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugRespawnTrace.tamework.respawn.trace.diagnostics.logging").param("0", String.valueOf((enabled ? "enabled" : "disabled"))));
     }
 
     static String getFirstArg(String input) {

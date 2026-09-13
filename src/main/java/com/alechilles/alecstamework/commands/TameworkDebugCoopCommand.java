@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
 public final class TameworkDebugCoopCommand extends AbstractTameworkServerCommand {
 
     public TameworkDebugCoopCommand() {
-        super("coop", "Toggle Tamework coop identity debug logging.");
+        super("coop", "server.tamework.commands.debugCoop.description");
         setAllowsExtraArguments(true);
     }
 
@@ -19,7 +19,7 @@ public final class TameworkDebugCoopCommand extends AbstractTameworkServerComman
     protected void executeServer(@Nonnull CommandContext commandContext) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugCoop.tamework.plugin.not.available"));
             return;
         }
         String raw = getFirstArg(commandContext);
@@ -27,9 +27,7 @@ public final class TameworkDebugCoopCommand extends AbstractTameworkServerComman
         boolean enabled = explicit != null
                 ? plugin.setDebugCoopEnabled(explicit)
                 : plugin.toggleDebugCoopEnabled();
-        commandContext.sender().sendMessage(Message.raw(
-                "Tamework coop debug logging: " + (enabled ? "enabled" : "disabled")
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugCoop.tamework.coop.debug.logging").param("0", String.valueOf((enabled ? "enabled" : "disabled"))));
     }
 
     private static String getFirstArg(CommandContext commandContext) {

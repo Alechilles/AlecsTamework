@@ -7,7 +7,7 @@ import com.hypixel.hytale.server.core.command.system.basecommands.AbstractComman
  */
 public final class TameworkDebugSetCommand extends AbstractCommandCollection {
     public TameworkDebugSetCommand() {
-        super("set", "Set debug NPC state.");
+        super("set", "server.tamework.commands.debugSet.description");
         addSubCommand(new TameworkSetNeedsCommand());
         addSubCommand(new TameworkSetHungerCommand());
         addSubCommand(new TameworkSetThirstCommand());

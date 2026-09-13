@@ -26,7 +26,7 @@ public final class TameworkDebugDragonFlightCommand extends AbstractPlayerComman
             new AvatarFlightMountLifecycleService();
 
     public TameworkDebugDragonFlightCommand() {
-        super("dragon-flight", "Toggle transformed-player dragon flight testing.");
+        super("dragon-flight", "server.tamework.commands.debugDragonFlight.description");
         setAllowsExtraArguments(true);
     }
 
@@ -38,7 +38,7 @@ public final class TameworkDebugDragonFlightCommand extends AbstractPlayerComman
                            @Nonnull World world) {
         UUID playerUuid = playerRef.getUuid();
         if (playerUuid == null) {
-            commandContext.sender().sendMessage(Message.raw("Player UUID is not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugDragonFlight.player.uuid.is.not.available"));
             return;
         }
         String[] args = getArgs(commandContext);
@@ -85,9 +85,7 @@ public final class TameworkDebugDragonFlightCommand extends AbstractPlayerComman
             sendResult(commandContext, ACTIVATOR.enable(store, ref, playerUuid, configId));
             return;
         }
-        commandContext.sender().sendMessage(Message.raw(
-                "Usage: /tw debugdragonflight [on [configId] | off | toggle | status | inputprobe [on|off|toggle|status] | flightprobe [on|off|toggle|status]]"
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugDragonFlight.usage.tw.debugdragonflight.on.configid.off.toggle"));
     }
 
     private static void sendStatus(@Nonnull CommandContext commandContext,
@@ -96,8 +94,8 @@ public final class TameworkDebugDragonFlightCommand extends AbstractPlayerComman
                                    @Nonnull UUID playerUuid) {
         AvatarFlightActivator.Status status = ACTIVATOR.status(store, ref, playerUuid);
         long inputAge = status.lastInputAtMs() == 0L ? -1L : System.currentTimeMillis() - status.lastInputAtMs();
-        commandContext.sender().sendMessage(Message.raw(String.format(
-                "Avatar flight: active=%s config=%s mode=%s velocity=%.2f/%.2f/%.2f inputAgeMs=%s savedModel=%s flightProbe=%s inputLog=%s",
+        commandContext.sender().sendMessage(Message.join(Message.translation("server.tamework.commands.debugDragonFlight.statusHeading"), Message.raw(String.format(
+                " active=%s config=%s mode=%s velocity=%.2f/%.2f/%.2f inputAgeMs=%s savedModel=%s flightProbe=%s inputLog=%s",
                 status.active(),
                 status.configId().isBlank() ? "<default>" : status.configId(),
                 status.mode(),
@@ -108,7 +106,7 @@ public final class TameworkDebugDragonFlightCommand extends AbstractPlayerComman
                 status.savedModelId() == null ? "<none>" : status.savedModelId(),
                 AvatarFlightClientFlightProbe.isActive(playerUuid),
                 PlayerInputDebugProbe.isEnabled(playerUuid)
-        )));
+        ))));
     }
 
     private static void sendClientFlightProbeResult(@Nonnull CommandContext commandContext,
@@ -117,22 +115,19 @@ public final class TameworkDebugDragonFlightCommand extends AbstractPlayerComman
                                                     @Nonnull UUID playerUuid,
                                                     @Nonnull String action) {
         if ("status".equals(action)) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "Client flight probe: active=" + AvatarFlightClientFlightProbe.isActive(playerUuid)
-                            + " inputLog=" + PlayerInputDebugProbe.isEnabled(playerUuid)
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugDragonFlight.client.flight.probe.active.inputlog").param("0", String.valueOf(AvatarFlightClientFlightProbe.isActive(playerUuid))).param("1", String.valueOf(PlayerInputDebugProbe.isEnabled(playerUuid))));
             return;
         }
         if (isOff(action)) {
             AvatarFlightClientFlightProbe.Result result = AvatarFlightClientFlightProbe.disable(store, ref, playerUuid);
             PlayerInputDebugProbe.disable(playerUuid);
-            commandContext.sender().sendMessage(Message.raw(result.message() + " Input logging disabled."));
+            commandContext.sender().sendMessage(Message.join(localizedResult(result.message()), Message.raw(" "), Message.translation("server.tamework.commands.debugDragonFlight.input.probe.disabled")));
             return;
         }
         if ("toggle".equals(action) && AvatarFlightClientFlightProbe.isActive(playerUuid)) {
             AvatarFlightClientFlightProbe.Result result = AvatarFlightClientFlightProbe.disable(store, ref, playerUuid);
             PlayerInputDebugProbe.disable(playerUuid);
-            commandContext.sender().sendMessage(Message.raw(result.message() + " Input logging disabled."));
+            commandContext.sender().sendMessage(Message.join(localizedResult(result.message()), Message.raw(" "), Message.translation("server.tamework.commands.debugDragonFlight.input.probe.disabled")));
             return;
         }
         if ("toggle".equals(action) || "on".equals(action) || "enable".equals(action) || "start".equals(action)) {
@@ -140,51 +135,92 @@ public final class TameworkDebugDragonFlightCommand extends AbstractPlayerComman
             if (result.ok()) {
                 PlayerInputDebugProbe.enable(playerUuid);
             }
-            commandContext.sender().sendMessage(Message.raw(result.message()));
+            commandContext.sender().sendMessage(localizedResult(result.message()));
             return;
         }
-        commandContext.sender().sendMessage(Message.raw(
-                "Usage: /tw debugdragonflight flightprobe [on|off|toggle|status]"
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugDragonFlight.usage.tw.debugdragonflight.flightprobe.on.off.toggle"));
     }
 
     private static void sendInputProbeResult(@Nonnull CommandContext commandContext,
                                              @Nonnull UUID playerUuid,
                                              @Nonnull String action) {
         if ("status".equals(action)) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "Input probe: active=" + PlayerInputDebugProbe.isEnabled(playerUuid)
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugDragonFlight.input.probe.active").param("0", String.valueOf(PlayerInputDebugProbe.isEnabled(playerUuid))));
             return;
         }
         if (isOff(action)) {
             PlayerInputDebugProbe.disable(playerUuid);
-            commandContext.sender().sendMessage(Message.raw("Input probe disabled."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugDragonFlight.input.probe.disabled"));
             return;
         }
         if ("toggle".equals(action) && PlayerInputDebugProbe.isEnabled(playerUuid)) {
             PlayerInputDebugProbe.disable(playerUuid);
-            commandContext.sender().sendMessage(Message.raw("Input probe disabled."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugDragonFlight.input.probe.disabled"));
             return;
         }
         if ("toggle".equals(action) || "on".equals(action) || "enable".equals(action) || "start".equals(action)) {
             PlayerInputDebugProbe.enable(playerUuid);
-            commandContext.sender().sendMessage(Message.raw("Input probe enabled."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugDragonFlight.input.probe.enabled"));
             return;
         }
-        commandContext.sender().sendMessage(Message.raw(
-                "Usage: /tw debugdragonflight inputprobe [on|off|toggle|status]"
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugDragonFlight.usage.tw.debugdragonflight.inputprobe.on.off.toggle"));
     }
 
     private static void sendResult(@Nonnull CommandContext commandContext,
                                    @Nonnull AvatarFlightActivator.Result result) {
-        commandContext.sender().sendMessage(Message.raw(result.message()));
+        commandContext.sender().sendMessage(localizedResult(result.message()));
     }
 
     private static void sendMountResult(@Nonnull CommandContext commandContext,
                                         @Nonnull AvatarFlightMountLifecycleService.Result result) {
-        commandContext.sender().sendMessage(Message.raw(result.message()));
+        commandContext.sender().sendMessage(localizedResult(result.message()));
+    }
+
+    /** Translates the legacy debug service result without changing its diagnostic contract. */
+    private static Message localizedResult(String text) {
+        String key = switch (text) {
+            case "Avatar flight component types are not registered." -> "tamework.commands.debugDragonFlight.result.avatar.flight.component.types.are.not.registered";
+            case "Avatar flight is already active." -> "tamework.commands.debugDragonFlight.result.avatar.flight.is.already.active";
+            case "Hold Flightmaster's Talisman before starting avatar flight." -> "tamework.commands.debugDragonFlight.result.hold.flightmaster.s.talisman.before.starting.avatar.flight";
+            case "Avatar flight disabled, but no saved model or skin fallback was available." -> "tamework.commands.debugDragonFlight.result.avatar.flight.disabled.but.no.saved.model.or.skin";
+            case "Client flight probe failed: MovementManager is unavailable." -> "tamework.commands.debugDragonFlight.result.client.flight.probe.failed.movementmanager.is.unavailable";
+            case "Client flight probe failed: MovementStatesComponent is unavailable." -> "tamework.commands.debugDragonFlight.result.client.flight.probe.failed.movementstatescomponent.is.unavailable";
+            case "Client flight probe failed: Player packet handler is unavailable." -> "tamework.commands.debugDragonFlight.result.client.flight.probe.failed.player.packet.handler.is.unavailable";
+            case "Client flight probe enabled and input logging enabled." -> "tamework.commands.debugDragonFlight.result.client.flight.probe.enabled.and.input.logging.enabled";
+            case "Client flight probe was not active." -> "tamework.commands.debugDragonFlight.result.client.flight.probe.was.not.active";
+            case "Client flight probe disabled and movement settings restored." -> "tamework.commands.debugDragonFlight.result.client.flight.probe.disabled.and.movement.settings.restored";
+            case "Avatar-flight mount rejected: source_snapshot_failed" -> "tamework.commands.debugDragonFlight.result.avatar.flight.mount.rejected.source.snapshot.failed";
+            case "Avatar-flight mount rejected: session_snapshot_failed" -> "tamework.commands.debugDragonFlight.result.avatar.flight.mount.rejected.session.snapshot.failed";
+            case "Avatar-flight mount rejected: component_type_unavailable" -> "tamework.commands.debugDragonFlight.result.avatar.flight.mount.rejected.component.type.unavailable";
+            case "Avatar-flight mount failed while parking source NPC." -> "tamework.commands.debugDragonFlight.result.avatar.flight.mount.failed.while.parking.source.npc";
+            case "Avatar-flight mount cleanup already in progress." -> "tamework.commands.debugDragonFlight.result.avatar.flight.mount.cleanup.already.in.progress";
+            case "Avatar flight disabled." -> "tamework.commands.debugDragonFlight.result.avatar.flight.disabled";
+            case "Avatar flight disabled and model restored." -> "tamework.commands.debugDragonFlight.result.avatar.flight.disabled.and.model.restored";
+            default -> null;
+        };
+        if (key != null) {
+            return Message.translation("server." + key);
+        }
+        if (text.startsWith("Avatar flight config is disabled: ")) {
+            return Message.translation("server.tamework.commands.debugDragonFlight.result.configDisabled").param("0", text.substring(34));
+        }
+        if (text.startsWith("Avatar flight model asset not found: ")) {
+            return Message.translation("server.tamework.commands.debugDragonFlight.result.modelMissing").param("0", text.substring(37));
+        }
+        if (text.startsWith("Avatar flight enabled with ")) {
+            return Message.translation("server.tamework.commands.debugDragonFlight.result.enabled").param("0", text.substring(27));
+        }
+        if (text.startsWith("Avatar flight mounted with ")) {
+            return Message.translation("server.tamework.commands.debugDragonFlight.result.mounted").param("0", text.substring(27));
+        }
+        if (text.startsWith("Avatar-flight mount rejected: ")) {
+            return Message.translation("server.tamework.commands.debugDragonFlight.result.mountRejected").param("0", text.substring(30));
+        }
+        if (text.startsWith("Avatar-flight mount restored; player flight state was already absent. ")) {
+            return Message.translation("server.tamework.commands.debugDragonFlight.result.mountRestored")
+                    .param("0", localizedResult(text.substring(70)));
+        }
+        return Message.translation("server.tamework.commands.debugDragonFlight.result.unavailable");
     }
 
     private static boolean isOff(@Nonnull String value) {

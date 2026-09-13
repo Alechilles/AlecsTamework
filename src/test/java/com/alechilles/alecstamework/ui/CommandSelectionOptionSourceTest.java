@@ -50,5 +50,7 @@ class CommandSelectionOptionSourceTest {
                 config, null, null, Integer.MAX_VALUE);
 
         assertEquals("Flight Toggle", options[0].label());
+        assertEquals("Alternar vuelo", CommandSelectionOptionSource.build(
+                config, null, "es-ES", Integer.MAX_VALUE)[0].label());
     }
 }

@@ -126,7 +126,7 @@ Group #TameworkAvatarFlightControls {
         Label #LaunchBinding {
             Anchor: (Top: 50, Left: 3, Width: 52, Height: 19);
             Background: @FlightControlBindingBackground;
-            Text: "CROUCH";
+            Text: %server.tamework.ui.flight.crouch;
             Style: @FlightControlBindingStyle;
         }
     }

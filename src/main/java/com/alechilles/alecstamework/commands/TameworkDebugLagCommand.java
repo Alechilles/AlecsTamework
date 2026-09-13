@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
 public final class TameworkDebugLagCommand extends AbstractTameworkServerCommand {
 
     public TameworkDebugLagCommand() {
-        super("lag", "Toggle Tamework lag diagnostics logging.");
+        super("lag", "server.tamework.commands.debugLag.description");
         setAllowsExtraArguments(true);
     }
 
@@ -19,7 +19,7 @@ public final class TameworkDebugLagCommand extends AbstractTameworkServerCommand
     protected void executeServer(@Nonnull CommandContext commandContext) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugLag.tamework.plugin.not.available"));
             return;
         }
         String raw = getFirstArg(commandContext);
@@ -27,9 +27,7 @@ public final class TameworkDebugLagCommand extends AbstractTameworkServerCommand
         boolean enabled = explicit != null
                 ? plugin.setDebugLagEnabled(explicit)
                 : plugin.toggleDebugLagEnabled();
-        commandContext.sender().sendMessage(Message.raw(
-                "Tamework lag diagnostics logging: " + (enabled ? "enabled" : "disabled")
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugLag.tamework.lag.diagnostics.logging").param("0", String.valueOf((enabled ? "enabled" : "disabled"))));
     }
 
     private static String getFirstArg(CommandContext commandContext) {

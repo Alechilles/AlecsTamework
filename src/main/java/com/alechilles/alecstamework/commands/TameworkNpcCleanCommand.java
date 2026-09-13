@@ -14,6 +14,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -23,7 +24,7 @@ import javax.annotation.Nullable;
  */
 public final class TameworkNpcCleanCommand extends AbstractWorldCommand {
     public TameworkNpcCleanCommand() {
-        super("clean", "Remove all unowned NPCs matching a specific role id.");
+        super("clean", "server.tamework.commands.npcClean.description");
         setAllowsExtraArguments(true);
     }
 
@@ -33,20 +34,20 @@ public final class TameworkNpcCleanCommand extends AbstractWorldCommand {
                            @Nonnull Store<EntityStore> store) {
         String requestedRole = getArg(commandContext, 2);
         if (requestedRole == null || requestedRole.isBlank()) {
-            commandContext.sender().sendMessage(Message.raw("Usage: /tw npcclean <roleId>"));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.npcClean.usage.tw.npcclean.roleid"));
             return;
         }
 
         NPCPlugin npcPlugin = NPCPlugin.get();
         TameworkNpcRoleResolver.RoleResolution resolution = TameworkNpcRoleResolver.resolveRole(requestedRole.trim(), npcPlugin);
         if (resolution.errorMessage() != null) {
-            commandContext.sender().sendMessage(Message.raw(resolution.errorMessage()));
+            commandContext.sender().sendMessage(roleResolutionMessage(resolution));
             return;
         }
 
         String targetRoleId = resolution.roleId();
         if (targetRoleId == null || targetRoleId.isBlank()) {
-            commandContext.sender().sendMessage(Message.raw("Unable to resolve role id: " + requestedRole));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.npcClean.unable.to.resolve.role.id").param("0", String.valueOf(requestedRole)));
             return;
         }
 
@@ -54,9 +55,7 @@ public final class TameworkNpcCleanCommand extends AbstractWorldCommand {
         ComponentType<EntityStore, TameworkCommandLinksComponent> linksType =
                 TameworkCommandLinksComponent.getComponentType();
         if (ownerType == null || linksType == null) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "NPC cleanup is unavailable while companion ownership data is unavailable."
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.npcClean.npc.cleanup.is.unavailable.while.companion.ownership"));
             return;
         }
 
@@ -84,24 +83,36 @@ public final class TameworkNpcCleanCommand extends AbstractWorldCommand {
         if (removed == 0) {
             int protectedNpcCount = protectedCount.get();
             if (protectedNpcCount > 0) {
-                commandContext.sender().sendMessage(Message.raw(
-                        "No unowned NPCs were removed for role '" + targetRoleId
-                                + "'. Skipped " + protectedNpcCount + " owned companion(s)."
-                ));
+                commandContext.sender().sendMessage(Message.translation("server.tamework.commands.npcClean.no.unowned.npcs.were.removed.for.role").param("0", String.valueOf(targetRoleId)).param("1", String.valueOf(protectedNpcCount)));
                 return;
             }
-            commandContext.sender().sendMessage(Message.raw(
-                    "No NPCs matched role '" + targetRoleId + "'."
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.npcClean.no.npcs.matched.role").param("0", String.valueOf(targetRoleId)));
             return;
         }
         int protectedNpcCount = protectedCount.get();
-        String skipped = protectedNpcCount == 0
-                ? ""
-                : " Skipped " + protectedNpcCount + " owned companion(s).";
-        commandContext.sender().sendMessage(Message.raw(
-                "Removed " + removed + " unowned NPC(s) with role '" + targetRoleId + "'." + skipped
-        ));
+        commandContext.sender().sendMessage(protectedNpcCount == 0
+                ? Message.translation("server.tamework.commands.npcClean.removed")
+                .param("removed", removed).param("role", targetRoleId)
+                : Message.translation("server.tamework.commands.npcClean.removedWithProtected")
+                .param("removed", removed).param("role", targetRoleId)
+                .param("protected", protectedNpcCount));
+    }
+
+    @Nonnull
+    private static Message roleResolutionMessage(
+            @Nonnull TameworkNpcRoleResolver.RoleResolution resolution
+    ) {
+        String key = resolution.errorKey();
+        if (key == null || key.isBlank()) {
+            String fallback = resolution.errorMessage();
+            return Message.raw(fallback == null ? "" : fallback);
+        }
+        Message message = Message.translation("server." + key);
+        List<String> arguments = resolution.errorArguments();
+        for (int index = 0; index < arguments.size(); index++) {
+            message.param(Integer.toString(index), arguments.get(index));
+        }
+        return message;
     }
 
     private static boolean isProtectedOwnedCompanion(

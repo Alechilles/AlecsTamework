@@ -38,6 +38,27 @@ items.Tw_Plant_Crop_Mushroom_Glowing_Purple_Block.name=Glowing Purple Mushroom
 
 # ===== Tamework UI: Shared =====
 tamework.ui.shared.button.apply=Apply
+tamework.ui.shared.brandTooltip=Alec's Tamework! v{0}\nby Alec (Alechilles)
+tamework.ui.shared.unknown=Unknown
+tamework.ui.shared.npc=NPC
+tamework.ui.shared.bondedCompanion=Bonded Companion
+tamework.ui.shared.modifier=Modifier
+tamework.ui.settings.openUnavailable=Unable to open settings right now.
+tamework.ui.settings.notAvailable=Tamework settings are not available.
+tamework.ui.settings.permissionDenied=You do not have permission to use /tw settings.
+tamework.ui.settingsAnnouncement.openUnavailable=Unable to open Tamework news right now.
+tamework.ui.talents.openUnavailable=Talent page is unavailable right now.
+tamework.ui.talents.noUsableData=This companion has no usable talent data.
+tamework.ui.linkedPanel.removal.confirmTitle={0} {1}
+tamework.ui.flight.crouch=CROUCH
+tamework.ui.notifications.command.respawn.incompatibleSetup=Companion revival is unavailable because its persistence setup is incompatible.
+tamework.ui.notifications.command.respawn.workflowStartFailed=Companion revival failed before its workflow could start.
+tamework.ui.notifications.command.respawn.savedStateInvalid=Companion revival could not validate its saved state.
+tamework.ui.notifications.command.respawn.worldRestoreFailed=Companion revival could not restore the companion in the world.
+tamework.ui.notifications.command.respawn.saveFailed=Companion revival could not save the restored companion.
+tamework.ui.notifications.command.respawn.incomplete=Companion revival is incomplete. Try again shortly.
+tamework.ui.notifications.command.respawn.rolledBack=Companion revival was rolled back. Try again shortly.
+tamework.ui.notifications.command.respawn.completed=Companion revival completed.
 tamework.ui.shared.button.back=Back
 tamework.ui.shared.button.cancel=Cancel
 tamework.ui.shared.button.random=Random
@@ -1157,5 +1178,519 @@ tamework.ui.guide.topic.worldUtilities.title=World utilities
 tamework.ui.guide.topic.worldUtilities.body=SCARECROW PLACEMENT\nPlace a Tamework scarecrow on a solid surface. It faces the placer. Look at it and hold its collection prompt for one second to pick it up; if inventory is full, it stays placed.\n\nCOVERAGE\nAutomatic NPC spawn markers are paused within 32 blocks. Ordinary spawning is suppressed in native spawn chunks intersecting that area, so its horizontal edge can extend to a chunk boundary. Overlapping scarecrows remain active independently until collected.\n\nWHAT STILL EXISTS OR SPAWNS\nScarecrows do not remove existing creatures. Manually triggered spawn markers, spawner items, commands, breeding, recall, and other deliberate scripted spawns can still create or move animals.\n\nTROUGHS AND COOPS\nSupported troughs provide care resources and need refilling. Supported coops store and release animals. Their prompts and the companion's card explain the current state.\n\nSee Care & happiness for feeding and water, and Capture & coops for storage. Availability of these utilities depends on the installed content.
 tamework.ui.guide.topic.worldUtilities.visual=Protected area ≠ empty area
 tamework.ui.guide.topic.worldUtilities.note=The scarecrow limits automatic spawning. Animals already inside and deliberate arrivals such as breeding or recall remain possible.
+
+tamework.ui.population.action.capture=capture
+tamework.ui.population.action.release=release
+tamework.ui.population.action.revive=revive
+tamework.ui.population.action.default=action
+tamework.ui.population.slot=slot
+tamework.ui.population.slots=slots
+tamework.ui.population.capacity.deployed=Not enough deployed companion capacity: {0} / {1} slots used; {2} needs {3} {4}.
+tamework.ui.population.capacity.owned=Not enough owned companion capacity: {0} / {1} slots used; {2} needs {3} {4}.
+tamework.ui.population.deployedLimit=Your deployed companion limit has been reached.
+tamework.ui.population.ownedLimit=Your owned companion limit has been reached.
+tamework.ui.population.familyLocked=Your Husbandry level is too low to {0} this companion.
+tamework.ui.population.familyUnknown=This companion family is not configured for Husbandry.
+tamework.ui.population.providerUnavailable=Husbandry requirements are temporarily unavailable. Try again shortly.
+tamework.ui.notifications.spawner.captureFailed=Capture could not be completed.
+tamework.ui.notifications.spawner.releaseFailed=Companion release could not be completed.
+tamework.ui.notifications.spawner.releaseInvalidContext=This capture item does not contain a valid companion.
+tamework.ui.notifications.spawner.captureInvalidContext=No valid companion was available to capture.
+tamework.ui.notifications.spawner.releaseEvidenceFailed=The stored companion state could not be verified.
+tamework.ui.notifications.spawner.captureEvidenceFailed=The companion state could not be verified for capture.
+tamework.ui.notifications.spawner.profileReadFailed=The companion record could not be loaded.
+tamework.ui.notifications.spawner.releaseProfileConflict=This capture item no longer matches the companion record.
+tamework.ui.notifications.spawner.captureProfileConflict=The companion record changed before capture completed.
+tamework.ui.notifications.spawner.adoptionRejected=This companion cannot be added to managed ownership.
+tamework.ui.notifications.spawner.adoptionFailed=The companion could not be added to managed ownership.
+tamework.ui.notifications.spawner.snapshotDecodeFailed=The stored companion data could not be read.
+tamework.ui.notifications.spawner.placementFailed=No safe companion release location was available here.
+tamework.ui.notifications.spawner.releaseUnavailable=Companion release is temporarily unavailable. Try again shortly.
+tamework.ui.notifications.spawner.captureUnavailable=Capture is temporarily unavailable. Try again shortly.
+tamework.ui.notifications.spawner.compensated=The action failed, and its changes were safely rolled back.
 tamework.ui.linkedLocation.copy=Copy coordinates
 tamework.ui.linkedLocation.copyHint=Select text to copy
+
+tamework.commands.activationStatus.description=Show Tamework runtime activation status.
+tamework.commands.addTrait.no.npc.found.in.view=No NPC found in view.
+tamework.commands.addTrait.traits.component.is.not.available=Traits component is not available.
+tamework.commands.addTrait.no.enabled.trait.config.resolved.for.this=No enabled trait config resolved for this NPC (role/config lookup failed).
+tamework.commands.addTrait.trait.config.has.no.trait.definitions=Trait config '{0}' has no trait definitions.
+tamework.commands.addTrait.trait.id.is.invalid=Trait id '{0}' is invalid.
+tamework.commands.addTrait.unknown.trait.known.traits=Unknown trait '{0}'. Known traits: {1}
+tamework.commands.addTrait.description=Append one trait to the NPC you are looking at.
+tamework.commands.api.description=Tamework API tooling commands.
+tamework.commands.apiSelfTestCommandSupport.tamework.plugin.not.available=Tamework plugin not available.
+tamework.commands.apiSelfTestCommandSupport.api.self.test.fixtures.are.not.available=API self-test fixtures are not available.
+tamework.commands.apiSelfTestCommandSupport.api.self.test.runner.is.not.available=API self-test runner is not available.
+tamework.commands.apiSelfTestCommandSupport.tamework.api.is.not.available=Tamework API is not available.
+tamework.commands.apiSelfTestCommandSupport.you.do.not.have.permission.to.use=You do not have permission to use /tw api test.
+tamework.commands.apiSelfTestCommandSupport.no.api.self.test.fixture.set.found=No API self-test fixture set found in this world.
+tamework.commands.apiSelfTestCommandSupport.npcuuid.owner.role= - {0}: npcUuid={1}, owner={2}, role={3}
+tamework.commands.apiTest.description=Run or manage Tamework API self-tests.
+tamework.commands.apiTestPrepare.unable.to.resolve.the.player.for.fixture=Unable to resolve the player for fixture setup.
+tamework.commands.apiTestPrepare.failed.to.prepare.api.self.test.fixtures=Failed to prepare API self-test fixtures safely.
+tamework.commands.apiTestPrepare.description=Provision fixtures from the optional Tamework example asset pack.
+tamework.commands.apiTestReset.unable.to.resolve.the.player.for.fixture=Unable to resolve the player for fixture reset.
+tamework.commands.apiTestReset.description=Remove the current API self-test fixtures.
+tamework.commands.apiTestRun.usage.tw.api.test.run.core.profile=Usage: /tw api test run [core|profile|command-links|configs|progression|interaction-extensions|trait-effects|policies|command-ui|command-hud|diagnostics|hydragon-integrations|all] [verbose]
+tamework.commands.apiTestRun.that.suite.requires.prepared.in.world.fixtures=That suite requires prepared in-world fixtures. From the console use core, command-hud, diagnostics, hydragon-integrations, or all for the read-only aggregate.
+tamework.commands.apiTestRun.description=Run the live Tamework API self-test suites.
+tamework.commands.apiTestStatus.api.self.test.status.runner.fixtures.player=API self-test status: runner={0}, fixtures=player-scoped, prepare/reset=player-scoped. Use /tw api test run all for the console-safe aggregate.
+tamework.commands.apiTestStatus.description=Show the current API self-test fixture status.
+tamework.commands.commandRoot.description=Tamework commands.
+tamework.commands.config.tamework.config.editor.is.not.available=Tamework config editor is not available.
+tamework.commands.config.you.do.not.have.permission.to.use=You do not have permission to use /tw config.
+tamework.commands.config.unable.to.open.the.config.editor.right=Unable to open the config editor right now.
+tamework.commands.config.description=Open the Tamework config editor.
+tamework.commands.config.tamework.configuration.commands=Tamework configuration commands.
+tamework.commands.debugAvatar.description=Tamework avatar debug commands.
+tamework.commands.debugAvatarFlight.tamework.plugin.not.available=Tamework plugin not available.
+tamework.commands.debugAvatarFlight.tamework.avatar.flight.debug.logging=Tamework avatar-flight debug logging: {0}
+tamework.commands.debugAvatarFlight.description=Toggle Tamework avatar-flight debug logging.
+tamework.commands.debugBreeding.tamework.plugin.not.available=Tamework plugin not available.
+tamework.commands.debugBreeding.tamework.breeding.debug.logging=Tamework breeding debug logging: {0}
+tamework.commands.debugBreeding.description=Toggle Tamework breeding debug logging.
+tamework.commands.debug.description=Tamework debug commands.
+tamework.commands.debugCompanionLog.description=Companion debug logging commands.
+tamework.commands.debugCoop.tamework.plugin.not.available=Tamework plugin not available.
+tamework.commands.debugCoop.tamework.coop.debug.logging=Tamework coop debug logging: {0}
+tamework.commands.debugCoop.description=Toggle Tamework coop identity debug logging.
+tamework.commands.debugCrashTelemetry.tamework.plugin.not.available=Tamework plugin not available.
+tamework.commands.debugCrashTelemetry.crash.telemetry.service.is.not.initialized=Crash telemetry service is not initialized.
+tamework.commands.debugCrashTelemetry.you.are.not.allowed.to.run.tw=You are not allowed to run /tw debugcrashtelemetry eventerror.
+tamework.commands.debugCrashTelemetry.you.are.not.allowed.to.run.tw2=You are not allowed to run /tw debugcrashtelemetry eventlifecycle.
+tamework.commands.debugCrashTelemetry.you.are.not.allowed.to.run.tw3=You are not allowed to run /tw debugcrashtelemetry simulate.
+tamework.commands.debugCrashTelemetry.simulated.uncaught.tamework.crash.dispatched.token=Simulated uncaught Tamework crash dispatched (token={0}).
+tamework.commands.debugCrashTelemetry.usage.tw.debugcrashtelemetry.flush.simulate.eventerror.eventlifecycle=Usage: /tw debugcrashtelemetry [flush|simulate|eventerror|eventlifecycle]
+tamework.commands.debugCrashTelemetry.crash.telemetry.enabled.endpoint.pending.flushinprogress=Crash telemetry: enabled={0}, endpoint={1}, pending={2}, flushInProgress={3}
+tamework.commands.debugCrashTelemetry.crash.telemetry.last.flush=Crash telemetry last flush: {0} | {1}
+tamework.commands.debugCrashTelemetry.description=Show crash telemetry diagnostics. Optional: flush|simulate|eventerror|eventlifecycle
+tamework.commands.debugDespawn.tamework.plugin.not.available=Tamework plugin not available.
+tamework.commands.debugDespawn.tamework.despawn.diagnostics.logging.role.filter=Tamework despawn diagnostics logging: {0} (role filter: {1})
+tamework.commands.debugDespawn.description=Toggle Tamework companion despawn diagnostics logging (optional role filter).
+tamework.commands.debugDragonFlight.player.uuid.is.not.available=Player UUID is not available.
+tamework.commands.debugDragonFlight.usage.tw.debugdragonflight.on.configid.off.toggle=Usage: /tw debugdragonflight [on [configId] | off | toggle | status | inputprobe [on|off|toggle|status] | flightprobe [on|off|toggle|status]]
+tamework.commands.debugDragonFlight.client.flight.probe.active.inputlog=Client flight probe: active={0} inputLog={1}
+tamework.commands.debugDragonFlight.usage.tw.debugdragonflight.flightprobe.on.off.toggle=Usage: /tw debugdragonflight flightprobe [on|off|toggle|status]
+tamework.commands.debugDragonFlight.input.probe.active=Input probe: active={0}
+tamework.commands.debugDragonFlight.input.probe.disabled=Input probe disabled.
+tamework.commands.debugDragonFlight.input.probe.enabled=Input probe enabled.
+tamework.commands.debugDragonFlight.usage.tw.debugdragonflight.inputprobe.on.off.toggle=Usage: /tw debugdragonflight inputprobe [on|off|toggle|status]
+tamework.commands.debugDragonFlight.description=Toggle transformed-player dragon flight testing.
+tamework.commands.debugFlyingCompanion.tamework.plugin.not.available=Tamework plugin not available.
+tamework.commands.debugFlyingCompanion.tamework.flying.companion.diagnostics.logging=Tamework flying companion diagnostics logging: {0}
+tamework.commands.debugFlyingCompanion.description=Toggle Tamework flying companion diagnostics logging.
+tamework.commands.debugGet.description=Get debug NPC state.
+tamework.commands.debugHarvest.tamework.plugin.not.available=Tamework plugin not available.
+tamework.commands.debugHarvest.tamework.harvest.diagnostics.logging=Tamework harvest diagnostics logging: {0}
+tamework.commands.debugHarvest.description=Toggle Tamework harvest diagnostics logging.
+tamework.commands.debugHook.tamework.plugin.not.available=Tamework plugin not available.
+tamework.commands.debugHook.tamework.hook.debug.logging=Tamework hook debug logging: {0}
+tamework.commands.debugHook.description=Toggle Tamework hook debug logging.
+tamework.commands.debugLag.tamework.plugin.not.available=Tamework plugin not available.
+tamework.commands.debugLag.tamework.lag.diagnostics.logging=Tamework lag diagnostics logging: {0}
+tamework.commands.debugLag.description=Toggle Tamework lag diagnostics logging.
+tamework.commands.debugLog.description=Tamework debug logging commands.
+tamework.commands.debugNeedsConsume.tamework.plugin.not.available=Tamework plugin not available.
+tamework.commands.debugNeedsConsume.tamework.needs.consume.diagnostics.logging=Tamework needs consume diagnostics logging: {0}
+tamework.commands.debugNeedsConsume.description=Toggle Tamework needs consume diagnostics logging.
+tamework.commands.debugNeedsDamage.tamework.plugin.not.available=Tamework plugin not available.
+tamework.commands.debugNeedsDamage.tamework.needs.damage.diagnostics.logging=Tamework needs damage diagnostics logging: {0}
+tamework.commands.debugNeedsDamage.description=Toggle Tamework needs damage diagnostics logging.
+tamework.commands.debugNeedsLog.description=Needs debug logging commands.
+tamework.commands.debugNeedsSeek.tamework.plugin.not.available=Tamework plugin not available.
+tamework.commands.debugNeedsSeek.tamework.needs.seek.diagnostics.logging=Tamework needs seek diagnostics logging: {0}
+tamework.commands.debugNeedsSeek.description=Toggle Tamework needs seek diagnostics logging.
+tamework.commands.debugNeedsTelemetry.tamework.plugin.not.available=Tamework plugin not available.
+tamework.commands.debugNeedsTelemetry.tamework.needs.telemetry.context.events=Tamework needs telemetry context events: {0}
+tamework.commands.debugNeedsTelemetry.description=Toggle Tamework needs telemetry context events.
+tamework.commands.debugPersistence.description=Tamework persistence diagnostics.
+tamework.commands.debugPersistenceFailure.persistence.diagnostics.are.not.initialized=Persistence diagnostics are not initialized.
+tamework.commands.debugPersistenceFailure.synthetic.persistence.diagnostic.requested.token.no.persistence=Synthetic persistence diagnostic requested (token={0}). No persistence data was changed.
+tamework.commands.debugPersistenceFailure.synthetic.persistence.diagnostic.could.not.be.requested=Synthetic persistence diagnostic could not be requested.
+tamework.commands.debugPersistenceFailure.description=Send a synthetic persistence diagnostic without changing data.
+tamework.commands.debugPlayerInput.player.uuid.is.not.available=Player UUID is not available.
+tamework.commands.debugPlayerInput.tamework.player.input.diagnostics.for.you.total=Tamework player input diagnostics: {0} for you; total enabled={1}
+tamework.commands.debugPlayerInput.tamework.player.input.diagnostics=Tamework player input diagnostics: {0}
+tamework.commands.debugPlayerInput.description=Toggle player input diagnostics for mount-avatar experiments.
+tamework.commands.debugPlayerModel.player.uuid.is.not.available=Player UUID is not available.
+tamework.commands.debugPlayerModel.player.model.debug.can.crash.the.current=Player model debug can crash the current client when non-player models animate. Use /tw debugplayermodel unsafe [ModelId] [scale] only for isolated probes.
+tamework.commands.debugPlayerModel.model.asset.not.found.usage.tw.debugplayermodel=Model asset not found: {0}. Usage: /tw debugplayermodel unsafe [ModelId] [scale] | reset | status
+tamework.commands.debugPlayerModel.invalid.scale=Invalid scale: {0}
+tamework.commands.debugPlayerModel.player.model.debug.set.model.scale.use=Player model debug: set model={0} scale={1}. Use /tw debugplayermodel reset to restore.
+tamework.commands.debugPlayerModel.player.model.debug.restored.saved.player.model=Player model debug: restored saved player model.
+tamework.commands.debugPlayerModel.player.model.debug.restored.model.from.player=Player model debug: restored model from player skin.
+tamework.commands.debugPlayerModel.player.model.debug.no.saved.player.model=Player model debug: no saved player model or skin fallback is available.
+tamework.commands.debugPlayerModel.player.model.debug.current.saved=Player model debug: current={0}, saved={1}
+tamework.commands.debugPlayerModel.description=Temporarily swap your player model for mount-control testing.
+tamework.commands.debugPrompt.tamework.plugin.not.available=Tamework plugin not available.
+tamework.commands.debugPrompt.tamework.prompt.debug.logging=Tamework prompt debug logging: {0}
+tamework.commands.debugPrompt.description=Toggle Tamework interaction prompt debug logging.
+tamework.commands.debugRespawnTrace.tamework.plugin.not.available=Tamework plugin not available.
+tamework.commands.debugRespawnTrace.tamework.respawn.trace.diagnostics.logging=Tamework respawn trace diagnostics logging: {0}
+tamework.commands.debugRespawnTrace.description=Toggle Tamework capture, release, and revival health trace logging.
+tamework.commands.debugReviveReady.description=Make all your dead linked companions ready to revive.
+tamework.commands.debugRide.tamework.plugin.not.available=Tamework plugin not available.
+tamework.commands.debugRide.tamework.ride.diagnostics.logging=Tamework ride diagnostics logging: {0}
+tamework.commands.debugRide.description=Toggle Tamework ride diagnostics logging.
+tamework.commands.debugSetBreeding.description=Set debug breeding state.
+tamework.commands.debugSet.description=Set debug NPC state.
+tamework.commands.debugSpawner.tamework.plugin.not.available=Tamework plugin not available.
+tamework.commands.debugSpawner.tamework.spawner.flow.debug.logging=Tamework spawner flow debug logging: {0}
+tamework.commands.debugSpawner.description=Toggle Tamework spawner capture/spawn flow debug logging.
+tamework.commands.debugSpawnerLocation.tamework.plugin.not.available=Tamework plugin not available.
+tamework.commands.debugSpawnerLocation.tamework.spawn.position.debug.logging=Tamework spawn-position debug logging: {0}
+tamework.commands.debugSpawnerLocation.description=Toggle Tamework spawn-position debug logging.
+tamework.commands.debugTargetHud.tamework.command.target.hud.diagnostics.logging=Tamework command target HUD diagnostics logging: {0}
+tamework.commands.debugTargetHud.description=Toggle Tamework command target HUD diagnostics logging.
+tamework.commands.debugTelemetry.description=Tamework telemetry debug commands.
+tamework.commands.debugView.description=Tamework debug visualization commands.
+tamework.commands.debugXpEvents.tamework.xp.event.debug.service.is.not=Tamework XP event debug service is not available.
+tamework.commands.debugXpEvents.tamework.xp.event.debug.logging.events.seen=Tamework XP event debug logging: {0} (events seen this session: {1})
+tamework.commands.debugXpEvents.description=Toggle Tamework companion XP API event debug logging.
+tamework.commands.deleteSpawnMarker.usage.tw.deletespawnmarker.range=Usage: /tw deletespawnmarker [range]
+tamework.commands.deleteSpawnMarker.unable.to.resolve.your.position=Unable to resolve your position.
+tamework.commands.deleteSpawnMarker.no.loaded.spawn.marker.found.in.front=No loaded spawn marker found in front of you within {0} blocks.
+tamework.commands.deleteSpawnMarker.target.spawn.marker.is.no.longer.valid=Target spawn marker is no longer valid.
+tamework.commands.deleteSpawnMarker.deleted.loaded.spawn.marker.at.npc.distance=Deleted loaded spawn marker {0} at {1}, npc={2}, distance={3}{4}.
+tamework.commands.deleteSpawnMarker.description=Delete the loaded spawn marker you are looking at.
+tamework.commands.findNpc.usage.tw.findnpc.uuid.mark.on.off=Usage: /tw findnpc <uuid> [mark:on|off]
+tamework.commands.findNpc.npc.is.not.currently.valid.in.world=NPC {0} is not currently valid in-world.
+tamework.commands.findNpc.entity.exists.but.has.no.npc.component=Entity {0} exists but has no NPC component.
+tamework.commands.findNpc.npc.found.role.pos.distance.stage.scale=NPC {0} found: role={1}, pos={2}, distance={3}, stage={4}, scale={5}, marked={6}.
+tamework.commands.findNpc.description=Find an NPC by UUID and print its current world state.
+tamework.commands.getAlarm.target.is.not.an.npc=Target is not an NPC.
+tamework.commands.getAlarm.npc.has.no.alarm.store=NPC has no alarm store.
+tamework.commands.getAlarm.alarm.for.npc.is=Alarm {0} for NPC {1} is {2}.{3}
+tamework.commands.getAlarm.description=Get alarm status of the NPC you are looking at.
+tamework.commands.getFlockDebug.no.npc.found.in.view=No NPC found in view.
+tamework.commands.getFlockDebug.target.is.not.an.npc=Target is not an NPC.
+tamework.commands.getFlockDebug.description=Get flock direct-follow debug state for the NPC you are looking at.
+tamework.commands.getHappiness.no.npc.found.in.view=No NPC found in view.
+tamework.commands.getHappiness.npc.has.no.tracked.happiness.state=NPC {0} has no tracked happiness state.
+tamework.commands.getHappiness.description=Get happiness of the NPC you are looking at.
+tamework.commands.getLifeStage.no.npc.found.in.view=No NPC found in view.
+tamework.commands.getLifeStage.life.stage.for.npc.fallback.role.gate=Life stage for NPC {0}: {1} (fallback role gate, no component).
+tamework.commands.getLifeStage.life.stage.for.npc.bornatms.adolescentatms.adultatms=Life stage for NPC {0}: {1} (bornAtMs={2}, adolescentAtMs={3}, adultAtMs={4}, growthScaling={5}).
+tamework.commands.getLifeStage.description=Get life stage of the NPC you are looking at.
+tamework.commands.getNeeds.needs.component.type.is.not.registered=Needs component type is not registered.
+tamework.commands.getNeeds.npc.has.no.tracked.needs.state=NPC {0} has no tracked needs state.
+tamework.commands.getNeeds.description=Get hunger and thirst for selected NPCs.
+tamework.commands.getOwner.no.npc.found.in.view=No NPC found in view.
+tamework.commands.getOwner.owner.for.npc.is=Owner for NPC {0} is {1}
+tamework.commands.getOwner.description=Get owner of the NPC you are looking at.
+tamework.commands.getTamed.no.npc.found.in.view=No NPC found in view.
+tamework.commands.getTamed.tamed.for.npc.is=Tamed for NPC {0} is {1}
+tamework.commands.getTamed.description=Get tamed status of the NPC you are looking at.
+tamework.commands.getTraits.no.npc.found.in.view=No NPC found in view.
+tamework.commands.getTraits.traits.component.is.not.available=Traits component is not available.
+tamework.commands.getTraits.npc.has.no.tracked.trait.state=NPC {0} has no tracked trait state.
+tamework.commands.getTraits.description=Get traits of the NPC you are looking at.
+tamework.commands.news.tamework.news.is.not.available=Tamework news is not available.
+tamework.commands.news.you.do.not.have.permission.to.use=You do not have permission to use /tw news.
+tamework.commands.news.unable.to.open.tamework.news.right.now=Unable to open Tamework news right now.
+tamework.commands.news.description=Open the current Tamework settings announcement.
+tamework.commands.npcClean.usage.tw.npcclean.roleid=Usage: /tw npcclean <roleId>
+tamework.commands.npcClean.unable.to.resolve.role.id=Unable to resolve role id: {0}
+tamework.commands.npcClean.npc.cleanup.is.unavailable.while.companion.ownership=NPC cleanup is unavailable while companion ownership data is unavailable.
+tamework.commands.npcClean.no.unowned.npcs.were.removed.for.role=No unowned NPCs were removed for role '{0}'. Skipped {1} owned companion(s).
+tamework.commands.npcClean.no.npcs.matched.role=No NPCs matched role '{0}'.
+tamework.commands.npcClean.removed.unowned.npc.s.with.role=Removed {0} unowned NPC(s) with role '{1}'.{2}
+tamework.commands.npcClean.description=Remove all unowned NPCs matching a specific role id.
+tamework.commands.npc.description=Tamework NPC commands.
+tamework.commands.npcSpawn.description=Spawn Tamework NPCs.
+tamework.commands.npcSpawnTamed.count.must.be.greater.than.zero=--count must be greater than zero.
+tamework.commands.npcSpawnTamed.radius.must.be.a.positive.number=--radius must be a positive number.
+tamework.commands.npcSpawnTamed.unable.to.resolve.npc.role.id=Unable to resolve NPC role id.
+tamework.commands.npcSpawnTamed.attachment.must.use.slot.value.for.example=--attachment must use slot:value, for example --attachment=coat:browntabby.
+tamework.commands.npcSpawnTamed.argument.role=NPC role to spawn.
+tamework.commands.npcSpawnTamed.argument.count=Number of NPCs to spawn.
+tamework.commands.npcSpawnTamed.argument.radius=Maximum radius for the batch spawn formation.
+tamework.commands.npcSpawnTamed.argument.attachment=Attachment override formatted as slot:value.
+tamework.commands.npcSpawnTamed.description=Spawn owned and tamed NPCs from a role id.
+tamework.commands.reloadConfig.tamework.plugin.not.available=Tamework plugin not available.
+tamework.commands.reloadConfig.reloading.tamework.configs=Reloading Tamework configs...
+tamework.commands.reloadConfig.reload.failed.see.server.log.for.details=Reload failed. See server log for details.
+tamework.commands.reloadConfig.reloaded.tamework.configs.overridepacks.overridedirs.itemloaded.spawners=Reloaded Tamework configs. OverridePacks={0} OverrideDirs={1} ItemLoaded={2} Spawners={3} Naming={4} DebugDefaults={5}
+tamework.commands.reloadConfig.runtime.topology.changed.restart.required=Runtime topology changed; restart required. {0}
+tamework.commands.reloadConfig.override.reload.reported.error.s.see.server=Override reload reported {0} error(s). See server log.
+tamework.commands.reloadConfig.description=Reload Tamework item feature configs.
+tamework.commands.runtime.description=Tamework runtime commands.
+tamework.commands.setBreedingReady.mode.must.be.true.false.or.toggle=--mode must be true, false, or toggle.
+tamework.commands.setBreedingReady.breeding.component.is.not.available=Breeding component is not available.
+tamework.commands.setBreedingReady.npc.has.no.enabled.breeding.state=NPC {0} has no enabled breeding state.
+tamework.commands.setBreedingReady.could.not.clear.the.breeding.cooldown.alarm=Could not clear the breeding cooldown alarm for NPC {0}.
+tamework.commands.setBreedingReady.set.breeding.readiness.for.npc.readynow=Set breeding readiness for NPC {0}: readyNow {1} -> {2}.
+tamework.commands.setBreedingReady.argument.mode=Readiness mode: true, false, or toggle.
+tamework.commands.setBreedingReady.description=Set breeding readiness for selected NPCs.
+tamework.commands.setHappiness.usage.tw.sethappiness.value=Usage: /tw sethappiness <value>
+tamework.commands.setHappiness.no.npc.found.in.view=No NPC found in view.
+tamework.commands.setHappiness.happiness.and.breeding.components.are.not.available=Happiness and breeding components are not available.
+tamework.commands.setHappiness.npc.has.no.tracked.happiness.or.breeding=NPC {0} has no tracked happiness or breeding state.
+tamework.commands.setHappiness.npc.has.no.enabled.happiness.progression=NPC {0} has no enabled happiness progression.
+tamework.commands.setHappiness.description=Set happiness of the NPC you are looking at.
+tamework.commands.setHunger.no.enabled.needs.config.resolved.for.npc=No enabled needs config resolved for NPC {0}.
+tamework.commands.setHunger.set.hunger.for.npc=Set hunger for NPC {0}: {1}.
+tamework.commands.setHunger.argument.value=Hunger value to apply.
+tamework.commands.setHunger.description=Set hunger for selected NPCs.
+tamework.commands.setLevel.usage.tw.setlevel.level=Usage: /tw setlevel <level>
+tamework.commands.setLevel.no.npc.found.in.view=No NPC found in view.
+tamework.commands.setLevel.could.not.set.level.for.npc=Could not set level for NPC {0}: {1}.
+tamework.commands.setLevel.description=Set level of the NPC you are looking at.
+tamework.commands.setNeeds.needs.component.type.is.not.registered=Needs component type is not registered.
+tamework.commands.setNeeds.no.enabled.needs.config.resolved.for.npc=No enabled needs config resolved for NPC {0}.
+tamework.commands.setNeeds.set.needs.for.npc.hunger.thirst=Set needs for NPC {0}: hunger={1}, thirst={2}.
+tamework.commands.setNeeds.argument.hunger=Hunger value to apply.
+tamework.commands.setNeeds.argument.thirst=Thirst value to apply.
+tamework.commands.setNeeds.description=Set hunger and thirst for selected NPCs.
+tamework.commands.setOwner.no.player.context=No player context.
+tamework.commands.setOwner.invalid.uuid.use.clear.or.a.valid=Invalid UUID. Use 'clear' or a valid UUID.
+tamework.commands.setOwner.no.npc.found.in.view=No NPC found in view.
+tamework.commands.setOwner.set.owner.for.npc.to=Set owner for NPC {0} to {1}
+tamework.commands.setOwner.description=Set owner of the NPC you are looking at.
+tamework.commands.setTamed.no.npc.found.in.view=No NPC found in view.
+tamework.commands.setTamed.tamed.component.is.not.available=Tamed component is not available.
+tamework.commands.setTamed.set.tamed.for.npc.to=Set tamed for NPC {0} to {1}
+tamework.commands.setTamed.description=Set or toggle tamed status of the NPC you are looking at.
+tamework.commands.setThirst.no.enabled.needs.config.resolved.for.npc=No enabled needs config resolved for NPC {0}.
+tamework.commands.setThirst.set.thirst.for.npc=Set thirst for NPC {0}: {1}.
+tamework.commands.setThirst.argument.value=Thirst value to apply.
+tamework.commands.setThirst.description=Set thirst for selected NPCs.
+tamework.commands.settings.you.do.not.have.permission.to.use=You do not have permission to use /tw settings.
+tamework.commands.settings.description=Open the Tamework settings page.
+tamework.commands.setTraits.no.npc.found.in.view=No NPC found in view.
+tamework.commands.setTraits.traits.component.is.not.available=Traits component is not available.
+tamework.commands.setTraits.no.enabled.trait.config.resolved.for.this=No enabled trait config resolved for this NPC (role/config lookup failed).
+tamework.commands.setTraits.trait.config.has.no.trait.definitions=Trait config '{0}' has no trait definitions.
+tamework.commands.setTraits.trait.id.is.invalid=Trait id '{0}' is invalid.
+tamework.commands.setTraits.unknown.trait.known.traits=Unknown trait '{0}'. Known traits: {1}
+tamework.commands.setTraits.description=Replace traits on the NPC you are looking at.
+tamework.commands.showHitboxes.unable.to.resolve.your.player.uuid=Unable to resolve your player UUID.
+tamework.commands.showHitboxes.hitbox.tracking.disabled=Hitbox tracking disabled.
+tamework.commands.showHitboxes.no.npc.found.in.view=No NPC found in view.
+tamework.commands.showHitboxes.target.npc.is.missing.required.components=Target NPC is missing required components.
+tamework.commands.showHitboxes.tracking.hitbox.debug.for.npc.role.with=Tracking hitbox debug for NPC {0} (role={1}) with per-tick updates (visible to you only). Run /tw showhitboxes again to disable.
+tamework.commands.showHitboxes.rendered.main.hitbox.and.detail.boxes.across=Rendered 1 main hitbox and {0} detail boxes across {1} detail groups.
+tamework.commands.showHitboxes.description=Toggle live hitbox/detail-box tracking for the NPC in view.
+tamework.commands.showSpawnBeacons.unable.to.resolve.your.player.uuid=Unable to resolve your player UUID.
+tamework.commands.showSpawnBeacons.usage.tw.showspawnbeacons.radius.off=Usage: /tw showspawnbeacons [radius|off]
+tamework.commands.showSpawnBeacons.spawn.beacon.visualization.enabled.within.blocks.showing=Spawn beacon visualization enabled within {0} blocks. Showing {1} loaded natural beacon{2}{3} Run /tw showspawnbeacons off to disable.
+tamework.commands.showSpawnBeacons.at=  {0} at {1}
+tamework.commands.showSpawnBeacons.and.more.loaded.beacon.s=  ...and {0} more loaded beacon(s).
+tamework.commands.showSpawnBeacons.description=Toggle natural spawn beacon visualization.
+tamework.commands.showSpawnMarkers.unable.to.resolve.your.player.uuid=Unable to resolve your player UUID.
+tamework.commands.showSpawnMarkers.usage.tw.showspawnmarkers.radius.off=Usage: /tw showspawnmarkers [radius|off]
+tamework.commands.showSpawnMarkers.unable.to.resolve.your.position=Unable to resolve your position.
+tamework.commands.showSpawnMarkers.spawn.marker.debug.rendering.enabled.within.blocks=Spawn marker debug rendering enabled within {0} blocks. Found {1} loaded marker{2}. Run /tw showspawnmarkers off to disable.
+tamework.commands.showSpawnMarkers.at.distance.npc.spawncount.manual.suppressed=  {0} at {1}, distance={2}, npc={3}, spawnCount={4}, manual={5}, suppressed={6}
+tamework.commands.showSpawnMarkers.and.more.loaded.marker.s=  ...and {0} more loaded marker(s).
+tamework.commands.showSpawnMarkers.description=Toggle player-local spawn marker debug rendering.
+
+tamework.ui.talents.defaultCompanionName=Companion
+tamework.ui.talents.effect.points={0} points
+tamework.ui.talents.mutation.companionNotLoaded=Companion is no longer loaded.
+tamework.ui.talents.mutation.companionUnavailable=Companion is not available.
+tamework.ui.talents.mutation.disabled=Companion talents are disabled in Tamework settings.
+tamework.ui.talents.mutation.noTalentSelected=No talent was selected.
+tamework.ui.talents.mutation.roleUnavailable=Companion role is unavailable.
+tamework.ui.talents.mutation.storageUnavailable=Talent storage is unavailable.
+tamework.ui.talents.mutation.noTree=No talent tree is configured for this companion.
+tamework.ui.talents.mutation.talentMissing=That talent could not be found.
+tamework.ui.talents.mutation.alreadyUnlocked=That talent is already unlocked.
+tamework.ui.talents.mutation.levelUnavailable=Level data is unavailable for this companion.
+tamework.ui.talents.mutation.levelTooLow=This talent requires a higher level.
+tamework.ui.talents.mutation.prerequisiteMissing=This talent requires another talent first.
+tamework.ui.talents.mutation.insufficientPoints=Not enough talent points are available.
+tamework.ui.talents.mutation.noPointsSpent=No talent points are spent.
+tamework.ui.talents.mutation.unlocked=Talent unlocked.
+tamework.ui.talents.mutation.refunded=Talent points refunded.
+tamework.ui.talents.mutation.failed=Talent change could not be completed.
+tamework.ui.talents.mutation.bondedUnavailable=Bonded companion data is unavailable right now.
+tamework.ui.talents.mutation.saving=Talent changes are still being saved. Try again shortly.
+tamework.ui.talents.mutation.bondedUnlockFailed=That talent can no longer be unlocked.
+tamework.ui.talents.mutation.bondedRefundFailed=No talent points could be refunded.
+tamework.ui.linkedPanel.progression.happinessBreakdown=Happiness: {0} - [+0 / {1} / {2}]
+tamework.ui.linkedPanel.progression.healthBonus={0} HP
+tamework.ui.linkedPanel.progression.speedBonus={0} m/s
+tamework.ui.linkedPanel.progression.effect.unknown={0}
+tamework.ui.linkedPanel.trait.flatBonus={0}: {1}
+tamework.ui.linkedPanel.trait.minimum=min
+tamework.ui.linkedPanel.trait.maximum=max
+tamework.ui.linkedPanel.trait.tooltip={0}: {1} / {2} {3} ({4})
+
+tamework.ui.commandMenu.action.showLinked=Show linked companions
+tamework.ui.commandMenu.action.showNearby=Show nearby companions
+tamework.ui.commandMenu.action.showOwned=Show owned companions
+tamework.ui.commandMenu.action.toggleAutoLink=Toggle automatic linking
+tamework.ui.commandMenu.action.toggleActiveHighlight=Toggle active highlight
+tamework.ui.commandMenu.action.manageGroups=Manage groups
+tamework.ui.commandMenu.action.decreaseRadius=Decrease radius
+tamework.ui.commandMenu.action.increaseRadius=Increase radius
+tamework.ui.commandMenu.action.clearFilters=Clear filters
+tamework.ui.commandMenu.action.sortBy=Sort by {0}
+tamework.ui.commandMenu.action.filterBy=Filter by {0}
+tamework.ui.commandMenu.action.setFilterText=Set filter text
+tamework.ui.commandMenu.action.useAllGroups=Use all companion groups
+tamework.ui.commandMenu.action.useNoGroups=Use no companion groups
+tamework.ui.commandMenu.action.useGroup=Use group {0}
+tamework.ui.commandMenu.action.assignGroup=Assign to {0}
+tamework.ui.commandMenu.action.setActive=Set active
+tamework.ui.commandMenu.action.setInactive=Set inactive
+tamework.ui.commandMenu.action.enableBreeding=Enable breeding
+tamework.ui.commandMenu.action.disableBreeding=Disable breeding
+tamework.ui.commandMenu.action.toggleFlight=Toggle flight
+tamework.ui.commandMenu.action.toggleShoulderRide=Toggle shoulder ride
+tamework.ui.commandMenu.hotswap.unassigned=Unassigned
+tamework.ui.commandMenu.hotswap.cycleGroup=Cycle Group
+tamework.ui.spawnerTooltip.traits=-- Traits --
+tamework.ui.spawnerTooltip.appearance=-- Appearance --
+tamework.ui.spawnerTooltip.level=Level {level}
+tamework.ui.spawnerTooltip.levelWithMax=Level {level}/{max}
+
+tamework.commands.activationStatus.tamework.activation.state.is.not.available=Tamework activation state is not available.
+tamework.commands.activationStatus.activation.fingerprint.reload=Activation fingerprint={0}, reload={1}.
+tamework.commands.activationStatus.systems.callbacks.workcycles.workers.subscriptions.databaseopens.reasons={0}={1}, systems={2}, callbacks={3}, workCycles={4}, workers={5}, subscriptions={6}, databaseOpens={7}, reasons={8}.
+tamework.commands.debugDb.replacement.persistence.runtime.is.not.available=Replacement persistence runtime is not available.
+tamework.commands.debugDb.generic.persistence.status.is.unavailable=Generic persistence status is unavailable.
+tamework.commands.debugDb.persistence.engine.mode.origin.schema=Persistence engine={0}, mode={1}, origin={2}, schema={3}
+tamework.commands.debugDb.startup.readiness.running.deferred.failed.detail=Startup readiness={0}, running={1}, deferred={2}, failed={3}, detail={4}
+tamework.commands.debugDb.operations.accepted.rejected.completed.failed.busyretries.readsfailed=Operations: accepted={0}, rejected={1}, completed={2}, failed={3}, busyRetries={4}, readsFailed={5}
+tamework.commands.debugDb.schema.integrity.validation.checkpoint=Schema/integrity validation={0}, checkpoint={1}
+tamework.commands.debugDb.generic.persistence.detail.is.unavailable=Generic persistence detail is unavailable.
+tamework.commands.debugDb.persistence.detail.is.unavailable=Persistence detail is unavailable.
+tamework.commands.debugDb.persistence.detail.read.did.not.complete=Persistence detail read did not complete.
+tamework.commands.debugDb.persistence.detail.features.outboxhead.openincidents.activequarantines.opencircuits=Persistence detail: features={0}, outboxHead={1}, openIncidents={2}, activeQuarantines={3}, openCircuits={4}, operationPhases={5}
+tamework.commands.debugDb.persistence.diagnostic.export.is.unavailable=Persistence diagnostic export is unavailable.
+tamework.commands.debugDb.collecting.bounded.persistence.diagnostics=Collecting bounded persistence diagnostics...
+tamework.commands.debugDb.persistence.diagnostic.export.failed.see.the.server=Persistence diagnostic export failed; see the server log.
+tamework.commands.debugDb.persistence.bundle.created.files.bytes=Persistence bundle {0} created ({1} files, {2} bytes): {3}
+tamework.commands.debugDb.bonded.companions.readiness.schema.stored.active.dead=Bonded companions: readiness={0}, schema={1}, stored={2}, active={3}, dead={4}, leases={5}, pendingCleanup={6}, lastFailure={7}
+tamework.commands.debugReviveReady.generic.persistence.is.not.available=Generic persistence is not available.
+tamework.commands.debugReviveReady.could.not.resolve.your.player.uuid=Could not resolve your player UUID.
+tamework.commands.debugReviveReady.linked.companion.data.is.still.updating.retry=Linked companion data is still updating. Retry the command.
+tamework.commands.debugReviveReady.no.dead.linked.companions.were.found.for=No dead linked companions were found for your player.
+tamework.commands.debugReviveReady.dead.linked.companion.revive.ready.update.total=Dead linked companion revive-ready update: total={0}, accepted={1}, alreadyReady={2}, rejected={3}.
+tamework.commands.debugCrashTelemetry.crash.telemetry.flush.scheduled=Crash telemetry flush scheduled.
+tamework.commands.debugCrashTelemetry.crash.telemetry.flush.was.not.scheduled.disabled=Crash telemetry flush was not scheduled (disabled, already running, or no executor available).
+tamework.commands.debugCrashTelemetry.embedded.telemetry.error.event.requested=Embedded telemetry error event requested.
+tamework.commands.debugCrashTelemetry.embedded.telemetry.error.event.was.not.requested=Embedded telemetry error event was not requested (telemetry disabled or event delivery not configured).
+tamework.commands.debugCrashTelemetry.embedded.telemetry.lifecycle.event.requested=Embedded telemetry lifecycle event requested.
+tamework.commands.debugCrashTelemetry.embedded.telemetry.lifecycle.event.was.not.requested=Embedded telemetry lifecycle event was not requested (telemetry disabled or event delivery not configured).
+tamework.commands.getAlarm.no.npc.found.in.view=No NPC found in view.
+tamework.commands.getAlarm.no.npc.resolved.console.usage.requires.an=No NPC resolved. Console usage requires an NPC UUID.
+tamework.commands.showSpawnBeacons.spawn.beacon.visualization.disabled=Spawn beacon visualization disabled.
+tamework.commands.showSpawnBeacons.spawn.beacon.visualization.was.not.active=Spawn beacon visualization was not active.
+tamework.commands.showSpawnMarkers.spawn.marker.debug.rendering.disabled=Spawn marker debug rendering disabled.
+tamework.commands.showSpawnMarkers.spawn.marker.debug.rendering.was.not.active=Spawn marker debug rendering was not active.
+tamework.commands.showHitboxes.hitbox.tracking.stopped.target.npc.is.missing=Hitbox tracking stopped: target NPC is missing required components.
+tamework.commands.showHitboxes.hitbox.tracking.stopped.target.npc.is.no=Hitbox tracking stopped: target NPC is no longer available in this world.
+tamework.commands.showHitboxes.hitbox.tracking.stopped.target.npc.no.longer=Hitbox tracking stopped: target NPC no longer exists.
+
+tamework.ui.roster.progression.level=Level: {0}
+tamework.ui.roster.progression.max=Level: {0}/{1} - MAX XP
+tamework.ui.roster.progression.xp=Level: {0}/{1} - {2}/{3} XP
+
+tamework.ui.commandMenu.noCommands=No commands
+
+tamework.ui.shared.item=Item
+tamework.ui.shared.levelAbbreviation=Lv.
+
+tamework.commands.npc.role.noneRegistered=No NPC roles are currently registered.
+tamework.commands.npc.role.notFound=No role matched '{0}'.
+tamework.commands.npc.role.suggestions=No role matched '{0}'. Try one of: {1}.
+tamework.commands.npc.role.ambiguous=Role '{0}' is ambiguous. Use one of: {1}.
+tamework.commands.npcClean.removed=Removed {removed} unowned NPC(s) with role '{role}'.
+tamework.commands.npcClean.removedWithProtected=Removed {removed} unowned NPC(s) with role '{role}'. Skipped {protected} owned companion(s).
+tamework.commands.npcSpawnTamed.playerContextUnavailable=No player context.
+tamework.commands.npcSpawnTamed.pluginUnavailable=Tamework plugin not available.
+tamework.commands.npcSpawnTamed.result.summary=Spawned {spawned}/{requested} tamed NPC(s) with role '{role}'.
+tamework.commands.npcSpawnTamed.result.autoLinked=Auto-linked {linked} to the held command item.
+tamework.commands.npcSpawnTamed.result.noHeldCommandItem=No command item was held for auto-linking.
+tamework.commands.npcSpawnTamed.result.appliedAttachments=Applied attachments: {attachments}.
+tamework.commands.npcSpawnTamed.result.invalidAttachments=Ignored invalid attachments: {attachments}.
+tamework.commands.npcSpawnTamed.result.failure.quantity=Quantity must be greater than zero.
+tamework.commands.npcSpawnTamed.result.failure.npcPlugin=NPC plugin not available.
+tamework.commands.npcSpawnTamed.result.failure.unknownRole=Unknown role '{role}'.
+tamework.commands.npcSpawnTamed.result.failure.player=Player UUID not available.
+tamework.commands.npcSpawnTamed.result.failure.position=Unable to resolve a spawn position.
+tamework.commands.npcSpawnTamed.result.stopped.populationCap=Owner population cap reached.
+tamework.commands.npcSpawnTamed.result.stopped.spawnFailed=Spawn failed before completing the requested quantity.
+tamework.commands.npcSpawnTamed.result.stopped.applyState=Spawn failed while applying owned companion state.
+tamework.commands.npcSpawnTamed.result.stopped.admissionUnavailable=Managed population admission is unavailable.
+tamework.commands.npcSpawnTamed.result.stopped.admissionFailed=Managed population admission failed.
+tamework.commands.npcSpawnTamed.result.stopped.admissionRejected=Managed population admission was not accepted.
+tamework.commands.npcSpawnTamed.result.stopped.worldClosedAdmission=World closed during managed spawn admission.
+tamework.commands.npcSpawnTamed.result.stopped.npcUnavailable=Spawned NPC was no longer available.
+tamework.commands.npcSpawnTamed.result.stopped.admissionClaim=Managed population admission could not be claimed.
+tamework.commands.npcSpawnTamed.result.stopped.worldDispatchAdmission=World dispatch failed during managed spawn admission.
+tamework.commands.npcSpawnTamed.result.stopped.profilePublication=Managed profile publication failed.
+tamework.commands.npcSpawnTamed.result.stopped.admissionCommit=Managed population admission did not commit.
+tamework.commands.npcSpawnTamed.result.stopped.worldClosedSettlement=World closed during managed spawn settlement.
+tamework.commands.npcSpawnTamed.result.stopped.worldDispatchSettlement=World dispatch failed during managed spawn settlement.
+
+tamework.ui.commandMenu.flightToggle=Flight Toggle
+
+tamework.commands.traits.invalid.input=Trait input is invalid.
+tamework.commands.traits.usage.setTraits=Usage: /tw settraits <TraitId> <Value> [TraitId Value ...]
+tamework.commands.traits.usage.addTrait=Usage: /tw addtrait <TraitId> <Value>
+tamework.commands.traits.trait.id.empty=Trait id at argument {0} is empty.
+tamework.commands.traits.trait.value.invalid=Value for trait '{0}' is invalid.
+tamework.commands.traits.values.missing=No trait values were provided.
+tamework.commands.addTrait.result=Added trait for NPC {0}: {1}={2}, count={3}.
+tamework.commands.addTrait.result.clamped=Added trait for NPC {0}: {1}={2}, count={3} (requested {4}, clamped to breeding range).
+tamework.commands.setTraits.result=Set traits for NPC {0}: count={1}, values=[{2}].
+tamework.commands.setTraits.result.clamped=Set traits for NPC {0}: count={1}, values=[{2}]. One or more values were clamped to their breeding ranges.
+tamework.commands.getTraits.result.empty=Traits for NPC {0}: config={1}, seed={2}, count=0.
+tamework.commands.getTraits.result=Traits for NPC {0}: config={1}, seed={2}, count={3}, values=[{4}].
+tamework.commands.setHappiness.result.noClamp=Set happiness for NPC {0}: requested={1}, applied={2}, clamp=none.
+tamework.commands.setHappiness.result.noClamp.ready=Set happiness for NPC {0}: requested={1}, applied={2}, clamp=none, ready={3}.
+tamework.commands.setHappiness.result=Set happiness for NPC {0}: requested={1}, applied={2}, clamp=[{3}, {4}].
+tamework.commands.setHappiness.result.ready=Set happiness for NPC {0}: requested={1}, applied={2}, clamp=[{3}, {4}], ready={5}.
+tamework.commands.getHappiness.result.noBreeding=Happiness for NPC {0}: {1} (source={2}, config={3}, lastUpdateMs={4}, base={5}, target={6}, modifiers={7}). Breeding component: none.
+tamework.commands.getHappiness.result=Happiness for NPC {0}: {1} (source={2}, config={3}, lastUpdateMs={4}, base={5}, target={6}, modifiers={7}). Breeding: readyFlag={8}, cooldownActive={9}, cooldownUntilMs={10}, cooldownRemainingMs={11}, readyNow={12}, config={13}, fertilityOffspringFactor={14}, cooldownTraitFactor={15}, timerBasis={16}, gameSecPerRealSecCurrent={17}, gameSecPerRealSecBaseline={18}, cooldownRemainingRealSec~={19}, effective={20}, threshold={21}, eligible={22}.
+tamework.commands.getNeeds.result=Needs for NPC {0}: hunger={1}, thirst={2}, appliedPenalty={3}, lastUpdateMs={4}, lastPassiveSweepMs={5}.
+tamework.commands.getNeeds.result.withConfig=Needs for NPC {0}: hunger={1}, thirst={2}, appliedPenalty={3}, hunger%={4}, thirst%={5}, config={6}, timing={7}, lastUpdateMs={8}, lastPassiveSweepMs={9}.
+tamework.commands.setLevel.unavailable=Could not set level for NPC {0}.
+tamework.commands.setLevel.result=Set level for NPC {0}: requested={1}, previous={2}, applied={3}/{4}, totalXp={5}.
+tamework.commands.setLevel.result.clamped=Set level for NPC {0}: requested={1}, previous={2}, applied={3}/{4}, totalXp={5} (clamped).
+
+tamework.commands.debugDb.description=Inspect bounded replacement persistence diagnostics.
+
+tamework.commands.debugDragonFlight.result.avatar.flight.component.types.are.not.registered=Avatar flight component types are not registered.
+tamework.commands.debugDragonFlight.result.avatar.flight.is.already.active=Avatar flight is already active.
+tamework.commands.debugDragonFlight.result.hold.flightmaster.s.talisman.before.starting.avatar.flight=Hold Flightmaster's Talisman before starting avatar flight.
+tamework.commands.debugDragonFlight.result.avatar.flight.disabled.but.no.saved.model.or.skin=Avatar flight disabled, but no saved model or skin fallback was available.
+tamework.commands.debugDragonFlight.result.client.flight.probe.failed.movementmanager.is.unavailable=Client flight probe failed: MovementManager is unavailable.
+tamework.commands.debugDragonFlight.result.client.flight.probe.failed.movementstatescomponent.is.unavailable=Client flight probe failed: MovementStatesComponent is unavailable.
+tamework.commands.debugDragonFlight.result.client.flight.probe.failed.player.packet.handler.is.unavailable=Client flight probe failed: Player packet handler is unavailable.
+tamework.commands.debugDragonFlight.result.client.flight.probe.enabled.and.input.logging.enabled=Client flight probe enabled and input logging enabled.
+tamework.commands.debugDragonFlight.result.client.flight.probe.was.not.active=Client flight probe was not active.
+tamework.commands.debugDragonFlight.result.client.flight.probe.disabled.and.movement.settings.restored=Client flight probe disabled and movement settings restored.
+tamework.commands.debugDragonFlight.result.avatar.flight.mount.rejected.source.snapshot.failed=Avatar-flight mount rejected: source_snapshot_failed
+tamework.commands.debugDragonFlight.result.avatar.flight.mount.rejected.session.snapshot.failed=Avatar-flight mount rejected: session_snapshot_failed
+tamework.commands.debugDragonFlight.result.avatar.flight.mount.rejected.component.type.unavailable=Avatar-flight mount rejected: component_type_unavailable
+tamework.commands.debugDragonFlight.result.avatar.flight.mount.failed.while.parking.source.npc=Avatar-flight mount failed while parking source NPC.
+tamework.commands.debugDragonFlight.result.avatar.flight.mount.cleanup.already.in.progress=Avatar-flight mount cleanup already in progress.
+tamework.commands.debugDragonFlight.result.avatar.flight.disabled=Avatar flight disabled.
+tamework.commands.debugDragonFlight.result.avatar.flight.disabled.and.model.restored=Avatar flight disabled and model restored.
+tamework.commands.debugDragonFlight.result.configDisabled=Avatar flight config is disabled: {0}
+tamework.commands.debugDragonFlight.result.modelMissing=Avatar flight model asset not found: {0}
+tamework.commands.debugDragonFlight.result.enabled=Avatar flight enabled with {0}
+tamework.commands.debugDragonFlight.result.mounted=Avatar flight mounted with {0}
+tamework.commands.debugDragonFlight.result.mountRejected=Avatar-flight mount rejected: {0}
+tamework.commands.debugDragonFlight.result.mountRestored=Avatar-flight mount restored; player flight state was already absent. {0}
+tamework.commands.debugDragonFlight.result.unavailable=The flight action could not be completed.
+tamework.commands.debugDragonFlight.statusHeading=Avatar flight:
+tamework.commands.getFlockDebug.heading=Flock debug for NPC
+tamework.commands.getFlockDebug.leashHeading=Flock leash debug:
+tamework.commands.apiTestPrepare.completed=API self-test fixtures prepared.
+tamework.commands.apiTestReset.completed=API self-test fixtures reset.
+tamework.commands.apiTestReset.failed=Failed to reset API self-test fixtures safely. See the server log for details.
+tamework.commands.apiTest.fixture=Fixture set={0}, world={1}, toolId={2}, fixtures={3}
+tamework.commands.apiTest.reportTitle==== Tamework API Self-Test ===
+tamework.commands.apiTest.pass=PASS
+tamework.commands.apiTest.fail=FAIL
+tamework.commands.apiTest.suite={0} {1} ({2}/{3})
+tamework.commands.apiTest.assertion=  {0} {1}: {2}
+tamework.commands.apiTest.totals=Totals: {0}/{1} passed, {2} failed

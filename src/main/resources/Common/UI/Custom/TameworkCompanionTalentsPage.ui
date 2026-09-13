@@ -49,13 +49,13 @@ $C.@PageOverlay {
 
         Label #TameworkCompanionTalentsLevelSummary {
           Anchor: (Top: 0, Left: 0, Width: 340, Height: 24);
-          Text: "Level 1";
+          Text: "";
           Style: (FontSize: 16, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
         }
 
         Label #TameworkCompanionTalentsPointsSummary {
           Anchor: (Top: 24, Left: 0, Width: 340, Height: 22);
-          Text: "Talent Points: 0 available";
+          Text: "";
           Style: (FontSize: 14, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
         }
 
@@ -79,7 +79,7 @@ $C.@PageOverlay {
 
           Label #TalentTreePanLabel {
             Anchor: (Width: 52, Height: 28);
-            Text: "Pan";
+            Text: %server.tamework.ui.talents.pan.label;
             Style: (FontSize: 12, RenderBold: true, TextColor: #afb6b0, HorizontalAlignment: Center, VerticalAlignment: Center);
           }
 
@@ -119,7 +119,7 @@ $C.@PageOverlay {
 
           Label #TalentDetailEmpty {
             Anchor: (Top: 18, Left: 12, Right: 12, Height: 64);
-            Text: "Choose a talent node.";
+            Text: %server.tamework.ui.talents.detail.empty;
             Style: (FontSize: 15, TextColor: #afb6b0, HorizontalAlignment: Center, VerticalAlignment: Center, Wrap: true);
           }
 
@@ -129,49 +129,49 @@ $C.@PageOverlay {
 
             Label #TalentDetailName {
               Anchor: (Top: 2, Left: 0, Right: 0, Height: 48);
-              Text: "Talent";
+              Text: "";
               Style: (FontSize: 18, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
             }
 
             Label #TalentDetailBranch {
               Anchor: (Top: 54, Left: 0, Right: 0, Height: 20);
-              Text: "Branch - Tier 1";
+              Text: "";
               Style: (FontSize: 12, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
             }
 
             Label #TalentDetailStatus {
               Anchor: (Top: 80, Left: 0, Right: 0, Height: 36);
-              Text: "Locked";
+              Text: %server.tamework.ui.talents.state.Locked;
               Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
             }
 
             Label #TalentDetailDescription {
               Anchor: (Top: 126, Left: 0, Right: 0, Height: 96);
-              Text: "Description";
+              Text: "";
               Style: (FontSize: 13, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
             }
 
             Label #TalentDetailRequirementsLabel {
               Anchor: (Top: 238, Left: 0, Right: 0, Height: 18);
-              Text: "Requirements";
+              Text: %server.tamework.ui.talents.detail.requirements;
               Style: (FontSize: 12, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
             }
 
             Label #TalentDetailRequirements {
               Anchor: (Top: 260, Left: 0, Right: 0, Height: 42);
-              Text: "Level 1";
+              Text: "";
               Style: (FontSize: 12, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
             }
 
             Label #TalentDetailEffectsLabel {
               Anchor: (Top: 318, Left: 0, Right: 0, Height: 18);
-              Text: "Effects";
+              Text: %server.tamework.ui.talents.detail.effects;
               Style: (FontSize: 12, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
             }
 
             Label #TalentDetailEffects {
               Anchor: (Top: 340, Left: 0, Right: 0, Height: 116);
-              Text: "No passive effects";
+              Text: %server.tamework.ui.talents.effects.none;
               Style: (FontSize: 12, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
             }
 

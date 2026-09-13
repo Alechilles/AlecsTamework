@@ -18,7 +18,7 @@ import javax.annotation.Nonnull;
 public final class TameworkSettingsCommand extends AbstractPlayerCommand {
 
     public TameworkSettingsCommand() {
-        super("settings", "Open the Tamework settings page.");
+        super("settings", "server.tamework.commands.settings.description");
         requirePermission(TameworkConfigPermission.NODE);
         setPermissionGroups(TameworkConfigPermission.adminPermissionGroups());
         setAllowsExtraArguments(true);
@@ -36,7 +36,7 @@ public final class TameworkSettingsCommand extends AbstractPlayerCommand {
                            @Nonnull PlayerRef playerRef,
                            @Nonnull World world) {
         if (!TameworkSettingsPageService.hasAccess(playerRef, commandContext.sender())) {
-            commandContext.sender().sendMessage(Message.raw("You do not have permission to use /tw settings."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.settings.you.do.not.have.permission.to.use"));
             return;
         }
         String error = TameworkSettingsPageService.openSettingsPage(ref, store, world, "command", "/tw settings");

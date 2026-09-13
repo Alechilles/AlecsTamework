@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
 public final class TameworkDebugSpawnerCommand extends AbstractTameworkServerCommand {
 
     public TameworkDebugSpawnerCommand() {
-        super("spawner", "Toggle Tamework spawner capture/spawn flow debug logging.");
+        super("spawner", "server.tamework.commands.debugSpawner.description");
         setAllowsExtraArguments(true);
     }
 
@@ -19,7 +19,7 @@ public final class TameworkDebugSpawnerCommand extends AbstractTameworkServerCom
     protected void executeServer(@Nonnull CommandContext commandContext) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugSpawner.tamework.plugin.not.available"));
             return;
         }
         String raw = getFirstArg(commandContext);
@@ -27,9 +27,7 @@ public final class TameworkDebugSpawnerCommand extends AbstractTameworkServerCom
         boolean enabled = explicit != null
                 ? plugin.setDebugSpawnerEnabled(explicit)
                 : plugin.toggleDebugSpawnerEnabled();
-        commandContext.sender().sendMessage(Message.raw(
-                "Tamework spawner flow debug logging: " + (enabled ? "enabled" : "disabled")
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugSpawner.tamework.spawner.flow.debug.logging").param("0", String.valueOf((enabled ? "enabled" : "disabled"))));
     }
 
     private static String getFirstArg(CommandContext commandContext) {

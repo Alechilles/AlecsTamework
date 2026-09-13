@@ -8,7 +8,7 @@ Group {
 
   Label #TalentBranchName {
     Anchor: (Top: 0, Left: 6, Right: 6, Bottom: 0);
-    Text: "Branch";
+    Text: "";
     Style: (FontSize: 11, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Center, VerticalAlignment: Center);
   }
 }

@@ -21,7 +21,7 @@ public final class TameworkDebugPersistenceFailureCommand
     ) {
         super(
                 "simulateerror",
-                "Send a synthetic persistence diagnostic without changing data."
+                "server.tamework.commands.debugPersistenceFailure.description"
         );
         this.failureSink = failureSink;
     }
@@ -29,9 +29,7 @@ public final class TameworkDebugPersistenceFailureCommand
     @Override
     protected void executeServer(@Nonnull CommandContext context) {
         if (failureSink == null) {
-            context.sender().sendMessage(Message.raw(
-                    "Persistence diagnostics are not initialized."
-            ));
+            context.sender().sendMessage(Message.translation("server.tamework.commands.debugPersistenceFailure.persistence.diagnostics.are.not.initialized"));
             return;
         }
 
@@ -45,14 +43,9 @@ public final class TameworkDebugPersistenceFailureCommand
                     "simulated_" + token,
                     new IllegalStateException("Synthetic persistence diagnostic")
             ));
-            context.sender().sendMessage(Message.raw(
-                    "Synthetic persistence diagnostic requested (token=" + token
-                            + "). No persistence data was changed."
-            ));
+            context.sender().sendMessage(Message.translation("server.tamework.commands.debugPersistenceFailure.synthetic.persistence.diagnostic.requested.token.no.persistence").param("0", String.valueOf(token)));
         } catch (RuntimeException failure) {
-            context.sender().sendMessage(Message.raw(
-                    "Synthetic persistence diagnostic could not be requested."
-            ));
+            context.sender().sendMessage(Message.translation("server.tamework.commands.debugPersistenceFailure.synthetic.persistence.diagnostic.could.not.be.requested"));
         }
     }
 }

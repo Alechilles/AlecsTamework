@@ -36,7 +36,7 @@ final class CommandTargetHudFoodResolver {
         }
         return new CommandTargetHudViewModel.FoodRow(
                 itemId,
-                safe(nameResolver.apply(player, itemId), humanize(itemId)),
+                safe(nameResolver.apply(player, itemId), humanize(itemId, player)),
                 iconResolver.apply(itemId)
         );
     }
@@ -54,7 +54,7 @@ final class CommandTargetHudFoodResolver {
             }
             rows.add(new CommandTargetHudViewModel.FoodRow(
                     clean,
-                    safe(nameResolver.apply(player, clean), humanize(clean)),
+                    safe(nameResolver.apply(player, clean), humanize(clean, player)),
                     iconResolver.apply(clean)
             ));
         }
@@ -75,7 +75,7 @@ final class CommandTargetHudFoodResolver {
             Double delta = Double.isFinite(entry.happinessDelta()) ? entry.happinessDelta() : null;
             rows.add(new CommandTargetHudViewModel.FoodRow(
                     clean,
-                    safe(nameResolver.apply(player, clean), humanize(clean)),
+                    safe(nameResolver.apply(player, clean), humanize(clean, player)),
                     iconResolver.apply(clean),
                     delta
             ));
@@ -113,7 +113,7 @@ final class CommandTargetHudFoodResolver {
         } catch (Throwable ignored) {
             // Asset maps are not always available in focused unit tests.
         }
-        return humanize(itemId);
+        return humanize(itemId, player);
     }
 
     @Nullable
@@ -131,9 +131,9 @@ final class CommandTargetHudFoodResolver {
         }
     }
 
-    private static String humanize(String itemId) {
+    private static String humanize(String itemId, @Nullable Player player) {
         if (itemId == null || itemId.isBlank()) {
-            return "Food";
+            return LocalizedText.resolve(player, "tamework.ui.linkedPanel.happiness.food.unknown");
         }
         String normalized = itemId.startsWith("Tw_") ? itemId.substring(3) : itemId;
         String[] parts = normalized.replace('-', '_').split("_");

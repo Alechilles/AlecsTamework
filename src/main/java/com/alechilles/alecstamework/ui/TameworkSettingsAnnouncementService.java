@@ -67,7 +67,7 @@ public final class TameworkSettingsAnnouncementService {
                                       @Nonnull Player player) {
         UUID playerUuid = player.getUuid();
         if (playerUuid == null) {
-            return "Unable to open Tamework news right now.";
+            return LocalizedText.resolve(player, "tamework.ui.settingsAnnouncement.openUnavailable");
         }
         return openAnnouncement(playerUuid, playerRef, store, player, false, true);
     }
@@ -342,10 +342,10 @@ public final class TameworkSettingsAnnouncementService {
     private String resolveCurrentTameworkVersion() {
         PluginManifest manifest = plugin.getManifest();
         if (manifest == null) {
-            return "Unknown";
+            return "?";
         }
         Semver version = manifest.getVersion();
-        return version == null ? "Unknown" : version.toString();
+        return version == null ? "?" : version.toString();
     }
 
     private record AnnouncementCopy(@Nonnull String title,

@@ -14,7 +14,7 @@ $C.@PageOverlay {
       Label #TwSettingsAnnouncementTitle {
         Anchor: (Left: 14, Right: 14, Height: 44);
         Style: (FontSize: 20, RenderBold: true, TextColor: #f0eee7, VerticalAlignment: Center);
-        Text: "Important Alec's Tamework Update";
+        Text: %server.tamework.ui.settingsAnnouncement.title;
       }
     }
 
@@ -25,7 +25,7 @@ $C.@PageOverlay {
 
       Label #TwSettingsAnnouncementSubtitle {
         Anchor: (Height: 44);
-        Text: "New features, settings, or updates have been added to Tamework that require your attention.";
+        Text: %server.tamework.ui.settingsAnnouncement.subtitle;
         Style: (FontSize: 13, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
       }
 
@@ -69,7 +69,7 @@ $C.@PageOverlay {
 
         Label #TwSettingsAnnouncementOptOutLabel {
           Anchor: (Left: 30, Right: 0, Height: 30);
-          Text: "Don't show again until next announcement";
+          Text: %server.tamework.ui.settingsAnnouncement.optOut;
           Style: (FontSize: 12, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
         }
       }
@@ -79,7 +79,7 @@ $C.@PageOverlay {
 
         TextButton #TwSettingsAnnouncementLaterButton {
           Style: $A.@PanelButton;
-          Text: "Later";
+          Text: %server.tamework.ui.settingsAnnouncement.button.later;
           Anchor: (Width: 128, Height: 30);
         }
 
@@ -89,7 +89,7 @@ $C.@PageOverlay {
 
         TextButton #TwSettingsAnnouncementReviewButton {
           Style: $A.@PanelButton;
-          Text: "Review Settings";
+          Text: %server.tamework.ui.settingsAnnouncement.button.review;
           Anchor: (Width: 170, Height: 30);
         }
       }

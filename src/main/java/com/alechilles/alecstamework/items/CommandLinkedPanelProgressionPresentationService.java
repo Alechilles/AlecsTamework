@@ -38,23 +38,22 @@ final class CommandLinkedPanelProgressionPresentationService {
     LinkedNpcEntry.FutureStat buildLevelFutureStat(@Nonnull CompanionLevelingService.LevelingSnapshot snapshot,
                                                    @Nullable String language,
                                                    @Nullable String modifierTooltip) {
-        String prefix = LocalizedText.resolve(language, "tamework.ui.linkedPanel.futureStat.levelPrefix");
         if (snapshot.atMaxLevel()) {
             return new LinkedNpcEntry.FutureStat(
-                    prefix + " " + snapshot.level() + " MAX",
+                    LocalizedText.format(language, "tamework.ui.talents.levelSummary.max", snapshot.level()),
                     1,
                     1,
-                    "Level: " + snapshot.level() + "/" + snapshot.maxLevel() + " - MAX XP",
+                    LocalizedText.format(language, "tamework.ui.roster.progression.max", snapshot.level(), snapshot.maxLevel()),
                     modifierTooltip
             );
         }
         int current = Math.max(0, (int) Math.round(snapshot.currentXp()));
         int max = Math.max(1, (int) Math.round(snapshot.nextLevelDeltaXp()));
         return new LinkedNpcEntry.FutureStat(
-                prefix + " " + snapshot.level() + " XP",
+                LocalizedText.format(language, "tamework.ui.roster.progression.level", snapshot.level()),
                 current,
                 max,
-                "Level: " + snapshot.level() + "/" + snapshot.maxLevel() + " - " + current + "/" + max + " XP",
+                LocalizedText.format(language, "tamework.ui.roster.progression.xp", snapshot.level(), snapshot.maxLevel(), current, max),
                 modifierTooltip
         );
     }
@@ -139,9 +138,13 @@ final class CommandLinkedPanelProgressionPresentationService {
         }
         if (attitude != null || Math.abs(happinessTalents) > EPSILON) {
             double traitBonus = attitude == null ? 0.0 : attitude;
-            lines.add(String.format(Locale.ROOT, "Happiness: %+d - [+0 / %+d / %+d]",
-                    Math.round(traitBonus + happinessTalents),
-                    Math.round(happinessTalents), Math.round(traitBonus)));
+            lines.add(LocalizedText.format(
+                    language,
+                    "tamework.ui.linkedPanel.progression.happinessBreakdown",
+                    formatSignedWhole(traitBonus + happinessTalents),
+                    formatSignedWhole(happinessTalents),
+                    formatSignedWhole(traitBonus)
+            ));
         }
         return lines.size() == 1 ? null : String.join("\n", lines);
     }
@@ -211,7 +214,7 @@ final class CommandLinkedPanelProgressionPresentationService {
                     resolveIconGlyph(label),
                     resolveIconTexturePath(definition),
                     label,
-                    buildTraitTooltip(label, value, min, defaultValue, max,
+                    buildTraitTooltip(language, label, value, min, defaultValue, max,
                             flatDisposition && "HappinessGainMultiplier".equalsIgnoreCase(definition.getEffectKey())
                                     ? CompanionHappinessModifierService.resolveFlatDispositionOffset(
                                             value, happinessConfig.getDisposition())
@@ -234,7 +237,13 @@ final class CommandLinkedPanelProgressionPresentationService {
             double baseHealth,
             double baseSpeed,
             @Nullable String language) {
-        String absolute = formatAbsoluteBonus(breakdown.effectKey(), breakdown.totalMultiplier(), baseHealth, baseSpeed);
+        String absolute = formatAbsoluteBonus(
+                breakdown.effectKey(),
+                breakdown.totalMultiplier(),
+                baseHealth,
+                baseSpeed,
+                language
+        );
         return labelForEffectKey(breakdown.effectKey(), language)
                 + ": "
                 + formatSignedPercent(breakdown.totalMultiplier())
@@ -248,17 +257,31 @@ final class CommandLinkedPanelProgressionPresentationService {
                 + "]";
     }
 
-    private static String formatAbsoluteBonus(String effectKey, double totalMultiplier, double baseHealth, double baseSpeed) {
+    private static String formatAbsoluteBonus(
+            String effectKey,
+            double totalMultiplier,
+            double baseHealth,
+            double baseSpeed,
+            @Nullable String language
+    ) {
         if (HEALTH_EFFECT_KEY.equalsIgnoreCase(effectKey)) {
             double bonus = baseHealth * (totalMultiplier - 1.0);
             if (Double.isFinite(bonus) && Math.abs(bonus) > EPSILON) {
-                return " (" + formatWholeDelta(bonus) + " HP)";
+                return " (" + LocalizedText.format(
+                        language,
+                        "tamework.ui.linkedPanel.progression.healthBonus",
+                        formatWholeDelta(bonus)
+                ) + ")";
             }
         }
         if (SPEED_EFFECT_KEY.equalsIgnoreCase(effectKey)) {
             double bonus = baseSpeed * (totalMultiplier - 1.0);
             if (Double.isFinite(bonus) && Math.abs(bonus) > EPSILON) {
-                return " (" + formatDecimalDelta(bonus) + " m/s)";
+                return " (" + LocalizedText.format(
+                        language,
+                        "tamework.ui.linkedPanel.progression.speedBonus",
+                        formatDecimalDelta(bonus)
+                ) + ")";
             }
         }
         return "";
@@ -282,57 +305,16 @@ final class CommandLinkedPanelProgressionPresentationService {
                 return localized;
             }
         }
-        if (HEALTH_EFFECT_KEY.equalsIgnoreCase(effectKey)) {
-            return "Health";
-        }
-        if (SPEED_EFFECT_KEY.equalsIgnoreCase(effectKey)) {
-            return "Speed";
-        }
-        if ("DamageDealtMultiplier".equalsIgnoreCase(effectKey)) {
-            return "Damage Dealt";
-        }
-        if ("DamageTakenMultiplier".equalsIgnoreCase(effectKey)) {
-            return "Damage Taken";
-        }
-        if ("HarvestDoubleDropChanceMultiplier".equalsIgnoreCase(effectKey)) {
-            return "Harvest Bonus";
-        }
-        if ("FertilityMultiplier".equalsIgnoreCase(effectKey)) {
-            return "Fertility";
-        }
-        if ("HappinessGainMultiplier".equalsIgnoreCase(effectKey)) {
-            return "Happiness Gain";
-        }
-        if ("HappinessDecayMultiplier".equalsIgnoreCase(effectKey)) {
-            return "Happiness Decay";
-        }
-        if ("BreedCooldownMultiplier".equalsIgnoreCase(effectKey)) {
-            return "Breeding Cooldown";
-        }
-        if ("NeedsDecayMultiplier".equalsIgnoreCase(effectKey)) {
-            return "Needs Decay";
-        }
-        if ("ReviveCooldownMultiplier".equalsIgnoreCase(effectKey)) {
-            return "Revive Cooldown";
-        }
-        if ("TraitMutationChanceMultiplier".equalsIgnoreCase(effectKey)) {
-            return "Trait Mutation";
-        }
-        if ("AppearanceMutationChanceMultiplier".equalsIgnoreCase(effectKey)) {
-            return "Appearance Mutation";
-        }
-        if ("HarvestCooldownMultiplier".equalsIgnoreCase(effectKey)) {
-            return "Harvest Reset";
-        }
-        if ("SizeMultiplier".equalsIgnoreCase(effectKey)) {
-            return "Size";
-        }
-        return humanizeEffectKey(effectKey);
+        return LocalizedText.format(
+                language,
+                "tamework.ui.linkedPanel.progression.effect.unknown",
+                humanizeEffectKey(effectKey)
+        );
     }
 
     private static String humanizeEffectKey(String effectKey) {
         if (effectKey == null || effectKey.isBlank()) {
-            return "Modifier";
+            return "";
         }
         String trimmed = effectKey.trim();
         if (trimmed.endsWith("Multiplier")) {
@@ -361,6 +343,10 @@ final class CommandLinkedPanelProgressionPresentationService {
         return rounded > 0L
                 ? Long.toString(rounded)
                 : String.format(Locale.ROOT, "%d", rounded);
+    }
+
+    private static String formatSignedWhole(double value) {
+        return String.format(Locale.ROOT, "%+d", Math.round(value));
     }
 
     private static String formatDecimalDelta(double value) {
@@ -473,14 +459,20 @@ final class CommandLinkedPanelProgressionPresentationService {
         return Math.max(min, Math.min(max, value));
     }
 
-    private String buildTraitTooltip(String label,
+    private String buildTraitTooltip(@Nullable String language,
+                                     String label,
                                      double value,
                                      double min,
                                      double defaultValue,
                                      double max,
                                      @Nullable Double flatDispositionOffset) {
         if (flatDispositionOffset != null) {
-            return label + ": " + formatSignedPoints(flatDispositionOffset);
+            return LocalizedText.format(
+                    language,
+                    "tamework.ui.linkedPanel.trait.flatBonus",
+                    label,
+                    formatSignedPoints(language, flatDispositionOffset)
+            );
         }
         double safeMin = Double.isFinite(min) ? min : 0.0;
         double safeMax = Double.isFinite(max) ? max : 0.0;
@@ -495,26 +487,38 @@ final class CommandLinkedPanelProgressionPresentationService {
         double normalized = belowDefault
                 ? ratioToLowerBound(safeValue, safeMin, safeDefault)
                 : ratioToUpperBound(safeValue, safeDefault, safeMax);
-        String boundLabel = belowDefault ? "min" : "max";
+        String boundLabel = LocalizedText.resolve(
+                language,
+                belowDefault
+                        ? "tamework.ui.linkedPanel.trait.minimum"
+                        : "tamework.ui.linkedPanel.trait.maximum"
+        );
         double boundValue = belowDefault ? safeMin : safeMax;
-        return label
-                + ": "
-                + format(safeValue)
-                + " / "
-                + format(boundValue)
-                + " "
-                + boundLabel
-                + " ("
-                + formatPercent(normalized, belowDefault)
-                + ")";
+        return LocalizedText.format(
+                language,
+                "tamework.ui.linkedPanel.trait.tooltip",
+                label,
+                format(safeValue),
+                format(boundValue),
+                boundLabel,
+                formatPercent(normalized, belowDefault)
+        );
     }
 
-    private static String formatSignedPoints(double value) {
+    private static String formatSignedPoints(@Nullable String language, double value) {
         if (!Double.isFinite(value)) {
-            return "+0 points";
+            return LocalizedText.format(
+                    language,
+                    "tamework.ui.talents.effect.points",
+                    "+0"
+            );
         }
         String magnitude = format(Math.abs(value));
-        return (value >= 0.0 ? "+" : "-") + magnitude + " points";
+        return LocalizedText.format(
+                language,
+                "tamework.ui.talents.effect.points",
+                (value >= 0.0 ? "+" : "-") + magnitude
+        );
     }
 
     private static String format(double value) {

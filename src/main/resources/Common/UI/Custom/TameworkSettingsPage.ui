@@ -23,24 +23,24 @@ $C.@PageOverlay {
       Group { Anchor: (Top: 7, Left: 12, Width: 34, Height: 34); Background: "Tamework/Telemetry/TameworkConsentIcon.png"; }
       Label #TwSettingsTitle {
         Anchor: (Left: 56, Right: 278, Height: 48);
-        Text: "Tamework Settings";
+        Text: %server.tamework.ui.settings.title;
         Style: (FontSize: 23, RenderBold: true, TextColor: #f0eee7, VerticalAlignment: Center);
       }
       TextButton #TwSettingsRefreshButton {
         Anchor: (Top: 9, Right: 164, Width: 96, Height: 30);
-        Text: "Refresh";
+        Text: %server.tamework.ui.shared.button.refresh;
         Style: $A.@PanelButton;
       }
       TextButton #TwSettingsApplyButton {
         Anchor: (Top: 9, Right: 58, Width: 96, Height: 30);
-        Text: "Apply";
+        Text: %server.tamework.ui.shared.button.apply;
         Style: $A.@PanelButtonSelected;
       }
       Group {
         Anchor: (Top: 9, Right: 14, Width: 30, Height: 30);
         TextButton #TwSettingsCloseButton {
           Anchor: (Full: 0);
-          Text: "";
+          Text: %server.tamework.ui.shared.button.close;
           TooltipText: %server.tamework.ui.shared.button.close;
           Style: $A.@Remove;
         }
@@ -111,14 +111,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsExperiencePresetsLabel {
                 Anchor: (Left: 0, Right: 0, Height: 28);
-                Text: "Experience Presets";
+                Text: %server.tamework.ui.settings.label.experiencePresets;
                 Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsExperiencePresetsTooltip {
                 Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "";
-                TooltipText: "Loads bundled presets for the major companion experience toggles below without changing the rest of the settings page.";
+                TooltipText: %server.tamework.ui.settings.tooltip.experiencePresets;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -129,14 +129,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsLoadPresetLabel {
                 Anchor: (Left: 0, Width: 120, Height: 28);
-                Text: "Load Preset";
+                Text: %server.tamework.ui.settings.label.loadPreset;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsLoadPresetTooltip {
                 Anchor: (Left: 0, Width: 120, Height: 28);
                 Text: "";
-                TooltipText: "Choose a preset to change the companion experience toggles below. Review the rest of the page before applying.";
+                TooltipText: %server.tamework.ui.settings.tooltip.loadPreset;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -145,12 +145,12 @@ $C.@PageOverlay {
                 Anchor: (Left: 126, Width: 220, Height: 28);
                 Style: (...$A.@PanelDropdown, HorizontalPadding: 8);
                 MaxSelection: 1;
-                NoItemsText: "No preset";
+                NoItemsText: %server.tamework.ui.settings.noItems.preset;
               }
 
               TextButton #TwSettingsLoadPresetButton {
                 Anchor: (Left: 354, Width: 110, Height: 28);
-                Text: "Load Preset";
+                Text: %server.tamework.ui.settings.button.loadPreset;
                 Style: $A.@PanelButton;
               }
             }
@@ -160,14 +160,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsPresetNoteLabel {
                 Anchor: (Left: 0, Right: 0, Height: 18);
-                Text: "Presets only change the experience toggles below. Review everything else before applying.";
+                Text: %server.tamework.ui.settings.note.presetScope;
                 Style: (FontSize: 11, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
               }
 
               TextButton #TwSettingsPresetNoteTooltip {
                 Anchor: (Left: 0, Right: 0, Height: 18);
                 Text: "";
-                TooltipText: "Preset loads only affect the main experience toggles in this section. They do not change ownership, population, or claims settings.";
+                TooltipText: %server.tamework.ui.settings.tooltip.presetScope;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -182,14 +182,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsRecallSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 28);
-                Text: "Recall / Return Home";
+                Text: %server.tamework.ui.settings.label.recallSection;
                 Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsRecallSectionTooltip {
                 Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "";
-                TooltipText: "Controls whether recall and return-home commands may teleport companions when normal movement cannot reach them.";
+                TooltipText: %server.tamework.ui.settings.tooltip.recallSection;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -200,14 +200,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsRecallTeleportingLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Enable Recall Teleporting";
+                Text: %server.tamework.ui.settings.label.recallTeleporting;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsRecallTeleportingTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "When disabled, recall and return-home commands will not teleport unloaded or distant companions. Use Locate to see their last recorded location.";
+                TooltipText: %server.tamework.ui.settings.tooltip.recallTeleporting;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -231,14 +231,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsCompanionSystemsLabel {
                 Anchor: (Left: 0, Right: 0, Height: 28);
-                Text: "Companion Systems";
+                Text: %server.tamework.ui.settings.label.companionSystems;
                 Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsCompanionSystemsTooltip {
                 Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "";
-                TooltipText: "High-level toggles for the main companion gameplay systems that Tamework can run.";
+                TooltipText: %server.tamework.ui.settings.tooltip.companionSystems;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -249,14 +249,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsNeedsEnabledLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Enable Needs System";
+                Text: %server.tamework.ui.settings.label.needsEnabled;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsEnabledTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Turns hunger and thirst simulation on or off for companions.";
+                TooltipText: %server.tamework.ui.settings.tooltip.needsEnabled;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -276,14 +276,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsHappinessEnabledLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Enable Happiness System";
+                Text: %server.tamework.ui.settings.label.happinessEnabled;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsHappinessEnabledTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Turns happiness tracking on or off for companions.";
+                TooltipText: %server.tamework.ui.settings.tooltip.happinessEnabled;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -303,14 +303,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsPassiveBreedingEnabledLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Enable Passive Breeding";
+                Text: %server.tamework.ui.settings.label.passiveBreedingEnabled;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsPassiveBreedingTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Allows companions to breed on their own when breeding conditions are met.";
+                TooltipText: %server.tamework.ui.settings.tooltip.passiveBreedingEnabled;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -330,14 +330,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsBreedingRequiresHappinessLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Breeding Requires Happiness";
+                Text: %server.tamework.ui.settings.label.breedingRequiresHappiness;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsBreedingRequiresHappinessTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Requires companions to satisfy happiness rules before passive breeding can happen.";
+                TooltipText: %server.tamework.ui.settings.tooltip.breedingRequiresHappiness;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -357,14 +357,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsLevelingEnabledLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Enable Leveling System";
+                Text: %server.tamework.ui.settings.label.levelingEnabled;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsLevelingEnabledTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Allows companions to gain XP, level up, and apply level-based stat growth.";
+                TooltipText: %server.tamework.ui.settings.tooltip.levelingEnabled;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -384,14 +384,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsTalentsEnabledLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Enable Talents System";
+                Text: %server.tamework.ui.settings.label.talentsEnabled;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsTalentsEnabledTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Allows companion talent points, talent spending, and purchased passive talent effects.";
+                TooltipText: %server.tamework.ui.settings.tooltip.talentsEnabled;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -411,14 +411,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsBreedingGenderEnabledLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Enable Breeding Genders";
+                Text: %server.tamework.ui.settings.label.breedingGenderEnabled;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsBreedingGenderTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Turns companion gender assignment and gender-aware breeding checks on or off.";
+                TooltipText: %server.tamework.ui.settings.tooltip.breedingGenderEnabled;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -438,14 +438,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsTraitsEnabledLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Enable Traits System";
+                Text: %server.tamework.ui.settings.label.traitsEnabled;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsTraitsEnabledTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Turns trait generation and trait-based companion effects on or off.";
+                TooltipText: %server.tamework.ui.settings.tooltip.traitsEnabled;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -469,14 +469,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsNeedsSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 28);
-                Text: "Needs (Hunger/Thirst)";
+                Text: %server.tamework.ui.settings.label.needsSection;
                 Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsSectionTooltip {
                 Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "";
-                TooltipText: "Controls hunger and thirst damage, offline decay behavior, and how needs-based damage is calculated.";
+                TooltipText: %server.tamework.ui.settings.tooltip.needsSection;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -487,14 +487,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsNeedsResourceModeLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Needs Resource Mode";
+                Text: %server.tamework.ui.settings.label.needsResourceMode;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsResourceModeTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Controls how hungry or thirsty companions reach food and water.";
+                TooltipText: %server.tamework.ui.settings.tooltip.needsResourceMode;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -503,7 +503,7 @@ $C.@PageOverlay {
                 Anchor: (Left: 356, Width: 290, Height: 28);
                 Style: (...$A.@PanelDropdown, HorizontalPadding: 8);
                 MaxSelection: 1;
-                NoItemsText: "No resource modes";
+                NoItemsText: %server.tamework.ui.settings.noItems.needsResourceMode;
               }
             }
 
@@ -512,14 +512,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsNeedsDamageEnabledLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Enable Hunger/Thirst Damage";
+                Text: %server.tamework.ui.settings.label.needsDamageEnabled;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsDamageEnabledTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Applies damage when hunger or thirst reaches the configured minimum threshold.";
+                TooltipText: %server.tamework.ui.settings.tooltip.needsDamageEnabled;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -539,14 +539,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsNeedsTickPolicyModeLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Needs Tick Policy";
+                Text: %server.tamework.ui.settings.label.needsTickPolicy;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsTickPolicyTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Chooses when needs are allowed to tick, such as after an owner's offline grace period or whenever any player keeps the area loaded.";
+                TooltipText: %server.tamework.ui.settings.tooltip.needsTickPolicy;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -555,7 +555,7 @@ $C.@PageOverlay {
                 Anchor: (Left: 356, Width: 290, Height: 28);
                 Style: (...$A.@PanelDropdown, HorizontalPadding: 8);
                 MaxSelection: 1;
-                NoItemsText: "No policy";
+                NoItemsText: %server.tamework.ui.settings.noItems.policy;
               }
             }
 
@@ -564,14 +564,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsNeedsOwnerOfflineGraceHoursLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Owner Offline Grace Hours";
+                Text: %server.tamework.ui.settings.label.ownerOfflineGraceHours;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsOfflineGraceTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "How many hours an owner can stay offline before needs begin decaying under the owner-online grace policy.";
+                TooltipText: %server.tamework.ui.settings.tooltip.ownerOfflineGraceHours;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -594,14 +594,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsNeedsOwnerOfflineDecayMultiplierLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Owner Offline Decay Multiplier";
+                Text: %server.tamework.ui.settings.label.ownerOfflineDecayMultiplier;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsOfflineDecayMultiplierTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Multiplier applied to needs decay after the owner has been offline longer than the grace period.";
+                TooltipText: %server.tamework.ui.settings.tooltip.ownerOfflineDecayMultiplier;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -624,14 +624,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsNeedsDamageModelLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Needs Damage Model";
+                Text: %server.tamework.ui.settings.label.needsDamageModel;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsDamageModelTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Chooses how starvation or dehydration damage is calculated once a need bottoms out.";
+                TooltipText: %server.tamework.ui.settings.tooltip.needsDamageModel;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -640,7 +640,7 @@ $C.@PageOverlay {
                 Anchor: (Left: 356, Width: 290, Height: 28);
                 Style: (...$A.@PanelDropdown, HorizontalPadding: 8);
                 MaxSelection: 1;
-                NoItemsText: "No model";
+                NoItemsText: %server.tamework.ui.settings.noItems.model;
               }
             }
 
@@ -649,14 +649,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsNeedsDamageDualNeedRuleLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Dual Need Rule";
+                Text: %server.tamework.ui.settings.label.dualNeedRule;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsDualNeedRuleTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Chooses whether low hunger and low thirst use only the higher damage amount or add both together.";
+                TooltipText: %server.tamework.ui.settings.tooltip.dualNeedRule;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -665,7 +665,7 @@ $C.@PageOverlay {
                 Anchor: (Left: 356, Width: 290, Height: 28);
                 Style: (...$A.@PanelDropdown, HorizontalPadding: 8);
                 MaxSelection: 1;
-                NoItemsText: "No rule";
+                NoItemsText: %server.tamework.ui.settings.noItems.rule;
               }
             }
 
@@ -674,14 +674,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsNeedsStarvationDamagePerMinuteLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Starvation Damage Per Minute";
+                Text: %server.tamework.ui.settings.label.starvationDamagePerMinute;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsStarvationDamageTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Damage applied per minute when hunger is depleted and the current damage model uses starvation damage.";
+                TooltipText: %server.tamework.ui.settings.tooltip.starvationDamagePerMinute;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -704,14 +704,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsNeedsDehydrationDamagePerMinuteLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Dehydration Damage Per Minute";
+                Text: %server.tamework.ui.settings.label.dehydrationDamagePerMinute;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsDehydrationDamageTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Damage applied per minute when thirst is depleted and the current damage model uses dehydration damage.";
+                TooltipText: %server.tamework.ui.settings.tooltip.dehydrationDamagePerMinute;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -734,14 +734,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsNeedsDamageLethalLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Needs Damage Is Lethal";
+                Text: %server.tamework.ui.settings.label.needsDamageLethal;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsNeedsDamageLethalTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "When enabled, needs damage can kill companions. When disabled, it stops at 1 health.";
+                TooltipText: %server.tamework.ui.settings.tooltip.needsDamageLethal;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -765,14 +765,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsOwnershipSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 28);
-                Text: "Ownership";
+                Text: %server.tamework.ui.settings.label.ownership;
                 Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsOwnershipSectionTooltip {
                 Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "";
-                TooltipText: "Controls owner-only protections, capture behavior, and general ownership checks for companions.";
+                TooltipText: %server.tamework.ui.settings.tooltip.ownership;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -783,14 +783,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsDamageProtectionSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 18);
-                Text: "Damage Protection";
+                Text: %server.tamework.ui.settings.label.damageProtection;
                 Style: (FontSize: 12, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsOwnershipDamageProtectionTooltip {
                 Anchor: (Left: 0, Right: 0, Height: 18);
                 Text: "";
-                TooltipText: "Protection rules that apply to owned companions during damage events.";
+                TooltipText: %server.tamework.ui.settings.tooltip.damageProtection;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -801,14 +801,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsBlockOwnerDamageLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Block Owner Damage";
+                Text: %server.tamework.ui.settings.label.blockOwnerDamage;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsBlockOwnerDamageTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Prevents the owner from damaging their own owned companions.";
+                TooltipText: %server.tamework.ui.settings.tooltip.blockOwnerDamage;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -828,14 +828,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsBlockAllDamageIfOwnedLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Block All Player Damage If Owned";
+                Text: %server.tamework.ui.settings.label.blockAllDamageIfOwned;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsBlockAllPlayerDamageTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Prevents all player-sourced damage against owned companions.";
+                TooltipText: %server.tamework.ui.settings.tooltip.blockAllDamageIfOwned;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -855,14 +855,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsInvulnerableIfOwnedLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Invulnerable If Owned";
+                Text: %server.tamework.ui.settings.label.invulnerableIfOwned;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsInvulnerableIfOwnedTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Makes owned companions ignore all damage, not just player damage.";
+                TooltipText: %server.tamework.ui.settings.tooltip.invulnerableIfOwned;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -882,14 +882,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsCaptureSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 18);
-                Text: "Capture";
+                Text: %server.tamework.ui.settings.label.capture;
                 Style: (FontSize: 12, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsOwnershipCaptureTooltip {
                 Anchor: (Left: 0, Right: 0, Height: 18);
                 Text: "";
-                TooltipText: "Rules for owner requirements during capture and spawn flows.";
+                TooltipText: %server.tamework.ui.settings.tooltip.capture;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -900,14 +900,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsCaptureRequiresOwnerLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Capture Requires Owner";
+                Text: %server.tamework.ui.settings.label.captureRequiresOwner;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsCaptureRequiresOwnerTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Requires a companion to already have an owner before it can be captured with supported Tamework items.";
+                TooltipText: %server.tamework.ui.settings.tooltip.captureRequiresOwner;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -927,14 +927,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsSpawnRequiresOwnerLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Spawn Requires Owner";
+                Text: %server.tamework.ui.settings.label.spawnRequiresOwner;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsSpawnRequiresOwnerTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Requires an owner assignment before a companion can be spawned from supported Tamework items.";
+                TooltipText: %server.tamework.ui.settings.tooltip.spawnRequiresOwner;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -954,14 +954,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsCaptureClearsOwnerLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Capture Clears Owner";
+                Text: %server.tamework.ui.settings.label.captureClearsOwner;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsCaptureClearsOwnerTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Removes ownership when a companion is captured.";
+                TooltipText: %server.tamework.ui.settings.tooltip.captureClearsOwner;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -981,14 +981,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsSpawnSetsOwnerLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Spawn Sets Owner";
+                Text: %server.tamework.ui.settings.label.spawnSetsOwner;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsSpawnSetsOwnerTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Assigns the spawning player as owner when the companion is spawned.";
+                TooltipText: %server.tamework.ui.settings.tooltip.spawnSetsOwner;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -1008,14 +1008,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsCaptureTradeNoteLabel {
                 Anchor: (Left: 0, Right: 0, Height: 18);
-                Text: "Note: Enabling both allows trading captured mobs between players.";
+                Text: %server.tamework.ui.settings.note.captureTrade;
                 Style: (FontSize: 11, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsOwnershipTradingNoteTooltip {
                 Anchor: (Left: 0, Right: 0, Height: 18);
                 Text: "";
-                TooltipText: "If both capture clears owner and spawn sets owner are enabled, captured companions can be transferred between players.";
+                TooltipText: %server.tamework.ui.settings.tooltip.captureTrade;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -1026,14 +1026,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsGeneralSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 18);
-                Text: "General";
+                Text: %server.tamework.ui.settings.label.general;
                 Style: (FontSize: 12, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsOwnershipGeneralTooltip {
                 Anchor: (Left: 0, Right: 0, Height: 18);
                 Text: "";
-                TooltipText: "Owner requirement rules for common companion interactions.";
+                TooltipText: %server.tamework.ui.settings.tooltip.general;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -1044,14 +1044,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsInteractionRequiresOwnerLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Interaction Requires Owner";
+                Text: %server.tamework.ui.settings.label.interactionRequiresOwner;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsInteractionRequiresOwnerTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Restricts supported companion interactions so only the owner can use them.";
+                TooltipText: %server.tamework.ui.settings.tooltip.interactionRequiresOwner;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -1071,14 +1071,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsLinkingRequiresOwnerLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Linking Requires Owner";
+                Text: %server.tamework.ui.settings.label.linkingRequiresOwner;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsLinkingRequiresOwnerTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Restricts command-item linking so only the owner can link a companion.";
+                TooltipText: %server.tamework.ui.settings.tooltip.linkingRequiresOwner;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -1102,14 +1102,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsReviveSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 28);
-                Text: "Revive System";
+                Text: %server.tamework.ui.settings.label.reviveSystem;
                 Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsReviveSectionTooltip {
                 Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "";
-                TooltipText: "Controls whether dead owned companions can use Tamework's revive flow.";
+                TooltipText: %server.tamework.ui.settings.tooltip.reviveSystem;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -1120,14 +1120,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsReviveSystemEnabledLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Enable Revive System";
+                Text: %server.tamework.ui.settings.label.reviveSystemEnabled;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsReviveEnabledTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Allows supported Tamework revive and respawn behavior for owned companions.";
+                TooltipText: %server.tamework.ui.settings.tooltip.reviveSystemEnabled;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -1151,14 +1151,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsPopulationSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 28);
-                Text: "Population";
+                Text: %server.tamework.ui.settings.label.population;
                 Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsPopulationSectionTooltip {
                 Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "";
-                TooltipText: "Controls the per-player owned companion cap used by Tamework.";
+                TooltipText: %server.tamework.ui.settings.tooltip.population;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -1169,14 +1169,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsPopulationLimitLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Limit Per Player Owned Total";
+                Text: %server.tamework.ui.settings.label.populationLimit;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsPopulationLimitTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Maximum number of owned companions a player can have before Tamework blocks additional ownership or acquisition.";
+                TooltipText: %server.tamework.ui.settings.tooltip.populationLimit;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -1199,14 +1199,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsPopulationScopeLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Per Player Limit Scope";
+                Text: %server.tamework.ui.settings.label.populationScope;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsPopulationScopeTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Chooses whether the population limit is counted separately per world or across the entire universe.";
+                TooltipText: %server.tamework.ui.settings.tooltip.populationScope;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -1215,7 +1215,7 @@ $C.@PageOverlay {
                 Anchor: (Left: 356, Width: 290, Height: 28);
                 Style: (...$A.@PanelDropdown, HorizontalPadding: 8);
                 MaxSelection: 1;
-                NoItemsText: "No scope";
+                NoItemsText: %server.tamework.ui.settings.noItems.scope;
               }
             }
 
@@ -1228,14 +1228,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsSimpleClaimsSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 28);
-                Text: "Simple Claims";
+                Text: %server.tamework.ui.settings.label.simpleClaims;
                 Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsSimpleClaimsSectionTooltip {
                 Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "";
-                TooltipText: "Controls Tamework's integration with Simple Claims for breeding and protection rules.";
+                TooltipText: %server.tamework.ui.settings.tooltip.simpleClaims;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -1246,14 +1246,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsSimpleClaimsEnabledLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Enable Simple Claims Integration";
+                Text: %server.tamework.ui.settings.label.simpleClaimsEnabled;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsSimpleClaimsEnabledTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Turns Simple Claims integration on or off for claim-aware breeding and protection checks.";
+                TooltipText: %server.tamework.ui.settings.tooltip.simpleClaimsEnabled;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -1273,14 +1273,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsClaimLimitChunkLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Breeding Limit Per Claim Chunk";
+                Text: %server.tamework.ui.settings.label.claimLimitChunk;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsClaimLimitChunkTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Maximum number of bred companions allowed in a single claim chunk.";
+                TooltipText: %server.tamework.ui.settings.tooltip.claimLimitChunk;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -1303,14 +1303,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsClaimLimitTotalLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Breeding Limit Per Claim Total";
+                Text: %server.tamework.ui.settings.label.claimLimitTotal;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsClaimLimitTotalTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Maximum number of bred companions allowed across the entire claim.";
+                TooltipText: %server.tamework.ui.settings.tooltip.claimLimitTotal;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -1333,14 +1333,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsBreedingRequiresClaimLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Breeding Requires Claim";
+                Text: %server.tamework.ui.settings.label.breedingRequiresClaim;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsBreedingRequiresClaimTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Requires breeding to happen inside a Simple Claims claim.";
+                TooltipText: %server.tamework.ui.settings.tooltip.breedingRequiresClaim;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -1360,14 +1360,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsSimpleClaimsProtectLabel {
                 Anchor: (Left: 0, Width: 340, Height: 28);
-                Text: "Protect Tamed From Non-Members";
+                Text: %server.tamework.ui.settings.label.simpleClaimsProtect;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsSimpleClaimsProtectTooltip {
                 Anchor: (Left: 0, Width: 340, Height: 28);
                 Text: "";
-                TooltipText: "Prevents non-members of a claim from harming or interfering with owned companions inside that claim.";
+                TooltipText: %server.tamework.ui.settings.tooltip.simpleClaimsProtect;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -1391,14 +1391,14 @@ $C.@PageOverlay {
 
               Label #TwSettingsTelemetrySectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 28);
-                Text: "Beacon Consent";
+                Text: %server.tamework.ui.settings.label.telemetrySection;
                 Style: (FontSize: 16, RenderBold: true, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsCrashTelemetrySectionTooltip {
                 Anchor: (Left: 0, Right: 0, Height: 28);
                 Text: "";
-                TooltipText: "Telemetry consent is managed by the shared Beacon command.";
+                TooltipText: %server.tamework.ui.settings.tooltip.telemetrySection;
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -1409,7 +1409,7 @@ $C.@PageOverlay {
 
               Label #TwSettingsTelemetryConsentInstructionLabel {
                 Anchor: (Left: 0, Right: 16, Height: 42);
-                Text: "Use /beacon consent to review or change Tamework telemetry consent. This settings page no longer edits telemetry.";
+                Text: %server.tamework.ui.settings.note.telemetryConsentCommand;
                 Style: (FontSize: 13, TextColor: #e8e4da, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
               }
             }

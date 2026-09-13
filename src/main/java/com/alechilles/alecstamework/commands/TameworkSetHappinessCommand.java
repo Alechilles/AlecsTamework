@@ -29,7 +29,7 @@ public final class TameworkSetHappinessCommand extends AbstractPlayerCommand {
     private static final double DEFAULT_HAPPINESS_MAX = 100.0;
 
     public TameworkSetHappinessCommand() {
-        super("happiness", "Set happiness of the NPC you are looking at.");
+        super("happiness", "server.tamework.commands.setHappiness.description");
         setAllowsExtraArguments(true);
     }
 
@@ -41,13 +41,13 @@ public final class TameworkSetHappinessCommand extends AbstractPlayerCommand {
                            @Nonnull World world) {
         Double requested = parseRequestedValue(commandContext);
         if (requested == null) {
-            commandContext.sender().sendMessage(Message.raw("Usage: /tw sethappiness <value>"));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setHappiness.usage.tw.sethappiness.value"));
             return;
         }
 
         TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
         if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.raw("No NPC found in view."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setHappiness.no.npc.found.in.view"));
             return;
         }
 
@@ -61,21 +61,17 @@ public final class TameworkSetHappinessCommand extends AbstractPlayerCommand {
                 : null;
 
         if (happinessType == null && breedingType == null) {
-            commandContext.sender().sendMessage(Message.raw("Happiness and breeding components are not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setHappiness.happiness.and.breeding.components.are.not.available"));
             return;
         }
         if (happiness == null && breeding == null && happinessType == null) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "NPC " + candidate.npcUuid + " has no tracked happiness or breeding state."
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setHappiness.npc.has.no.tracked.happiness.or.breeding").param("0", String.valueOf(candidate.npcUuid)));
             return;
         }
 
         TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(candidate.ref, store, happiness);
         if (!HappinessConfigResolver.isRuntimeEnabled(happinessConfig)) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "NPC " + candidate.npcUuid + " has no enabled happiness progression."
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setHappiness.npc.has.no.enabled.happiness.progression").param("0", String.valueOf(candidate.npcUuid)));
             return;
         }
         TwBreedingConfig breedingConfig = BreedingConfigResolver.resolveConfig(candidate.ref, store, breeding);
@@ -119,13 +115,8 @@ public final class TameworkSetHappinessCommand extends AbstractPlayerCommand {
             store.putComponent(candidate.ref, breedingType, breeding);
         }
 
-        commandContext.sender().sendMessage(Message.raw(buildResultMessage(
-                candidate.npcUuid.toString(),
-                requested,
-                clamped,
-                clampRules,
-                ready
-        )));
+        commandContext.sender().sendMessage(buildLocalizedResultMessage(
+                candidate.npcUuid.toString(), requested, clamped, clampRules, ready));
     }
 
     @Nullable
@@ -183,32 +174,42 @@ public final class TameworkSetHappinessCommand extends AbstractPlayerCommand {
         return value;
     }
 
-    private static String buildResultMessage(String npcUuid,
-                                             double requested,
-                                             double applied,
-                                             @Nullable ClampRules clampRules,
-                                             @Nullable Boolean ready) {
-        StringBuilder message = new StringBuilder();
-        message.append("Set happiness for NPC ")
-                .append(npcUuid)
-                .append(": requested=")
-                .append(formatDouble(requested))
-                .append(", applied=")
-                .append(formatDouble(applied));
-        if (clampRules != null) {
-            message.append(", clamp=[")
-                    .append(formatDouble(clampRules.min()))
-                    .append(", ")
-                    .append(formatDouble(clampRules.max()))
-                    .append("]");
-        } else {
-            message.append(", clamp=none");
+    @Nonnull
+    private static Message buildLocalizedResultMessage(@Nonnull String npcUuid,
+                                                       double requested,
+                                                       double applied,
+                                                       @Nullable ClampRules clampRules,
+                                                       @Nullable Boolean ready) {
+        String requestedText = formatDouble(requested);
+        String appliedText = formatDouble(applied);
+        if (clampRules == null) {
+            if (ready == null) {
+                return Message.translation("server.tamework.commands.setHappiness.result.noClamp")
+                        .param("0", npcUuid)
+                        .param("1", requestedText)
+                        .param("2", appliedText);
+            }
+            return Message.translation("server.tamework.commands.setHappiness.result.noClamp.ready")
+                    .param("0", npcUuid)
+                    .param("1", requestedText)
+                    .param("2", appliedText)
+                    .param("3", String.valueOf(ready));
         }
-        if (ready != null) {
-            message.append(", ready=").append(ready);
+        if (ready == null) {
+            return Message.translation("server.tamework.commands.setHappiness.result")
+                    .param("0", npcUuid)
+                    .param("1", requestedText)
+                    .param("2", appliedText)
+                    .param("3", formatDouble(clampRules.min()))
+                    .param("4", formatDouble(clampRules.max()));
         }
-        message.append(".");
-        return message.toString();
+        return Message.translation("server.tamework.commands.setHappiness.result.ready")
+                .param("0", npcUuid)
+                .param("1", requestedText)
+                .param("2", appliedText)
+                .param("3", formatDouble(clampRules.min()))
+                .param("4", formatDouble(clampRules.max()))
+                .param("5", String.valueOf(ready));
     }
 
     private static String formatDouble(double value) {

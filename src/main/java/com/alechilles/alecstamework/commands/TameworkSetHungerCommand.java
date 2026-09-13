@@ -19,10 +19,10 @@ import static com.hypixel.hytale.server.core.command.system.arguments.types.ArgT
 
 /** Sets hunger for NPCs selected with the standard NPC debug selectors. */
 public final class TameworkSetHungerCommand extends NPCMultiSelectCommandBase {
-    private final RequiredArg<Double> valueArg = withRequiredArg("value", "Hunger value to apply.", DOUBLE);
+    private final RequiredArg<Double> valueArg = withRequiredArg("value", "server.tamework.commands.setHunger.argument.value", DOUBLE);
 
     public TameworkSetHungerCommand() {
-        super("hunger", "Set hunger for selected NPCs.");
+        super("hunger", "server.tamework.commands.setHunger.description");
     }
 
     @Override
@@ -32,7 +32,7 @@ public final class TameworkSetHungerCommand extends NPCMultiSelectCommandBase {
         TameworkNeedsCommandSupport.NeedsContext needsContext =
                 needsType == null ? null : TameworkNeedsCommandSupport.resolveContext(npcRef, store);
         if (needsContext == null) {
-            context.sendMessage(Message.raw("No enabled needs config resolved for NPC " + npc.getUuid() + "."));
+            context.sendMessage(Message.translation("server.tamework.commands.setHunger.no.enabled.needs.config.resolved.for.npc").param("0", String.valueOf(npc.getUuid())));
             return;
         }
         TwNeedsConfig.ValueSettings values = needsContext.config() != null ? needsContext.config().getValues() : null;
@@ -48,7 +48,6 @@ public final class TameworkSetHungerCommand extends NPCMultiSelectCommandBase {
         needs.setLastPassiveSweepMs(now);
         store.putComponent(npcRef, needsType, needs);
         CompanionNeedsService.tickNeeds(npcRef, store, needsContext.roleId());
-        context.sendMessage(Message.raw("Set hunger for NPC " + npc.getUuid() + ": "
-                + TameworkNeedsCommandSupport.format(hunger) + "."));
+        context.sendMessage(Message.translation("server.tamework.commands.setHunger.set.hunger.for.npc").param("0", String.valueOf(npc.getUuid())).param("1", String.valueOf(TameworkNeedsCommandSupport.format(hunger))));
     }
 }

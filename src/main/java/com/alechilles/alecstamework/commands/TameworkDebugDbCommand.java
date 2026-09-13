@@ -52,7 +52,7 @@ public final class TameworkDebugDbCommand
     ) {
         super(
                 action.commandName,
-                "Inspect bounded replacement persistence diagnostics."
+                "server.tamework.commands.debugDb.description"
         );
         this.action = action;
         this.diagnostics = diagnostics;
@@ -63,7 +63,7 @@ public final class TameworkDebugDbCommand
     @Override
     protected void executeServer(@Nonnull CommandContext context) {
         if (diagnostics == null && exporter == null && bonded == null) {
-            send(context, "Replacement persistence runtime is not available.");
+            send(context, Message.translation("server.tamework.commands.debugDb.replacement.persistence.runtime.is.not.available"));
             return;
         }
         switch (action) {
@@ -75,7 +75,7 @@ public final class TameworkDebugDbCommand
 
     private void printStatus(CommandContext context) {
         if (diagnostics == null) {
-            send(context, "Generic persistence status is unavailable.");
+            send(context, Message.translation("server.tamework.commands.debugDb.generic.persistence.status.is.unavailable"));
             printBondedStatus(context);
             return;
         }
@@ -85,39 +85,25 @@ public final class TameworkDebugDbCommand
             status = diagnostics.status();
             metrics = diagnostics.metrics();
         } catch (RuntimeException unavailable) {
-            send(context, "Generic persistence status is unavailable.");
+            send(context, Message.translation("server.tamework.commands.debugDb.generic.persistence.status.is.unavailable"));
             printBondedStatus(context);
             return;
         }
-        send(context, "Persistence engine=" + status.engine()
-                + ", mode=" + status.storageMode()
-                + ", origin=" + status.targetOrigin()
-                .map(Enum::name).orElse("<pending>")
-                + ", schema=" + (status.schemaVersion().isPresent()
-                ? status.schemaVersion().getAsInt() : "<pending>"));
-        send(context, "Startup readiness=" + status.startup().readiness()
-                + ", running=" + value(status.startup().runningNode())
-                + ", deferred=" + value(status.startup().deferredNode())
-                + ", failed=" + value(status.startup().failedNode())
-                + ", detail=" + text(status.startup().detail()));
-        send(context, "Operations: accepted=" + accepted(metrics)
-                + ", rejected=" + rejected(metrics)
-                + ", completed=" + completed(metrics)
-                + ", failed=" + failed(metrics)
-                + ", busyRetries=" + retries(metrics)
-                + ", readsFailed=" + metrics.readsFailed());
+        send(context, Message.translation("server.tamework.commands.debugDb.persistence.engine.mode.origin.schema").param("0", String.valueOf(status.engine())).param("1", String.valueOf(status.storageMode())).param("2", String.valueOf(status.targetOrigin()
+                .map(Enum::name).orElse("<pending>"))).param("3", String.valueOf((status.schemaVersion().isPresent()
+                ? status.schemaVersion().getAsInt() : "<pending>"))));
+        send(context, Message.translation("server.tamework.commands.debugDb.startup.readiness.running.deferred.failed.detail").param("0", String.valueOf(status.startup().readiness())).param("1", String.valueOf(value(status.startup().runningNode()))).param("2", String.valueOf(value(status.startup().deferredNode()))).param("3", String.valueOf(value(status.startup().failedNode()))).param("4", String.valueOf(text(status.startup().detail()))));
+        send(context, Message.translation("server.tamework.commands.debugDb.operations.accepted.rejected.completed.failed.busyretries.readsfailed").param("0", String.valueOf(accepted(metrics))).param("1", String.valueOf(rejected(metrics))).param("2", String.valueOf(completed(metrics))).param("3", String.valueOf(failed(metrics))).param("4", String.valueOf(retries(metrics))).param("5", String.valueOf(metrics.readsFailed())));
         boolean schemaVerified = status.startupNodes().get(
                 PersistenceStartupNode.VALIDATE_SCHEMA
         ) == PublicPersistenceOperationalStatus.NodeState.COMPLETED;
-        send(context, "Schema/integrity validation="
-                + (schemaVerified ? "complete" : "not complete")
-                + ", checkpoint=" + status.lastCheckpoint().status());
+        send(context, Message.translation("server.tamework.commands.debugDb.schema.integrity.validation.checkpoint").param("0", String.valueOf((schemaVerified ? "complete" : "not complete"))).param("1", String.valueOf(status.lastCheckpoint().status())));
         printBondedStatus(context);
     }
 
     private void printDetail(CommandContext context) {
         if (diagnostics == null) {
-            send(context, "Generic persistence detail is unavailable.");
+            send(context, Message.translation("server.tamework.commands.debugDb.generic.persistence.detail.is.unavailable"));
             printBondedStatus(context);
             return;
         }
@@ -127,19 +113,19 @@ public final class TameworkDebugDbCommand
         try {
             details = diagnostics.details();
         } catch (RuntimeException unavailable) {
-            send(context, "Generic persistence detail is unavailable.");
+            send(context, Message.translation("server.tamework.commands.debugDb.generic.persistence.detail.is.unavailable"));
             printBondedStatus(context);
             return;
         }
         details.whenComplete((read, failure) -> {
             if (failure != null || read == null) {
-                send(context, "Persistence detail is unavailable.");
+                send(context, Message.translation("server.tamework.commands.debugDb.persistence.detail.is.unavailable"));
                 printBondedStatus(context);
                 return;
             }
             if (!(read instanceof PersistenceReadResult.Found<
                     PublicPersistenceDiagnosticsSnapshot> found)) {
-                send(context, "Persistence detail read did not complete.");
+                send(context, Message.translation("server.tamework.commands.debugDb.persistence.detail.read.did.not.complete"));
                 printBondedStatus(context);
                 return;
             }
@@ -148,13 +134,7 @@ public final class TameworkDebugDbCommand
                     .mapToLong(Long::longValue).sum();
             long quarantines = detail.activeQuarantinesByScope().values()
                     .stream().mapToLong(Long::longValue).sum();
-            send(context, "Persistence detail: features="
-                    + detail.features().size()
-                    + ", outboxHead=" + detail.outboxHead()
-                    + ", openIncidents=" + incidents
-                    + ", activeQuarantines=" + quarantines
-                    + ", openCircuits=" + detail.openCircuitCount()
-                    + ", operationPhases=" + detail.operationsByPhase());
+            send(context, Message.translation("server.tamework.commands.debugDb.persistence.detail.features.outboxhead.openincidents.activequarantines.opencircuits").param("0", String.valueOf(detail.features().size())).param("1", String.valueOf(detail.outboxHead())).param("2", String.valueOf(incidents)).param("3", String.valueOf(quarantines)).param("4", String.valueOf(detail.openCircuitCount())).param("5", String.valueOf(detail.operationsByPhase())));
             printBondedStatus(context);
         });
     }
@@ -173,40 +153,22 @@ public final class TameworkDebugDbCommand
         ));
     }
 
-    private String bondedLine(BondedCompanionDiagnosticSnapshot snapshot) {
-        return "Bonded companions: readiness=" + snapshot.readiness()
-                + ", schema=" + snapshot.schemaVersion()
-                + ", stored=" + snapshot.storedProfiles()
-                + ", active=" + snapshot.activeProfiles()
-                + ", dead=" + snapshot.deadProfiles()
-                + ", leases=" + snapshot.activeLeases()
-                + ", pendingCleanup=" + snapshot.pendingBoundedCleanups()
-                + ", lastFailure=" + snapshot.lastFailureCategory();
+    private Message bondedLine(BondedCompanionDiagnosticSnapshot snapshot) {
+        return Message.translation("server.tamework.commands.debugDb.bonded.companions.readiness.schema.stored.active.dead").param("0", String.valueOf(snapshot.readiness())).param("1", String.valueOf(snapshot.schemaVersion())).param("2", String.valueOf(snapshot.storedProfiles())).param("3", String.valueOf(snapshot.activeProfiles())).param("4", String.valueOf(snapshot.deadProfiles())).param("5", String.valueOf(snapshot.activeLeases())).param("6", String.valueOf(snapshot.pendingBoundedCleanups())).param("7", String.valueOf(snapshot.lastFailureCategory()));
     }
 
     private void export(CommandContext context) {
         if (exporter == null) {
-            send(context, "Persistence diagnostic export is unavailable.");
+            send(context, Message.translation("server.tamework.commands.debugDb.persistence.diagnostic.export.is.unavailable"));
             return;
         }
-        send(context, "Collecting bounded persistence diagnostics...");
+        send(context, Message.translation("server.tamework.commands.debugDb.collecting.bounded.persistence.diagnostics"));
         exporter.export().whenComplete((result, failure) -> {
             if (failure != null || result == null) {
-                send(
-                        context,
-                        "Persistence diagnostic export failed; "
-                                + "see the server log."
-                );
+                send(context, Message.translation("server.tamework.commands.debugDb.persistence.diagnostic.export.failed.see.the.server"));
                 return;
             }
-            send(
-                    context,
-                    "Persistence bundle "
-                            + shortId(result.supportId())
-                            + " created (" + result.memberCount()
-                            + " files, " + result.sizeBytes()
-                            + " bytes): " + result.path()
-            );
+            send(context, Message.translation("server.tamework.commands.debugDb.persistence.bundle.created.files.bytes").param("0", String.valueOf(shortId(result.supportId()))).param("1", String.valueOf(result.memberCount())).param("2", String.valueOf(result.sizeBytes())).param("3", String.valueOf(result.path())));
         });
     }
 
@@ -247,10 +209,10 @@ public final class TameworkDebugDbCommand
         return value.substring(0, Math.min(12, value.length()));
     }
 
-    private void send(CommandContext context, String message) {
+    private void send(CommandContext context, Message message) {
         LOGGER.at(Level.INFO).log(
-                "/tw debug persistence " + action.commandName + ": " + message
+                "/tw debug persistence " + action.commandName + ": " + message.getAnsiMessage()
         );
-        context.sender().sendMessage(Message.raw(message));
+        context.sender().sendMessage(message);
     }
 }

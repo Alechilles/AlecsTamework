@@ -30,7 +30,7 @@ final class TameworkApiSelfTestCommandSupport {
     static Tamework requirePlugin(@Nonnull CommandContext commandContext) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.apiSelfTestCommandSupport.tamework.plugin.not.available"));
         }
         return plugin;
     }
@@ -39,7 +39,7 @@ final class TameworkApiSelfTestCommandSupport {
     static ApiSelfTestFixtureManager requireFixtureManager(@Nonnull CommandContext commandContext, @Nonnull Tamework plugin) {
         ApiSelfTestFixtureManager manager = plugin.getApiSelfTestFixtureManager();
         if (manager == null) {
-            commandContext.sender().sendMessage(Message.raw("API self-test fixtures are not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.apiSelfTestCommandSupport.api.self.test.fixtures.are.not.available"));
         }
         return manager;
     }
@@ -48,7 +48,7 @@ final class TameworkApiSelfTestCommandSupport {
     static ApiSelfTestRunner requireRunner(@Nonnull CommandContext commandContext, @Nonnull Tamework plugin) {
         ApiSelfTestRunner runner = plugin.getApiSelfTestRunner();
         if (runner == null) {
-            commandContext.sender().sendMessage(Message.raw("API self-test runner is not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.apiSelfTestCommandSupport.api.self.test.runner.is.not.available"));
         }
         return runner;
     }
@@ -57,7 +57,7 @@ final class TameworkApiSelfTestCommandSupport {
     static TameworkApi requireApi(@Nonnull CommandContext commandContext, @Nonnull Tamework plugin) {
         TameworkApi api = plugin.getApi();
         if (api == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework API is not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.apiSelfTestCommandSupport.tamework.api.is.not.available"));
         }
         return api;
     }
@@ -66,7 +66,7 @@ final class TameworkApiSelfTestCommandSupport {
         if (TameworkApiTestPermission.hasAccess(commandContext.sender())) {
             return true;
         }
-        commandContext.sender().sendMessage(Message.raw("You do not have permission to use /tw api test."));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.apiSelfTestCommandSupport.you.do.not.have.permission.to.use"));
         return false;
     }
 
@@ -83,20 +83,15 @@ final class TameworkApiSelfTestCommandSupport {
 
     static void sendFixtureStatus(@Nonnull CommandContext commandContext, @Nullable ApiSelfTestFixtureSet fixtureSet) {
         if (fixtureSet == null) {
-            commandContext.sender().sendMessage(Message.raw("No API self-test fixture set found in this world."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.apiSelfTestCommandSupport.no.api.self.test.fixture.set.found"));
             return;
         }
-        commandContext.sender().sendMessage(Message.raw(ApiSelfTestReportFormatter.formatFixtureSet(fixtureSet)));
-        fixtureSet.fixtures().values().forEach(fixture -> commandContext.sender().sendMessage(Message.raw(
-                " - "
-                        + fixture.fixtureKey()
-                        + ": npcUuid="
-                        + fixture.npcUuid()
-                        + ", owner="
-                        + fixture.ownerUuid()
-                        + ", role="
-                        + fixture.roleId()
-        )));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.apiTest.fixture")
+                .param("0", fixtureSet.fixtureSetId().toString())
+                .param("1", fixtureSet.worldName())
+                .param("2", String.valueOf(fixtureSet.toolId()))
+                .param("3", fixtureSet.fixtures().keySet().toString()));
+        fixtureSet.fixtures().values().forEach(fixture -> commandContext.sender().sendMessage(Message.translation("server.tamework.commands.apiSelfTestCommandSupport.npcuuid.owner.role").param("0", String.valueOf(fixture.fixtureKey())).param("1", String.valueOf(fixture.npcUuid())).param("2", String.valueOf(fixture.ownerUuid())).param("3", String.valueOf(fixture.roleId()))));
     }
 
     static void sendReport(@Nonnull CommandContext commandContext,
@@ -104,10 +99,32 @@ final class TameworkApiSelfTestCommandSupport {
                            @Nonnull ApiSelfTestRunReport report,
                            @Nonnull ApiSelfTestRunner.Suite suite,
                            boolean verbose) {
-        List<String> lines = ApiSelfTestReportFormatter.format(report, verbose);
-        for (String line : lines) {
-            commandContext.sender().sendMessage(Message.raw(line));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.apiTest.reportTitle"));
+        for (var result : report.suites()) {
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.apiTest.suite")
+                    .param("0", Message.translation(result.passed()
+                            ? "server.tamework.commands.apiTest.pass" : "server.tamework.commands.apiTest.fail"))
+                    .param("1", result.suiteName()).param("2", result.passedCount())
+                    .param("3", result.assertions().size()));
+            for (var assertion : result.assertions()) {
+                if (!verbose && assertion.passed()) {
+                    continue;
+                }
+                // Assertion names and bounded failure evidence are diagnostic data.
+                String detail = assertion.detail() == null ? "" : assertion.detail()
+                        .replaceAll("[\\r\\n\\t\\p{Cntrl}]+", " ").trim();
+                if (detail.length() > 240) {
+                    detail = detail.substring(0, 237) + "...";
+                }
+                commandContext.sender().sendMessage(Message.translation("server.tamework.commands.apiTest.assertion")
+                        .param("0", Message.translation(assertion.passed()
+                                ? "server.tamework.commands.apiTest.pass" : "server.tamework.commands.apiTest.fail"))
+                        .param("1", assertion.name()).param("2", detail));
+            }
         }
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.apiTest.totals")
+                .param("0", report.totalPassed()).param("1", report.totalAssertions())
+                .param("2", report.totalFailed()));
         List<String> logLines = ApiSelfTestReportFormatter.format(report, true);
         String suiteName = suite.name().toLowerCase(Locale.ROOT).replace('_', '-');
         plugin.getLogger().at(Level.INFO).log(

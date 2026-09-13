@@ -18,7 +18,7 @@ import javax.annotation.Nonnull;
  */
 public final class TameworkDebugPlayerInputCommand extends AbstractPlayerCommand {
     public TameworkDebugPlayerInputCommand() {
-        super("input", "Toggle player input diagnostics for mount-avatar experiments.");
+        super("input", "server.tamework.commands.debugPlayerInput.description");
         setAllowsExtraArguments(true);
     }
 
@@ -30,17 +30,13 @@ public final class TameworkDebugPlayerInputCommand extends AbstractPlayerCommand
                            @Nonnull World world) {
         UUID playerUuid = playerRef.getUuid();
         if (playerUuid == null) {
-            commandContext.sender().sendMessage(Message.raw("Player UUID is not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugPlayerInput.player.uuid.is.not.available"));
             return;
         }
 
         String arg = getFirstArg(commandContext);
         if ("status".equals(arg)) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "Tamework player input diagnostics: "
-                            + (PlayerInputDebugProbe.isEnabled(playerUuid) ? "enabled" : "disabled")
-                            + " for you; total enabled=" + PlayerInputDebugProbe.enabledCount()
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugPlayerInput.tamework.player.input.diagnostics.for.you.total").param("0", String.valueOf((PlayerInputDebugProbe.isEnabled(playerUuid) ? "enabled" : "disabled"))).param("1", String.valueOf(PlayerInputDebugProbe.enabledCount())));
             return;
         }
 
@@ -59,9 +55,7 @@ public final class TameworkDebugPlayerInputCommand extends AbstractPlayerCommand
             enabled = true;
         }
 
-        commandContext.sender().sendMessage(Message.raw(
-                "Tamework player input diagnostics: " + (enabled ? "enabled" : "disabled")
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugPlayerInput.tamework.player.input.diagnostics").param("0", String.valueOf((enabled ? "enabled" : "disabled"))));
     }
 
     private static String getFirstArg(CommandContext commandContext) {

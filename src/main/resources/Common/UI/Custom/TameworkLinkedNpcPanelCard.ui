@@ -172,8 +172,8 @@ Group {
     Group #XpProgressRing {
         Anchor: (Top: 38, Left: 358, Width: 48, Height: 24);
         Visible: false;
-        TextButton #XpTooltip { Anchor: (Top: 0, Left: 0, Width: 48, Height: 24); Style: $A.@PanelButton; Text: ""; TooltipText: "0/0 XP"; TextTooltipStyle: @LinkedProgressionTooltipStyle; }
-        Label { Anchor: (Top: 2, Left: 7, Width: 23, Height: 20); HitTestVisible: false; Text: "Lv."; Style: (FontSize: 12, TextColor: #afb6b0, VerticalAlignment: Center); }
+        TextButton #XpTooltip { Anchor: (Top: 0, Left: 0, Width: 48, Height: 24); Style: $A.@PanelButton; Text: ""; TooltipText: ""; TextTooltipStyle: @LinkedProgressionTooltipStyle; }
+        Label { Anchor: (Top: 2, Left: 7, Width: 23, Height: 20); HitTestVisible: false; Text: %server.tamework.ui.shared.levelAbbreviation; Style: (FontSize: 12, TextColor: #afb6b0, VerticalAlignment: Center); }
         Group #RingTrackTopLeft { Anchor: (Top: 0, Left: 0, Width: 12, Height: 3); Background: #353c36; Visible: false; }
         Group #RingTrackTopRight { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #353c36; Visible: false; }
         Group #RingTrackLeft { Anchor: (Top: 0, Left: 0, Width: 3, Height: 20); Background: #353c36; Visible: false; }

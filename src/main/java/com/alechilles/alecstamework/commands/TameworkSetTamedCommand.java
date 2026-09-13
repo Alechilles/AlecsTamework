@@ -18,7 +18,7 @@ import javax.annotation.Nonnull;
 public final class TameworkSetTamedCommand extends AbstractPlayerCommand {
 
     public TameworkSetTamedCommand() {
-        super("tamed", "Set or toggle tamed status of the NPC you are looking at.");
+        super("tamed", "server.tamework.commands.setTamed.description");
         setAllowsExtraArguments(true);
     }
 
@@ -30,13 +30,13 @@ public final class TameworkSetTamedCommand extends AbstractPlayerCommand {
                            @Nonnull World world) {
         TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
         if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.raw("No NPC found in view."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setTamed.no.npc.found.in.view"));
             return;
         }
 
         ComponentType<EntityStore, TameworkTamedComponent> type = TameworkTamedComponent.getComponentType();
         if (type == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamed component is not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setTamed.tamed.component.is.not.available"));
             return;
         }
 
@@ -51,7 +51,7 @@ public final class TameworkSetTamedCommand extends AbstractPlayerCommand {
         boolean next = parsed != null ? parsed : !current;
 
         store.putComponent(candidate.ref, type, new TameworkTamedComponent(next));
-        commandContext.sender().sendMessage(Message.raw("Set tamed for NPC " + candidate.npcUuid + " to " + next));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setTamed.set.tamed.for.npc.to").param("0", String.valueOf(candidate.npcUuid)).param("1", String.valueOf(next)));
     }
 
     private static String getFirstArg(CommandContext commandContext) {

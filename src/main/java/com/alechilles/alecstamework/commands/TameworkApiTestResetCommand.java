@@ -19,7 +19,7 @@ import javax.annotation.Nonnull;
  */
 public final class TameworkApiTestResetCommand extends AbstractPlayerCommand {
     public TameworkApiTestResetCommand() {
-        super("reset", "Remove the current API self-test fixtures.");
+        super("reset", "server.tamework.commands.apiTestReset.description");
         requirePermission(TameworkApiTestPermission.NODE);
         setPermissionGroups("OP", "Admin", "Operator");
     }
@@ -43,15 +43,18 @@ public final class TameworkApiTestResetCommand extends AbstractPlayerCommand {
         }
         Player player = store.getComponent(ref, Player.getComponentType());
         if (player == null) {
-            commandContext.sender().sendMessage(Message.raw("Unable to resolve the player for fixture reset."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.apiTestReset.unable.to.resolve.the.player.for.fixture"));
             return;
         }
         manager.resetAsync(player, store, world).whenComplete((result, failure) -> {
             LeaseBoundWorldDispatcher.execute(world, () -> {
-                String summary = failure != null || result == null
-                        ? "Failed to reset API self-test fixtures safely."
-                        : result.summary();
-                commandContext.sender().sendMessage(Message.raw(summary));
+                commandContext.sender().sendMessage(Message.translation(
+                        failure == null && result != null && result.success()
+                                ? "server.tamework.commands.apiTestReset.completed"
+                                : "server.tamework.commands.apiTestReset.failed"));
+                if (result != null) {
+                    plugin.getLogger().at(java.util.logging.Level.INFO).log(result.summary());
+                }
             });
         });
     }

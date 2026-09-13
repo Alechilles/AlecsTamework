@@ -5,7 +5,7 @@ import com.hypixel.hytale.server.core.command.system.basecommands.AbstractComman
 /** Groups Tamework configuration commands. */
 public final class TameworkConfigCommandGroup extends AbstractCommandCollection {
     public TameworkConfigCommandGroup() {
-        super("config", "Tamework configuration commands.");
+        super("config", "server.tamework.commands.config.tamework.configuration.commands");
         addSubCommand(new TameworkConfigCommand());
         addSubCommand(new TameworkReloadConfigCommand());
     }

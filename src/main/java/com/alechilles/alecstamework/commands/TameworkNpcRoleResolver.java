@@ -47,7 +47,9 @@ final class TameworkNpcRoleResolver {
 
         List<String> allRoles = npcPlugin.getRoleTemplateNames(true);
         if (allRoles == null || allRoles.isEmpty()) {
-            return new RoleResolution(null, "No NPC roles are currently registered.");
+            return RoleResolution.failure(
+                    "No NPC roles are currently registered.",
+                    "tamework.commands.npc.role.noneRegistered", List.of());
         }
 
         List<String> exactMatches = new ArrayList<>();
@@ -71,29 +73,36 @@ final class TameworkNpcRoleResolver {
             return new RoleResolution(exactMatches.get(0), null);
         }
         if (exactMatches.size() > 1) {
-            return new RoleResolution(null, ambiguousRoleMessage(requestedRole, exactMatches));
+            return ambiguousRoleResolution(requestedRole, exactMatches);
         }
         if (shortNameMatches.size() == 1) {
             return new RoleResolution(shortNameMatches.get(0), null);
         }
         if (shortNameMatches.size() > 1) {
-            return new RoleResolution(null, ambiguousRoleMessage(requestedRole, shortNameMatches));
+            return ambiguousRoleResolution(requestedRole, shortNameMatches);
         }
 
         List<String> suggestions = suggestRoles(normalizedRequested, allRoles);
         if (suggestions.isEmpty()) {
-            return new RoleResolution(null, "No role matched '" + requestedRole + "'.");
+            return RoleResolution.failure(
+                    "No role matched '" + requestedRole + "'.",
+                    "tamework.commands.npc.role.notFound", List.of(requestedRole));
         }
-        return new RoleResolution(
-                null,
-                "No role matched '" + requestedRole + "'. Try one of: " + String.join(", ", suggestions) + "."
-        );
+        return RoleResolution.failure(
+                "No role matched '" + requestedRole + "'. Try one of: "
+                        + String.join(", ", suggestions) + ".",
+                "tamework.commands.npc.role.suggestions",
+                List.of(requestedRole, String.join(", ", suggestions)));
     }
 
     @Nonnull
-    private static String ambiguousRoleMessage(@Nonnull String requestedRole, @Nonnull List<String> matches) {
+    private static RoleResolution ambiguousRoleResolution(@Nonnull String requestedRole,
+                                                           @Nonnull List<String> matches) {
         List<String> limited = matches.size() > 8 ? matches.subList(0, 8) : matches;
-        return "Role '" + requestedRole + "' is ambiguous. Use one of: " + String.join(", ", limited) + ".";
+        String choices = String.join(", ", limited);
+        return RoleResolution.failure(
+                "Role '" + requestedRole + "' is ambiguous. Use one of: " + choices + ".",
+                "tamework.commands.npc.role.ambiguous", List.of(requestedRole, choices));
     }
 
     @Nonnull
@@ -140,10 +149,30 @@ final class TameworkNpcRoleResolver {
         private final String roleId;
         @Nullable
         private final String errorMessage;
+        @Nullable
+        private final String errorKey;
+        @Nonnull
+        private final List<String> errorArguments;
 
         private RoleResolution(@Nullable String roleId, @Nullable String errorMessage) {
+            this(roleId, errorMessage, null, List.of());
+        }
+
+        private RoleResolution(@Nullable String roleId,
+                               @Nullable String errorMessage,
+                               @Nullable String errorKey,
+                               @Nonnull List<String> errorArguments) {
             this.roleId = roleId;
             this.errorMessage = errorMessage;
+            this.errorKey = errorKey;
+            this.errorArguments = List.copyOf(errorArguments);
+        }
+
+        @Nonnull
+        private static RoleResolution failure(@Nonnull String message,
+                                              @Nonnull String key,
+                                              @Nonnull List<String> arguments) {
+            return new RoleResolution(null, message, key, arguments);
         }
 
         @Nullable
@@ -154,6 +183,16 @@ final class TameworkNpcRoleResolver {
         @Nullable
         String errorMessage() {
             return errorMessage;
+        }
+
+        @Nullable
+        String errorKey() {
+            return errorKey;
+        }
+
+        @Nonnull
+        List<String> errorArguments() {
+            return errorArguments;
         }
     }
 }

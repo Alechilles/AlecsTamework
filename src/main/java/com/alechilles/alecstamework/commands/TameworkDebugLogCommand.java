@@ -5,7 +5,7 @@ import com.hypixel.hytale.server.core.command.system.basecommands.AbstractComman
 /** Groups verbose debug logging switches. */
 public final class TameworkDebugLogCommand extends AbstractCommandCollection {
     public TameworkDebugLogCommand() {
-        super("log", "Tamework debug logging commands.");
+        super("log", "server.tamework.commands.debugLog.description");
         addSubCommand(new TameworkDebugHookCommand());
         addSubCommand(new TameworkDebugSpawnerCommand());
         addSubCommand(new TameworkDebugSpawnerLocationCommand());

@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
 public final class TameworkDebugNeedsTelemetryCommand extends AbstractTameworkServerCommand {
 
     public TameworkDebugNeedsTelemetryCommand() {
-        super("needs", "Toggle Tamework needs telemetry context events.");
+        super("needs", "server.tamework.commands.debugNeedsTelemetry.description");
         setAllowsExtraArguments(true);
     }
 
@@ -19,7 +19,7 @@ public final class TameworkDebugNeedsTelemetryCommand extends AbstractTameworkSe
     protected void executeServer(@Nonnull CommandContext commandContext) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugNeedsTelemetry.tamework.plugin.not.available"));
             return;
         }
         String raw = getFirstArg(commandContext.getInputString());
@@ -27,9 +27,7 @@ public final class TameworkDebugNeedsTelemetryCommand extends AbstractTameworkSe
         boolean enabled = explicit != null
                 ? plugin.setDebugNeedsTelemetryDiagnosticsEnabled(explicit)
                 : plugin.toggleDebugNeedsTelemetryDiagnosticsEnabled();
-        commandContext.sender().sendMessage(Message.raw(
-                "Tamework needs telemetry context events: " + (enabled ? "enabled" : "disabled")
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugNeedsTelemetry.tamework.needs.telemetry.context.events").param("0", String.valueOf((enabled ? "enabled" : "disabled"))));
     }
 
     static String getFirstArg(String input) {

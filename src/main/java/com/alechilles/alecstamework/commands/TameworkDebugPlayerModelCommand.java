@@ -27,7 +27,7 @@ public final class TameworkDebugPlayerModelCommand extends AbstractPlayerCommand
     private static final ConcurrentHashMap<UUID, Model> SAVED_MODELS = new ConcurrentHashMap<>();
 
     public TameworkDebugPlayerModelCommand() {
-        super("player-model", "Temporarily swap your player model for mount-control testing.");
+        super("player-model", "server.tamework.commands.debugPlayerModel.description");
         setAllowsExtraArguments(true);
     }
 
@@ -39,7 +39,7 @@ public final class TameworkDebugPlayerModelCommand extends AbstractPlayerCommand
                            @Nonnull World world) {
         UUID playerUuid = playerRef.getUuid();
         if (playerUuid == null) {
-            commandContext.sender().sendMessage(Message.raw("Player UUID is not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugPlayerModel.player.uuid.is.not.available"));
             return;
         }
 
@@ -54,26 +54,20 @@ public final class TameworkDebugPlayerModelCommand extends AbstractPlayerCommand
         }
 
         if (args.length == 0 || !"unsafe".equals(args[0].toLowerCase(Locale.ROOT))) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "Player model debug can crash the current client when non-player models animate. "
-                            + "Use /tw debugplayermodel unsafe [ModelId] [scale] only for isolated probes."
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugPlayerModel.player.model.debug.can.crash.the.current"));
             return;
         }
 
         String modelId = args.length > 1 ? args[1] : DEFAULT_MODEL_ID;
         ModelAsset modelAsset = ModelAsset.getAssetMap().getAsset(modelId);
         if (modelAsset == null) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "Model asset not found: " + modelId
-                            + ". Usage: /tw debugplayermodel unsafe [ModelId] [scale] | reset | status"
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugPlayerModel.model.asset.not.found.usage.tw.debugplayermodel").param("0", String.valueOf(modelId)));
             return;
         }
 
         Float requestedScale = args.length > 2 ? parseScale(args[2]) : null;
         if (args.length > 2 && requestedScale == null) {
-            commandContext.sender().sendMessage(Message.raw("Invalid scale: " + args[2]));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugPlayerModel.invalid.scale").param("0", String.valueOf(args[2])));
             return;
         }
 
@@ -86,10 +80,7 @@ public final class TameworkDebugPlayerModelCommand extends AbstractPlayerCommand
         store.putComponent(ref, ModelComponent.getComponentType(),
                 new ModelComponent(Model.createScaledModel(modelAsset, scale)));
 
-        commandContext.sender().sendMessage(Message.raw(
-                "Player model debug: set model=" + modelId + " scale=" + scale
-                        + ". Use /tw debugplayermodel reset to restore."
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugPlayerModel.player.model.debug.set.model.scale.use").param("0", String.valueOf(modelId)).param("1", String.valueOf(scale)));
     }
 
     private static void restoreModel(CommandContext commandContext,
@@ -99,7 +90,7 @@ public final class TameworkDebugPlayerModelCommand extends AbstractPlayerCommand
         Model savedModel = SAVED_MODELS.remove(playerUuid);
         if (savedModel != null) {
             store.putComponent(ref, ModelComponent.getComponentType(), new ModelComponent(new Model(savedModel)));
-            commandContext.sender().sendMessage(Message.raw("Player model debug: restored saved player model."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugPlayerModel.player.model.debug.restored.saved.player.model"));
             return;
         }
 
@@ -108,13 +99,11 @@ public final class TameworkDebugPlayerModelCommand extends AbstractPlayerCommand
             Model fallbackModel = CosmeticsModule.get().createModel(skin.getPlayerSkin());
             store.putComponent(ref, ModelComponent.getComponentType(), new ModelComponent(fallbackModel));
             skin.setNetworkOutdated();
-            commandContext.sender().sendMessage(Message.raw("Player model debug: restored model from player skin."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugPlayerModel.player.model.debug.restored.model.from.player"));
             return;
         }
 
-        commandContext.sender().sendMessage(Message.raw(
-                "Player model debug: no saved player model or skin fallback is available."
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugPlayerModel.player.model.debug.no.saved.player.model"));
     }
 
     private static void sendStatus(CommandContext commandContext,
@@ -127,9 +116,7 @@ public final class TameworkDebugPlayerModelCommand extends AbstractPlayerCommand
                 : "<none>";
         Model savedModel = SAVED_MODELS.get(playerUuid);
         String savedId = savedModel != null ? savedModel.getModelAssetId() : "<none>";
-        commandContext.sender().sendMessage(Message.raw(
-                "Player model debug: current=" + currentId + ", saved=" + savedId
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugPlayerModel.player.model.debug.current.saved").param("0", String.valueOf(currentId)).param("1", String.valueOf(savedId)));
     }
 
     private static String[] getArgs(CommandContext commandContext) {

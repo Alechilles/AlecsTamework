@@ -19,7 +19,7 @@ import javax.annotation.Nonnull;
  */
 public final class TameworkApiTestPrepareCommand extends AbstractPlayerCommand {
     public TameworkApiTestPrepareCommand() {
-        super("prepare", "Provision fixtures from the optional Tamework example asset pack.");
+        super("prepare", "server.tamework.commands.apiTestPrepare.description");
         requirePermission(TameworkApiTestPermission.NODE);
         setPermissionGroups("OP", "Admin", "Operator");
     }
@@ -43,18 +43,19 @@ public final class TameworkApiTestPrepareCommand extends AbstractPlayerCommand {
         }
         Player player = store.getComponent(ref, Player.getComponentType());
         if (player == null) {
-            commandContext.sender().sendMessage(Message.raw("Unable to resolve the player for fixture setup."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.apiTestPrepare.unable.to.resolve.the.player.for.fixture"));
             return;
         }
         manager.prepareAsync(player, store, ref, world).whenComplete((result, failure) -> {
             LeaseBoundWorldDispatcher.execute(world, () -> {
                 if (failure != null || result == null) {
-                    commandContext.sender().sendMessage(Message.raw(
-                            "Failed to prepare API self-test fixtures safely."
-                    ));
+                    commandContext.sender().sendMessage(Message.translation("server.tamework.commands.apiTestPrepare.failed.to.prepare.api.self.test.fixtures"));
                     return;
                 }
-                commandContext.sender().sendMessage(Message.raw(result.summary()));
+                commandContext.sender().sendMessage(Message.translation(result.success()
+                        ? "server.tamework.commands.apiTestPrepare.completed"
+                        : "server.tamework.commands.apiTestPrepare.failed.to.prepare.api.self.test.fixtures"));
+                plugin.getLogger().at(java.util.logging.Level.INFO).log(result.summary());
                 if (result.fixtureSet() != null) {
                     TameworkApiSelfTestCommandSupport.sendFixtureStatus(
                             commandContext, result.fixtureSet()

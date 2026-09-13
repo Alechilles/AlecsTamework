@@ -18,7 +18,7 @@ import javax.annotation.Nullable;
  */
 public final class TameworkSetLevelCommand extends AbstractPlayerCommand {
     public TameworkSetLevelCommand() {
-        super("level", "Set level of the NPC you are looking at.");
+        super("level", "server.tamework.commands.setLevel.description");
         setAllowsExtraArguments(true);
     }
 
@@ -30,13 +30,13 @@ public final class TameworkSetLevelCommand extends AbstractPlayerCommand {
                            @Nonnull World world) {
         Integer requestedLevel = parseRequestedLevel(commandContext);
         if (requestedLevel == null) {
-            commandContext.sender().sendMessage(Message.raw("Usage: /tw setlevel <level>"));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setLevel.usage.tw.setlevel.level"));
             return;
         }
 
         TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
         if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.raw("No NPC found in view."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setLevel.no.npc.found.in.view"));
             return;
         }
 
@@ -46,17 +46,13 @@ public final class TameworkSetLevelCommand extends AbstractPlayerCommand {
                 requestedLevel
         );
         if (!result.applied()) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "Could not set level for NPC " + candidate.npcUuid + ": " + result.reason() + "."
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setLevel.unavailable")
+                    .param("0", String.valueOf(candidate.npcUuid)));
             return;
         }
 
-        commandContext.sender().sendMessage(Message.raw(buildResultMessage(
-                candidate.npcUuid.toString(),
-                requestedLevel,
-                result
-        )));
+        commandContext.sender().sendMessage(buildLocalizedResultMessage(
+                candidate.npcUuid.toString(), requestedLevel, result));
     }
 
     @Nullable
@@ -93,6 +89,22 @@ public final class TameworkSetLevelCommand extends AbstractPlayerCommand {
         }
         message.append(".");
         return message.toString();
+    }
+
+    @Nonnull
+    private static Message buildLocalizedResultMessage(@Nonnull String npcUuid,
+                                                       int requestedLevel,
+                                                       @Nonnull CompanionLevelingService.SetLevelResult result) {
+        String key = requestedLevel == result.currentLevel()
+                ? "server.tamework.commands.setLevel.result"
+                : "server.tamework.commands.setLevel.result.clamped";
+        return Message.translation(key)
+                .param("0", npcUuid)
+                .param("1", String.valueOf(requestedLevel))
+                .param("2", String.valueOf(result.previousLevel()))
+                .param("3", String.valueOf(result.currentLevel()))
+                .param("4", String.valueOf(result.maxLevel()))
+                .param("5", formatXp(result.totalXp()));
     }
 
     @Nonnull

@@ -113,7 +113,7 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
             @Nullable PublicPersistenceOperations persistenceOperations,
             @Nullable Consumer<PersistenceFailureSignal> persistenceFailureSink
     ) {
-        super("tw", "Tamework commands.");
+        super("tw", "server.tamework.commands.commandRoot.description");
         requirePermission(ROOT_PERMISSION);
         setPermissionGroups(TameworkConfigPermission.adminPermissionGroups());
         addSubCommand(new TameworkDebugCommand(

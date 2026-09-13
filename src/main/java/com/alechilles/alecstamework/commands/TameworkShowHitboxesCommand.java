@@ -44,7 +44,7 @@ public final class TameworkShowHitboxesCommand extends AbstractPlayerCommand {
     private static final Map<UUID, TrackingSession> ACTIVE_TRACKING = new ConcurrentHashMap<>();
 
     public TameworkShowHitboxesCommand() {
-        super("hitboxes", "Toggle live hitbox/detail-box tracking for the NPC in view.");
+        super("hitboxes", "server.tamework.commands.showHitboxes.description");
     }
 
     @Override
@@ -55,20 +55,20 @@ public final class TameworkShowHitboxesCommand extends AbstractPlayerCommand {
                            @Nonnull World world) {
         UUID playerUuid = playerRef.getUuid();
         if (playerUuid == null) {
-            commandContext.sender().sendMessage(Message.raw("Unable to resolve your player UUID."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.showHitboxes.unable.to.resolve.your.player.uuid"));
             return;
         }
 
         TrackingSession removed = ACTIVE_TRACKING.remove(playerUuid);
         if (removed != null) {
             clearDebugForPlayer(playerRef);
-            commandContext.sender().sendMessage(Message.raw("Hitbox tracking disabled."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.showHitboxes.hitbox.tracking.disabled"));
             return;
         }
 
         TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
         if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.raw("No NPC found in view."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.showHitboxes.no.npc.found.in.view"));
             return;
         }
 
@@ -76,7 +76,7 @@ public final class TameworkShowHitboxesCommand extends AbstractPlayerCommand {
         TransformComponent transformComponent = store.getComponent(candidate.ref, TransformComponent.getComponentType());
         NPCEntity npc = store.getComponent(candidate.ref, NPCEntity.getComponentType());
         if (boundingBoxComponent == null || transformComponent == null || npc == null) {
-            commandContext.sender().sendMessage(Message.raw("Target NPC is missing required components."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.showHitboxes.target.npc.is.missing.required.components"));
             return;
         }
 
@@ -87,15 +87,8 @@ public final class TameworkShowHitboxesCommand extends AbstractPlayerCommand {
         scheduleTrackingTick(world, playerRef, playerUuid, sessionId);
 
         String roleId = CompanionRoleIdResolver.resolveRoleId(candidate.ref, store);
-        commandContext.sender().sendMessage(Message.raw(
-                "Tracking hitbox debug for NPC " + npc.getUuid()
-                        + " (role=" + (roleId == null || roleId.isBlank() ? "<unknown>" : roleId)
-                        + ") with per-tick updates (visible to you only). Run /tw showhitboxes again to disable."
-        ));
-        commandContext.sender().sendMessage(Message.raw(
-                "Rendered 1 main hitbox and " + initialRender.detailBoxes + " detail boxes across "
-                        + initialRender.detailGroups + " detail groups."
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.showHitboxes.tracking.hitbox.debug.for.npc.role.with").param("0", String.valueOf(npc.getUuid())).param("1", String.valueOf((roleId == null || roleId.isBlank() ? "<unknown>" : roleId))));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.showHitboxes.rendered.main.hitbox.and.detail.boxes.across").param("0", String.valueOf(initialRender.detailBoxes)).param("1", String.valueOf(initialRender.detailGroups)));
     }
 
     private static Vector3f colorForDetailGroup(String name) {
@@ -226,7 +219,7 @@ public final class TameworkShowHitboxesCommand extends AbstractPlayerCommand {
 
         Ref<EntityStore> npcRef = session.npcRef;
         if (!npcRef.isValid()) {
-            stopTracking(playerUuid, session, playerRef, "Hitbox tracking stopped: target NPC no longer exists.");
+            stopTracking(playerUuid, session, playerRef, "server.tamework.commands.showHitboxes.hitbox.tracking.stopped.target.npc.no.longer");
             return;
         }
 
@@ -238,14 +231,14 @@ public final class TameworkShowHitboxesCommand extends AbstractPlayerCommand {
 
         Store<EntityStore> store = npcRef.getStore();
         if (store == null || store.getExternalData() == null || store.getExternalData().getWorld() != world) {
-            stopTracking(playerUuid, session, playerRef, "Hitbox tracking stopped: target NPC is no longer available in this world.");
+            stopTracking(playerUuid, session, playerRef, "server.tamework.commands.showHitboxes.hitbox.tracking.stopped.target.npc.is.no");
             return;
         }
 
         BoundingBox boundingBoxComponent = store.getComponent(npcRef, BoundingBox.getComponentType());
         TransformComponent transformComponent = store.getComponent(npcRef, TransformComponent.getComponentType());
         if (boundingBoxComponent == null || transformComponent == null) {
-            stopTracking(playerUuid, session, playerRef, "Hitbox tracking stopped: target NPC is missing required components.");
+            stopTracking(playerUuid, session, playerRef, "server.tamework.commands.showHitboxes.hitbox.tracking.stopped.target.npc.is.missing");
             return;
         }
 
@@ -263,7 +256,7 @@ public final class TameworkShowHitboxesCommand extends AbstractPlayerCommand {
         }
         clearDebugForPlayer(playerRef);
         if (!reason.isBlank()) {
-            playerRef.sendMessage(Message.raw(reason));
+            playerRef.sendMessage(Message.translation(reason));
         }
     }
 

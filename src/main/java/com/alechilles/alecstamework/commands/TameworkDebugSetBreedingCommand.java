@@ -7,7 +7,7 @@ import com.hypixel.hytale.server.core.command.system.basecommands.AbstractComman
  */
 public final class TameworkDebugSetBreedingCommand extends AbstractCommandCollection {
     public TameworkDebugSetBreedingCommand() {
-        super("breeding", "Set debug breeding state.");
+        super("breeding", "server.tamework.commands.debugSetBreeding.description");
         addSubCommand(new TameworkSetBreedingReadyCommand());
     }
 }

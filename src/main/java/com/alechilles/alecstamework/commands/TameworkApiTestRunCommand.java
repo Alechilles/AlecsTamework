@@ -25,7 +25,7 @@ import javax.annotation.Nullable;
  */
 public final class TameworkApiTestRunCommand extends AbstractTameworkServerCommand {
     public TameworkApiTestRunCommand() {
-        super("run", "Run the live Tamework API self-test suites.");
+        super("run", "server.tamework.commands.apiTestRun.description");
         requirePermission(TameworkApiTestPermission.NODE);
         setPermissionGroups("OP", "Admin", "Operator");
         setAllowsExtraArguments(true);
@@ -48,9 +48,7 @@ public final class TameworkApiTestRunCommand extends AbstractTameworkServerComma
 
         ParsedArgs parsed = parse(commandContext);
         if (parsed == null) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "Usage: /tw api test run [core|profile|command-links|configs|progression|interaction-extensions|trait-effects|policies|command-ui|command-hud|diagnostics|hydragon-integrations|all] [verbose]"
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.apiTestRun.usage.tw.api.test.run.core.profile"));
             return;
         }
         PlayerExecution playerExecution = resolvePlayerExecution(commandContext);
@@ -58,9 +56,7 @@ public final class TameworkApiTestRunCommand extends AbstractTameworkServerComma
             ApiSelfTestRunReport report = TameworkApiSelfTestCommandSupport.runConsoleSafe(
                     runner, plugin, api, parsed.suite());
             if (report == null) {
-                commandContext.sender().sendMessage(Message.raw(
-                        "That suite requires prepared in-world fixtures. From the console use "
-                                + "core, command-hud, diagnostics, hydragon-integrations, or all for the read-only aggregate."));
+                commandContext.sender().sendMessage(Message.translation("server.tamework.commands.apiTestRun.that.suite.requires.prepared.in.world.fixtures"));
                 return;
             }
             TameworkApiSelfTestCommandSupport.sendReport(

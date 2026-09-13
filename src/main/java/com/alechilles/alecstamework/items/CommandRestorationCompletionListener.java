@@ -76,38 +76,43 @@ public final class CommandRestorationCompletionListener
         }
         entry.log("Companion revival workflow failed (status="
                 + result.workflowStatus() + ", detail=" + result.detail() + ").");
-        feedback.showWarning(player, workflowFailureMessage(result));
+        feedback.showWarning(player, workflowFailureMessage(result,
+                player.getPlayerRef() == null ? null : player.getPlayerRef().getLanguage()));
     }
 
     static String workflowFailureMessage(CompanionLifecycleAuthorResult result) {
+        return workflowFailureMessage(result, null);
+    }
+
+    static String workflowFailureMessage(CompanionLifecycleAuthorResult result, String language) {
         if (hasFailureCode(
                 result.failure(), "operation_scope_policy_mismatch:"
         )) {
-            return "Companion revival is unavailable because its persistence "
-                    + "setup is incompatible.";
+            return LocalizedText.resolve(language, "tamework.ui.notifications.command.respawn.incompatibleSetup");
         }
         String specific = PopulationAdmissionFailureFeedback.describe(
-                result.failure(), "revive"
+                result.failure(), "revive", language
         );
         if (specific != null) return specific;
         if (result.workflowStatus() == null) {
-            return "Companion revival failed before its workflow could start.";
+            return LocalizedText.resolve(language, "tamework.ui.notifications.command.respawn.workflowStartFailed");
         }
-        return switch (result.workflowStatus()) {
+        String key = switch (result.workflowStatus()) {
             case PREPARE_FAILED, INVALID_PHASE ->
-                    "Companion revival could not validate its saved state.";
+                    "savedStateInvalid";
             case TRANSITION_FAILED, LIVE_RETRYABLE, LIVE_UNKNOWN ->
-                    "Companion revival could not restore the companion in the world.";
+                    "worldRestoreFailed";
             case DURABLE_READ_FAILED, DURABLE_COMMIT_FAILED ->
-                    "Companion revival could not save the restored companion.";
+                    "saveFailed";
             case PUBLICATION_PENDING, TERMINALIZATION_FAILED ->
-                    "Companion revival is incomplete. Try again shortly.";
+                    "incomplete";
             case COMPENSATED, COMPENSATION_REQUIRED,
                     COMPENSATION_PREPARE_FAILED, COMPENSATION_RETRYABLE,
                     COMPENSATION_UNKNOWN, COMPENSATION_COMMIT_FAILED ->
-                    "Companion revival was rolled back. Try again shortly.";
-            case PUBLISHED -> "Companion revival completed.";
+                    "rolledBack";
+            case PUBLISHED -> "completed";
         };
+        return LocalizedText.resolve(language, "tamework.ui.notifications.command.respawn." + key);
     }
 
     private static boolean hasFailureCode(Throwable failure, String prefix) {

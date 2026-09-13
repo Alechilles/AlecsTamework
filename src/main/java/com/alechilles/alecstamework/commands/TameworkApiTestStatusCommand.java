@@ -19,7 +19,7 @@ import javax.annotation.Nonnull;
  */
 public final class TameworkApiTestStatusCommand extends AbstractTameworkServerCommand {
     public TameworkApiTestStatusCommand() {
-        super("status", "Show the current API self-test fixture status.");
+        super("status", "server.tamework.commands.apiTestStatus.description");
         requirePermission(TameworkApiTestPermission.NODE);
         setPermissionGroups("OP", "Admin", "Operator");
     }
@@ -34,11 +34,7 @@ public final class TameworkApiTestStatusCommand extends AbstractTameworkServerCo
             return;
         }
         if (!commandContext.isPlayer()) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "API self-test status: runner="
-                            + (plugin.getApiSelfTestRunner() == null ? "unavailable" : "ready")
-                            + ", fixtures=player-scoped, prepare/reset=player-scoped. "
-                            + "Use /tw api test run all for the console-safe aggregate."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.apiTestStatus.api.self.test.status.runner.fixtures.player").param("0", String.valueOf((plugin.getApiSelfTestRunner() == null ? "unavailable" : "ready"))));
             return;
         }
         ApiSelfTestFixtureManager manager = TameworkApiSelfTestCommandSupport.requireFixtureManager(commandContext, plugin);

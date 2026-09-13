@@ -49,6 +49,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
@@ -706,17 +707,17 @@ final class CommandSelectionPageService {
             CommandUiSnapshot snapshot
     ) {
         PanelCallbacks panel = buildPanelCallbacks(context);
-        addPanel(catalog, "MODE_LINKED", "Show linked companions",
+        addPanel(catalog, "MODE_LINKED", actionLabel(context, "showLinked"),
                 "LinkedMode", context.preferenceAuthority(),
                 () -> panel.setMode().accept("LinkedMode"));
         if (!context.config().usesBondedCompanionRoster()) {
-            addPanel(catalog, "MODE_NEARBY", "Show nearby companions",
+            addPanel(catalog, "MODE_NEARBY", actionLabel(context, "showNearby"),
                     "NearbyMode", context.preferenceAuthority(),
                     () -> panel.setMode().accept("NearbyMode"));
-            addPanel(catalog, "MODE_OWNED", "Show owned companions",
+            addPanel(catalog, "MODE_OWNED", actionLabel(context, "showOwned"),
                     "OwnedMode", context.preferenceAuthority(),
                     () -> panel.setMode().accept("OwnedMode"));
-            addPanel(catalog, "TOGGLE_AUTO_LINK", "Toggle automatic linking",
+            addPanel(catalog, "TOGGLE_AUTO_LINK", actionLabel(context, "toggleAutoLink"),
                     Boolean.toString(!toolInventoryService
                             .resolvePanelAutoLinkEnabledForTool(
                                     resolveCurrentPlayer(context.ownerUuid()),
@@ -727,7 +728,7 @@ final class CommandSelectionPageService {
                                             resolveCurrentPlayer(context.ownerUuid()),
                                             context.toolId())));
             addPanel(catalog, "TOGGLE_ACTIVE_HIGHLIGHT",
-                    "Toggle active highlight",
+                    actionLabel(context, "toggleActiveHighlight"),
                     Boolean.toString(!toolInventoryService
                             .resolvePanelActiveHighlightEnabledForTool(
                                     resolveCurrentPlayer(context.ownerUuid()),
@@ -737,45 +738,45 @@ final class CommandSelectionPageService {
                                     .resolvePanelActiveHighlightEnabledForTool(
                                             resolveCurrentPlayer(context.ownerUuid()),
                                             context.toolId())));
-            catalog.addGlobal("MANAGE_GROUPS", "Manage groups",
+            catalog.addGlobal("MANAGE_GROUPS", actionLabel(context, "manageGroups"),
                     managedPanelActions.groupFlowBinding(
                             managedPanelContext(context)));
         }
-        addPanel(catalog, "RADIUS_DECREASE", "Decrease radius", "decrease",
+        addPanel(catalog, "RADIUS_DECREASE", actionLabel(context, "decreaseRadius"), "decrease",
                 context.toolAuthority(), panel.decreaseRadius());
-        addPanel(catalog, "RADIUS_INCREASE", "Increase radius", "increase",
+        addPanel(catalog, "RADIUS_INCREASE", actionLabel(context, "increaseRadius"), "increase",
                 context.toolAuthority(), panel.increaseRadius());
-        addPanel(catalog, "CLEAR_FILTERS", "Clear filters", "clear",
+        addPanel(catalog, "CLEAR_FILTERS", actionLabel(context, "clearFilters"), "clear",
                 context.preferenceAuthority(), panel.clearFilters());
         for (String sort : List.of("Default", "Name", "Species", "Group", "Happiness", "Hunger", "Thirst")) {
             addPanel(catalog, "SORT_" + sort.toUpperCase(java.util.Locale.ROOT),
-                    "Sort by " + sort.toLowerCase(java.util.Locale.ROOT),
+                    actionLabel(context, "sortBy", sortLabel(context, sort)),
                     "sort:" + sort, context.preferenceAuthority(),
                     () -> panel.setSort().accept(sort));
         }
         for (String filter : List.of("None", "Name", "Species", "Group")) {
             addPanel(catalog,
                     "FILTER_" + filter.toUpperCase(java.util.Locale.ROOT),
-                    "Filter by " + filter.toLowerCase(java.util.Locale.ROOT),
+                    actionLabel(context, "filterBy", filterLabel(context, filter)),
                     "filter:" + filter, context.preferenceAuthority(),
                     () -> panel.setFilterMode().accept(filter));
         }
-        catalog.addPanel("SET_FILTER_TEXT", "Set filter text",
+        catalog.addPanel("SET_FILTER_TEXT", actionLabel(context, "setFilterText"),
                 managedPanelActions.filterTextBinding(
                         managedPanelContext(context)));
         if (context.genericRosterActions()) {
-            addPanel(catalog, "GROUP_ALL", "Use all companion groups",
+            addPanel(catalog, "GROUP_ALL", actionLabel(context, "useAllGroups"),
                     "group:" + CommandGroupActivationService.ALL_VALUE,
                     context.genericAuthority(), () -> panel
                             .setGroupActivation().accept(
                                     CommandGroupActivationService.ALL_VALUE));
-            addPanel(catalog, "GROUP_NONE", "Use no companion groups",
+            addPanel(catalog, "GROUP_NONE", actionLabel(context, "useNoGroups"),
                     "group:" + CommandGroupActivationService.NONE_VALUE,
                     context.genericAuthority(), () -> panel
                             .setGroupActivation().accept(
                                     CommandGroupActivationService.NONE_VALUE));
             snapshot.groups().forEach((groupId, label) -> addPanel(
-                    catalog, "GROUP_" + groupId, "Use group " + label,
+                    catalog, "GROUP_" + groupId, actionLabel(context, "useGroup", label),
                     "group:" + groupId, context.genericAuthority(),
                     () -> panel.setGroupActivation().accept(groupId)));
         }
@@ -791,6 +792,46 @@ final class CommandSelectionPageService {
     ) {
         catalog.addPanel(key, label, genericBinding(
                 "PANEL_PREFERENCE", value, authority, operation, false));
+    }
+
+    private static String actionLabel(@Nonnull PageContext context,
+                                      @Nonnull String action,
+                                      Object... arguments) {
+        String key = switch (action) {
+            case "link" -> "tamework.ui.linkedPanel.card.button.link";
+            case "unlink", "release", "cull", "locate", "recall", "setHome",
+                    "returnHome", "revive" -> "tamework.ui.linkedPanel.action." + action;
+            case "abandon" -> "tamework.ui.linkedPanel.card.button.abandon";
+            case "summon", "dismiss" -> "tamework.ui.linkedPanel.roster." + action;
+            case "noGroup" -> "tamework.ui.linkedPanel.groupAssign.none";
+            default -> "tamework.ui.commandMenu.action." + action;
+        };
+        return arguments.length == 0
+                ? LocalizedText.resolve(context.uiPlayerRef(), key)
+                : LocalizedText.format(context.uiPlayerRef(), key, arguments);
+    }
+
+    private static String sortLabel(@Nonnull PageContext context, @Nonnull String sort) {
+        return LocalizedText.resolve(context.uiPlayerRef(), switch (sort) {
+            case "Default" -> "tamework.ui.linkedPanel.sort.default";
+            case "Name" -> "tamework.ui.linkedPanel.sort.name";
+            case "Species" -> "tamework.ui.linkedPanel.sort.species";
+            case "Group" -> "tamework.ui.linkedPanel.sort.group";
+            case "Happiness" -> "tamework.ui.linkedPanel.sort.happiness";
+            case "Hunger" -> "tamework.ui.linkedPanel.sort.hunger";
+            case "Thirst" -> "tamework.ui.linkedPanel.sort.thirst";
+            default -> sort;
+        });
+    }
+
+    private static String filterLabel(@Nonnull PageContext context, @Nonnull String filter) {
+        return LocalizedText.resolve(context.uiPlayerRef(), switch (filter) {
+            case "None" -> "tamework.ui.linkedPanel.filter.none";
+            case "Name" -> "tamework.ui.linkedPanel.filter.name";
+            case "Species" -> "tamework.ui.linkedPanel.filter.species";
+            case "Group" -> "tamework.ui.linkedPanel.filter.group";
+            default -> filter;
+        });
     }
 
     private GenericUiActionBinding genericBinding(
@@ -862,58 +903,58 @@ final class CommandSelectionPageService {
         boolean releasable = !managed && entry.loaded()
                 && !entry.dead() && !entry.captured() && !entry.inCoop()
                 && !entry.lost();
-        if (!linked && releasable) addGenericRow(catalog, rowId, "LINK", "Link",
+        if (!linked && releasable) addGenericRow(catalog, rowId, "LINK", actionLabel(context, "link"),
                 npcId, null, npc.link(), context.genericAuthority(), false);
-        if (linked) addGenericRow(catalog, rowId, "UNLINK", "Unlink",
+        if (linked) addGenericRow(catalog, rowId, "UNLINK", actionLabel(context, "unlink"),
                 npcId, null, npc.unlink(), context.genericAuthority(),
                 false);
         if (!managed && !entry.captured() && !entry.inCoop()) {
-            addGenericRow(catalog, rowId, "RELEASE", "Release", npcId, null,
+            addGenericRow(catalog, rowId, "RELEASE", actionLabel(context, "release"), npcId, null,
                     npc.release(), context.genericAuthority(), true);
         }
         if (releasable) {
-            addGenericRow(catalog, rowId, "CULL", "Cull", npcId, null,
+            addGenericRow(catalog, rowId, "CULL", actionLabel(context, "cull"), npcId, null,
                     npc.cull(), context.genericAuthority(), true);
         }
         if (linked) addGenericRow(catalog, rowId, "TOGGLE_ACTIVE",
-                entry.active() ? "Set inactive" : "Set active", npcId, null,
+                actionLabel(context, entry.active() ? "setInactive" : "setActive"), npcId, null,
                 npc.toggleActive(), context.genericAuthority(), false);
         if (linked && entry.loaded() && entry.breedingAvailable()) {
             addGenericRow(catalog, rowId, "TOGGLE_BREEDING",
-                    entry.breedingEnabled() ? "Disable breeding" : "Enable breeding",
+                    actionLabel(context, entry.breedingEnabled() ? "disableBreeding" : "enableBreeding"),
                     npcId, null, npc.toggleBreeding(), context.genericAuthority(), false);
         }
         boolean revive = genericLinkedOrOwned && (entry.dead() || entry.lost())
                 && entry.deadRespawnRemainingMs() == 0L
                 && (feature == null || !feature.managesPaidRevival());
-        if (revive) addGenericRow(catalog, rowId, "RESPAWN", "Respawn",
+        if (revive) addGenericRow(catalog, rowId, "RESPAWN", actionLabel(context, "revive"),
                 npcId, null, npc.respawn(), context.genericAuthority(), false);
         if (genericLinkedOrOwned && !entry.dead() && !entry.lost()) {
-            addGenericRow(catalog, rowId, "LOCATE", "Locate", npcId, null,
+            addGenericRow(catalog, rowId, "LOCATE", actionLabel(context, "locate"), npcId, null,
                     npc.locate(), context.genericAuthority(), false);
         }
         if (genericLinkedOrOwned && context.recallTeleportingEnabled() && !entry.dead()
                 && !entry.captured() && !entry.inCoop() && !entry.lost()) {
-            addGenericRow(catalog, rowId, "RECALL", "Recall", npcId, null,
+            addGenericRow(catalog, rowId, "RECALL", actionLabel(context, "recall"), npcId, null,
                     npc.recall(), context.genericAuthority(), false);
         }
         if (linked && entry.loaded() && !entry.dead() && !entry.captured()
                 && !entry.inCoop() && !entry.lost()) {
-            addGenericRow(catalog, rowId, "SET_HOME", "Set home", npcId, null,
+            addGenericRow(catalog, rowId, "SET_HOME", actionLabel(context, "setHome"), npcId, null,
                     npc.setHome(), context.genericAuthority(), false);
         }
         if (linked && entry.hasHome() && !entry.dead() && !entry.captured()
                 && !entry.inCoop() && !entry.lost()) {
-            addGenericRow(catalog, rowId, "RETURN_HOME", "Return home",
+            addGenericRow(catalog, rowId, "RETURN_HOME", actionLabel(context, "returnHome"),
                     npcId, null, npc.returnHome(), context.genericAuthority(), false);
         }
         if (linked && entry.loaded() && entry.flightToggleAvailable()) {
-            addFeatureRow(catalog, rowId, "TOGGLE_FLIGHT", "Toggle flight",
+            addFeatureRow(catalog, rowId, "TOGGLE_FLIGHT", actionLabel(context, "toggleFlight"),
                     npcId, features.flightToggle(), context, false);
         }
         if (linked && entry.loaded() && entry.shoulderRideAvailable()) {
             addFeatureRow(catalog, rowId, "TOGGLE_SHOULDER_RIDE",
-                    "Toggle shoulder ride", npcId, shoulderRideCallback(context),
+                    actionLabel(context, "toggleShoulderRide"), npcId, shoulderRideCallback(context),
                     context, false);
         }
         managedTalentActions.addGenericAction(catalog, rowId, entry,
@@ -921,23 +962,23 @@ final class CommandSelectionPageService {
                 () -> resolveCurrentPlayer(context.ownerUuid()));
         if (feature != null && feature.roster() != null) {
             if (feature.roster().summonEnabled()) addFeatureRow(catalog, rowId,
-                    "SUMMON", "Summon", npcId, features.summon(), context, false);
+                    "SUMMON", actionLabel(context, "summon"), npcId, features.summon(), context, false);
             if (feature.roster().dismissEnabled()) addFeatureRow(catalog, rowId,
-                    "DISMISS", "Dismiss", npcId, features.dismiss(), context, false);
+                    "DISMISS", actionLabel(context, "dismiss"), npcId, features.dismiss(), context, false);
             if (feature.revival() != null
                     && feature.revival().status()
                     == com.alechilles.alecstamework.api.PaidCommandRevivalQuote.Status.READY) {
-                addFeatureRow(catalog, rowId, "REVIVE", "Revive", npcId,
+                addFeatureRow(catalog, rowId, "REVIVE", actionLabel(context, "revive"), npcId,
                         features.revive(), context, true);
             }
         }
         if (linked && context.genericRosterActions()) {
             PanelCallbacks panel = buildPanelCallbacks(context);
-            addGroupAssignment(catalog, context, rowId, npcId, "", "No group",
+            addGroupAssignment(catalog, context, rowId, npcId, "", actionLabel(context, "noGroup"),
                     panel.assignGroup());
             snapshot.groups().forEach((groupId, label) ->
                     addGroupAssignment(catalog, context, rowId, npcId, groupId,
-                            "Assign to " + label, panel.assignGroup()));
+                            actionLabel(context, "assignGroup", label), panel.assignGroup()));
         }
     }
 
@@ -987,22 +1028,22 @@ final class CommandSelectionPageService {
         if (kind != null && status.actionEnabled()) {
             addBondedRow(catalog, context, rowId, feature, kind,
                     switch (kind) {
-                        case "SUMMON" -> "Summon";
-                        case "DISMISS" -> "Dismiss";
-                        default -> "Revive";
+                        case "SUMMON" -> actionLabel(context, "summon");
+                        case "DISMISS" -> actionLabel(context, "dismiss");
+                        default -> actionLabel(context, "revive");
                     }, "REVIVE".equals(kind));
         }
         addBondedRow(catalog, context, rowId, feature, "ABANDON",
-                "Abandon", true);
+                actionLabel(context, "abandon"), true);
         if (BondedCompanionFlightToggleActionService
                 .isFlightToggleAvailable(feature.bonded())) {
-            addFeatureRow(catalog, rowId, "TOGGLE_FLIGHT", "Toggle flight",
+            addFeatureRow(catalog, rowId, "TOGGLE_FLIGHT", actionLabel(context, "toggleFlight"),
                     presentationId, features.flightToggle(), context, false);
         }
         if (BondedCompanionShoulderRideActionService
                 .isAvailable(feature.bonded())) {
             addFeatureRow(catalog, rowId, "TOGGLE_SHOULDER_RIDE",
-                    "Toggle shoulder ride", presentationId,
+                    actionLabel(context, "toggleShoulderRide"), presentationId,
                     shoulderRideCallback(context), context, false);
         }
     }

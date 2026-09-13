@@ -1001,6 +1001,12 @@ public final class NpcSpawnCommandService {
             return failureMessage;
         }
 
+        /** Provides a presentation key for a known command failure without changing the raw result contract. */
+        @Nullable
+        public String getFailureMessageKey() {
+            return presentationKey(failureMessage);
+        }
+
         public int getRequestedCount() {
             return requestedCount;
         }
@@ -1022,6 +1028,12 @@ public final class NpcSpawnCommandService {
             return stoppedReason;
         }
 
+        /** Provides a presentation key for a known stop reason without changing the raw result contract. */
+        @Nullable
+        public String getStoppedReasonKey() {
+            return presentationKey(stoppedReason);
+        }
+
         @Nullable
         public Map<String, String> getAppliedAttachments() {
             return appliedAttachments;
@@ -1030,6 +1042,55 @@ public final class NpcSpawnCommandService {
         @Nonnull
         public List<String> getInvalidAttachments() {
             return invalidAttachments;
+        }
+
+        @Nullable
+        private static String presentationKey(@Nullable String reason) {
+            if (reason == null || reason.isBlank()) {
+                return null;
+            }
+            if (reason.startsWith("Unknown role '")) {
+                return "tamework.commands.npcSpawnTamed.result.failure.unknownRole";
+            }
+            return switch (reason) {
+                case "Quantity must be greater than zero." ->
+                        "tamework.commands.npcSpawnTamed.result.failure.quantity";
+                case "NPC plugin not available." ->
+                        "tamework.commands.npcSpawnTamed.result.failure.npcPlugin";
+                case "Player UUID not available." ->
+                        "tamework.commands.npcSpawnTamed.result.failure.player";
+                case "Unable to resolve a spawn position." ->
+                        "tamework.commands.npcSpawnTamed.result.failure.position";
+                case "Owner population cap reached." ->
+                        "tamework.commands.npcSpawnTamed.result.stopped.populationCap";
+                case "Spawn failed before completing the requested quantity." ->
+                        "tamework.commands.npcSpawnTamed.result.stopped.spawnFailed";
+                case "Spawn failed while applying owned companion state." ->
+                        "tamework.commands.npcSpawnTamed.result.stopped.applyState";
+                case "Managed population admission is unavailable." ->
+                        "tamework.commands.npcSpawnTamed.result.stopped.admissionUnavailable";
+                case "Managed population admission failed." ->
+                        "tamework.commands.npcSpawnTamed.result.stopped.admissionFailed";
+                case "Managed population admission was not accepted." ->
+                        "tamework.commands.npcSpawnTamed.result.stopped.admissionRejected";
+                case "World closed during managed spawn admission." ->
+                        "tamework.commands.npcSpawnTamed.result.stopped.worldClosedAdmission";
+                case "Spawned NPC was no longer available." ->
+                        "tamework.commands.npcSpawnTamed.result.stopped.npcUnavailable";
+                case "Managed population admission could not be claimed." ->
+                        "tamework.commands.npcSpawnTamed.result.stopped.admissionClaim";
+                case "World dispatch failed during managed spawn admission." ->
+                        "tamework.commands.npcSpawnTamed.result.stopped.worldDispatchAdmission";
+                case "Managed profile publication failed." ->
+                        "tamework.commands.npcSpawnTamed.result.stopped.profilePublication";
+                case "Managed population admission did not commit." ->
+                        "tamework.commands.npcSpawnTamed.result.stopped.admissionCommit";
+                case "World closed during managed spawn settlement." ->
+                        "tamework.commands.npcSpawnTamed.result.stopped.worldClosedSettlement";
+                case "World dispatch failed during managed spawn settlement." ->
+                        "tamework.commands.npcSpawnTamed.result.stopped.worldDispatchSettlement";
+                default -> null;
+            };
         }
     }
 

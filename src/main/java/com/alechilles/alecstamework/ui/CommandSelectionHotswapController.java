@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.items.CommandHotswapAction;
 import com.alechilles.alecstamework.items.CommandHotswapAssignmentStore;
 import com.alechilles.alecstamework.items.CommandHotswapAssignmentStore.Slot;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
 import com.hypixel.hytale.server.core.ui.LocalizableString;
@@ -50,10 +51,12 @@ final class CommandSelectionHotswapController {
                 selectedCommandId == null ? "" : selectedCommandId);
 
         List<DropdownEntryInfo> entries = new ArrayList<>();
-        entries.add(new DropdownEntryInfo(LocalizableString.fromString("Unassigned"), ""));
+        entries.add(new DropdownEntryInfo(LocalizableString.fromString(
+                LocalizedText.resolve(languageSupplier.get(), "tamework.ui.commandMenu.hotswap.unassigned")), ""));
         if (!config.usesBondedCompanionRoster()) {
             entries.add(new DropdownEntryInfo(
-                    LocalizableString.fromString("Cycle Group"),
+                    LocalizableString.fromString(LocalizedText.resolve(
+                            languageSupplier.get(), "tamework.ui.commandMenu.hotswap.cycleGroup")),
                     CommandHotswapAction.CYCLE_GROUP
             ));
         }

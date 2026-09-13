@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
 public final class TameworkDebugBreedingCommand extends AbstractTameworkServerCommand {
 
     public TameworkDebugBreedingCommand() {
-        super("breeding", "Toggle Tamework breeding debug logging.");
+        super("breeding", "server.tamework.commands.debugBreeding.description");
         setAllowsExtraArguments(true);
     }
 
@@ -19,7 +19,7 @@ public final class TameworkDebugBreedingCommand extends AbstractTameworkServerCo
     protected void executeServer(@Nonnull CommandContext commandContext) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugBreeding.tamework.plugin.not.available"));
             return;
         }
         String raw = getFirstArg(commandContext);
@@ -27,9 +27,7 @@ public final class TameworkDebugBreedingCommand extends AbstractTameworkServerCo
         boolean enabled = explicit != null
                 ? plugin.setDebugBreedingEnabled(explicit)
                 : plugin.toggleDebugBreedingEnabled();
-        commandContext.sender().sendMessage(Message.raw(
-                "Tamework breeding debug logging: " + (enabled ? "enabled" : "disabled")
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugBreeding.tamework.breeding.debug.logging").param("0", String.valueOf((enabled ? "enabled" : "disabled"))));
     }
 
     private static String getFirstArg(CommandContext commandContext) {

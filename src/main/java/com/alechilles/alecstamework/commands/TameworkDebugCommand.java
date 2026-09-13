@@ -23,7 +23,7 @@ public final class TameworkDebugCommand extends AbstractCommandCollection {
             @Nullable PublicPersistenceOperations persistenceOperations,
             @Nullable Consumer<PersistenceFailureSignal> persistenceFailureSink
     ) {
-        super("debug", "Tamework debug commands.");
+        super("debug", "server.tamework.commands.debug.description");
         addSubCommand(new TameworkDebugSetCommand());
         addSubCommand(new TameworkDebugGetCommand());
         addSubCommand(new TameworkDebugLogCommand());

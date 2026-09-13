@@ -5,7 +5,7 @@ import com.hypixel.hytale.server.core.command.system.basecommands.AbstractComman
 /** Groups client-local debug visual controls. */
 public final class TameworkDebugViewCommand extends AbstractCommandCollection {
     public TameworkDebugViewCommand(SpawnBeaconVisualizationService spawnBeaconVisualizationService) {
-        super("view", "Tamework debug visualization commands.");
+        super("view", "server.tamework.commands.debugView.description");
         addSubCommand(new TameworkShowHitboxesCommand());
         addSubCommand(new TameworkShowSpawnBeaconsCommand(spawnBeaconVisualizationService));
         addSubCommand(new TameworkShowSpawnMarkersCommand());

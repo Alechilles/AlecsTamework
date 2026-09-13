@@ -233,8 +233,7 @@ final class LinkedNpcPanelProgressionBinder {
         String headerKey = "tamework.ui.linkedPanel.progression.modifiersBreakdown";
         String header = LocalizedText.resolve(language, headerKey);
         List<String> lines = new ArrayList<>(breakdowns.size() + 1);
-        lines.add(header.equals(headerKey)
-                ? "Modifiers: Total - [Level - Talents - Traits]" : header);
+        lines.add(header);
         for (CompanionProgressionModifierBreakdownService.ModifierBreakdown breakdown : breakdowns) {
             lines.add(formatModifierLine(breakdown, currentMaxHealth, language));
         }
@@ -242,9 +241,11 @@ final class LinkedNpcPanelProgressionBinder {
             double attitude = flatAttitude ? CompanionHappinessModifierService.resolveFlatDispositionOffset(
                     TraitModifierService.resolveMultiplier(traits, traitConfig, "HappinessGainMultiplier", 1.0),
                     happiness.getDisposition()) : 0.0;
-            lines.add(String.format(Locale.ROOT,
-                    "Happiness: %+d - [+0 / %+d / %+d]",
-                    Math.round(attitude + happinessTalents), Math.round(happinessTalents), Math.round(attitude)));
+            lines.add(LocalizedText.format(language,
+                    "tamework.ui.linkedPanel.progression.happinessBreakdown",
+                    String.format(Locale.ROOT, "%+d", Math.round(attitude + happinessTalents)),
+                    String.format(Locale.ROOT, "%+d", Math.round(happinessTalents)),
+                    String.format(Locale.ROOT, "%+d", Math.round(attitude))));
         }
         return String.join("\n", lines);
     }
@@ -310,7 +311,7 @@ final class LinkedNpcPanelProgressionBinder {
     ) {
         return labelForEffectKey(breakdown.effectKey(), language)
                 + ": " + formatSignedPercent(breakdown.totalMultiplier())
-                + healthAbsoluteBonus(breakdown, currentMaxHealth)
+                + healthAbsoluteBonus(breakdown, currentMaxHealth, language)
                 + " - [" + formatSignedPercent(breakdown.levelMultiplier())
                 + " / " + formatSignedPercent(breakdown.talentMultiplier())
                 + " / " + formatSignedPercent(breakdown.traitMultiplier()) + "]";
@@ -318,7 +319,8 @@ final class LinkedNpcPanelProgressionBinder {
 
     private static String healthAbsoluteBonus(
             CompanionProgressionModifierBreakdownService.ModifierBreakdown breakdown,
-            double currentMaxHealth
+            double currentMaxHealth,
+            @Nullable String language
     ) {
         if (!"MaxHealthMultiplier".equalsIgnoreCase(breakdown.effectKey())
                 || !Double.isFinite(currentMaxHealth) || currentMaxHealth <= 0.0
@@ -330,7 +332,7 @@ final class LinkedNpcPanelProgressionBinder {
         if (!Double.isFinite(bonus) || Math.abs(bonus) <= EPSILON) {
             return "";
         }
-        return " (" + String.format(Locale.ROOT, "%+d", Math.round(bonus)) + " HP)";
+        return " (" + LocalizedText.format(language, "tamework.ui.linkedPanel.progression.healthBonus", String.format(Locale.ROOT, "%+d", Math.round(bonus))) + ")";
     }
 
     private static boolean isNeutral(double multiplier) {
@@ -347,16 +349,16 @@ final class LinkedNpcPanelProgressionBinder {
             }
         }
         if ("MaxHealthMultiplier".equalsIgnoreCase(effectKey)) {
-            return "Health";
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.progression.effect.MaxHealthMultiplier");
         }
         if ("MoveSpeedMultiplier".equalsIgnoreCase(effectKey)) {
-            return "Speed";
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.progression.effect.MoveSpeedMultiplier");
         }
         if ("DamageDealtMultiplier".equalsIgnoreCase(effectKey)) {
-            return "Damage Dealt";
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.progression.effect.DamageDealtMultiplier");
         }
         if ("DamageTakenMultiplier".equalsIgnoreCase(effectKey)) {
-            return "Damage Taken";
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.progression.effect.DamageTakenMultiplier");
         }
         return normalizedKey.replace("Multiplier", "")
                 .replaceAll("(?<=[a-z])(?=[A-Z])", " ");

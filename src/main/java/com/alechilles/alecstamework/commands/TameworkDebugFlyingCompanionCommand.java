@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
 public final class TameworkDebugFlyingCompanionCommand extends AbstractTameworkServerCommand {
 
     public TameworkDebugFlyingCompanionCommand() {
-        super("flight", "Toggle Tamework flying companion diagnostics logging.");
+        super("flight", "server.tamework.commands.debugFlyingCompanion.description");
         setAllowsExtraArguments(true);
     }
 
@@ -19,7 +19,7 @@ public final class TameworkDebugFlyingCompanionCommand extends AbstractTameworkS
     protected void executeServer(@Nonnull CommandContext commandContext) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugFlyingCompanion.tamework.plugin.not.available"));
             return;
         }
         String raw = getFirstArg(commandContext.getInputString());
@@ -27,9 +27,7 @@ public final class TameworkDebugFlyingCompanionCommand extends AbstractTameworkS
         boolean enabled = explicit != null
                 ? plugin.setDebugFlyingCompanionEnabled(explicit)
                 : plugin.toggleDebugFlyingCompanionEnabled();
-        commandContext.sender().sendMessage(Message.raw(
-                "Tamework flying companion diagnostics logging: " + (enabled ? "enabled" : "disabled")
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugFlyingCompanion.tamework.flying.companion.diagnostics.logging").param("0", String.valueOf((enabled ? "enabled" : "disabled"))));
     }
 
     static String getFirstArg(String input) {

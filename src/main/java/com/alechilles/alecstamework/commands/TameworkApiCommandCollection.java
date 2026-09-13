@@ -7,7 +7,7 @@ import com.hypixel.hytale.server.core.command.system.basecommands.AbstractComman
  */
 public final class TameworkApiCommandCollection extends AbstractCommandCollection {
     public TameworkApiCommandCollection() {
-        super("api", "Tamework API tooling commands.");
+        super("api", "server.tamework.commands.api.description");
         addSubCommand(new TameworkApiTestCommandCollection());
     }
 }

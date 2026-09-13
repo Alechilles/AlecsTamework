@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
 public final class TameworkDebugHarvestCommand extends AbstractTameworkServerCommand {
 
     public TameworkDebugHarvestCommand() {
-        super("harvest", "Toggle Tamework harvest diagnostics logging.");
+        super("harvest", "server.tamework.commands.debugHarvest.description");
         setAllowsExtraArguments(true);
     }
 
@@ -19,7 +19,7 @@ public final class TameworkDebugHarvestCommand extends AbstractTameworkServerCom
     protected void executeServer(@Nonnull CommandContext commandContext) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugHarvest.tamework.plugin.not.available"));
             return;
         }
         String raw = getFirstArg(commandContext);
@@ -27,9 +27,7 @@ public final class TameworkDebugHarvestCommand extends AbstractTameworkServerCom
         boolean enabled = explicit != null
                 ? plugin.setDebugHarvestEnabled(explicit)
                 : plugin.toggleDebugHarvestEnabled();
-        commandContext.sender().sendMessage(Message.raw(
-                "Tamework harvest diagnostics logging: " + (enabled ? "enabled" : "disabled")
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugHarvest.tamework.harvest.diagnostics.logging").param("0", String.valueOf((enabled ? "enabled" : "disabled"))));
     }
 
     private static String getFirstArg(CommandContext commandContext) {

@@ -58,7 +58,7 @@ final class CommandTargetHudBinder {
         commandBuilder.set("#RoleSubtitle.Visible", !status.roleSubtitle().isBlank());
         LinkedNpcPanelVitalsBinder.bindHud(commandBuilder, status, language, HEALTH_FILL_MAX_WIDTH);
         bindStatusVisibility(commandBuilder, status);
-        bindProgression(commandBuilder, status);
+        bindProgression(commandBuilder, status, language);
         bindTraits(commandBuilder, status.traitIndicators());
         bindFood(commandBuilder, model.favoriteFood(), model.compatibleFoods(), language);
         bindAttachments(commandBuilder, model.attachments());
@@ -195,18 +195,19 @@ final class CommandTargetHudBinder {
         commandBuilder.set("#StatusRingRow.Visible", hasStatusRow(status));
     }
 
-    private static void bindProgression(UICommandBuilder commandBuilder, LinkedNpcEntry status) {
+    private static void bindProgression(UICommandBuilder commandBuilder, LinkedNpcEntry status, @Nullable String language) {
         boolean hasTalentPoints = LinkedNpcPanelProgressionBinder.availableTalentPoints(status.futureStatB()) > 0;
         commandBuilder.set("#ProgressionRow.Visible", hasProgressionRow(status));
         commandBuilder.set("#XpProgressRing.Visible", status.futureStatA() != null);
         String level = status.futureStatA() != null
                 ? LinkedNpcPanelProgressionBinder.resolveLevelText(status.futureStatA().label()) : "";
-        int levelWidth = status.futureStatA() != null ? 24 + level.length() * 8 : 0;
+        String levelLabel = LocalizedText.format(language, "tamework.ui.linkedPanel.bonded.talents.level", level);
+        int levelWidth = status.futureStatA() != null ? levelLabel.length() * 8 : 0;
         commandBuilder.setObject("#ProgressionRow.Anchor",
                 rightAnchor(26, levelWidth + (hasTalentPoints ? 44 : 0), 18));
         commandBuilder.setObject("#XpProgressRing.Anchor", rightAnchor(0, Math.max(1, levelWidth), 18));
         if (status.futureStatA() != null) {
-            commandBuilder.set("#XpLevelText.Text", "Lv. " + level);
+            commandBuilder.set("#XpLevelText.Text", levelLabel);
             commandBuilder.set("#XpTooltip.TooltipText", LinkedNpcPanelProgressionBinder.resolveXpTooltip(status.futureStatA()));
         }
         LinkedNpcPanelProgressionBinder.bindTalentPointIndicator(

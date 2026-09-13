@@ -70,7 +70,12 @@ final class CommandTalentPageService {
             java.util.function.BooleanSupplier authority) {
         return savedTalentPages == null
                 ? java.util.concurrent.CompletableFuture.completedFuture(
-                        com.alechilles.alecstamework.api.commandui.CommandUiActionResult.notFound("Saved talents are unavailable"))
+                        com.alechilles.alecstamework.api.commandui.CommandUiActionResult.notFound(
+                                LocalizedText.resolve(
+                                        resolveLanguage(player),
+                                        "tamework.ui.talents.saved.unavailable"
+                                )
+                        ))
                 : savedTalentPages.open(session, rowId, player, toolId, npcId, authority);
     }
 
@@ -83,14 +88,14 @@ final class CommandTalentPageService {
         }
         World world = player.getWorld();
         if (world == null || player.getPageManager() == null) {
-            feedbackService.showWarning(player, "Talent page is unavailable right now.");
+            feedbackService.showWarningKey(player, "tamework.ui.talents.openUnavailable");
             return;
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
         Ref<EntityStore> playerRef = player.getReference();
         PlayerRef uiPlayerRef = player.getPlayerRef();
         if (store == null || playerRef == null || !playerRef.isValid() || uiPlayerRef == null || !uiPlayerRef.isValid()) {
-            feedbackService.showWarning(player, "Talent page is unavailable right now.");
+            feedbackService.showWarningKey(player, "tamework.ui.talents.openUnavailable");
             return;
         }
         TameworkCompanionTalentsPage page = new TameworkCompanionTalentsPage(
@@ -113,7 +118,7 @@ final class CommandTalentPageService {
                             "Failed to open companion talents page."
                     ).build()
             );
-            feedbackService.showWarning(player, "Talent page is unavailable right now.");
+            feedbackService.showWarningKey(player, "tamework.ui.talents.openUnavailable");
         }
     }
 
@@ -302,13 +307,19 @@ final class CommandTalentPageService {
                 ? null : resolveLinkedCompanionTalentContext(
                         player, toolId, npcUuid);
         if (target == null) {
-            return ManagedMutation.notFound(
-                    "Companion is no longer loaded.");
+            return ManagedMutation.notFound(LocalizedText.resolve(
+                    resolveLanguage(player),
+                    "tamework.ui.talents.mutation.companionNotLoaded"
+            ));
         }
         CompanionTalentService.PurchaseResult result =
                 CompanionTalentService.purchaseTalent(
                         target.npcRef(), target.store(), talentId);
-        return new ManagedMutation(result.applied(), false, result.message());
+        return new ManagedMutation(
+                result.applied(),
+                false,
+                resolveMutationMessage(resolveLanguage(player), result.message())
+        );
     }
 
     @Nonnull
@@ -321,13 +332,19 @@ final class CommandTalentPageService {
                 ? null : resolveLinkedCompanionTalentContext(
                         player, toolId, npcUuid);
         if (target == null) {
-            return ManagedMutation.notFound(
-                    "Companion is no longer loaded.");
+            return ManagedMutation.notFound(LocalizedText.resolve(
+                    resolveLanguage(player),
+                    "tamework.ui.talents.mutation.companionNotLoaded"
+            ));
         }
         CompanionTalentService.ResetResult result =
                 CompanionTalentService.resetTalents(
                         target.npcRef(), target.store());
-        return new ManagedMutation(result.applied(), false, result.message());
+        return new ManagedMutation(
+                result.applied(),
+                false,
+                resolveMutationMessage(resolveLanguage(player), result.message())
+        );
     }
 
     @Nonnull
@@ -350,7 +367,7 @@ final class CommandTalentPageService {
                     "tamework.ui.talents.effects.line",
                     formatEffectKey(language, effect.getEffectKey()),
                     "HappinessFlatBonus".equalsIgnoreCase(effect.getEffectKey())
-                            ? formatPoints(effect.getAmount())
+                            ? formatPoints(language, effect.getAmount())
                             : formatMultiplierChange(effect.getMultiplier())
             ));
         }
@@ -396,12 +413,16 @@ final class CommandTalentPageService {
     }
 
     @Nonnull
-    private String formatPoints(double amount) {
+    private String formatPoints(@Nullable String language, double amount) {
         if (!Double.isFinite(amount) || Math.abs(amount) < 0.05) {
-            return "+0 points";
+            return LocalizedText.format(language, "tamework.ui.talents.effect.points", "+0");
         }
         String value = formatPercentMagnitude(Math.abs(amount));
-        return (amount > 0.0 ? "+" : "-") + value + " points";
+        return LocalizedText.format(
+                language,
+                "tamework.ui.talents.effect.points",
+                (amount > 0.0 ? "+" : "-") + value
+        );
     }
 
     @Nonnull
@@ -441,7 +462,10 @@ final class CommandTalentPageService {
                                        @Nullable String talentId) {
         TalentTarget context = targetResolver.resolve();
         if (context == null) {
-            String message = "Companion is no longer loaded.";
+            String message = LocalizedText.resolve(
+                    resolveLanguage(player),
+                    "tamework.ui.talents.mutation.companionNotLoaded"
+            );
             feedbackService.showWarning(player, message);
             return message;
         }
@@ -450,12 +474,13 @@ final class CommandTalentPageService {
                 context.store(),
                 talentId
         );
+        String message = resolveMutationMessage(resolveLanguage(player), result.message());
         if (result.applied()) {
-            feedbackService.showSuccess(player, result.message());
+            feedbackService.showSuccess(player, message);
         } else {
-            feedbackService.showWarning(player, result.message());
+            feedbackService.showWarning(player, message);
         }
-        return result.message();
+        return message;
     }
 
     @Nonnull
@@ -463,7 +488,10 @@ final class CommandTalentPageService {
                                     @Nonnull TalentTargetResolver targetResolver) {
         TalentTarget context = targetResolver.resolve();
         if (context == null) {
-            String message = "Companion is no longer loaded.";
+            String message = LocalizedText.resolve(
+                    resolveLanguage(player),
+                    "tamework.ui.talents.mutation.companionNotLoaded"
+            );
             feedbackService.showWarning(player, message);
             return message;
         }
@@ -471,12 +499,13 @@ final class CommandTalentPageService {
                 context.npcRef(),
                 context.store()
         );
+        String message = resolveMutationMessage(resolveLanguage(player), result.message());
         if (result.applied()) {
-            feedbackService.showSuccess(player, result.message());
+            feedbackService.showSuccess(player, message);
         } else {
-            feedbackService.showWarning(player, result.message());
+            feedbackService.showWarning(player, message);
         }
-        return result.message();
+        return message;
     }
 
     @Nullable
@@ -500,8 +529,8 @@ final class CommandTalentPageService {
     }
 
     @Nullable
-    private static String resolveLanguage(@Nonnull Player player) {
-        PlayerRef playerRef = player.getPlayerRef();
+    private static String resolveLanguage(@Nullable Player player) {
+        PlayerRef playerRef = player == null ? null : player.getPlayerRef();
         return playerRef != null ? playerRef.getLanguage() : null;
     }
 
@@ -553,9 +582,53 @@ final class CommandTalentPageService {
         }
         String displayName = npcNameResolver.resolveNpcDisplayName(npcRef, store, npc);
         if (displayName == null || displayName.isBlank()) {
-            displayName = "Companion";
+            displayName = LocalizedText.resolve(
+                    resolveLanguage(player),
+                    "tamework.ui.talents.defaultCompanionName"
+            );
         }
         return new TalentTarget(npcRef, store, displayName, roleId);
+    }
+
+    @Nonnull
+    private static String resolveMutationMessage(
+            @Nullable String language,
+            @Nullable String message
+    ) {
+        String key = switch (message == null ? "" : message) {
+            case "Companion is not available." ->
+                    "tamework.ui.talents.mutation.companionUnavailable";
+            case "Companion talents are disabled in Tamework settings." ->
+                    "tamework.ui.talents.mutation.disabled";
+            case "No talent was selected." ->
+                    "tamework.ui.talents.mutation.noTalentSelected";
+            case "Companion role is unavailable." ->
+                    "tamework.ui.talents.mutation.roleUnavailable";
+            case "Talent storage is unavailable." ->
+                    "tamework.ui.talents.mutation.storageUnavailable";
+            case "No talent tree is configured for this companion." ->
+                    "tamework.ui.talents.mutation.noTree";
+            case "That talent could not be found." ->
+                    "tamework.ui.talents.mutation.talentMissing";
+            case "That talent is already unlocked." ->
+                    "tamework.ui.talents.mutation.alreadyUnlocked";
+            case "Level data is unavailable for this companion." ->
+                    "tamework.ui.talents.mutation.levelUnavailable";
+            case "This talent requires a higher level." ->
+                    "tamework.ui.talents.mutation.levelTooLow";
+            case "This talent requires another talent first." ->
+                    "tamework.ui.talents.mutation.prerequisiteMissing";
+            case "Not enough talent points are available." ->
+                    "tamework.ui.talents.mutation.insufficientPoints";
+            case "No talent points are spent." ->
+                    "tamework.ui.talents.mutation.noPointsSpent";
+            case "Talent unlocked." ->
+                    "tamework.ui.talents.mutation.unlocked";
+            case "Talent points refunded." ->
+                    "tamework.ui.talents.mutation.refunded";
+            default -> "tamework.ui.talents.mutation.failed";
+        };
+        return LocalizedText.resolve(language, key);
     }
 
     @FunctionalInterface
@@ -577,7 +650,10 @@ final class CommandTalentPageService {
             java.util.Objects.requireNonNull(npcRef, "npcRef");
             java.util.Objects.requireNonNull(store, "store");
             if (displayName == null || displayName.isBlank()) {
-                displayName = "Companion";
+                displayName = LocalizedText.resolve(
+                        (String) null,
+                        "tamework.ui.talents.defaultCompanionName"
+                );
             }
         }
     }

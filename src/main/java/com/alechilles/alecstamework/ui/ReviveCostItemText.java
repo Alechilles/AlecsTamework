@@ -17,7 +17,7 @@ final class ReviveCostItemText {
     ) {
         String normalizedItemId = itemId == null ? "" : itemId.trim();
         if (normalizedItemId.isEmpty()) {
-            return "Item";
+            return LocalizedText.resolve(language, "tamework.ui.shared.item");
         }
         String directKey = "items." + normalizedItemId + ".name";
         String directTranslation = LocalizedText.resolve(language, directKey);

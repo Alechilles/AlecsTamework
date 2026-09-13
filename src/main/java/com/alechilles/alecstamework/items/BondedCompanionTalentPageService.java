@@ -64,12 +64,12 @@ final class BondedCompanionTalentPageService {
         PlayerRef uiPlayerRef = player.getPlayerRef();
         if (world == null || playerRef == null || !playerRef.isValid()
                 || uiPlayerRef == null || !uiPlayerRef.isValid()) {
-            feedback.showWarning(player, "Talent page is unavailable right now.");
+            feedback.showWarningKey(player, "tamework.ui.talents.openUnavailable");
             return;
         }
         State state = State.from(player.getUuid(), presentation);
         if (state == null) {
-            feedback.showWarning(player, "This companion has no usable talent data.");
+            feedback.showWarningKey(player, "tamework.ui.talents.noUsableData");
             return;
         }
         TameworkCompanionTalentsPage page = new TameworkCompanionTalentsPage(
@@ -86,7 +86,7 @@ final class BondedCompanionTalentPageService {
             player.getPageManager().openCustomPage(playerRef,
                     world.getEntityStore().getStore(), page);
         } catch (RuntimeException failure) {
-            feedback.showWarning(player, "Talent page is unavailable right now.");
+            feedback.showWarningKey(player, "tamework.ui.talents.openUnavailable");
         }
     }
 
@@ -157,11 +157,13 @@ final class BondedCompanionTalentPageService {
             @Nullable String talentId
     ) {
         State state = target.state;
+        String language = player == null ? null : resolveLanguage(player);
         BondedCompanionApi current = api.get();
         if (current == null || !current.availability().available()) {
             return new ManagedMutation(false, false,
                     BondedCompanionResultCode.UNAVAILABLE,
-                    "Bonded companion data is unavailable right now.");
+                    LocalizedText.resolve(language,
+                            "tamework.ui.talents.mutation.bondedUnavailable"));
         }
         String idempotency = "talents:" + state.profileId + ":"
                 + state.revision + ":" + action + ":"
@@ -180,20 +182,22 @@ final class BondedCompanionTalentPageService {
         if (result == null) {
             return new ManagedMutation(false, true,
                     BondedCompanionResultCode.UNAVAILABLE,
-                    "Talent changes are still being saved. Try again shortly.");
+                    LocalizedText.resolve(language,
+                            "tamework.ui.talents.mutation.saving"));
         }
         if (!result.successful() || result.value() == null) {
-            String fallback = action
-                    == BondedCompanionTalentActionRequest.Action.PURCHASE
-                    ? "That talent can no longer be unlocked."
-                    : "No talent points could be refunded.";
             return new ManagedMutation(false, false, result.code(),
-                    result.reason() == null ? fallback : result.reason());
+                    LocalizedText.resolve(language,
+                            action == BondedCompanionTalentActionRequest.Action.PURCHASE
+                                    ? "tamework.ui.talents.mutation.bondedUnlockFailed"
+                                    : "tamework.ui.talents.mutation.bondedRefundFailed"));
         }
         state.apply(result.value());
         if (player != null) applyLiveProjection(player, state);
-        String message = action == BondedCompanionTalentActionRequest.Action.PURCHASE
-                ? "Talent unlocked." : "Talent points refunded.";
+        String message = LocalizedText.resolve(language,
+                action == BondedCompanionTalentActionRequest.Action.PURCHASE
+                        ? "tamework.ui.talents.mutation.unlocked"
+                        : "tamework.ui.talents.mutation.refunded");
         return new ManagedMutation(true, false,
                 BondedCompanionResultCode.SUCCESS, message);
     }

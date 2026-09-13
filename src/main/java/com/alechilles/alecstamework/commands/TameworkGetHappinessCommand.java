@@ -34,7 +34,7 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
     private static final String BREED_COOLDOWN_MULTIPLIER_KEY = "BreedCooldownMultiplier";
 
     public TameworkGetHappinessCommand() {
-        super("happiness", "Get happiness of the NPC you are looking at.");
+        super("happiness", "server.tamework.commands.getHappiness.description");
         setAllowsExtraArguments(true);
     }
 
@@ -46,21 +46,18 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
                            @Nonnull World world) {
         TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
         if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.raw("No NPC found in view."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getHappiness.no.npc.found.in.view"));
             return;
         }
 
         HappinessSnapshot snapshot = resolveHappinessSnapshot(candidate.ref, store);
         if (snapshot == null) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "NPC " + candidate.npcUuid + " has no tracked happiness state."
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getHappiness.npc.has.no.tracked.happiness.state").param("0", String.valueOf(candidate.npcUuid)));
             return;
         }
 
         BreedingSnapshot breeding = resolveBreedingSnapshot(candidate.ref, store, snapshot.value());
-        commandContext.sender().sendMessage(Message.raw(
-                buildMessage(candidate.npcUuid, snapshot, breeding)));
+        commandContext.sender().sendMessage(buildLocalizedMessage(candidate.npcUuid, snapshot, breeding));
     }
 
     @Nullable
@@ -160,65 +157,47 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
         );
     }
 
-    private static String buildMessage(@Nonnull UUID npcUuid,
-                                       @Nonnull HappinessSnapshot happiness,
-                                       @Nonnull BreedingSnapshot breeding) {
-        StringBuilder message = new StringBuilder();
-        message.append("Happiness for NPC ")
-                .append(npcUuid)
-                .append(": ")
-                .append(formatDouble(happiness.value()))
-                .append(" (source=")
-                .append(happiness.source());
-        if (happiness.configId() != null) {
-            message.append(", config=").append(happiness.configId());
-        }
-        if (happiness.lastUpdateMs() != 0L) {
-            message.append(", lastUpdateMs=").append(happiness.lastUpdateMs());
-        }
-        message.append(", base=").append(formatDouble(happiness.baseSetpoint()));
-        message.append(", target=").append(formatDouble(happiness.target()));
-        if (!happiness.modifiers().isEmpty()) {
-            message.append(", modifiers=").append(formatModifiers(happiness.modifiers()));
-        } else {
-            message.append(", modifiers=[]");
-        }
-        message.append(")");
-
+    @Nonnull
+    private static Message buildLocalizedMessage(@Nonnull UUID npcUuid,
+                                                 @Nonnull HappinessSnapshot happiness,
+                                                 @Nonnull BreedingSnapshot breeding) {
+        String configId = happiness.configId() != null ? happiness.configId() : "-";
+        String modifiers = formatModifiers(happiness.modifiers());
         if (!breeding.hasComponent()) {
-            message.append(". Breeding component: none.");
-            return message.toString();
+            return Message.translation("server.tamework.commands.getHappiness.result.noBreeding")
+                    .param("0", String.valueOf(npcUuid))
+                    .param("1", formatDouble(happiness.value()))
+                    .param("2", happiness.source())
+                    .param("3", configId)
+                    .param("4", String.valueOf(happiness.lastUpdateMs()))
+                    .param("5", formatDouble(happiness.baseSetpoint()))
+                    .param("6", formatDouble(happiness.target()))
+                    .param("7", modifiers);
         }
-
-        message.append(". Breeding: readyFlag=").append(breeding.readyFlag());
-        message.append(", cooldownActive=").append(breeding.cooldownActive());
-        if (breeding.cooldownUntilMs() != 0L) {
-            message.append(", cooldownUntilMs=").append(breeding.cooldownUntilMs());
-        }
-        if (breeding.cooldownActive()) {
-            message.append(", cooldownRemainingMs=").append(breeding.cooldownRemainingMs());
-        }
-        message.append(", readyNow=").append(breeding.readyFlag() && !breeding.cooldownActive());
-        if (breeding.configId() != null) {
-            message.append(", config=").append(breeding.configId());
-        }
-        message.append(", fertilityOffspringFactor=").append(formatDouble(breeding.fertilityMultiplier()));
-        message.append(", cooldownTraitFactor=").append(formatDouble(breeding.cooldownMultiplier()));
-        message.append(", timerBasis=").append(breeding.timerBasis());
-        message.append(", gameSecPerRealSecCurrent=").append(formatDouble(breeding.rateCurrent()));
-        message.append(", gameSecPerRealSecBaseline=").append(formatDouble(breeding.rateBaseline()));
-        if (breeding.cooldownActive()) {
-            message.append(", cooldownRemainingRealSec~=").append(formatDouble(breeding.cooldownRemainingRealSeconds()));
-        }
-        message.append(", effective=").append(formatDouble(breeding.effectiveHappiness()));
-        if (breeding.threshold() != null) {
-            message.append(", threshold=").append(formatDouble(breeding.threshold()));
-            message.append(", eligible=").append(Boolean.TRUE.equals(breeding.eligible()));
-        } else {
-            message.append(", threshold=n/a, eligible=n/a");
-        }
-        message.append(".");
-        return message.toString();
+        return Message.translation("server.tamework.commands.getHappiness.result")
+                .param("0", String.valueOf(npcUuid))
+                .param("1", formatDouble(happiness.value()))
+                .param("2", happiness.source())
+                .param("3", configId)
+                .param("4", String.valueOf(happiness.lastUpdateMs()))
+                .param("5", formatDouble(happiness.baseSetpoint()))
+                .param("6", formatDouble(happiness.target()))
+                .param("7", modifiers)
+                .param("8", String.valueOf(breeding.readyFlag()))
+                .param("9", String.valueOf(breeding.cooldownActive()))
+                .param("10", String.valueOf(breeding.cooldownUntilMs()))
+                .param("11", String.valueOf(breeding.cooldownRemainingMs()))
+                .param("12", String.valueOf(breeding.readyFlag() && !breeding.cooldownActive()))
+                .param("13", breeding.configId() != null ? breeding.configId() : "-")
+                .param("14", formatDouble(breeding.fertilityMultiplier()))
+                .param("15", formatDouble(breeding.cooldownMultiplier()))
+                .param("16", breeding.timerBasis().toConfigValue())
+                .param("17", formatDouble(breeding.rateCurrent()))
+                .param("18", formatDouble(breeding.rateBaseline()))
+                .param("19", formatDouble(breeding.cooldownRemainingRealSeconds()))
+                .param("20", formatDouble(breeding.effectiveHappiness()))
+                .param("21", breeding.threshold() != null ? formatDouble(breeding.threshold()) : "-")
+                .param("22", breeding.eligible() != null ? String.valueOf(breeding.eligible()) : "-");
     }
 
     @Nonnull

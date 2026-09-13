@@ -51,7 +51,7 @@ public final class TameworkShowSpawnMarkersCommand extends AbstractPlayerCommand
     private static final ConcurrentHashMap<UUID, TrackingSession> ACTIVE_TRACKING = new ConcurrentHashMap<>();
 
     public TameworkShowSpawnMarkersCommand() {
-        super("spawn-markers", "Toggle player-local spawn marker debug rendering.");
+        super("spawn-markers", "server.tamework.commands.showSpawnMarkers.description");
         setAllowsExtraArguments(true);
     }
 
@@ -63,16 +63,14 @@ public final class TameworkShowSpawnMarkersCommand extends AbstractPlayerCommand
                            @Nonnull World world) {
         UUID playerUuid = playerRef.getUuid();
         if (playerUuid == null) {
-            commandContext.sender().sendMessage(Message.raw("Unable to resolve your player UUID."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.showSpawnMarkers.unable.to.resolve.your.player.uuid"));
             return;
         }
 
         TameworkShowSpawnMarkersCommandSupport.ParseResult parse =
                 TameworkShowSpawnMarkersCommandSupport.parse(commandContext.getInputString());
         if (parse.mode() == TameworkShowSpawnMarkersCommandSupport.Mode.INVALID) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "Usage: /tw showspawnmarkers [radius|off]"
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.showSpawnMarkers.usage.tw.showspawnmarkers.radius.off"));
             return;
         }
         if (parse.mode() == TameworkShowSpawnMarkersCommandSupport.Mode.OFF) {
@@ -80,15 +78,13 @@ public final class TameworkShowSpawnMarkersCommand extends AbstractPlayerCommand
             if (removed != null) {
                 clearDebugForPlayer(playerRef);
             }
-            commandContext.sender().sendMessage(Message.raw(
-                    removed != null ? "Spawn marker debug rendering disabled." : "Spawn marker debug rendering was not active."
-            ));
+            commandContext.sender().sendMessage(removed != null ? Message.translation("server.tamework.commands.showSpawnMarkers.spawn.marker.debug.rendering.disabled") : Message.translation("server.tamework.commands.showSpawnMarkers.spawn.marker.debug.rendering.was.not.active"));
             return;
         }
 
         TransformComponent playerTransform = store.getComponent(ref, TransformComponent.getComponentType());
         if (playerTransform == null) {
-            commandContext.sender().sendMessage(Message.raw("Unable to resolve your position."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.showSpawnMarkers.unable.to.resolve.your.position"));
             return;
         }
 
@@ -99,15 +95,7 @@ public final class TameworkShowSpawnMarkersCommand extends AbstractPlayerCommand
         ACTIVE_TRACKING.put(playerUuid, new TrackingSession(sessionId, world, parse.radius()));
         scheduleTrackingTick(world, playerRef, playerUuid, sessionId);
 
-        commandContext.sender().sendMessage(Message.raw(
-                "Spawn marker debug rendering enabled within "
-                        + formatNumber(parse.radius())
-                        + " blocks. Found "
-                        + markers.size()
-                        + " loaded marker"
-                        + (markers.size() == 1 ? "" : "s")
-                        + ". Run /tw showspawnmarkers off to disable."
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.showSpawnMarkers.spawn.marker.debug.rendering.enabled.within.blocks").param("0", String.valueOf(formatNumber(parse.radius()))).param("1", String.valueOf(markers.size())).param("2", String.valueOf((markers.size() == 1 ? "" : "s"))));
         sendMarkerSummary(commandContext, markers);
     }
 
@@ -115,27 +103,10 @@ public final class TameworkShowSpawnMarkersCommand extends AbstractPlayerCommand
         int rows = Math.min(MAX_SUMMARY_ROWS, markers.size());
         for (int i = 0; i < rows; i++) {
             MarkerSnapshot marker = markers.get(i);
-            commandContext.sender().sendMessage(Message.raw(
-                    "  "
-                            + marker.markerId
-                            + " at "
-                            + formatPosition(marker.position)
-                            + ", distance="
-                            + formatNumber(marker.distance)
-                            + ", npc="
-                            + marker.npcSummary
-                            + ", spawnCount="
-                            + marker.spawnCount
-                            + ", manual="
-                            + marker.manualTrigger
-                            + ", suppressed="
-                            + marker.suppressed
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.showSpawnMarkers.at.distance.npc.spawncount.manual.suppressed").param("0", String.valueOf(marker.markerId)).param("1", String.valueOf(formatPosition(marker.position))).param("2", String.valueOf(formatNumber(marker.distance))).param("3", String.valueOf(marker.npcSummary)).param("4", String.valueOf(marker.spawnCount)).param("5", String.valueOf(marker.manualTrigger)).param("6", String.valueOf(marker.suppressed)));
         }
         if (markers.size() > rows) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "  ...and " + (markers.size() - rows) + " more loaded marker(s)."
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.showSpawnMarkers.and.more.loaded.marker.s").param("0", String.valueOf((markers.size() - rows))));
         }
     }
 

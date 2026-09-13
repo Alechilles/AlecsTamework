@@ -17,7 +17,7 @@ import javax.annotation.Nonnull;
 public final class TameworkGetTamedCommand extends AbstractPlayerCommand {
 
     public TameworkGetTamedCommand() {
-        super("tamed", "Get tamed status of the NPC you are looking at.");
+        super("tamed", "server.tamework.commands.getTamed.description");
         setAllowsExtraArguments(true);
     }
 
@@ -29,12 +29,12 @@ public final class TameworkGetTamedCommand extends AbstractPlayerCommand {
                            @Nonnull World world) {
         TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
         if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.raw("No NPC found in view."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getTamed.no.npc.found.in.view"));
             return;
         }
 
         boolean tamed = TamedStateResolver.isTamed(candidate.ref, store);
 
-        commandContext.sender().sendMessage(Message.raw("Tamed for NPC " + candidate.npcUuid + " is " + tamed));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getTamed.tamed.for.npc.is").param("0", String.valueOf(candidate.npcUuid)).param("1", String.valueOf(tamed)));
     }
 }

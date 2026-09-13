@@ -19,7 +19,7 @@ import javax.annotation.Nonnull;
  */
 public final class TameworkGetLifeStageCommand extends AbstractPlayerCommand {
     public TameworkGetLifeStageCommand() {
-        super("lifestage", "Get life stage of the NPC you are looking at.");
+        super("lifestage", "server.tamework.commands.getLifeStage.description");
         setAllowsExtraArguments(true);
     }
 
@@ -31,7 +31,7 @@ public final class TameworkGetLifeStageCommand extends AbstractPlayerCommand {
                            @Nonnull World world) {
         TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
         if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.raw("No NPC found in view."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getLifeStage.no.npc.found.in.view"));
             return;
         }
         String roleId = CompanionRoleIdResolver.resolveRoleId(candidate.ref, store);
@@ -39,19 +39,9 @@ public final class TameworkGetLifeStageCommand extends AbstractPlayerCommand {
         ComponentType<EntityStore, TameworkLifeStageComponent> type = TameworkLifeStageComponent.getComponentType();
         TameworkLifeStageComponent component = type != null ? store.getComponent(candidate.ref, type) : null;
         if (component == null) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "Life stage for NPC " + candidate.npcUuid + ": " + stage + " (fallback role gate, no component)."
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getLifeStage.life.stage.for.npc.fallback.role.gate").param("0", String.valueOf(candidate.npcUuid)).param("1", String.valueOf(stage)));
             return;
         }
-        commandContext.sender().sendMessage(Message.raw(
-                "Life stage for NPC " + candidate.npcUuid
-                        + ": " + stage
-                        + " (bornAtMs=" + component.getBornAtMs()
-                        + ", adolescentAtMs=" + component.getAdolescentAtMs()
-                        + ", adultAtMs=" + component.getAdultAtMs()
-                        + ", growthScaling=" + component.isGrowthScalingEnabled()
-                        + ")."
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getLifeStage.life.stage.for.npc.bornatms.adolescentatms.adultatms").param("0", String.valueOf(candidate.npcUuid)).param("1", String.valueOf(stage)).param("2", String.valueOf(component.getBornAtMs())).param("3", String.valueOf(component.getAdolescentAtMs())).param("4", String.valueOf(component.getAdultAtMs())).param("5", String.valueOf(component.isGrowthScalingEnabled())));
     }
 }

@@ -19,7 +19,7 @@ $C.@PageOverlay {
       Label #TameworkLinkedLocationTitle {
         Anchor: (Left: 58, Right: 58, Height: 54);
         Style: (FontSize: 20, RenderBold: true, TextColor: #f0eee7, VerticalAlignment: Center);
-        Text: "Companion - Location";
+        Text: "";
       }
       Group {
         Anchor: (Top: 11, Right: 12, Width: 32, Height: 32);

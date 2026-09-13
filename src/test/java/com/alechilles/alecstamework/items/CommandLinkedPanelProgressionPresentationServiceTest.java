@@ -40,7 +40,7 @@ class CommandLinkedPanelProgressionPresentationServiceTest {
 
         LinkedNpcEntry.FutureStat stat = service.buildLevelFutureStat(snapshot, "en-US", "Modifiers");
 
-        assertEquals("Level 12 XP", stat.label());
+        assertEquals("Level: 12", stat.label());
         assertEquals(147, stat.current());
         assertEquals(300, stat.max());
         assertEquals("Level: 12/30 - 147/300 XP", stat.tooltipHeaderText());

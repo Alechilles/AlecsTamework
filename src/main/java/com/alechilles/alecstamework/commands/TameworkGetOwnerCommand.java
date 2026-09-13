@@ -21,7 +21,7 @@ import javax.annotation.Nonnull;
 public final class TameworkGetOwnerCommand extends AbstractPlayerCommand {
 
     public TameworkGetOwnerCommand() {
-        super("owner", "Get owner of the NPC you are looking at.");
+        super("owner", "server.tamework.commands.getOwner.description");
         setAllowsExtraArguments(true);
     }
 
@@ -33,7 +33,7 @@ public final class TameworkGetOwnerCommand extends AbstractPlayerCommand {
                            @Nonnull World world) {
         TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
         if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.raw("No NPC found in view."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getOwner.no.npc.found.in.view"));
             return;
         }
 
@@ -64,6 +64,6 @@ public final class TameworkGetOwnerCommand extends AbstractPlayerCommand {
         } else {
             ownerText = ownerUuid.toString();
         }
-        commandContext.sender().sendMessage(Message.raw("Owner for NPC " + candidate.npcUuid + " is " + ownerText));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getOwner.owner.for.npc.is").param("0", String.valueOf(candidate.npcUuid)).param("1", String.valueOf(ownerText)));
     }
 }

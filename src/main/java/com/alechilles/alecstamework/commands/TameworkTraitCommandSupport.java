@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.HashMap;
@@ -135,14 +136,43 @@ final class TameworkTraitCommandSupport {
     @Nonnull
     static String buildKnownTraitsText(@Nonnull Map<String, TwTraitConfig.TraitDefinition> definitionMap) {
         if (definitionMap.isEmpty()) {
-            return "none";
+            return "-";
         }
         return definitionMap.values().stream()
                 .map(TwTraitConfig.TraitDefinition::getId)
                 .filter(id -> id != null && !id.isBlank())
                 .sorted(String::compareToIgnoreCase)
                 .reduce((left, right) -> left + ", " + right)
-                .orElse("none");
+                .orElse("-");
+    }
+
+    @Nonnull
+    static Message parseErrorMessage(@Nullable String errorMessage) {
+        if (errorMessage == null) {
+            return Message.translation("server.tamework.commands.traits.invalid.input");
+        }
+        if (errorMessage.startsWith("Usage: /tw settraits")) {
+            return Message.translation("server.tamework.commands.traits.usage.setTraits");
+        }
+        if (errorMessage.startsWith("Usage: /tw addtrait")) {
+            return Message.translation("server.tamework.commands.traits.usage.addTrait");
+        }
+        if (errorMessage.startsWith("Trait id at argument ") && errorMessage.endsWith(" is empty.")) {
+            String index = errorMessage.substring("Trait id at argument ".length(), errorMessage.length() - " is empty.".length());
+            return Message.translation("server.tamework.commands.traits.trait.id.empty").param("0", index);
+        }
+        if (errorMessage.startsWith("Value for trait '") && errorMessage.contains("' is invalid.")) {
+            int end = errorMessage.indexOf("' is invalid.", "Value for trait '".length());
+            if (end > "Value for trait '".length()) {
+                String traitId = errorMessage.substring("Value for trait '".length(), end);
+                return Message.translation("server.tamework.commands.traits.trait.value.invalid")
+                        .param("0", traitId);
+            }
+        }
+        if ("No trait values were provided.".equals(errorMessage)) {
+            return Message.translation("server.tamework.commands.traits.values.missing");
+        }
+        return Message.translation("server.tamework.commands.traits.invalid.input");
     }
 
     private static double clamp(double value, double min, double max) {

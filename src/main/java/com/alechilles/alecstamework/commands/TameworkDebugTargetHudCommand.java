@@ -8,7 +8,7 @@ import javax.annotation.Nonnull;
 /** Toggles command target HUD diagnostics logging on the server. */
 public final class TameworkDebugTargetHudCommand extends AbstractTameworkServerCommand {
     public TameworkDebugTargetHudCommand() {
-        super("target-hud", "Toggle Tamework command target HUD diagnostics logging.");
+        super("target-hud", "server.tamework.commands.debugTargetHud.description");
         setAllowsExtraArguments(true);
     }
 
@@ -19,9 +19,7 @@ public final class TameworkDebugTargetHudCommand extends AbstractTameworkServerC
         boolean enabled = explicit != null
                 ? CommandTargetHudDebugLog.setEnabled(explicit)
                 : CommandTargetHudDebugLog.toggle();
-        commandContext.sender().sendMessage(Message.raw(
-                "Tamework command target HUD diagnostics logging: " + (enabled ? "enabled" : "disabled")
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugTargetHud.tamework.command.target.hud.diagnostics.logging").param("0", String.valueOf((enabled ? "enabled" : "disabled"))));
     }
 
     private static String getFirstArg(CommandContext commandContext) {

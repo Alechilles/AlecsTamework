@@ -22,7 +22,7 @@ import javax.annotation.Nullable;
  */
 public final class TameworkGetNeedsCommand extends NPCMultiSelectCommandBase {
     public TameworkGetNeedsCommand() {
-        super("needs", "Get hunger and thirst for selected NPCs.");
+        super("needs", "server.tamework.commands.getNeeds.description");
     }
 
     @Override
@@ -33,53 +33,47 @@ public final class TameworkGetNeedsCommand extends NPCMultiSelectCommandBase {
                            @Nonnull Ref<EntityStore> ref) {
         ComponentType<EntityStore, TameworkNeedsComponent> needsType = TameworkNeedsComponent.getComponentType();
         if (needsType == null) {
-            commandContext.sender().sendMessage(Message.raw("Needs component type is not registered."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getNeeds.needs.component.type.is.not.registered"));
             return;
         }
         TameworkNeedsComponent needs = store.getComponent(ref, needsType);
         if (needs == null) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "NPC " + npc.getUuid() + " has no tracked needs state."
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getNeeds.npc.has.no.tracked.needs.state").param("0", String.valueOf(npc.getUuid())));
             return;
         }
         TwNeedsConfig config = NeedsConfigResolver.resolveConfig(ref, store, needs);
         if (!NeedsConfigResolver.isRuntimeEnabled(config)) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "NPC " + npc.getUuid() + " has no tracked needs state."
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getNeeds.npc.has.no.tracked.needs.state").param("0", String.valueOf(npc.getUuid())));
             return;
         }
-        commandContext.sender().sendMessage(Message.raw(buildMessage(npc.getUuid(), needs, config)));
+        commandContext.sender().sendMessage(buildLocalizedMessage(npc.getUuid(), needs, config));
     }
 
-    private static String buildMessage(@Nonnull UUID npcUuid,
-                                       @Nonnull TameworkNeedsComponent needs,
-                                       @Nullable TwNeedsConfig config) {
-        StringBuilder message = new StringBuilder();
-        message.append("Needs for NPC ")
-                .append(npcUuid)
-                .append(": hunger=")
-                .append(format(needs.getHunger()))
-                .append(", thirst=")
-                .append(format(needs.getThirst()))
-                .append(", appliedPenalty=")
-                .append(format(needs.getAppliedHappinessPenalty()));
-        if (config != null) {
-            TwNeedsConfig.ValueSettings values = config.getValues();
-            message.append(", hunger%=").append(formatPercent(needs.getHunger(), values.getHungerMin(), values.getHungerMax()));
-            message.append(", thirst%=").append(formatPercent(needs.getThirst(), values.getThirstMin(), values.getThirstMax()));
-            message.append(", config=").append(config.getId());
-            message.append(", timing=").append(config.getTiming().getTimerBasis().toConfigValue());
+    @Nonnull
+    private static Message buildLocalizedMessage(@Nonnull UUID npcUuid,
+                                                 @Nonnull TameworkNeedsComponent needs,
+                                                 @Nullable TwNeedsConfig config) {
+        if (config == null) {
+            return Message.translation("server.tamework.commands.getNeeds.result")
+                    .param("0", String.valueOf(npcUuid))
+                    .param("1", format(needs.getHunger()))
+                    .param("2", format(needs.getThirst()))
+                    .param("3", format(needs.getAppliedHappinessPenalty()))
+                    .param("4", String.valueOf(needs.getLastUpdateMs()))
+                    .param("5", String.valueOf(needs.getLastPassiveSweepMs()));
         }
-        if (needs.getLastUpdateMs() != 0L) {
-            message.append(", lastUpdateMs=").append(needs.getLastUpdateMs());
-        }
-        if (needs.getLastPassiveSweepMs() != 0L) {
-            message.append(", lastPassiveSweepMs=").append(needs.getLastPassiveSweepMs());
-        }
-        message.append(".");
-        return message.toString();
+        TwNeedsConfig.ValueSettings values = config.getValues();
+        return Message.translation("server.tamework.commands.getNeeds.result.withConfig")
+                .param("0", String.valueOf(npcUuid))
+                .param("1", format(needs.getHunger()))
+                .param("2", format(needs.getThirst()))
+                .param("3", format(needs.getAppliedHappinessPenalty()))
+                .param("4", String.valueOf(formatPercent(needs.getHunger(), values.getHungerMin(), values.getHungerMax())))
+                .param("5", String.valueOf(formatPercent(needs.getThirst(), values.getThirstMin(), values.getThirstMax())))
+                .param("6", String.valueOf(config.getId()))
+                .param("7", config.getTiming().getTimerBasis().toConfigValue())
+                .param("8", String.valueOf(needs.getLastUpdateMs()))
+                .param("9", String.valueOf(needs.getLastPassiveSweepMs()));
     }
 
     private static String format(double value) {

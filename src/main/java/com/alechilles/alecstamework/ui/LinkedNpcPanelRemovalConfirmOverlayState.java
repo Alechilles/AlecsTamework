@@ -80,7 +80,8 @@ final class LinkedNpcPanelRemovalConfirmOverlayState {
             return;
         }
         String caption = LocalizedText.resolve(language, action.captionKey);
-        commands.set("#TameworkLinkedPanelRemovalConfirmTitle.Text", caption + " " + npcName);
+        commands.set("#TameworkLinkedPanelRemovalConfirmTitle.Text", LocalizedText.format(language,
+                "tamework.ui.linkedPanel.removal.confirmTitle", caption, npcName));
         commands.set("#TameworkLinkedPanelRemovalConfirmTitle.TooltipText", npcName);
         commands.set("#TameworkLinkedPanelRemovalConfirmMessage.Text",
                 LocalizedText.resolve(language, action.consequenceKey));

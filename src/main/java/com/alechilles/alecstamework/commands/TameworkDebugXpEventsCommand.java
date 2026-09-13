@@ -12,7 +12,7 @@ import javax.annotation.Nullable;
  */
 public final class TameworkDebugXpEventsCommand extends AbstractTameworkServerCommand {
     public TameworkDebugXpEventsCommand() {
-        super("xp-events", "Toggle Tamework companion XP API event debug logging.");
+        super("xp-events", "server.tamework.commands.debugXpEvents.description");
         setAllowsExtraArguments(true);
     }
 
@@ -21,18 +21,12 @@ public final class TameworkDebugXpEventsCommand extends AbstractTameworkServerCo
         Tamework plugin = Tamework.getInstance();
         CompanionXpEventDebugLogService service = plugin != null ? plugin.getCompanionXpEventDebugLogService() : null;
         if (service == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework XP event debug service is not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugXpEvents.tamework.xp.event.debug.service.is.not"));
             return;
         }
         Boolean explicit = parseBoolean(getFirstArg(commandContext));
         boolean enabled = explicit != null ? service.setEnabled(explicit) : service.toggle();
-        commandContext.sender().sendMessage(Message.raw(
-                "Tamework XP event debug logging: "
-                        + (enabled ? "enabled" : "disabled")
-                        + " (events seen this session: "
-                        + service.getEventCount()
-                        + ")"
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugXpEvents.tamework.xp.event.debug.logging.events.seen").param("0", String.valueOf((enabled ? "enabled" : "disabled"))).param("1", String.valueOf(service.getEventCount())));
     }
 
     @Nullable

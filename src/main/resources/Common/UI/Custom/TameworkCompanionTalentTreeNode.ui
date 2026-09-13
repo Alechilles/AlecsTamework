@@ -47,19 +47,19 @@ Group {
 
   Label #TalentNodeName {
     Anchor: (Top: 6, Left: 6, Right: 6, Height: 34);
-    Text: "Talent";
+    Text: "";
     Style: (FontSize: 11, RenderBold: true, TextColor: #e8e4da, HorizontalAlignment: Center, VerticalAlignment: Center, Wrap: true);
   }
 
   Label #TalentNodeCost {
     Anchor: (Bottom: 6, Left: 6, Width: 34, Height: 16);
-    Text: "1 pt";
+    Text: "";
     Style: (FontSize: 10, TextColor: #c4dbc9, HorizontalAlignment: Start, VerticalAlignment: Center);
   }
 
   Label #TalentNodeState {
     Anchor: (Bottom: 6, Right: 6, Width: 62, Height: 16);
-    Text: "Locked";
+    Text: %server.tamework.ui.talents.state.Locked;
     Style: (FontSize: 10, TextColor: #afb6b0, HorizontalAlignment: End, VerticalAlignment: Center);
   }
 

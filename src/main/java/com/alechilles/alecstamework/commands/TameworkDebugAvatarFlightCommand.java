@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
 public final class TameworkDebugAvatarFlightCommand extends AbstractTameworkServerCommand {
 
     public TameworkDebugAvatarFlightCommand() {
-        super("avatar-flight", "Toggle Tamework avatar-flight debug logging.");
+        super("avatar-flight", "server.tamework.commands.debugAvatarFlight.description");
         setAllowsExtraArguments(true);
     }
 
@@ -19,7 +19,7 @@ public final class TameworkDebugAvatarFlightCommand extends AbstractTameworkServ
     protected void executeServer(@Nonnull CommandContext commandContext) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugAvatarFlight.tamework.plugin.not.available"));
             return;
         }
         String raw = getFirstArg(commandContext);
@@ -27,9 +27,7 @@ public final class TameworkDebugAvatarFlightCommand extends AbstractTameworkServ
         boolean enabled = explicit != null
                 ? plugin.setDebugAvatarFlightEnabled(explicit)
                 : plugin.setDebugAvatarFlightEnabled(!plugin.isDebugAvatarFlightEnabled());
-        commandContext.sender().sendMessage(Message.raw(
-                "Tamework avatar-flight debug logging: " + (enabled ? "enabled" : "disabled")
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugAvatarFlight.tamework.avatar.flight.debug.logging").param("0", String.valueOf((enabled ? "enabled" : "disabled"))));
     }
 
     private static String getFirstArg(CommandContext commandContext) {

@@ -54,7 +54,7 @@ $C.@PageOverlay {
      OutlineSize: 1;
      Label { Anchor: (Top: 4, Left: 8, Right: 8, Height: 24); Text: "LMB"; Style: @CommandAssignmentKeyStyle; }
      Group { Anchor: (Top: 29, Left: 8, Right: 8, Height: 1); Background: #414845(0.72); }
-     DropdownBox #TameworkCommandPrimary { Anchor: (Top: 34, Left: 8, Right: 8, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: "No commands"; }
+     DropdownBox #TameworkCommandPrimary { Anchor: (Top: 34, Left: 8, Right: 8, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: %server.tamework.ui.commandMenu.noCommands; }
     }
     Group #TameworkCommandHotswapQAssignment {
      Anchor: (Top: 86, Left: 8, Right: 8, Height: 70);
@@ -63,7 +63,7 @@ $C.@PageOverlay {
      OutlineSize: 1;
      Label { Anchor: (Top: 4, Left: 8, Right: 8, Height: 24); Text: "Q"; Style: @CommandAssignmentKeyStyle; }
      Group { Anchor: (Top: 29, Left: 8, Right: 8, Height: 1); Background: #414845(0.72); }
-     DropdownBox #TameworkCommandHotswapQ { Anchor: (Top: 34, Left: 8, Right: 8, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: "No commands"; }
+     DropdownBox #TameworkCommandHotswapQ { Anchor: (Top: 34, Left: 8, Right: 8, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: %server.tamework.ui.commandMenu.noCommands; }
     }
     Group #TameworkCommandHotswapEAssignment {
      Anchor: (Top: 164, Left: 8, Right: 8, Height: 70);
@@ -72,7 +72,7 @@ $C.@PageOverlay {
      OutlineSize: 1;
      Label { Anchor: (Top: 4, Left: 8, Right: 8, Height: 24); Text: "E"; Style: @CommandAssignmentKeyStyle; }
      Group { Anchor: (Top: 29, Left: 8, Right: 8, Height: 1); Background: #414845(0.72); }
-     DropdownBox #TameworkCommandHotswapE { Anchor: (Top: 34, Left: 8, Right: 8, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: "No commands"; }
+     DropdownBox #TameworkCommandHotswapE { Anchor: (Top: 34, Left: 8, Right: 8, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: %server.tamework.ui.commandMenu.noCommands; }
     }
     Group #TameworkCommandHotswapRAssignment {
      Anchor: (Top: 242, Left: 8, Right: 8, Height: 70);
@@ -81,7 +81,7 @@ $C.@PageOverlay {
      OutlineSize: 1;
      Label { Anchor: (Top: 4, Left: 8, Right: 8, Height: 24); Text: "R"; Style: @CommandAssignmentKeyStyle; }
      Group { Anchor: (Top: 29, Left: 8, Right: 8, Height: 1); Background: #414845(0.72); }
-     DropdownBox #TameworkCommandHotswapR { Anchor: (Top: 34, Left: 8, Right: 8, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: "No commands"; }
+     DropdownBox #TameworkCommandHotswapR { Anchor: (Top: 34, Left: 8, Right: 8, Height: 28); Style: @CommandAssignmentDropdownStyle; HitTestVisible: true; MaxSelection: 1; NoItemsText: %server.tamework.ui.commandMenu.noCommands; }
     }
 
     Group #TameworkGroupQuickSelect {

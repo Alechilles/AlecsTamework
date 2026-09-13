@@ -22,7 +22,7 @@ import javax.annotation.Nonnull;
 public final class TameworkNewsCommand extends AbstractPlayerCommand {
 
     public TameworkNewsCommand() {
-        super("news", "Open the current Tamework settings announcement.");
+        super("news", "server.tamework.commands.news.description");
         requirePermission(TameworkConfigPermission.NODE);
         setPermissionGroups(TameworkConfigPermission.adminPermissionGroups());
         setAllowsExtraArguments(true);
@@ -41,22 +41,22 @@ public final class TameworkNewsCommand extends AbstractPlayerCommand {
                            @Nonnull World world) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework news is not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.news.tamework.news.is.not.available"));
             return;
         }
         if (!TameworkSettingsPageService.hasAccess(playerRef, commandContext.sender())) {
-            commandContext.sender().sendMessage(Message.raw("You do not have permission to use /tw news."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.news.you.do.not.have.permission.to.use"));
             return;
         }
 
         Player player = store.getComponent(ref, Player.getComponentType());
         if (player == null) {
-            commandContext.sender().sendMessage(Message.raw("Unable to open Tamework news right now."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.news.unable.to.open.tamework.news.right.now"));
             return;
         }
         TameworkSettingsAnnouncementService service = plugin.getSettingsAnnouncementService();
         if (service == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework news is not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.news.tamework.news.is.not.available"));
             return;
         }
 

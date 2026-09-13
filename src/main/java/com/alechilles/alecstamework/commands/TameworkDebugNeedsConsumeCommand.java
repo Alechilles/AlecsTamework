@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
 public final class TameworkDebugNeedsConsumeCommand extends AbstractTameworkServerCommand {
 
     public TameworkDebugNeedsConsumeCommand() {
-        super("consume", "Toggle Tamework needs consume diagnostics logging.");
+        super("consume", "server.tamework.commands.debugNeedsConsume.description");
         setAllowsExtraArguments(true);
     }
 
@@ -19,7 +19,7 @@ public final class TameworkDebugNeedsConsumeCommand extends AbstractTameworkServ
     protected void executeServer(@Nonnull CommandContext commandContext) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugNeedsConsume.tamework.plugin.not.available"));
             return;
         }
         String raw = getFirstArg(commandContext);
@@ -27,9 +27,7 @@ public final class TameworkDebugNeedsConsumeCommand extends AbstractTameworkServ
         boolean enabled = explicit != null
                 ? plugin.setDebugNeedsConsumeDiagnosticsEnabled(explicit)
                 : plugin.toggleDebugNeedsConsumeDiagnosticsEnabled();
-        commandContext.sender().sendMessage(Message.raw(
-                "Tamework needs consume diagnostics logging: " + (enabled ? "enabled" : "disabled")
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugNeedsConsume.tamework.needs.consume.diagnostics.logging").param("0", String.valueOf((enabled ? "enabled" : "disabled"))));
     }
 
     private static String getFirstArg(CommandContext commandContext) {

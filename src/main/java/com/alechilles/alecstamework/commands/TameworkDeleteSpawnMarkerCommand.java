@@ -39,7 +39,7 @@ public final class TameworkDeleteSpawnMarkerCommand extends AbstractPlayerComman
     private static final int MAX_NPC_SUMMARY_ROWS = 4;
 
     public TameworkDeleteSpawnMarkerCommand() {
-        super("delete", "Delete the loaded spawn marker you are looking at.");
+        super("delete", "server.tamework.commands.deleteSpawnMarker.description");
         setAllowsExtraArguments(true);
     }
 
@@ -52,13 +52,13 @@ public final class TameworkDeleteSpawnMarkerCommand extends AbstractPlayerComman
         TameworkDeleteSpawnMarkerCommandSupport.ParseResult parse =
                 TameworkDeleteSpawnMarkerCommandSupport.parse(commandContext.getInputString());
         if (parse.mode() == TameworkDeleteSpawnMarkerCommandSupport.Mode.INVALID) {
-            commandContext.sender().sendMessage(Message.raw("Usage: /tw deletespawnmarker [range]"));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.deleteSpawnMarker.usage.tw.deletespawnmarker.range"));
             return;
         }
 
         TransformComponent playerTransform = store.getComponent(ref, TransformComponent.getComponentType());
         if (playerTransform == null) {
-            commandContext.sender().sendMessage(Message.raw("Unable to resolve your position."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.deleteSpawnMarker.unable.to.resolve.your.position"));
             return;
         }
 
@@ -66,33 +66,18 @@ public final class TameworkDeleteSpawnMarkerCommand extends AbstractPlayerComman
         Vector3d forward = resolveForward(store, ref, playerTransform);
         TargetMarker target = findTargetMarker(store, playerPosition, forward, parse.range());
         if (target == null) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "No loaded spawn marker found in front of you within "
-                            + formatNumber(parse.range())
-                            + " blocks."
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.deleteSpawnMarker.no.loaded.spawn.marker.found.in.front").param("0", String.valueOf(formatNumber(parse.range()))));
             return;
         }
 
         if (target.ref == null || !target.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.raw("Target spawn marker is no longer valid."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.deleteSpawnMarker.target.spawn.marker.is.no.longer.valid"));
             return;
         }
 
         store.removeEntity(target.ref, RemoveReason.REMOVE);
         boolean removedSourceBlockComponent = removeSourceBlockMarkerComponent(world, target.blockPosition);
-        commandContext.sender().sendMessage(Message.raw(
-                "Deleted loaded spawn marker "
-                        + target.markerId
-                        + " at "
-                        + formatPosition(target.position)
-                        + ", npc="
-                        + target.npcSummary
-                        + ", distance="
-                        + formatNumber(target.score.forwardDistance())
-                        + target.blockBackedSuffix(removedSourceBlockComponent)
-                        + "."
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.deleteSpawnMarker.deleted.loaded.spawn.marker.at.npc.distance").param("0", String.valueOf(target.markerId)).param("1", String.valueOf(formatPosition(target.position))).param("2", String.valueOf(target.npcSummary)).param("3", String.valueOf(formatNumber(target.score.forwardDistance()))).param("4", String.valueOf(target.blockBackedSuffix(removedSourceBlockComponent))));
     }
 
     @Nullable

@@ -22,14 +22,14 @@ import static com.hypixel.hytale.server.core.command.system.arguments.types.ArgT
  */
 public final class TameworkSetNeedsCommand extends NPCMultiSelectCommandBase {
     private final RequiredArg<Double> hungerArg = withRequiredArg(
-            "hunger", "Hunger value to apply.", DOUBLE
+            "hunger", "server.tamework.commands.setNeeds.argument.hunger", DOUBLE
     );
     private final RequiredArg<Double> thirstArg = withRequiredArg(
-            "thirst", "Thirst value to apply.", DOUBLE
+            "thirst", "server.tamework.commands.setNeeds.argument.thirst", DOUBLE
     );
 
     public TameworkSetNeedsCommand() {
-        super("needs", "Set hunger and thirst for selected NPCs.");
+        super("needs", "server.tamework.commands.setNeeds.description");
     }
 
     @Override
@@ -40,13 +40,13 @@ public final class TameworkSetNeedsCommand extends NPCMultiSelectCommandBase {
                            @Nonnull Ref<EntityStore> npcRef) {
         ComponentType<EntityStore, TameworkNeedsComponent> needsType = TameworkNeedsComponent.getComponentType();
         if (needsType == null) {
-            context.sendMessage(Message.raw("Needs component type is not registered."));
+            context.sendMessage(Message.translation("server.tamework.commands.setNeeds.needs.component.type.is.not.registered"));
             return;
         }
         TameworkNeedsCommandSupport.NeedsContext needsContext =
                 TameworkNeedsCommandSupport.resolveContext(npcRef, store);
         if (needsContext == null) {
-            context.sendMessage(Message.raw("No enabled needs config resolved for NPC " + npc.getUuid() + "."));
+            context.sendMessage(Message.translation("server.tamework.commands.setNeeds.no.enabled.needs.config.resolved.for.npc").param("0", String.valueOf(npc.getUuid())));
             return;
         }
 
@@ -70,10 +70,6 @@ public final class TameworkSetNeedsCommand extends NPCMultiSelectCommandBase {
         needs.setLastPassiveSweepMs(now);
         store.putComponent(npcRef, needsType, needs);
         CompanionNeedsService.tickNeeds(npcRef, store, needsContext.roleId());
-        context.sendMessage(Message.raw(
-                "Set needs for NPC " + npc.getUuid() + ": hunger="
-                        + TameworkNeedsCommandSupport.format(hunger)
-                        + ", thirst=" + TameworkNeedsCommandSupport.format(thirst) + "."
-        ));
+        context.sendMessage(Message.translation("server.tamework.commands.setNeeds.set.needs.for.npc.hunger.thirst").param("0", String.valueOf(npc.getUuid())).param("1", String.valueOf(TameworkNeedsCommandSupport.format(hunger))).param("2", String.valueOf(TameworkNeedsCommandSupport.format(thirst))));
     }
 }

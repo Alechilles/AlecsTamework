@@ -25,7 +25,7 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractTameworkSe
     );
 
     public TameworkDebugCrashTelemetryCommand() {
-        super("crash", "Show crash telemetry diagnostics. Optional: flush|simulate|eventerror|eventlifecycle");
+        super("crash", "server.tamework.commands.debugCrashTelemetry.description");
         setAllowsExtraArguments(true);
     }
 
@@ -33,30 +33,24 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractTameworkSe
     protected void executeServer(@Nonnull CommandContext commandContext) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugCrashTelemetry.tamework.plugin.not.available"));
             return;
         }
 
         CrashTelemetryService crashTelemetryService = plugin.getCrashTelemetryService();
         if (crashTelemetryService == null) {
-            commandContext.sender().sendMessage(Message.raw("Crash telemetry service is not initialized."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugCrashTelemetry.crash.telemetry.service.is.not.initialized"));
             return;
         }
 
         String action = normalizeAction(getFirstArg(commandContext));
         if ("flush".equals(action)) {
             boolean scheduled = crashTelemetryService.triggerFlushAsync();
-            commandContext.sender().sendMessage(Message.raw(
-                    scheduled
-                            ? "Crash telemetry flush scheduled."
-                            : "Crash telemetry flush was not scheduled (disabled, already running, or no executor available)."
-            ));
+            commandContext.sender().sendMessage(scheduled ? Message.translation("server.tamework.commands.debugCrashTelemetry.crash.telemetry.flush.scheduled") : Message.translation("server.tamework.commands.debugCrashTelemetry.crash.telemetry.flush.was.not.scheduled.disabled"));
         } else if ("eventerror".equals(action)) {
             UUID playerUuid = playerUuid(commandContext);
             if (!isAllowedSimulateCaller(playerUuid)) {
-                commandContext.sender().sendMessage(Message.raw(
-                        "You are not allowed to run /tw debugcrashtelemetry eventerror."
-                ));
+                commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugCrashTelemetry.you.are.not.allowed.to.run.tw"));
                 return;
             }
             String token = Long.toHexString(System.currentTimeMillis());
@@ -75,17 +69,11 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractTameworkSe
                             .detail("debugToken", token)
                             .build()
             );
-            commandContext.sender().sendMessage(Message.raw(
-                    recorded
-                            ? "Embedded telemetry error event requested."
-                            : "Embedded telemetry error event was not requested (telemetry disabled or event delivery not configured)."
-            ));
+            commandContext.sender().sendMessage(recorded ? Message.translation("server.tamework.commands.debugCrashTelemetry.embedded.telemetry.error.event.requested") : Message.translation("server.tamework.commands.debugCrashTelemetry.embedded.telemetry.error.event.was.not.requested"));
         } else if ("eventlifecycle".equals(action)) {
             UUID playerUuid = playerUuid(commandContext);
             if (!isAllowedSimulateCaller(playerUuid)) {
-                commandContext.sender().sendMessage(Message.raw(
-                        "You are not allowed to run /tw debugcrashtelemetry eventlifecycle."
-                ));
+                commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugCrashTelemetry.you.are.not.allowed.to.run.tw2"));
                 return;
             }
             String token = Long.toHexString(System.currentTimeMillis());
@@ -105,17 +93,11 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractTameworkSe
                             .detail("debugToken", token)
                             .build()
             );
-            commandContext.sender().sendMessage(Message.raw(
-                    recorded
-                            ? "Embedded telemetry lifecycle event requested."
-                            : "Embedded telemetry lifecycle event was not requested (telemetry disabled or event delivery not configured)."
-            ));
+            commandContext.sender().sendMessage(recorded ? Message.translation("server.tamework.commands.debugCrashTelemetry.embedded.telemetry.lifecycle.event.requested") : Message.translation("server.tamework.commands.debugCrashTelemetry.embedded.telemetry.lifecycle.event.was.not.requested"));
         } else if ("simulate".equals(action)) {
             UUID playerUuid = playerUuid(commandContext);
             if (!isAllowedSimulateCaller(playerUuid)) {
-                commandContext.sender().sendMessage(Message.raw(
-                        "You are not allowed to run /tw debugcrashtelemetry simulate."
-                ));
+                commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugCrashTelemetry.you.are.not.allowed.to.run.tw3"));
             } else {
                 String token = Long.toHexString(System.currentTimeMillis());
                 Thread thread = new Thread(
@@ -124,9 +106,7 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractTameworkSe
                 );
                 thread.setDaemon(true);
                 thread.start();
-                commandContext.sender().sendMessage(Message.raw(
-                        "Simulated uncaught Tamework crash dispatched (token=" + token + ")."
-                ));
+                commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugCrashTelemetry.simulated.uncaught.tamework.crash.dispatched.token").param("0", String.valueOf(token)));
                 if (HytaleServer.SCHEDULED_EXECUTOR != null) {
                     HytaleServer.SCHEDULED_EXECUTOR.schedule(
                             crashTelemetryService::triggerFlushAsync,
@@ -136,23 +116,13 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractTameworkSe
                 }
             }
         } else if (action != null) {
-            commandContext.sender().sendMessage(Message.raw("Usage: /tw debugcrashtelemetry [flush|simulate|eventerror|eventlifecycle]"));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugCrashTelemetry.usage.tw.debugcrashtelemetry.flush.simulate.eventerror.eventlifecycle"));
             return;
         }
 
         CrashTelemetryDiagnostics diagnostics = crashTelemetryService.diagnostics();
-        commandContext.sender().sendMessage(Message.raw(
-                "Crash telemetry: enabled=" + diagnostics.enabled()
-                        + ", endpoint=" + diagnostics.endpoint()
-                        + ", pending=" + diagnostics.pendingReports()
-                        + ", flushInProgress=" + diagnostics.flushInProgress()
-        ));
-        commandContext.sender().sendMessage(Message.raw(
-                "Crash telemetry last flush: "
-                        + diagnostics.formatLastFlushAtUtc()
-                        + " | "
-                        + diagnostics.lastFlushResult()
-        ));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugCrashTelemetry.crash.telemetry.enabled.endpoint.pending.flushinprogress").param("0", String.valueOf(diagnostics.enabled())).param("1", String.valueOf(diagnostics.endpoint())).param("2", String.valueOf(diagnostics.pendingReports())).param("3", String.valueOf(diagnostics.flushInProgress())));
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugCrashTelemetry.crash.telemetry.last.flush").param("0", String.valueOf(diagnostics.formatLastFlushAtUtc())).param("1", String.valueOf(diagnostics.lastFlushResult())));
     }
 
     @Nullable

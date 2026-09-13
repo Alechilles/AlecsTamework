@@ -11,6 +11,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /** Player-feedback regressions for completed spawner persistence workflows. */
 class TameworkPersistenceAuthorsTest {
     @Test
+    void releaseFailureUsesTheRecipientsLanguageAndFormatsCapacityValues() {
+        assertEquals(
+                "No hay suficiente capacidad para compañeros desplegados: 8 / 8 espacios usados; liberar necesita 1 espacio.",
+                TameworkPersistenceAuthors.spawnerFailureMessage(failed(
+                        SpawnerPersistenceAuthorResult.Kind.CAPTURE_RELEASE,
+                        new PopulationDomainCapacityException(
+                                PopulationDomainAdmission.Status.DEPLOYABLE_CAPACITY_REACHED,
+                                8, 1, 8)), "es-ES"));
+    }
+
+    @Test
     void capacityFailuresHaveSpecificFeedback() {
         // Protects the generic release message reported for the 2026-08-25
         // population_domain_deployable_capacity_reached failure.

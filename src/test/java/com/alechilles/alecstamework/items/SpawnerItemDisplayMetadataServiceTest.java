@@ -172,7 +172,7 @@ class SpawnerItemDisplayMetadataServiceTest {
         CapturingDisplayMetadataWriter writer = new CapturingDisplayMetadataWriter();
         TwTraitConfig traitConfig = traitConfig(
                 "Traits_Sheep",
-                trait("Trait_Size", "Size", 0.65, 1.0, 1.35),
+                trait("Trait_Size", "tamework.traits.size.name", 0.65, 1.0, 1.35),
                 trait("Trait_Temperament", "Temperament", 0.5, 1.0, 1.5)
         );
         TwLevelingConfig levelingConfig = levelingConfig("Levels_Sheep", 25);
@@ -230,6 +230,13 @@ class SpawnerItemDisplayMetadataServiceTest {
         assertEquals("#FFFFFF", messageWithText(description, "/1.35 (").getColor());
         assertEquals("#F6C453", messageWithText(description, "-- Traits --").getColor());
         assertEquals("#74D7E8", messageWithText(description, "-- Appearance --").getColor());
+        // The same item's deferred messages must render for a different recipient.
+        assertEquals(
+                "Jane - Mob_Sheep (F) - Nivel 15/25\n\n"
+                        + "-- Rasgos --\nTamaño: 1.19/1.35 (+55%)\n"
+                        + "Temperament: 0.75/1.50 (-50%)\n\n"
+                        + "-- Apariencia --\nFleece: White",
+                plainText(description, "es-ES"));
     }
 
     @Test
@@ -457,21 +464,40 @@ class SpawnerItemDisplayMetadataServiceTest {
     }
 
     private static String plainText(Message message) {
+        return plainText(message, "en-US");
+    }
+
+    private static String plainText(Message message, String language) {
         if (message == null) {
             return "";
         }
         StringBuilder text = new StringBuilder();
         if (message.getRawText() != null) {
             text.append(message.getRawText());
+        } else if (message.getMessageId() != null) {
+            String translated = com.alechilles.alecstamework.localization.LocalizedText.resolve(
+                    language, message.getMessageId());
+            var params = message.getFormattedMessage().params;
+            if (params != null) {
+                for (var entry : params.entrySet()) {
+                    String value = switch (entry.getValue()) {
+                        case com.hypixel.hytale.protocol.IntParamValue number -> Integer.toString(number.value);
+                        case com.hypixel.hytale.protocol.StringParamValue string -> string.value;
+                        default -> throw new AssertionError("Unsupported tooltip parameter");
+                    };
+                    translated = translated.replace("{" + entry.getKey() + "}", value);
+                }
+            }
+            text.append(translated);
         }
         for (Message child : message.getChildren()) {
-            text.append(plainText(child));
+            text.append(plainText(child, language));
         }
         return text.toString();
     }
 
     private static Message messageWithText(Message message, String expectedText) {
-        if (expectedText.equals(message.getRawText())) {
+        if (expectedText.equals(plainText(message))) {
             return message;
         }
         for (Message child : message.getChildren()) {
@@ -484,7 +510,7 @@ class SpawnerItemDisplayMetadataServiceTest {
     }
 
     private static Message messageWithTextOrNull(Message message, String expectedText) {
-        if (expectedText.equals(message.getRawText())) {
+        if (expectedText.equals(plainText(message))) {
             return message;
         }
         for (Message child : message.getChildren()) {

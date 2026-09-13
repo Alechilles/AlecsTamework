@@ -25,7 +25,7 @@ import javax.annotation.Nullable;
  */
 public final class TameworkGetTraitsCommand extends AbstractPlayerCommand {
     public TameworkGetTraitsCommand() {
-        super("traits", "Get traits of the NPC you are looking at.");
+        super("traits", "server.tamework.commands.getTraits.description");
         setAllowsExtraArguments(true);
     }
 
@@ -37,24 +37,24 @@ public final class TameworkGetTraitsCommand extends AbstractPlayerCommand {
                            @Nonnull World world) {
         TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
         if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.raw("No NPC found in view."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getTraits.no.npc.found.in.view"));
             return;
         }
 
         ComponentType<EntityStore, TameworkTraitsComponent> type = TameworkTraitsComponent.getComponentType();
         if (type == null) {
-            commandContext.sender().sendMessage(Message.raw("Traits component is not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getTraits.traits.component.is.not.available"));
             return;
         }
 
         TameworkTraitsComponent traits = store.getComponent(candidate.ref, type);
         if (traits == null) {
-            commandContext.sender().sendMessage(Message.raw("NPC " + candidate.npcUuid + " has no tracked trait state."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.getTraits.npc.has.no.tracked.trait.state").param("0", String.valueOf(candidate.npcUuid)));
             return;
         }
 
         TwTraitConfig config = resolveTraitConfig(candidate.ref, store, traits);
-        commandContext.sender().sendMessage(Message.raw(buildMessage(candidate.npcUuid, traits, config)));
+        commandContext.sender().sendMessage(buildLocalizedMessage(candidate.npcUuid, traits, config));
     }
 
     @Nullable
@@ -77,38 +77,53 @@ public final class TameworkGetTraitsCommand extends AbstractPlayerCommand {
         return TwTraitConfig.resolveForRole(roleId);
     }
 
-    private static String buildMessage(@Nonnull UUID npcUuid,
-                                       @Nonnull TameworkTraitsComponent traits,
-                                       @Nullable TwTraitConfig config) {
-        StringBuilder message = new StringBuilder();
-        message.append("Traits for NPC ").append(npcUuid).append(": ");
-
+    @Nonnull
+    private static Message buildLocalizedMessage(@Nonnull UUID npcUuid,
+                                                 @Nonnull TameworkTraitsComponent traits,
+                                                 @Nullable TwTraitConfig config) {
         String configId = normalizeBlank(traits.getConfigId());
         if (configId == null && config != null) {
             configId = normalizeBlank(config.getId());
         }
-        message.append("config=").append(configId != null ? configId : "n/a");
-        message.append(", seed=").append(traits.getRollSeed());
-
         TameworkTraitsComponent.TraitValue[] values = traits.getTraitValues().clone();
-        Arrays.sort(values, (left, right) -> compareTraitIds(left, right));
-
+        Arrays.sort(values, TameworkGetTraitsCommand::compareTraitIds);
         if (values.length == 0) {
-            message.append(", count=0.");
-            return message.toString();
+            return Message.translation("server.tamework.commands.getTraits.result.empty")
+                    .param("0", String.valueOf(npcUuid))
+                    .param("1", configId != null ? configId : "-")
+                    .param("2", String.valueOf(traits.getRollSeed()));
         }
+        return Message.translation("server.tamework.commands.getTraits.result")
+                .param("0", String.valueOf(npcUuid))
+                .param("1", configId != null ? configId : "-")
+                .param("2", String.valueOf(traits.getRollSeed()))
+                .param("3", String.valueOf(values.length))
+                .param("4", formatTraitValues(values, definitionMap(config)));
+    }
 
-        message.append(", count=").append(values.length).append(", values=[");
-        Map<String, TwTraitConfig.TraitDefinition> definitions = definitionMap(config);
-        for (int i = 0; i < values.length; i++) {
-            TameworkTraitsComponent.TraitValue value = values[i];
-            if (i > 0) {
-                message.append("; ");
+    @Nonnull
+    private static String formatTraitValues(@Nonnull TameworkTraitsComponent.TraitValue[] values,
+                                            @Nonnull Map<String, TwTraitConfig.TraitDefinition> definitions) {
+        StringBuilder result = new StringBuilder();
+        for (TameworkTraitsComponent.TraitValue value : values) {
+            if (!result.isEmpty()) {
+                result.append("; ");
             }
-            appendTraitValue(message, value, definitions);
+            if (value == null || value.getId() == null || value.getId().isBlank()) {
+                result.append("?=").append(formatDouble(0.0));
+                continue;
+            }
+            String id = value.getId();
+            result.append(id).append("=").append(formatDouble(value.getValue()));
+            TwTraitConfig.TraitDefinition definition = definitions.get(id.trim().toLowerCase(Locale.ROOT));
+            if (definition != null) {
+                String effectKey = normalizeBlank(definition.getEffectKey());
+                if (effectKey != null) {
+                    result.append(" [").append(effectKey).append("]");
+                }
+            }
         }
-        message.append("].");
-        return message.toString();
+        return result.toString();
     }
 
     private static int compareTraitIds(@Nullable TameworkTraitsComponent.TraitValue left,
@@ -116,29 +131,6 @@ public final class TameworkGetTraitsCommand extends AbstractPlayerCommand {
         String leftId = (left == null || left.getId() == null) ? "" : left.getId();
         String rightId = (right == null || right.getId() == null) ? "" : right.getId();
         return leftId.compareToIgnoreCase(rightId);
-    }
-
-    private static void appendTraitValue(StringBuilder message,
-                                         @Nullable TameworkTraitsComponent.TraitValue value,
-                                         Map<String, TwTraitConfig.TraitDefinition> definitions) {
-        if (value == null || value.getId() == null || value.getId().isBlank()) {
-            message.append("unknown=").append(formatDouble(0.0));
-            return;
-        }
-        String id = value.getId();
-        String normalizedId = id.trim().toLowerCase(Locale.ROOT);
-        TwTraitConfig.TraitDefinition definition = definitions.get(normalizedId);
-
-        message.append(id)
-                .append("=")
-                .append(formatDouble(value.getValue()));
-        if (definition == null) {
-            return;
-        }
-        String effectKey = normalizeBlank(definition.getEffectKey());
-        if (effectKey != null) {
-            message.append(" (effect=").append(effectKey).append(")");
-        }
     }
 
     private static Map<String, TwTraitConfig.TraitDefinition> definitionMap(@Nullable TwTraitConfig config) {

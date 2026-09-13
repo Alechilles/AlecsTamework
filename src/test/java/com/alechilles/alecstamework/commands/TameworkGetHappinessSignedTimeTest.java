@@ -45,18 +45,24 @@ class TameworkGetHappinessSignedTimeTest {
         Object breeding = emptyBreeding.invoke(null);
 
         Method buildMessage = TameworkGetHappinessCommand.class.getDeclaredMethod(
-                "buildMessage",
+                "buildLocalizedMessage",
                 UUID.class,
                 happinessType,
                 breedingType
         );
         buildMessage.setAccessible(true);
-        String message = (String) buildMessage.invoke(
+        com.hypixel.hytale.server.core.Message translated =
+                (com.hypixel.hytale.server.core.Message) buildMessage.invoke(
                 null,
                 UUID.fromString("00000000-0000-0000-0000-000000000001"),
                 happiness,
                 breeding
         );
+        String message = com.hypixel.hytale.server.core.util.MessageUtil.formatText(
+                com.alechilles.alecstamework.localization.LocalizedText.resolve(
+                        "en-US", translated.getMessageId()),
+                translated.getFormattedMessage().params,
+                translated.getFormattedMessage().messageParams);
 
         assertTrue(message.contains("lastUpdateMs=-123456"));
         assertTrue(message.endsWith(". Breeding component: none."));

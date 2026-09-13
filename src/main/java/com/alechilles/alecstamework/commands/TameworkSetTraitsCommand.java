@@ -14,19 +14,16 @@ import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayer
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 /**
  * Replaces the targeted NPC's trait list with explicit trait/value pairs.
  */
 public final class TameworkSetTraitsCommand extends AbstractPlayerCommand {
     public TameworkSetTraitsCommand() {
-        super("traits", "Replace traits on the NPC you are looking at.");
+        super("traits", "server.tamework.commands.setTraits.description");
         setAllowsExtraArguments(true);
     }
 
@@ -39,60 +36,49 @@ public final class TameworkSetTraitsCommand extends AbstractPlayerCommand {
         TameworkTraitCommandInputParser.ParseResult parseResult =
                 TameworkTraitCommandInputParser.parseSetTraits(commandContext.getInputString());
         if (!parseResult.isSuccess()) {
-            commandContext.sender().sendMessage(Message.raw(parseResult.errorMessage()));
+            commandContext.sender().sendMessage(TameworkTraitCommandSupport.parseErrorMessage(parseResult.errorMessage()));
             return;
         }
 
         TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
         if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.raw("No NPC found in view."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setTraits.no.npc.found.in.view"));
             return;
         }
 
         ComponentType<EntityStore, TameworkTraitsComponent> traitsType = TameworkTraitsComponent.getComponentType();
         if (traitsType == null) {
-            commandContext.sender().sendMessage(Message.raw("Traits component is not available."));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setTraits.traits.component.is.not.available"));
             return;
         }
         TameworkTraitsComponent existing = store.getComponent(candidate.ref, traitsType);
         TwTraitConfig config = TameworkTraitCommandSupport.resolveTraitConfig(candidate.ref, store, existing);
         if (config == null || !config.isEnabled()) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "No enabled trait config resolved for this NPC (role/config lookup failed)."
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setTraits.no.enabled.trait.config.resolved.for.this"));
             return;
         }
         Map<String, TwTraitConfig.TraitDefinition> definitions = TameworkTraitCommandSupport.definitionMap(config);
         if (definitions.isEmpty()) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "Trait config '" + config.getId() + "' has no trait definitions."
-            ));
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setTraits.trait.config.has.no.trait.definitions").param("0", String.valueOf(config.getId())));
             return;
         }
 
         LinkedHashMap<String, TameworkTraitsComponent.TraitValue> deduped = new LinkedHashMap<>();
-        ArrayList<String> notes = new ArrayList<>();
+        boolean clampedAny = false;
         for (TameworkTraitCommandInputParser.TraitRequest request : parseResult.requests()) {
             String normalizedId = TameworkTraitCommandSupport.normalize(request.traitId());
             if (normalizedId == null) {
-                commandContext.sender().sendMessage(Message.raw(
-                        "Trait id '" + request.traitId() + "' is invalid."
-                ));
+                commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setTraits.trait.id.is.invalid").param("0", String.valueOf(request.traitId())));
                 return;
             }
             TwTraitConfig.TraitDefinition definition = definitions.get(normalizedId);
             if (definition == null) {
-                commandContext.sender().sendMessage(Message.raw(
-                        "Unknown trait '" + request.traitId() + "'. Known traits: "
-                                + TameworkTraitCommandSupport.buildKnownTraitsText(definitions)
-                ));
+                commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setTraits.unknown.trait.known.traits").param("0", String.valueOf(request.traitId())).param("1", String.valueOf(TameworkTraitCommandSupport.buildKnownTraitsText(definitions))));
                 return;
             }
             double applied = TameworkTraitCommandSupport.clampToBreedingRange(request.value(), definition);
             if (TameworkTraitCommandSupport.wasClamped(request.value(), applied)) {
-                notes.add(definition.getId()
-                        + " clamped to "
-                        + TameworkTraitCommandSupport.formatDouble(applied));
+                clampedAny = true;
             }
             deduped.put(normalizedId, new TameworkTraitsComponent.TraitValue(definition.getId(), applied));
         }
@@ -124,39 +110,31 @@ public final class TameworkSetTraitsCommand extends AbstractPlayerCommand {
                 nextSizeMultiplier
         );
 
-        commandContext.sender().sendMessage(Message.raw(buildResultMessage(
-                candidate.npcUuid.toString(),
-                updated,
-                notes
-        )));
+        String values = formatTraitValues(updated);
+        if (!clampedAny) {
+            commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setTraits.result")
+                    .param("0", String.valueOf(candidate.npcUuid))
+                    .param("1", String.valueOf(updated.getTraitValues().length))
+                    .param("2", values));
+            return;
+        }
+        commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setTraits.result.clamped")
+                .param("0", String.valueOf(candidate.npcUuid))
+                .param("1", String.valueOf(updated.getTraitValues().length))
+                .param("2", values));
     }
 
-    private static String buildResultMessage(String npcUuid,
-                                             TameworkTraitsComponent traits,
-                                             @Nullable ArrayList<String> notes) {
-        StringBuilder message = new StringBuilder();
-        message.append("Set traits for NPC ")
-                .append(npcUuid)
-                .append(": count=")
-                .append(traits.getTraitValues().length)
-                .append(", values=[");
-        TameworkTraitsComponent.TraitValue[] values = traits.getTraitValues();
-        for (int i = 0; i < values.length; i++) {
-            if (i > 0) {
-                message.append("; ");
+    @Nonnull
+    private static String formatTraitValues(@Nonnull TameworkTraitsComponent traits) {
+        StringBuilder values = new StringBuilder();
+        for (TameworkTraitsComponent.TraitValue value : traits.getTraitValues()) {
+            if (!values.isEmpty()) {
+                values.append("; ");
             }
-            TameworkTraitsComponent.TraitValue value = values[i];
-            String id = value != null && value.getId() != null ? value.getId() : "unknown";
+            String id = value != null && value.getId() != null ? value.getId() : "?";
             double numeric = value != null ? value.getValue() : 0.0;
-            message.append(id)
-                    .append("=")
-                    .append(TameworkTraitCommandSupport.formatDouble(numeric));
+            values.append(id).append("=").append(TameworkTraitCommandSupport.formatDouble(numeric));
         }
-        message.append("]");
-        if (notes != null && !notes.isEmpty()) {
-            message.append(", notes=").append(String.join(", ", notes));
-        }
-        message.append(".");
-        return message.toString();
+        return values.toString();
     }
 }
