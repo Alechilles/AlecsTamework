@@ -130,6 +130,9 @@ final class LinkedNpcPanelCardDynamicPresenter {
                 false);
         LinkedNpcPanelIconStyles.style(commands, selector + " #FlightToggleButton",
                 current.flightToggleAirborne() ? "FlightAirborne" : "FlightGrounded");
+        commands.set(selector + " #FlightToggleButtonCaption.Text",
+                LocalizedText.resolve(language, "tamework.ui.linkedPanel.action."
+                        + (current.flightToggleAirborne() ? "flightAirborne" : "flightGrounded")));
         commands.set(selector + " #FlightToggleButton.TooltipText",
                 LocalizedText.resolve(language, current.flightToggleAirborne()
                         ? "tamework.ui.linkedPanel.bonded.flight.switchToGround"

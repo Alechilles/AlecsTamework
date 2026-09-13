@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
+import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.UUID;
@@ -10,6 +11,29 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class LinkedNpcPanelCardRenderStateTest {
+    @Test
+    void flightModeChangesRefreshTheCaptionWithoutReopeningThePanel() {
+        UUID id = UUID.randomUUID();
+        LinkedNpcEntry entry = new LinkedNpcEntry(id, "Drake", 100, 100,
+                0, 0, "", 0, 0, 0, 0, true, false, false, false, false,
+                false, 0L, LinkedNpcTraitIndicator.EMPTY);
+        for (boolean airborne : new boolean[] {true, false}) {
+            UICommandBuilder commands = new UICommandBuilder();
+            LinkedNpcPanelCardDynamicPresenter.refresh(commands,
+                    new UIEventBuilder(),
+                    "#Card", id, entry.withFlightToggle(true, !airborne),
+                    entry.withFlightToggle(true, airborne), null, null, false, null, "en-US");
+
+            UICommandBuilder expected = new UICommandBuilder();
+            String selector = "#Card #FlightToggleButtonCaption.Text";
+            expected.set(selector, airborne ? "Flying" : "Grounded");
+            assertEquals(expected.getCommands()[0].data,
+                    Arrays.stream(commands.getCommands())
+                            .filter(command -> selector.equals(command.selector))
+                            .reduce((first, last) -> last).orElseThrow().data);
+        }
+    }
+
     @Test
     void currentXpOnlyChangeUsesDynamicUpdateWhileActionChangeRebuildsCard() {
         UUID id = UUID.randomUUID();
