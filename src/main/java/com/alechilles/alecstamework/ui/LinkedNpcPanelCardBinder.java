@@ -355,10 +355,10 @@ final class LinkedNpcPanelCardBinder {
             );
         }
         if (removalMenuAvailable) {
-            commandBuilder.set(removeSelector + ".Style", Value.ref("TameworkPanelActionStyles.ui",
-                    showRemovalMenu ? "Back" : "Remove"));
-            commandBuilder.set(removeSelector + ".Text", showRemovalMenu ? "\u2190" : "");
-            commandBuilder.set(removeSelector + "Glyph.Visible", !showRemovalMenu);
+            LinkedNpcPanelIconStyles.style(commandBuilder, removeSelector,
+                    showRemovalMenu ? "Back" : "Remove");
+            commandBuilder.set(removeSelector + ".Text", "");
+            commandBuilder.set(removeSelector + "Glyph.Visible", true);
             commandBuilder.set(removeSelector + ".TooltipText", LocalizedText.resolve(language,
                     showRemovalMenu ? "tamework.ui.shared.button.back"
                             : "tamework.ui.linkedPanel.card.tooltip.removalMenu"));
