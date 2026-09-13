@@ -61,7 +61,7 @@ final class CommandTargetHudBinder {
         bindProgression(commandBuilder, status, language);
         bindTraits(commandBuilder, status.traitIndicators());
         bindFood(commandBuilder, model.favoriteFood(), model.compatibleFoods(), language);
-        bindAttachments(commandBuilder, model.attachments());
+        bindAttachments(commandBuilder, model.attachments(), language);
         bindTameRequirement(commandBuilder, model.tameRequirement(), language);
         bindOwner(commandBuilder, model.ownerDisplayName(), language);
         bindLayout(commandBuilder, model);
@@ -389,7 +389,8 @@ final class CommandTargetHudBinder {
     }
 
     private static void bindAttachments(UICommandBuilder commandBuilder,
-                                        @Nonnull List<CommandTargetHudViewModel.AttachmentRow> attachments) {
+                                        @Nonnull List<CommandTargetHudViewModel.AttachmentRow> attachments,
+                                        @Nullable String language) {
         for (int i = 0; i < MAX_ATTACHMENT_ROWS; i++) {
             String selector = "#AttachmentRow" + i;
             boolean visible = i < attachments.size();
@@ -398,7 +399,9 @@ final class CommandTargetHudBinder {
                 continue;
             }
             CommandTargetHudViewModel.AttachmentRow row = attachments.get(i);
-            commandBuilder.set(selector + " #Text.Text", row.displayLine());
+            String label = LocalizedText.resolveConfigValue(language, row.setLabel(), row.setLabel());
+            String value = LocalizedText.resolveConfigValue(language, row.valueLabel(), row.valueLabel());
+            commandBuilder.set(selector + " #Text.Text", value.isBlank() ? label : label + ": " + value);
         }
     }
 

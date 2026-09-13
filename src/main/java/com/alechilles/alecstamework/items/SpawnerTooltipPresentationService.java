@@ -21,7 +21,6 @@ import org.bson.BsonValue;
  * Builds the colored summary, progression, and appearance sections for captured spawner tooltips.
  */
 final class SpawnerTooltipPresentationService {
-    private static final String DEFAULT_LANGUAGE = "en-US";
     private static final String WHITE = "#FFFFFF";
     private static final String FEMALE = "#FF8FBD";
     private static final String MALE = "#63A9FF";
@@ -234,9 +233,11 @@ final class SpawnerTooltipPresentationService {
             if (display == null) {
                 continue;
             }
-            String line = normalize(display.toTooltipLine());
-            if (line != null) {
-                lines.add(white(line));
+            String label = normalize(display.setLabel());
+            String value = normalize(display.valueLabel());
+            if (label != null) {
+                Message heading = displayLabel(label);
+                lines.add(value == null ? heading : Message.join(heading, white(": "), displayLabel(value)));
             }
         }
         return lines;
@@ -289,10 +290,13 @@ final class SpawnerTooltipPresentationService {
             return white(fallback);
         }
         String configured = normalize(definition.getDisplayName());
-        if (configured != null && looksLikeTranslationKey(configured)) {
-            return Message.translation(serverTranslationKey(configured));
-        }
-        return white(configured == null ? fallback : configured);
+        return displayLabel(configured == null ? fallback : configured);
+    }
+
+    private static Message displayLabel(String value) {
+        return looksLikeTranslationKey(value)
+                ? Message.translation(serverTranslationKey(value)).color(WHITE)
+                : white(value);
     }
 
     private static boolean looksLikeTranslationKey(String value) {

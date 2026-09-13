@@ -64,6 +64,22 @@ class CommandTargetHudBinderTest {
     }
 
     @Test
+    void translatesAttachmentLabelsAndValuesForEachViewer() {
+        var appearance = List.of(new CommandTargetHudViewModel.AttachmentRow(
+                "server.tamework.traits.size.name", "server.tamework.ui.shared.unknown"));
+        var model = model(loadedNeedsStatus("Cat"), appearance);
+        UICommandBuilder english = bind(model);
+        UICommandBuilder spanish = new UICommandBuilder();
+        CommandTargetHudBinder.bind(spanish, model, "es-ES");
+        UICommandBuilder expectedEnglish = new UICommandBuilder();
+        expectedEnglish.set("#AttachmentRow0 #Text.Text", "Size: Unknown");
+        assertCommands(expectedEnglish, english);
+        UICommandBuilder expectedSpanish = new UICommandBuilder();
+        expectedSpanish.set("#AttachmentRow0 #Text.Text", "Tamaño: Desconocido");
+        assertCommands(expectedSpanish, spanish);
+    }
+
+    @Test
     void optionalSectionsCollapseAndFoodPrecedesAppearanceAndOwner() {
         var food = new CommandTargetHudViewModel.FoodRow("Food_Corn", "Corn", null, 5.0);
         var detailed = new CommandTargetHudViewModel(loadedNeedsStatus("Duck"), food, List.of(food),

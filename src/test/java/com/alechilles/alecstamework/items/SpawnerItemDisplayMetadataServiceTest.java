@@ -190,7 +190,8 @@ class SpawnerItemDisplayMetadataServiceTest {
                         0,
                         true,
                         entry("sheep", appliesTo(new String[] { "Mob_Sheep" }, null, null, null),
-                                set("Fleece", "Fleece", Map.of("White", "White")))
+                                set("Fleece", "server.tamework.traits.size.name",
+                                        Map.of("White", "server.tamework.ui.shared.unknown")))
                 ))),
                 stack -> null,
                 writer,
@@ -219,7 +220,7 @@ class SpawnerItemDisplayMetadataServiceTest {
                         + "Size: 1.19/1.35 (+55%)\n"
                         + "Temperament: 0.75/1.50 (-50%)\n\n"
                         + "-- Appearance --\n"
-                        + "Fleece: White",
+                        + "Size: Unknown",
                 plainText(description)
         );
         assertEquals("#FF8FBD", messageWithText(description, "F").getColor());
@@ -235,7 +236,7 @@ class SpawnerItemDisplayMetadataServiceTest {
                 "Jane - Mob_Sheep (F) - Nivel 15/25\n\n"
                         + "-- Rasgos --\nTamaño: 1.19/1.35 (+55%)\n"
                         + "Temperament: 0.75/1.50 (-50%)\n\n"
-                        + "-- Apariencia --\nFleece: White",
+                        + "-- Apariencia --\nTamaño: Desconocido",
                 plainText(description, "es-ES"));
     }
 

@@ -55,7 +55,7 @@ final class CommandTargetHudAttachmentResolver {
         if (primary != null && !primary.isBlank()) {
             return primary;
         }
-        return fallback == null || fallback.isBlank() ? "Unknown" : fallback;
+        return fallback == null || fallback.isBlank() ? "tamework.ui.shared.unknown" : fallback;
     }
 
     @FunctionalInterface

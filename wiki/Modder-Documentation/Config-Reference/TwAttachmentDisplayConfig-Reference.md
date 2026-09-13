@@ -31,10 +31,10 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Alec's Tamew
       },
       "Sets": {
         "BaseColor": {
-          "Label": "Coat",
+          "Label": "server.myMod.attachments.coat.label",
           "Values": {
-            "Black": "Black Coat",
-            "White": "White Coat"
+            "Black": "server.myMod.attachments.coat.black",
+            "White": "server.myMod.attachments.coat.white"
           }
         }
       }
@@ -53,7 +53,22 @@ Entry fields:
 
 - `Id`: optional stable ID for deterministic tie-breaking.
 - `AppliesTo`: optional filters. If omitted or empty, the entry is a global fallback.
-- `Sets`: map of raw attachment set IDs to labels and raw value labels.
+- `Sets`: map of raw attachment set IDs to display labels and value labels.
+
+`Label` and each `Values` value accept language keys. Define them in every
+supported `Server/Languages/<locale>/server.lang` catalog, without the `server.`
+prefix in the catalog itself. For example:
+
+```properties
+myMod.attachments.coat.label=Coat
+myMod.attachments.coat.black=Black Coat
+myMod.attachments.coat.white=White Coat
+```
+
+The target HUD resolves these labels in the viewer's language. Captured-item
+tooltips retain translation keys so the same item can display in each viewer's
+language. Existing literal labels remain supported. Set IDs and value IDs remain
+unchanged and must not be translated.
 
 `AppliesTo` supports:
 

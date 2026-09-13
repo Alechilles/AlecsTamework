@@ -2,6 +2,8 @@
 
 ## Unreleased development changes
 
+- Attachment display labels and values now support language keys in the target HUD and captured-item tooltips, preserving each viewer's language.
+
 - Completed translations for menus, HUDs, tooltips, command help and responses
   across all six supported languages. Captured-item labels now retain language
   keys so each viewer can see their own translation.
