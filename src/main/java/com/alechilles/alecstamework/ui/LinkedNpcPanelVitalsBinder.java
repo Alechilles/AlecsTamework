@@ -339,7 +339,7 @@ final class LinkedNpcPanelVitalsBinder {
         boolean muted = !entry.loaded() || !entry.breedingEnabled()
                 || LinkedNpcPanelStatusTextService.breedingBlockedByHappiness(entry);
         bindCooldownMeter(commands, card + " #BreedingCooldown",
-                entry.breedingCooldownKnown(), (entry.loaded() || entry.breedingEnabled()) && entry.breedingCooldownActive(),
+                !entry.lost() && entry.breedingCooldownKnown(), (entry.loaded() || entry.breedingEnabled()) && entry.breedingCooldownActive(),
                 entry.breedingCooldownRatio(), !entry.loaded() && !entry.breedingEnabled() ? 0L : entry.breedingCooldownRemainingMs(),
                 LocalizedText.resolve(language, entry.breedingEnabled()
                         ? "tamework.ui.linkedPanel.breedingCooldown.ready"
@@ -353,7 +353,7 @@ final class LinkedNpcPanelVitalsBinder {
     private static void bindHarvestCooldownMeter(UICommandBuilder commands, String card,
                                                  LinkedNpcEntry entry, String language) {
         bindCooldownMeter(commands, card + " #HarvestCooldown",
-                entry.harvestCooldownKnown(), entry.harvestCooldownActive(),
+                !entry.lost() && entry.harvestCooldownKnown(), entry.harvestCooldownActive(),
                 entry.harvestCooldownRatio(), entry.harvestCooldownRemainingMs(),
                 LocalizedText.resolve(language, "tamework.ui.linkedPanel.harvestCooldown.ready"),
                 LinkedNpcPanelStatusTextService.resolveHarvestCooldownTooltip(entry, language),

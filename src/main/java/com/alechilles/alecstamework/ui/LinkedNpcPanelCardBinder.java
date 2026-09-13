@@ -356,14 +356,17 @@ final class LinkedNpcPanelCardBinder {
             // Center in the entire action section, independently of visible actions.
             int statusLeft = 432;
             int statusWidth = 414;
-            int emblemSize = compact ? 36 : 44;
+            boolean lost = entry.lost() && !entry.dead() && !entry.inCoop();
+            int emblemSize = lost ? (compact ? 48 : 72) : compact ? 36 : 44;
+            int emblemTop = lost ? (compact ? 37 : managedRoster ? 64 : 46) : 36;
+            int labelTop = lost ? emblemTop + emblemSize + 4 : compact ? 74 : 82;
             commandBuilder.set(entrySelector + " #StatusEmblem.Background", emblem);
             commandBuilder.setObject(entrySelector + " #StatusEmblem.Anchor",
-                    fixedAnchor(36, statusLeft + (statusWidth - emblemSize) / 2, emblemSize, emblemSize));
+                    fixedAnchor(emblemTop, statusLeft + (statusWidth - emblemSize) / 2, emblemSize, emblemSize));
             commandBuilder.setObject(statusUnloadedSelector + ".Anchor",
-                    fixedAnchor(compact ? 74 : 82, statusLeft, statusWidth, 16));
+                    fixedAnchor(labelTop, statusLeft, statusWidth, 16));
             commandBuilder.setObject(recallCountdownSelector + ".Anchor",
-                    fixedAnchor(98, statusLeft, statusWidth, 12));
+                    fixedAnchor(lost ? labelTop + 18 : 98, statusLeft, statusWidth, 12));
         }
         boolean showInlineStatus = showInlineLocation && !location.status().isBlank();
         boolean showInlineWorld = showInlineLocation && !location.world().isBlank();
