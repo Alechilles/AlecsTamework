@@ -19,8 +19,10 @@ breeding, traits and talents, capture and coops, finding and recovery, bonded
 companions, travel and flight, or world utilities. The guide also covers taming,
 ownership, linking, and naming for new players.
 
-Example cards use sample values and cannot issue commands or change your
-companions. Features, controls, and requirements depend on the animal pack and
+Example cards use the same controls as your animals' cards, with made-up names
+and numbers. Hover over their bars and icons for help. Use the example's
+Previous and Next buttons to see other situations. These cards cannot issue
+commands or change your companions. Features and controls depend on the animal pack and
 server settings. Use the guide's Back or close button to return to the existing
 panel without changing its filters or selection.
 

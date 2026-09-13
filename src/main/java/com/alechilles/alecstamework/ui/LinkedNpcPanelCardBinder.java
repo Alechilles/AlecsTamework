@@ -86,6 +86,32 @@ final class LinkedNpcPanelCardBinder {
             );
             return;
         }
+        if (appendCard) {
+            commandBuilder.append("#TameworkLinkedPanelList", config.linkedPanelCardUiPath());
+        }
+        bind(commandBuilder, eventBuilder, entrySelector, entry, pendingUnlink, config, language, feature);
+    }
+
+    /** Binds an already-appended generic card under an explicit selector. */
+    static void bind(UICommandBuilder commandBuilder,
+                     UIEventBuilder eventBuilder,
+                     String entrySelector,
+                     LinkedNpcEntry entry,
+                     boolean pendingUnlink,
+                     CardBindingConfig config,
+                     String language) {
+        bind(commandBuilder, eventBuilder, entrySelector, entry, pendingUnlink,
+                config, language, null);
+    }
+
+    private static void bind(UICommandBuilder commandBuilder,
+                     UIEventBuilder eventBuilder,
+                     String entrySelector,
+                     LinkedNpcEntry entry,
+                     boolean pendingUnlink,
+                     CardBindingConfig config,
+                     String language,
+                     CommandPanelFeaturePresentation feature) {
         String nameSelector = entrySelector + " #Name";
         String maleIconSelector = entrySelector + " #GenderMaleIcon";
         String femaleIconSelector = entrySelector + " #GenderFemaleIcon";
@@ -125,10 +151,6 @@ final class LinkedNpcPanelCardBinder {
         String releaseSelector = entrySelector + " #ReleaseButton";
         String releaseDisabledSelector = entrySelector + " #ReleaseButtonDisabled";
         String cullSelector = entrySelector + " #CullButton";
-
-        if (appendCard) {
-            commandBuilder.append("#TameworkLinkedPanelList", config.linkedPanelCardUiPath());
-        }
         commandBuilder.set(nameSelector + ".Text", entry.displayName());
         commandBuilder.set(nameSelector + ".TooltipText", entry.displayName());
         commandBuilder.set(entrySelector + " #RoleSubtitle.Text", entry.roleSubtitle());

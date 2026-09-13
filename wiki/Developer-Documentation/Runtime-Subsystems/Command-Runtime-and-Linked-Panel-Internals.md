@@ -39,13 +39,16 @@ they do not enter companion action routing. While the guide is visible, the
 page ignores underlying command and assignment events. Closing it hides the
 overlay and keeps the mounted panel and its session intact.
 
-Guide examples are read-only UI with sample values. They do not create NPCs,
+Guide examples reuse the production linked and bonded card UI assets with
+detached sample entries and visual binders. They bind no companion actions;
+only guide navigation emits events. They do not create NPCs,
 resolve live companions, issue commands, or save state. The guide has no
 executor, listener, or persistence owner; its lifetime is the command page's.
 
 All guide copy, including sample labels and page navigation, uses
-`tamework.ui.guide.*` language keys. Each supported locale includes English
-fallback copy for translation. The UI document contains no literal guide text.
+`tamework.ui.guide.*` language keys, alongside the real cards' shared language
+keys. The guide is translated into all six supported languages. The UI
+document contains no literal guide text.
 
 ## Persistence model
 Legacy command tools persist their link list, group metadata, panel

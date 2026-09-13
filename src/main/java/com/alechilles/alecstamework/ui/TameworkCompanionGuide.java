@@ -25,10 +25,13 @@ final class TameworkCompanionGuide {
     private static final String ACTION_PREVIOUS = "guide:previous";
     private static final String ACTION_NEXT = "guide:next";
     private static final String ACTION_TOPIC_PREFIX = "guide:topic:";
+    private static final String ACTION_EXAMPLE_PREVIOUS = "guide:example:previous";
+    private static final String ACTION_EXAMPLE_NEXT = "guide:example:next";
     private static final String EVENT_COMMAND_ID = "CommandId";
 
     private final Supplier<String> languageSupplier;
     private int topicIndex;
+    private int exampleIndex;
     private boolean visible;
 
     TameworkCompanionGuide(@Nonnull Supplier<String> languageSupplier) {
@@ -44,6 +47,8 @@ final class TameworkCompanionGuide {
         bind(eventBuilder, "#TameworkCompanionGuideBackButton", ACTION_CLOSE);
         bind(eventBuilder, "#TameworkCompanionGuidePreviousButton", ACTION_PREVIOUS);
         bind(eventBuilder, "#TameworkCompanionGuideNextButton", ACTION_NEXT);
+        bind(eventBuilder, "#TameworkCompanionGuideExamplePreviousButton", ACTION_EXAMPLE_PREVIOUS);
+        bind(eventBuilder, "#TameworkCompanionGuideExampleNextButton", ACTION_EXAMPLE_NEXT);
         for (int index = 0; index < TameworkCompanionGuideContent.TOPICS.length; index++) {
             bind(eventBuilder, "#TameworkCompanionGuideTopic" + index, ACTION_TOPIC_PREFIX + index);
         }
@@ -73,13 +78,25 @@ final class TameworkCompanionGuide {
         }
         if (ACTION_PREVIOUS.equals(action)) {
             topicIndex = Math.max(0, topicIndex - 1);
+            exampleIndex = 0;
         } else if (ACTION_NEXT.equals(action)) {
             topicIndex = Math.min(TameworkCompanionGuideContent.TOPICS.length - 1, topicIndex + 1);
+            exampleIndex = 0;
+        } else if (ACTION_EXAMPLE_PREVIOUS.equals(action)) {
+            if (TameworkCompanionGuideCardRenderer.hasExampleScenarios(topicIndex)) {
+                exampleIndex = Math.floorMod(exampleIndex - 1,
+                        TameworkCompanionGuideCardRenderer.EXAMPLE_COUNT);
+            }
+        } else if (ACTION_EXAMPLE_NEXT.equals(action)) {
+            if (TameworkCompanionGuideCardRenderer.hasExampleScenarios(topicIndex)) {
+                exampleIndex = (exampleIndex + 1) % TameworkCompanionGuideCardRenderer.EXAMPLE_COUNT;
+            }
         } else if (action.startsWith(ACTION_TOPIC_PREFIX)) {
             try {
                 int requested = Integer.parseInt(action.substring(ACTION_TOPIC_PREFIX.length()));
                 if (requested >= 0 && requested < TameworkCompanionGuideContent.TOPICS.length) {
                     topicIndex = requested;
+                    exampleIndex = 0;
                 }
             } catch (NumberFormatException ignored) {
                 // A forged guide action must not escape into command execution.
@@ -87,7 +104,8 @@ final class TameworkCompanionGuide {
         } else {
             return true;
         }
-        applyPage(commandBuilder);
+        applyPage(commandBuilder, !ACTION_EXAMPLE_PREVIOUS.equals(action)
+                && !ACTION_EXAMPLE_NEXT.equals(action));
         return true;
     }
 
@@ -101,6 +119,10 @@ final class TameworkCompanionGuide {
     }
 
     private void applyPage(UICommandBuilder commands) {
+        applyPage(commands, true);
+    }
+
+    private void applyPage(UICommandBuilder commands, boolean resetReadingArea) {
         TameworkCompanionGuideContent.Topic topic = TameworkCompanionGuideContent.TOPICS[topicIndex];
         String language = languageSupplier.get();
         commands.set("#TameworkCompanionGuideTitle.Text", text(language, "title"));
@@ -108,46 +130,32 @@ final class TameworkCompanionGuide {
         commands.set("#TameworkCompanionGuideTopicsLabel.Text", text(language, "topics"));
         commands.set("#TameworkCompanionGuideCloseButton.TooltipText", text(language, "close"));
         commands.set("#TameworkCompanionGuideExampleLabel.Text", text(language, "example"));
-        commands.set("#TameworkCompanionGuideSampleName.Text", text(language, "sample.name"));
-        commands.set("#TameworkCompanionGuideSampleSubtitle.Text", text(language, "sample.subtitle"));
-        commands.set("#TameworkCompanionGuideSampleProgress.Text", text(language, "sample.progress"));
-        commands.set("#TameworkCompanionGuideSampleHealth.Text", text(language, "sample.health"));
-        commands.set("#TameworkCompanionGuideSampleHappiness.Text", text(language, "sample.happiness"));
         commands.set("#TameworkCompanionGuidePreviousButton.Text", text(language, "previous"));
         commands.set("#TameworkCompanionGuideNextButton.Text", text(language, "next"));
         commands.set("#TameworkCompanionGuideBackButton.Text", text(language, "back"));
         commands.set("#TameworkCompanionGuideContentTitle.Text", text(language, "topic." + topic.key() + ".title"));
-        // Recreate only the reading area so a new topic starts at the top.
-        commands.clear("#TameworkCompanionGuideBodyViewport");
-        commands.append("#TameworkCompanionGuideBodyViewport", "TameworkCompanionGuideBody.ui");
-        commands.set("#TameworkCompanionGuideContentBody.Text", text(language, "topic." + topic.key() + ".body"));
+        // A new topic starts at the top; changing examples keeps the reader's place.
+        if (resetReadingArea) {
+            commands.clear("#TameworkCompanionGuideBodyViewport");
+            commands.append("#TameworkCompanionGuideBodyViewport", "TameworkCompanionGuideBody.ui");
+            commands.set("#TameworkCompanionGuideContentBody.Text", text(language, "topic." + topic.key() + ".body"));
+        }
         commands.set("#TameworkCompanionGuideExampleTitle.Text", text(language, "topic." + topic.key() + ".visual"));
         commands.set("#TameworkCompanionGuideExampleNote.Text", text(language, "topic." + topic.key() + ".note"));
+        boolean scenarios = TameworkCompanionGuideCardRenderer.hasExampleScenarios(topicIndex);
+        String scenarioKey = "sample." + topic.key();
+        commands.set("#TameworkCompanionGuideScenarioTitle.Text", scenarios
+                ? text(language, scenarioKey + ".scenario" + exampleIndex + ".title") : "");
+        commands.set("#TameworkCompanionGuideScenarioTitle.Visible", scenarios);
+        commands.set("#TameworkCompanionGuideExamplePreviousButton.Text", text(language, "previous"));
+        commands.set("#TameworkCompanionGuideExampleNextButton.Text", text(language, "next"));
+        commands.set("#TameworkCompanionGuideExamplePreviousButton.Visible", scenarios && exampleIndex > 0);
+        commands.set("#TameworkCompanionGuideExampleNextButton.Visible",
+                scenarios && exampleIndex < TameworkCompanionGuideCardRenderer.EXAMPLE_COUNT - 1);
         commands.set("#TameworkCompanionGuidePage.Text", LocalizedText.format(language, "tamework.ui.guide.page", topicIndex + 1, TameworkCompanionGuideContent.TOPICS.length));
-        commands.set("#TameworkCompanionGuideSampleState.Text", text(language, "sample." + topic.key() + ".state"));
-        commands.set("#TameworkCompanionGuideSampleCallout0.Text", text(language, "sample." + topic.key() + ".callout0"));
-        commands.set("#TameworkCompanionGuideSampleCallout1.Text", text(language, "sample." + topic.key() + ".callout1"));
-        commands.set("#TameworkCompanionGuideSampleCallout2.Text", text(language, "sample." + topic.key() + ".callout2"));
-        commands.set("#TameworkCompanionGuideSampleCallout3.Text", text(language, "sample." + topic.key() + ".callout3"));
-        commands.set("#TameworkCompanionGuideSampleCare.Visible", topicIndex != 8);
-        commands.set("#TameworkCompanionGuideHappiness.Visible", topicIndex != 8);
-        commands.set("#TameworkCompanionGuideBondedBadge.Text", text(language, "sample.bonded"));
-        commands.set("#TameworkCompanionGuideBondedBadge.Visible", topicIndex == 8);
-        boolean scenarios = topicIndex != 1 && topicIndex != 5 && topicIndex != 9;
-        commands.set("#TameworkCompanionGuideScenarios.Visible", scenarios);
-        commands.set("#TameworkCompanionGuideSampleCard.Visible", !scenarios);
-        if (scenarios) {
-            for (int index = 0; index < 3; index++) {
-                String selector = "#TameworkCompanionGuideScenario" + index;
-                String key = "sample." + topic.key() + ".scenario" + index;
-                commands.set(selector + " #Title.Text", text(language, key + ".title"));
-                commands.set(selector + " #Body.Text", text(language, key + ".body"));
-                commands.set(selector + " #Portrait.Visible", topicIndex != 10);
-            }
-        }
-        commands.set("#TameworkCompanionGuideSampleCommand1.Text", text(language, "sample." + topic.key() + ".action0"));
-        commands.set("#TameworkCompanionGuideSampleCommand2.Text", text(language, "sample." + topic.key() + ".action1"));
-        commands.set("#TameworkCompanionGuideSampleCommand3.Text", text(language, "sample." + topic.key() + ".action2"));
+        TameworkCompanionGuideCardRenderer.render(
+                commands, topic, topicIndex, exampleIndex, language
+        );
         commands.set("#TameworkCompanionGuidePreviousButton.Visible", topicIndex > 0);
         commands.set("#TameworkCompanionGuideNextButton.Visible", topicIndex < TameworkCompanionGuideContent.TOPICS.length - 1);
         for (int index = 0; index < TameworkCompanionGuideContent.TOPICS.length; index++) {

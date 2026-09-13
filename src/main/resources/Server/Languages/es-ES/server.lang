@@ -1638,3 +1638,6 @@ tamework.commands.apiTest.suite={0} {1} ({2}/{3})
 tamework.commands.apiTest.assertion=  {0} {1}: {2}
 tamework.commands.apiTest.totals=Totales: {0}/{1} aprobados, {2} fallidos
 tamework.commands.debugDb.description=Mostrar diagnósticos de persistencia de base de datos de Tamework.
+tamework.ui.guide.sample.species=Lobo
+tamework.ui.guide.sample.trait.attitude=Cambia la forma en que se comporta tu animal.
+tamework.ui.guide.sample.trait.fertility=Puede cambiar cuántas crías tiene tu animal.

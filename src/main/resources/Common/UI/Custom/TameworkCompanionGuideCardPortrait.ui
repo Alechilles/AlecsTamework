@@ -1,0 +1,12 @@
+Group #TameworkCompanionGuideGenericPortrait {
+ Anchor: (Top: 31, Left: 28, Width: 92, Height: 92);
+ Background: "Tamework/Guide/CompanionGuidePortrait.png";
+ HitTestVisible: false;
+ Visible: false;
+}
+Group #TameworkCompanionGuideBondedPortrait {
+ Anchor: (Top: 57, Left: 27, Width: 90, Height: 90);
+ Background: "Tamework/Guide/CompanionGuidePortrait.png";
+ HitTestVisible: false;
+ Visible: false;
+}
