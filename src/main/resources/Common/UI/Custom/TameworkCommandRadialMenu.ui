@@ -37,9 +37,9 @@ $C.@PageOverlay {
      Group { Anchor: (Top: 1, Left: 2, Width: 24, Height: 24); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelActions/Settings_Glyph_Default.png"); }
     }
     Group #CommandMenuClose {
-     Anchor: (Top: 8, Right: 14, Width: 28, Height: 26);
+     Anchor: (Top: 7, Right: 14, Width: 28, Height: 28);
      TextButton #CommandMenuCloseButton { Anchor: (Full: 0); Text: ""; TooltipText: %server.tamework.ui.shared.button.close; Style: $A.@Remove; }
-     Group { Anchor: (Top: 1, Left: 2, Width: 24, Height: 24); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png"); }
+     Group { Anchor: (Top: 2, Left: 2, Width: 24, Height: 24); HitTestVisible: false; Background: (TexturePath: "Tamework/PanelActions/Remove_Glyph_Default.png"); }
     }
    }
    Group #TameworkCommandAssignments {

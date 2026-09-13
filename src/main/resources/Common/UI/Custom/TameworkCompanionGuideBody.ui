@@ -5,9 +5,8 @@ Group {
  LayoutMode: TopScrolling;
  ScrollbarStyle: $C.@DefaultScrollbarStyle;
  Padding: (Right: 10);
- Label #TameworkCompanionGuideContentBody {
-  Anchor: (Left: 0, Right: 0, Height: 800);
-  Text: "";
-  Style: (FontSize: 14, TextColor: #d6d9d0, Wrap: true, VerticalAlignment: Start);
+ Group #TameworkCompanionGuideSections {
+  Anchor: (Left: 0, Right: 0);
+  LayoutMode: Top;
  }
 }

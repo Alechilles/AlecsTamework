@@ -138,7 +138,17 @@ final class TameworkCompanionGuide {
         if (resetReadingArea) {
             commands.clear("#TameworkCompanionGuideBodyViewport");
             commands.append("#TameworkCompanionGuideBodyViewport", "TameworkCompanionGuideBody.ui");
-            commands.set("#TameworkCompanionGuideContentBody.Text", text(language, "topic." + topic.key() + ".body"));
+            // Locale bodies separate sections with a blank line, then heading from prose
+            // with one newline. Keep that translated content intact while styling each part.
+            String[] sections = text(language, "topic." + topic.key() + ".body").split("\n\n");
+            for (int index = 0; index < sections.length; index++) {
+                commands.append("#TameworkCompanionGuideSections", "TameworkCompanionGuideSection.ui");
+                String selector = "#TameworkCompanionGuideSections[" + index + "]";
+                int headingEnd = sections[index].indexOf('\n');
+                commands.set(selector + " #Heading.Visible", headingEnd >= 0);
+                commands.set(selector + " #Heading.Text", headingEnd < 0 ? "" : sections[index].substring(0, headingEnd));
+                commands.set(selector + " #Body.Text", headingEnd < 0 ? sections[index] : sections[index].substring(headingEnd + 1));
+            }
         }
         commands.set("#TameworkCompanionGuideExampleTitle.Text", text(language, "topic." + topic.key() + ".visual"));
         commands.set("#TameworkCompanionGuideExampleNote.Text", text(language, "topic." + topic.key() + ".note"));
