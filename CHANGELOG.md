@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Companion removal now keeps its heading and actions together, with a Back arrow
+  and named confirmations before releasing or culling an animal.
+
 - Linking and admin spawning now save full companion checkpoints for offline
   card details and Recall recovery. Recall progress no longer overlaps action captions.
 

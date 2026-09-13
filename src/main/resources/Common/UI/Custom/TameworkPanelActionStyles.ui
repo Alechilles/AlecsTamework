@@ -57,6 +57,8 @@ $C = "Common.ui";
 );
 
 @PanelButtonSelected = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 3), LabelStyle: @PanelButtonLabel), Hovered: (Background: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 3), LabelStyle: @PanelButtonLabel), Sounds: $C.@ButtonSounds);
+@BackLabel = LabelStyle(FontSize: 20, RenderBold: true, TextColor: #e8e4da, Alignment: Center);
+@Back = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3), LabelStyle: @BackLabel), Hovered: (Background: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 3), LabelStyle: @BackLabel), Pressed: (Background: (TexturePath: "Tamework/PanelActions/Base_Hover.png", Border: 3), LabelStyle: @BackLabel), Sounds: $C.@ButtonSounds);
 
 // Text entry fields in this panel share the same quiet charcoal treatment as dropdowns.
 // Keep the text and placeholder colors here so runtime-created filter fields can reuse it.

@@ -205,7 +205,7 @@ final class LinkedNpcPanelCardBinder {
                 && !pendingUnlink;
         commandBuilder.set(
                 statusUnloadedSelector + ".Visible",
-                !entry.loaded() || entry.dead() || entry.lost() || entry.captured() || entry.inCoop()
+                !pendingUnlink && (!entry.loaded() || entry.dead() || entry.lost() || entry.captured() || entry.inCoop())
         );
         commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry, language));
         commandBuilder.set(recallCountdownSelector + ".Visible", showRecallCountdown);
@@ -304,11 +304,17 @@ final class LinkedNpcPanelCardBinder {
         for (int actionIndex = 0; actionIndex < actionSelectors.length; actionIndex++) {
             if (actionVisible[actionIndex]) {
                 LinkedNpcPanelIconStyles.placeAction(commandBuilder, actionSelectors[actionIndex], actionLeft);
+                if (showRemovalMenu) {
+                    LinkedNpcPanelIconStyles.anchor(commandBuilder, actionSelectors[actionIndex],
+                            fixedAnchor(52, actionLeft, 42, 42));
+                    commandBuilder.setObject(actionSelectors[actionIndex] + "Caption.Anchor",
+                            fixedAnchor(96, actionLeft - 6, 54, 12));
+                }
                 actionLeft += 60;
             }
         }
         String emblem = LinkedNpcPanelStatusTextService.resolveAvailabilityEmblem(entry);
-        commandBuilder.set(entrySelector + " #StatusEmblem.Visible", emblem != null);
+        commandBuilder.set(entrySelector + " #StatusEmblem.Visible", emblem != null && !pendingUnlink);
         if (emblem != null) {
             boolean compact = !managedRoster && !entry.hasKnownCardDetails();
             // Center in the entire action section, independently of visible actions.
@@ -349,7 +355,13 @@ final class LinkedNpcPanelCardBinder {
             );
         }
         if (removalMenuAvailable) {
-            commandBuilder.set(removeSelector + ".Text", "");
+            commandBuilder.set(removeSelector + ".Style", Value.ref("TameworkPanelActionStyles.ui",
+                    showRemovalMenu ? "Back" : "Remove"));
+            commandBuilder.set(removeSelector + ".Text", showRemovalMenu ? "\u2190" : "");
+            commandBuilder.set(removeSelector + "Glyph.Visible", !showRemovalMenu);
+            commandBuilder.set(removeSelector + ".TooltipText", LocalizedText.resolve(language,
+                    showRemovalMenu ? "tamework.ui.shared.button.back"
+                            : "tamework.ui.linkedPanel.card.tooltip.removalMenu"));
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
                     removeSelector,

@@ -95,7 +95,7 @@ Group {
             TextButton #TraitTooltip { Anchor: (Top: 0, Left: 0, Width: 32, Height: 30); Style: @TraitTooltipButtonStyle; Text: ""; TextTooltipStyle: @LinkedActionTooltipStyle; }
         }
     }
-    Label #StatusConfirm { Anchor: (Top: 57, Left: 0, Width: 150, Height: 20); Text: %server.tamework.ui.linkedPanel.card.confirmRemove; Style: (FontSize: 10, RenderBold: true, TextColor: #ffd3d3, HorizontalAlignment: Start, VerticalAlignment: Center); Visible: false; }
+    Label #StatusConfirm { Anchor: (Top: 30, Left: 432, Width: 414, Height: 16); Text: %server.tamework.ui.linkedPanel.card.confirmRemove; Style: (FontSize: 11, RenderBold: true, TextColor: #ffd3d3, HorizontalAlignment: Start, VerticalAlignment: Center); Visible: false; }
     Label #StatusInactive { Anchor: (Top: 43, Left: 48, Width: 96, Height: 18); Text: %server.tamework.ui.linkedPanel.card.inactive; Style: (FontSize: 10, RenderBold: true, TextColor: #ffbd9a, HorizontalAlignment: Start, VerticalAlignment: Center); Visible: false; }
     Label #RecallCountdown { Anchor: (Top: 72, Left: 568, Width: 270, Height: 20); Text: %server.tamework.ui.linkedPanel.card.recallCountdown.default; Style: (FontSize: 10, RenderBold: true, TextColor: #ffcf6e, HorizontalAlignment: Center, VerticalAlignment: Center); Visible: false; }
     TextButton #LinkButton { Anchor: (Top: 98, Left: 746, Width: 100, Height: 26); Style: $A.@PanelButton; Padding: (Horizontal: 4); Text: %server.tamework.ui.linkedPanel.card.button.link; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.link; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
