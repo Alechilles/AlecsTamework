@@ -1,5 +1,8 @@
 package com.alechilles.alecstamework.npc.movement;
 
+import com.alechilles.alecstamework.compat.HytaleSpatialAccess;
+import com.hypixel.hytale.component.spatial.SpatialResource;
+import com.hypixel.hytale.server.core.modules.entity.EntityModule;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ComponentAccessor;
@@ -30,6 +33,14 @@ public final class BodyMotionTameworkFlightFormation extends TameworkBodyMotionB
     private static final double EPSILON = 1.0E-6;
 
     private final BuilderBodyMotionTameworkFlightFormation.Formation formation;
+    private final BoidFlightSteering boid = new BoidFlightSteering();
+    private final Vector3d boidNeighborHeading = new Vector3d();
+    private final Vector3d boidDesired = new Vector3d();
+    private final Vector3d boidSmoothed = new Vector3d();
+    private final java.util.ArrayList<Ref<EntityStore>> boidNeighbors = new java.util.ArrayList<>(12);
+    private final double[] boidDistances = new double[12];
+    private double boidRefreshRemaining;
+    private boolean hasBoidSample;
     private final double spacing;
     private final double tightness;
     private final double relativeSpeed;
@@ -126,53 +137,58 @@ public final class BodyMotionTameworkFlightFormation extends TameworkBodyMotionB
         }
         sampleLeaderMotion(leaderTransform, dt);
         looseDriftSeconds += Math.max(0.0, dt);
-        int followerIndex = 0;
-        long nowMillis = System.currentTimeMillis();
-        UUIDComponent identity = componentAccessor.getComponent(ref, UUIDComponent.getComponentType());
-        UUID memberId = identity == null ? null : identity.getUuid();
-        NativeFormationSlots.GroupKey slotGroup = NativeFormationSlots.get().resolveGroup(
-                formationSlotGroup, ref, leaderRef, "Flight", formation.name(), spacing, componentAccessor);
-        if (slotGroup != null && memberId != null) {
-            int assignedSlot = NativeFormationSlots.get().claim(
-                    ref, slotGroup, memberId, followerIndex, nowMillis);
-            if (assignedSlot != lastFormationSlot) {
-                hasFormationOffset = false;
-            }
-            formationSlotGroup = slotGroup;
-            lastFormationSlot = assignedSlot;
-            followerIndex = assignedSlot;
+        if (formation == BuilderBodyMotionTameworkFlightFormation.Formation.BOID) {
+            computeBoid(ref, selfTransform.getPosition(), leaderTransform.getPosition(), fly, dt, componentAccessor);
         } else {
-            followerIndex = resolveFollowerIndex(group, ref, leaderRef);
-            formationSlotGroup = null;
-            if (lastFormationSlot >= 0) {
-                hasFormationOffset = false;
+            int followerIndex = 0;
+            long nowMillis = System.currentTimeMillis();
+            UUIDComponent identity = componentAccessor.getComponent(ref, UUIDComponent.getComponentType());
+            UUID memberId = identity == null ? null : identity.getUuid();
+            NativeFormationSlots.GroupKey slotGroup = NativeFormationSlots.get().resolveGroup(
+                    formationSlotGroup, ref, leaderRef, "Flight", formation.name(), spacing, componentAccessor);
+            if (slotGroup != null && memberId != null) {
+                int assignedSlot = NativeFormationSlots.get().claim(
+                        ref, slotGroup, memberId, followerIndex, nowMillis);
+                if (assignedSlot != lastFormationSlot) {
+                    hasFormationOffset = false;
+                }
+                formationSlotGroup = slotGroup;
+                lastFormationSlot = assignedSlot;
+                followerIndex = assignedSlot;
+            } else {
+                followerIndex = resolveFollowerIndex(group, ref, leaderRef);
+                formationSlotGroup = null;
+                if (lastFormationSlot >= 0) {
+                    hasFormationOffset = false;
+                }
+                lastFormationSlot = -1;
             }
-            lastFormationSlot = -1;
+            FlightFormationSteering.resolveTarget(
+                    formation, followerIndex, spacing, looseDriftSeconds,
+                    leaderTransform.getPosition(), leaderHeading, targetPosition);
+            if (formationSlotGroup != null && memberId != null) {
+                NativeFormationSlots.get().report(ref, formationSlotGroup, memberId,
+                        selfTransform.getPosition(), targetPosition, spacing, nowMillis);
+            }
+            targetPosition.sub(leaderTransform.getPosition());
+            slotVelocity.set(leaderVelocity);
+            if (!hasFormationOffset) {
+                formationOffset.set(targetPosition);
+                hasFormationOffset = true;
+            } else {
+                previousFormationOffset.set(formationOffset);
+                FlightFormationSteering.smoothOffset(
+                        formationOffset, targetPosition,
+                        Math.min(spacing * 0.75, fly.getSteeringSpeedScale() * 0.35), dt, formationOffset);
+                FlightFormationSteering.resolveSlotVelocity(
+                        previousFormationOffset, formationOffset, leaderVelocity, dt, slotVelocity);
+            }
+            targetPosition.set(leaderTransform.getPosition()).add(formationOffset);
+            FlightFormationSteering.resolveTranslation(
+                    selfTransform.getPosition(), targetPosition, slotVelocity,
+                    fly.getSteeringSpeedScale(), relativeSpeed, tightness, dt, translation);
+
         }
-        FlightFormationSteering.resolveTarget(
-                formation, followerIndex, spacing, looseDriftSeconds,
-                leaderTransform.getPosition(), leaderHeading, targetPosition);
-        if (formationSlotGroup != null && memberId != null) {
-            NativeFormationSlots.get().report(ref, formationSlotGroup, memberId,
-                    selfTransform.getPosition(), targetPosition, spacing, nowMillis);
-        }
-        targetPosition.sub(leaderTransform.getPosition());
-        slotVelocity.set(leaderVelocity);
-        if (!hasFormationOffset) {
-            formationOffset.set(targetPosition);
-            hasFormationOffset = true;
-        } else {
-            previousFormationOffset.set(formationOffset);
-            FlightFormationSteering.smoothOffset(
-                    formationOffset, targetPosition,
-                    Math.min(spacing * 0.75, fly.getSteeringSpeedScale() * 0.35), dt, formationOffset);
-            FlightFormationSteering.resolveSlotVelocity(
-                    previousFormationOffset, formationOffset, leaderVelocity, dt, slotVelocity);
-        }
-        targetPosition.set(leaderTransform.getPosition()).add(formationOffset);
-        FlightFormationSteering.resolveTranslation(
-                selfTransform.getPosition(), targetPosition, slotVelocity,
-                fly.getSteeringSpeedScale(), relativeSpeed, tightness, dt, translation);
 
         bindObstacleProbe(ref, selfTransform.getPosition(), fly, componentAccessor);
         obstacleAvoidance.beginUpdate(dt);
@@ -191,6 +207,79 @@ public final class BodyMotionTameworkFlightFormation extends TameworkBodyMotionB
         } finally {
             clearObstacleProbeContext();
         }
+    }
+
+    /** World-thread samples at 5 Hz; keeps only 12 nearest airborne flock mates.
+     * The spatial query is radius limited, but dense query results still cost O(k) to examine.
+     * No component or neighbor reference survives the sample. Normal steering runs every tick.
+     */
+    private void computeBoid(Ref<EntityStore> ref, Vector3d self, Vector3d leader,
+                             MotionControllerTameworkFormationFly fly, double dt,
+                             ComponentAccessor<EntityStore> accessor) {
+        boidRefreshRemaining -= Math.max(0.0, dt);
+        if (!hasBoidSample || boidRefreshRemaining <= 0.0) {
+            boid.reset();
+            FlockMembership membership = accessor.getComponent(ref, FlockMembership.getComponentType());
+            SpatialResource<Ref<EntityStore>, EntityStore> spatial =
+                    accessor.getResource(EntityModule.get().getEntitySpatialResourceType());
+            if (spatial != null && membership != null) {
+                List<Ref<EntityStore>> nearby = SpatialResource.getThreadLocalReferenceList();
+                HytaleSpatialAccess.collect(spatial.getSpatialStructure(), self, spacing * 4.0, nearby);
+                try {
+                    for (Ref<EntityStore> candidate : nearby) {
+                        if (!candidate.isValid() || candidate.equals(ref)) continue;
+                        FlockMembership other = accessor.getComponent(candidate, FlockMembership.getComponentType());
+                        if (other == null || !membership.getFlockRef().equals(other.getFlockRef())) continue;
+                        NPCEntity npc = accessor.getComponent(candidate, NPCEntity.getComponentType());
+                        if (npc == null || npc.getRole() == null || !isAutonomousFlying(npc.getRole())
+                                || hasRiderMount(candidate, accessor)) continue;
+                        TransformComponent transform = accessor.getComponent(candidate, TransformComponent.getComponentType());
+                        if (transform == null) continue;
+                        double distance = self.distanceSquared(transform.getPosition());
+                        if (!Double.isFinite(distance) || distance > spacing * spacing * 16.0) continue;
+                        int at = 0;
+                        while (at < boidNeighbors.size() && boidDistances[at] <= distance) at++;
+                        if (at >= 12) continue;
+                        if (boidNeighbors.size() == 12) boidNeighbors.remove(11);
+                        boidNeighbors.add(at, candidate);
+                        for (int j = boidNeighbors.size() - 1; j > at; j--) boidDistances[j] = boidDistances[j - 1];
+                        boidDistances[at] = distance;
+                    }
+                    for (Ref<EntityStore> candidate : boidNeighbors) {
+                        TransformComponent transform = accessor.getComponent(candidate, TransformComponent.getComponentType());
+                        // Engine Velocity does not represent NPC motion; use facing for alignment.
+                        resolveHeadingFromYaw(transform.getRotation().yaw(), boidNeighborHeading)
+                                .mul(leaderVelocity.length());
+                        double overlapDirection = 1.0;
+                        if (self.distanceSquared(transform.getPosition()) <= EPSILON * EPSILON) {
+                            UUIDComponent selfId = accessor.getComponent(ref, UUIDComponent.getComponentType());
+                            UUIDComponent otherId = accessor.getComponent(candidate, UUIDComponent.getComponentType());
+                            if (selfId != null && otherId != null) {
+                                overlapDirection = selfId.getUuid().compareTo(otherId.getUuid()) < 0 ? -1.0 : 1.0;
+                            }
+                        }
+                        boid.addNeighbor(self, transform.getPosition(), boidNeighborHeading, spacing, overlapDirection);
+                    }
+                } finally {
+                    boidNeighbors.clear();
+                    nearby.clear();
+                }
+            }
+            boid.resolve(self, leader, leaderVelocity, spacing, tightness,
+                    fly.getSteeringSpeedScale(), relativeSpeed, boidDesired);
+            if (!hasBoidSample) {
+                boidSmoothed.set(leaderVelocity).div(Math.max(EPSILON, fly.getSteeringSpeedScale()));
+                UUIDComponent identity = accessor.getComponent(ref, UUIDComponent.getComponentType());
+                int phase = identity == null ? 0 : Math.floorMod(identity.getUuid().hashCode(), 100);
+                boidRefreshRemaining = 0.1 + phase * 0.001;
+            } else {
+                boidRefreshRemaining = 0.2;
+            }
+            hasBoidSample = true;
+        }
+        boidSmoothed.lerp(boidDesired, 1.0 - Math.exp(-4.0 * Math.max(0.0, dt)));
+        translation.set(boidSmoothed);
+        if (translation.lengthSquared() > 1.0) translation.normalize();
     }
 
     /**
@@ -313,6 +402,11 @@ public final class BodyMotionTameworkFlightFormation extends TameworkBodyMotionB
     }
 
     private void resetLeaderTracking() {
+        hasBoidSample = false;
+        boidRefreshRemaining = 0.0;
+        boidNeighbors.clear();
+        boidDesired.zero();
+        boidSmoothed.zero();
         trackedLeaderRef = null;
         formationSlotGroup = null;
         hasLeaderPosition = false;

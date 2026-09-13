@@ -54,3 +54,11 @@ Obstacle probes use Tamework's existing autonomous flight avoidance. Formation i
 Movement runs in the current NPC steering callback on the owning world. Each active follower reads its native flock's member list to find its position. No global entity scan, background task, persistence store or shared cache is added. Position and heading samples belong to the body motion and reset when it activates, deactivates or loses/replaces its leader.
 
 Automated tests cover formation layout, heading reversal, speed correction and leader eligibility. Actual flight appearance, flock turns, terrain avoidance and coordinated landing still need in-game verification and species tuning.
+
+## Experimental Boid formation
+
+Set `FlightFormation` to `Boid` to replace assigned slots with local separation, heading alignment, and cohesion while retaining the native leader's wandering route. `FlightFormationSpacing` controls preferred separation (default 3 blocks); neighbors are sampled within four times that distance. `FlightFormationTightness` controls correction strength.
+
+Each follower uses the nearest 12 eligible airborne members of its own flock. Neighbor sampling runs every 0.2 seconds with a staggered refresh phase, and steering is smoothed each tick. Sampling uses the engine spatial index, but still examines all candidates returned within the radius; the 12-neighbor limit does not guarantee constant query cost in dense groups. All entity reads stay on the world thread, and temporary neighbor references are cleared after sampling. Existing obstacle avoidance remains active. No performance improvement over slot formations is claimed.
+
+Animal Husbandry includes `Pigeon_Boid`, a variant of `Pigeon` that changes the formation and restricts flock membership to `Pigeon_Boid` for side-by-side testing. It is not added to natural spawn tables. Taming still changes it into the ordinary tamed pigeon role.

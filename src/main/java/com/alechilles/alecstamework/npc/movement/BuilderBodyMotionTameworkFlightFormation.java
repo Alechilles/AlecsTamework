@@ -26,10 +26,10 @@ public final class BuilderBodyMotionTameworkFlightFormation extends BuilderBodyM
         super.readConfig(data);
         getEnum(data, "Formation", formation, Formation.class, Formation.NONE,
                 BuilderDescriptorState.WorkInProgress,
-                "Flight formation: None, Loose, Cluster, or Chevron.", null);
+                "Flight formation: None, Loose, Cluster, Boid, or Chevron.", null);
         getDouble(data, "Spacing", spacing, 3.0, DoubleSingleValidator.greater0(),
                 BuilderDescriptorState.WorkInProgress,
-                "Distance between neighboring formation slots.", null);
+                "Distance between formation slots, or preferred neighbor separation for Boid.", null);
         getDouble(data, "Tightness", tightness, 0.6, DoubleRangeValidator.fromExclToIncl(0.0, 1.0),
                 BuilderDescriptorState.WorkInProgress,
                 "How strongly followers correct toward their assigned slot.", null);
@@ -48,7 +48,7 @@ public final class BuilderBodyMotionTameworkFlightFormation extends BuilderBodyM
     @Nonnull
     @Override
     public String getShortDescription() {
-        return "Maintain a loose, cluster, or chevron flight formation behind the native flock leader.";
+        return "Follow the native flock leader using slots or local Boid steering.";
     }
 
     @Nonnull
@@ -83,6 +83,7 @@ public final class BuilderBodyMotionTameworkFlightFormation extends BuilderBodyM
         NONE("None"),
         LOOSE("Loose"),
         CLUSTER("Cluster"),
+        BOID("Boid"),
         CHEVRON("Chevron");
 
         private final String name;
