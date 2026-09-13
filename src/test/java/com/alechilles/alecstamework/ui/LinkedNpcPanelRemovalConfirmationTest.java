@@ -113,7 +113,7 @@ class LinkedNpcPanelRemovalConfirmationTest {
             AtomicInteger releases,
             AtomicInteger culls
     ) throws Exception {
-        try (AutoCloseable ignored = LinkedNpcPanelRefreshTestSeam.installPacketSender(
+        try (AutoCloseable packetSenderScope = LinkedNpcPanelRefreshTestSeam.installPacketSender(
                 (commands, events) -> { });
              AutoCloseable ignoredNavigator = LinkedNpcPanelRefreshTestSeam.installDeferredNavigator(
                      (player, action) -> { })) {
