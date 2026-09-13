@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Refreshed Locate with a compact layout that hides unused status and coordinate
+  sections while preserving container locations and last-seen details.
+
 - Fixed newly linked companions appearing unloaded after death when their saved
   profile had not finished publishing.
 

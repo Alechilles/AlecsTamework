@@ -10,6 +10,8 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
+import com.hypixel.hytale.server.core.ui.Anchor;
+import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
@@ -56,6 +58,17 @@ public final class TameworkLinkedNpcLocationPage
                       @Nonnull Store<EntityStore> store) {
         try {
             commandBuilder.append(UI_PATH);
+            boolean hasStatus = !status.isBlank();
+            // Player-held and unknown capture items have no meaningful coordinate fields.
+            boolean hasLocation = !coordinates.isBlank();
+            commandBuilder.set("#TameworkLinkedLocationStatusSection.Visible", hasStatus);
+            commandBuilder.set("#TameworkLinkedLocationStatusGap.Visible", hasStatus && hasLocation);
+            commandBuilder.set("#TameworkLinkedLocationDetails.Visible", hasLocation);
+            Anchor rootAnchor = new Anchor();
+            rootAnchor.setWidth(Value.of(600));
+            rootAnchor.setHeight(Value.of(92 + (hasStatus ? 64 : 0)
+                    + (hasStatus && hasLocation ? 16 : 0) + (hasLocation ? 138 : 0)));
+            commandBuilder.setObject("#TameworkLinkedLocationRoot.Anchor", rootAnchor);
             commandBuilder.set("#TameworkLinkedLocationTitle.Text", title);
             commandBuilder.set("#TameworkLinkedLocationStatus.Text", status);
             commandBuilder.set("#TameworkLinkedLocationWorldValue.Text", worldName);

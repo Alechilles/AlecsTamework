@@ -5,83 +5,82 @@ $C.@PageOverlay {
   LayoutMode: Middle;
 
   Group #TameworkLinkedLocationRoot {
-    Anchor: (Width: 600, Height: 340);
+    Anchor: (Width: 600, Height: 230);
     Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
 
     Group #Title {
-      Anchor: (Top: 3, Left: 3, Right: 3, Height: 44);
+      Anchor: (Top: 3, Left: 3, Right: 3, Height: 54);
       Background: #252b27;
       Group {
-        Anchor: (Top: 7, Right: 10, Width: 28, Height: 28);
-        TextButton #TameworkLinkedLocationCloseButton { Anchor: (Full: 0); Text: ""; TooltipText: %server.tamework.ui.shared.button.close; Style: $A.@Remove; }
-        Group { Anchor: (Top: 2, Left: 2, Width: 24, Height: 24); HitTestVisible: false; Background: "Tamework/PanelActions/Remove_Glyph_Default.png"; }
+        Anchor: (Left: 16, Top: 12, Width: 30, Height: 30);
+        Background: "Tamework/PanelActions/Locate_Glyph_Default.png";
+        HitTestVisible: false;
       }
       Label #TameworkLinkedLocationTitle {
-        Anchor: (Left: 14, Right: 50, Height: 44);
+        Anchor: (Left: 58, Right: 58, Height: 54);
         Style: (FontSize: 20, RenderBold: true, TextColor: #f0eee7, VerticalAlignment: Center);
         Text: "Companion - Location";
       }
+      Group {
+        Anchor: (Top: 11, Right: 12, Width: 32, Height: 32);
+        TextButton #TameworkLinkedLocationCloseButton { Anchor: (Full: 0); Text: ""; TooltipText: %server.tamework.ui.shared.button.close; Style: $A.@Remove; }
+        Group { Anchor: (Top: 4, Left: 4, Width: 24, Height: 24); HitTestVisible: false; Background: "Tamework/PanelActions/Remove_Glyph_Default.png"; }
+      }
     }
+    Group { Anchor: (Top: 57, Left: 3, Right: 3, Height: 1); Background: #4a5a50; }
 
     Group #Content {
-      Anchor: (Top: 54, Left: 14, Right: 14, Bottom: 14);
+      Anchor: (Top: 74, Left: 22, Right: 22, Bottom: 18);
       LayoutMode: Top;
-      Padding: (Left: 10, Right: 10, Top: 8, Bottom: 8);
 
-      Group {
-        Anchor: (Height: 212, Bottom: 14);
-        Background: #181c1a;
-        Padding: (Left: 12, Right: 12, Top: 12, Bottom: 12);
-        LayoutMode: Top;
-
+      Group #TameworkLinkedLocationStatusSection {
+        Anchor: (Height: 64);
+        Background: #252c27;
+        Group { Anchor: (Left: 0, Top: 0, Bottom: 0, Width: 3); Background: #8b9d7c; }
         Label #TameworkLinkedLocationStatus {
-          Anchor: (Height: 76, Bottom: 8);
+          Anchor: (Full: 0);
+          Padding: (Horizontal: 16, Vertical: 10);
           Text: "";
-          Style: (FontSize: 14, TextColor: #f0eee7, Wrap: true, VerticalAlignment: Center);
+          Style: (FontSize: 15, TextColor: #d5ddcd, Wrap: true, VerticalAlignment: Center);
         }
+      }
+      Group #TameworkLinkedLocationStatusGap { Anchor: (Height: 16); }
 
+      Group #TameworkLinkedLocationDetails {
+        Anchor: (Height: 138);
+        LayoutMode: Top;
         Group {
-          Anchor: (Height: 32, Bottom: 12);
-
+          Anchor: (Height: 64);
           Label #TameworkLinkedLocationWorldLabel {
-            Anchor: (Left: 0, Width: 108, Height: 32);
+            Anchor: (Top: 0, Left: 0, Right: 0, Height: 20);
             Text: %server.tamework.ui.linkedLocation.worldLabel;
-            Style: (FontSize: 14, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Center);
+            Style: (FontSize: 14, TextColor: #a9b69f, VerticalAlignment: Center);
           }
-
           Label #TameworkLinkedLocationWorldValue {
-            Anchor: (Left: 118, Right: 0, Height: 32);
+            Anchor: (Top: 23, Left: 0, Right: 0, Height: 30);
             Text: "";
-            Style: (FontSize: 14, TextColor: #f0eee7, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+            Style: (FontSize: 18, RenderBold: true, TextColor: #f0eee7, VerticalAlignment: Center);
           }
         }
-
         Group {
-          Anchor: (Height: 44);
-
+          Anchor: (Height: 74);
           Label #TameworkLinkedLocationCoordinatesLabel {
-            Anchor: (Left: 0, Width: 108, Height: 44);
+            Anchor: (Top: 0, Left: 0, Right: 0, Height: 20);
             Text: %server.tamework.ui.linkedLocation.coordinatesLabel;
-            Style: (FontSize: 14, TextColor: #afb6b0, HorizontalAlignment: Start, VerticalAlignment: Center);
+            Style: (FontSize: 14, TextColor: #a9b69f, VerticalAlignment: Center);
           }
-
           TextField #TameworkLinkedLocationCoordinatesInput {
+            Anchor: (Top: 26, Left: 0, Right: 0, Height: 48);
             Style: $A.@PanelInputFieldStyle;
             PlaceholderStyle: $A.@PanelInputFieldPlaceholderStyle;
-            Background: #252c27;
-        OutlineColor: #4a5a50;
-        OutlineSize: 1;
-            Anchor: (Left: 118, Right: 0, Height: 44);
-            Padding: (Horizontal: 10);
+            Background: #181c1a;
+            OutlineColor: #4a5a50;
+            OutlineSize: 1;
+            Padding: (Horizontal: 14);
             Value: "";
             MaxLength: 96;
           }
         }
-      }
-
-      Group {
-        LayoutMode: Right;
-
       }
     }
   }

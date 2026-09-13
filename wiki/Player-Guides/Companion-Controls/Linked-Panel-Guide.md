@@ -91,6 +91,11 @@ Use **Locate** in Linked or Owned mode to find a stored animal. Coop occupants
 show their recorded world and block coordinates. Capture items can show the player
 carrying them, a storage container's coordinates, or their position on the ground.
 
+The Locate window hides unused sections and shrinks to fit. Capture items in a
+player's inventory show the holder without empty world or coordinate fields.
+Container and dropped-item results include their location and retain last-seen
+details when the holder is unloaded.
+
 Locate checks the recorded holder without loading distant chunks. If a player is
 offline or storage is unloaded, it shows **Last seen** and an observation time in
 UTC. **Unknown** means no usable item sighting is available; it does not mean the
