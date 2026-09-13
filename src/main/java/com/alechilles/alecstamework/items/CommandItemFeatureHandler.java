@@ -794,7 +794,8 @@ public final class CommandItemFeatureHandler {
                 feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.notLinkedToTool");
             } else {
                 hotbar.setItemStackForSlot(slot, updatedStack);
-                feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.unlink.success");
+                feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.unlink.success",
+                        panelActionService.resolveFeedbackName(player, stack, npcUuid));
             }
             return;
         }

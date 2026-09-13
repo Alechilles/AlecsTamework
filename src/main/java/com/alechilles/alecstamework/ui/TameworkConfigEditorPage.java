@@ -1286,7 +1286,14 @@ public final class TameworkConfigEditorPage
                 }
                 yield values;
             }
-            case BOOLEAN -> new JsonPrimitive(parseBooleanStrict(trimmed));
+            case BOOLEAN -> {
+                try {
+                    yield new JsonPrimitive(parseBooleanStrict(trimmed));
+                } catch (IllegalArgumentException ex) {
+                    throw new IllegalArgumentException(tr(
+                            "tamework.ui.configEditor.validation.booleanTrueFalse", labelForPath(field.path)));
+                }
+            }
             case INTEGER -> {
                 if (trimmed.isBlank()) {
                     throw new IllegalArgumentException(tr("tamework.ui.configEditor.validation.mustBeInteger", labelForPath(field.path)));
@@ -1965,9 +1972,7 @@ public final class TameworkConfigEditorPage
         return switch (normalized) {
             case "1", "true", "yes", "on" -> true;
             case "0", "false", "no", "off", "" -> false;
-            default -> throw new IllegalArgumentException(
-                    LocalizedText.resolve((String) null, "tamework.ui.configEditor.validation.booleanTrueFalse")
-            );
+            default -> throw new IllegalArgumentException();
         };
     }
 

@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.hypixel.hytale.component.ComponentType;
@@ -169,7 +170,8 @@ final class CommandPanelActionService {
                 player,
                 result.active
                         ? "tamework.ui.notifications.command.toggleActive.enabled"
-                        : "tamework.ui.notifications.command.toggleActive.disabled"
+                        : "tamework.ui.notifications.command.toggleActive.disabled",
+                resolveFeedbackName(player, result.updatedItem, npcUuid)
         );
     }
 
@@ -200,8 +202,30 @@ final class CommandPanelActionService {
                 player,
                 result.breedingEnabled
                         ? "tamework.ui.notifications.command.toggleBreeding.enabled"
-                        : "tamework.ui.notifications.command.toggleBreeding.disabled"
+                        : "tamework.ui.notifications.command.toggleBreeding.disabled",
+                resolveFeedbackName(player, result.updatedItem, npcUuid)
         );
+    }
+
+    String resolveFeedbackName(Player player, ItemStack stack, UUID npcUuid) {
+        String language = player.getPlayerRef() != null ? player.getPlayerRef().getLanguage() : null;
+        for (LinkedNpcRecord record : linkMutationService.readLinkedNpcRecords(stack)) {
+            if (npcUuid.equals(record.npcUuid)) {
+                return resolveFeedbackName(language, record);
+            }
+        }
+        return LocalizedText.resolve(language, "tamework.ui.nameInput.defaultNpcName");
+    }
+
+    private static String resolveFeedbackName(String language, LinkedNpcRecord record) {
+        if (record.cachedDisplayName != null && !record.cachedDisplayName.isBlank()
+                && !record.cachedDisplayName.equals(record.cachedNameKey)) {
+            return record.cachedDisplayName;
+        }
+        String fallback = record.cachedRoleId != null && !record.cachedRoleId.isBlank()
+                ? record.cachedRoleId
+                : LocalizedText.resolve(language, "tamework.ui.nameInput.defaultNpcName");
+        return LocalizedText.resolveConfigValue(language, record.cachedNameKey, fallback);
     }
 
     void applyTogglePanelMode(Player player,

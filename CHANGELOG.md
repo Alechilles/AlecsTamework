@@ -2,6 +2,8 @@
 
 ## Unreleased development changes
 
+- Fixed active/inactive, breeding, and unlink notifications showing `{0}` instead of the companion's name, and boolean config errors missing the field label.
+
 - Attachment display labels and values now support language keys in the target HUD and captured-item tooltips, preserving each viewer's language.
 
 - Completed translations for menus, HUDs, tooltips, command help and responses
