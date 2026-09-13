@@ -113,10 +113,12 @@ player's inventory show the holder without empty world or coordinate fields.
 Container and dropped-item results include their location and retain last-seen
 details when the holder is unloaded.
 
-Inline capture details show **Last seen** and the observation time, without
-loading distant chunks or checking inventories as cards refresh. The Locate
-action verifies the recorded holder when available. Observation times use
-UTC. **Unknown** means no usable item sighting is available; it does not mean the
+Inline cards show **World:** and labeled **X**, **Y**, and **Z** coordinates,
+without an observation timestamp. Click the copy icon to switch to a selectable
+text field containing the plain coordinate tuple; click it again to restore the
+labels. Cards do not load distant chunks or check inventories as they refresh.
+The Locate action verifies the recorded holder when available. **Unknown** means
+no usable item sighting is available; it does not mean the
 animal died or the item was destroyed. Older capture items without a capture receipt
 and storage provided by other mods may have no known location.
 

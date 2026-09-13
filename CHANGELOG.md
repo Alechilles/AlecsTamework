@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Polished inline location details with a World label, named coordinate axes,
+  and a copy icon that reveals selectable coordinates; removed observation timestamps.
+
 - Added a Companion Guide through the command menu's Help button, with eleven
   topics, read-only example cards, and language keys for all supported locales.
 

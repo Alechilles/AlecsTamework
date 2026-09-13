@@ -19,6 +19,13 @@ import java.util.concurrent.TimeUnit;
 
 /** Owns standard-page linked-panel refresh and card rendering. */
 final class CommandSelectionLinkedPanelRuntime {
+    private final LinkedNpcLocationCopyControl locationCopy = new LinkedNpcLocationCopyControl();
+
+    void toggleLocationCopy(String command) {
+        UICommandBuilder commands = new UICommandBuilder();
+        locationCopy.toggle(command, page.linkedNpcEntries, commands);
+        if (commands.getCommands().length > 0) page.packetSender.send(commands, new UIEventBuilder());
+    }
     private final TameworkCommandSelectionPage page;
     private long removalConfirmOverlayRevision = -1L;
 
@@ -293,6 +300,7 @@ final class CommandSelectionLinkedPanelRuntime {
                 page.isPendingUnlink(entry.npcUuid()), page.cardBindingConfig,
                 page.resolveLanguage(), presentation);
         if (presentation != null && presentation.bonded() != null) return;
+        locationCopy.bind(commands, index, entry);
         String selector = "#TameworkLinkedPanelList[" + index + "] #GroupSelector";
         boolean available = canAssignGroup(entry, presentation);
         commands.set(selector + ".Visible", available);

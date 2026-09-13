@@ -4,7 +4,6 @@ import com.alechilles.alecstamework.items.locate.CapturedItemTracker;
 import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.ui.TameworkLinkedNpcLocationFormatter;
-import java.time.Instant;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwDynamicIconConfig;
@@ -361,10 +360,7 @@ final class CommandLinkedPanelEntryService {
                             "tamework.ui.notifications.command.locate.captureUnknown")
                     : CommandLinkedNpcLocateService.describeSighting(player, sighting);
             if (sighting != null) {
-                // Inline cards report observations; no cross-world inventory verification runs here.
-                status = LocalizedText.format(player,
-                        "tamework.ui.notifications.command.locate.lastSeen", status,
-                        Instant.ofEpochMilli(sighting.observedAtMs()).toString());
+                // These remain advisory observations; cards do not verify distant inventories.
                 if (sighting.holder().kind() != CapturedItemLocationIndex.Kind.PLAYER) {
                     world = sighting.holder().worldName();
                     coordinates = TameworkLinkedNpcLocationFormatter.formatCoordinates(

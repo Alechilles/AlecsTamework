@@ -530,6 +530,10 @@ public final class TameworkCommandSelectionPage
         if (handleRemovalConfirmation(commandId)) {
             return;
         }
+        if (commandId.startsWith(LinkedNpcLocationCopyControl.PREFIX)) {
+            linkedPanelRuntime.toggleLocationCopy(commandId);
+            return;
+        }
         if (CommandSelectionPageEventBinder.FEEDBACK_COMMAND_ID.equals(commandId)) {
             if (!beginPageNavigation()) return;
             navigateAfterUiDrain(() -> {

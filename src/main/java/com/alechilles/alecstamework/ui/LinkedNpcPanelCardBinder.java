@@ -349,19 +349,46 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(inlineLocationSelector + ".Visible", showInlineLocation);
         commandBuilder.set(inlineLocationStatusSelector + ".Visible", showInlineStatus);
         commandBuilder.set(inlineLocationWorldSelector + ".Visible", showInlineWorld);
-        commandBuilder.set(inlineLocationCoordinatesSelector + ".Visible", showInlineCoordinates);
+        commandBuilder.set(inlineLocationCoordinatesSelector + ".Visible", false);
+        commandBuilder.set(inlineLocationSelector + " #CoordinateLabel.Visible", showInlineCoordinates);
+        commandBuilder.set(inlineLocationSelector + " #CopyButton.Visible", showInlineCoordinates);
+        commandBuilder.set(inlineLocationSelector + " #CopyGlyph.Visible", showInlineCoordinates);
+        commandBuilder.set(inlineLocationSelector + " #CopyHint.Visible", false);
+        commandBuilder.set(inlineLocationSelector + " #Heading.Text", entry.captured()
+                ? LocalizedText.resolve(language, "tamework.ui.notifications.command.locate.itemGeneric")
+                : LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry, language));
         commandBuilder.set(inlineLocationStatusSelector + ".Text", location.status());
-        commandBuilder.set(inlineLocationWorldSelector + ".Text", location.world());
+        commandBuilder.set(inlineLocationWorldSelector + ".Text",
+                LocalizedText.resolve(language, "tamework.ui.linkedLocation.worldLabel") + ": " + location.world());
+        commandBuilder.set(inlineLocationSelector + " #CoordinateLabel.Text",
+                LinkedNpcLocationCopyControl.labeledCoordinates(location.coordinates()));
+        commandBuilder.set(inlineLocationSelector + " #CopyButton.TooltipText",
+                LocalizedText.resolve(language, "tamework.ui.linkedLocation.copy"));
+        commandBuilder.set(inlineLocationSelector + " #CopyHint.Text",
+                LocalizedText.resolve(language, "tamework.ui.linkedLocation.copyHint"));
         commandBuilder.set(inlineLocationCoordinatesSelector + ".Value", location.coordinates());
         commandBuilder.set(inlineLocationCoordinatesSelector + ".MaxLength",
                 Math.max(64, location.coordinates().length() + 16));
-        int locationRow = showInlineStatus ? 58 : 0;
+        int locationRow = showInlineStatus ? 52 : 18;
         int inlineLocationWidth = showRecall || showReturnHome || showSetHome ? 296 : 414;
         commandBuilder.setObject(inlineLocationWorldSelector + ".Anchor",
                 fixedAnchor(locationRow, 0, inlineLocationWidth, 18));
         locationRow += showInlineWorld ? 22 : 0;
         commandBuilder.setObject(inlineLocationCoordinatesSelector + ".Anchor",
-                fixedAnchor(locationRow, 0, inlineLocationWidth, 26));
+                fixedAnchor(locationRow, 0, inlineLocationWidth - 34, 26));
+        commandBuilder.setObject(inlineLocationSelector + " #CoordinateLabel.Anchor",
+                fixedAnchor(locationRow, 0, inlineLocationWidth - 34, 26));
+        commandBuilder.setObject(inlineLocationSelector + " #CopyButton.Anchor",
+                fixedAnchor(locationRow, inlineLocationWidth - 28, 28, 26));
+        commandBuilder.setObject(inlineLocationSelector + " #CopyGlyph.Anchor",
+                fixedAnchor(locationRow + 4, inlineLocationWidth - 23, 18, 18));
+        commandBuilder.setObject(inlineLocationSelector + " #CopyHint.Anchor",
+                fixedAnchor(locationRow + 27, 0, inlineLocationWidth - 34, 13));
+        if (showInlineCoordinates) {
+            eventBuilder.addEventBinding(CustomUIEventBindingType.Activating,
+                    inlineLocationSelector + " #CopyButton",
+                    EventData.of(config.eventCommandId(), LinkedNpcLocationCopyControl.PREFIX + entry.npcUuid()), false);
+        }
         if (showInlineLocation) {
             Anchor inlineAnchor = fixedAnchor(32, 432, inlineLocationWidth, 110);
             commandBuilder.setObject(inlineLocationSelector + ".Anchor", inlineAnchor);
