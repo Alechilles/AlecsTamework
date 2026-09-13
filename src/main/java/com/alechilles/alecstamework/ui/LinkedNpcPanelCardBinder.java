@@ -205,7 +205,7 @@ final class LinkedNpcPanelCardBinder {
                 && !pendingUnlink;
         commandBuilder.set(
                 statusUnloadedSelector + ".Visible",
-                !pendingUnlink && (!entry.loaded() || entry.dead() || entry.lost() || entry.captured() || entry.inCoop())
+                !entry.loaded() || entry.dead() || entry.lost() || entry.captured() || entry.inCoop()
         );
         commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry, language));
         commandBuilder.set(recallCountdownSelector + ".Visible", showRecallCountdown);
@@ -314,7 +314,7 @@ final class LinkedNpcPanelCardBinder {
             }
         }
         String emblem = LinkedNpcPanelStatusTextService.resolveAvailabilityEmblem(entry);
-        commandBuilder.set(entrySelector + " #StatusEmblem.Visible", emblem != null && !pendingUnlink);
+        commandBuilder.set(entrySelector + " #StatusEmblem.Visible", emblem != null);
         if (emblem != null) {
             boolean compact = !managedRoster && !entry.hasKnownCardDetails();
             // Center in the entire action section, independently of visible actions.

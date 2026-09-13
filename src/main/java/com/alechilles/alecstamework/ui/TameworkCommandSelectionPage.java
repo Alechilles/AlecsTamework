@@ -49,6 +49,8 @@ public final class TameworkCommandSelectionPage
     private static final int MAX_COMMAND_BUTTONS = 8;
     static final long PANEL_FILTER_INPUT_DEBOUNCE_MS = 500L;
     private static final long PAGE_NAVIGATION_DRAIN_DELAY_MS = 100L;
+    private static final String REMOVAL_CONFIRM_COMMAND_PREFIX = "__removal_confirm__:";
+    private static final String REMOVAL_CONFIRM_CANCEL_COMMAND_ID = "__removal_confirm_cancel__";
     private static final AtomicLong NEXT_LINKED_PANEL_GENERATION = new AtomicLong();
     private static final ConcurrentHashMap<UUID, Long> ACTIVE_LINKED_PANEL_GENERATIONS = new ConcurrentHashMap<>();
     private final CommandSelectionOptionSource.Option[] options;
@@ -90,6 +92,8 @@ public final class TameworkCommandSelectionPage
     String rosterStateFilter = "All";
     UUID pendingUnlinkNpcUuid;
     final LinkedNpcPanelPendingRemovals pendingRemovals = new LinkedNpcPanelPendingRemovals();
+    final LinkedNpcPanelRemovalConfirmOverlayState removalConfirmOverlay =
+            new LinkedNpcPanelRemovalConfirmOverlayState();
     private String selectedCommandId;
     private final Consumer<String> selectionCallback;
     private final CommandSelectionHotswapController hotswapController;
@@ -421,6 +425,9 @@ public final class TameworkCommandSelectionPage
             );
             hotswapController.build(commandBuilder, options, selectedCommandId);
             commandBuilder.set("#TameworkLinkedPanelRoot.Visible", true);
+            commandBuilder.append("#TameworkLinkedPanelRoot",
+                    "TameworkLinkedNpcPanelRemovalConfirm.ui");
+            removalConfirmOverlay.applyTo(commandBuilder, resolveLanguage());
             commandBuilder.set("#TameworkCommandMenuTitle.Text", LinkedNpcPanelPresentationSupport.title(panelModeValueSupplier, linkedNpcEntries, resolveLanguage()));
             commandBuilder.set("#TameworkLinkedPanelGroupSelectorDropdown.Entries", LinkedNpcPanelPresentationSupport.entries(panelGroupActivationEntriesSupplier));
             commandBuilder.set("#TameworkLinkedPanelGroupSelectorDropdown.Value", LinkedNpcPanelPresentationSupport.value(panelGroupActivationValueSupplier, ""));
@@ -447,11 +454,13 @@ public final class TameworkCommandSelectionPage
             CommandSelectionPageEventBinder.bindPanelControls(
                     eventBuilder, featureController
             );
+            bindRemovalConfirmationEvents(eventBuilder);
             BondedCompanionPanelChrome.bindToolbar(commandBuilder, eventBuilder, this, null);
             CommandSelectionPageEventBinder.bindClose(eventBuilder);
             CommandSelectionPageEventBinder.bindHotswapControls(eventBuilder);
             seedRefreshValues();
             refreshTransaction.seedOverlayRevisions(groupAssignOverlay.revision(), featureController.reviveOverlayRevision());
+            linkedPanelRuntime.seedRemovalConfirmOverlayRevision();
             refreshLifecycle.start(true, shortestVisibleCountdownRemainingMs(),
                     !rosterEventBoundary.bondedRoster());
         } catch (Throwable throwable) {
@@ -476,6 +485,11 @@ public final class TameworkCommandSelectionPage
     public void handleDataEvent(@Nonnull Ref<EntityStore> ref,
                                 @Nonnull Store<EntityStore> store,
                                 @Nonnull CommandSelectionEventData data) {
+        if (removalConfirmOverlay.isVisible()
+                && (data.primaryCommandValue != null || data.hotswapQValue != null
+                || data.hotswapEValue != null || data.hotswapRValue != null)) {
+            return;
+        }
         if (data.primaryCommandValue != null) {
             if (!dismissed && !navigationPending && CommandSelectionOptionSource.contains(options, data.primaryCommandValue)) {
                 selectionCallback.accept(data.primaryCommandValue);
@@ -506,6 +520,9 @@ public final class TameworkCommandSelectionPage
             return;
         }
         String commandId = receivedCommandId;
+        if (handleRemovalConfirmation(commandId)) {
+            return;
+        }
         if (CommandSelectionPageEventBinder.FEEDBACK_COMMAND_ID.equals(commandId)) {
             if (!beginPageNavigation()) return;
             navigateAfterUiDrain(() -> {
@@ -777,7 +794,12 @@ public final class TameworkCommandSelectionPage
             UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId,
                     OPEN_REMOVAL_MENU_COMMAND_PREFIX);
             if (genericRemovalMenuAvailable(npcUuid)) {
-                pendingUnlinkNpcUuid = isPendingUnlink(npcUuid) ? null : npcUuid;
+                if (isPendingUnlink(npcUuid)) {
+                    pendingUnlinkNpcUuid = null;
+                    removalConfirmOverlay.clear();
+                } else {
+                    pendingUnlinkNpcUuid = npcUuid;
+                }
                 sendCardRefreshUpdate();
             }
             return;
@@ -791,6 +813,7 @@ public final class TameworkCommandSelectionPage
                 if (isPendingUnlink(npcUuid) && genericUnlinkAvailable(npcUuid)) {
                     unlinkCallback.accept(npcUuid);
                     pendingUnlinkNpcUuid = null;
+                    removalConfirmOverlay.clear();
                     refreshLinkedNpcEntries();
                     sendCardRefreshUpdate();
                 }
@@ -798,31 +821,15 @@ public final class TameworkCommandSelectionPage
             return;
         }
         if (commandId.startsWith(RELEASE_COMMAND_PREFIX)) {
-            if (releaseCallback == null) {
-                return;
-            }
             UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, RELEASE_COMMAND_PREFIX);
-            if (isPendingUnlink(npcUuid) && genericReleaseAvailable(npcUuid)) {
-                releaseCallback.accept(npcUuid);
-                pendingRemovals.hide(npcUuid);
-                pendingUnlinkNpcUuid = null;
-                refreshLinkedNpcEntries();
-                sendCardRefreshUpdate();
-            }
+            openRemovalConfirmation(npcUuid,
+                    LinkedNpcPanelRemovalConfirmOverlayState.Action.RELEASE);
             return;
         }
         if (commandId.startsWith(CULL_COMMAND_PREFIX)) {
-            if (cullCallback == null) {
-                return;
-            }
             UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, CULL_COMMAND_PREFIX);
-            if (isPendingUnlink(npcUuid) && genericCullAvailable(npcUuid)) {
-                cullCallback.accept(npcUuid);
-                pendingRemovals.hide(npcUuid);
-                pendingUnlinkNpcUuid = null;
-                refreshLinkedNpcEntries();
-                sendCardRefreshUpdate();
-            }
+            openRemovalConfirmation(npcUuid,
+                    LinkedNpcPanelRemovalConfirmOverlayState.Action.CULL);
             return;
         }
         if (commandId.startsWith(TOGGLE_ACTIVE_COMMAND_PREFIX)) {
@@ -1002,6 +1009,106 @@ public final class TameworkCommandSelectionPage
         return true;
     }
 
+    void bindRemovalConfirmationEvents(@Nonnull UIEventBuilder events) {
+        events.addEventBinding(
+                CustomUIEventBindingType.Activating,
+                "#TameworkLinkedPanelRemovalConfirmCancelButton",
+                EventData.of(CommandSelectionPageEventBinder.EVENT_COMMAND_ID,
+                        REMOVAL_CONFIRM_CANCEL_COMMAND_ID),
+                false
+        );
+        events.addEventBinding(
+                CustomUIEventBindingType.Activating,
+                "#TameworkLinkedPanelRemovalConfirmButton",
+                EventData.of(CommandSelectionPageEventBinder.EVENT_COMMAND_ID,
+                        REMOVAL_CONFIRM_COMMAND_PREFIX + removalConfirmOverlay.revision()),
+                false
+        );
+    }
+
+    private boolean handleRemovalConfirmation(String commandId) {
+        if (!removalConfirmOverlay.isVisible()) {
+            return REMOVAL_CONFIRM_CANCEL_COMMAND_ID.equals(commandId)
+                    || commandId.startsWith(REMOVAL_CONFIRM_COMMAND_PREFIX);
+        }
+        if (CLOSE_COMMAND_ID.equals(commandId)) {
+            removalConfirmOverlay.clear();
+            pendingUnlinkNpcUuid = null;
+            closePage();
+            return true;
+        }
+        if (REMOVAL_CONFIRM_CANCEL_COMMAND_ID.equals(commandId)) {
+            removalConfirmOverlay.clear();
+            sendCardRefreshUpdate();
+            return true;
+        }
+        long revision = parseRemovalConfirmationRevision(commandId);
+        if (!removalConfirmOverlay.matchesRevision(revision)) {
+            return true;
+        }
+        UUID npcUuid = removalConfirmOverlay.npcUuid();
+        LinkedNpcPanelRemovalConfirmOverlayState.Action action =
+                removalConfirmOverlay.action();
+        refreshLinkedNpcEntries();
+        boolean completed = false;
+        if (action == LinkedNpcPanelRemovalConfirmOverlayState.Action.RELEASE
+                && releaseCallback != null
+                && isPendingUnlink(npcUuid)
+                && genericReleaseAvailable(npcUuid)) {
+            releaseCallback.accept(npcUuid);
+            completed = true;
+        } else if (action == LinkedNpcPanelRemovalConfirmOverlayState.Action.CULL
+                && cullCallback != null
+                && isPendingUnlink(npcUuid)
+                && genericCullAvailable(npcUuid)) {
+            cullCallback.accept(npcUuid);
+            completed = true;
+        }
+        if (completed) {
+            pendingRemovals.hide(npcUuid);
+            pendingUnlinkNpcUuid = null;
+        } else if (!genericRemovalMenuAvailable(npcUuid)) {
+            pendingUnlinkNpcUuid = null;
+        }
+        removalConfirmOverlay.clear();
+        refreshLinkedNpcEntries();
+        sendCardRefreshUpdate();
+        return true;
+    }
+
+    private static long parseRemovalConfirmationRevision(String commandId) {
+        if (commandId == null || !commandId.startsWith(REMOVAL_CONFIRM_COMMAND_PREFIX)) {
+            return Long.MIN_VALUE;
+        }
+        try {
+            return Long.parseLong(commandId.substring(
+                    REMOVAL_CONFIRM_COMMAND_PREFIX.length()));
+        } catch (NumberFormatException ignored) {
+            return Long.MIN_VALUE;
+        }
+    }
+
+    private void openRemovalConfirmation(
+            @Nullable UUID npcUuid,
+            @Nonnull LinkedNpcPanelRemovalConfirmOverlayState.Action action
+    ) {
+        if (!isPendingUnlink(npcUuid)) {
+            return;
+        }
+        boolean available = action == LinkedNpcPanelRemovalConfirmOverlayState.Action.RELEASE
+                ? releaseCallback != null && genericReleaseAvailable(npcUuid)
+                : cullCallback != null && genericCullAvailable(npcUuid);
+        if (!available) {
+            return;
+        }
+        LinkedNpcEntry entry = genericRemovalEntry(npcUuid);
+        if (entry == null) {
+            return;
+        }
+        removalConfirmOverlay.open(entry, action);
+        sendCardRefreshUpdate();
+    }
+
     private boolean genericRemovalMenuAvailable(@Nullable UUID npcUuid) {
         return genericRemovalEntry(npcUuid) != null;
     }
@@ -1043,6 +1150,7 @@ public final class TameworkCommandSelectionPage
     void closeForHost() {
         dismissed = true;
         navigationPending = false;
+        removalConfirmOverlay.clear();
         clearLinkedPanelOwner();
         refreshLifecycle.close();
     }
@@ -1066,6 +1174,7 @@ public final class TameworkCommandSelectionPage
     private void closePage() {
         dismissed = true;
         navigationPending = false;
+        removalConfirmOverlay.clear();
         clearLinkedPanelOwner();
         refreshLifecycle.close();
         close();

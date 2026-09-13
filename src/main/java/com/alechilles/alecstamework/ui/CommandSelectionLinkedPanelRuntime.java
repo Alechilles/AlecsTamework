@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 /** Owns standard-page linked-panel refresh and card rendering. */
 final class CommandSelectionLinkedPanelRuntime {
     private final TameworkCommandSelectionPage page;
+    private long removalConfirmOverlayRevision = -1L;
 
     CommandSelectionLinkedPanelRuntime(TameworkCommandSelectionPage page) {
         this.page = page;
@@ -189,6 +190,11 @@ final class CommandSelectionLinkedPanelRuntime {
                 page.groupAssignOverlay, commands, language);
         long reviveRevision = page.refreshTransaction.applyReviveOverlay(
                 page.featureController, commands, language);
+        long removalConfirmRevision = page.removalConfirmOverlay.revision();
+        if (removalConfirmOverlayRevision != removalConfirmRevision) {
+            page.removalConfirmOverlay.applyTo(commands, language);
+            page.bindRemovalConfirmationEvents(events);
+        }
         boolean hasEntries = page.linkedNpcEntries.length > 0;
         values.set(commands, "#TameworkLinkedPanelEmptyState.Text",
                 LinkedNpcPanelPresentationSupport.empty(
@@ -209,6 +215,7 @@ final class CommandSelectionLinkedPanelRuntime {
         }
         page.packetSender.send(commands, events);
         page.refreshTransaction.commit(values, groupRevision, reviveRevision);
+        removalConfirmOverlayRevision = removalConfirmRevision;
         page.cardRenderState.markRendered(page.linkedNpcEntries,
                 page.pendingUnlinkNpcUuid, features);
         return LinkedNpcPanelRefreshOutcome.sent(
@@ -273,6 +280,10 @@ final class CommandSelectionLinkedPanelRuntime {
         // The initial roster chrome overrides generic values; seed those final values too.
         BondedCompanionPanelChrome.bindToolbar(new UICommandBuilder(), new UIEventBuilder(),
                 page, page.refreshTransaction.values());
+    }
+
+    void seedRemovalConfirmOverlayRevision() {
+        removalConfirmOverlayRevision = page.removalConfirmOverlay.revision();
     }
 
     void bindCard(UICommandBuilder commands, UIEventBuilder events, int index,
@@ -378,6 +389,10 @@ final class CommandSelectionLinkedPanelRuntime {
         if (page.pendingUnlinkNpcUuid != null
                 && resolveEntry(page.pendingUnlinkNpcUuid) == null) {
             page.pendingUnlinkNpcUuid = null;
+        }
+        if (page.removalConfirmOverlay.isVisible()
+                && !page.isPendingUnlink(page.removalConfirmOverlay.npcUuid())) {
+            page.removalConfirmOverlay.clear();
         }
     }
 

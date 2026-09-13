@@ -1,0 +1,47 @@
+$A = "TameworkPanelActionStyles.ui";
+$C = "Common.ui";
+
+Group #TameworkLinkedPanelRemovalConfirmOverlay {
+    Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+    Background: #101311(0.82);
+    Visible: false;
+
+    Group #TameworkLinkedPanelRemovalConfirmModal {
+        Anchor: (Top: 217, Left: 234, Width: 460, Height: 190);
+        Background: (TexturePath: "Tamework/PanelActions/Base_Default.png", Border: 3);
+
+        Label #TameworkLinkedPanelRemovalConfirmTitle {
+            Anchor: (Top: 12, Left: 14, Width: 432, Height: 46);
+            Text: "";
+            Style: (FontSize: 18, RenderBold: true, TextColor: #ffd3d3, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+            TextTooltipStyle: $C.@DefaultTextTooltipStyle;
+        }
+
+        Label #TameworkLinkedPanelRemovalConfirmMessage {
+            Anchor: (Top: 66, Left: 14, Width: 432, Height: 54);
+            Text: "";
+            Style: (FontSize: 12, TextColor: #d6d9d0, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+        }
+
+        Group #TameworkLinkedPanelRemovalConfirmActions {
+            Anchor: (Top: 145, Left: 14, Width: 432, Height: 28);
+            LayoutMode: Left;
+
+            Group { Anchor: (Width: 232); }
+
+            TextButton #TameworkLinkedPanelRemovalConfirmCancelButton {
+                Anchor: (Width: 88, Height: 28);
+                Text: %server.tamework.ui.shared.button.cancel;
+                Style: $A.@PanelButton;
+            }
+
+            Group { Anchor: (Width: 8); }
+
+            TextButton #TameworkLinkedPanelRemovalConfirmButton {
+                Anchor: (Width: 104, Height: 28);
+                Text: "";
+                Style: $A.@PanelButton;
+            }
+        }
+    }
+}
