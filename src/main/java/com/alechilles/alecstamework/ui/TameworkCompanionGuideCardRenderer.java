@@ -2,9 +2,12 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
+import com.hypixel.hytale.server.core.ui.LocalizableString;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import java.util.Map;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -32,7 +35,7 @@ final class TameworkCompanionGuideCardRenderer {
     }
 
     static boolean hasExampleScenarios(int topicIndex) {
-        return topicIndex == 3 || topicIndex == 6 || topicIndex == 7 || topicIndex == 8;
+        return topicIndex == 2 || topicIndex == 3 || topicIndex == 6 || topicIndex == 7 || topicIndex == 8;
     }
 
     static void render(UICommandBuilder commands,
@@ -61,6 +64,17 @@ final class TameworkCompanionGuideCardRenderer {
         // Its controls retain normal hover and tooltip behavior but cannot reach the host.
         LinkedNpcPanelCardBinder.bind(commands, new UIEventBuilder(), card, entry,
                 false, GUIDE_CARD_CONFIG, language);
+        if (topicIndex == 2) {
+            String group = card + " #GroupSelector";
+            commands.set(group + ".Visible", true);
+            commands.set(group + "Marker.Visible", true);
+            commands.set(group + "Label.Visible", true);
+            commands.set(group + ".Entries", List.of(new DropdownEntryInfo(
+                    LocalizableString.fromString(entry.groupName()), entry.groupId())));
+            commands.set(group + ".Value", entry.groupId());
+            commands.set(group + "Label.Text", entry.groupName());
+            LinkedNpcPanelGroupTabBinder.bind(commands, group, entry);
+        }
         commands.set(EXAMPLE_VIEWPORT + " #TameworkCompanionGuideGenericPortrait.Visible", true);
         commands.set(EXAMPLE_VIEWPORT + " #TameworkCompanionGuideBondedPortrait.Visible", false);
     }
@@ -71,6 +85,10 @@ final class TameworkCompanionGuideCardRenderer {
         boolean dead = topicIndex == 7 && exampleIndex == 2;
         boolean unloaded = captured || topicIndex == 7 && exampleIndex == 0 || dead;
         boolean active = !(topicIndex == 2 && exampleIndex == 2);
+        String nameKey = topicIndex == 2 && exampleIndex > 0
+                ? exampleIndex == 1 ? "sample.nameBramble" : "sample.nameWillow" : "sample.name";
+        String groupId = topicIndex == 2 ? exampleIndex == 2 ? "barn" : "meadow" : null;
+        String groupName = groupId == null ? null : guideText(language, "sample.group." + groupId);
         int hunger = topicIndex == 3 && exampleIndex == 0 ? 20 : 85;
         int thirst = topicIndex == 3 && exampleIndex == 0 ? 30 : 90;
         int happiness = topicIndex == 3 && exampleIndex == 2 ? 75 : 68;
@@ -90,11 +108,11 @@ final class TameworkCompanionGuideCardRenderer {
                 } : LinkedNpcTraitIndicator.EMPTY;
         LinkedNpcEntry entry = new LinkedNpcEntry(
                 UUID.nameUUIDFromBytes(("guide-" + topicIndex + "-" + exampleIndex).getBytes()),
-                guideText(language, "sample.name"), "Female",
+                guideText(language, nameKey), "Female",
                 78, 100, happiness, 100, happiness, "", hunger, 100, thirst, 100,
                 !unloaded, topicIndex == 9, dead, captured, false, false, 0L, null,
                 level, points, traits, false, false, topicIndex == 5, topicIndex == 5,
-                true, active, null, null, null, null, null,
+                true, active, null, null, groupId, groupName, exampleIndex == 2 ? "#d5b15c" : "#85b99a",
                 topicIndex == 4 || topicIndex == 3, topicIndex == 4 || topicIndex == 3,
                 false, 0L, 0.0, topicIndex == 4 || topicIndex == 3,
                 false, 0L, 0.0, false, false, 0L

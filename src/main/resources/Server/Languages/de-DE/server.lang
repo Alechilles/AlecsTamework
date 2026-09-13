@@ -950,6 +950,10 @@ tamework.ui.notifications.command.locate.lastKnown=Letzter bekannter Standort
 
 # Companion Guide: English fallback copy, ready for translation.
 tamework.ui.guide.sample.species=Wolf
+tamework.ui.guide.sample.nameBramble=Bramble
+tamework.ui.guide.sample.nameWillow=Willow
+tamework.ui.guide.sample.group.meadow=Wiese
+tamework.ui.guide.sample.group.barn=Stall
 tamework.ui.guide.sample.trait.attitude=Ändert, wie sich dein Tier verhält.
 tamework.ui.guide.sample.trait.fertility=Kann ändern, wie viele Babys dein Tier bekommt.
 tamework.ui.guide.sample.gettingStarted.scenario0.title=Wildtier

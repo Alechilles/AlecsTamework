@@ -950,6 +950,10 @@ tamework.ui.notifications.command.locate.lastKnown=Última localização conheci
 
 # Companion Guide: English fallback copy, ready for translation.
 tamework.ui.guide.sample.species=Lobo
+tamework.ui.guide.sample.nameBramble=Bramble
+tamework.ui.guide.sample.nameWillow=Willow
+tamework.ui.guide.sample.group.meadow=Prado
+tamework.ui.guide.sample.group.barn=Galpão
 tamework.ui.guide.sample.trait.attitude=Muda como seu animal se comporta.
 tamework.ui.guide.sample.trait.fertility=Pode mudar quantos filhotes seu animal terá.
 tamework.ui.guide.sample.gettingStarted.scenario0.title=Selvagem

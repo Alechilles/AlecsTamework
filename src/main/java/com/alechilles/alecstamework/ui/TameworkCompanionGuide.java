@@ -84,12 +84,12 @@ final class TameworkCompanionGuide {
             exampleIndex = 0;
         } else if (ACTION_EXAMPLE_PREVIOUS.equals(action)) {
             if (TameworkCompanionGuideCardRenderer.hasExampleScenarios(topicIndex)) {
-                exampleIndex = Math.floorMod(exampleIndex - 1,
-                        TameworkCompanionGuideCardRenderer.EXAMPLE_COUNT);
+                exampleIndex = Math.max(0, exampleIndex - 1);
             }
         } else if (ACTION_EXAMPLE_NEXT.equals(action)) {
             if (TameworkCompanionGuideCardRenderer.hasExampleScenarios(topicIndex)) {
-                exampleIndex = (exampleIndex + 1) % TameworkCompanionGuideCardRenderer.EXAMPLE_COUNT;
+                exampleIndex = Math.min(TameworkCompanionGuideCardRenderer.EXAMPLE_COUNT - 1,
+                        exampleIndex + 1);
             }
         } else if (action.startsWith(ACTION_TOPIC_PREFIX)) {
             try {
