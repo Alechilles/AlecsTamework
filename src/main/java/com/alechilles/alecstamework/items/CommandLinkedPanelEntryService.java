@@ -1,5 +1,10 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.items.locate.CapturedItemTracker;
+import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex;
+import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.ui.TameworkLinkedNpcLocationFormatter;
+import java.time.Instant;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwDynamicIconConfig;
@@ -44,6 +49,11 @@ final class CommandLinkedPanelEntryService {
     private final CommandLoadedNpcStatusSnapshotService loadedSnapshotService;
     private final CommandLinkedPanelLiveTargetResolver liveTargetResolver;
     private final CommandPersistenceView persistenceView;
+    private CapturedItemTracker itemTracker;
+
+    void configureItemLocations(CapturedItemTracker tracker) {
+        itemTracker = tracker;
+    }
 
     CommandLinkedPanelEntryService(CommandLinkedNpcRecordStore linkedNpcRecordStore,
                                    CommandNpcRelocationService relocationService,
@@ -327,13 +337,69 @@ final class CommandLinkedPanelEntryService {
             if (saved != null) {
                 entry = saved.apply(entry, player.getPlayerRef() == null ? null : player.getPlayerRef().getLanguage());
             }
+            if (!entry.loaded() && !entry.dead() && !entry.lost()) {
+                entry = entry.withLocation(location(player, record, entry, saved));
+            }
             entries.add(entry);
             renderedIds.put(record.npcUuid, entry.npcUuid());
         }
         return new ResolvedEntries(entries, renderedIds);
     }
 
-    /** One refresh's cards and the aliases they resolved to for rendering. */
+    /** Uses saved evidence and observed item holders without querying live inventories. */
+    private LinkedNpcEntry.Location location(Player player, LinkedNpcRecord record, LinkedNpcEntry entry,
+                                             CommandSavedNpcPanelSnapshot saved) {
+        var stored = saved == null ? null : saved.storedLocation();
+        String status;
+        String world = "";
+        String coordinates = "";
+        if (entry.captured()) {
+            var sighting = stored == null || stored.capture() == null || itemTracker == null ? null
+                    : itemTracker.index().find(stored.capture()).orElse(null);
+            status = sighting == null
+                    ? LocalizedText.resolve(player,
+                            "tamework.ui.notifications.command.locate.captureUnknown")
+                    : CommandLinkedNpcLocateService.describeSighting(player, sighting);
+            if (sighting != null) {
+                // Inline cards report observations; no cross-world inventory verification runs here.
+                status = LocalizedText.format(player,
+                        "tamework.ui.notifications.command.locate.lastSeen", status,
+                        Instant.ofEpochMilli(sighting.observedAtMs()).toString());
+                if (sighting.holder().kind() != CapturedItemLocationIndex.Kind.PLAYER) {
+                    world = sighting.holder().worldName();
+                    coordinates = TameworkLinkedNpcLocationFormatter.formatCoordinates(
+                            sighting.holder().x(), sighting.holder().y(), sighting.holder().z());
+                }
+            }
+        } else if (entry.inCoop()) {
+            status = LocalizedText.resolve(player,
+                    "tamework.ui.notifications.command.locate.coop");
+            if (stored != null && stored.coop() != null) {
+                var coop = stored.coop();
+                world = coop.worldKey();
+                coordinates = TameworkLinkedNpcLocationFormatter.formatCoordinates(
+                        coop.x(), coop.y(), coop.z());
+            }
+        } else {
+            status = LocalizedText.resolve(player,
+                    "tamework.ui.notifications.command.locate.lastKnown");
+            if (record.lastKnownPosition != null) {
+                world = record.lastKnownWorldName;
+                coordinates = TameworkLinkedNpcLocationFormatter.formatCoordinates(
+                        record.lastKnownPosition.x, record.lastKnownPosition.y, record.lastKnownPosition.z);
+            } else {
+                status = LocalizedText.format(player,
+                        "tamework.ui.notifications.command.locate.noLocation", entry.displayName());
+            }
+        }
+        if (!coordinates.isBlank()) {
+            world = TameworkLinkedNpcLocationFormatter.formatDisplayWorldName(world,
+                    LocalizedText.resolve(player,
+                            "tamework.ui.notifications.command.locate.unknownWorld"));
+        }
+        return new LinkedNpcEntry.Location(status, world == null ? "" : world, coordinates);
+    }
+
     record ResolvedEntries(
             List<LinkedNpcEntry> entries,
             Map<UUID, UUID> renderedIds

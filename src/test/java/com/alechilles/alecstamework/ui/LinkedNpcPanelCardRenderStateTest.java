@@ -63,10 +63,10 @@ class LinkedNpcPanelCardRenderStateTest {
                 50, 100, "", 100, 100, 100, 100, true, false, false, false, false,
                 false, 0L, LinkedNpcTraitIndicator.EMPTY);
         UICommandBuilder commands = new UICommandBuilder();
-        LinkedNpcPanelCardBinder.bindCardLayout(commands, "#Card", unavailable, false, false);
+        LinkedNpcPanelCardBinder.bindCardLayout(commands, "#Card", unavailable, false, false, false);
         assertVisible(commands, "#Card #NeedRingRow.Visible", false);
         assertVisible(commands, "#Card #TraitStrip.Visible", false);
-        LinkedNpcPanelCardBinder.bindCardLayout(commands, "#Card", live, false, true);
+        LinkedNpcPanelCardBinder.bindCardLayout(commands, "#Card", live, false, true, false);
         assertVisible(commands, "#Card #NeedRingRow.Visible", true);
         assertVisible(commands, "#Card #TraitStrip.Visible", true);
     }
@@ -79,10 +79,23 @@ class LinkedNpcPanelCardRenderStateTest {
                 false, false, false, false, 0L, LinkedNpcTraitIndicator.EMPTY);
         UICommandBuilder commands = new UICommandBuilder();
 
-        LinkedNpcPanelCardBinder.bindCardLayout(commands, "#Card", offline, false, false);
+        LinkedNpcPanelCardBinder.bindCardLayout(commands, "#Card", offline, false, false, false);
 
         assertVisible(commands, "#Card #NeedRingRow.Visible", true);
         assertVisible(commands, "#Card #TraitStrip.Visible", true);
+    }
+
+    @Test
+    void changedLocationRebindsTheVisibleCard() {
+        var entry = new LinkedNpcEntry(UUID.randomUUID(), "Duck", 0, 0,
+                0, 0, "", 0, 0, 0, 0, false, false, false, true, false,
+                false, 0L, LinkedNpcTraitIndicator.EMPTY);
+        var state = new LinkedNpcPanelCardRenderState();
+        state.markRendered(LinkedNpcEntrySnapshotMapper.build(java.util.List.of(entry.withLocation(
+                new LinkedNpcEntry.Location("Carried by Alec", "", "")))), null, Map.of());
+        assertEquals(LinkedNpcPanelCardRenderState.Update.FULL, state.updateAt(0,
+                LinkedNpcEntrySnapshotMapper.build(java.util.List.of(entry.withLocation(new LinkedNpcEntry.Location(
+                        "In Wooden Chest", "world", "1, 2, 3")))), null, Map.of()));
     }
 
     private static void assertVisible(UICommandBuilder commands, String selector, boolean visible) {

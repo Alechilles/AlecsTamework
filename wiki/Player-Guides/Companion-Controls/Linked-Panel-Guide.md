@@ -87,17 +87,24 @@ records without a complete saved talent snapshot cannot use offline spending.
 
 ## Finding captured animals
 
-Use **Locate** in Linked or Owned mode to find a stored animal. Coop occupants
-show their recorded world and block coordinates. Capture items can show the player
-carrying them, a storage container's coordinates, or their position on the ground.
+In Linked and Owned modes, captured, cooped, and unloaded animals show location
+details directly on their cards, replacing the unused status and cooldown area.
+Coop occupants show recorded world and block coordinates; unloaded animals show
+their last known location. Loaded animals keep the **Locate** action.
+
+Capture sightings name the item and storage container when known, for example
+**Soul Lantern in Wooden Chest**. Player-held items name the carrier; dropped
+items show their recorded position. Older sightings use generic labels until
+the item or container is observed again.
 
 The Locate window hides unused sections and shrinks to fit. Capture items in a
 player's inventory show the holder without empty world or coordinate fields.
 Container and dropped-item results include their location and retain last-seen
 details when the holder is unloaded.
 
-Locate checks the recorded holder without loading distant chunks. If a player is
-offline or storage is unloaded, it shows **Last seen** and an observation time in
+Inline capture details show **Last seen** and the observation time, without
+loading distant chunks or checking inventories as cards refresh. The Locate
+action verifies the recorded holder when available. Observation times use
 UTC. **Unknown** means no usable item sighting is available; it does not mean the
 animal died or the item was destroyed. Older capture items without a capture receipt
 and storage provided by other mods may have no known location.

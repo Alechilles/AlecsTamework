@@ -92,6 +92,10 @@ final class LinkedNpcPanelCardBinder {
         String statusUnloadedSelector = entrySelector + " #StatusUnloaded";
         String recallCountdownSelector = entrySelector + " #RecallCountdown";
         String statusConfirmSelector = entrySelector + " #StatusConfirm";
+        String inlineLocationSelector = entrySelector + " #InlineLocation";
+        String inlineLocationStatusSelector = inlineLocationSelector + " #Status";
+        String inlineLocationWorldSelector = inlineLocationSelector + " #World";
+        String inlineLocationCoordinatesSelector = inlineLocationSelector + " #Coordinates";
         String xpProgressRingSelector = entrySelector + " #XpProgressRing";
         String xpLevelTextSelector = xpProgressRingSelector + " #XpLevelText";
         String xpTooltipSelector = xpProgressRingSelector + " #XpTooltip";
@@ -141,11 +145,20 @@ final class LinkedNpcPanelCardBinder {
                 && (legacyLinked || entry.ownedActions());
         boolean paidRevivalManaged = feature != null
                 && feature.managesPaidRevival();
+        LinkedNpcEntry.Location location = entry.location();
+        boolean showInlineLocation = !managedRoster
+                && !pendingUnlink
+                && !entry.loaded()
+                && !entry.dead()
+                && !entry.lost()
+                && (!location.status().isBlank()
+                        || !location.world().isBlank()
+                        || !location.coordinates().isBlank());
         boolean showReviveAction = !paidRevivalManaged && genericLinkedOrOwned
                 && (entry.dead() || entry.lost())
                 && entry.deadRespawnRemainingMs() == 0L
                 && !pendingUnlink;
-        boolean showLocate = genericLinkedOrOwned
+        boolean showLocate = !showInlineLocation && genericLinkedOrOwned
                 && !entry.dead() && !entry.lost() && !pendingUnlink;
         boolean showRecall = genericLinkedOrOwned
                 && config.recallActionEnabled()
@@ -195,7 +208,7 @@ final class LinkedNpcPanelCardBinder {
                 : showReviveAction;
         boolean showInactiveBadge = legacyLinked && !entry.active()
                 && !showRespawn && !pendingUnlink;
-        boolean showRecallCountdown = legacyLinked
+        boolean showRecallCountdown = !showInlineLocation && legacyLinked
                 && entry.recallPending()
                 && !entry.loaded()
                 && !entry.dead()
@@ -205,7 +218,8 @@ final class LinkedNpcPanelCardBinder {
                 && !pendingUnlink;
         commandBuilder.set(
                 statusUnloadedSelector + ".Visible",
-                !entry.loaded() || entry.dead() || entry.lost() || entry.captured() || entry.inCoop()
+                !showInlineLocation
+                        && (!entry.loaded() || entry.dead() || entry.lost() || entry.captured() || entry.inCoop())
         );
         commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry, language));
         commandBuilder.set(recallCountdownSelector + ".Visible", showRecallCountdown);
@@ -250,9 +264,9 @@ final class LinkedNpcPanelCardBinder {
                 : "tamework.ui.linkedPanel.bonded.shoulder.toMe.tooltip") : "");
         commandBuilder.set(inactiveBadgeSelector + ".Visible", showInactiveBadge);
         bindCardLayout(commandBuilder, entrySelector, entry, managedRoster,
-                showActiveToggleActive || showActiveToggleInactive);
+                showActiveToggleActive || showActiveToggleInactive, showInlineLocation);
         commandBuilder.set(entrySelector + " #CooldownRow.Visible",
-                entry.hasKnownCooldowns());
+                !showInlineLocation && entry.hasKnownCooldowns());
         LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry, language);
         LinkedNpcPanelProgressionBinder.bindXpProgressRing(
                 commandBuilder,
@@ -291,7 +305,7 @@ final class LinkedNpcPanelCardBinder {
                 language
         );
         LinkedNpcPanelIconStyles.apply(commandBuilder, entrySelector, entry);
-        int actionLeft = 432;
+        int actionLeft = showInlineLocation ? 736 : 432;
         String[] actionSelectors = {shoulderRideSelector, flightToggleSelector,
                 showBreedingToggleEnabled ? breedingToggleEnabledSelector : breedingToggleDisabledSelector,
                 respawnSelector, locateSelector, recallSelector, setHomeSelector,
@@ -314,8 +328,8 @@ final class LinkedNpcPanelCardBinder {
             }
         }
         String emblem = LinkedNpcPanelStatusTextService.resolveAvailabilityEmblem(entry);
-        commandBuilder.set(entrySelector + " #StatusEmblem.Visible", emblem != null);
-        if (emblem != null) {
+        commandBuilder.set(entrySelector + " #StatusEmblem.Visible", emblem != null && !showInlineLocation);
+        if (emblem != null && !showInlineLocation) {
             boolean compact = !managedRoster && !entry.hasKnownCardDetails();
             // Center in the entire action section, independently of visible actions.
             int statusLeft = 432;
@@ -328,6 +342,29 @@ final class LinkedNpcPanelCardBinder {
                     fixedAnchor(compact ? 74 : 82, statusLeft, statusWidth, 16));
             commandBuilder.setObject(recallCountdownSelector + ".Anchor",
                     fixedAnchor(98, statusLeft, statusWidth, 12));
+        }
+        boolean showInlineStatus = showInlineLocation && !location.status().isBlank();
+        boolean showInlineWorld = showInlineLocation && !location.world().isBlank();
+        boolean showInlineCoordinates = showInlineLocation && !location.coordinates().isBlank();
+        commandBuilder.set(inlineLocationSelector + ".Visible", showInlineLocation);
+        commandBuilder.set(inlineLocationStatusSelector + ".Visible", showInlineStatus);
+        commandBuilder.set(inlineLocationWorldSelector + ".Visible", showInlineWorld);
+        commandBuilder.set(inlineLocationCoordinatesSelector + ".Visible", showInlineCoordinates);
+        commandBuilder.set(inlineLocationStatusSelector + ".Text", location.status());
+        commandBuilder.set(inlineLocationWorldSelector + ".Text", location.world());
+        commandBuilder.set(inlineLocationCoordinatesSelector + ".Value", location.coordinates());
+        commandBuilder.set(inlineLocationCoordinatesSelector + ".MaxLength",
+                Math.max(64, location.coordinates().length() + 16));
+        int locationRow = showInlineStatus ? 58 : 0;
+        int inlineLocationWidth = showRecall || showReturnHome || showSetHome ? 296 : 414;
+        commandBuilder.setObject(inlineLocationWorldSelector + ".Anchor",
+                fixedAnchor(locationRow, 0, inlineLocationWidth, 18));
+        locationRow += showInlineWorld ? 22 : 0;
+        commandBuilder.setObject(inlineLocationCoordinatesSelector + ".Anchor",
+                fixedAnchor(locationRow, 0, inlineLocationWidth, 26));
+        if (showInlineLocation) {
+            Anchor inlineAnchor = fixedAnchor(32, 432, inlineLocationWidth, 110);
+            commandBuilder.setObject(inlineLocationSelector + ".Anchor", inlineAnchor);
         }
         commandBuilder.set(flightToggleSelector + "Caption.Text", LocalizedText.resolve(language,
                 "tamework.ui.linkedPanel.action." + (entry.flightToggleAirborne() ? "flightAirborne" : "flightGrounded")));
@@ -507,12 +544,14 @@ final class LinkedNpcPanelCardBinder {
 
     /** Keep unavailable cards concise and reset geometry when a reused row becomes live again. */
     static void bindCardLayout(UICommandBuilder commands, String card, LinkedNpcEntry entry,
-                               boolean managedRoster, boolean showActiveToggle) {
-        boolean compact = !managedRoster && !entry.hasKnownCardDetails();
+                               boolean managedRoster, boolean showActiveToggle,
+                               boolean showInlineLocation) {
+        boolean compact = !managedRoster && !entry.hasKnownCardDetails() && !showInlineLocation;
         commands.setObject(card + ".Anchor", buildCardAnchor(managedRoster, compact));
         bindPortrait(commands, card, entry, compact);
-        commands.set(card + " #NeedRingRow.Visible", !compact);
-        commands.set(card + " #TraitStrip.Visible", !compact);
+        boolean showDetails = !compact && (!showInlineLocation || entry.hasKnownCardDetails());
+        commands.set(card + " #NeedRingRow.Visible", showDetails);
+        commands.set(card + " #TraitStrip.Visible", showDetails);
         commands.set(card + " #HealthTextShadow.Visible", entry.hasHealth() || entry.dead());
         commands.set(card + " #StatusDivider.Visible", true);
         commands.setObject(card + " #StatusUnloaded.Anchor",

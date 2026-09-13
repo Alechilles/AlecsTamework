@@ -71,8 +71,9 @@ public final class CapturedItemContainerSystem extends RefSystem<ChunkStore> {
         var info = buffer.getComponent(ref, BlockModule.get().getBlockStateInfoComponentType());
         var location = HytaleBlockStateAccess.resolve(store, info);
         if (location == null) return null;
+        var blockType = location.chunk().getBlockType(location.x(), location.y(), location.z());
         return new Holder(Kind.CONTAINER, store.getExternalData().getWorld().getName(),
-                location.x() + "," + location.y() + "," + location.z(), "",
+                location.x() + "," + location.y() + "," + location.z(), blockType == null ? "" : blockType.getId(),
                 location.x(), location.y(), location.z());
     }
 }

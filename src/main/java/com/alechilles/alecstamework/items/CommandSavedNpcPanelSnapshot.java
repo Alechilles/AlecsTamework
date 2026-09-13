@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.companion.coop.CoopSlotKey;
+import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex.CaptureKey;
 import com.alechilles.alecstamework.config.assets.TwDynamicIconConfig;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
@@ -57,6 +59,22 @@ final class CommandSavedNpcPanelSnapshot {
     private final Appearance appearance;
     private final boolean exactCheckpoint;
     private final boolean savedTalentsEditable;
+    private final StoredLocation storedLocation;
+
+    record StoredLocation(CoopSlotKey coop,
+                          CaptureKey capture) { }
+
+    StoredLocation storedLocation() { return storedLocation; }
+
+    private CommandSavedNpcPanelSnapshot(CommandSavedNpcPanelSnapshot source, StoredLocation location) {
+        this.observedAtMs = source == null ? 0 : source.observedAtMs;
+        this.roleId = source == null ? null : source.roleId;
+        this.facts = source == null ? null : source.facts;
+        this.appearance = source == null ? null : source.appearance;
+        this.exactCheckpoint = source != null && source.exactCheckpoint;
+        this.savedTalentsEditable = source != null && source.savedTalentsEditable;
+        this.storedLocation = location;
+    }
 
     private CommandSavedNpcPanelSnapshot(long observedAtMs, String roleId, Facts facts,
                                          Appearance appearance, boolean exactCheckpoint) {
@@ -67,6 +85,7 @@ final class CommandSavedNpcPanelSnapshot {
                                         Appearance appearance, boolean exactCheckpoint,
                                         boolean savedTalentsEditable) {
         this.savedTalentsEditable = savedTalentsEditable;
+        this.storedLocation = null;
         this.observedAtMs = observedAtMs;
         this.roleId = trimToNull(roleId);
         this.facts = facts;
@@ -91,6 +110,16 @@ final class CommandSavedNpcPanelSnapshot {
             CompanionProfileReadModel profile,
             @Nullable String checkpointJson
     ) {
+        if (profile == null) return null;
+        var state = decodeState(profile, checkpointJson);
+        var coop = profile.currentCoopSlot() == null ? null : profile.currentCoopSlot().key();
+        var capture = CommandLinkedNpcLocateService.captureKey(profile, profile.identity().profileId().value());
+        return coop == null && capture == null ? state
+                : new CommandSavedNpcPanelSnapshot(state, new StoredLocation(coop, capture));
+    }
+
+    private static CommandSavedNpcPanelSnapshot decodeState(
+            CompanionProfileReadModel profile, @Nullable String checkpointJson) {
         if (profile == null) {
             return null;
         }
@@ -123,6 +152,7 @@ final class CommandSavedNpcPanelSnapshot {
         if (base == null) {
             return null;
         }
+        if (facts == null) return base;
         String effectiveRole = firstNonBlank(roleId, base.speciesId());
         Health health = facts.health != null ? facts.health : new Health(base.currentHealth(), base.maxHealth());
         Meter happiness = resolveHappiness(facts.happiness, effectiveRole, base);

@@ -90,6 +90,7 @@ final class LinkedNpcEntrySnapshotMapper {
             ).withBreedingHappinessRatio(entry.breedingHappinessRatio())
                     .withRoleSubtitle(entry.roleSubtitle())
                     .withPortraitIcon(entry.portraitIcon())
+                    .withLocation(entry.location())
                     .withFlightToggle(entry.flightToggleAvailable(),
                     entry.flightToggleAirborne())
                     .withShoulderRide(entry.shoulderRideAvailable(),

@@ -98,6 +98,7 @@ public final class CapturedItemLocationCache implements AutoCloseable {
             value.add("holder", write(sighting.holder()));
             value.addProperty("observedAtMs", sighting.observedAtMs());
             value.addProperty("loaded", sighting.loaded());
+            nullable(value, "itemId", sighting.itemId());
             values.add(value);
         }
         root.add("sightings", values);
@@ -151,11 +152,15 @@ public final class CapturedItemLocationCache implements AutoCloseable {
     }
 
     private CapturedItemLocationIndex.Sighting readSighting(JsonObject value) {
-        requireFields(value, Set.of("capture", "holder", "observedAtMs", "loaded"));
+        // Version 1 caches written before item labels remain readable.
+        requireFields(value, value.has("itemId")
+                ? Set.of("capture", "holder", "observedAtMs", "loaded", "itemId")
+                : Set.of("capture", "holder", "observedAtMs", "loaded"));
         return new CapturedItemLocationIndex.Sighting(
                 readCapture(object(value.get("capture"), "capture")),
                 readHolder(object(value.get("holder"), "holder")),
-                number(value, "observedAtMs"), booleanValue(value, "loaded")
+                number(value, "observedAtMs"), booleanValue(value, "loaded"),
+                value.has("itemId") ? nullableString(value, "itemId") : null
         );
     }
 

@@ -103,7 +103,7 @@ public final class CapturedItemTracker implements AutoCloseable {
             });
         } catch (RuntimeException failure) { index.unload(known.holder()); result.complete(index.find(capture)); }
         return result.completeOnTimeout(Optional.of(new Sighting(known.capture(), known.holder(),
-                known.observedAtMs(), false)), 3, TimeUnit.SECONDS);
+                known.observedAtMs(), false, known.itemId())), 3, TimeUnit.SECONDS);
     }
 
     private void refresh(World world, Holder holder) {
@@ -114,7 +114,12 @@ public final class CapturedItemTracker implements AutoCloseable {
             var block = ref == null || !ref.isValid() ? null : world.getChunkStore().getStore()
                     .getComponent(ref, ItemContainerBlock.getComponentType());
             if (block == null) index.observe(holder, List.of(), System.currentTimeMillis());
-            else observeContainer(holder, block.getItemContainer());
+            else {
+                var type = chunk.getBlockType((int) holder.x(), (int) holder.y(), (int) holder.z());
+                Holder current = new Holder(holder.kind(), holder.worldName(), holder.id(),
+                        type == null ? "" : type.getId(), holder.x(), holder.y(), holder.z());
+                observeContainer(current, block.getItemContainer());
+            }
             return;
         }
         var ref = world.getEntityRef(UUID.fromString(holder.id()));
@@ -133,7 +138,7 @@ public final class CapturedItemTracker implements AutoCloseable {
         Holder holder = new Holder(Kind.PLAYER, worldName, player.getUuid().toString(),
                 player.getPlayerRef() == null ? player.getUuid().toString() : player.getPlayerRef().getUsername(), position == null ? 0 : position.x,
                 position == null ? 0 : position.y, position == null ? 0 : position.z);
-        List<CaptureKey> captures = new ArrayList<>();
+        Map<CaptureKey, String> captures = new HashMap<>();
         if (InventoryComponent.EVERYTHING == null) return;
         for (var type : InventoryComponent.EVERYTHING) {
             var inventory = accessor.getComponent(ref, type);
@@ -152,20 +157,22 @@ public final class CapturedItemTracker implements AutoCloseable {
         Holder holder = new Holder(Kind.DROPPED, worldName, uuid.getUuid().toString(), "",
                 position.x, position.y, position.z);
         CaptureKey capture = item == null ? null : CapturedItemMetadata.read(item.getItemStack());
-        index.observe(holder, capture == null ? List.of() : List.of(capture), System.currentTimeMillis());
+        index.observe(holder, capture == null ? Map.of() : Map.of(capture, item.getItemStack().getItemId()),
+                System.currentTimeMillis());
     }
 
     public void observeContainer(Holder holder, @Nullable ItemContainer container) {
         if (closed || container == null) return;
-        List<CaptureKey> captures = new ArrayList<>();
+        Map<CaptureKey, String> captures = new HashMap<>();
         collect(container, captures);
         index.observe(holder, captures, System.currentTimeMillis());
     }
 
-    private static void collect(ItemContainer container, List<CaptureKey> captures) {
+    private static void collect(ItemContainer container, Map<CaptureKey, String> captures) {
         for (short slot = 0, capacity = container.getCapacity(); slot < capacity; slot++) {
-            CaptureKey capture = CapturedItemMetadata.read(container.getItemStack(slot));
-            if (capture != null) captures.add(capture);
+            var stack = container.getItemStack(slot);
+            CaptureKey capture = CapturedItemMetadata.read(stack);
+            if (capture != null) captures.put(capture, stack.getItemId());
         }
     }
 

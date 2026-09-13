@@ -259,6 +259,7 @@ public final class CommandItemFeatureHandler {
                 profileActionResolver
         );
         this.resolutionService = new CommandResolutionService(registry, DEFAULT_RAYCAST_DISTANCE);
+        this.panelEntryService.configureItemLocations(capturedItemTracker);
         this.panelPreferenceService = new CommandPanelPreferenceService();
         this.panelEntrySourceService = new CommandPanelEntrySourceService(
                 panelEntryService,

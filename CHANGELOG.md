@@ -2,6 +2,10 @@
 
 ## Unreleased development changes
 
+- Captured, cooped, and unloaded companions now show location details directly
+  on Linked and Owned cards. Capture sightings name their item and storage
+  container when known, with last-seen details and generic labels for older sightings.
+
 - Refreshed Locate with a compact layout that hides unused status and coordinate
   sections while preserving container locations and last-seen details.
 

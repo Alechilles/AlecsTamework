@@ -43,6 +43,14 @@ public final class CapturedItemLocationIndex {
             Collection<CaptureKey> captures,
             long now
     ) {
+        Map<CaptureKey, String> items = new HashMap<>();
+        for (CaptureKey capture : captures) items.put(capture, null);
+        observe(holder, items, now);
+    }
+
+    /** Item IDs are optional presentation data, separate from capture identity. */
+    public synchronized void observe(Holder holder, Map<CaptureKey, String> items, long now) {
+        Collection<CaptureKey> captures = items.keySet();
         Objects.requireNonNull(holder, "holder");
         Objects.requireNonNull(captures, "captures");
         SourceKey source = SourceKey.of(holder);
@@ -85,7 +93,7 @@ public final class CapturedItemLocationIndex {
                     changed = true;
                 }
             }
-            Sighting next = new Sighting(capture, holder, now, true);
+            Sighting next = new Sighting(capture, holder, now, true, items.get(capture));
             if (!next.equals(previousSighting)) {
                 replaceSighting(next);
                 changed = true;
@@ -113,7 +121,7 @@ public final class CapturedItemLocationIndex {
             if (current != null && source.equals(SourceKey.of(current.holder()))
                     && current.loaded()) {
                 replaceSighting(new Sighting(
-                        capture, current.holder(), current.observedAtMs(), false
+                        capture, current.holder(), current.observedAtMs(), false, current.itemId()
                 ));
                 changed = true;
             }
@@ -149,7 +157,7 @@ public final class CapturedItemLocationIndex {
             Objects.requireNonNull(sighting, "sighting");
             Sighting stale = new Sighting(
                     sighting.capture(), sighting.holder(),
-                    sighting.observedAtMs(), false
+                    sighting.observedAtMs(), false, sighting.itemId()
             );
             Sighting replaced = sightings.get(stale.capture());
             if (replaced != null) {
@@ -266,7 +274,10 @@ public final class CapturedItemLocationIndex {
         }
     }
 
-    /** A holder's stable source identity is kind, world, and id only. */
+    /**
+     * A holder's stable source identity is kind, world, and id only.
+     * Name is the username for players, the block asset ID for containers, or empty when unknown.
+     */
     public record Holder(
             Kind kind,
             String worldName,
@@ -293,8 +304,12 @@ public final class CapturedItemLocationIndex {
             CaptureKey capture,
             Holder holder,
             long observedAtMs,
-            boolean loaded
+            boolean loaded,
+            String itemId
     ) {
+        public Sighting(CaptureKey capture, Holder holder, long observedAtMs, boolean loaded) {
+            this(capture, holder, observedAtMs, loaded, null);
+        }
         public Sighting {
             Objects.requireNonNull(capture, "capture");
             Objects.requireNonNull(holder, "holder");

@@ -167,6 +167,22 @@ class CommandSavedNpcPanelSnapshotTest {
         );
     }
 
+    @Test
+    void captureLocationDoesNotRequireAStatsSnapshot() {
+        var base = profileWithoutSnapshots(new ProfileId(UUID.randomUUID()));
+        var lifecycle = new CompanionLifecycle(base.identity().profileId(), base.lifecycle().ownerId(),
+                LifecycleState.CAPTURED, LifecycleLocation.keyed(
+                        com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind.CAPTURE_ITEM, "receipt"),
+                LifecycleRevision.INITIAL, null, -20L, ReconciliationGeneration.INITIAL, null, null);
+        var profile = new CompanionProfileReadModel(base.identity(), base.currentAlias(), lifecycle,
+                List.of(), List.of(), null);
+        var saved = CommandSavedNpcPanelSnapshot.decode(profile);
+        assertNotNull(saved);
+        assertEquals("receipt", saved.storedLocation().capture().snapshotId());
+        LinkedNpcEntry card = baseCard();
+        assertEquals(card, saved.apply(card, null));
+    }
+
     private static LinkedNpcEntry baseCard() {
         return new LinkedNpcEntry(UUID.randomUUID(), "Sheep", 1, 1, 0, 0,
                 null, 0, 0, 0, 0, false, false, false, false, false, false,

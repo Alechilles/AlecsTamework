@@ -66,6 +66,7 @@ public final class LinkedNpcEntry {
     private final boolean flightToggleAirborne;
     private final boolean shoulderRideAvailable;
     private final boolean shoulderRideMounted;
+    private final Location location;
 
     public LinkedNpcEntry(UUID npcUuid,
                           String displayName,
@@ -499,6 +500,7 @@ public final class LinkedNpcEntry {
         this.flightToggleAirborne = false;
         this.shoulderRideAvailable = false;
         this.shoulderRideMounted = false;
+        this.location = Location.EMPTY;
     }
 
     public boolean hasHealth() {
@@ -771,6 +773,21 @@ public final class LinkedNpcEntry {
                         breedingHappinessRatio, ownedActions, roleSubtitle, normalized);
     }
 
+    /** Returns an immutable presentation copy with the current location details. */
+    public LinkedNpcEntry withLocation(Location location) {
+        Location normalized = Location.normalize(location);
+        return Objects.equals(this.location, normalized) ? this
+                : new LinkedNpcEntry(this, recoveryHeld, recoveryIncidentId,
+                        flightToggleAvailable, flightToggleAirborne, shoulderRideAvailable,
+                        shoulderRideMounted, breedingHappinessRatio, ownedActions,
+                        roleSubtitle, portraitIcon, normalized);
+    }
+
+    /** Localized location details for the inline companion card. */
+    public Location location() {
+        return location;
+    }
+
     public double healthRatio() {
         if (!hasHealth()) {
             return 0.0;
@@ -947,6 +964,16 @@ public final class LinkedNpcEntry {
                           boolean shoulderRideAvailable, boolean shoulderRideMounted,
                           double breedingHappinessRatio, boolean ownedActions,
                           String roleSubtitle, String portraitIcon) {
+        this(source, recoveryHeld, incidentId, flightToggleAvailable, flightToggleAirborne,
+                shoulderRideAvailable, shoulderRideMounted, breedingHappinessRatio,
+                ownedActions, roleSubtitle, portraitIcon, source.location);
+    }
+
+    private LinkedNpcEntry(LinkedNpcEntry source, boolean recoveryHeld, String incidentId,
+                          boolean flightToggleAvailable, boolean flightToggleAirborne,
+                          boolean shoulderRideAvailable, boolean shoulderRideMounted,
+                          double breedingHappinessRatio, boolean ownedActions,
+                          String roleSubtitle, String portraitIcon, Location location) {
         this.portraitIcon = portraitIcon;
         this.npcUuid = source.npcUuid;
         this.displayName = source.displayName;
@@ -1004,6 +1031,7 @@ public final class LinkedNpcEntry {
         this.shoulderRideMounted = shoulderRideAvailable && shoulderRideMounted;
         this.recoveryHeld = recoveryHeld;
         this.recoveryIncidentId = recoveryHeld ? normalizeIncidentId(incidentId) : null;
+        this.location = Location.normalize(location);
     }
 
     private static String normalizeIncidentId(String incidentId) {
@@ -1105,6 +1133,7 @@ public final class LinkedNpcEntry {
                 && Objects.equals(groupId, other.groupId)
                 && Objects.equals(groupName, other.groupName)
                 && Objects.equals(groupColorHex, other.groupColorHex)
+                && Objects.equals(location, other.location)
                 && Objects.equals(futureStatA, other.futureStatA)
                 && Objects.equals(futureStatB, other.futureStatB)
                 && Arrays.equals(traitIndicators, other.traitIndicators);
@@ -1166,10 +1195,30 @@ public final class LinkedNpcEntry {
                 flightToggleAvailable,
                 flightToggleAirborne,
                 shoulderRideAvailable,
-                shoulderRideMounted
+                shoulderRideMounted,
+                location
         );
         result = 31 * result + Arrays.hashCode(traitIndicators);
         return result;
+    }
+
+    /** Localized text displayed in the inline location section. */
+    public record Location(String status, String world, String coordinates) {
+        public static final Location EMPTY = new Location("", "", "");
+
+        public Location {
+            status = normalizeText(status);
+            world = normalizeText(world);
+            coordinates = normalizeText(coordinates);
+        }
+
+        private static Location normalize(Location location) {
+            return location == null ? EMPTY : location;
+        }
+
+        private static String normalizeText(String value) {
+            return value == null ? "" : value.trim();
+        }
     }
 
     /**

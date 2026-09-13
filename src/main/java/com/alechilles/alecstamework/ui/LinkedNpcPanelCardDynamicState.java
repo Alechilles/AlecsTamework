@@ -19,6 +19,7 @@ final class LinkedNpcPanelCardDynamicState {
         return !previous.equals(current)
                 && Objects.equals(previous.npcUuid(), current.npcUuid())
                 && Objects.equals(previous.displayName(), current.displayName())
+                && Objects.equals(previous.location(), current.location())
                 && Objects.equals(previous.gender(), current.gender())
                 && previous.loaded() == current.loaded()
                 && previous.hasHealth() == current.hasHealth()

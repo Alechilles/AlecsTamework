@@ -86,6 +86,15 @@ at shutdown. Saved card values never authorize a live action or mutate persisten
 
 ## Captured-animal Locate
 
+Generic Linked and Owned cards display location details inline for captured,
+cooped, and unloaded companions. The existing saved-panel cache carries immutable
+coop slots and capture identities from its asynchronous profile read. Normal
+card refreshes read the advisory item index; they do not dispatch holder
+verification or scan inventories. Inline item locations are explicitly last-seen
+observations. Sightings retain optional item asset IDs and container block IDs,
+resolved to localized names when displayed. Older cache entries remain readable
+with generic item and container labels.
+
 `CommandLinkedNpcLocateService` reads the canonical profile on demand. Coop addresses
 come from its `CoopSlotKey`; capture sightings must match the profile and current
 capture snapshot ID. Sightings cannot change ownership, lifecycle, or recovery state.

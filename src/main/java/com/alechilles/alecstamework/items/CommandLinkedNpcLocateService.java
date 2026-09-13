@@ -229,13 +229,7 @@ final class CommandLinkedNpcLocateService {
                 status = LocalizedText.resolve(player, "tamework.ui.notifications.command.locate.captureUnknown");
             } else {
                 var holder = sighting.holder();
-                String key = switch (holder.kind()) {
-                    case PLAYER -> "player";
-                    case CONTAINER -> "container";
-                    case DROPPED -> "dropped";
-                };
-                String place = LocalizedText.format(player, "tamework.ui.notifications.command.locate." + key,
-                        holder.name() == null || holder.name().isBlank() ? holder.id() : holder.name());
+                String place = describeSighting(player, sighting);
                 status = sighting.loaded() ? place : LocalizedText.format(player,
                         "tamework.ui.notifications.command.locate.lastSeen", place, Instant.ofEpochMilli(sighting.observedAtMs()).toString());
                 // Inventory location identifies the holder; old player coordinates would be misleading.
@@ -264,6 +258,26 @@ final class CommandLinkedNpcLocateService {
     }
 
     void close() { pending.clear(); }
+
+    static String describeSighting(Player player, Sighting sighting) {
+        var holder = sighting.holder();
+        var names = new CommandItemDisplayResolver();
+        String item = sighting.itemId() == null || sighting.itemId().isBlank()
+                ? LocalizedText.resolve(player, "tamework.ui.notifications.command.locate.itemGeneric")
+                : names.resolveItemDisplayName(player, sighting.itemId());
+        String target = holder.name() == null || holder.name().isBlank() ? holder.id() : holder.name();
+        String key = switch (holder.kind()) {
+            case PLAYER -> "namedPlayer";
+            case CONTAINER -> "namedContainer";
+            case DROPPED -> "namedDropped";
+        };
+        if (holder.kind() == Kind.CONTAINER) {
+            target = holder.name() == null || holder.name().isBlank()
+                    ? LocalizedText.resolve(player, "tamework.ui.notifications.command.locate.containerGeneric")
+                    : names.resolveItemDisplayName(player, holder.name());
+        }
+        return LocalizedText.format(player, "tamework.ui.notifications.command.locate." + key, item, target);
+    }
 
     private record ContainedResult(CompanionProfileReadModel profile, Optional<Sighting> sighting) { }
 
