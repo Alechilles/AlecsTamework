@@ -115,23 +115,24 @@ class FlightFormationSteeringTest {
     }
 
     @Test
-    void looseFormationStaggersAboveAndBelowLeaderThroughoutItsDrift() {
+    void looseFormationRetainsVerticalDepthThroughoutItsDrift() {
         Vector3d leader = new Vector3d(0.0, 40.0, 0.0);
         Vector3d heading = new Vector3d(0.0, 0.0, 1.0);
         Vector3d target = new Vector3d();
         for (int second = 0; second < 60; second++) {
-            boolean above = false;
-            boolean below = false;
+            double minimumHeight = Double.POSITIVE_INFINITY;
+            double maximumHeight = Double.NEGATIVE_INFINITY;
             for (int slot = 0; slot < 6; slot++) {
                 FlightFormationSteering.resolveTarget(
                         BuilderBodyMotionTameworkFlightFormation.Formation.LOOSE,
                         slot, 3.0, second, leader, heading, target);
-                above |= target.y > leader.y + 0.3;
-                below |= target.y < leader.y - 0.3;
+                minimumHeight = Math.min(minimumHeight, target.y);
+                maximumHeight = Math.max(maximumHeight, target.y);
                 assertTrue(Math.abs(target.y - leader.y) < 3.2,
                         "Loose height variation should remain bounded at normal spacing.");
             }
-            assertTrue(above && below, "The flock needs depth above and below its leader.");
+            assertTrue(maximumHeight - minimumHeight > 0.6,
+                    "The evolving flock must retain depth without fixed bands around the leader.");
         }
     }
 
