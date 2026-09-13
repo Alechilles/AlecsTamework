@@ -150,7 +150,12 @@ public final class BodyMotionTameworkFlightFormation extends TameworkBodyMotionB
                 int assignedSlot = NativeFormationSlots.get().claim(
                         ref, slotGroup, memberId, followerIndex, nowMillis);
                 if (assignedSlot != lastFormationSlot) {
-                    hasFormationOffset = false;
+                    if (lastFormationSlot >= 0 && hasFormationOffset && isOrganicFormation()) {
+                        // Start a traded slot's smooth approach at the bird, not its former distant target.
+                        formationOffset.set(selfTransform.getPosition()).sub(leaderTransform.getPosition());
+                    } else {
+                        hasFormationOffset = false;
+                    }
                 }
                 formationSlotGroup = slotGroup;
                 lastFormationSlot = assignedSlot;
@@ -164,7 +169,8 @@ public final class BodyMotionTameworkFlightFormation extends TameworkBodyMotionB
                 lastFormationSlot = -1;
             }
             FlightFormationSteering.resolveTarget(
-                    formation, followerIndex, spacing, looseDriftSeconds,
+                    formation, followerIndex, spacing,
+                    isOrganicFormation() ? System.nanoTime() * 1.0E-9 : looseDriftSeconds,
                     leaderTransform.getPosition(), leaderHeading, targetPosition);
             if (formationSlotGroup != null && memberId != null) {
                 NativeFormationSlots.get().report(ref, formationSlotGroup, memberId,
@@ -207,6 +213,11 @@ public final class BodyMotionTameworkFlightFormation extends TameworkBodyMotionB
         } finally {
             clearObstacleProbeContext();
         }
+    }
+
+    private boolean isOrganicFormation() {
+        return formation == BuilderBodyMotionTameworkFlightFormation.Formation.CLUSTER
+                || formation == BuilderBodyMotionTameworkFlightFormation.Formation.LOOSE;
     }
 
     /** World-thread samples at 5 Hz; keeps only 12 nearest airborne flock mates.

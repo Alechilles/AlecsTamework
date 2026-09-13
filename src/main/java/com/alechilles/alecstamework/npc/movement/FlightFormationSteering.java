@@ -8,11 +8,12 @@ final class FlightFormationSteering {
     private static final double EPSILON = 1.0E-6;
     private static final double CORRECTION_RESPONSE_PER_SECOND = 1.5;
     private static final double SLOT_MOTION_MATCH = 0.85;
-    private static final double LOOSE_DRIFT_FREQUENCY = 0.35;
-    private static final double LOOSE_DRIFT_SCALE = 0.18;
-    private static final double CLUSTER_DRIFT_FREQUENCY = 0.28;
-    private static final double CLUSTER_DRIFT_SCALE = 0.07;
+    private static final double LOOSE_WARP_FREQUENCY = 0.045;
+    private static final double CLUSTER_WARP_FREQUENCY = 0.055;
     private static final double GOLDEN_ANGLE = 2.399963229728653;
+    private static final double CLUSTER_HEIGHT_SEQUENCE = 0.7548776662466927;
+    private static final double LOOSE_HEIGHT_SEQUENCE = 0.5698402909980532;
+    private static final double TWO_PI = Math.PI * 2.0;
 
     private FlightFormationSteering() {
     }
@@ -41,30 +42,46 @@ final class FlightFormationSteering {
             trailing = row * safeSpacing;
             sideways = (index & 1) == 0 ? row * safeSpacing : -row * safeSpacing;
         } else if (formation == BuilderBodyMotionTameworkFlightFormation.Formation.CLUSTER) {
-            double slotAngle = (index + 1) * GOLDEN_ANGLE;
+            double slotAngle = (index + 1) * GOLDEN_ANGLE + centeredHash(index, 17) * 0.48;
             double radius = safeSpacing * 0.80 * Math.cbrt(index + 1.0);
-            double heightFraction = 1.0 - 2.0 * fractionalPart(index * 0.618033988749895 + 0.10);
+            // Do not derive height from the angle's companion sequence. That produces a visible folded surface
+            // in large flocks; this independent, deterministic sequence keeps slots evenly distributed in 3D.
+            double heightFraction = clamp(-1.0, 1.0,
+                    1.0 - 2.0 * fractionalPart(index * CLUSTER_HEIGHT_SEQUENCE + 0.10)
+                            + centeredHash(index, 31) * 0.18);
             double horizontalRadius = radius * Math.sqrt(Math.max(0.0, 1.0 - heightFraction * heightFraction));
-            double phase = driftSeconds * CLUSTER_DRIFT_FREQUENCY + index * 1.618033988749895;
-            double drift = safeSpacing * CLUSTER_DRIFT_SCALE;
-            // A staggered three-dimensional flock stays compact without the wide trailing footprint of Loose.
+            double phase = driftSeconds * CLUSTER_WARP_FREQUENCY + unitHash(index, 43) * TWO_PI;
+            double secondaryPhase = driftSeconds * 0.037 + unitHash(index, 59) * TWO_PI;
+            double warp = Math.min(safeSpacing * 0.75, safeSpacing * 0.10 + radius * 0.05);
+            double sinPhase = Math.sin(phase);
+            double cosPhase = Math.cos(phase);
+            double sinSecondaryPhase = Math.sin(secondaryPhase);
+            // Slow, independently phased deformation keeps a flock alive without rotating or translating it as one.
             trailing = safeSpacing * 1.10 + radius * (0.55 + 0.25 * Math.cos(slotAngle))
-                    + Math.sin(phase * 0.8) * drift;
-            sideways = horizontalRadius * Math.sin(slotAngle) + Math.cos(phase) * drift;
+                    + sinPhase * warp;
+            sideways = horizontalRadius * Math.sin(slotAngle)
+                    + (cosPhase + sinSecondaryPhase * 0.45) * warp * 0.70;
             vertical = radius * heightFraction
-                    + Math.sin(phase * 1.2) * drift;
+                    + (sinSecondaryPhase + cosPhase * 0.35) * warp * 0.55;
         } else {
-            double slotAngle = (index + 1) * GOLDEN_ANGLE;
+            double slotAngle = (index + 1) * GOLDEN_ANGLE + centeredHash(index, 71) * 0.68;
             double radius = safeSpacing * 0.60 * Math.sqrt(index + 1.0);
-            double phase = driftSeconds * LOOSE_DRIFT_FREQUENCY + index * GOLDEN_ANGLE;
-            double drift = safeSpacing * LOOSE_DRIFT_SCALE;
-            // Keep the expanding sunflower footprint behind the leader while its width and depth grow with sqrt(n).
-            trailing = safeSpacing * 1.2 + radius * (1.0 + Math.cos(slotAngle))
-                    + Math.sin(phase * 0.7) * drift;
-            sideways = radius * Math.sin(slotAngle) + Math.cos(phase) * drift;
-            double height = safeSpacing * (0.2 + 0.1 * ((index / 2) % 3));
-            vertical = ((index & 1) == 0 ? height : -height)
-                    + Math.sin(phase * 1.3) * safeSpacing * 0.08;
+            double phase = driftSeconds * LOOSE_WARP_FREQUENCY + unitHash(index, 83) * TWO_PI;
+            double secondaryPhase = driftSeconds * 0.031 + unitHash(index, 97) * TWO_PI;
+            double warp = Math.min(safeSpacing * 0.80, safeSpacing * 0.14 + radius * 0.04);
+            double verticalSpan = Math.min(safeSpacing * 0.75, safeSpacing * 0.16 + radius * 0.04);
+            double heightFraction = 1.0 - 2.0 * fractionalPart(index * LOOSE_HEIGHT_SEQUENCE + 0.20)
+                    + centeredHash(index, 109) * 0.16;
+            double sinPhase = Math.sin(phase);
+            double cosPhase = Math.cos(phase);
+            double sinSecondaryPhase = Math.sin(secondaryPhase);
+            // Keep the expanding footprint behind the leader, but perturb its spiral and height bands into a volume.
+            trailing = safeSpacing * 1.2 + radius * (0.85 + 0.55 * Math.cos(slotAngle))
+                    + sinPhase * warp;
+            sideways = radius * 0.95 * Math.sin(slotAngle)
+                    + (cosPhase + sinSecondaryPhase * 0.45) * warp * 0.80;
+            vertical = clamp(-1.0, 1.0, heightFraction) * verticalSpan
+                    + (sinSecondaryPhase + cosPhase * 0.35) * warp * 0.55;
         }
         return output.set(
                 leaderPosition.x - trailing * forwardX + sideways * rightX,
@@ -184,6 +201,23 @@ final class FlightFormationSteering {
 
     private static double clamp01(double value) {
         return Math.max(0.0, Math.min(1.0, value));
+    }
+
+    private static double clamp(double minimum, double maximum, double value) {
+        return Math.max(minimum, Math.min(maximum, value));
+    }
+
+    /** Stable [0, 1) pseudo-random value for a formation slot, with no shared state or allocation. */
+    private static double unitHash(int index, int salt) {
+        long value = ((long) index + 1L) * 0x9E3779B97F4A7C15L + ((long) salt * 0xD1B54A32D192ED03L);
+        value = (value ^ (value >>> 30)) * 0xBF58476D1CE4E5B9L;
+        value = (value ^ (value >>> 27)) * 0x94D049BB133111EBL;
+        value ^= value >>> 31;
+        return (value >>> 11) * 0x1.0p-53;
+    }
+
+    private static double centeredHash(int index, int salt) {
+        return unitHash(index, salt) * 2.0 - 1.0;
     }
 
     private static double fractionalPart(double value) {

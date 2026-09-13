@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.movement;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import org.joml.Vector3d;
@@ -20,10 +21,12 @@ public final class FormationSlotAssignments {
 
     private final HashMap<UUID, Member> byId = new HashMap<>();
     private final ArrayList<Member> members = new ArrayList<>();
+    private final HashSet<Integer> occupiedSlots = new HashSet<>();
     private boolean hasRebalanced;
     private long lastRebalanceMillis;
-    private int nextFirst;
-    private int nextSecond = 1;
+    private int nextFreeSlot;
+    private int nextRound;
+    private int nextPairInRound;
 
     /**
      * Reserves a stable, unique slot for an ID. Existing IDs retain their slot; newly seen IDs use
@@ -39,13 +42,17 @@ public final class FormationSlotAssignments {
             return existing.slot;
         }
         int slot = Math.max(0, preferredSlot);
-        if (isSlotUsed(slot)) {
+        if (!occupiedSlots.add(slot)) {
             slot = lowestFreeSlot();
+            occupiedSlots.add(slot);
+        }
+        if (slot == nextFreeSlot) {
+            advanceNextFreeSlot();
         }
         Member member = new Member(id, slot, nowMillis);
         byId.put(id, member);
         members.add(member);
-        resetPairCursor();
+        resetPairSchedule();
         return slot;
     }
 
@@ -99,7 +106,7 @@ public final class FormationSlotAssignments {
         expireMembers(nowMillis);
         int memberCount = members.size();
         if (memberCount < 2) {
-            resetPairCursor();
+            resetPairSchedule();
             return 0;
         }
 
@@ -107,14 +114,11 @@ public final class FormationSlotAssignments {
         int comparisonLimit = (int) Math.min(MAX_COMPARISONS_PER_REBALANCE, totalPairs);
         int comparisons = 0;
         while (comparisons < comparisonLimit) {
-            if (nextFirst >= memberCount - 1) {
-                resetPairCursor();
-            }
-            Member first = members.get(nextFirst);
-            Member second = members.get(nextSecond);
-            advancePairCursor(memberCount);
+            int firstIndex = firstIndexForScheduledPair(memberCount);
+            int secondIndex = secondIndexForScheduledPair(memberCount);
+            advancePairSchedule(memberCount);
             comparisons++;
-            trySwap(first, second, nowMillis);
+            trySwap(members.get(firstIndex), members.get(secondIndex), nowMillis);
         }
         return comparisons;
     }
@@ -151,7 +155,8 @@ public final class FormationSlotAssignments {
                     member.reported = false;
                 }
             }
-            resetPairCursor();
+            rebuildOccupiedSlots();
+            resetPairSchedule();
         }
     }
 
@@ -211,34 +216,62 @@ public final class FormationSlotAssignments {
         second.spacing = spacing;
     }
 
-    private boolean isSlotUsed(int slot) {
-        for (int index = 0; index < members.size(); index++) {
-            if (members.get(index).slot == slot) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private int lowestFreeSlot() {
-        int slot = 0;
-        while (isSlotUsed(slot) && slot < Integer.MAX_VALUE) {
-            slot++;
-        }
-        return slot;
+        return nextFreeSlot;
     }
 
-    private void advancePairCursor(int memberCount) {
-        nextSecond++;
-        if (nextSecond >= memberCount) {
-            nextFirst++;
-            nextSecond = nextFirst + 1;
+    private void advanceNextFreeSlot() {
+        while (occupiedSlots.contains(nextFreeSlot) && nextFreeSlot < Integer.MAX_VALUE) {
+            nextFreeSlot++;
         }
     }
 
-    private void resetPairCursor() {
-        nextFirst = 0;
-        nextSecond = 1;
+    private void rebuildOccupiedSlots() {
+        occupiedSlots.clear();
+        for (Member member : members) {
+            occupiedSlots.add(member.slot);
+        }
+        nextFreeSlot = members.size();
+    }
+
+    /**
+     * Returns one pair from a round-robin tournament. A round has disjoint pairs, and completing
+     * all rounds visits every unordered pair exactly once. Odd-sized flocks add an implicit ghost
+     * member, whose pair is skipped each round.
+     */
+    private int firstIndexForScheduledPair(int memberCount) {
+        int effectiveMemberCount = memberCount + (memberCount & 1);
+        int rotatingCount = effectiveMemberCount - 1;
+        if ((memberCount & 1) == 0 && nextPairInRound == 0) {
+            return rotatingCount;
+        }
+        int offset = (memberCount & 1) == 0 ? nextPairInRound : nextPairInRound + 1;
+        return (nextRound + offset) % rotatingCount;
+    }
+
+    private int secondIndexForScheduledPair(int memberCount) {
+        int effectiveMemberCount = memberCount + (memberCount & 1);
+        int rotatingCount = effectiveMemberCount - 1;
+        if ((memberCount & 1) == 0 && nextPairInRound == 0) {
+            return nextRound;
+        }
+        int offset = (memberCount & 1) == 0 ? nextPairInRound : nextPairInRound + 1;
+        return Math.floorMod(nextRound - offset, rotatingCount);
+    }
+
+    private void advancePairSchedule(int memberCount) {
+        int pairsPerRound = memberCount / 2;
+        nextPairInRound++;
+        if (nextPairInRound >= pairsPerRound) {
+            nextPairInRound = 0;
+            int roundCount = memberCount + (memberCount & 1) - 1;
+            nextRound = (nextRound + 1) % roundCount;
+        }
+    }
+
+    private void resetPairSchedule() {
+        nextRound = 0;
+        nextPairInRound = 0;
     }
 
     private static boolean hasExceeded(long nowMillis, long earlierMillis, long durationMillis) {

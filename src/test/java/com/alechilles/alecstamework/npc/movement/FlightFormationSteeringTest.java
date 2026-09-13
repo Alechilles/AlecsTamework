@@ -128,8 +128,8 @@ class FlightFormationSteeringTest {
                         slot, 3.0, second, leader, heading, target);
                 above |= target.y > leader.y + 0.3;
                 below |= target.y < leader.y - 0.3;
-                assertTrue(Math.abs(target.y - leader.y) < 1.5,
-                        "Height staggering should stay modest at normal spacing.");
+                assertTrue(Math.abs(target.y - leader.y) < 3.2,
+                        "Loose height variation should remain bounded at normal spacing.");
             }
             assertTrue(above && below, "The flock needs depth above and below its leader.");
         }
@@ -209,8 +209,70 @@ class FlightFormationSteeringTest {
                 BuilderBodyMotionTameworkFlightFormation.Formation.CLUSTER,
                 4, 3.0, 20.0, leader, heading, new Vector3d());
         double driftDistance = initial.distance(later);
-        assertTrue(driftDistance > 0.05 && driftDistance < 0.75,
+        assertTrue(driftDistance > 0.05 && driftDistance < 1.25,
                 "Cluster movement should be visible without breaking its compact spacing.");
+    }
+
+    @Test
+    void clusterAndLooseUseDeterministicThreeDimensionalSlots() {
+        Vector3d leader = new Vector3d(100.0, 80.0, -50.0);
+        Vector3d heading = new Vector3d(3.0, 0.0, 4.0);
+        for (BuilderBodyMotionTameworkFlightFormation.Formation formation : new BuilderBodyMotionTameworkFlightFormation.Formation[] {
+                BuilderBodyMotionTameworkFlightFormation.Formation.CLUSTER,
+                BuilderBodyMotionTameworkFlightFormation.Formation.LOOSE }) {
+            Vector3d first = FlightFormationSteering.resolveTarget(
+                    formation, 437, 3.0, 23.5, leader, heading, new Vector3d());
+            Vector3d repeat = FlightFormationSteering.resolveTarget(
+                    formation, 437, 3.0, 23.5, leader, heading, new Vector3d());
+            assertEquals(first, repeat, "A slot must not depend on which bird or tick evaluated it.");
+
+            double minimumY = Double.POSITIVE_INFINITY;
+            double maximumY = Double.NEGATIVE_INFINITY;
+            double minimumSideways = Double.POSITIVE_INFINITY;
+            double maximumSideways = Double.NEGATIVE_INFINITY;
+            for (int slot = 0; slot < 1_000; slot++) {
+                Vector3d target = FlightFormationSteering.resolveTarget(
+                        formation, slot, 3.0, 23.5, leader, heading, new Vector3d());
+                double sideways = (target.x - leader.x) * -0.8 + (target.z - leader.z) * 0.6;
+                minimumY = Math.min(minimumY, target.y);
+                maximumY = Math.max(maximumY, target.y);
+                minimumSideways = Math.min(minimumSideways, sideways);
+                maximumSideways = Math.max(maximumSideways, sideways);
+            }
+            assertTrue(maximumY - minimumY > 2.0,
+                    "Large formations should occupy a volume instead of a few repeated height bands.");
+            assertTrue(maximumSideways - minimumSideways > 20.0,
+                    "Large formations should remain laterally spread.");
+        }
+    }
+
+    @Test
+    void formationDeformationChangesShapeSlowlyWithoutARigidGroupShift() {
+        Vector3d leader = new Vector3d();
+        Vector3d heading = new Vector3d(0.0, 0.0, 1.0);
+        for (BuilderBodyMotionTameworkFlightFormation.Formation formation : new BuilderBodyMotionTameworkFlightFormation.Formation[] {
+                BuilderBodyMotionTameworkFlightFormation.Formation.CLUSTER,
+                BuilderBodyMotionTameworkFlightFormation.Formation.LOOSE }) {
+            Vector3d slotA = FlightFormationSteering.resolveTarget(
+                    formation, 137, 3.0, 30.0, leader, heading, new Vector3d());
+            Vector3d slotANext = FlightFormationSteering.resolveTarget(
+                    formation, 137, 3.0, 30.05, leader, heading, new Vector3d());
+            Vector3d slotB = FlightFormationSteering.resolveTarget(
+                    formation, 781, 3.0, 30.0, leader, heading, new Vector3d());
+            Vector3d slotBNext = FlightFormationSteering.resolveTarget(
+                    formation, 781, 3.0, 30.05, leader, heading, new Vector3d());
+            Vector3d slotALater = FlightFormationSteering.resolveTarget(
+                    formation, 137, 3.0, 120.0, leader, heading, new Vector3d());
+
+            assertTrue(slotA.distance(slotANext) < 0.015,
+                    "Slow slot deformation must remain within the formation steering speed budget.");
+            assertTrue(Math.abs(slotA.distance(slotB) - slotANext.distance(slotBNext)) > 1.0E-6,
+                    "Individual phases must alter the flock's internal shape.");
+            assertTrue(Math.abs(slotA.distance(slotB) - slotANext.distance(slotBNext)) < 0.03,
+                    "Adjacent shape changes should remain smooth.");
+            assertTrue(slotA.distance(slotALater) > 0.1,
+                    "Each slot should visibly evolve over a longer interval.");
+        }
     }
 
     @Test

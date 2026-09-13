@@ -118,4 +118,56 @@ class FormationSlotAssignmentsTest {
         assertEquals(0, assignments.slot(first));
         assertEquals(1, assignments.slot(second));
     }
+
+    @Test
+    void largeFlocksLetLateFollowersTradeDuringTheFirstRoundRobinRound() {
+        var assignments = new FormationSlotAssignments();
+        UUID[] followers = claimFollowers(assignments, 1_000, START);
+
+        for (int cadence = 0; cadence < 4; cadence++) {
+            long now = START + cadence * 500L;
+            refreshReports(assignments, followers, 999, 0, now);
+            assertEquals(128, assignments.rebalance(now));
+        }
+
+        assertEquals(0, assignments.slot(followers[999]));
+        assertEquals(999, assignments.slot(followers[0]));
+    }
+
+    @Test
+    void oddFlocksEventuallyReachLatePairsWithoutAStarvedGhostSlot() {
+        var assignments = new FormationSlotAssignments();
+        UUID[] followers = claimFollowers(assignments, 257, START);
+
+        for (int cadence = 0; cadence < 128; cadence++) {
+            long now = START + cadence * 500L;
+            refreshReports(assignments, followers, 255, 256, now);
+            assertEquals(128, assignments.rebalance(now));
+        }
+        assertEquals(256, assignments.slot(followers[255]));
+        assertEquals(255, assignments.slot(followers[256]));
+    }
+
+    private static UUID[] claimFollowers(FormationSlotAssignments assignments, int count, long nowMillis) {
+        UUID[] followers = new UUID[count];
+        for (int index = 0; index < count; index++) {
+            UUID follower = new UUID(0, index + 1L);
+            followers[index] = follower;
+            assignments.claim(follower, index, nowMillis);
+        }
+        return followers;
+    }
+
+    private static void refreshReports(FormationSlotAssignments assignments, UUID[] followers,
+                                       int crossedFirst, int crossedSecond, long nowMillis) {
+        for (int index = 0; index < followers.length; index++) {
+            UUID follower = followers[index];
+            int slot = assignments.claim(follower, index, nowMillis);
+            double targetX = slot * 10.0;
+            double positionX = index == crossedFirst ? crossedSecond * 10.0
+                    : index == crossedSecond ? crossedFirst * 10.0 : targetX;
+            assignments.report(follower, new Vector3d(positionX, 0, 0), new Vector3d(targetX, 0, 0),
+                    4, nowMillis);
+        }
+    }
 }
