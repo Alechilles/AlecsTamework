@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Fixed newly linked companions appearing unloaded after death when their saved
+  profile had not finished publishing.
+
 - Companion removal now keeps its heading and actions together, with a Back arrow
   and named confirmations before releasing or culling an animal.
 

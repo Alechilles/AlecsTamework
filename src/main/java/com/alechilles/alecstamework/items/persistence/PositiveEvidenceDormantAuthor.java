@@ -27,6 +27,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.function.BiFunction;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -42,16 +43,23 @@ public final class PositiveEvidenceDormantAuthor {
     private static final String SNAPSHOT = "companion-dormant-snapshot:v1";
 
     private final PersistencePort persistence;
+    private final BiFunction<Ref<EntityStore>, Store<EntityStore>, CompletionStage<Void>>
+            profilePublication;
     private final TameworkFullStateSnapshotReader snapshots;
     private final SnapshotCodecRegistry codecs;
     private final LongSupplier clock;
     private final DormantCompanionEventFactsFreezer eventFacts;
     private final PublishedDormantEventPublisher eventPublisher;
 
-    /** Creates the production author over the replacement persistence facades. */
+    /**
+     * Creates the production author. Profile publication must freeze its live inputs
+     * synchronously and complete only after the linked profile is readable.
+     */
     public PositiveEvidenceDormantAuthor(
             @Nonnull PersistenceDomainFacades persistence,
             @Nonnull TameworkFullStateSnapshotReader snapshots,
+            @Nonnull BiFunction<Ref<EntityStore>, Store<EntityStore>, CompletionStage<Void>>
+                    profilePublication,
             @Nonnull LongSupplier clock,
             @Nonnull DormantCompanionEventSink events,
             @Nonnull DormantCompanionEventWarningSink warnings
@@ -59,6 +67,7 @@ public final class PositiveEvidenceDormantAuthor {
         this(
                 new FacadeDormantPersistencePort(persistence),
                 snapshots,
+                profilePublication,
                 TameworkSnapshotCodecs.create(),
                 clock,
                 new DormantCompanionEventFactsFreezer(),
@@ -76,6 +85,23 @@ public final class PositiveEvidenceDormantAuthor {
             DormantCompanionEventSink events,
             DormantCompanionEventWarningSink warnings
     ) {
+        this(persistence, snapshots, (reference, store) ->
+                        CompletableFuture.completedFuture(null),
+                codecs, clock, eventFacts, events, warnings);
+    }
+
+    PositiveEvidenceDormantAuthor(
+            PersistencePort persistence,
+            TameworkFullStateSnapshotReader snapshots,
+            BiFunction<Ref<EntityStore>, Store<EntityStore>, CompletionStage<Void>>
+                    profilePublication,
+            SnapshotCodecRegistry codecs,
+            LongSupplier clock,
+            DormantCompanionEventFactsFreezer eventFacts,
+            DormantCompanionEventSink events,
+            DormantCompanionEventWarningSink warnings
+    ) {
+        this.profilePublication = Objects.requireNonNull(profilePublication, "profilePublication");
         this.persistence = Objects.requireNonNull(persistence, "persistence");
         this.snapshots = Objects.requireNonNull(snapshots, "snapshots");
         this.codecs = Objects.requireNonNull(codecs, "codecs");
@@ -116,9 +142,14 @@ public final class PositiveEvidenceDormantAuthor {
             ));
         }
         try {
-            return persistence.findProfile(
+            // Freeze profile facts while the entity is still available. Only the completed
+            // publication and immutable death evidence reach the async profile lookup.
+            CompletionStage<Void> profileReady = profilePublication.apply(
+                    intent.sourceRef(), intent.sourceStore()
+            );
+            return profileReady.thenCompose(ignored -> persistence.findProfile(
                             frozen.observation().profileId()
-                    )
+                    ))
                     .thenCompose(read -> author(frozen, read))
                     .exceptionally(failure -> result(
                             CompanionLifecycleAuthorResult.Status

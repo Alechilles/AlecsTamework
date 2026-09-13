@@ -312,9 +312,14 @@ public final class CommandLinkedNpcStateSnapshotService {
         return publication;
     }
 
-    private CompletionStage<Void> refreshFromEntityStage(
-            Ref<EntityStore> reference,
-            Store<EntityStore> store
+    /**
+     * Freezes linked profile facts on the world thread and returns their publication completion.
+     * Terminal lifecycle authors await this before reading a newly linked companion's profile.
+     */
+    @Nonnull
+    public CompletionStage<Void> refreshFromEntityStage(
+            @Nullable Ref<EntityStore> reference,
+            @Nullable Store<EntityStore> store
     ) {
         if (reference == null || !reference.isValid() || store == null) {
             return CompletableFuture.completedFuture(null);

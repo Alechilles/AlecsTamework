@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -49,6 +50,59 @@ class PositiveEvidenceDormantAuthorTest {
             new LifecycleRevision(7);
     private static final ReconciliationGeneration GENERATION =
             new ReconciliationGeneration(3);
+
+    @Test
+    void deathWaitsForFirstProfilePublicationWithEvidenceAlreadyFrozen() {
+        FakePersistence persistence = new FakePersistence(null);
+        CompletableFuture<Void> publication = new CompletableFuture<>();
+        AtomicInteger snapshotReads = new AtomicInteger();
+        PositiveEvidenceDormantAuthor author = new PositiveEvidenceDormantAuthor(
+                persistence,
+                new TameworkFullStateSnapshotReader((reference, store, uuid, context) -> {
+                    snapshotReads.incrementAndGet();
+                    return fullState();
+                }),
+                (reference, store) -> publication,
+                TameworkSnapshotCodecs.create(),
+                () -> -450L,
+                new DormantCompanionEventFactsFreezer(),
+                event -> { }, warning -> { }
+        );
+
+        var completion = author.makeDormant(intent(
+                DormantCompanionObservation.Evidence.SAVED_DEATH_COMPONENT
+        )).toCompletableFuture();
+
+        assertEquals(1, snapshotReads.get());
+        assertFalse(completion.isDone());
+        persistence.profile = profile();
+        publication.complete(null);
+
+        assertTrue(completion.join().published());
+        assertEquals(LifecycleState.DEAD_REVIVABLE, persistence.request.targetState());
+        assertEquals(1, snapshotReads.get());
+    }
+
+    @Test
+    void failedProfilePublicationDoesNotAuthorDeath() {
+        FakePersistence persistence = new FakePersistence(null);
+        CompletableFuture<Void> publication = new CompletableFuture<>();
+        PositiveEvidenceDormantAuthor author = new PositiveEvidenceDormantAuthor(
+                persistence, reader(), (reference, store) -> publication,
+                TameworkSnapshotCodecs.create(), () -> -450L,
+                new DormantCompanionEventFactsFreezer(),
+                event -> { }, warning -> { }
+        );
+        var completion = author.makeDormant(intent(
+                DormantCompanionObservation.Evidence.SAVED_DEATH_COMPONENT
+        )).toCompletableFuture();
+
+        publication.completeExceptionally(new IllegalStateException("profile write failed"));
+
+        assertEquals(CompanionLifecycleAuthorResult.Status.PROFILE_READ_FAILED,
+                completion.join().status());
+        assertNull(persistence.request);
+    }
 
     @Test
     void savedDeathFreezesFullStateAndAuthorsModernExactSnapshot() {
@@ -538,7 +592,7 @@ class PositiveEvidenceDormantAuthorTest {
 
     private static final class FakePersistence
             implements PositiveEvidenceDormantAuthor.PersistencePort {
-        private final CompanionProfileReadModel profile;
+        private CompanionProfileReadModel profile;
         private final RuntimeException failure =
                 new RuntimeException("workflow failed");
         private SubmissionMode mode = SubmissionMode.PUBLISHED;
@@ -554,6 +608,9 @@ class PositiveEvidenceDormantAuthorTest {
         public CompletionStage<PersistenceReadResult<CompanionProfileReadModel>>
         findProfile(ProfileId profileId) {
             profileReads++;
+            if (profile == null) {
+                return CompletableFuture.completedFuture(PersistenceReadResult.absent());
+            }
             return CompletableFuture.completedFuture(
                     PersistenceReadResult.found(
                             request == null ? profile : dormantProfile(),

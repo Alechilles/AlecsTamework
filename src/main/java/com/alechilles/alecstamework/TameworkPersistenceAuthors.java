@@ -173,7 +173,7 @@ final class TameworkPersistenceAuthors {
                         feedback
                 ),
                 restorationAuthor(facades, completions),
-                dormantAuthor(logger, events, facades, snapshots),
+                dormantAuthor(logger, events, facades, snapshots, stateSnapshots),
                 new DirectLiveCoopAuthor(facades),
                 new DirectLiveCoopProjectionView(facades),
                 exactRecallRecovery
@@ -239,11 +239,13 @@ final class TameworkPersistenceAuthors {
             HytaleLogger logger,
             TameworkEventBus events,
             PersistenceDomainFacades facades,
-            TameworkFullStateSnapshotReader snapshots
+            TameworkFullStateSnapshotReader snapshots,
+            CommandLinkedNpcStateSnapshotService stateSnapshots
     ) {
         return new PositiveEvidenceDormantAuthor(
                 facades,
                 snapshots,
+                stateSnapshots::refreshFromEntityStage,
                 System::currentTimeMillis,
                 new TameworkDormantCompanionEventSink(
                         events::publishDeathRecorded,
