@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased development changes
+## 4.0.0 - Companion Commands, Formations, and Localization - 2026-09-14
 
 - Inline companion locations now show rounded north/south and east/west distances
   from the player in the same world. Captured cards use the heading "Captured".
@@ -14,6 +14,9 @@
 - Added localized trait descriptions below command-panel tooltips, with effect amounts and configurable direction/value placeholders.
 
 - Fixed active/inactive, breeding, and unlink notifications showing `{0}` instead of the companion's name, and boolean config errors missing the field label.
+
+- Fixed linked companion controls retaining an old target after Lost recovery,
+  requiring the panel to be closed and reopened before toggling active status.
 
 - Attachment display labels and values now support language keys in the target HUD and captured-item tooltips, preserving each viewer's language.
 
@@ -76,9 +79,13 @@
   labels, duration and cooldown bars span the action section, and permanent
   deletion can be cancelled directly from the card.
 
-- Regular NPC cards reuse capture images through hidden display-item aliases,
-  including configured appearance variants, without copying textures into the UI
-  atlas or sending unsupported captured-item metadata.
+- Normal and bonded roster cards share companion portraits with capture items
+  through role-based `TwDynamicIconConfig` assets. Appearance variants no longer
+  require a spawner config. Icon-only display items reuse existing textures.
+  Dependent packs and icon tooling must migrate the removed inline spawner maps.
+- Icon generation can retain fixed minor attachments without multiplying variants.
+  The renderer preserves the animal body for empty skins and glow/detail layers,
+  and the generator accepts source directories containing exclamation marks.
 
 - NPC names span the companion card header, with a small increase in card height
   for comfortable spacing below the header and full names available on hover.

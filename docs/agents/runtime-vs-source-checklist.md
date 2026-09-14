@@ -26,7 +26,7 @@ Use this checklist when an in-game report, log, screenshot, packaged jar, save o
 ## Useful Commands
 
 ```bash
-rg -F "<asset-or-type-id>" src/main/resources src/main/java docs wiki
+rg -F "<asset-or-type-id>" src/main/resources examples/asset-pack src/main/java docs wiki
 rg -F "<asset-or-type-id>" \
   "/c/Users/22ale/AppData/Roaming/Hytale/Modding/run/mods/Alechilles_Alec's Tamework!"
 for archive in build/libs/*.jar target/*.jar; do

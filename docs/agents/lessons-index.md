@@ -21,5 +21,5 @@ Agents should check these notes when a task matches the topic. Keep this index l
 | `2026-07-25-bonded-companion-lease-boundary.md` | Durable companion profiles, temporary NPC projections, lease/source replay authority, or profile-keyed roster panels are involved. |
 | `2026-08-21-private-model-particle-proxies.md` | A private persistent model particle needs to follow an entity and stop through entity cleanup. |
 
-When a new lesson is discovered during work, update the external note first, then update this index if the lesson adds a new file or major topic.
+Record lessons when they are reusable. Update this index if a durable note adds a new file or major topic. External notes are optional context; their availability is not a general completion gate.
 

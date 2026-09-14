@@ -1,28 +1,28 @@
 # Agent Guardrails
 
-This page collects repo-specific checks that should be run before trusting an answer or change. Keep policy in `AGENTS.md`; keep routing and executable commands here.
+Use the checks relevant to the changed behavior. Keep policy in `AGENTS.md`; keep routing and executable commands here. Run commands from the Tamework repo unless a different directory is stated.
 
 ## Before Editing
 
 - Confirm the requested target is the source repo, runtime copy, packaged artifact, save override, or external wiki path the user named.
 - Read the closest existing docs and tests before introducing a new pattern.
-- Prefer base-game assets and existing Tamework config before adding Java behavior.
-- If a change touches an existing class over 1000 lines, look for an extraction opportunity instead of adding more behavior to the same class.
+- Check existing base-game assets and Tamework mechanisms, then use the simplest reliable approach. Source evidence can rule out an approach without an implementation attempt.
+- Extract responsibilities when this makes the requested change clearer or safer. Class size alone does not require a refactor.
 
 ## Runtime and ECS Safety
 
 Before finalizing changes to runtime systems, tick paths, async callbacks, damage dispatch, or player access, run:
 
 ```bash
-rg "PlayerRef\.getComponent\(Player|getComponent\(Player\.getComponentType\(\)\)|Universe\.get\(\).*getPlayers" -n src/main/java
+rg -n -F -e 'PlayerRef.getComponent(Player' -e '.getHolder().getComponent(Player.getComponentType())' src/main/java
 bash ../gradlew -p .. :alecstamework:test \
   --tests '*EcsWriteSafetyGuardTest' \
   --tests '*AsyncThreadSafetyGuardTest'
 ```
 
-If matches are in tick/runtime paths, resolve players from the current world/store or route writes through `CommandBuffer` before merge.
+The search highlights the direct lookup forms prohibited by the async guard; no matches is a normal `rg` exit code of 1. Inspect matches and the changed execution path. Resolve players from the owning world/store or active query callback, and use `CommandBuffer` for system writes. These static checks do not replace checking thread ownership. Add focused behavior tests when the Test Value Gate is met; a full suite is needed when shared behavior or several subsystems are affected.
 
-Before adding or expanding a tick system, record:
+For new or materially expanded periodic scans or reconciliation, record:
 
 - which reliable events or dirty signals were considered;
 - why continuous simulation, time-based behavior, recovery, or missing events
@@ -34,9 +34,11 @@ Before adding or expanding a tick system, record:
 Reject full-player or full-entity polling for infrequent state changes when a
 reliable event source exists.
 
+Normal per-entity simulation only needs notes for non-obvious cadence and ownership. Keep bounded I/O and pure computation on immutable data separate from live world/store access.
+
 ## Agent Documentation Checks
 
-Run this after changing `AGENTS.md`, `docs/agents`, package layout, scripts, tests, or major docs:
+Run this after changing agent guidance, navigation links, or these tooling scripts:
 
 ```bash
 pwsh -NoProfile -ExecutionPolicy Bypass \
@@ -45,11 +47,10 @@ pwsh -NoProfile -ExecutionPolicy Bypass \
 
 The check verifies that:
 
-- required agent docs exist,
-- `AGENTS.md` still links to the agent routing docs,
-- the generated agent index is current,
-- the safety guard tests still exist,
-- the external Lessons Learned path is reachable.
+- required navigation docs and referenced safety guard tests exist,
+- relative Markdown links in agent docs and the local `AGENTS.md`, when present, resolve.
+
+The checker does not require exact policy phrases, external lesson directories, or a fresh index. It does not verify policy correctness. Refresh the navigation snapshot after layout changes that affect it with `scripts/tools/build-agent-index.ps1`. To check that snapshot explicitly, add `-CheckGeneratedIndex` to the checker command. Ordinary behavior changes do not require index regeneration.
 
 ## Replacement Persistence Architecture
 
@@ -72,20 +73,12 @@ shutdown crash boundary.
 
 When behavior differs between source and game:
 
-- Compare source assets under `src/main/resources` against runtime assets in `UserData\Mods`.
+- Use `docs/agents/runtime-vs-source-checklist.md` to identify the loaded copy. Compare framework assets in `src/main/resources` or optional examples in `examples/asset-pack` with the linked server's `Modding/run/mods` first. Check `UserData\Mods` only for a legacy/manual runtime.
 - Inspect packaged jar/zip contents instead of assuming a build copied the latest files.
 - Check save overrides before changing source assets. A stale full-array override can mask correct source behavior.
 - Run `/patchwork status` when an asset patch appears valid but does not win at runtime. Confirm the elected runtime, eligible neutral/legacy roots, generated-pack location, and whether the target is restart-required.
 
 ## Release Checks
 
-Use release skills and scripts for release work. The common entry points are:
-
-```powershell
-.\scripts\release\validate-release.ps1 -Version <version>
-.\scripts\release\build-package.ps1 -Version <version>
-.\scripts\release\publish-prebuilt.ps1 -Version <version>
-```
-
-Pass the explicit version from the manifest/build source rather than assuming a default.
+Use `alec-mod-release-prep`, `docs/Build-and-Packaging.md`, and then `alec-mod-publish` for release work. Follow the current local `mod-release-publisher` workflow for credentials and uploads. Resolve the requested version and destinations rather than assuming defaults. Packaging checks include packaged behavior, manifests, and affected assets.
 

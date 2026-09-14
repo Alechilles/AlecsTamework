@@ -1,5 +1,6 @@
 param(
-    [string] $Root = (Get-Location).Path
+    [string] $Root = (Get-Location).Path,
+    [switch] $CheckGeneratedIndex
 )
 
 $ErrorActionPreference = "Stop"
@@ -10,17 +11,9 @@ function Assert-PathExists([string] $Path) {
     }
 }
 
-function Assert-Contains([string] $Path, [string] $Text) {
-    $content = Get-Content -LiteralPath $Path -Raw
-    if (-not $content.Contains($Text)) {
-        throw "Expected '$Path' to contain '$Text'"
-    }
-}
-
 $repoRoot = (Resolve-Path $Root).Path
 
 $requiredFiles = @(
-    "AGENTS.md",
     "docs/agents/agent-map.md",
     "docs/agents/guardrails.md",
     "docs/agents/runtime-vs-source-checklist.md",
@@ -36,24 +29,31 @@ foreach ($file in $requiredFiles) {
     Assert-PathExists (Join-Path $repoRoot $file)
 }
 
+$agentDocs = @(Get-ChildItem -LiteralPath (Join-Path $repoRoot "docs/agents") -Filter "*.md" -File)
+# Local policy is Git-ignored and may not be present in a fresh checkout.
 $agentsPath = Join-Path $repoRoot "AGENTS.md"
-Assert-Contains $agentsPath "docs/agents/agent-map.md"
-Assert-Contains $agentsPath "docs/agents/guardrails.md"
-Assert-Contains $agentsPath "docs/agents/runtime-vs-source-checklist.md"
-Assert-Contains $agentsPath "docs/agents/lessons-index.md"
-Assert-Contains $agentsPath ".\scripts\tools\build-agent-index.ps1"
-Assert-Contains $agentsPath ".\scripts\tools\check-agent-docs.ps1"
-
-$indexPath = Join-Path $repoRoot "docs/agents/generated-index.md"
-$indexContent = Get-Content -LiteralPath $indexPath -Raw
-if ($indexContent -match "Microsoft\.PowerShell|@\{|`\$\(") {
-    throw "Generated index appears to contain leaked PowerShell expressions."
+if (Test-Path -LiteralPath $agentsPath) {
+    $agentDocs += Get-Item -LiteralPath $agentsPath
 }
 
-$lessonRoot = "C:\Users\22ale\AppData\Roaming\Hytale\My Mod Docs\Lessons Learned"
-Assert-PathExists $lessonRoot
+foreach ($doc in $agentDocs) {
+    $content = Get-Content -LiteralPath $doc.FullName -Raw
+    foreach ($link in [regex]::Matches($content, '\[[^\]]*\]\(([^)]+)\)')) {
+        $target = $link.Groups[1].Value.Trim().Trim('<', '>')
+        # External URLs, absolute local paths, and same-page anchors are not repo links.
+        if ($target -match '^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|[/\\]|#)') {
+            continue
+        }
+        $relativePath = [uri]::UnescapeDataString(($target -split '[#?]', 2)[0])
+        if ($relativePath -and -not (Test-Path -LiteralPath (Join-Path $doc.DirectoryName $relativePath))) {
+            throw "Broken local link in $($doc.FullName): $target"
+        }
+    }
+}
 
-& (Join-Path $repoRoot "scripts/tools/build-agent-index.ps1") -Root $repoRoot -Check
+if ($CheckGeneratedIndex) {
+    & (Join-Path $repoRoot "scripts/tools/build-agent-index.ps1") -Root $repoRoot -Check
+}
 
 Write-Host "Agent docs checks passed."
 

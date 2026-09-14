@@ -21,6 +21,9 @@ final class LinkedNpcPanelCardRenderState {
         if (entries.length != currentEntries.length) return true;
         for (int index = 0; index < currentEntries.length; index++) {
             UUID npcUuid = currentEntries[index].npcUuid();
+            // Recovery and sorting can replace a row's target. Recreate its
+            // controls so no event binding retains the previous companion ID.
+            if (!Objects.equals(entries[index].npcUuid(), npcUuid)) return true;
             if (isBonded(features.get(npcUuid))
                     != isBonded(currentFeatures.get(npcUuid))) {
                 return true;

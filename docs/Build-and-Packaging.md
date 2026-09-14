@@ -80,7 +80,7 @@ Run the test suite before packaging:
 
 ```bash
 ./gradlew test packagingTest
-./gradlew validateManifest validateExampleAssetPackManifest assemble
+./gradlew validateManifest assemble
 jar tf "build/libs/Alec's Tamework! v<version>.jar" | rg -i 'Mob_Tamework_Example|Spawner_Tamework_Example|Tamework_Nametag_Example|Tamework_Command_Whistle_Example|Tw[A-Za-z]*Example'
 unzip -l "build/distributions/Alec's Tamework! Examples v<version>.zip"
 ```

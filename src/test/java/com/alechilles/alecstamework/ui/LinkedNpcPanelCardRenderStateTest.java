@@ -12,6 +12,23 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class LinkedNpcPanelCardRenderStateTest {
     @Test
+    void recoveredCompanionIdentityRebuildsCardActionBindings() {
+        LinkedNpcEntry lost = entryForIdentity(UUID.randomUUID());
+        LinkedNpcEntry recovered = entryForIdentity(UUID.randomUUID());
+        LinkedNpcPanelCardRenderState state = new LinkedNpcPanelCardRenderState();
+        state.markRendered(new LinkedNpcEntry[] {lost}, null, Map.of());
+
+        assertEquals(false, state.requiresRebuild(new LinkedNpcEntry[] {lost}, Map.of()));
+        assertEquals(true, state.requiresRebuild(new LinkedNpcEntry[] {recovered}, Map.of()));
+    }
+
+    private static LinkedNpcEntry entryForIdentity(UUID id) {
+        return new LinkedNpcEntry(id, "Raven", 25, 25,
+                0, 0, "", 0, 0, 0, 0, true, false, false, false, false,
+                false, 0L, LinkedNpcTraitIndicator.EMPTY);
+    }
+
+    @Test
     void flightModeChangesRefreshTheCaptionWithoutReopeningThePanel() {
         UUID id = UUID.randomUUID();
         LinkedNpcEntry entry = new LinkedNpcEntry(id, "Drake", 100, 100,
