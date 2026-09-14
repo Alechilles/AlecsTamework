@@ -2,6 +2,8 @@
 
 ## 4.0.0 - Companion Commands, Formations, and Localization - 2026-09-14
 
+- Restored GNU GPLv3 with an attribution clause and removed the private-server licensing template.
+
 **Upgrade compatibility:** Dependent mods whose manifests require Tamework
 below `4.0.0` need a compatible update before installing this release. Pack
 authors must migrate inline spawner icon maps to `TwDynamicIconConfig`; see the

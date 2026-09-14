@@ -5,7 +5,6 @@
     "RawText": "Alec's Tamework is a modular NPC framework for taming, ownership, capture items, command tools, companion progression, and asset-driven behavior integrations."
   },
   "License": {
-    "MessageId": "tamework.credits.license",
-    "RawText": "Alec's Tamework is source-available under the Alec's Tamework Source Available License 1.0."
+    "MessageId": "tamework.credits.license"
   }
 }

@@ -1713,3 +1713,4 @@ tamework.ui.linkedLocation.relative.north.east={0} m ao norte, {1} m a leste
 tamework.ui.linkedLocation.relative.north.west={0} m ao norte, {1} m a oeste
 tamework.ui.linkedLocation.relative.south.east={0} m ao sul, {1} m a leste
 tamework.ui.linkedLocation.relative.south.west={0} m ao sul, {1} m a oeste
+tamework.credits.license=Alec's Tamework é licenciado sob a GNU GPLv3 com uma cláusula de atribuição.

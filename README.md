@@ -112,9 +112,9 @@ Player-facing Tamework config strings support `server.lang` keys. Built-in talen
 - [HyDragon / API 0.9 Integration Guide](https://wiki.hytalemodding.dev/mod/alecs-tamework/hydragon-integration-guide)
 
 ## Licensing
-Tamework is source-available under [Alec's Tamework Source Available License 1.0](LICENSE.txt). Unmodified dependency use and example/template reuse are allowed under the public license.
+Tamework is licensed under the [GNU General Public License v3.0 with an attribution clause](LICENSE.txt). You may use, modify, and redistribute Tamework under GPLv3.
 
-Custom private plugins, private forks, or server-specific adaptations that copy or derive from Tamework systems require separate written permission. See [Private Server Licensing Template](PRIVATE-SERVER-LICENSE-TEMPLATE.md) for the starting deal structure.
+Distributed versions and derivative works must credit "Alec's Tamework!" by Alechilles in their listing, description, or documentation.
 
 ## Issue Reporting
 If you run into a bug, integration issue, or behavior problem, report it in the Discord server:
