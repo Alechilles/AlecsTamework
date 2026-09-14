@@ -16,9 +16,11 @@ class LinkedNpcLocationCopyControlTest {
         control.bind(commands, 0, entry);
         assertCommand(commands, path + " #Coordinates.Visible", false);
         assertCommand(commands, path + " #CoordinateLabel.Visible", true);
+        assertCommand(commands, path + " #RelativeDistance.Visible", true);
         control.toggle(LinkedNpcLocationCopyControl.PREFIX + entry.npcUuid(), new LinkedNpcEntry[] {entry}, commands);
         assertCommand(commands, path + " #Coordinates.Visible", true);
         assertCommand(commands, path + " #CoordinateLabel.Visible", false);
+        assertCommand(commands, path + " #RelativeDistance.Visible", false);
         UICommandBuilder expected = new UICommandBuilder();
         expected.set(path + " #Coordinates.Value", "-3990.0, 120.0, -2533.0");
         assertEquals(expected.getCommands()[0].data, latest(commands, path + " #Coordinates.Value"));
@@ -27,6 +29,7 @@ class LinkedNpcLocationCopyControlTest {
         control.toggle(LinkedNpcLocationCopyControl.PREFIX + entry.npcUuid(), new LinkedNpcEntry[] {entry}, commands);
         assertCommand(commands, path + " #Coordinates.Visible", false);
         assertCommand(commands, path + " #CoordinateLabel.Visible", true);
+        assertCommand(commands, path + " #RelativeDistance.Visible", true);
     }
 
     @Test
@@ -46,7 +49,8 @@ class LinkedNpcLocationCopyControlTest {
     private static LinkedNpcEntry entry() {
         return new LinkedNpcEntry(UUID.randomUUID(), "Sheep", 0, 0, 0, 0, "", 0, 0, 0, 0,
                 false, false, false, true, false, false, 0L, LinkedNpcTraitIndicator.EMPTY)
-                .withLocation(new LinkedNpcEntry.Location("Soul Lantern in Wooden Chest", "default", "-3990.0, 120.0, -2533.0"));
+                .withLocation(new LinkedNpcEntry.Location("Soul Lantern in Wooden Chest", "default",
+                        "-3990.0, 120.0, -2533.0", "1550m north, 780m west"));
     }
 
     private static void assertCommand(UICommandBuilder commands, String selector, boolean value) {

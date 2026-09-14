@@ -119,6 +119,11 @@ card refreshes read the advisory item index; they do not dispatch holder
 verification or scan inventories. Inline item locations remain advisory
 observations, but omit timestamps. A page-owned copy toggle switches labeled axes
 to a selectable raw coordinate tuple without using the clipboard API.
+Card assembly reads the viewer's current transform on the owning world thread
+and adds rounded horizontal direction offsets only for an exact world-name match,
+before instance names are shortened for display. The existing card refresh updates
+these offsets; no additional scan or timer is used. Coordinate selection temporarily
+replaces the distance line with its copy hint.
 Sightings retain optional item asset IDs and container block IDs,
 resolved to localized names when displayed. Older cache entries remain readable
 with generic item and container labels.

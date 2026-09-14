@@ -28,6 +28,8 @@ final class LinkedNpcLocationCopyControl {
         commands.set(selector + " #Coordinates.Visible", editing);
         commands.set(selector + " #CoordinateLabel.Visible", hasCoordinates && !editing);
         commands.set(selector + " #CopyHint.Visible", editing);
+        commands.set(selector + " #RelativeDistance.Visible",
+                hasCoordinates && !editing && !entry.location().relativeDistance().isBlank());
         if (editing) commands.set(selector + " #Coordinates.Value", entry.location().coordinates());
     }
 

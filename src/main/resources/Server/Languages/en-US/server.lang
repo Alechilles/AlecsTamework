@@ -1714,3 +1714,14 @@ tamework.traits.description.happinessGain={direction} happiness gain by {percent
 tamework.traits.description.happinessFlat={direction} happiness by {points} points.
 tamework.traits.description.fertility={direction} this parent's contribution to expected offspring count by {percent}% (combines with the other parent and is capped at 4 offspring).
 tamework.traits.description.harvest=Gives a {percent}% chance of bonus harvest output or preserving the harvest cooldown, depending on the creature.
+
+tamework.ui.linkedLocation.captured=Captured
+tamework.ui.linkedLocation.relative.here=Less than 1m away
+tamework.ui.linkedLocation.relative.north={0}m north
+tamework.ui.linkedLocation.relative.south={0}m south
+tamework.ui.linkedLocation.relative.east={0}m east
+tamework.ui.linkedLocation.relative.west={0}m west
+tamework.ui.linkedLocation.relative.north.east={0}m north, {1}m east
+tamework.ui.linkedLocation.relative.north.west={0}m north, {1}m west
+tamework.ui.linkedLocation.relative.south.east={0}m south, {1}m east
+tamework.ui.linkedLocation.relative.south.west={0}m south, {1}m west

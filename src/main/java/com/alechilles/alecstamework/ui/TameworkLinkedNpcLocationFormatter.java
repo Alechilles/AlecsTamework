@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.localization.LocalizedText;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -23,6 +24,27 @@ public final class TameworkLinkedNpcLocationFormatter {
     @Nonnull
     public static String formatCoordinates(double x, double y, double z) {
         return formatCoordinate(x) + ", " + formatCoordinate(y) + ", " + formatCoordinate(z);
+    }
+
+    /** Uses exact world identities, before display-name shortening, and horizontal meter offsets. */
+    @Nonnull
+    public static String formatRelativeDistance(@Nullable String language,
+            @Nullable String playerWorld, double playerX, double playerZ,
+            @Nullable String targetWorld, double targetX, double targetZ) {
+        double dx = targetX - playerX;
+        double dz = targetZ - playerZ;
+        if (playerWorld == null || playerWorld.isBlank() || !playerWorld.equals(targetWorld)
+                || !Double.isFinite(dx) || !Double.isFinite(dz)) return "";
+        long x = Math.round(Math.abs(dx));
+        long z = Math.round(Math.abs(dz));
+        String prefix = "tamework.ui.linkedLocation.relative.";
+        if (x == 0 && z == 0) return LocalizedText.resolve(language, prefix + "here");
+        // Hytale Direction.toNormal: north = -Z, east = +X.
+        String ns = dz < 0 ? "north" : "south";
+        String ew = dx < 0 ? "west" : "east";
+        if (x == 0) return LocalizedText.format(language, prefix + ns, z);
+        if (z == 0) return LocalizedText.format(language, prefix + ew, x);
+        return LocalizedText.format(language, prefix + ns + "." + ew, z, x);
     }
 
     @Nonnull

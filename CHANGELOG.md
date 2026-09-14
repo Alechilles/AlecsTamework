@@ -2,6 +2,9 @@
 
 ## Unreleased development changes
 
+- Inline companion locations now show rounded north/south and east/west distances
+  from the player in the same world. Captured cards use the heading "Captured".
+
 - Chevron birds now approach exchanged formation slots smoothly while keeping their fixed V shape.
 
 - Restored recall progress on unloaded companion cards with inline locations,

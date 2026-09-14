@@ -107,6 +107,7 @@ Group {
         TextButton #CopyButton { Anchor: (Top: 74, Right: 0, Width: 28, Height: 26); Text: ""; Style: $A.@PanelButton; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
         Group #CopyGlyph { Anchor: (Top: 78, Right: 5, Width: 18, Height: 18); HitTestVisible: false; Visible: false; Background: "Tamework/PanelActions/Copy_Glyph_Default.png"; }
         Label #CopyHint { Anchor: (Top: 101, Left: 0, Right: 34, Height: 13); Text: ""; Style: (FontSize: 9, TextColor: #a9b69f); Visible: false; }
+        Label #RelativeDistance { Anchor: (Top: 100, Left: 0, Right: 0, Height: 14); Text: ""; Style: (FontSize: 11, TextColor: #a9b69f, VerticalAlignment: Center); Visible: false; }
     }
     TextButton #LinkButton { Anchor: (Top: 98, Left: 746, Width: 100, Height: 26); Style: $A.@PanelButton; Padding: (Horizontal: 4); Text: %server.tamework.ui.linkedPanel.card.button.link; TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.link; TextTooltipStyle: @LinkedActionTooltipStyle; Visible: false; }
 

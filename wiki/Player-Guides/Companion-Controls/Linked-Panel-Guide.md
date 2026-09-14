@@ -118,7 +118,10 @@ details when the holder is unloaded.
 Inline cards show **World:** and labeled **X**, **Y**, and **Z** coordinates,
 without an observation timestamp. Click the copy icon to switch to a selectable
 text field containing the plain coordinate tuple; click it again to restore the
-labels. Cards do not load distant chunks or check inventories as they refresh.
+labels. When you are in the same world, a line below the coordinates shows rounded
+horizontal distances from you, such as **1550m north, 780m west**. These distances
+update with the card and use the saved or observed location. Captured animals use
+the heading **Captured**. Cards do not load distant chunks or check inventories as they refresh.
 The Locate action verifies the recorded holder when available. **Unknown** means
 no usable item sighting is available; it does not mean the
 animal died or the item was destroyed. Older capture items without a capture receipt

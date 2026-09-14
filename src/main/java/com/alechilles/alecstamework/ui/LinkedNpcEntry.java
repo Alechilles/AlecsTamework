@@ -1203,13 +1203,18 @@ public final class LinkedNpcEntry {
     }
 
     /** Localized text displayed in the inline location section. */
-    public record Location(String status, String world, String coordinates) {
+    public record Location(String status, String world, String coordinates, String relativeDistance) {
         public static final Location EMPTY = new Location("", "", "");
+
+        public Location(String status, String world, String coordinates) {
+            this(status, world, coordinates, "");
+        }
 
         public Location {
             status = normalizeText(status);
             world = normalizeText(world);
             coordinates = normalizeText(coordinates);
+            relativeDistance = normalizeText(relativeDistance);
         }
 
         private static Location normalize(Location location) {

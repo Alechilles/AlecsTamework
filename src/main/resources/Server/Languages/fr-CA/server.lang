@@ -1702,3 +1702,14 @@ tamework.traits.description.happinessGain={direction} le gain de bonheur de {per
 tamework.traits.description.happinessFlat={direction} le bonheur de {points} points.
 tamework.traits.description.fertility={direction} la contribution de ce parent au nombre attendu de petits de {percent}% (elle se combine avec celle de l'autre parent et est limitée à 4 petits au maximum).
 tamework.traits.description.harvest=Accorde une chance de {percent}% d'obtenir une récolte supplémentaire ou de préserver le temps de recharge de la récolte, selon la créature.
+
+tamework.ui.linkedLocation.captured=Capturé
+tamework.ui.linkedLocation.relative.here=À moins de 1 m
+tamework.ui.linkedLocation.relative.north={0} m au nord
+tamework.ui.linkedLocation.relative.south={0} m au sud
+tamework.ui.linkedLocation.relative.east={0} m à l’est
+tamework.ui.linkedLocation.relative.west={0} m à l’ouest
+tamework.ui.linkedLocation.relative.north.east={0} m au nord, {1} m à l’est
+tamework.ui.linkedLocation.relative.north.west={0} m au nord, {1} m à l’ouest
+tamework.ui.linkedLocation.relative.south.east={0} m au sud, {1} m à l’est
+tamework.ui.linkedLocation.relative.south.west={0} m au sud, {1} m à l’ouest

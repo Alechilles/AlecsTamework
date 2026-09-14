@@ -16,6 +16,7 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -135,6 +136,12 @@ final class CommandLinkedPanelEntryService {
         }
         Map<String, CommandGroupService.GroupRecord> groupById = buildGroupLookup(stack);
         World world = player.getWorld();
+        // Panel assembly runs on the viewer's world thread. Keep only position scalars for its rows.
+        Ref<EntityStore> viewerRef = world == null ? null : world.getEntityRef(player.getUuid());
+        TransformComponent viewerTransform = viewerRef == null || !viewerRef.isValid() ? null
+                : store.getComponent(viewerRef, TransformComponent.getComponentType());
+        double viewerX = viewerTransform == null ? Double.NaN : viewerTransform.getPosition().x;
+        double viewerZ = viewerTransform == null ? Double.NaN : viewerTransform.getPosition().z;
         ArrayList<LinkedNpcEntry> entries = new ArrayList<>(records.size());
         Map<UUID, UUID> renderedIds = new LinkedHashMap<>();
         for (LinkedNpcRecord record : records) {
@@ -337,7 +344,8 @@ final class CommandLinkedPanelEntryService {
                 entry = saved.apply(entry, player.getPlayerRef() == null ? null : player.getPlayerRef().getLanguage());
             }
             if (!entry.loaded() && !entry.dead() && !entry.lost()) {
-                entry = entry.withLocation(location(player, record, entry, saved));
+                entry = entry.withLocation(location(player, record, entry, saved,
+                        world == null ? null : world.getName(), viewerX, viewerZ));
             }
             entries.add(entry);
             renderedIds.put(record.npcUuid, entry.npcUuid());
@@ -347,11 +355,14 @@ final class CommandLinkedPanelEntryService {
 
     /** Uses saved evidence and observed item holders without querying live inventories. */
     private LinkedNpcEntry.Location location(Player player, LinkedNpcRecord record, LinkedNpcEntry entry,
-                                             CommandSavedNpcPanelSnapshot saved) {
+                                             CommandSavedNpcPanelSnapshot saved,
+                                             String viewerWorld, double viewerX, double viewerZ) {
         var stored = saved == null ? null : saved.storedLocation();
         String status;
         String world = "";
         String coordinates = "";
+        double targetX = Double.NaN;
+        double targetZ = Double.NaN;
         if (entry.captured()) {
             var sighting = stored == null || stored.capture() == null || itemTracker == null ? null
                     : itemTracker.index().find(stored.capture()).orElse(null);
@@ -363,6 +374,8 @@ final class CommandLinkedPanelEntryService {
                 // These remain advisory observations; cards do not verify distant inventories.
                 if (sighting.holder().kind() != CapturedItemLocationIndex.Kind.PLAYER) {
                     world = sighting.holder().worldName();
+                    targetX = sighting.holder().x();
+                    targetZ = sighting.holder().z();
                     coordinates = TameworkLinkedNpcLocationFormatter.formatCoordinates(
                             sighting.holder().x(), sighting.holder().y(), sighting.holder().z());
                 }
@@ -373,6 +386,8 @@ final class CommandLinkedPanelEntryService {
             if (stored != null && stored.coop() != null) {
                 var coop = stored.coop();
                 world = coop.worldKey();
+                targetX = coop.x();
+                targetZ = coop.z();
                 coordinates = TameworkLinkedNpcLocationFormatter.formatCoordinates(
                         coop.x(), coop.y(), coop.z());
             }
@@ -381,6 +396,8 @@ final class CommandLinkedPanelEntryService {
                     "tamework.ui.notifications.command.locate.lastKnown");
             if (record.lastKnownPosition != null) {
                 world = record.lastKnownWorldName;
+                targetX = record.lastKnownPosition.x;
+                targetZ = record.lastKnownPosition.z;
                 coordinates = TameworkLinkedNpcLocationFormatter.formatCoordinates(
                         record.lastKnownPosition.x, record.lastKnownPosition.y, record.lastKnownPosition.z);
             } else {
@@ -388,12 +405,15 @@ final class CommandLinkedPanelEntryService {
                         "tamework.ui.notifications.command.locate.noLocation", entry.displayName());
             }
         }
+        String relativeDistance = TameworkLinkedNpcLocationFormatter.formatRelativeDistance(
+                player.getPlayerRef() == null ? null : player.getPlayerRef().getLanguage(),
+                viewerWorld, viewerX, viewerZ, world, targetX, targetZ);
         if (!coordinates.isBlank()) {
             world = TameworkLinkedNpcLocationFormatter.formatDisplayWorldName(world,
                     LocalizedText.resolve(player,
                             "tamework.ui.notifications.command.locate.unknownWorld"));
         }
-        return new LinkedNpcEntry.Location(status, world == null ? "" : world, coordinates);
+        return new LinkedNpcEntry.Location(status, world == null ? "" : world, coordinates, relativeDistance);
     }
 
     record ResolvedEntries(

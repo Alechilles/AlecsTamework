@@ -379,8 +379,11 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(inlineLocationSelector + " #CopyButton.Visible", showInlineCoordinates);
         commandBuilder.set(inlineLocationSelector + " #CopyGlyph.Visible", showInlineCoordinates);
         commandBuilder.set(inlineLocationSelector + " #CopyHint.Visible", false);
+        commandBuilder.set(inlineLocationSelector + " #RelativeDistance.Visible",
+                showInlineCoordinates && !location.relativeDistance().isBlank());
+        commandBuilder.set(inlineLocationSelector + " #RelativeDistance.Text", location.relativeDistance());
         commandBuilder.set(inlineLocationSelector + " #Heading.Text", entry.captured()
-                ? LocalizedText.resolve(language, "tamework.ui.notifications.command.locate.itemGeneric")
+                ? LocalizedText.resolve(language, "tamework.ui.linkedLocation.captured")
                 : LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry, language));
         commandBuilder.set(inlineLocationStatusSelector + ".Text", location.status());
         commandBuilder.set(inlineLocationWorldSelector + ".Text",
@@ -409,13 +412,15 @@ final class LinkedNpcPanelCardBinder {
                 fixedAnchor(locationRow + 4, inlineLocationWidth - 23, 18, 18));
         commandBuilder.setObject(inlineLocationSelector + " #CopyHint.Anchor",
                 fixedAnchor(locationRow + 27, 0, inlineLocationWidth - 34, 13));
+        commandBuilder.setObject(inlineLocationSelector + " #RelativeDistance.Anchor",
+                fixedAnchor(locationRow + 26, 0, inlineLocationWidth, 14));
         if (showInlineCoordinates) {
             eventBuilder.addEventBinding(CustomUIEventBindingType.Activating,
                     inlineLocationSelector + " #CopyButton",
                     EventData.of(config.eventCommandId(), LinkedNpcLocationCopyControl.PREFIX + entry.npcUuid()), false);
         }
         if (showInlineLocation) {
-            Anchor inlineAnchor = fixedAnchor(32, 432, inlineLocationWidth, 110);
+            Anchor inlineAnchor = fixedAnchor(32, 432, inlineLocationWidth, 114);
             commandBuilder.setObject(inlineLocationSelector + ".Anchor", inlineAnchor);
             commandBuilder.setObject(recallCountdownSelector + ".Anchor",
                     fixedAnchor(146, 432, inlineLocationWidth, 14));
