@@ -387,7 +387,7 @@ final class LinkedNpcPanelCardBinder {
                 : LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry, language));
         commandBuilder.set(inlineLocationStatusSelector + ".Text", location.status());
         commandBuilder.set(inlineLocationWorldSelector + ".Text",
-                LocalizedText.resolve(language, "tamework.ui.linkedLocation.worldLabel") + ": " + location.world());
+                LocalizedText.resolve(language, "tamework.ui.linkedLocation.worldLabel") + " " + location.world());
         commandBuilder.set(inlineLocationSelector + " #CoordinateLabel.Text",
                 LinkedNpcLocationCopyControl.labeledCoordinates(location.coordinates()));
         commandBuilder.set(inlineLocationSelector + " #CopyButton.TooltipText",
