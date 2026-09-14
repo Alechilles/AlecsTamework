@@ -14,8 +14,9 @@ each summoned NPC is a temporary world projection.
 
 ## Required boundary
 
-HyDragon requires Tamework `>=3.0.0 <4.0.0` and checks public API capability
-names at runtime. Bonded features require both:
+The current HyDragon manifest requires Tamework `>=3.1.0 <4.0.0`, so it needs
+a compatible release before use with Tamework 4.0.0. HyDragon also checks public
+API capability names at runtime. Bonded features require both:
 
 - advertised `BONDED_COMPANIONS`; and
 - `TameworkApi.bondedCompanions().availability().available()`.

@@ -2,6 +2,11 @@
 
 ## 4.0.0 - Companion Commands, Formations, and Localization - 2026-09-14
 
+**Upgrade compatibility:** Dependent mods whose manifests require Tamework
+below `4.0.0` need a compatible update before installing this release. Pack
+authors must migrate inline spawner icon maps to `TwDynamicIconConfig`; see the
+[dynamic icon migration reference](wiki/Modder-Documentation/Config-Reference/TwDynamicIconConfig-Reference.md).
+
 - Inline companion locations now show rounded north/south and east/west distances
   from the player in the same world. Captured cards use the heading "Captured".
 

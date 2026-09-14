@@ -70,7 +70,7 @@ matching `-Phytale_version` when testing a prerelease game build.
 
 For local development installs, keep the manifest's normal mod version when
 dependent mods require a stable version range. Hytale excludes prerelease
-versions such as `3.4.5-formation-dev` from ranges such as `>=3.1.0 <4.0.0`.
+versions such as `4.0.0-formation-dev` from ranges such as `>=4.0.0 <5.0.0`.
 Put development labels in the JAR filename only, and verify the embedded
 `manifest.json` before installing.
 
@@ -110,11 +110,9 @@ release notes, assets, and the final artifact. Runtime verification should
 cover the ordinary no-claims configuration and the direct SimpleClaims
 integration used for breeding limits and tamed-companion damage.
 
-For the first replacement-persistence release, also complete
-[Persistence Replacement Release Checklist](Persistence-Replacement-Release-Checklist.md).
-It uses the normal Gradle and release scripts plus two focused live-smoke lanes;
-there is no separate persistence candidate builder or persistence rehearsal
-runtime to package and maintain.
+The [Persistence Replacement Release Checklist](Persistence-Replacement-Release-Checklist.md)
+records the historical first-release acceptance work for 3.0.0. Its candidate
+identity and unchecked items are not a current 4.0.0 release checklist.
 
 Tamework does not create or restore complete Hytale world backups. Operators
 and hosting platforms remain responsible for consistent world backups.

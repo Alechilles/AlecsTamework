@@ -1,5 +1,10 @@
 # Persistence Replacement Release Checklist
 
+> **Historical 3.0.0 checklist:** This document preserves the candidate and
+> acceptance notes from the first replacement-persistence release. It is not
+> the release gate for 4.0.0. Unchecked items below retain their recorded status;
+> they do not establish current live-test results.
+
 > **Live acceptance pending:** The replacement core and required persistence
 > feature recovery under ADR 0008 are implemented and automated gates are
 > green. Public release preparation remains blocked until the exact artifact
