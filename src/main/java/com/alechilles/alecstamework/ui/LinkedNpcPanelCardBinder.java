@@ -651,8 +651,7 @@ final class LinkedNpcPanelCardBinder {
         int activeTop = compact ? 56 : 96;
         boolean portrait = !entry.portraitIcon().isBlank();
         commands.setObject(card + " #StatusInactive.Anchor", fixedAnchor(
-                portrait && !compact ? activeTop - 20 : activeTop,
-                portrait && !compact ? 0 : 48, portrait ? compact ? 56 : 76 : 96, 20));
+                activeTop, 48, portrait && compact ? 56 : 96, 20));
     }
 
     private static Anchor fixedAnchor(int top, int left, int width, int height) {
