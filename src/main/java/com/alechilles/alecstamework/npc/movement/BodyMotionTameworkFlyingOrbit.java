@@ -57,6 +57,7 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
     private final FlyingObstacleAvoidance obstacleAvoidance = new FlyingObstacleAvoidance();
     private final ProbeMoveData obstacleProbeData = new ProbeMoveData();
     private final Vector3d targetPosition = new Vector3d();
+    private final FollowFlightSteering followFlight = new FollowFlightSteering();
     private final KettleFlightState kettle = new KettleFlightState();
     private int kettleMemberIndex;
     private String kettleAnimation;
@@ -128,6 +129,7 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
         hasPassThroughDestination = false;
         obstacleAvoidance.reset();
         kettle.reset();
+        followFlight.reset();
         if (mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.CYCLE) {
             beginOrbit();
         }
@@ -138,6 +140,10 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
                            @Nonnull Role role,
                            @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         clearKettleAnimation(ref, componentAccessor);
+        if (mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.FOLLOW_FORMATION
+                && role.getActiveMotionController() instanceof MotionControllerTameworkFormationFly fly) {
+            fly.requestFollowArrival(false);
+        }
     }
 
     @Override
@@ -150,6 +156,7 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
         desiredSteering.clear();
         MotionController active = role.getActiveMotionController();
         boolean kettling = mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.KETTLE;
+        boolean followingFormation = mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.FOLLOW_FORMATION;
         if (!(active instanceof MotionControllerFly fly)
                 || (kettling ? !resolveKettleCenter(ref, componentAccessor)
                 : !resolveTargetPosition(sensorInfo, componentAccessor))) {
@@ -158,6 +165,7 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
                     returningToWanderTarget, false, 0.0,
                     wanderRadiusRange[0], wanderRadiusRange[1]);
             obstacleAvoidance.reset();
+            followFlight.reset();
             return true;
         }
 
@@ -198,7 +206,10 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
             boolean wandering = mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.WANDER_TARGET;
             boolean passingThrough = mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.PASS_THROUGH_TARGET;
             boolean deferWaypointMovement = false;
-            if (wandering) {
+            if (followingFormation) {
+                followFlight.resolve(selfPosition, targetPosition, relativeSpeed, approachSlowDownDistance,
+                        climbRelativeSpeed, sinkRelativeSpeed, translation);
+            } else if (wandering) {
                 double targetOffsetX = selfPosition.x() - targetPosition.x();
                 double targetOffsetZ = selfPosition.z() - targetPosition.z();
                 returningToWanderTarget = updateWanderReturnState(
@@ -262,8 +273,9 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
                         approachStopDistance, approachSlowDownDistance, relativeSpeed, translation);
             }
 
-            double altitudeCorrection = 0.0;
-            if (shouldApplyTargetRelativeAltitude(wandering, passingThrough, returningToWanderTarget)) {
+            double altitudeCorrection = followingFormation ? translation.y : 0.0;
+            if (!followingFormation
+                    && shouldApplyTargetRelativeAltitude(wandering, passingThrough, returningToWanderTarget)) {
                 altitudeCorrection = resolveTargetRelativeAltitudeCorrection(
                         selfPosition.y(), targetPosition.y(), desiredAltitudeRange,
                         climbRelativeSpeed, sinkRelativeSpeed);
@@ -293,6 +305,9 @@ public final class BodyMotionTameworkFlyingOrbit extends TameworkBodyMotionBase 
             }
 
             desiredSteering.setTranslation(translation);
+            if (followingFormation && active instanceof MotionControllerTameworkFormationFly formationFly) {
+                formationFly.requestFollowArrival(translation.lengthSquared() == 0);
+            }
             Vector3d yawDirection = facingTarget
                     ? resolveTargetDirection(
                             selfPosition.x(), selfPosition.z(),

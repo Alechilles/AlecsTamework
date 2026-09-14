@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.npc.sensors;
 
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkFollowFormation;
+import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkFlyingOrbit;
+import com.google.gson.JsonParser;
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderManager;
@@ -18,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FollowFormationValidationTest {
     @Test
-    void formationPositionSatisfiesNativeSeekValidation() throws Exception {
+    void formationPositionLoadsWithGroundAndFlyingMotion() throws Exception {
         // Regression: Hytale rejected the follow component because Seek could not see
         // a position provider, even though the runtime sensor returned a position.
         var errors = new ArrayList<String>();
@@ -43,6 +45,12 @@ class FollowFormationValidationTest {
         // NPCPlugin registers BuilderBodyMotionFind as the native "Seek" motion.
         new BuilderBodyMotionFind().readConfig(null, seek, manager, parameters, validation);
 
-        assertTrue(errors.isEmpty(), () -> "Follow sensor and Seek must load together: " + errors);
+        // The flying branch must accept the position sensor and its dedicated arrival mode.
+        new BuilderBodyMotionTameworkFlyingOrbit().readConfig(null, JsonParser.parseString("""
+                {"Mode":"FOLLOW_FORMATION", "ApproachSlowDownDistance":3,
+                 "RelativeSpeed":0.65, "DesiredAltitudeRange":[0,0]}
+                """), manager, parameters, validation);
+
+        assertTrue(errors.isEmpty(), () -> "Follow sensor and ground/flying motions must load together: " + errors);
     }
 }

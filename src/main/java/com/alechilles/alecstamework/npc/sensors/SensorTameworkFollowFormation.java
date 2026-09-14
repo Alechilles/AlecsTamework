@@ -80,8 +80,7 @@ public final class SensorTameworkFollowFormation extends TameworkSensorBase {
             masterId = identity.getUuid();
             probeRemaining = 0;
         }
-        double height = flying ? altitude + (slot.index() % 3) * 1.5 : 0;
-        target.set(slot.x(), flying ? masterTransform.getPosition().y + height
+        target.set(slot.x(), flying ? slot.y()
                 : selfTransform.getPosition().y, slot.z());
         if (controller instanceof MotionControllerWalk walk) {
             probeRemaining -= dt;

@@ -51,8 +51,7 @@
         },
         "BodyMotion": {
           "Type": "TameworkFlyingOrbit",
-          "Mode": "Approach",
-          "ApproachStopDistance": 0.25,
+          "Mode": "FOLLOW_FORMATION",
           "ApproachSlowDownDistance": 3,
           "RelativeSpeed": { "Compute": "FormationRelativeSpeed" },
           "DesiredAltitudeRange": [0, 0]

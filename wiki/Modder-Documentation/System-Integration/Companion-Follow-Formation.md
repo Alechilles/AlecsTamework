@@ -5,8 +5,9 @@ Companions form compact rows around their own group center, initially
 placed at the animals' average position. The group moves toward the player only
 when it is too far away. The player is not a formation slot or the shape's center.
 Turning or walking toward the group does not rotate it or make it move behind the
-player. Flying companions use a separate group with staggered heights above the
-player's altitude.
+player. Flying companions use a separate loose group above the player's altitude.
+Their shared target ignores owner movement up to 2 blocks horizontally and
+1.5 blocks vertically. Larger movements translate the group without rotating it.
 
 The shared Simple, Simple TP, Advanced, Large, and Flying follow components try
 `Component_Tamework_Instruction_Follow_Formation` before their normal movement.
@@ -36,8 +37,14 @@ animal can still widen the space between its row and the next one.
 The layout updates at the existing half-second cadence using linear row packing,
 not an all-pairs collision solver. A swap and its new occupant radii are applied
 in the same group refresh before sensors can publish the new targets. Arrival
-tolerance is 0.25 blocks, leaving room within the default gap for small errors.
+tolerance for ground followers is 0.25 blocks, leaving room within the default gap for small errors.
 This is preferred target spacing; terrain and movement can still distort it.
+
+Flying followers reserve an extra 2 blocks between hitboxes for movement
+tolerance. They slow gradually in all three dimensions, settle within 0.4 blocks
+of their target, and resume approaching only after drifting more than 1 block
+away. Birds share an altitude instead of changing height lanes when slots swap.
+The existing obstacle avoidance still applies while approaching.
 
 The group moves closer to the player when its footprint needs more recovery room.
 Hitbox spacing is not shrunk to force a large group into a small recovery range.
@@ -81,12 +88,12 @@ The existing non-follow formation shapes and leader movement remain unchanged.
 | `FormationSpacing` | `4` | Fallback center spacing when a hitbox is unavailable |
 | `FormationGap` | `0.75` | Desired empty gap between neighboring hitboxes |
 | `FormationRelativeSpeed` | `1` | Speed while approaching the assigned position |
-| `FormationAltitude` | `5` | Flying height above the owner, before height staggering |
+| `FormationAltitude` | `5` | Flying height above the group's retained owner altitude |
 
 The internal `TameworkFollowFormation` sensor exposes a position-only target.
 It takes `TargetSlot`, `Range`, `Spacing`, `Gap`, and `Altitude`. It does not replace
 `MasterTarget` with a synthetic entity. The ground motion uses native `Seek`;
-the flying motion uses `TameworkFlyingOrbit` in `Approach` mode.
+the flying motion uses `TameworkFlyingOrbit` in `FOLLOW_FORMATION` mode.
 
 ## Runtime lifecycle
 

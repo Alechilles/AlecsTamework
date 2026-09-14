@@ -13,6 +13,8 @@ import org.joml.Vector3d;
  */
 public final class CompanionFollowFormation {
     private final Vector3d center = new Vector3d();
+    private final Vector3d flightOwnerAnchor = new Vector3d();
+    private boolean flightAnchorInitialized;
     private double[] offsetX = new double[0];
     private double[] offsetZ = new double[0];
     private double[] configuredRadii = new double[0];
@@ -60,6 +62,24 @@ public final class CompanionFollowFormation {
             center.z += dz * fraction;
         }
         return output.set(center.x + offsetX[slot], 0, center.z + offsetZ[slot]);
+    }
+
+    /** Flying groups share a height and ignore small owner steps and jumps. */
+    Vector3d flyingTarget(Vector3d player, int slot, double altitude, Vector3d output) {
+        if (!flightAnchorInitialized) {
+            flightOwnerAnchor.set(player);
+            flightAnchorInitialized = true;
+        }
+        double dx = player.x - flightOwnerAnchor.x;
+        double dz = player.z - flightOwnerAnchor.z;
+        if (dx * dx + dz * dz > 4) {
+            flightOwnerAnchor.x = player.x;
+            flightOwnerAnchor.z = player.z;
+        }
+        if (Math.abs(player.y - flightOwnerAnchor.y) > 1.5) flightOwnerAnchor.y = player.y;
+        target(flightOwnerAnchor, slot, output);
+        output.y = flightOwnerAnchor.y + altitude;
+        return output;
     }
 
     private boolean sameConfiguration(int size, double[] radii, double[] gaps, double safeRange) {

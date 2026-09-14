@@ -2,6 +2,9 @@
 
 ## 4.0.0 - Companion Commands, Formations, and Localization - 2026-09-14
 
+- Flying followers now approach as a loose group with hitbox-based spacing,
+  gradual slowdown, and tolerance for small player movements and height changes.
+
 - Restored GNU GPLv3 with an attribution clause and removed the private-server licensing template.
 
 **Upgrade compatibility:** Dependent mods whose manifests require Tamework

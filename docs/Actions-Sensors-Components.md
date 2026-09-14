@@ -106,7 +106,15 @@ distance. Parameters:
 Autonomous flying follow behavior that takes off from `Walk`, maintains a
 target-relative altitude, wanders around its owner with
 `TameworkFlyingOrbit`, teleports after extreme separation, and hovers safely
-when the owner target is temporarily unavailable. Parameters:
+when the owner target is temporarily unavailable.
+
+In Adventure mode, `Follow` first uses the shared companion formation. Its
+`TameworkFlyingOrbit` `FOLLOW_FORMATION` mode slows in three dimensions and
+allows birds to settle near their targets. The group ignores small owner
+steps and height changes. See the
+[companion follow guide](../wiki/Modder-Documentation/System-Integration/Companion-Follow-Formation.md).
+
+Parameters:
 
 - `MasterTargetSlot`
 - `FollowDesiredAltitudeRange`

@@ -64,7 +64,9 @@ public final class CompanionFollowFlockService {
         }
         member.lastSeen = System.currentTimeMillis();
         member.radius = radius;
-        member.gap = gap;
+        // Each bird may settle anywhere within its resume radius. Reserve both
+        // neighbors' drift allowance in addition to their real hitbox clearance.
+        member.gap = flying ? gap + 2 * FollowFlightSteering.RESUME_DISTANCE : gap;
         member.range = range;
         member.position.set(selfTransform.getPosition());
         int index = member.group.assignments.claim(id, 0, member.lastSeen);
@@ -76,13 +78,15 @@ public final class CompanionFollowFlockService {
             return null;
         }
         FollowGroup follow = member.group;
-        follow.formation.target(ownerTransform.getPosition(), index, follow.target);
-        double height = flying ? ownerTransform.getPosition().y + altitude + (index % 3) * 1.5 : 0;
-        follow.target.y = height;
+        if (flying) {
+            follow.formation.flyingTarget(ownerTransform.getPosition(), index, altitude, follow.target);
+        } else {
+            follow.formation.target(ownerTransform.getPosition(), index, follow.target);
+        }
         follow.position.set(member.position);
         if (!flying) follow.position.y = 0;
         follow.assignments.report(id, follow.position, follow.target, follow.spacing, member.lastSeen);
-        return new Slot(index, follow.spacing, follow.target.x, follow.target.z);
+        return new Slot(index, follow.spacing, follow.target.x, follow.target.z, follow.target.y);
 
     }
 
@@ -306,7 +310,11 @@ public final class CompanionFollowFlockService {
 
     private static boolean valid(Ref<EntityStore> ref) { return ref != null && ref.isValid(); }
 
-    public record Slot(int index, double spacing, double x, double z) { }
+    public record Slot(int index, double spacing, double x, double z, double y) {
+        public Slot(int index, double spacing, double x, double z) {
+            this(index, spacing, x, z, 0);
+        }
+    }
 
     private record GroupKey(UUID owner, boolean flying) { }
 

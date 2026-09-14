@@ -9,6 +9,23 @@ class CompanionFollowFormationTest {
     private static final double GAP = 0.75;
 
     @Test
+    void flyingGroupIgnoresSmallOwnerStepsAndJumpsThenMovesTogether() {
+        var group = new CompanionFollowFormation();
+        group.configure(new Vector3d(10, 0, 0), 2, new double[] {.5, 2},
+                new double[] {2.75, 2.75}, 32);
+        Vector3d player = new Vector3d(0, 20, 0);
+        Vector3d first = group.flyingTarget(player, 0, 5, new Vector3d());
+        Vector3d second = group.flyingTarget(player, 1, 5, new Vector3d());
+        assertEquals(first, group.flyingTarget(new Vector3d(-1, 21, 0), 0, 5, new Vector3d()));
+        Vector3d movedFirst = group.flyingTarget(new Vector3d(-8, 23, 0), 0, 5, new Vector3d());
+        Vector3d movedSecond = group.flyingTarget(new Vector3d(-8, 23, 0), 1, 5, new Vector3d());
+        assertTrue(movedFirst.x < first.x - 2);
+        assertEquals(28, movedFirst.y, 1e-9);
+        assertEquals(new Vector3d(second).sub(first), new Vector3d(movedSecond).sub(movedFirst));
+        assertTrue(movedFirst.distance(movedSecond) >= .5 + 2 + 2.75 - 1e-9);
+    }
+
+    @Test
     void equalCowsUseTheirPairClearanceInsteadOfTheOldSixBlockSpacing() {
         var group = new CompanionFollowFormation();
         group.configure(new Vector3d(), 2, new double[] {1, 1}, new double[] {GAP, GAP}, 40);
