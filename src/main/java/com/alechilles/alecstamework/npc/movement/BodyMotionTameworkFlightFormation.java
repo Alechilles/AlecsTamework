@@ -150,7 +150,7 @@ public final class BodyMotionTameworkFlightFormation extends TameworkBodyMotionB
                 int assignedSlot = NativeFormationSlots.get().claim(
                         ref, slotGroup, memberId, followerIndex, nowMillis);
                 if (assignedSlot != lastFormationSlot) {
-                    if (lastFormationSlot >= 0 && hasFormationOffset && isOrganicFormation()) {
+                    if (lastFormationSlot >= 0 && hasFormationOffset) {
                         // Start a traded slot's smooth approach at the bird, not its former distant target.
                         formationOffset.set(selfTransform.getPosition()).sub(leaderTransform.getPosition());
                     } else {

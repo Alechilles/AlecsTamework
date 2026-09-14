@@ -2,6 +2,8 @@
 
 ## Unreleased development changes
 
+- Chevron birds now approach exchanged formation slots smoothly while keeping their fixed V shape.
+
 - Restored recall progress on unloaded companion cards with inline locations,
   including Owned cards. Recall logs now identify automatic recovery retries,
   and rejected links explain when the command tool does not allow that companion type.
