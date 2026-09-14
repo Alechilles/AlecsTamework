@@ -633,6 +633,7 @@ tamework.ui.notifications.command.group.renamed=Groupe renommé : {0}
 tamework.ui.notifications.command.group.renameFailed=Impossible de renommer le groupe.
 tamework.ui.notifications.command.link.alreadyLinked=Ce PNJ est déjà lié.
 tamework.ui.notifications.command.link.failed=Échec de la liaison de ce PNJ.
+tamework.ui.notifications.command.link.roleNotAllowed=Cet outil de commande ne peut pas lier ce type de compagnon.
 tamework.ui.notifications.command.link.mustBeLoaded=Le PNJ doit être chargé pour être lié.
 tamework.ui.notifications.command.link.success=Lié : {0}
 tamework.ui.notifications.command.link.successInactive=Lié comme inactif : {0}

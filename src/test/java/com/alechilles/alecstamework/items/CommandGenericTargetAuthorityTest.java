@@ -447,6 +447,25 @@ class CommandGenericTargetAuthorityTest {
     }
 
     @Test
+    void disallowedRoleLinkReportsRestrictionWithoutChangingMembership() throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            LiveTarget target = scope.liveOrdinaryTarget(false);
+            TwCommandItemConfig config = TwCommandItemConfig.CODEC.decode(BsonDocument.parse("""
+                    {"RequireTamed":false,"AllowedRoles":{"Mode":"Allowlist","Allowlist":["Cow"]}}
+                    """), new ExtraInfo());
+            ItemStack unchanged = metadataStack("test:generic-whistle");
+            LinkToggleResult result = new CommandLinkMutationService(null,
+                    new CommandLinkPolicyService(), null, null).tryToggleLink(
+                    target.player, scope.store, target.reference, "generic-tool", config, unchanged);
+
+            assertFalse(result.toggled);
+            assertEquals("tamework.ui.notifications.command.link.roleNotAllowed", result.failureMessageKey);
+            assertFalse(scope.store.getComponent(target.reference, scope.linksType).containsToolId("generic-tool"));
+            assertTrue(new CommandLinkedNpcRecordStore().read(unchanged).isEmpty());
+        }
+    }
+
+    @Test
     void genericRecipientQueryExcludesBondedProjectionButKeepsOrdinaryNpc()
             throws Exception {
         try (ProjectionScope scope = ProjectionScope.install()) {

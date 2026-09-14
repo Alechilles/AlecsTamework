@@ -98,7 +98,18 @@ final class CommandRelocationTerminalService {
                             pending.completedSourceSections()
                     )
             ).whenComplete((outcome, problem) -> {
-                if (problem == null && outcome
+                if (problem != null) {
+                    diagnostics.accept(Level.WARNING,
+                            "Recall recovery failed for npc=" + npcUuid
+                                    + ", reason=" + problem.getClass().getSimpleName());
+                    return;
+                }
+                diagnostics.accept(Level.INFO,
+                        "Recall recovery completed for npc=" + npcUuid
+                                + ", outcome=" + outcome
+                                + (outcome == ImportedRecallRecoverySink.RecoveryOutcome.RETRY_REQUIRED
+                                        ? "; automatically retrying relocation" : ""));
+                if (outcome
                         == ImportedRecallRecoverySink.RecoveryOutcome
                         .RETRY_REQUIRED) {
                     retryHandler.accept(pending);

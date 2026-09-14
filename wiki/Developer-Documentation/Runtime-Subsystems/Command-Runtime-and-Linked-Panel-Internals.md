@@ -87,6 +87,13 @@ at shutdown. Saved card values never authorize a live action or mutate persisten
 - Relocation retry exhaustion removes the pending relocation and reports a
   warning. It does not create `LOST`; only positive destructive-removal
   evidence can author that lifecycle.
+- Explicit Recall can continue automatically after checkpoint recovery loads
+  the source entity. Recovery logs identify that retry; the drop warning alone
+  does not mean Recall has finished. Linked and Owned cards retain their recall
+  countdown alongside inline location details while relocation is pending.
+- Link execution applies the command tool's role policy, even in Owned mode.
+  A role restriction produces a localized explanation; ownership alone does
+  not make a companion eligible for every command tool.
 - Active-NPC indicators are sent only to the controlling player. Each loaded
   target gets one invisible, non-persistent helper entity mounted above its
   model bounds. Its mount component is added after spawning so Hytale registers

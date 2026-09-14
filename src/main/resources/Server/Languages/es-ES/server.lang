@@ -702,6 +702,7 @@ tamework.ui.notifications.command.group.renamed=Grupo renombrado: {0}
 tamework.ui.notifications.command.group.renameFailed=No se pudo cambiar el nombre del grupo.
 tamework.ui.notifications.command.link.alreadyLinked=Ese NPC ya está vinculado.
 tamework.ui.notifications.command.link.failed=No se pudo vincular ese NPC.
+tamework.ui.notifications.command.link.roleNotAllowed=Esta herramienta de órdenes no puede vincular este tipo de compañero.
 tamework.ui.notifications.command.link.mustBeLoaded=El NPC debe estar cargado para vincularse.
 tamework.ui.notifications.command.link.success=Vinculado: {0}
 tamework.ui.notifications.command.link.successInactive=Vinculado como inactivo: {0}

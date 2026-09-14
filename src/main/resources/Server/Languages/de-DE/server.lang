@@ -633,6 +633,7 @@ tamework.ui.notifications.command.group.renamed=Gruppe umbenannt: {0}
 tamework.ui.notifications.command.group.renameFailed=Gruppe konnte nicht umbenannt werden.
 tamework.ui.notifications.command.link.alreadyLinked=Dieser NPC ist bereits verknüpft.
 tamework.ui.notifications.command.link.failed=Dieser NPC konnte nicht verknüpft werden.
+tamework.ui.notifications.command.link.roleNotAllowed=Mit diesem Befehlswerkzeug kann dieser Begleitertyp nicht verknüpft werden.
 tamework.ui.notifications.command.link.mustBeLoaded=NPC muss geladen sein, um verknüpft zu werden.
 tamework.ui.notifications.command.link.success=Verknüpft: {0}
 tamework.ui.notifications.command.link.successInactive=Als inaktiv verknüpft: {0}

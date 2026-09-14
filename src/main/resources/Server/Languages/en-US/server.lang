@@ -654,6 +654,7 @@ tamework.ui.notifications.command.group.renamed=Group renamed: {0}
 tamework.ui.notifications.command.group.renameFailed=Could not rename group.
 tamework.ui.notifications.command.link.alreadyLinked=That NPC is already linked.
 tamework.ui.notifications.command.link.failed=Failed to link that NPC.
+tamework.ui.notifications.command.link.roleNotAllowed=This command tool cannot link this type of companion.
 tamework.ui.notifications.command.link.mustBeLoaded=NPC must be loaded to link.
 tamework.ui.notifications.command.link.success=Linked: {0}
 tamework.ui.notifications.command.link.successInactive=Linked as inactive: {0}

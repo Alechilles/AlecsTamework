@@ -89,7 +89,8 @@ final class CommandPanelActionService {
             return;
         }
         if (result == null || !result.toggled) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.link.failed");
+            feedbackService.showWarningKey(player, result == null
+                    ? "tamework.ui.notifications.command.link.failed" : result.failureMessageKey);
             return;
         }
         if (!result.linked) {
@@ -124,7 +125,8 @@ final class CommandPanelActionService {
         });
         LinkToggleResult result = resultHolder[0];
         if (!mutated || result == null || !result.toggled || result.updatedItem == null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.link.failed");
+            feedbackService.showWarningKey(player, result == null
+                    ? "tamework.ui.notifications.command.link.failed" : result.failureMessageKey);
             return;
         }
         if (!result.linked) {

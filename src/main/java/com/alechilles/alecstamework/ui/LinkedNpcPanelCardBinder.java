@@ -230,7 +230,7 @@ final class LinkedNpcPanelCardBinder {
                 : showReviveAction;
         boolean showInactiveBadge = legacyLinked && !entry.active()
                 && !showRespawn && !pendingUnlink;
-        boolean showRecallCountdown = !showInlineLocation && legacyLinked
+        boolean showRecallCountdown = genericLinkedOrOwned
                 && entry.recallPending()
                 && !entry.loaded()
                 && !entry.dead()
@@ -417,6 +417,8 @@ final class LinkedNpcPanelCardBinder {
         if (showInlineLocation) {
             Anchor inlineAnchor = fixedAnchor(32, 432, inlineLocationWidth, 110);
             commandBuilder.setObject(inlineLocationSelector + ".Anchor", inlineAnchor);
+            commandBuilder.setObject(recallCountdownSelector + ".Anchor",
+                    fixedAnchor(146, 432, inlineLocationWidth, 14));
         }
         commandBuilder.set(flightToggleSelector + "Caption.Text", LocalizedText.resolve(language,
                 "tamework.ui.linkedPanel.action." + (entry.flightToggleAirborne() ? "flightAirborne" : "flightGrounded")));

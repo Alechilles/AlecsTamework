@@ -2,6 +2,10 @@
 
 ## Unreleased development changes
 
+- Restored recall progress on unloaded companion cards with inline locations,
+  including Owned cards. Recall logs now identify automatic recovery retries,
+  and rejected links explain when the command tool does not allow that companion type.
+
 - Added localized trait descriptions below command-panel tooltips, with effect amounts and configurable direction/value placeholders.
 
 - Fixed active/inactive, breeding, and unlink notifications showing `{0}` instead of the companion's name, and boolean config errors missing the field label.
