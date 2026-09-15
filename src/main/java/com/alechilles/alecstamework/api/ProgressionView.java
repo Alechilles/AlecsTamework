@@ -26,12 +26,55 @@ public record ProgressionView(@Nullable String profileId,
                                 @Nonnull String source,
                                 double baseSetpoint,
                                 double target,
-                                @Nonnull List<ModifierEntryView> modifiers) {
+                                @Nonnull List<ModifierEntryView> modifiers,
+                                @Nonnull HappinessPresentationView presentation) {
+        public HappinessView(@Nullable String configId,
+                             double value,
+                             double min,
+                             double max,
+                             long lastUpdateMs,
+                             @Nonnull String source,
+                             double baseSetpoint,
+                             double target,
+                             @Nonnull List<ModifierEntryView> modifiers) {
+            this(configId, value, min, max, lastUpdateMs, source, baseSetpoint, target, modifiers,
+                    HappinessPresentationView.empty());
+        }
     }
 
     public record ModifierEntryView(@Nonnull String id,
                                     @Nonnull String label,
                                     double value) {
+    }
+
+    /** Complete explanation data for a happiness target; labels remain config-owned. */
+    public record HappinessPresentationView(double current,
+                                            double min,
+                                            double max,
+                                            double base,
+                                            double target,
+                                            @Nonnull List<HappinessEffectView> activeEffects,
+                                            @Nonnull List<HappinessEffectView> inactiveEffects,
+                                            boolean foodEffectsExclusive) {
+        public HappinessPresentationView(double current,
+                                         double min,
+                                         double max,
+                                         double base,
+                                         double target,
+                                         @Nonnull List<HappinessEffectView> activeEffects,
+                                         @Nonnull List<HappinessEffectView> inactiveEffects) {
+            this(current, min, max, base, target, activeEffects, inactiveEffects, false);
+        }
+
+        public static HappinessPresentationView empty() {
+            return new HappinessPresentationView(0.0, 0.0, 0.0, 0.0, 0.0, List.of(), List.of(), false);
+        }
+    }
+
+    public record HappinessEffectView(@Nonnull String id,
+                                      @Nonnull String label,
+                                      double value,
+                                      @Nonnull String kind) {
     }
 
     public record NeedsView(@Nullable String configId,

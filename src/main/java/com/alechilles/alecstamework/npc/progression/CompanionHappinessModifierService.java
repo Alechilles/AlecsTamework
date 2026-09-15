@@ -270,9 +270,9 @@ public final class CompanionHappinessModifierService {
         return new BandResolution(adjustedOffset, band.hasCareBonus());
     }
 
-    private static double resolveDispositionMultiplier(@Nullable Ref<EntityStore> npcRef,
-                                                       @Nullable Store<EntityStore> store,
-                                                       @Nonnull TwHappinessConfig happinessConfig) {
+    static double resolveDispositionMultiplier(@Nullable Ref<EntityStore> npcRef,
+                                               @Nullable Store<EntityStore> store,
+                                               @Nonnull TwHappinessConfig happinessConfig) {
         if (happinessConfig.getDisposition().getMode() == TwHappinessConfig.DispositionMode.FLAT) {
             return 1.0;
         }

@@ -20,6 +20,7 @@ import com.alechilles.alecstamework.npc.components.TameworkShoulderRideComponent
 import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
 import com.alechilles.alecstamework.npc.progression.BreedingConfigResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
+import com.alechilles.alecstamework.npc.progression.CompanionHappinessPresentationService;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
@@ -44,6 +45,7 @@ import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
@@ -441,8 +443,78 @@ final class CommandLoadedNpcStatusSnapshotService {
         int roundedValue = Math.max(0, Math.min(roundedMax, Math.round((float) value)));
         int targetPercent = computePercent(snapshot.target(), snapshot.min(), snapshot.max());
         String modifierBreakdown = includeModifierBreakdown
-                ? buildHappinessModifierBreakdown(snapshot, language, TwFoodConfig.resolveProfileForRole(roleId)) : null;
+                ? buildHappinessPresentation(
+                        CompanionHappinessPresentationService.resolve(npcRef, store, roleId), language)
+                : null;
         return new HappinessSnapshot(roundedValue, roundedMax, targetPercent, modifierBreakdown);
+    }
+
+    @Nullable
+    String buildHappinessPresentation(
+            @Nullable CompanionHappinessPresentationService.PresentationSnapshot presentation,
+            @Nullable String language) {
+        if (presentation == null) {
+            return null;
+        }
+        ArrayList<String> lines = new ArrayList<>();
+        lines.add(LocalizedText.format(
+                language,
+                "tamework.ui.linkedPanel.happiness.explanation",
+                computePercent(presentation.current(), presentation.min(), presentation.max()),
+                computePercent(presentation.base(), presentation.min(), presentation.max()),
+                computePercent(presentation.target(), presentation.min(), presentation.max())
+        ));
+        if (!presentation.activeEffects().isEmpty()) {
+            lines.add(LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.activeEffects"));
+            for (CompanionHappinessPresentationService.EffectEntry effect : presentation.activeEffects()) {
+                lines.add(resolvePresentationEffectLabel(effect, language) + ": " + formatSigned(effect.value()));
+            }
+        }
+        if (!presentation.inactiveEffects().isEmpty()) {
+            lines.add(LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.allEffects"));
+            for (CompanionHappinessPresentationService.EffectEntry effect : presentation.inactiveEffects()) {
+                lines.add(resolvePresentationEffectLabel(effect, language) + ": " + formatSigned(effect.value()));
+            }
+        }
+        if (presentation.foodEffectsExclusive()) {
+            lines.add(LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.foodExclusive"));
+        }
+        return String.join("\n", lines);
+    }
+
+    @Nonnull
+    private String resolvePresentationEffectLabel(
+            @Nonnull CompanionHappinessPresentationService.EffectEntry effect,
+            @Nullable String language) {
+        if (effect.kind() == CompanionHappinessPresentationService.EffectKind.FOOD
+                || effect.id().startsWith("food_")) {
+            return resolveItemDisplayName(language, effect.label());
+        }
+        String id = normalize(effect.id());
+        if ("impulse_hand_feed".equals(id)) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.impulse.handFed");
+        }
+        if ("impulse_pet".equals(id)) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.impulse.petted");
+        }
+        if ("impulse_damage".equals(id)) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.impulse.attacked");
+        }
+        if ("owner_nearby".equals(normalize(effect.id()))) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.modifier.ownerNearby");
+        }
+        if ("caretaking".equals(normalize(effect.id()))) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.modifier.caretaking");
+        }
+        if ("disposition".equals(normalize(effect.id()))) {
+            return LocalizedText.resolve(language, "tamework.traits.disposition.name");
+        }
+        String label = effect.label();
+        if (label == null || label.isBlank()) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.modifier.generic");
+        }
+        String stripped = stripModifierPrefix(label);
+        return LocalizedText.resolveConfigValue(language, stripped, stripped);
     }
 
     private double resolveBreedingHappinessRatio(Ref<EntityStore> npcRef,

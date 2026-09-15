@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.ui;
 import com.hypixel.hytale.server.core.ui.Anchor;
 import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
+import com.hypixel.hytale.server.core.Message;
+import java.awt.Color;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -66,6 +68,27 @@ class LinkedNpcPanelVitalsBinderTest {
         Assertions.assertEquals("1:05", LinkedNpcPanelStatusMeter.formatRemainingClock(65_000L));
         Assertions.assertEquals("60:00", LinkedNpcPanelStatusMeter.formatRemainingClock(3_600_000L));
         Assertions.assertEquals("0:00", LinkedNpcPanelStatusMeter.formatRemainingClock(-1L));
+    }
+
+    @Test
+    void colorsActiveSignedEffectsAndMutesInactiveEffectsInHappinessTooltip() {
+        Message tooltip = LinkedNpcPanelVitalsBinder.happinessTooltipSpans(
+                "Happiness: 60% (base 50%, target 65%)\nActive effects\nOwner nearby: +5.00"
+                        + "\nHungry: -8.00\nAll effects\nBerry: +2.00",
+                "en-US"
+        );
+
+        List<Message> spans = tooltip.getChildren();
+        Assertions.assertTrue(spans.stream().anyMatch(span -> "+5.00".equals(span.getRawText())
+                && sameColor(span, new Color(0x6f, 0xc5, 0x76))));
+        Assertions.assertTrue(spans.stream().anyMatch(span -> "-8.00".equals(span.getRawText())
+                && sameColor(span, new Color(0xd4, 0x5f, 0x5f))));
+        Assertions.assertTrue(spans.stream().anyMatch(span -> span.getRawText().contains("Berry: +2.00")
+                && sameColor(span, new Color(0xaf, 0xb6, 0xb0))));
+    }
+
+    private static boolean sameColor(Message span, Color color) {
+        return Message.raw("reference").color(color).getColor().equals(span.getColor());
     }
 
     @Test

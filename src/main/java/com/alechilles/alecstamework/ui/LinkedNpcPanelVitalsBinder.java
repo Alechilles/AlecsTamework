@@ -2,9 +2,15 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
+import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.ui.Anchor;
 import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
+import java.awt.Color;
+import java.util.ArrayList;
+import java.util.List;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Applies linked companion vitals to UI card controls.
@@ -15,6 +21,10 @@ final class LinkedNpcPanelVitalsBinder {
     private static final String ICON_NEED_HAPPINESS = "Tamework/LinkedPanelIcons/Need_Happiness.png";
     private static final String ICON_NEED_HUNGER = "Tamework/LinkedPanelIcons/Need_Hunger.png";
     private static final String ICON_NEED_THIRST = "Tamework/LinkedPanelIcons/Need_Thirst.png";
+    private static final Color TOOLTIP_WHITE = new Color(0xff, 0xff, 0xff);
+    private static final Color TOOLTIP_GREEN = new Color(0x6f, 0xc5, 0x76);
+    private static final Color TOOLTIP_RED = new Color(0xd4, 0x5f, 0x5f);
+    private static final Color TOOLTIP_GRAY = new Color(0xaf, 0xb6, 0xb0);
 
     private LinkedNpcPanelVitalsBinder() {
     }
@@ -203,21 +213,22 @@ final class LinkedNpcPanelVitalsBinder {
 
     private static NeedVisual resolveHappinessNeed(LinkedNpcEntry entry, String language) {
         if (entry.hasHappiness()) {
-            String tooltip = LocalizedText.format(
-                    language,
-                    "tamework.ui.linkedPanel.happiness.tooltip",
-                    percent(entry.happinessRatio()),
-                    entry.targetHappinessPercent()
-            );
-
-            if (entry.happinessModifierBreakdown() != null && !entry.happinessModifierBreakdown().isBlank()) {
-                tooltip = tooltip + "\n" + entry.happinessModifierBreakdown();
+            String tooltip = entry.happinessModifierBreakdown();
+            if (tooltip == null || tooltip.isBlank()) {
+                tooltip = LocalizedText.format(
+                        language,
+                        "tamework.ui.linkedPanel.happiness.tooltip",
+                        percent(entry.happinessRatio()),
+                        entry.targetHappinessPercent()
+                );
             }
+            tooltip = LinkedNpcPanelStatusTextService.appendLastKnownTooltip(tooltip, entry, language);
             return new NeedVisual(
                     entry.happinessRatio(),
-                    LinkedNpcPanelStatusTextService.appendLastKnownTooltip(tooltip, entry, language),
+                    tooltip,
                     true,
-                    !entry.loaded()
+                    !entry.loaded(),
+                    happinessTooltipSpans(tooltip, language)
             );
         }
         if (entry.dead()) {
@@ -321,6 +332,7 @@ final class LinkedNpcPanelVitalsBinder {
             commandBuilder.set(slotSelector + " #NeedIcon.Text", icon.fallbackText());
         }
         commandBuilder.set(slotSelector + " #NeedTooltip.TooltipText", visual.tooltipText());
+        commandBuilder.set(slotSelector + " #NeedTooltip.TooltipTextSpans", visual.tooltipSpans());
         commandBuilder.set(slotSelector + " #NeedValueText.Text",
                 visual.available() ? percent(visual.fillRatio()) + "%" : "—");
         commandBuilder.set(slotSelector + " #NeedValueText.Style", Value.ref(
@@ -391,7 +403,51 @@ final class LinkedNpcPanelVitalsBinder {
         return Math.max(0.0, Math.min(1.0, value));
     }
 
-    private record NeedVisual(double fillRatio, String tooltipText, boolean available, boolean muted) {
+    @Nonnull
+    static Message happinessTooltipSpans(@Nonnull String tooltip, @Nullable String language) {
+        String activeHeading = LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.activeEffects");
+        String allHeading = LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.allEffects");
+        boolean inactive = false;
+        List<Message> spans = new ArrayList<>();
+        String[] lines = tooltip.split("\\n", -1);
+        for (int index = 0; index < lines.length; index++) {
+            String line = lines[index];
+            String prefix = index == 0 ? "" : "\n";
+            if (line.equals(allHeading)) {
+                inactive = true;
+                spans.add(Message.raw(prefix + line).color(TOOLTIP_GRAY));
+                continue;
+            }
+            if (line.equals(activeHeading)) {
+                spans.add(Message.raw(prefix + line).color(TOOLTIP_WHITE));
+                continue;
+            }
+            if (inactive) {
+                spans.add(Message.raw(prefix + line).color(TOOLTIP_GRAY));
+                continue;
+            }
+            int delimiter = line.lastIndexOf(": ");
+            if (delimiter > 0 && delimiter + 2 < line.length()) {
+                String value = line.substring(delimiter + 2);
+                Color valueColor = value.startsWith("+") ? TOOLTIP_GREEN
+                        : value.startsWith("-") ? TOOLTIP_RED : TOOLTIP_WHITE;
+                spans.add(Message.raw(prefix + line.substring(0, delimiter + 2)).color(TOOLTIP_WHITE));
+                spans.add(Message.raw(value).color(valueColor));
+                continue;
+            }
+            spans.add(Message.raw(prefix + line).color(TOOLTIP_WHITE));
+        }
+        return Message.join(spans.toArray(new Message[0]));
+    }
+
+    private record NeedVisual(double fillRatio,
+                              String tooltipText,
+                              boolean available,
+                              boolean muted,
+                              Message tooltipSpans) {
+        private NeedVisual(double fillRatio, String tooltipText, boolean available, boolean muted) {
+            this(fillRatio, tooltipText, available, muted, Message.raw(tooltipText));
+        }
     }
 
     private record NeedIcon(String fallbackText, String texturePath) {

@@ -46,6 +46,25 @@ Capability: `PROFILES`
   canonical lifecycle decisions. Do not create a parallel lifecycle state from
   them.
 
+## Unreleased: saved owner trait pages
+
+`getOwnedTraitSnapshots(UUID ownerUuid, int offset, int limit)` returns
+`CompletionStage<Optional<List<OwnedTraitSnapshot>>>`. The built-in implementation
+accepts a non-null owner, offset >= 0, and limit 1..64. It reads saved state without
+loading NPCs. Rows are sorted by profile ID and include captured/stored companions,
+but exclude released/dead companions. This list is not an admission-capacity count.
+
+An empty optional means unavailable; a present empty list means no matching rows.
+Each immutable row exposes `profileId`, `roleId`, `displayName`, `traitConfigId`,
+`traits`, `traitDataAvailable`, and `snapshotCreatedAtMs`. Missing or invalid trait
+data remains explicitly unavailable. Values describe the latest decodable saved
+full-state snapshot, not necessarily current live values.
+
+The method has a default unavailable implementation for older API implementers.
+Existing methods are unchanged. Completion may run off the world thread: return
+to the original world and revalidate the player/page before changing UI. Pagination
+can shift when ownership changes; it is not a durable cursor.
+
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
 - [Read Saved Home Position and Show a Waypoint Recipe](/mod/alecs-tamework/read-saved-home-position-and-show-a-waypoint-recipe)

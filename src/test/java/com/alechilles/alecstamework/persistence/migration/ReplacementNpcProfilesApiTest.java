@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.migration;
 
 import com.alechilles.alecstamework.api.NpcProfileView;
+import com.alechilles.alecstamework.api.OwnedTraitSnapshot;
 import com.alechilles.alecstamework.persistence.facade.ReplacementNpcProfilesApi;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
@@ -9,6 +10,7 @@ import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceRuntime
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceWorldReconciliation;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -88,6 +90,51 @@ class ReplacementNpcProfilesApiTest {
             assertEquals("fixture-coop", cooped.coopId());
             assertEquals(0, cooped.coopSlot());
             assertTrue(api.getByProfileId("not-a-uuid").isEmpty());
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void readsOnlyOwnedDurableTraitRowsAndMarksMissingEvidenceUnavailable()
+            throws Exception {
+        Path source = tempDir.resolve("tamework.sqlite");
+        PersistenceConsolidationFixtureDatabase.materialize(
+                "public-v4-representative.sql",
+                source
+        );
+        PublicPersistenceRuntime runtime = runtime();
+        try {
+            assertTrue(runtime.start().toCompletableFuture().join().complete());
+            ReplacementNpcProfilesApi api = new ReplacementNpcProfilesApi(
+                    runtime.queries(),
+                    Duration.ofSeconds(5)
+            );
+
+            List<OwnedTraitSnapshot> ownerRows = api.getOwnedTraitSnapshots(
+                    UUID.fromString("10000000-0000-0000-0000-000000000001"),
+                    0,
+                    64
+            ).toCompletableFuture().join().orElseThrow();
+
+            assertTrue(ownerRows.stream().noneMatch(row ->
+                    row.profileId().equals("20000000-0000-0000-0000-000000000006")));
+            assertTrue(ownerRows.stream().noneMatch(row ->
+                    row.profileId().equals(DEAD)));
+            OwnedTraitSnapshot active = ownerRows.stream().filter(row ->
+                    row.profileId().equals("20000000-0000-0000-0000-000000000001")
+            ).findFirst().orElseThrow();
+            assertTrue(!active.traitDataAvailable());
+            assertTrue(active.traits().isEmpty());
+            assertEquals(0L, active.snapshotCreatedAtMs());
+
+            List<OwnedTraitSnapshot> otherOwnerRows = api.getOwnedTraitSnapshots(
+                    UUID.fromString("10000000-0000-0000-0000-000000000002"),
+                    0,
+                    64
+            ).toCompletableFuture().join().orElseThrow();
+            assertEquals(List.of("20000000-0000-0000-0000-000000000006"),
+                    otherOwnerRows.stream().map(OwnedTraitSnapshot::profileId).toList());
         } finally {
             runtime.close();
         }

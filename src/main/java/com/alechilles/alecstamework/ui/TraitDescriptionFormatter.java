@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.npc.progression.TraitModifierService;
 import java.text.NumberFormat;
 import java.util.Locale;
 import javax.annotation.Nonnull;
@@ -63,6 +64,13 @@ public final class TraitDescriptionFormatter {
                 .replace("{percent}", magnitude)
                 .replace("{signedPercent}", (delta > 0 ? "+" : delta < 0 ? "-" : "") + magnitude)
                 .replace("{points}", numbers.format(Math.abs(points)));
-        return header + "\n" + description;
+        String result = header + "\n" + description;
+        if ("sizemultiplier".equals(effect)) {
+            double bonus = TraitModifierService.resolveSizeMeatHideYieldBonus(definition, value);
+            String signed = (bonus > 0 ? "+" : bonus < 0 ? "-" : "")
+                    + numbers.format(Math.abs(bonus) * 100.0);
+            result += "\n" + LocalizedText.format(language, "tamework.traits.description.sizeYield", signed);
+        }
+        return result;
     }
 }

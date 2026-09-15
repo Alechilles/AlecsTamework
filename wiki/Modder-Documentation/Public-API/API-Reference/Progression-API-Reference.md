@@ -59,6 +59,21 @@ Each subview is optional and only present when the target NPC has that system ac
 - `setHappiness` explicitly rebases happiness and clears existing timed effects
   on reconciliation. Method signatures, capabilities, and mutation statuses are unchanged.
 
+## Unreleased: happiness explanation
+
+`HappinessView.presentation()` exposes current/min/max/base/target values, active
+effects, inactive configured effects, and whether food effects are exclusive.
+Effects contain an ID, label, signed value, and kind. Values use the same evaluated
+inputs and disposition adjustment as happiness calculation. The previous
+nine-argument `HappinessView` constructor remains available and supplies an empty
+presentation. Existing accessors are unchanged; consumers that inspect record
+components or serialized shape must account for the added component.
+
+The default companion tooltip shows active labels in white, positive/negative
+values in green/red, and inactive effects in gray under **All effects**. Food
+parameter matches resolved only at consumption time are not enumerated as inactive
+items. Saved/unloaded values remain last-known data.
+
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
 - [Increase Mob Happiness from Custom Interaction Recipe](/mod/alecs-tamework/increase-mob-happiness-from-custom-interaction-recipe)

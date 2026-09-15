@@ -28,6 +28,7 @@ import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
+import com.alechilles.alecstamework.npc.progression.CompanionHappinessPresentationService;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.TraitModifierService;
@@ -108,6 +109,15 @@ final class ApiMapper {
                                                       long lastUpdateMs,
                                                       @Nonnull String source,
                                                       @Nonnull CompanionHappinessService.HappinessSnapshot snapshot) {
+        return mapHappiness(configId, lastUpdateMs, source, snapshot, null);
+    }
+
+    @Nonnull
+    static ProgressionView.HappinessView mapHappiness(@Nullable String configId,
+                                                      long lastUpdateMs,
+                                                      @Nonnull String source,
+                                                      @Nonnull CompanionHappinessService.HappinessSnapshot snapshot,
+                                                      @Nullable CompanionHappinessPresentationService.PresentationSnapshot presentation) {
         List<ProgressionView.ModifierEntryView> modifiers = snapshot.modifiers().stream()
                 .filter(Objects::nonNull)
                 .map(ApiMapper::mapModifierEntry)
@@ -121,8 +131,30 @@ final class ApiMapper {
                 source,
                 snapshot.baseSetpoint(),
                 snapshot.target(),
-                modifiers
+                modifiers,
+                mapHappinessPresentation(presentation)
         );
+    }
+
+    @Nonnull
+    private static ProgressionView.HappinessPresentationView mapHappinessPresentation(
+            @Nullable CompanionHappinessPresentationService.PresentationSnapshot presentation) {
+        if (presentation == null) {
+            return ProgressionView.HappinessPresentationView.empty();
+        }
+        return new ProgressionView.HappinessPresentationView(
+                presentation.current(), presentation.min(), presentation.max(), presentation.base(), presentation.target(),
+                presentation.activeEffects().stream().map(ApiMapper::mapHappinessEffect).toList(),
+                presentation.inactiveEffects().stream().map(ApiMapper::mapHappinessEffect).toList(),
+                presentation.foodEffectsExclusive()
+        );
+    }
+
+    @Nonnull
+    private static ProgressionView.HappinessEffectView mapHappinessEffect(
+            @Nonnull CompanionHappinessPresentationService.EffectEntry effect) {
+        return new ProgressionView.HappinessEffectView(
+                effect.id(), effect.label(), effect.value(), effect.kind().name());
     }
 
     @Nonnull

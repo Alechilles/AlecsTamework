@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Companion happiness tooltips now explain current, base, and target values, with
+  colored active effects and a gray list of inactive configured effects.
+- Added a read-only saved trait page API for owner-scoped companion lists.
+- Size trait tooltips now show the resolved meat and hide yield bonus.
+
 ## 4.0.0 - Companion Commands, Formations, and Localization - 2026-09-14
 
 - Flying followers now approach as a loose group with hitbox-based spacing,

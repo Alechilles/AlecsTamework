@@ -79,6 +79,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionModelScaleService;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
+import com.alechilles.alecstamework.npc.progression.CompanionHappinessPresentationService;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
 import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
 import com.alechilles.alecstamework.npc.progression.HappinessConfigResolver;
@@ -109,6 +110,7 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -672,6 +674,12 @@ public final class TameworkApiImpl
     @Override
     public Set<String> listActiveSnapshotTypes(String profileId) {
         return profilesApi.listActiveSnapshotTypes(profileId);
+    }
+
+    @Override
+    public java.util.concurrent.CompletionStage<Optional<List<com.alechilles.alecstamework.api.OwnedTraitSnapshot>>>
+    getOwnedTraitSnapshots(UUID ownerUuid, int offset, int limit) {
+        return profilesApi.getOwnedTraitSnapshots(ownerUuid, offset, limit);
     }
 
     @Override
@@ -1740,7 +1748,13 @@ public final class TameworkApiImpl
         if (configId == null && happinessConfig != null) {
             configId = normalizeBlank(happinessConfig.getId());
         }
-        return ApiMapper.mapHappiness(configId, lastUpdateMs, source, snapshot);
+        return ApiMapper.mapHappiness(
+                configId,
+                lastUpdateMs,
+                source,
+                snapshot,
+                CompanionHappinessPresentationService.resolve(npcRef, store, CompanionRoleIdResolver.resolveRoleId(npcRef, store))
+        );
     }
 
     @Nullable
