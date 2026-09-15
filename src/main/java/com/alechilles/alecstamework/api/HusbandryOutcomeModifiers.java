@@ -18,8 +18,23 @@ public record HusbandryOutcomeModifiers(
         double happinessPopulationBonus,
         double breedingInheritanceChanceBonus,
         double harmfulMutationRerollChance,
-        double happinessFlatBonus
+        double happinessFlatBonus,
+        double yieldBonus,
+        double harvestRecoverySpeedBonus,
+        boolean toolAuthorized,
+        double toolWearMultiplier
 ) {
+    /** Compatibility constructor for the pre-tool outcome contract. */
+    public HusbandryOutcomeModifiers(double needsDecayMultiplier, double happinessDispositionMultiplier,
+            double bonusOutputChance, double tripleOutputChance, double breedingCooldownMultiplier,
+            double happinessHungerBonus, double happinessThirstBonus, double happinessPopulationBonus,
+            double breedingInheritanceChanceBonus, double harmfulMutationRerollChance,
+            double happinessFlatBonus) {
+        this(needsDecayMultiplier, happinessDispositionMultiplier, bonusOutputChance, tripleOutputChance,
+                breedingCooldownMultiplier, happinessHungerBonus, happinessThirstBonus, happinessPopulationBonus,
+                breedingInheritanceChanceBonus, harmfulMutationRerollChance, happinessFlatBonus,
+                0.0, 0.0, true, 1.0);
+    }
     /** Compatibility constructor: existing providers keep their conditional Care bonuses. */
     public HusbandryOutcomeModifiers(double needsDecayMultiplier, double happinessDispositionMultiplier,
             double bonusOutputChance, double tripleOutputChance, double breedingCooldownMultiplier,

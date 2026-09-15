@@ -19,6 +19,8 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompanionHarvestBonusServiceTest {
@@ -55,6 +57,37 @@ class CompanionHarvestBonusServiceTest {
                         sequence(0.10, 0.20)
                 )
         );
+    }
+
+    @Test
+    void legacyProviderExpectationKeepsTripleConditionalOnPrimary() {
+        assertEquals(0.0, CompanionHarvestBonusService.expectedLegacyProviderBonusCopies(
+                new HusbandryOutcomeModifiers(1.0, 1.0, 0.0, 1.0, 1.0)));
+        assertEquals(0.75, CompanionHarvestBonusService.expectedLegacyProviderBonusCopies(
+                new HusbandryOutcomeModifiers(1.0, 1.0, 0.5, 0.5, 1.0)));
+    }
+
+    @Test
+    void legacyTraitExpectationAppliesOnlyInDropDuplicateMode() {
+        assertEquals(0.25,
+                CompanionHarvestBonusService.expectedDropDuplicateYieldBonus("DropDuplicate", 1.25));
+        assertEquals(0.0,
+                CompanionHarvestBonusService.expectedDropDuplicateYieldBonus("CooldownPreserve", 1.25));
+        assertEquals(0.0,
+                CompanionHarvestBonusService.expectedDropDuplicateYieldBonus("Disabled", 1.25));
+    }
+
+    @Test
+    void preparedShearOutputOnlyMatchesItsManualDropAction() {
+        CompanionOutputService.FinalizedOutput prepared = new CompanionOutputService.FinalizedOutput(
+                List.of(new TestItemStack("Ingredient_Fabric_Scrap_Silk", 3)),
+                Map.of("Ingredient_Fabric_Scrap_Silk", 3));
+        HusbandryHarvestUseContext.CapturedUse use = HusbandryHarvestUseContext.CapturedUse.empty()
+                .withPreparedOutput("RH_Harvest_Wool", prepared);
+
+        assertSame(prepared, use.preparedOutputFor("RH_Harvest_Wool", true));
+        assertNull(use.preparedOutputFor("RH_Harvest_Wool", false));
+        assertNull(use.preparedOutputFor("TameworkHarvestDrop", true));
     }
 
     @Test

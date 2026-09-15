@@ -4,7 +4,9 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.InteractionEffectContext;
 import com.alechilles.alecstamework.api.InteractionEffectSpec;
 import com.alechilles.alecstamework.api.InteractionPresetDefinition;
+import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
+import com.alechilles.alecstamework.api.internal.HusbandryYieldResolver;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AddItemInventoryEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AddItemsHandEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.BreedInteraction;
@@ -29,6 +31,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.UiMessageE
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsConsumeService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
+import com.alechilles.alecstamework.output.CompanionOutputService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -512,7 +515,8 @@ final class TameworkInteractEffects {
                                                            Store<EntityStore> store,
                                                            Role role,
                                                            Player player,
-                                                           InteractionContextSnapshot ctx) {
+                                                           InteractionContextSnapshot ctx,
+                                                           HusbandryHarvestUseContext.CapturedUse toolUse) {
         HarvestContainerOutcome outcome = harvestEffects.applyContainerTransform(
                 npcRef, store, role, player, ctx);
         if (outcome.result != HarvestContainerResult.APPLIED
@@ -520,13 +524,17 @@ final class TameworkInteractEffects {
             return outcome;
         }
         String productId = outcome.itemQuantities.keySet().iterator().next();
-        int requestedCopies = CompanionHarvestBonusService.resolveBonusCopies(
-                npcRef,
-                store,
-                role,
-                productId,
-                ThreadLocalRandom.current()::nextDouble
-        );
+        int baseQuantity = outcome.itemQuantities.getOrDefault(productId, 0);
+        HusbandryOutcomeModifiers modifiers = HusbandryYieldResolver.resolveHarvest(
+                npcRef, store, role == null ? null : role.getRoleName(), productId,
+                toolUse == null ? null : toolUse.tool(), player == null ? null : player.getUuid());
+        double bonus = modifiers.toolAuthorized()
+                ? HusbandryYieldResolver.harvestYieldBonus(
+                        npcRef, store, productId, modifiers,
+                        CompanionHarvestBonusService.expectedDropDuplicateYieldBonus(npcRef, store, role))
+                : 0.0;
+        int requestedCopies = Math.max(0, CompanionOutputService.resolveExpectedQuantity(
+                baseQuantity, bonus, ThreadLocalRandom.current()::nextDouble) - baseQuantity);
         int committedCopies = inventoryEffects.addOutputCopies(
                 player, productId, requestedCopies);
         return outcome.withOutputCopies(productId, committedCopies);

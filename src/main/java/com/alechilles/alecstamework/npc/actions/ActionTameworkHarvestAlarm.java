@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.npc.alarms.TameworkAlarmService;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
+import com.alechilles.alecstamework.api.internal.HusbandryYieldResolver;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -64,7 +65,8 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
                 multiplierEffectKey,
                 1.0
         );
-        double cooldownSeconds = scaleHarvestCooldownSeconds(baseSeconds, multiplier);
+        double cooldownSeconds = scaleHarvestCooldownSeconds(baseSeconds, multiplier,
+                recoverySpeedBonus(npcRef, store, role));
         return applyHarvestCooldown(npcRef, store, resolveHarvestAlarmName(), cooldownSeconds, false, false);
     }
 
@@ -97,7 +99,8 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
                 multiplierEffectKey,
                 1.0
         );
-        double cooldownSeconds = scaleHarvestCooldownSeconds(baseSeconds, multiplier);
+        double cooldownSeconds = scaleHarvestCooldownSeconds(baseSeconds, multiplier,
+                recoverySpeedBonus(npcRef, store, role));
         return applyHarvestCooldown(npcRef, store, resolveHarvestAlarmName(), cooldownSeconds, markHandled, false);
     }
 
@@ -242,11 +245,26 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
     }
 
     static double scaleHarvestCooldownSeconds(double baseSeconds, double multiplier) {
+        return scaleHarvestCooldownSeconds(baseSeconds, multiplier, 0.0);
+    }
+
+    /**
+     * Converts the existing duration multiplier to a speed contribution, then
+     * combines it with new recovery speed once. Recovery uses
+     * base / clamp(1 + bonuses, .25, 2), so the total can never fall below
+     * half the base interval.
+     */
+    static double scaleHarvestCooldownSeconds(double baseSeconds,
+                                              double multiplier,
+                                              double recoverySpeedBonus) {
         double base = Double.isFinite(baseSeconds) ? Math.max(0.0, baseSeconds) : 0.0;
         if (!Double.isFinite(multiplier) || multiplier <= 0.0) {
             multiplier = 1.0;
         }
-        double scaled = base * multiplier;
+        double legacySpeed = 1.0 / multiplier;
+        double speed = legacySpeed + (Double.isFinite(recoverySpeedBonus) ? recoverySpeedBonus : 0.0);
+        speed = Math.max(0.25, Math.min(2.0, speed));
+        double scaled = base / speed;
         return Double.isFinite(scaled) ? Math.max(0.0, scaled) : base;
     }
 
@@ -291,7 +309,8 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
                 multiplierEffectKey,
                 1.0
         );
-        double cooldownSeconds = scaleHarvestCooldownSeconds(baseSeconds, multiplier);
+        double cooldownSeconds = scaleHarvestCooldownSeconds(baseSeconds, multiplier,
+                recoverySpeedBonus(npcRef, store, role));
         String alarmName = resolveHarvestAlarmName();
         return new HarvestCooldownContext(baseSeconds, multiplierEffectKey, multiplier, cooldownSeconds, alarmName);
     }
@@ -411,6 +430,21 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         return configured != null && !configured.isBlank()
                 ? configured
                 : HARVEST_COOLDOWN_MULTIPLIER_EFFECT_KEY;
+    }
+
+    private static double recoverySpeedBonus(@Nullable Ref<EntityStore> npcRef,
+                                             @Nullable Store<EntityStore> store,
+                                             @Nullable Role role) {
+        if (npcRef == null || store == null) {
+            return 0.0;
+        }
+        HusbandryHarvestUseContext.CapturedUse use = HusbandryHarvestUseContext.current(npcRef, store);
+        if (!use.tool().present()) {
+            return HusbandryYieldResolver.harvestRecoverySpeedBonus(
+                    npcRef, store, null, role == null ? null : role.getRoleName(), null);
+        }
+        return HusbandryYieldResolver.harvestRecoverySpeedBonus(
+                npcRef, store, use.genericModifiers());
     }
 
     private static final class HarvestCooldownContext {

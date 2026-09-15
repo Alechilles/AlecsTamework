@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import java.util.List;
 import java.util.Map;
+import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
 /** Behavior checks for the finalized companion-output boundary. */
@@ -63,6 +64,21 @@ class CompanionOutputServiceTest {
         );
     }
 
+    @Test
+    void expectedYieldScalesOnlyResolvedEligibleProducts() {
+        CompanionOutputService.FinalizedOutput output = CompanionOutputService.finalizeExpectedQuantity(
+                List.of(
+                        new TestItemStack("Ingredient_Fabric_Scrap_Wool", 2),
+                        new TestItemStack("Animal_Manure", 3)
+                ),
+                stack -> stack.getItemId().contains("Wool") ? 0.25 : 0.0,
+                () -> 0.40
+        );
+
+        assertEquals(Map.of("Ingredient_Fabric_Scrap_Wool", 3, "Animal_Manure", 3),
+                output.itemQuantities());
+    }
+
     private static final class TestItemStack extends ItemStack {
         private final String itemId;
         private final int quantity;
@@ -85,6 +101,13 @@ class CompanionOutputServiceTest {
         @Override
         public boolean isEmpty() {
             return quantity <= 0 || itemId == null || itemId.isBlank();
+        }
+
+        @Override public double getDurability() { return 0.0; }
+        @Override public double getMaxDurability() { return 0.0; }
+        @Override public BsonDocument getMetadata() { return null; }
+        @Override public ItemStack withQuantity(int nextQuantity) {
+            return new TestItemStack(itemId, nextQuantity);
         }
 
         @Override

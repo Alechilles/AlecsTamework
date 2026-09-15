@@ -48,9 +48,9 @@ public final class HusbandryOutcomeRegistry implements HusbandryOutcomeApi, Auto
         }
         try {
             HusbandryOutcomeModifiers modifiers = active.resolve(copyContext(context));
-            return modifiers == null ? HusbandryOutcomeModifiers.identity() : normalize(modifiers);
+            return modifiers == null ? failureResult(context) : normalize(modifiers);
         } catch (Throwable ignored) {
-            return HusbandryOutcomeModifiers.identity();
+            return failureResult(context);
         }
     }
 
@@ -79,11 +79,13 @@ public final class HusbandryOutcomeRegistry implements HusbandryOutcomeApi, Auto
         return new HusbandryOutcomeContext(
                 context.kind(),
                 context.ownerId(),
+                context.actorId(),
                 context.companionId(),
                 context.roleId(),
                 context.profileId(),
                 groups,
-                context.productId()
+                context.productId(),
+                context.tool()
         );
     }
 
@@ -99,8 +101,19 @@ public final class HusbandryOutcomeRegistry implements HusbandryOutcomeApi, Auto
                 || !Double.isFinite(modifiers.happinessPopulationBonus())
                 || !Double.isFinite(modifiers.breedingInheritanceChanceBonus())
                 || !Double.isFinite(modifiers.harmfulMutationRerollChance())
-                || !Double.isFinite(modifiers.happinessFlatBonus())) {
-            return HusbandryOutcomeModifiers.identity();
+                || !Double.isFinite(modifiers.happinessFlatBonus())
+                || !Double.isFinite(modifiers.yieldBonus())
+                || !Double.isFinite(modifiers.harvestRecoverySpeedBonus())
+                || !Double.isFinite(modifiers.toolWearMultiplier())) {
+            HusbandryOutcomeModifiers identity = HusbandryOutcomeModifiers.identity();
+            return new HusbandryOutcomeModifiers(
+                    identity.needsDecayMultiplier(), identity.happinessDispositionMultiplier(),
+                    identity.bonusOutputChance(), identity.tripleOutputChance(),
+                    identity.breedingCooldownMultiplier(), identity.happinessHungerBonus(),
+                    identity.happinessThirstBonus(), identity.happinessPopulationBonus(),
+                    identity.breedingInheritanceChanceBonus(), identity.harmfulMutationRerollChance(),
+                    identity.happinessFlatBonus(), identity.yieldBonus(),
+                    identity.harvestRecoverySpeedBonus(), false, identity.toolWearMultiplier());
         }
         HusbandryOutcomeModifiers identity = HusbandryOutcomeModifiers.identity();
         return new HusbandryOutcomeModifiers(
@@ -124,8 +137,29 @@ public final class HusbandryOutcomeRegistry implements HusbandryOutcomeApi, Auto
                         identity.breedingInheritanceChanceBonus()),
                 clamp(modifiers.harmfulMutationRerollChance(), 0.0, 1.0,
                         identity.harmfulMutationRerollChance()),
-                clamp(modifiers.happinessFlatBonus(), 0.0, 100.0, identity.happinessFlatBonus())
+                clamp(modifiers.happinessFlatBonus(), 0.0, 100.0, identity.happinessFlatBonus()),
+                clamp(modifiers.yieldBonus(), -1.0, 10.0, identity.yieldBonus()),
+                clamp(modifiers.harvestRecoverySpeedBonus(), -0.75, 1.0,
+                        identity.harvestRecoverySpeedBonus()),
+                modifiers.toolAuthorized(),
+                clamp(modifiers.toolWearMultiplier(), 0.1, 1.0, identity.toolWearMultiplier())
         );
+    }
+
+    @Nonnull
+    private HusbandryOutcomeModifiers failureResult(@Nonnull HusbandryOutcomeContext context) {
+        if (context.tool() == null || !context.tool().present()) {
+            return HusbandryOutcomeModifiers.identity();
+        }
+        HusbandryOutcomeModifiers identity = HusbandryOutcomeModifiers.identity();
+        return new HusbandryOutcomeModifiers(
+                identity.needsDecayMultiplier(), identity.happinessDispositionMultiplier(),
+                identity.bonusOutputChance(), identity.tripleOutputChance(),
+                identity.breedingCooldownMultiplier(), identity.happinessHungerBonus(),
+                identity.happinessThirstBonus(), identity.happinessPopulationBonus(),
+                identity.breedingInheritanceChanceBonus(), identity.harmfulMutationRerollChance(),
+                identity.happinessFlatBonus(), identity.yieldBonus(),
+                identity.harvestRecoverySpeedBonus(), false, identity.toolWearMultiplier());
     }
 
     private double clamp(double value, double minimum, double maximum, double fallback) {

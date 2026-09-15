@@ -69,6 +69,7 @@ import com.alechilles.alecstamework.config.assets.TwMountedGlideConfig;
 import com.alechilles.alecstamework.config.assets.TwMountedDescentConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.actions.BreedingLitterRuntime;
+import com.alechilles.alecstamework.npc.actions.HusbandryHarvestUseContext;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
@@ -102,6 +103,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionProgressionSignalBu
 import com.alechilles.alecstamework.integration.creditor.CreditorIntegration;
 import com.alechilles.alecstamework.integration.nameplatebuilder.NameplateBuilderBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
+import com.alechilles.alecstamework.items.TameworkNpcCullService;
 import com.alechilles.alecstamework.items.CaptureChannelVfxSystem;
 import com.alechilles.alecstamework.items.CaptureChannelSessionCleanupSystem;
 import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
@@ -1588,6 +1590,8 @@ public class Tamework extends JavaPlugin {
     }
     @Override
     protected void shutdown() {
+        HusbandryHarvestUseContext.clearPendingUses();
+        TameworkNpcCullService.clearPendingItemUses();
         TameworkShutdownSequence.run(
                 this::closeRuntimeParticipants,
                 this::closeRuntimeApiDependents,

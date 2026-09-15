@@ -9,6 +9,8 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RemoveItem
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RemoveItemsInventoryEffect;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.output.CompanionOutputService;
+import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
+import com.alechilles.alecstamework.api.internal.HusbandryYieldResolver;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -232,17 +234,28 @@ final class InteractionInventoryEffects {
         if (drops.isEmpty()) {
             return DropItemOutcome.empty();
         }
-        int bonusCopies = 0;
+        DropItemOutcome output;
         if (harvestInteraction) {
-            bonusCopies = CompanionHarvestBonusService.resolveBonusCopies(
-                    npcRef,
-                    store,
-                    role,
-                    resolveProductId(drops),
-                    ThreadLocalRandom.current()::nextDouble
-            );
+            HusbandryHarvestUseContext.CapturedUse toolUse = HusbandryHarvestUseContext.current(npcRef, store);
+            CompanionOutputService.FinalizedOutput finalized = CompanionOutputService.finalizeExpectedQuantity(
+                    drops,
+                    stack -> {
+                        HusbandryOutcomeModifiers modifiers = HusbandryYieldResolver.resolveHarvest(
+                                npcRef, store, role == null ? null : role.getRoleName(), stack.getItemId(),
+                                toolUse.tool(), toolUse.actorId());
+                        return modifiers.toolAuthorized()
+                                ? HusbandryYieldResolver.harvestYieldBonus(
+                                        npcRef, store, stack.getItemId(), modifiers,
+                                        CompanionHarvestBonusService.expectedDropDuplicateYieldBonus(
+                                                npcRef, store, role))
+                                : -1.0;
+                    },
+                    ThreadLocalRandom.current()::nextDouble);
+            output = new DropItemOutcome(!finalized.itemStacks().isEmpty(), finalized.itemStacks(),
+                    finalized.itemQuantities());
+        } else {
+            output = finalizeDropOutput(drops, 0);
         }
-        DropItemOutcome output = finalizeDropOutput(drops, bonusCopies);
         float throwSpeed = effect.getThrowSpeed() != null ? effect.getThrowSpeed().floatValue() : 0.0f;
         boolean applied = false;
         for (ItemStack stack : output.itemStacks()) {

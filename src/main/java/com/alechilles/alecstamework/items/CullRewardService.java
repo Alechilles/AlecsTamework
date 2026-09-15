@@ -1,8 +1,8 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.api.HusbandryOutcomeKind;
 import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
-import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRuntime;
+import com.alechilles.alecstamework.api.HusbandryToolContext;
+import com.alechilles.alecstamework.api.internal.HusbandryYieldResolver;
 import com.alechilles.alecstamework.output.CompanionOutputService;
 import com.alechilles.alecstamework.output.CompanionOutputService.FinalizedOutput;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
@@ -34,11 +34,26 @@ final class CullRewardService {
     static Outcome apply(
             @Nullable String dropListId,
             Ref<EntityStore> npcRef,
-            Store<EntityStore> store
+            Store<EntityStore> store,
+            @Nullable String roleId,
+            @Nullable HusbandryToolContext tool,
+            @Nullable java.util.UUID actorId
+    ) {
+        return apply(prepare(dropListId, npcRef, store, roleId, tool, actorId), npcRef, store);
+    }
+
+    /** Resolves one authorized cull batch before a deferred durable release. */
+    static PreparedOutcome prepare(
+            @Nullable String dropListId,
+            Ref<EntityStore> npcRef,
+            Store<EntityStore> store,
+            @Nullable String roleId,
+            @Nullable HusbandryToolContext tool,
+            @Nullable java.util.UUID actorId
     ) {
         ItemDropList dropList = resolve(dropListId);
         if (dropList == null || dropList.getContainer() == null) {
-            return Outcome.unavailable();
+            return PreparedOutcome.unavailable();
         }
         Random random = ThreadLocalRandom.current();
         Roll roll = roll(dropList, random);
@@ -50,14 +65,32 @@ final class CullRewardService {
                     reward.metadata()
             ));
         }
-        int bonusCopies = resolveBonusCopies(
-                npcRef, store, random::nextDouble);
-        FinalizedOutput output = CompanionOutputService.finalizeDrops(
-                stacks, bonusCopies);
-        for (ItemStack stack : output.itemStacks()) {
+        double[] wearMultiplier = {1.0};
+        FinalizedOutput output = CompanionOutputService.finalizeExpectedQuantity(
+                stacks,
+                stack -> {
+                    HusbandryOutcomeModifiers modifiers = HusbandryYieldResolver.resolveCull(
+                            npcRef, store, roleId, stack.getItemId(), tool, actorId);
+                    if (!modifiers.toolAuthorized()) {
+                        return -1.0;
+                    }
+                    wearMultiplier[0] = Math.min(wearMultiplier[0], modifiers.toolWearMultiplier());
+                    return HusbandryYieldResolver.cullYieldBonus(npcRef, store, stack.getItemId(), modifiers);
+                },
+                random::nextDouble);
+        return new PreparedOutcome(true, output.itemStacks(), output.itemQuantities(), wearMultiplier[0]);
+    }
+
+    static Outcome apply(@Nullable PreparedOutcome prepared,
+                         Ref<EntityStore> npcRef,
+                         Store<EntityStore> store) {
+        if (prepared == null || !prepared.domesticDropsPrepared()) {
+            return Outcome.unavailable();
+        }
+        for (ItemStack stack : prepared.itemStacks()) {
             ItemUtils.dropItem(npcRef, stack, store);
         }
-        return new Outcome(true, output.itemQuantities());
+        return new Outcome(true, prepared.itemQuantities(), prepared.toolWearMultiplier());
     }
 
     /** Resolves one cull batch bonus from the current husbandry provider. */
@@ -66,13 +99,8 @@ final class CullRewardService {
             @Nullable Store<EntityStore> store,
             @Nonnull DoubleSupplier random
     ) {
-        HusbandryOutcomeModifiers modifiers = HusbandryOutcomeRuntime.resolve(
-                HusbandryOutcomeKind.CULL_YIELD,
-                npcRef,
-                store,
-                (String) null,
-                null
-        );
+        HusbandryOutcomeModifiers modifiers = HusbandryYieldResolver.resolveCull(
+                npcRef, store, null, null, null, null);
         return resolveBonusCopies(modifiers, random);
     }
 
@@ -160,13 +188,28 @@ final class CullRewardService {
     }
 
     record Outcome(boolean domesticDropsApplied,
-                   Map<String, Integer> itemQuantities) {
+                   Map<String, Integer> itemQuantities,
+                   double toolWearMultiplier) {
         Outcome {
             itemQuantities = Map.copyOf(itemQuantities);
         }
 
         static Outcome unavailable() {
-            return new Outcome(false, Map.of());
+            return new Outcome(false, Map.of(), 1.0);
+        }
+    }
+
+    record PreparedOutcome(boolean domesticDropsPrepared,
+                           List<ItemStack> itemStacks,
+                           Map<String, Integer> itemQuantities,
+                           double toolWearMultiplier) {
+        PreparedOutcome {
+            itemStacks = List.copyOf(itemStacks);
+            itemQuantities = Map.copyOf(itemQuantities);
+        }
+
+        static PreparedOutcome unavailable() {
+            return new PreparedOutcome(false, List.of(), Map.of(), 1.0);
         }
     }
 }

@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.api.HusbandryOutcomeApi;
 import com.alechilles.alecstamework.api.HusbandryOutcomeContext;
 import com.alechilles.alecstamework.api.HusbandryOutcomeKind;
 import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
+import com.alechilles.alecstamework.api.HusbandryToolContext;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Set;
@@ -93,13 +94,14 @@ class HusbandryOutcomeRegistryTest {
     }
 
     @Test
-    void anyNonFiniteModifierReturnsFullIdentity() throws Exception {
+    void anyNonFiniteModifierDeniesToolUse() throws Exception {
         try (HusbandryOutcomeRegistry registry = new HusbandryOutcomeRegistry()) {
             registry.register(ignored -> new HusbandryOutcomeModifiers(
-                    0.8, Double.NaN, 0.5, 0.7, 0.8
+                    0.8, Double.NaN, 0.5, 0.7, 0.8,
+                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false, 1.0
             ));
 
-            assertEquals(HusbandryOutcomeModifiers.identity(), registry.resolve(context()));
+            assertFalse(registry.resolve(context()).toolAuthorized());
         }
     }
 
@@ -111,6 +113,28 @@ class HusbandryOutcomeRegistryTest {
             });
 
             assertEquals(HusbandryOutcomeModifiers.identity(), registry.resolve(context()));
+        }
+    }
+
+    @Test
+    void providerFailureDeniesARealCapturedTool() throws Exception {
+        try (HusbandryOutcomeRegistry registry = new HusbandryOutcomeRegistry()) {
+            registry.register(ignored -> {
+                throw new IllegalStateException("provider failure");
+            });
+
+            HusbandryOutcomeContext context = new HusbandryOutcomeContext(
+                    HusbandryOutcomeKind.HARVEST_YIELD,
+                    OWNER_ID,
+                    OWNER_ID,
+                    COMPANION_ID,
+                    "Tamed_Sheep",
+                    "runeteria:husbandry",
+                    Set.of("runeteria:husbandry"),
+                    "Ingredient_Fabric_Scrap_Wool",
+                    new HusbandryToolContext("RH_Shears_Iron", 1, 100.0, 100.0, null));
+
+            assertFalse(registry.resolve(context).toolAuthorized());
         }
     }
 

@@ -68,6 +68,8 @@ public enum TameworkApiCapability {
     COMMAND_HUD_CONTRIBUTORS,
     /** External husbandry providers can supply bounded action modifiers. */
     HUSBANDRY_OUTCOMES,
+    /** Husbandry outcome contexts include the captured tool and support authorization, yield, and wear fields. */
+    HUSBANDRY_TOOL_CONTEXT,
     /** External husbandry providers can supply bounded care bonuses for eligible mood bands. */
     HUSBANDRY_CARE_BONUSES,
     /** Unconditional, unscaled happiness bonus supplied by husbandry outcome providers. */

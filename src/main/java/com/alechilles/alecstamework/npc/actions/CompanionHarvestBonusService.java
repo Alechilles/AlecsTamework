@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.api.HusbandryOutcomeContext;
 import com.alechilles.alecstamework.api.HusbandryOutcomeKind;
 import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
 import com.alechilles.alecstamework.api.internal.HusbandryOutcomeRuntime;
+import com.alechilles.alecstamework.api.internal.HusbandryYieldResolver;
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.params.StdScopeLookupCache;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
@@ -90,6 +91,27 @@ final class CompanionHarvestBonusService {
         return copies;
     }
 
+    /** Expected additional copies from the legacy gated provider rolls. */
+    static double expectedLegacyProviderBonusCopies(@Nullable HusbandryOutcomeModifiers modifiers) {
+        return HusbandryYieldResolver.expectedLegacyProviderBonusCopies(modifiers);
+    }
+
+    /** Expected legacy trait bonus when the role is configured for duplicate output. */
+    static double expectedDropDuplicateYieldBonus(@Nullable Ref<EntityStore> npcRef,
+                                                   @Nullable Store<EntityStore> store,
+                                                   @Nullable Role role) {
+        return expectedDropDuplicateYieldBonus(
+                resolveHarvestBonusMode(role), resolveHarvestMultiplier(npcRef, store));
+    }
+
+    static double expectedDropDuplicateYieldBonus(@Nullable String mode, double multiplier) {
+        if (!MODE_DROP_DUPLICATE.equalsIgnoreCase(normalizeMode(mode))
+                || !Double.isFinite(multiplier)) {
+            return 0.0;
+        }
+        return Math.max(0.0, Math.min(1.0, multiplier - 1.0));
+    }
+
     static boolean shouldPreserveCooldown(@Nullable String mode,
                                           double multiplier,
                                           @Nonnull DoubleSupplier random) {
@@ -174,11 +196,15 @@ final class CompanionHarvestBonusService {
     }
 
     private static boolean rollChance(double chance, @Nonnull DoubleSupplier random) {
-        if (!Double.isFinite(chance)) {
-            return false;
-        }
-        double bounded = Math.max(0.0, Math.min(1.0, chance));
+        double bounded = clampChance(chance);
         return random.getAsDouble() < bounded;
+    }
+
+    private static double clampChance(double chance) {
+        if (!Double.isFinite(chance)) {
+            return 0.0;
+        }
+        return Math.max(0.0, Math.min(1.0, chance));
     }
 
     private static double resolveHarvestMultiplier(@Nullable Ref<EntityStore> npcRef,

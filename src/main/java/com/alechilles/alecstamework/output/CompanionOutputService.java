@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.DoubleSupplier;
+import java.util.function.ToDoubleFunction;
 import javax.annotation.Nonnull;
 
 /** Finalizes companion item output before materialization and activity publication. */
@@ -43,6 +45,53 @@ public final class CompanionOutputService {
             }
         }
         return new FinalizedOutput(finalDrops, quantities(finalDrops));
+    }
+
+    /**
+     * Applies an additive expected-yield bonus to each resolved existing product.
+     * A product never appears when its scaled resolved quantity is zero.
+     */
+    @Nonnull
+    public static FinalizedOutput finalizeExpectedQuantity(
+            List<ItemStack> baseDrops,
+            ToDoubleFunction<ItemStack> bonusResolver,
+            DoubleSupplier random
+    ) {
+        ArrayList<ItemStack> finalDrops = new ArrayList<>();
+        if (baseDrops != null && bonusResolver != null && random != null) {
+            for (ItemStack stack : baseDrops) {
+                if (!isUsable(stack)) {
+                    continue;
+                }
+                int quantity = resolveExpectedQuantity(
+                        stack.getQuantity(), bonusResolver.applyAsDouble(stack), random);
+                if (quantity > 0) {
+                    finalDrops.add(copyWithQuantity(stack, quantity));
+                }
+            }
+        }
+        return new FinalizedOutput(finalDrops, quantities(finalDrops));
+    }
+
+    /** Resolves floor(expected) plus one fractional Bernoulli roll. */
+    public static int resolveExpectedQuantity(
+            int baseQuantity,
+            double additiveBonus,
+            DoubleSupplier random
+    ) {
+        if (baseQuantity <= 0 || !Double.isFinite(additiveBonus) || random == null) {
+            return 0;
+        }
+        double expected = baseQuantity * Math.max(0.0, 1.0 + additiveBonus);
+        if (!Double.isFinite(expected) || expected <= 0.0) {
+            return 0;
+        }
+        long whole = (long) Math.floor(expected);
+        double fraction = expected - whole;
+        if (fraction > 0.0 && random.getAsDouble() < fraction) {
+            whole++;
+        }
+        return (int) Math.min(Integer.MAX_VALUE, whole);
     }
 
     /** Normalize an output that was already materialized, such as a filled container. */
@@ -96,6 +145,10 @@ public final class CompanionOutputService {
 
     private static ItemStack copy(ItemStack stack) {
         return stack.cleanCopy();
+    }
+
+    private static ItemStack copyWithQuantity(ItemStack stack, int quantity) {
+        return stack.withQuantity(quantity);
     }
 
     /** Immutable finalized item output used by drop and activity paths. */

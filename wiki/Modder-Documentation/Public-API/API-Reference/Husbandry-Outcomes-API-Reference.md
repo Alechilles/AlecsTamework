@@ -12,7 +12,9 @@ Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/a
 > This reference tracks the current `husbandryOutcomes()` contract in
 > `TameworkApi`.
 
-Capability: `HUSBANDRY_OUTCOMES`
+Capabilities: `HUSBANDRY_OUTCOMES`; require `HUSBANDRY_TOOL_CONTEXT` before
+using captured-tool fields or the expected-yield, recovery, authorization, and
+wear modifiers below.
 
 Development addition: `HUSBANDRY_CARE_BONUSES` advertises conditional happiness
 bonuses. Check it before requiring the eight-argument outcome contract.
@@ -43,10 +45,18 @@ The provider receives an immutable `HusbandryOutcomeContext` with:
 
 - `kind`: `NEEDS_DECAY`, `HAPPINESS_DISPOSITION`, `HAPPINESS_CARE`, `HARVEST_YIELD`,
   `CULL_YIELD`, `BREEDING_COOLDOWN`, or `BREEDING_GENETICS`;
-- `ownerId` and `companionId`, when known;
+- `ownerId`, `actorId`, and `companionId`, when known. `actorId` is the
+  player who started the action; authorization must use it rather than the
+  companion owner;
 - `roleId` and `profileId`, when known;
 - a detached `groupIds` set; and
-- `productId` for product actions, when known.
+- `productId` for each resolved product action, when known; and
+- `tool`, a detached `HusbandryToolContext` captured when a tool-gated interaction
+  began. It is `null` for automatic, container, and other harvests that do not
+  use a husbandry tool.
+  It supplies the original item ID, quantity, durability, maximum durability,
+  and copied BSON metadata. Providers can decode their own metadata without
+  receiving a mutable live `ItemStack`.
 
 The provider returns `HusbandryOutcomeModifiers`:
 
@@ -57,18 +67,39 @@ The provider returns `HusbandryOutcomeModifiers`:
 - `breedingCooldownMultiplier`, clamped to `0.25` through `1.0`;
 - `happinessHungerBonus`, `happinessThirstBonus`, `happinessPopulationBonus`, each clamped to `0.0..100.0`.
 - `breedingInheritanceChanceBonus` and `harmfulMutationRerollChance`, each clamped to `0.0..1.0`.
+- `yieldBonus`, clamped to `-1.0..10.0`, is an additive per-product bonus.
+- `harvestRecoverySpeedBonus`, clamped to `-0.75..1.0`, is an additive speed
+  term for the next renewable-harvest interval.
+- `toolAuthorized` denies the action when false; denied actions emit no output
+  and consume no tool wear.
+- `toolWearMultiplier`, clamped to `0.1..1.0`, scales one actual successful
+  tool use after authorization.
 
-The identity result is `(1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0)`.
-The five- and eight-argument constructors remain supported, with zero new bonuses. Tamework uses identity when no
-provider is active, the provider returns `null`, the provider throws, or any
-returned field is not finite.
+`HusbandryOutcomeModifiers.identity()` supplies neutral numeric values and
+allows tool use. Legacy constructors remain supported with neutral new fields.
+Tamework uses identity when no provider is active. A registered provider that
+returns `null` or throws denies a captured tool action; no-tool contexts retain
+neutral fallback behavior. A non-finite modifier also denies tool authorization
+and otherwise uses neutral numeric values.
 
 Tamework applies the needs-decay, happiness-disposition, output, and breeding
 cooldown modifiers to their matching husbandry actions. Output modifiers apply
-to harvest and cull results. Tamework applies the breeding multiplier to parent
-cooldowns only. Tamework rolls `tripleOutputChance` only after
-`bonusOutputChance` succeeds. A successful triple roll adds two output batches
-instead of one.
+to harvest and cull results. For `HUSBANDRY_TOOL_CONTEXT`, Tamework resolves
+each existing product independently as `floor(base * max(0, 1 + sum(bonuses)))`
+plus one fractional Bernoulli roll. It never creates a product that the base
+drop did not resolve. Legacy `bonusOutputChance` and `tripleOutputChance` are
+converted to their historical gated-roll expectation, where expected extra
+copies are `bonusOutputChance * (1 + tripleOutputChance)`. New providers must
+return zero for those fields and use `yieldBonus`.
+Standard manual shear and item-cull actions resolve their actual product batch
+before deferred completion. That accepted batch survives actor disconnects and
+later tool changes. A matching moved hotbar tool receives wear; unrelated
+automatic drops cannot consume a pending manual batch or wear its tool.
+Tamework applies the breeding multiplier to parent cooldowns only. Renewable
+harvest converts the legacy duration multiplier to a speed contribution, adds
+the new recovery-speed bonuses, then divides the base duration once by
+`clamp(totalSpeed, .25, 2)`. This preserves legacy neutral behavior and keeps
+the interval between one half and four times the base duration.
 
 `HAPPINESS_CARE` resolves once per mood calculation. Each returned bonus applies
 only to its corresponding selected hunger, thirst or population band when that

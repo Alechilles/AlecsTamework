@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.TameworkApi;
+import com.alechilles.alecstamework.api.HusbandryToolContext;
+import com.alechilles.alecstamework.api.internal.HusbandryYieldResolver;
 import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
@@ -29,6 +31,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
@@ -36,6 +39,9 @@ import javax.annotation.Nullable;
 /** Applies one authorized companion cull on the current world thread. */
 public final class TameworkNpcCullService {
     private static final float CULL_DAMAGE_AMOUNT = 2.1474836E9F;
+    private static final long ITEM_USE_MAX_AGE_NANOS = 120_000_000_000L;
+    private static final int MAX_PENDING_ITEM_USES = 256;
+    private static final ConcurrentHashMap<CullUseKey, CapturedItemUse> PENDING_ITEM_USES = new ConcurrentHashMap<>();
 
     enum Outcome {
         CULLED,
@@ -99,15 +105,30 @@ public final class TameworkNpcCullService {
             boolean requireOwner,
             boolean requireTamed
     ) {
+        return canCullFromItemInteraction(player, target, components, requireOwner, requireTamed, null);
+    }
+
+    /** Checks item-interaction eligibility while its context is still active. */
+    public static boolean canCullFromItemInteraction(
+            @Nullable Player player,
+            @Nullable Ref<EntityStore> target,
+            @Nullable ComponentAccessor<EntityStore> components,
+            boolean requireOwner,
+            boolean requireTamed,
+            @Nullable HusbandryToolContext tool
+    ) {
         if (player == null || target == null || !target.isValid()
                 || components == null
                 || components.getComponent(
                 target, NPCEntity.getComponentType()) == null) {
             return false;
         }
-        return new TameworkCullEligibility(new CommandLinkPolicyService())
+        if (!new TameworkCullEligibility(new CommandLinkPolicyService())
                 .allows(player.getUuid(), requireOwner, requireTamed,
-                        target, components);
+                        target, components)) {
+            return false;
+        }
+        return true;
     }
 
     /** Culls a target from a registered item interaction. */
@@ -118,12 +139,60 @@ public final class TameworkNpcCullService {
             boolean requireOwner,
             boolean requireTamed
     ) {
+        return cullFromItemInteraction(player, target, store, requireOwner, requireTamed, null);
+    }
+
+    /** Culls through the durable release path while retaining the item that authorized the action. */
+    public static boolean cullFromItemInteraction(
+            @Nullable Player player,
+            @Nullable Ref<EntityStore> target,
+            @Nullable Store<EntityStore> store,
+            boolean requireOwner,
+            boolean requireTamed,
+            @Nullable HusbandryToolContext tool
+    ) {
+        return cullFromItemInteraction(player, target, store, requireOwner, requireTamed, tool,
+                player == null ? (byte) -1 : PlayerInventoryAccess.getActiveHotbarSlot(player));
+    }
+
+    /** Culls with the item snapshot and hotbar-slot hint captured by the interaction boundary. */
+    public static boolean cullFromItemInteraction(
+            @Nullable Player player,
+            @Nullable Ref<EntityStore> target,
+            @Nullable Store<EntityStore> store,
+            boolean requireOwner,
+            boolean requireTamed,
+            @Nullable HusbandryToolContext tool,
+            byte capturedHotbarSlot
+    ) {
+        NPCEntity npc = store == null || target == null || !target.isValid()
+                ? null : store.getComponent(target, NPCEntity.getComponentType());
+        if (npc == null || !HusbandryYieldResolver.resolveCull(
+                target, store, npc.getRoleName(), null, tool,
+                player == null ? null : player.getUuid()).toolAuthorized()) {
+            return false;
+        }
+        String roleId = CompanionRoleIdResolver.resolveRoleId(target, store);
+        CullRewardService.PreparedOutcome preparedRewards = CullRewardService.prepare(
+                ActivityRuntime.resolveCullDropList(roleId), target, store, roleId, tool,
+                player == null ? null : player.getUuid());
+        CapturedItemUse use = CapturedItemUse.capture(
+                player == null ? null : player.getUuid(), tool, capturedHotbarSlot, preparedRewards);
+        CullUseKey key = CullUseKey.from(player == null ? null : player.getUuid(), target, store);
+        if (key != null) {
+            prunePendingItemUses();
+            PENDING_ITEM_USES.put(key, use);
+        }
         Tamework plugin = Tamework.getInstance();
         CommandItemFeatureHandler handler = plugin == null
                 ? null : plugin.getCommandItemFeatureHandler();
-        return handler != null && handler.cullFromItemInteraction(
+        boolean accepted = handler != null && handler.cullFromItemInteraction(
                 player, target, store, requireOwner, requireTamed
         );
+        if (!accepted && key != null) {
+            PENDING_ITEM_USES.remove(key);
+        }
+        return accepted;
     }
 
     Outcome cull(@Nullable Player player,
@@ -339,9 +408,9 @@ public final class TameworkNpcCullService {
         NPCEntity npc = store.getComponent(target, NPCEntity.getComponentType());
         String roleId = managedRewards
                 ? CompanionRoleIdResolver.resolveRoleId(target, store) : null;
+        CapturedItemUse itemUse = consumeItemUse(ownerUuid, target, store);
         CullRewardService.Outcome rewards = managedRewards
-                ? CullRewardService.apply(
-                ActivityRuntime.resolveCullDropList(roleId), target, store)
+                ? CullRewardService.apply(itemUse.preparedRewards(), target, store)
                 : CullRewardService.Outcome.unavailable();
         unlinkCommandTarget(target, store);
         removeCommandToolRecords(player, npc == null ? null : npc.getUuid());
@@ -354,6 +423,9 @@ public final class TameworkNpcCullService {
                 : store.getComponent(target, deathType);
         if (rewards.domesticDropsApplied() && death != null) {
             death.setItemsLossMode(DeathConfig.ItemsLossMode.NONE);
+        }
+        if (rewards.domesticDropsApplied() && !rewards.itemQuantities().isEmpty()) {
+            applyItemUseWear(player, itemUse, rewards.toolWearMultiplier());
         }
         if (managedRewards) {
             ActivityRuntime.publishCull(
@@ -374,6 +446,120 @@ public final class TameworkNpcCullService {
             return DeathComponent.getComponentType();
         } catch (NullPointerException unavailableComponentRegistry) {
             return null;
+        }
+    }
+
+    @Nullable
+    private static CapturedItemUse consumeItemUse(@Nullable UUID actorUuid,
+                                                   @Nullable Ref<EntityStore> target,
+                                                   @Nullable Store<EntityStore> store) {
+        CullUseKey key = CullUseKey.from(actorUuid, target, store);
+        return key == null ? CapturedItemUse.empty() : PENDING_ITEM_USES.remove(key);
+    }
+
+    private static void applyItemUseWear(@Nullable Player player,
+                                         @Nullable CapturedItemUse use,
+                                         double multiplier) {
+        if (player == null || use == null || !use.tool().present() || use.hotbarSlot() < 0
+                || !Double.isFinite(multiplier) || multiplier <= 0.0) {
+            return;
+        }
+        ItemContainer hotbar = PlayerInventoryAccess.getHotbar(player);
+        if (hotbar == null) {
+            return;
+        }
+        short slot = findMatchingHotbarSlot(hotbar, use);
+        if (slot < 0) {
+            return;
+        }
+        ItemStack current = hotbar.getItemStack(slot);
+        hotbar.setItemStackForSlot(slot, current.withIncreasedDurability(-multiplier));
+    }
+
+    /** Clears bounded item-use state when the Tamework runtime unloads. */
+    public static void clearPendingItemUses() {
+        PENDING_ITEM_USES.clear();
+    }
+
+    private static void prunePendingItemUses() {
+        long now = System.nanoTime();
+        PENDING_ITEM_USES.entrySet().removeIf(entry -> entry.getValue().expired(now));
+        if (PENDING_ITEM_USES.size() > MAX_PENDING_ITEM_USES) {
+            int surplus = PENDING_ITEM_USES.size() - MAX_PENDING_ITEM_USES;
+            for (CullUseKey key : PENDING_ITEM_USES.keySet()) {
+                if (surplus-- <= 0) {
+                    break;
+                }
+                PENDING_ITEM_USES.remove(key);
+            }
+        }
+    }
+
+    private static String fingerprint(ItemStack stack) {
+        return stack.getItemId() + "\u001f" + stack.getMaxDurability() + "\u001f"
+                + (stack.getMetadata() == null ? "" : stack.getMetadata().toJson());
+    }
+
+    private static String fingerprint(HusbandryToolContext tool) {
+        return tool == null ? "" : tool.itemId() + "\u001f" + tool.maxDurability() + "\u001f"
+                + (tool.metadata() == null ? "" : tool.metadata().toJson());
+    }
+
+    private static short findMatchingHotbarSlot(ItemContainer hotbar, CapturedItemUse use) {
+        if (use.hotbarSlot() >= 0 && use.hotbarSlot() < hotbar.getCapacity()) {
+            ItemStack current = hotbar.getItemStack(use.hotbarSlot());
+            if (matchesCapturedTool(current, use)) {
+                return use.hotbarSlot();
+            }
+        }
+        for (short slot = 0; slot < hotbar.getCapacity(); slot++) {
+            ItemStack current = hotbar.getItemStack(slot);
+            if (matchesCapturedTool(current, use)) {
+                return slot;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean matchesCapturedTool(@Nullable ItemStack current, CapturedItemUse use) {
+        return current != null && !current.isEmpty() && current.getMaxDurability() > 0.0
+                && use.fingerprint().equals(fingerprint(current));
+    }
+
+    private record CullUseKey(UUID playerId, UUID targetId) {
+        @Nullable
+        static CullUseKey from(@Nullable UUID playerId,
+                               @Nullable Ref<EntityStore> target,
+                               @Nullable ComponentAccessor<EntityStore> components) {
+            if (playerId == null || target == null || components == null || !target.isValid()) {
+                return null;
+            }
+            NPCEntity npc = components.getComponent(target, NPCEntity.getComponentType());
+            return npc == null || npc.getUuid() == null ? null : new CullUseKey(playerId, npc.getUuid());
+        }
+    }
+
+    private record CapturedItemUse(UUID actorId, HusbandryToolContext tool, byte hotbarSlot,
+                                   String fingerprint, CullRewardService.PreparedOutcome preparedRewards,
+                                   long startedAtNanos) {
+        static CapturedItemUse capture(@Nullable UUID actorId, @Nullable HusbandryToolContext tool,
+                                       byte hotbarSlot,
+                                       @Nullable CullRewardService.PreparedOutcome preparedRewards) {
+            HusbandryToolContext safe = tool == null
+                    ? new HusbandryToolContext(null, 0, 0.0, 0.0, null) : tool;
+            return new CapturedItemUse(actorId, safe, hotbarSlot,
+                    TameworkNpcCullService.fingerprint(safe),
+                    preparedRewards == null ? CullRewardService.PreparedOutcome.unavailable() : preparedRewards,
+                    System.nanoTime());
+        }
+
+        static CapturedItemUse empty() {
+            return new CapturedItemUse(null, new HusbandryToolContext(null, 0, 0.0, 0.0, null),
+                    (byte) -1, "", CullRewardService.PreparedOutcome.unavailable(), 0L);
+        }
+
+        boolean expired(long now) {
+            return startedAtNanos > 0L && now - startedAtNanos > ITEM_USE_MAX_AGE_NANOS;
         }
     }
 

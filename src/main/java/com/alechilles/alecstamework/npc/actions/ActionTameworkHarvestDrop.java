@@ -9,6 +9,8 @@ import com.alechilles.alecstamework.npc.progression.CompanionLevelingService.Awa
 import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.output.CompanionOutputService;
 import com.alechilles.alecstamework.output.CompanionOutputService.FinalizedOutput;
+import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
+import com.alechilles.alecstamework.api.internal.HusbandryYieldResolver;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -31,10 +33,10 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Drop-item action for harvest flows that supports trait- and husbandry-driven bonus drops.
+ * Drop-item action that applies trait and husbandry yield to each resolved product.
  *
- * <p>This action behaves like {@code DropItem} for regular output and then performs
- * the resolved number of additional identical drop passes.
+ * <p>Manual shearing can consume its batch prepared at authorization; other drops
+ * resolve their expected quantities when executed.
  */
 public final class ActionTameworkHarvestDrop extends ActionDropItem {
     private final boolean awardXp;
@@ -56,20 +58,35 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
         EntitySupport entitySupport = NpcSupportAccess.entity(role, ref, store);
         startDelay(entitySupport);
 
-        List<ItemStack> baseDrops = resolveDrops();
+        HusbandryHarvestUseContext.CapturedUse toolUse = HusbandryHarvestUseContext.current(ref, store);
+        FinalizedOutput preparedOutput = toolUse.preparedOutputFor(this.dropList, awardXp);
+        boolean usesCapturedTool = awardXp && toolUse.tool().present()
+                && (preparedOutput != null || toolUse.preparedDropList() == null);
+        List<ItemStack> baseDrops = preparedOutput == null ? resolveDrops() : preparedOutput.itemStacks();
         if (baseDrops.isEmpty()) {
+            if (preparedOutput != null) {
+                HusbandryHarvestUseContext.finish(ref, store);
+            }
             logHarvestDropAttempt("skipped reason=no-resolved-drops item=" + valueOrNull(this.item)
                     + " dropList=" + valueOrNull(this.dropList));
             return true;
         }
-        int bonusCopies = CompanionHarvestBonusService.resolveBonusCopies(
-                ref,
-                store,
-                role,
-                resolveProductId(baseDrops),
-                java.util.concurrent.ThreadLocalRandom.current()::nextDouble
-        );
-        FinalizedOutput output = CompanionOutputService.finalizeDrops(baseDrops, bonusCopies);
+        FinalizedOutput output = preparedOutput != null ? preparedOutput
+                : CompanionOutputService.finalizeExpectedQuantity(
+                        baseDrops,
+                        stack -> {
+                            HusbandryOutcomeModifiers modifiers = HusbandryYieldResolver.resolveHarvest(
+                                    ref, store, role == null ? null : role.getRoleName(), stack.getItemId(),
+                                    usesCapturedTool ? toolUse.tool() : null,
+                                    usesCapturedTool ? toolUse.actorId() : null);
+                            return modifiers.toolAuthorized()
+                                    ? HusbandryYieldResolver.harvestYieldBonus(
+                                            ref, store, stack.getItemId(), modifiers,
+                                            CompanionHarvestBonusService.expectedDropDuplicateYieldBonus(ref, store, role))
+                                    : -1.0;
+                        },
+                        java.util.concurrent.ThreadLocalRandom.current()::nextDouble
+                );
         List<ItemStack> drops = output.itemStacks();
         UUID operationId = UUID.randomUUID();
         String activityContext = resolveActivityContext(
@@ -91,6 +108,13 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
             ItemUtils.throwItem(ref, store, drop, this.dropDirection, this.throwSpeed);
             dropped = true;
             droppedCount++;
+        }
+        if (dropped && usesCapturedTool) {
+            HusbandryHarvestUseContext.applyWear(resolveInteractionPlayer(ref, role, store), toolUse,
+                    toolUse.wearMultiplier());
+        }
+        if (usesCapturedTool || !toolUse.tool().present()) {
+            HusbandryHarvestUseContext.finish(ref, store);
         }
         if (dropped && awardXp) {
             AwardResult result = CompanionLevelingService.awardHarvestXp(ref, store);
@@ -184,14 +208,14 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
     }
 
     @Nullable
-    private static String resolveProductId(@Nonnull List<ItemStack> drops) {
-        for (ItemStack drop : drops) {
-            if (drop != null && !drop.isEmpty()
-                    && drop.getItemId() != null && !drop.getItemId().isBlank()) {
-                return drop.getItemId();
-            }
-        }
-        return null;
+    private static com.hypixel.hytale.server.core.entity.entities.Player resolveInteractionPlayer(
+            Ref<EntityStore> npcRef, Role role, Store<EntityStore> store) {
+        com.hypixel.hytale.server.npc.role.support.StateSupport state =
+                NpcSupportAccess.state(role, npcRef, store);
+        Ref<EntityStore> playerRef = state == null ? null : state.getInteractionIterationTarget();
+        return playerRef == null || !playerRef.isValid() ? null
+                : store.getComponent(playerRef,
+                        com.hypixel.hytale.server.core.entity.entities.Player.getComponentType());
     }
 
     private void logHarvestDropAward(@Nonnull Ref<EntityStore> ref,

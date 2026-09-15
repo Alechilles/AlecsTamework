@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.api.HusbandryOutcomeApi;
 import com.alechilles.alecstamework.api.HusbandryOutcomeContext;
 import com.alechilles.alecstamework.api.HusbandryOutcomeKind;
 import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
+import com.alechilles.alecstamework.api.HusbandryToolContext;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -13,6 +14,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -64,7 +66,7 @@ public final class HusbandryOutcomeRuntime {
             @Nullable String productId
     ) {
         return resolve(kind, npcRef, store,
-                role == null ? null : role.getRoleName(), productId);
+                role == null ? null : role.getRoleName(), productId, null, null);
     }
 
     /** Resolves modifiers for one role-id-backed world-thread action. */
@@ -76,8 +78,35 @@ public final class HusbandryOutcomeRuntime {
             @Nullable String roleId,
             @Nullable String productId
     ) {
+        return resolve(kind, npcRef, store, roleId, productId, null, null);
+    }
+
+    /** Resolves one action with the tool identity captured at its interaction boundary. */
+    @Nonnull
+    public static HusbandryOutcomeModifiers resolve(
+            @Nonnull HusbandryOutcomeKind kind,
+            @Nullable Ref<EntityStore> npcRef,
+            @Nullable Store<EntityStore> store,
+            @Nullable String roleId,
+            @Nullable String productId,
+            @Nullable HusbandryToolContext tool
+    ) {
+        return resolve(kind, npcRef, store, roleId, productId, tool, null);
+    }
+
+    /** Resolves one action with its captured tool and authoritative acting player. */
+    @Nonnull
+    public static HusbandryOutcomeModifiers resolve(
+            @Nonnull HusbandryOutcomeKind kind,
+            @Nullable Ref<EntityStore> npcRef,
+            @Nullable Store<EntityStore> store,
+            @Nullable String roleId,
+            @Nullable String productId,
+            @Nullable HusbandryToolContext tool,
+            @Nullable UUID actorId
+    ) {
         try {
-            return resolve(buildContext(kind, npcRef, store, roleId, productId));
+            return resolve(buildContext(kind, npcRef, store, roleId, productId, tool, actorId));
         } catch (Throwable ignored) {
             return HusbandryOutcomeModifiers.identity();
         }
@@ -89,7 +118,9 @@ public final class HusbandryOutcomeRuntime {
             @Nullable Ref<EntityStore> npcRef,
             @Nullable Store<EntityStore> store,
             @Nullable String fallbackRoleId,
-            @Nullable String productId
+            @Nullable String productId,
+            @Nullable HusbandryToolContext tool,
+            @Nullable UUID actorId
     ) {
         String roleId = resolveRoleId(npcRef, store, fallbackRoleId);
         ManagedActivityConfigRegistry.RoleResolution managed = resolveManagedRole(roleId);
@@ -100,11 +131,13 @@ public final class HusbandryOutcomeRuntime {
         return new HusbandryOutcomeContext(
                 kind,
                 ActivityRuntime.resolveOwnerId(npcRef, store),
+                actorId,
                 ActivityRuntime.resolveCompanionId(npcRef, store),
                 roleId,
                 profileId,
                 groupIds,
-                productId
+                productId,
+                tool != null && tool.present() ? tool : null
         );
     }
 

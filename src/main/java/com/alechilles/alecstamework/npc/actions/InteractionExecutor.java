@@ -16,14 +16,19 @@ import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService.AwardResult;
 import com.alechilles.alecstamework.output.CompanionOutputService;
+import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
+import com.alechilles.alecstamework.api.internal.HusbandryYieldResolver;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.modules.item.ItemModule;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -166,6 +171,26 @@ final class InteractionExecutor {
         }
         if (entry instanceof HarvestInteraction) {
             effects.logHarvestExecution("selected", interactionConfigId, interactionIndex, role, ctx);
+            String harvestContext = resolveHarvestContext(role, ctx);
+            boolean shearContext = harvestContext != null && harvestContext.equalsIgnoreCase("Shear");
+            HusbandryHarvestUseContext.CapturedUse toolUse = shearContext
+                    ? HusbandryHarvestUseContext.capture(player, ctx == null ? null : ctx.activeItem)
+                    : HusbandryHarvestUseContext.CapturedUse.empty();
+            HusbandryOutcomeModifiers authorization = HusbandryYieldResolver.resolveHarvest(
+                    npcRef, store, role == null ? null : role.getRoleName(), null, toolUse.tool(),
+                    player == null ? null : player.getUuid());
+            if (!authorization.toolAuthorized()) {
+                effects.logHarvestExecution("tool-denied", interactionConfigId, interactionIndex, role, ctx);
+                return false;
+            }
+            if (!HusbandryHarvestUseContext.stillMatches(player, toolUse)) {
+                effects.logHarvestExecution("tool-swapped", interactionConfigId, interactionIndex, role, ctx);
+                return false;
+            }
+            HusbandryHarvestUseContext.CapturedUse resolvedToolUse = toolUse
+                    .withWearMultiplier(authorization.toolWearMultiplier())
+                    .withModifiers(authorization);
+            resolvedToolUse = prepareShearOutput(npcRef, store, role, ctx, resolvedToolUse);
             if (!effects.isHarvestCooldownReady(npcRef, role, store, ctx)) {
                 effects.logHarvestExecution("cooldown-blocked", interactionConfigId, interactionIndex, role, ctx);
                 return false;
@@ -173,7 +198,7 @@ final class InteractionExecutor {
             effects.logHarvestExecution("cooldown-ready", interactionConfigId, interactionIndex, role, ctx);
             UUID operationId = UUID.randomUUID();
             TameworkInteractEffects.HarvestContainerOutcome containerOutcome =
-                    effects.applyHarvestContainerTransform(npcRef, store, role, player, ctx);
+                    effects.applyHarvestContainerTransform(npcRef, store, role, player, ctx, resolvedToolUse);
             if (containerOutcome.result == TameworkInteractEffects.HarvestContainerResult.FAILED) {
                 effects.logHarvestExecution("container-failed", interactionConfigId, interactionIndex, role, ctx);
                 return false;
@@ -184,6 +209,7 @@ final class InteractionExecutor {
                 effects.logHarvestExecution("state-blocked", interactionConfigId, interactionIndex, role, ctx);
                 return false;
             }
+            HusbandryHarvestUseContext.begin(npcRef, store, resolvedToolUse);
             effects.logHarvestExecution("state-applied", interactionConfigId, interactionIndex, role, ctx);
             if (!containerOutcome.preserveCooldown
                     && !effects.ensureHarvestCooldownAfterState(npcRef, role, store, ctx)) {
@@ -414,6 +440,39 @@ final class InteractionExecutor {
         String dropList = new InteractionParamResolver(null, null, null)
                 .getStringParam(role, ctx, "HarvestDropList");
         return dropList != null && !dropList.isBlank();
+    }
+
+    private HusbandryHarvestUseContext.CapturedUse prepareShearOutput(
+            Ref<EntityStore> npcRef,
+            Store<EntityStore> store,
+            Role role,
+            InteractionContextSnapshot ctx,
+            HusbandryHarvestUseContext.CapturedUse use
+    ) {
+        if (use == null || !use.tool().present()) {
+            return use;
+        }
+        String dropList = new InteractionParamResolver(null, null, null)
+                .getStringParam(role, ctx, "HarvestDropList");
+        ItemModule itemModule = ItemModule.get();
+        if (dropList == null || dropList.isBlank() || itemModule == null || !itemModule.isEnabled()) {
+            return use;
+        }
+        List<ItemStack> baseDrops = itemModule.getRandomItemDrops(dropList);
+        CompanionOutputService.FinalizedOutput output = CompanionOutputService.finalizeExpectedQuantity(
+                baseDrops,
+                stack -> {
+                    HusbandryOutcomeModifiers productModifiers = HusbandryYieldResolver.resolveHarvest(
+                            npcRef, store, role == null ? null : role.getRoleName(), stack.getItemId(),
+                            use.tool(), use.actorId());
+                    return productModifiers.toolAuthorized()
+                            ? HusbandryYieldResolver.harvestYieldBonus(
+                                    npcRef, store, stack.getItemId(), productModifiers,
+                                    CompanionHarvestBonusService.expectedDropDuplicateYieldBonus(npcRef, store, role))
+                            : -1.0;
+                },
+                java.util.concurrent.ThreadLocalRandom.current()::nextDouble);
+        return use.withPreparedOutput(dropList, output);
     }
 
     private boolean isInteractingOwner(

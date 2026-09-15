@@ -15,6 +15,11 @@ class ActionTameworkHarvestAlarmTest {
     }
 
     @Test
+    void boundsLegacyAndNewRecoverySpeedTogether() {
+        assertEquals(30.0, ActionTameworkHarvestAlarm.scaleHarvestCooldownSeconds(60.0, 0.5, 1.0), 0.000001);
+    }
+
+    @Test
     void harvestCooldownUsesWorldTimeBasisEvenWhenEpochIsEarly() {
         Instant worldTime = Instant.parse("0001-01-01T00:00:00Z");
 
