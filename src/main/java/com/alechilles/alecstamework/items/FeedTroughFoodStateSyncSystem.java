@@ -43,21 +43,6 @@ public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
     private static final String MODERN_ITEM_CONTAINER_BLOCK_CLASS =
             "com.hypixel.hytale.server.core.modules.block.components.ItemContainerBlock";
 
-    private static final String BASE_BLOCK_ID = "Tw_Feed_Trough";
-    private static final String FOOD_STATE_PREFIX = "Tw_Feed_Trough_State_Food";
-    private static final String WATER_STATE_TOKEN = "_State_Water";
-
-    private static final String FOOD_STATE_FULL_BLOCK_ID = "Tw_Feed_Trough_State_Food_State_Full";
-    private static final String FOOD_STATE_90_BLOCK_ID = "Tw_Feed_Trough_State_Food_State_90";
-    private static final String FOOD_STATE_80_BLOCK_ID = "Tw_Feed_Trough_State_Food_State_80";
-    private static final String FOOD_STATE_70_BLOCK_ID = "Tw_Feed_Trough_State_Food_State_70";
-    private static final String FOOD_STATE_60_BLOCK_ID = "Tw_Feed_Trough_State_Food_State_60";
-    private static final String FOOD_STATE_50_BLOCK_ID = "Tw_Feed_Trough_State_Food_State_50";
-    private static final String FOOD_STATE_40_BLOCK_ID = "Tw_Feed_Trough_State_Food_State_40";
-    private static final String FOOD_STATE_30_BLOCK_ID = "Tw_Feed_Trough_State_Food_State_30";
-    private static final String FOOD_STATE_20_BLOCK_ID = "Tw_Feed_Trough_State_Food_State_20";
-    private static final String FOOD_STATE_10_BLOCK_ID = "Tw_Feed_Trough_State_Food_State_10";
-
     private final Map<Ref<ChunkStore>, EventRegistration<Void, ItemContainer.ItemContainerChangeEvent>> registrations =
             new ConcurrentHashMap<>();
     private final Map<Ref<ChunkStore>, Map<UUID, EventRegistration<Void, Window.WindowCloseEvent>>> closeRegistrations =
@@ -101,7 +86,12 @@ public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
             return;
         }
         BlockType blockType = location.chunk.getBlockType(location.x, location.y, location.z);
-        if (!isFeedTroughFoodSyncTarget(normalizeId(blockType != null ? blockType.getId() : null))) {
+        if (!isFeedTroughFoodSyncTarget(
+                state,
+                location,
+                normalizeId(blockType != null ? blockType.getId() : null),
+                store
+        )) {
             return;
         }
         ItemContainer container = resolveItemContainer(state);
@@ -215,10 +205,17 @@ public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
             return;
         }
         String normalizedCurrentId = normalizeId(currentType.getId());
-        if (!isFeedTroughFoodSyncTarget(normalizedCurrentId)) {
+        Store<ChunkStore> store = storesByReference.get(ref);
+        FeedTroughWaterStateService.TroughVariant variant = FeedTroughWaterStateService.resolveVariant(
+                chunk, store, x, y, z, normalizedCurrentId
+        );
+        if (variant == null || !FeedTroughWaterStateService.isFoodTroughBlockId(normalizedCurrentId, variant)) {
             return;
         }
-        BlockType targetType = resolveTargetFoodBlockType(resolveItemContainer(state));
+        if (!FeedTroughWaterStateService.resizeContainer(state, variant.foodCapacity())) {
+            return;
+        }
+        BlockType targetType = resolveTargetFoodBlockType(resolveItemContainer(state), variant);
         if (targetType == null) {
             return;
         }
@@ -235,13 +232,14 @@ public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
     }
 
     @Nullable
-    private BlockType resolveTargetFoodBlockType(@Nullable ItemContainer container) {
+    private BlockType resolveTargetFoodBlockType(@Nullable ItemContainer container,
+                                                 @Nonnull FeedTroughWaterStateService.TroughVariant variant) {
         if (container == null) {
-            return resolveVariantBlockType(BASE_BLOCK_ID);
+            return resolveVariantBlockType(FeedTroughWaterStateService.resolveCanonicalFoodBlockIdForPercent(variant, 0));
         }
         short capacity = container.getCapacity();
         if (capacity <= 0) {
-            return resolveVariantBlockType(BASE_BLOCK_ID);
+            return resolveVariantBlockType(FeedTroughWaterStateService.resolveCanonicalFoodBlockIdForPercent(variant, 0));
         }
 
         long totalCapacity = 0L;
@@ -258,26 +256,13 @@ public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
         }
 
         if (totalCapacity <= 0L || totalQuantity <= 0L) {
-            return resolveVariantBlockType(BASE_BLOCK_ID);
-        }
-        if (totalQuantity >= totalCapacity) {
-            return resolveVariantBlockType(FOOD_STATE_FULL_BLOCK_ID);
+            return resolveVariantBlockType(FeedTroughWaterStateService.resolveCanonicalFoodBlockIdForPercent(variant, 0));
         }
 
-        double fullnessPercent = ((double) totalQuantity * 100.0) / (double) totalCapacity;
-        int bucket = (int) Math.ceil(fullnessPercent / 10.0) * 10;
-        int clampedBucket = Math.max(10, Math.min(90, bucket));
-        return switch (clampedBucket) {
-            case 90 -> resolveVariantBlockType(FOOD_STATE_90_BLOCK_ID);
-            case 80 -> resolveVariantBlockType(FOOD_STATE_80_BLOCK_ID);
-            case 70 -> resolveVariantBlockType(FOOD_STATE_70_BLOCK_ID);
-            case 60 -> resolveVariantBlockType(FOOD_STATE_60_BLOCK_ID);
-            case 50 -> resolveVariantBlockType(FOOD_STATE_50_BLOCK_ID);
-            case 40 -> resolveVariantBlockType(FOOD_STATE_40_BLOCK_ID);
-            case 30 -> resolveVariantBlockType(FOOD_STATE_30_BLOCK_ID);
-            case 20 -> resolveVariantBlockType(FOOD_STATE_20_BLOCK_ID);
-            default -> resolveVariantBlockType(FOOD_STATE_10_BLOCK_ID);
-        };
+        int fullnessPercent = (int) Math.ceil((double) totalQuantity * 100.0 / totalCapacity);
+        return resolveVariantBlockType(FeedTroughWaterStateService.resolveCanonicalFoodBlockIdForPercent(
+                variant, fullnessPercent
+        ));
     }
 
     private int resolveSlotCapacity(@Nullable ItemStack stack) {
@@ -292,17 +277,15 @@ public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
         return maxStack > 0 ? maxStack : DEFAULT_EMPTY_SLOT_MAX_STACK;
     }
 
-    private boolean isFeedTroughFoodSyncTarget(@Nullable String normalizedBlockId) {
-        if (normalizedBlockId == null || normalizedBlockId.isBlank()) {
-            return false;
-        }
-        if (!normalizedBlockId.startsWith(BASE_BLOCK_ID)) {
-            return false;
-        }
-        if (normalizedBlockId.contains(WATER_STATE_TOKEN)) {
-            return false;
-        }
-        return normalizedBlockId.equals(BASE_BLOCK_ID) || normalizedBlockId.startsWith(FOOD_STATE_PREFIX);
+    private boolean isFeedTroughFoodSyncTarget(@Nullable Object state,
+                                                @Nonnull BlockLocation location,
+                                                @Nullable String normalizedBlockId,
+                                                @Nonnull Store<ChunkStore> store) {
+        FeedTroughWaterStateService.TroughVariant variant = FeedTroughWaterStateService.resolveVariant(
+                location.chunk, store, location.x, location.y, location.z, normalizedBlockId
+        );
+        return state != null && variant != null
+                && FeedTroughWaterStateService.isFoodTroughBlockId(normalizedBlockId, variant);
     }
 
     @Nullable

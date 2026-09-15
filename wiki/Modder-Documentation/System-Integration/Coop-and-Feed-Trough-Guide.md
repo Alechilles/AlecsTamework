@@ -58,3 +58,34 @@ recovery journal, vanilla resident importer, or coop repair command surface.
 
 
 
+
+## Configurable trough variants
+
+Each empty, food, and water block state can configure its existing
+`TameworkFeedTroughWaterCharges` block component:
+
+```json
+"TameworkFeedTroughWaterCharges": {
+  "BaseBlockId": "My_Feed_Trough",
+  "MaxWaterCharges": 320,
+  "FoodCapacity": 8,
+  "WaterCharges": 0
+}
+```
+
+Set `ItemContainerBlock.Capacity` and the item's `Container.Capacity` to the
+food capacity for empty and food states. Water states can keep their one-slot
+container. Include the same component configuration in every state.
+
+Use `<BaseBlockId>_State_Food_State_10` through `_90` and `_Full` for food,
+and the equivalent `_State_Water_State_...` names for water. Emptying and
+consumption preserve the configured base ID. Water charges are bounded by
+that variant's maximum; state inference uses the same maximum for legacy
+saves without stored charges. Food capacity does not increase feeding range.
+
+Omitted configuration preserves the original `Tw_Feed_Trough`, five food
+slots, and 200 water charges. Existing component saves remain readable.
+Configure each state's breaking `ItemId` to return the correct base item.
+Add bucket `ChangeBlock.Changes` entries for custom empty/water states, using
+Tamework's bucket patches as the reference. Keep food states out of refill
+mappings so filling cannot discard stored food.

@@ -16,67 +16,54 @@ import javax.annotation.Nullable;
 import java.lang.reflect.Method;
 import java.util.List;
 
-/**
- * Handles water-charge persistence and visual-state sync for feed trough water variants.
- */
+/** Handles configured water-charge persistence and visual-state sync for feed trough variants. */
 public final class FeedTroughWaterStateService {
-    private static final String BASE_BLOCK_ID = "Tw_Feed_Trough";
-    private static final String WATER_STATE_PREFIX = "Tw_Feed_Trough_State_Water";
     private static final String WATER_STATE_TOKEN = "_State_Water";
-
-    private static final String WATER_STATE_FULL_BLOCK_ID = "Tw_Feed_Trough_State_Water_State_Full";
-    private static final String WATER_STATE_90_BLOCK_ID = "Tw_Feed_Trough_State_Water_State_90";
-    private static final String WATER_STATE_80_BLOCK_ID = "Tw_Feed_Trough_State_Water_State_80";
-    private static final String WATER_STATE_70_BLOCK_ID = "Tw_Feed_Trough_State_Water_State_70";
-    private static final String WATER_STATE_60_BLOCK_ID = "Tw_Feed_Trough_State_Water_State_60";
-    private static final String WATER_STATE_50_BLOCK_ID = "Tw_Feed_Trough_State_Water_State_50";
-    private static final String WATER_STATE_40_BLOCK_ID = "Tw_Feed_Trough_State_Water_State_40";
-    private static final String WATER_STATE_30_BLOCK_ID = "Tw_Feed_Trough_State_Water_State_30";
-    private static final String WATER_STATE_20_BLOCK_ID = "Tw_Feed_Trough_State_Water_State_20";
-    private static final String WATER_STATE_10_BLOCK_ID = "Tw_Feed_Trough_State_Water_State_10";
-
+    private static final String FOOD_STATE_TOKEN = "_State_Food";
     private static final String LEGACY_CHARGE_STORAGE_PREFIX = "tw_water_charges:";
 
-    public static final int MAX_WATER_CHARGES = 200;
+    /** Kept for legacy callers and existing {@code Tw_Feed_Trough} assets. */
+    public static final int MAX_WATER_CHARGES = TameworkFeedTroughWaterChargesComponent.DEFAULT_MAX_WATER_CHARGES;
 
     private FeedTroughWaterStateService() {
     }
 
     public static boolean isWaterTroughBlockId(@Nullable String normalizedBlockId) {
-        if (normalizedBlockId == null || normalizedBlockId.isBlank()) {
-            return false;
-        }
-        if (!normalizedBlockId.startsWith(BASE_BLOCK_ID)) {
-            return false;
-        }
-        return normalizedBlockId.contains(WATER_STATE_TOKEN);
+        return normalizedBlockId != null && !normalizedBlockId.isBlank()
+                && normalizedBlockId.contains(WATER_STATE_TOKEN);
     }
 
     public static boolean hasConsumableWater(@Nullable WorldChunk chunk,
-                                             @Nullable Store<ChunkStore> chunkStore,
-                                             int x,
-                                             int y,
-                                             int z,
-                                             @Nullable BlockType blockType) {
+                                              @Nullable Store<ChunkStore> chunkStore,
+                                              int x,
+                                              int y,
+                                              int z,
+                                              @Nullable BlockType blockType) {
         if (chunk == null || blockType == null) {
-            return false;
-        }
-        Object state = FeedTroughContainerCompat.resolveContainerState(chunk, chunkStore, x, y, z);
-        if (state == null) {
             return false;
         }
         String normalizedBlockId = normalizeId(blockType.getId());
         if (!isWaterTroughBlockId(normalizedBlockId)) {
             return false;
         }
-        return resolveStoredOrInferredCharges(state, normalizedBlockId, chunk, chunkStore, x, y, z, false) > 0;
+        Object state = FeedTroughContainerCompat.resolveContainerState(chunk, chunkStore, x, y, z);
+        TroughVariant variant = resolveVariant(chunk, chunkStore, x, y, z, normalizedBlockId);
+        return state != null && variant != null
+                && resolveStoredOrInferredCharges(state, normalizedBlockId, chunk, chunkStore, x, y, z, variant, false) > 0;
     }
 
     public static boolean isWaterTroughBlockType(@Nullable BlockType blockType) {
         if (blockType == null) {
             return false;
         }
-        return isWaterTroughBlockId(normalizeId(blockType.getId()));
+        String id = normalizeId(blockType.getId());
+        if (isLegacyWaterTroughBlockId(id)) {
+            return true;
+        }
+        var componentType = TameworkFeedTroughWaterChargesComponent.getComponentType();
+        var template = blockType.getBlockEntity();
+        var component = componentType != null && template != null ? template.getComponent(componentType) : null;
+        return component != null && isWaterStateOf(id, normalizeBaseBlockId(component.getBaseBlockId()));
     }
 
     public static boolean clearStoredCharges(@Nullable WorldChunk chunk,
@@ -88,28 +75,20 @@ public final class FeedTroughWaterStateService {
             return false;
         }
         BlockType currentType = chunk.getBlockType(x, y, z);
-        if (!isWaterTroughBlockType(currentType)) {
+        String currentBlockId = normalizeId(currentType != null ? currentType.getId() : null);
+        if (!isWaterTroughBlockId(currentBlockId)) {
             return false;
         }
-        BlockType baseType = resolveVariantBlockType(BASE_BLOCK_ID);
-        if (baseType == null) {
+        Object state = FeedTroughContainerCompat.resolveContainerState(chunk, chunkStore, x, y, z);
+        TroughVariant variant = resolveVariant(chunk, chunkStore, x, y, z, currentBlockId);
+        if (state == null || variant == null || !setBlockType(chunk, x, y, z, variant.baseBlockId())) {
             return false;
         }
-        int baseIndex = BlockType.getAssetMap().getIndex(baseType.getId());
-        if (baseIndex == Integer.MIN_VALUE) {
-            return false;
-        }
-        int currentRotation = chunk.getRotationIndex(x, y, z);
-        chunk.setBlock(x, y, z, baseIndex, baseType, currentRotation, 0, 198);
-
         Object updatedState = FeedTroughContainerCompat.resolveContainerState(chunk, chunkStore, x, y, z);
-        if (updatedState == null) {
+        if (updatedState == null || !resizeContainer(updatedState, variant.foodCapacity())) {
             return false;
         }
-        if (!resizeContainerToBaseCapacity(updatedState)) {
-            return false;
-        }
-        setStoredCharges(chunk, chunkStore, x, y, z, updatedState, 0);
+        setStoredCharges(chunk, chunkStore, x, y, z, updatedState, variant, 0);
         return true;
     }
 
@@ -122,44 +101,60 @@ public final class FeedTroughWaterStateService {
             return false;
         }
         Object state = FeedTroughContainerCompat.resolveContainerState(chunk, chunkStore, x, y, z);
-        if (state == null) {
-            return false;
-        }
         BlockType currentType = chunk.getBlockType(x, y, z);
-        if (currentType == null) {
+        String currentBlockId = normalizeId(currentType != null ? currentType.getId() : null);
+        if (state == null || !isWaterTroughBlockId(currentBlockId)) {
             return false;
         }
-        String normalizedCurrentId = normalizeId(currentType.getId());
-        if (!isWaterTroughBlockId(normalizedCurrentId)) {
+        TroughVariant variant = resolveVariant(chunk, chunkStore, x, y, z, currentBlockId);
+        if (variant == null) {
             return false;
         }
-
-        int charges = resolveStoredOrInferredCharges(state, normalizedCurrentId, chunk, chunkStore, x, y, z, true);
+        int charges = resolveStoredOrInferredCharges(
+                state, currentBlockId, chunk, chunkStore, x, y, z, variant, true
+        );
         if (charges <= 0) {
             return false;
         }
         int remainingCharges = charges - 1;
-        String targetCanonicalId = resolveCanonicalWaterBlockIdForCharges(remainingCharges);
-        BlockType targetType = resolveVariantBlockType(targetCanonicalId);
-        if (targetType == null) {
+        String targetBlockId = resolveCanonicalWaterBlockIdForCharges(
+                remainingCharges, variant.baseBlockId(), variant.maxWaterCharges()
+        );
+        if (!currentBlockId.equals(normalizeId(targetBlockId)) && !setBlockType(chunk, x, y, z, targetBlockId)) {
             return false;
         }
-
-        String normalizedTargetId = normalizeId(targetType.getId());
-        if (!normalizedCurrentId.equals(normalizedTargetId)) {
-            int targetIndex = BlockType.getAssetMap().getIndex(targetType.getId());
-            if (targetIndex == Integer.MIN_VALUE) {
-                return false;
-            }
-            int currentRotation = chunk.getRotationIndex(x, y, z);
-            chunk.setBlock(x, y, z, targetIndex, targetType, currentRotation, 0, 198);
-        }
-
         Object updatedState = FeedTroughContainerCompat.resolveContainerState(chunk, chunkStore, x, y, z);
         if (updatedState != null) {
-            setStoredCharges(chunk, chunkStore, x, y, z, updatedState, remainingCharges);
+            setStoredCharges(chunk, chunkStore, x, y, z, updatedState, variant, remainingCharges);
         }
         return true;
+    }
+
+    @Nullable
+    static TroughVariant resolveVariant(@Nullable WorldChunk chunk,
+                                        @Nullable Store<ChunkStore> chunkStore,
+                                        int x,
+                                        int y,
+                                        int z,
+                                        @Nullable String normalizedBlockId) {
+        TameworkFeedTroughWaterChargesComponent component =
+                TameworkFeedTroughWaterChargesComponent.resolve(chunk, chunkStore, x, y, z);
+        if (component != null) {
+            String baseId = normalizeBaseBlockId(component.getBaseBlockId());
+            if (normalizedBlockId == null || !(normalizedBlockId.equals(baseId)
+                    || normalizedBlockId.startsWith(baseId + FOOD_STATE_TOKEN)
+                    || isWaterStateOf(normalizedBlockId, baseId))) {
+                return null;
+            }
+            return new TroughVariant(
+                    normalizeBaseBlockId(component.getBaseBlockId()),
+                    positiveOrDefault(component.getMaxWaterCharges(), MAX_WATER_CHARGES),
+                    positiveOrDefault(component.getFoodCapacity(), TameworkFeedTroughWaterChargesComponent.DEFAULT_FOOD_CAPACITY)
+            );
+        }
+        TroughVariant legacy = legacyVariant();
+        return isFoodTroughBlockId(normalizedBlockId, legacy) || isLegacyWaterTroughBlockId(normalizedBlockId)
+                ? legacy : null;
     }
 
     static int resolveStoredOrInferredCharges(@Nonnull Object state,
@@ -169,104 +164,231 @@ public final class FeedTroughWaterStateService {
                                               int x,
                                               int y,
                                               int z,
+                                              @Nonnull TroughVariant variant,
                                               boolean allowWriteBack) {
-        TameworkFeedTroughWaterChargesComponent waterChargesComponent =
+        TameworkFeedTroughWaterChargesComponent component =
                 TameworkFeedTroughWaterChargesComponent.resolve(chunk, chunkStore, x, y, z);
-        if (waterChargesComponent != null && waterChargesComponent.getWaterCharges() > 0) {
-            return clampCharges(waterChargesComponent.getWaterCharges());
-        }
-
-        String encoded = FeedTroughContainerCompat.getDroplist(state);
-        int stored = parseStoredCharges(encoded);
-        if (stored >= 0) {
-            int clampedStored = clampCharges(stored);
+        if (isFullWaterState(normalizedBlockId, variant)) {
             if (allowWriteBack) {
-                setStoredCharges(chunk, chunkStore, x, y, z, state, clampedStored);
+                setComponentCharges(chunk, chunkStore, x, y, z, variant.maxWaterCharges(), variant.maxWaterCharges());
             }
-            return clampedStored;
+            return variant.maxWaterCharges();
         }
-
-        int inferred = inferChargesFromWaterBlockId(normalizedBlockId);
+        if (component != null && component.getWaterCharges() > 0) {
+            int clamped = clampCharges(component.getWaterCharges(), variant.maxWaterCharges());
+            if (allowWriteBack && clamped != component.getWaterCharges()) {
+                component.setWaterCharges(clamped);
+            }
+            return clamped;
+        }
+        int stored = parseStoredCharges(FeedTroughContainerCompat.getDroplist(state));
+        if (stored >= 0) {
+            int clamped = clampCharges(stored, variant.maxWaterCharges());
+            if (allowWriteBack) {
+                setStoredCharges(chunk, chunkStore, x, y, z, state, variant, clamped);
+            }
+            return clamped;
+        }
+        int inferred = inferChargesFromWaterBlockId(normalizedBlockId, variant.baseBlockId(), variant.maxWaterCharges());
         if (allowWriteBack && inferred > 0) {
-            setComponentCharges(chunk, chunkStore, x, y, z, inferred);
+            setComponentCharges(chunk, chunkStore, x, y, z, inferred, variant.maxWaterCharges());
         }
         return inferred;
     }
 
     static int inferChargesFromWaterBlockId(@Nullable String normalizedBlockId) {
-        if (!isWaterTroughBlockId(normalizedBlockId)) {
-            return 0;
-        }
-        if (normalizedBlockId == null) {
-            return 0;
-        }
-        if (normalizedBlockId.equals(WATER_STATE_FULL_BLOCK_ID) || normalizedBlockId.equals(WATER_STATE_PREFIX)) {
-            return MAX_WATER_CHARGES;
-        }
-        if (normalizedBlockId.endsWith("_State_90")) {
-            return 180;
-        }
-        if (normalizedBlockId.endsWith("_State_80")) {
-            return 160;
-        }
-        if (normalizedBlockId.endsWith("_State_70")) {
-            return 140;
-        }
-        if (normalizedBlockId.endsWith("_State_60")) {
-            return 120;
-        }
-        if (normalizedBlockId.endsWith("_State_50")) {
-            return 100;
-        }
-        if (normalizedBlockId.endsWith("_State_40")) {
-            return 80;
-        }
-        if (normalizedBlockId.endsWith("_State_30")) {
-            return 60;
-        }
-        if (normalizedBlockId.endsWith("_State_20")) {
-            return 40;
-        }
-        if (normalizedBlockId.endsWith("_State_10")) {
-            return 20;
-        }
-        return MAX_WATER_CHARGES;
+        return inferChargesFromWaterBlockId(normalizedBlockId, TameworkFeedTroughWaterChargesComponent.DEFAULT_BASE_BLOCK_ID,
+                MAX_WATER_CHARGES);
     }
 
-    private static boolean resizeContainerToBaseCapacity(@Nonnull Object state) {
-        short targetCapacity = resolveBaseContainerCapacity();
-        if (targetCapacity <= 0) {
+    static int inferChargesFromWaterBlockId(@Nullable String normalizedBlockId,
+                                            @Nonnull String baseBlockId,
+                                            int maxWaterCharges) {
+        if (!isWaterStateOf(normalizedBlockId, baseBlockId) || normalizedBlockId == null) {
+            return 0;
+        }
+        int maximum = positiveOrDefault(maxWaterCharges, MAX_WATER_CHARGES);
+        if (normalizedBlockId.equals(baseBlockId + WATER_STATE_TOKEN)
+                || normalizedBlockId.endsWith(WATER_STATE_TOKEN + "_State_Full")) {
+            return maximum;
+        }
+        int percent = statePercent(normalizedBlockId, WATER_STATE_TOKEN);
+        return percent > 0 ? (int) ((long) maximum * percent / 100) : 0;
+    }
+
+    static String resolveCanonicalWaterBlockIdForCharges(int charges) {
+        return resolveCanonicalWaterBlockIdForCharges(
+                charges, TameworkFeedTroughWaterChargesComponent.DEFAULT_BASE_BLOCK_ID, MAX_WATER_CHARGES
+        );
+    }
+
+    static String resolveCanonicalWaterBlockIdForCharges(int charges,
+                                                          @Nonnull String baseBlockId,
+                                                          int maxWaterCharges) {
+        int maximum = positiveOrDefault(maxWaterCharges, MAX_WATER_CHARGES);
+        int clamped = clampCharges(charges, maximum);
+        if (clamped <= 0) {
+            return baseBlockId;
+        }
+        if (clamped >= maximum) {
+            return baseBlockId + WATER_STATE_TOKEN + "_State_Full";
+        }
+        int bucket = (int) Math.ceil(((double) clamped * 100.0 / maximum) / 10.0) * 10;
+        return baseBlockId + WATER_STATE_TOKEN + "_State_" + Math.max(10, Math.min(90, bucket));
+    }
+
+    static String resolveCanonicalFoodBlockIdForPercent(@Nonnull TroughVariant variant, int fullnessPercent) {
+        if (fullnessPercent <= 0) {
+            return variant.baseBlockId();
+        }
+        if (fullnessPercent >= 100) {
+            return variant.baseBlockId() + FOOD_STATE_TOKEN + "_State_Full";
+        }
+        int bucket = (int) Math.ceil(fullnessPercent / 10.0) * 10;
+        return variant.baseBlockId() + FOOD_STATE_TOKEN + "_State_" + Math.max(10, Math.min(90, bucket));
+    }
+
+    static boolean isFoodTroughBlockId(@Nullable String normalizedBlockId, @Nonnull TroughVariant variant) {
+        return normalizedBlockId != null && (normalizedBlockId.equals(variant.baseBlockId())
+                || normalizedBlockId.startsWith(variant.baseBlockId() + FOOD_STATE_TOKEN));
+    }
+
+    static boolean resizeContainer(@Nonnull Object state, int targetCapacity) {
+        int capacity = positiveOrDefault(targetCapacity, TameworkFeedTroughWaterChargesComponent.DEFAULT_FOOD_CAPACITY);
+        if (capacity > Short.MAX_VALUE) {
             return false;
         }
         ItemContainer existing = FeedTroughContainerCompat.getItemContainer(state);
-        if (existing == null) {
-            return false;
+        if (existing == null || existing.getCapacity() == (short) capacity) {
+            return existing != null;
         }
-        if (existing.getCapacity() == targetCapacity) {
-            return true;
-        }
-
         List<ItemStack> remainder = new ObjectArrayList<>();
-        ItemContainer resized = ItemContainer.ensureContainerCapacity(
-                existing,
-                targetCapacity,
-                SimpleItemContainer::new,
-                remainder
-        );
+        ItemContainer resized = ItemContainer.ensureContainerCapacity(existing, (short) capacity, SimpleItemContainer::new, remainder);
         if (!(resized instanceof SimpleItemContainer simpleResized)) {
             return false;
         }
         if (resized != existing) {
             bindItemChangeListenerIfSupported(state, simpleResized);
-            if (!FeedTroughContainerCompat.setItemContainer(state, simpleResized)) {
-                return false;
-            }
+            return FeedTroughContainerCompat.setItemContainer(state, simpleResized);
         }
         return true;
     }
 
-    private static void bindItemChangeListenerIfSupported(@Nonnull Object state,
-                                                           @Nonnull SimpleItemContainer container) {
+    private static boolean setBlockType(@Nonnull WorldChunk chunk, int x, int y, int z, @Nonnull String blockId) {
+        BlockType targetType = resolveVariantBlockType(blockId);
+        if (targetType == null) {
+            return false;
+        }
+        int targetIndex = BlockType.getAssetMap().getIndex(targetType.getId());
+        if (targetIndex == Integer.MIN_VALUE) {
+            return false;
+        }
+        int rotation = chunk.getRotationIndex(x, y, z);
+        chunk.setBlock(x, y, z, targetIndex, targetType, rotation, 0, 198);
+        return true;
+    }
+
+    private static void setStoredCharges(@Nullable WorldChunk chunk,
+                                         @Nullable Store<ChunkStore> chunkStore,
+                                         int x,
+                                         int y,
+                                         int z,
+                                         @Nonnull Object state,
+                                         @Nonnull TroughVariant variant,
+                                         int charges) {
+        setComponentCharges(chunk, chunkStore, x, y, z, charges, variant.maxWaterCharges());
+        FeedTroughContainerCompat.setDroplist(state, null);
+    }
+
+    private static void setComponentCharges(@Nullable WorldChunk chunk,
+                                            @Nullable Store<ChunkStore> chunkStore,
+                                            int x,
+                                            int y,
+                                            int z,
+                                            int charges,
+                                            int maxWaterCharges) {
+        TameworkFeedTroughWaterChargesComponent component =
+                TameworkFeedTroughWaterChargesComponent.resolve(chunk, chunkStore, x, y, z);
+        if (component != null) {
+            component.setWaterCharges(clampCharges(charges, maxWaterCharges));
+        }
+    }
+
+    private static int parseStoredCharges(@Nullable String encoded) {
+        if (encoded == null || encoded.isBlank() || !encoded.trim().startsWith(LEGACY_CHARGE_STORAGE_PREFIX)) {
+            return -1;
+        }
+        try {
+            return Integer.parseInt(encoded.trim().substring(LEGACY_CHARGE_STORAGE_PREFIX.length()));
+        } catch (NumberFormatException ignored) {
+            return -1;
+        }
+    }
+
+    private static int statePercent(@Nonnull String blockId, @Nonnull String stateToken) {
+        int tokenIndex = blockId.lastIndexOf(stateToken + "_State_");
+        if (tokenIndex < 0) {
+            return -1;
+        }
+        String value = blockId.substring(tokenIndex + stateToken.length() + "_State_".length());
+        try {
+            int percent = Integer.parseInt(value);
+            return percent >= 10 && percent <= 90 && percent % 10 == 0 ? percent : -1;
+        } catch (NumberFormatException ignored) {
+            return -1;
+        }
+    }
+
+    private static boolean isFullWaterState(@Nonnull String blockId, @Nonnull TroughVariant variant) {
+        return blockId.equals(variant.baseBlockId() + WATER_STATE_TOKEN)
+                || blockId.equals(variant.baseBlockId() + WATER_STATE_TOKEN + "_State_Full");
+    }
+
+    static boolean isWaterStateOf(@Nullable String id, @Nonnull String baseId) {
+        return id != null && (id.equals(baseId + WATER_STATE_TOKEN)
+                || id.equals(baseId + WATER_STATE_TOKEN + "_State_Full")
+                || (id.startsWith(baseId + WATER_STATE_TOKEN + "_State_")
+                    && statePercent(id, WATER_STATE_TOKEN) > 0));
+    }
+
+    private static boolean isLegacyWaterTroughBlockId(@Nullable String blockId) {
+        return blockId != null && blockId.startsWith(TameworkFeedTroughWaterChargesComponent.DEFAULT_BASE_BLOCK_ID + WATER_STATE_TOKEN);
+    }
+
+    @Nonnull
+    private static TroughVariant legacyVariant() {
+        return new TroughVariant(
+                TameworkFeedTroughWaterChargesComponent.DEFAULT_BASE_BLOCK_ID,
+                MAX_WATER_CHARGES,
+                TameworkFeedTroughWaterChargesComponent.DEFAULT_FOOD_CAPACITY
+        );
+    }
+
+    private static int clampCharges(int charges, int maximum) {
+        return Math.max(0, Math.min(charges, positiveOrDefault(maximum, MAX_WATER_CHARGES)));
+    }
+
+    private static int positiveOrDefault(int value, int fallback) {
+        return value > 0 ? value : fallback;
+    }
+
+    @Nonnull
+    private static String normalizeBaseBlockId(@Nullable String baseBlockId) {
+        String normalized = normalizeId(baseBlockId);
+        return normalized.isBlank() ? TameworkFeedTroughWaterChargesComponent.DEFAULT_BASE_BLOCK_ID : normalized;
+    }
+
+    @Nullable
+    private static BlockType resolveVariantBlockType(@Nonnull String blockId) {
+        BlockType exact = BlockType.getAssetMap().getAsset(blockId);
+        if (exact != null) {
+            return exact;
+        }
+        BlockType oneStar = BlockType.getAssetMap().getAsset("*" + blockId);
+        return oneStar != null ? oneStar : BlockType.getAssetMap().getAsset("**" + blockId);
+    }
+
+    private static void bindItemChangeListenerIfSupported(@Nonnull Object state, @Nonnull SimpleItemContainer container) {
         Method onItemChange = findMethod(state.getClass(), "onItemChange", ItemContainer.ItemContainerChangeEvent.class);
         if (onItemChange == null) {
             return;
@@ -279,107 +401,17 @@ public final class FeedTroughWaterStateService {
         });
     }
 
-    private static short resolveBaseContainerCapacity() {
-        BlockType baseType = resolveVariantBlockType(BASE_BLOCK_ID);
-        if (baseType == null) {
-            return 5;
-        }
-        Object stateData = invokeNoArg(baseType, "getState");
-        Integer configuredCapacity = invokeIntNoArg(stateData, "getCapacity");
-        if (configuredCapacity != null && configuredCapacity > 0 && configuredCapacity <= Short.MAX_VALUE) {
-            return configuredCapacity.shortValue();
-        }
-        return 5;
-    }
-
-    static String resolveCanonicalWaterBlockIdForCharges(int charges) {
-        int clampedCharges = clampCharges(charges);
-        if (clampedCharges <= 0) {
-            return BASE_BLOCK_ID;
-        }
-        if (clampedCharges >= MAX_WATER_CHARGES) {
-            return WATER_STATE_FULL_BLOCK_ID;
-        }
-        double fullnessPercent = ((double) clampedCharges * 100.0) / (double) MAX_WATER_CHARGES;
-        int bucket = (int) Math.ceil(fullnessPercent / 10.0) * 10;
-        int clampedBucket = Math.max(10, Math.min(90, bucket));
-        return switch (clampedBucket) {
-            case 90 -> WATER_STATE_90_BLOCK_ID;
-            case 80 -> WATER_STATE_80_BLOCK_ID;
-            case 70 -> WATER_STATE_70_BLOCK_ID;
-            case 60 -> WATER_STATE_60_BLOCK_ID;
-            case 50 -> WATER_STATE_50_BLOCK_ID;
-            case 40 -> WATER_STATE_40_BLOCK_ID;
-            case 30 -> WATER_STATE_30_BLOCK_ID;
-            case 20 -> WATER_STATE_20_BLOCK_ID;
-            default -> WATER_STATE_10_BLOCK_ID;
-        };
-    }
-
-    private static void setStoredCharges(@Nullable WorldChunk chunk,
-                                         @Nullable Store<ChunkStore> chunkStore,
-                                         int x,
-                                         int y,
-                                         int z,
-                                         @Nonnull Object state,
-                                         int charges) {
-        int clampedCharges = clampCharges(charges);
-        setComponentCharges(chunk, chunkStore, x, y, z, clampedCharges);
-        FeedTroughContainerCompat.setDroplist(state, null);
-    }
-
-    private static int parseStoredCharges(@Nullable String encoded) {
-        if (encoded == null || encoded.isBlank()) {
-            return -1;
-        }
-        String trimmed = encoded.trim();
-        if (!trimmed.startsWith(LEGACY_CHARGE_STORAGE_PREFIX)) {
-            return -1;
-        }
-        String value = trimmed.substring(LEGACY_CHARGE_STORAGE_PREFIX.length());
-        if (value.isBlank()) {
-            return -1;
-        }
-        try {
-            return Integer.parseInt(value);
-        } catch (NumberFormatException ignored) {
-            return -1;
-        }
-    }
-
-    private static int clampCharges(int charges) {
-        return Math.max(0, Math.min(MAX_WATER_CHARGES, charges));
-    }
-
-    private static void setComponentCharges(@Nullable WorldChunk chunk,
-                                            @Nullable Store<ChunkStore> chunkStore,
-                                            int x,
-                                            int y,
-                                            int z,
-                                            int charges) {
-        TameworkFeedTroughWaterChargesComponent waterChargesComponent =
-                TameworkFeedTroughWaterChargesComponent.resolve(chunk, chunkStore, x, y, z);
-        if (waterChargesComponent == null) {
-            return;
-        }
-        waterChargesComponent.setWaterCharges(clampCharges(charges));
-    }
-
     @Nullable
-    private static BlockType resolveVariantBlockType(@Nonnull String canonicalId) {
-        BlockType exact = BlockType.getAssetMap().getAsset(canonicalId);
-        if (exact != null) {
-            return exact;
+    private static Method findMethod(@Nonnull Class<?> type, @Nonnull String methodName, @Nonnull Class<?>... parameterTypes) {
+        try {
+            return type.getMethod(methodName, parameterTypes);
+        } catch (NoSuchMethodException ignored) {
+            return null;
         }
-        BlockType oneStar = BlockType.getAssetMap().getAsset("*" + canonicalId);
-        if (oneStar != null) {
-            return oneStar;
-        }
-        return BlockType.getAssetMap().getAsset("**" + canonicalId);
     }
 
     @Nonnull
-    private static String normalizeId(@Nullable String id) {
+    static String normalizeId(@Nullable String id) {
         if (id == null || id.isBlank()) {
             return "";
         }
@@ -390,36 +422,6 @@ public final class FeedTroughWaterStateService {
         return normalized;
     }
 
-    @Nullable
-    private static Method findMethod(@Nonnull Class<?> type,
-                                     @Nonnull String methodName,
-                                     @Nonnull Class<?>... parameterTypes) {
-        try {
-            return type.getMethod(methodName, parameterTypes);
-        } catch (NoSuchMethodException ignored) {
-            return null;
-        }
-    }
-
-    @Nullable
-    private static Object invokeNoArg(@Nullable Object target, @Nonnull String methodName) {
-        if (target == null) {
-            return null;
-        }
-        try {
-            Method method = target.getClass().getMethod(methodName);
-            return method.invoke(target);
-        } catch (ReflectiveOperationException ignored) {
-            return null;
-        }
-    }
-
-    @Nullable
-    private static Integer invokeIntNoArg(@Nullable Object target, @Nonnull String methodName) {
-        Object value = invokeNoArg(target, methodName);
-        if (value instanceof Number number) {
-            return number.intValue();
-        }
-        return null;
+    record TroughVariant(@Nonnull String baseBlockId, int maxWaterCharges, int foodCapacity) {
     }
 }

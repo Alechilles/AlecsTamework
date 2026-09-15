@@ -41,4 +41,41 @@ class FeedTroughWaterStateServiceTest {
         assertFalse(FeedTroughWaterStateService.isWaterTroughBlockId("Tw_Feed_Trough"));
         assertFalse(FeedTroughWaterStateService.isWaterTroughBlockId("Tw_Feed_Trough_State_Food_State_60"));
     }
+
+    @Test
+    void resolvesLegacyFoodWithoutComponentAndRejectsUnrelatedWaterStates() {
+        var empty = FeedTroughWaterStateService.resolveVariant(null, null, 0, 0, 0, "Tw_Feed_Trough");
+        var food = FeedTroughWaterStateService.resolveVariant(null, null, 0, 0, 0, "Tw_Feed_Trough_State_Food_State_50");
+        assertEquals(empty, food);
+        assertEquals("Tw_Feed_Trough_State_Food_State_Full",
+                FeedTroughWaterStateService.resolveCanonicalFoodBlockIdForPercent(food, 100));
+        assertEquals(null, FeedTroughWaterStateService.resolveVariant(null, null, 0, 0, 0, "Other_State_Water"));
+        assertFalse(FeedTroughWaterStateService.isWaterStateOf("Other_State_Water_State_Full", "Pack_Trough"));
+        assertEquals(0, FeedTroughWaterStateService.inferChargesFromWaterBlockId(
+                "Pack_Trough_State_Water_State_Empty", "Pack_Trough", 800));
+        assertTrue(FeedTroughWaterStateService.isWaterStateOf("Pack_Trough_State_Water_State_Full", "Pack_Trough"));
+    }
+    @Test
+    void resolvesConfiguredVariantStatesAtThatVariantsCapacity() {
+        assertEquals(
+                "RH_Feed_Trough_Tier_4_State_Water_State_Full",
+                FeedTroughWaterStateService.resolveCanonicalWaterBlockIdForCharges(560, "RH_Feed_Trough_Tier_4", 560)
+        );
+        assertEquals(
+                "RH_Feed_Trough_Tier_4_State_Water_State_90",
+                FeedTroughWaterStateService.resolveCanonicalWaterBlockIdForCharges(559, "RH_Feed_Trough_Tier_4", 560)
+        );
+        assertEquals(
+                448,
+                FeedTroughWaterStateService.inferChargesFromWaterBlockId(
+                        "RH_Feed_Trough_Tier_4_State_Water_State_80", "RH_Feed_Trough_Tier_4", 560
+                )
+        );
+        FeedTroughWaterStateService.TroughVariant variant =
+                new FeedTroughWaterStateService.TroughVariant("RH_Feed_Trough_Tier_4", 560, 14);
+        assertEquals(
+                "RH_Feed_Trough_Tier_4_State_Food_State_50",
+                FeedTroughWaterStateService.resolveCanonicalFoodBlockIdForPercent(variant, 50)
+        );
+    }
 }
