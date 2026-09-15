@@ -71,10 +71,9 @@ Return a ready contribution using these presentation keys:
 
 | Scope | Key | Type | Display |
 | --- | --- | --- | --- |
-| Page | `capacity.text` | String | Summary above the toolbar and animal list |
+| Page | `capacity.text` | String | Summary on the panel controls row |
 | Page | `capacity.tooltip` | String | Summary hover text |
-| Row | `portrait.stars` | Long, 1 through 5 | Five filled/empty stars over the portrait |
-| Row | `portrait.stars.tooltip` | String | Rating hover text |
+| Row | `portrait.stars` | Long, 1 through 5 | One to five gold star images at the portrait top-left |
 
 Key row data by `CommandUiCompanionRow.rowId()`. The nullable `traits()` view
 contains detached resolved trait values for live and saved animals, including

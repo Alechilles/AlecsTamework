@@ -16,7 +16,6 @@ final class CommandUiDefaultDecorationBinder {
     private static final String CAPACITY_TEXT = "capacity.text";
     private static final String CAPACITY_TOOLTIP = "capacity.tooltip";
     private static final String PORTRAIT_STARS = "portrait.stars";
-    private static final String PORTRAIT_STARS_TOOLTIP = "portrait.stars.tooltip";
 
     private CommandUiDefaultDecorationBinder() {
     }
@@ -60,10 +59,10 @@ final class CommandUiDefaultDecorationBinder {
         StarDecoration stars = state.stars(rowId);
         boolean visible = stars != null;
         commands.set(selector + " #ContributorPortraitStars.Visible", visible);
-        commands.set(selector + " #ContributorPortraitStarsTooltip.Visible", visible);
         if (!visible) return;
-        commands.set(selector + " #ContributorPortraitStars.Text", glyphs(stars.count()));
-        commands.set(selector + " #ContributorPortraitStarsTooltip.TooltipText", stars.tooltip());
+        for (int index = 1; index <= 5; index++) {
+            commands.set(selector + " #ContributorStar" + index + ".Visible", index <= stars.count());
+        }
     }
 
     @Nullable
@@ -77,11 +76,6 @@ final class CommandUiDefaultDecorationBinder {
         CommandUiValue count = values.get(PORTRAIT_STARS);
         return count != null && count.type() == CommandUiValue.Type.LONG
                 && count.longValue() >= 1L && count.longValue() <= 5L;
-    }
-
-    @Nonnull
-    private static String glyphs(int count) {
-        return "★".repeat(count) + "☆".repeat(5 - count);
     }
 
     record State(@Nullable String capacityText, @Nullable String capacityTooltip,
@@ -103,11 +97,10 @@ final class CommandUiDefaultDecorationBinder {
             if (count == null || count.type() != CommandUiValue.Type.LONG) return null;
             long raw = count.longValue();
             if (raw < 1 || raw > 5) return null;
-            String tooltip = string(values.get(PORTRAIT_STARS_TOOLTIP));
-            return new StarDecoration((int) raw, tooltip == null ? "" : tooltip);
+            return new StarDecoration((int) raw);
         }
     }
 
-    private record StarDecoration(int count, @Nonnull String tooltip) {
+    private record StarDecoration(int count) {
     }
 }

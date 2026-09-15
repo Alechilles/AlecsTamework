@@ -39,10 +39,10 @@ class CommandUiDefaultDecorationBinderTest {
                 "#TameworkContributorCapacity.Text"));
         assertEquals(encoded("Your current limit."), data(commands,
                 "#TameworkContributorCapacity.TooltipText"));
-        assertEquals(encoded("★★★☆☆"), data(commands,
-                "#Card #ContributorPortraitStars.Text"));
-        assertEquals(encoded("Excellent traits."), data(commands,
-                "#Card #ContributorPortraitStarsTooltip.TooltipText"));
+        for (int index = 1; index <= 5; index++) {
+            assertEquals(encoded(index <= 3), data(commands,
+                    "#Card #ContributorStar" + index + ".Visible"));
+        }
         assertEquals(encoded(false), data(commands,
                 "#CardInvalid #ContributorPortraitStars.Visible"));
     }

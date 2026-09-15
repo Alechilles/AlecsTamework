@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Portrait quality ratings now use gold star images at the top-left, without a tooltip.
+  Animal capacity appears on the controls row.
+
 - The standard animal panel can display optional plugin-provided portrait stars
   and a capacity summary, using detached traits from live and saved animals.
 

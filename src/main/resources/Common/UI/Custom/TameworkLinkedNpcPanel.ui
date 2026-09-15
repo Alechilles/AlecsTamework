@@ -70,6 +70,8 @@ Group #BondedRosterModeTabs { Anchor: (Top: 0, Left: 0, Width: 284, Height: 30);
 }
 Label #BondedRosterCapacity { Anchor: (Top: 0, Right: 0, Width: 180, Height: 28); Visible: false; Style: (FontSize: 12, TextColor: #d6d9d0, HorizontalAlignment: End, VerticalAlignment: Center); TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
 
+Label #TameworkContributorCapacity { Anchor: (Top: 0, Right: 0, Width: 100, Height: 28); Visible: false; Text: ""; Style: (FontSize: 12, TextColor: #d6d9d0, HorizontalAlignment: End, VerticalAlignment: Center); TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
+
 Group #TameworkLinkedPanelControlsSecondary {
                 Anchor: (Top: 0, Left: 444, Width: 360, Height: 28);
                 LayoutMode: Left;
@@ -188,7 +190,6 @@ Group #TameworkLinkedPanelSubtitleRadiusSlot {
  Group #Content {
  Anchor: (Top: 44, Left: 10, Right: 10, Bottom: 10);
  LayoutMode: Top;
-Label #TameworkContributorCapacity { Anchor: (Height: 22); Visible: false; Text: ""; Style: (FontSize: 12, TextColor: #d6d9d0, HorizontalAlignment: End, VerticalAlignment: Center); TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
  Group #TameworkLinkedPanelToolbar { Anchor: (Height: 0); Visible: false;
  Group #TameworkLinkedPanelSubtitleRow { Visible: false; Anchor: (Top: 0, Left: 0, Width: 158, Height: 28);
 DropdownBox #TameworkLinkedPanelGroupSelectorDropdown {
