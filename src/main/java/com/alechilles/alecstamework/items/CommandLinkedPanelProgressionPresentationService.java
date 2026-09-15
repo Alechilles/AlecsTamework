@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
+import com.alechilles.alecstamework.api.ProgressionView;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
@@ -9,6 +10,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierBreakdownService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
+import com.alechilles.alecstamework.npc.progression.TraitPresentationViewMapper;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
 import com.alechilles.alecstamework.ui.TraitDescriptionFormatter;
@@ -159,6 +161,18 @@ final class CommandLinkedPanelProgressionPresentationService {
                                                         Store<EntityStore> store,
                                                         @Nullable String language) {
         return readTraitIndicators(npcRef, store, TameworkTraitsComponent.getComponentType(), language);
+    }
+
+    /** Reads immutable trait values during the existing world-thread card pass. */
+    @Nullable
+    ProgressionView.TraitsView readLoadedTraitValues(Ref<EntityStore> npcRef,
+                                                      Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) return null;
+        TameworkTraitsComponent traits = safeGetComponent(store, npcRef,
+                TameworkTraitsComponent.getComponentType());
+        if (traits == null) return null;
+        return TraitPresentationViewMapper.map(traits,
+                resolveTraitConfig(npcRef, store, traits));
     }
 
     private LinkedNpcTraitIndicator[] readTraitIndicators(Ref<EntityStore> npcRef,

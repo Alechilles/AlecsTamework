@@ -34,6 +34,8 @@ final class CommandSelectionLinkedPanelRuntime {
     }
 
     void build(UICommandBuilder commands, UIEventBuilder events) {
+        CommandUiDefaultDecorationBinder.bindHeader(commands,
+                page.defaultDecorations());
         bindGroupShortcuts(commands, events, page.refreshTransaction.values(), true);
         page.cardRenderState.markRendered(page.linkedNpcEntries,
                 page.pendingUnlinkNpcUuid, page.featureController.presentations());
@@ -48,6 +50,20 @@ final class CommandSelectionLinkedPanelRuntime {
             bindCard(commands, events, index, page.linkedNpcEntries[index], true,
                     page.featureController.presentation(
                             page.linkedNpcEntries[index].npcUuid()));
+        }
+    }
+
+    void bindDefaultDecorations(UICommandBuilder commands) {
+        CommandUiDefaultDecorationBinder.bindHeader(commands,
+                page.defaultDecorations());
+        for (int index = 0; index < page.linkedNpcEntries.length; index++) {
+            LinkedNpcEntry entry = page.linkedNpcEntries[index];
+            CommandPanelFeaturePresentation presentation = page.featureController
+                    .presentation(entry.npcUuid());
+            if (presentation != null && presentation.bonded() != null) continue;
+            CommandUiDefaultDecorationBinder.bindCard(commands,
+                    "#TameworkLinkedPanelList[" + index + "]", entry.npcUuid(),
+                    page.defaultDecorations());
         }
     }
 
@@ -300,6 +316,9 @@ final class CommandSelectionLinkedPanelRuntime {
                 page.isPendingUnlink(entry.npcUuid()), page.cardBindingConfig,
                 page.resolveLanguage(), presentation);
         if (presentation != null && presentation.bonded() != null) return;
+        CommandUiDefaultDecorationBinder.bindCard(commands,
+                "#TameworkLinkedPanelList[" + index + "]", entry.npcUuid(),
+                page.defaultDecorations());
         locationCopy.bind(commands, index, entry);
         String selector = "#TameworkLinkedPanelList[" + index + "] #GroupSelector";
         boolean available = canAssignGroup(entry, presentation);

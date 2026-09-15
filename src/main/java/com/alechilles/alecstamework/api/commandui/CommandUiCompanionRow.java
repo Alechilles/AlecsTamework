@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.api.commandui;
 
+import com.alechilles.alecstamework.api.ProgressionView;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -40,6 +41,8 @@ public final class CommandUiCompanionRow {
     private final Integer currentHappiness;
     @Nullable
     private final Integer maxHappiness;
+    @Nullable
+    private final ProgressionView.TraitsView traits;
     @Nonnull
     private final Map<String, CommandUiActionView> actions;
     @Nonnull
@@ -88,6 +91,37 @@ public final class CommandUiCompanionRow {
             @Nullable Map<String, CommandUiActionView> actions,
             @Nullable Map<String, String> presentation
     ) {
+        this(rowId, companionUuid, profileId, displayName, role, species, gender,
+                lifecycleStatus, linked, active, locationAvailable, currentWorld,
+                currentHealth, maxHealth, currentHappiness, maxHappiness, null,
+                actions, presentation);
+    }
+
+    /**
+     * Full detached companion row with resolved trait values for optional
+     * presentation contributors. The view contains no live ECS state.
+     */
+    public CommandUiCompanionRow(
+            @Nonnull UUID rowId,
+            @Nullable UUID companionUuid,
+            @Nullable String profileId,
+            @Nonnull String displayName,
+            @Nullable String role,
+            @Nullable String species,
+            @Nullable String gender,
+            @Nullable String lifecycleStatus,
+            boolean linked,
+            boolean active,
+            boolean locationAvailable,
+            boolean currentWorld,
+            @Nullable Integer currentHealth,
+            @Nullable Integer maxHealth,
+            @Nullable Integer currentHappiness,
+            @Nullable Integer maxHappiness,
+            @Nullable ProgressionView.TraitsView traits,
+            @Nullable Map<String, CommandUiActionView> actions,
+            @Nullable Map<String, String> presentation
+    ) {
         this.rowId = Objects.requireNonNull(rowId, "rowId");
         this.companionUuid = companionUuid;
         this.profileId = normalize(profileId);
@@ -104,6 +138,7 @@ public final class CommandUiCompanionRow {
         this.maxHealth = maxHealth;
         this.currentHappiness = currentHappiness;
         this.maxHappiness = maxHappiness;
+        this.traits = traits;
         this.actions = copyActions(actions);
         this.presentation = copyPresentation(presentation);
     }
@@ -205,6 +240,12 @@ public final class CommandUiCompanionRow {
         return maxHappiness;
     }
 
+    /** Optional resolved trait data available to command-UI contributors. */
+    @Nullable
+    public ProgressionView.TraitsView traits() {
+        return traits;
+    }
+
     @Nonnull
     public Map<String, CommandUiActionView> actions() {
         return actions;
@@ -240,6 +281,7 @@ public final class CommandUiCompanionRow {
                 && Objects.equals(maxHealth, that.maxHealth)
                 && Objects.equals(currentHappiness, that.currentHappiness)
                 && Objects.equals(maxHappiness, that.maxHappiness)
+                && Objects.equals(traits, that.traits)
                 && actions.equals(that.actions)
                 && presentation.equals(that.presentation);
     }
@@ -249,7 +291,7 @@ public final class CommandUiCompanionRow {
         return Objects.hash(rowId, companionUuid, profileId, displayName, role,
                 species, gender, lifecycleStatus, linked, active,
                 locationAvailable, currentWorld, currentHealth, maxHealth,
-                currentHappiness, maxHappiness, actions, presentation);
+                currentHappiness, maxHappiness, traits, actions, presentation);
     }
 
     @Nonnull

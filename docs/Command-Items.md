@@ -300,6 +300,11 @@ Client UI files live below `Common/UI/Custom`. Runtime append paths are
 relative to that directory. See the durable wiki reference and recipe for
 registration, capability, bounds, diagnostics, and cleanup details.
 
+The standard animal panel also supports optional contributor summaries and
+portrait stars without a custom renderer. See the
+[standard-panel decoration contract](../wiki/Modder-Documentation/Public-API/API-Reference/Command-UI-Provider-API-Reference.md#optional-decorations-in-the-standard-panel)
+for keys, detached traits, and layout limits.
+
 ### Custom Java command-HUD composition
 
 The target HUD and equipped-tool hotswap strip are independent presentation

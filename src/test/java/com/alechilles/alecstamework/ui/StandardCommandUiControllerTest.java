@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.api.commandui.CommandUiPanelState;
 import com.alechilles.alecstamework.api.commandui.CommandUiSession;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
 import com.alechilles.alecstamework.api.commandui.CommandUiUpdateSink;
+import com.alechilles.alecstamework.api.commandui.CommandUiUpdate;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import java.util.List;
@@ -47,17 +48,47 @@ class StandardCommandUiControllerTest {
         assertEquals(1, delegate.closeCount);
     }
 
+    @Test
+    void deliversInitialAndRefreshSnapshotsToTheStandardRenderer() {
+        RecordingDelegate delegate = new RecordingDelegate();
+        RecordingSession session = new RecordingSession();
+        StandardCommandUiController controller = new StandardCommandUiController(delegate);
+
+        controller.buildInitial(new CommandUiOpenContext(), session, session.snapshot(),
+                null, null, new UICommandBuilder(), new UIEventBuilder());
+        CommandUiSnapshot refreshed = session.snapshot().withPresentationRevision(2L);
+        controller.update(new CommandUiUpdate(refreshed, session.snapshot(),
+                com.alechilles.alecstamework.api.commandui.CommandUiChangeSet.full()),
+                new UICommandBuilder(), new UIEventBuilder());
+
+        assertSame(session.snapshot(), delegate.initialSnapshot);
+        assertSame(refreshed, delegate.refreshSnapshot);
+    }
+
     private static final class RecordingDelegate
             implements StandardCommandUiController.Delegate {
         private LinkedNpcPanelPacketSender packetSender;
         private UICommandBuilder initialCommands;
         private UIEventBuilder initialEvents;
         private CommandSelectionEventData event;
+        private CommandUiSnapshot initialSnapshot;
+        private CommandUiSnapshot refreshSnapshot;
         private int closeCount;
 
         @Override
         public void configurePacketSender(LinkedNpcPanelPacketSender sender) {
             packetSender = sender;
+        }
+
+        @Override
+        public void configureSnapshot(CommandUiSnapshot snapshot) {
+            initialSnapshot = snapshot;
+        }
+
+        @Override
+        public void updateSnapshot(CommandUiSnapshot snapshot,
+                                   UICommandBuilder commands) {
+            refreshSnapshot = snapshot;
         }
 
         @Override

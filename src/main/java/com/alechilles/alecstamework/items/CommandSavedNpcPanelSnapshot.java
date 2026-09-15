@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.api.ProgressionView;
 import com.alechilles.alecstamework.companion.coop.CoopSlotKey;
 import com.alechilles.alecstamework.items.locate.CapturedItemLocationIndex.CaptureKey;
 import com.alechilles.alecstamework.config.assets.TwDynamicIconConfig;
@@ -27,6 +28,7 @@ import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
+import com.alechilles.alecstamework.npc.progression.TraitPresentationViewMapper;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
 import com.hypixel.hytale.codec.ExtraInfo;
@@ -184,7 +186,8 @@ final class CommandSavedNpcPanelSnapshot {
                 .withPortraitIcon(resolvePortrait(effectiveRole, base.portraitIcon()))
                 .withBreedingHappinessRatio(base.breedingHappinessRatio())
                 .withFlightToggle(base.flightToggleAvailable(), base.flightToggleAirborne())
-                .withShoulderRide(base.shoulderRideAvailable(), base.shoulderRideMounted());
+                .withShoulderRide(base.shoulderRideAvailable(), base.shoulderRideMounted())
+                .withTraitValues(traitValues(facts.traits, effectiveRole));
         if (base.ownedActions()) {
             applied = applied.withOwnedActions();
         }
@@ -398,6 +401,26 @@ final class CommandSavedNpcPanelSnapshot {
         }
         return new CommandLinkedPanelProgressionPresentationService().buildSavedTraitIndicators(
                 config, values, role, language);
+    }
+
+    @Nullable
+    private static ProgressionView.TraitsView traitValues(
+            @Nullable Traits saved,
+            @Nullable String roleId
+    ) {
+        if (saved == null) return null;
+        TwTraitConfig config = saved.configId == null ? null
+                : TwTraitConfig.resolveById(saved.configId);
+        if (config == null && roleId != null && !roleId.isBlank()) {
+            config = TwTraitConfig.resolveForRole(roleId);
+        }
+        Map<String, Double> values = new LinkedHashMap<>();
+        for (Trait value : saved.values) {
+            if (value == null || value.id == null || value.id.isBlank()
+                    || !Double.isFinite(value.value)) continue;
+            values.putIfAbsent(value.id, value.value);
+        }
+        return TraitPresentationViewMapper.map(saved.configId, 0L, values, config);
     }
 
     private static <T> T first(@Nullable T preferred, @Nullable T fallback) { return preferred != null ? preferred : fallback; }

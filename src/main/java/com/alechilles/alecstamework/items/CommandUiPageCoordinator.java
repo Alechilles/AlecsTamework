@@ -161,7 +161,8 @@ final class CommandUiPageCoordinator {
             }
         };
         CommandUiCompositionSession composition = null;
-        if (resolved.custom()) {
+        if (resolved.custom() || !resolved.contributors().isEmpty()
+                || !resolved.contributorStatuses().isEmpty()) {
             try {
                 composition = CommandUiCompositionSession.create(
                         baseSnapshot, context, resolved.contributors(),
@@ -229,8 +230,8 @@ final class CommandUiPageCoordinator {
                     Objects.requireNonNull(composition, "composition")
                             .actionBindings(),
                     registry.contributorRegistry(),
-                    () -> selectedRendererId != null
-                            && registry.rendererRegistry()
+                    () -> selectedRendererId == null
+                            || registry.rendererRegistry()
                             .resolve(selectedRendererId.value())
                             .map(current -> current.generation()
                                     == selectedRendererGeneration)

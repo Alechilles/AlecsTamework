@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.ui;
 import com.alechilles.alecstamework.api.commandui.CommandUiOpenContext;
 import com.alechilles.alecstamework.api.commandui.CommandUiSession;
 import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
+import com.alechilles.alecstamework.api.commandui.CommandUiUpdate;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -26,6 +27,17 @@ public final class StandardCommandUiController
             @Override
             public void configurePacketSender(LinkedNpcPanelPacketSender sender) {
                 page.configureHostPacketSender(sender);
+            }
+
+            @Override
+            public void configureSnapshot(CommandUiSnapshot snapshot) {
+                page.configureDefaultDecorations(snapshot);
+            }
+
+            @Override
+            public void updateSnapshot(CommandUiSnapshot snapshot,
+                                       UICommandBuilder commands) {
+                page.updateDefaultDecorations(snapshot, commands);
             }
 
             @Override
@@ -71,10 +83,18 @@ public final class StandardCommandUiController
             UIEventBuilder events
     ) {
         if (closed.get()) return;
+        delegate.configureSnapshot(snapshot);
         delegate.configurePacketSender((partialCommands, partialEvents) ->
                 session.updateSink().submit(
                         partialCommands, partialEvents, false));
         delegate.build(ref, commands, events, store);
+    }
+
+    @Override
+    public void update(CommandUiUpdate update, UICommandBuilder commands,
+                       UIEventBuilder events) {
+        if (closed.get()) return;
+        delegate.updateSnapshot(update.snapshot(), commands);
     }
 
     @Override
@@ -98,6 +118,13 @@ public final class StandardCommandUiController
 
     /** Narrow adapter that keeps the legacy renderer behind the controller. */
     interface Delegate {
+        default void configureSnapshot(CommandUiSnapshot snapshot) {
+        }
+
+        default void updateSnapshot(CommandUiSnapshot snapshot,
+                                    UICommandBuilder commands) {
+        }
+
         void configurePacketSender(LinkedNpcPanelPacketSender sender);
 
         void build(Ref<EntityStore> ref,

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The standard animal panel can display optional plugin-provided portrait stars
+  and a capacity summary, using detached traits from live and saved animals.
+
 - Companion happiness tooltips now explain current, base, and target values, with
   colored active effects and a gray list of inactive configured effects.
 - Added a read-only saved trait page API for owner-scoped companion lists.

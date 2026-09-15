@@ -276,6 +276,8 @@ final class CommandLoadedNpcStatusSnapshotService {
                 false,
                 0L
         );
+        entry = entry.withTraitValues(
+                progressionPresentationService.readLoadedTraitValues(npcRef, store));
         TwCompanionFlightToggleSettings flightToggle =
                 TwCompanionConfig.resolveEffectiveForRole(resolvedRoleId)
                         .getFlightToggle();

@@ -63,6 +63,34 @@ types. Tamework checks these declarations before it creates the page.
 The registration overloads without descriptors are unrestricted compatibility
 overloads. New integrations should use explicit descriptors.
 
+## Optional decorations in the standard panel
+
+The standard renderer can display an optional contributor without a custom
+`UiRendererId`. Add its ID to `UiContributors` and register the provider normally.
+Return a ready contribution using these presentation keys:
+
+| Scope | Key | Type | Display |
+| --- | --- | --- | --- |
+| Page | `capacity.text` | String | Summary above the toolbar and animal list |
+| Page | `capacity.tooltip` | String | Summary hover text |
+| Row | `portrait.stars` | Long, 1 through 5 | Five filled/empty stars over the portrait |
+| Row | `portrait.stars.tooltip` | String | Rating hover text |
+
+Key row data by `CommandUiCompanionRow.rowId()`. The nullable `traits()` view
+contains detached resolved trait values for live and saved animals, including
+bounds, merit direction, and resolved output-yield bonuses. Read these snapshots
+without accessing live entities. The contributor owns its scoring policy and
+viewer-localized text; the renderer grants no gameplay bonuses.
+
+Only generic animal cards display portrait decorations; bonded-companion cards
+retain their own layout. Missing or invalid values hide the affected decoration.
+When multiple ready contributors supply the same slot, the first valid value in
+contributor-ID order wins. Initial and refreshed snapshots update the display.
+Decorated standard pages use the existing five-second progression refresh while
+the page is open, bounded to that player's command snapshot. Closing the page
+cancels its refresh coordinator. Close the registration handle when the
+contributing plugin stops.
+
 ## Command Config Selection
 
 Select one renderer and zero or more contributors in the effective

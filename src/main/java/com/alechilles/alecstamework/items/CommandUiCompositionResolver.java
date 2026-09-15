@@ -35,8 +35,10 @@ final class CommandUiCompositionResolver {
 
     /**
      * Resolves a custom presentation or returns a standard controller.
-     * Optional contributors that are not registered are omitted. A missing
-     * renderer or required contributor uses the standard controller.
+     * The standard presentation can compose configured contributors when no
+     * renderer is requested. Optional contributors that are not registered
+     * are omitted. A missing renderer or required contributor uses the
+     * uncomposed standard controller.
      */
     @Nonnull
     Resolved resolve(
@@ -48,7 +50,9 @@ final class CommandUiCompositionResolver {
         Objects.requireNonNull(requirements, "requirements");
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(standardFactory, "standardFactory");
-        if (rendererId == null) return standard(standardFactory);
+        if (rendererId == null) {
+            return standardWithContributors(standardFactory, requirements);
+        }
 
         Optional<CommandUiRendererRegistry.ResolvedRenderer> renderer =
                 renderers.resolve(rendererId.value());
@@ -131,6 +135,43 @@ final class CommandUiCompositionResolver {
         return new Resolved(controller, null, 0L, false, List.of());
     }
 
+    /**
+     * Resolves contributors for the built-in page. The standard page has no
+     * renderer descriptor: it accepts generic contributor data and leaves any
+     * unsupported presentation data unused.
+     */
+    @Nonnull
+    private Resolved standardWithContributors(
+            @Nonnull Supplier<CommandUiPageController<?>> standardFactory,
+            @Nonnull List<CommandUiContributorRequirement> requirements
+    ) {
+        List<CommandUiCompositionSession.Binding> bindings = new ArrayList<>();
+        Map<CommandUiContributorId, CommandUiContribution.Status> statuses =
+                new LinkedHashMap<>();
+        for (CommandUiContributorRequirement requirement : requirements) {
+            if (requirement == null || requirement.id() == null) continue;
+            Optional<CommandUiContributorRegistry.ResolvedContributor>
+                    contributor = contributors.resolve(requirement.id().value());
+            if (contributor.isEmpty()) {
+                if (requirement.required()) return standard(standardFactory);
+                statuses.put(requirement.id(),
+                        CommandUiContribution.Status.OPTIONAL_UNAVAILABLE);
+                continue;
+            }
+            CommandUiContributorRegistry.ResolvedContributor value =
+                    contributor.orElseThrow();
+            bindings.add(new CommandUiCompositionSession.Binding(
+                    value.id(), value.generation(), value.provider(),
+                    requirement.required(), contributors));
+        }
+        CommandUiPageController<?> controller = Objects.requireNonNull(
+                standardFactory.get(), "standard controller");
+        Objects.requireNonNull(controller.eventCodec(),
+                "standard controller event codec");
+        return new Resolved(controller, null, 0L, false,
+                List.copyOf(bindings), statuses);
+    }
+
     private static void close(@Nullable CommandUiPageController<?> controller) {
         if (controller == null) return;
         try {
@@ -161,10 +202,9 @@ final class CommandUiCompositionResolver {
             statuses = java.util.Collections.unmodifiableMap(
                     new LinkedHashMap<>(Objects.requireNonNull(
                             statuses, "statuses")));
-            if (!custom && (rendererId != null || rendererGeneration != 0L
-                    || !contributors.isEmpty() || !statuses.isEmpty())) {
+            if (!custom && (rendererId != null || rendererGeneration != 0L)) {
                 throw new IllegalArgumentException(
-                        "Standard resolution cannot carry custom state.");
+                        "Standard resolution cannot carry renderer state.");
             }
         }
 

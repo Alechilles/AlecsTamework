@@ -45,18 +45,10 @@ final class CommandUiControllerResolver {
     private static Resolved fromComposition(
             @Nonnull CommandUiCompositionResolver.Resolved resolved
     ) {
-        if (!resolved.custom()) return standardResolved(resolved.controller());
         return new Resolved(resolved.controller(), resolved.rendererId(),
                 resolved.rendererGeneration(),
-                true, resolved.contributors(),
+                resolved.custom(), resolved.contributors(),
                 resolved.contributorStatuses());
-    }
-
-    @Nonnull
-    private static Resolved standardResolved(
-            @Nonnull CommandUiPageController<?> controller
-    ) {
-        return new Resolved(controller, null, 0L, false, List.of(), Map.of());
     }
 
     record Resolved(

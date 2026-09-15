@@ -94,7 +94,8 @@ final class LinkedNpcEntrySnapshotMapper {
                     .withFlightToggle(entry.flightToggleAvailable(),
                     entry.flightToggleAirborne())
                     .withShoulderRide(entry.shoulderRideAvailable(),
-                            entry.shoulderRideMounted());
+                            entry.shoulderRideMounted())
+                    .withTraitValues(entry.traitValues());
             if (entry.recoveryHeld()) {
                 snapshot = snapshot.withRecoveryHold(entry.recoveryIncidentId());
             }

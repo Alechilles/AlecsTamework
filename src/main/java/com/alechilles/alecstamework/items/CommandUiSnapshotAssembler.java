@@ -260,7 +260,7 @@ final class CommandUiSnapshotAssembler {
                 entry.hasHealth() ? entry.maxHealth() : null,
                 entry.hasHappiness() ? entry.currentHappiness() : null,
                 entry.hasHappiness() ? entry.maxHappiness() : null,
-                actions, presentation);
+                entry.traitValues(), actions, presentation);
     }
 
     /** Builds command choices from an asset config and issued action views. */

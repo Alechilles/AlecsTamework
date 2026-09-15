@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
+import com.alechilles.alecstamework.api.commandui.CommandUiSnapshot;
 import com.alechilles.alecstamework.items.CommandHotswapAssignmentStore.Slot;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
@@ -75,6 +76,8 @@ public final class TameworkCommandSelectionPage
     final Supplier<String> panelFilterModeValueSupplier;
     final Supplier<String> panelFilterInputValueSupplier;
     Supplier<java.util.Map<String, String>> panelGroupColorsSupplier = java.util.Map::of;
+    private CommandUiDefaultDecorationBinder.State defaultDecorations =
+            CommandUiDefaultDecorationBinder.State.EMPTY;
 
     /** Supplies current tool-group colors on the page's owning world thread, including empty groups. */
     public void configureGroupColors(@Nonnull Supplier<java.util.Map<String, String>> supplier) {
@@ -391,6 +394,22 @@ public final class TameworkCommandSelectionPage
     /** Routes background panel updates through the owning command UI host. */
     void configureHostPacketSender(@Nonnull LinkedNpcPanelPacketSender sender) {
         this.packetSender = Objects.requireNonNull(sender, "sender");
+    }
+
+    /** Accepts detached optional contributor presentation on this page's world thread. */
+    void configureDefaultDecorations(@Nonnull CommandUiSnapshot snapshot) {
+        defaultDecorations = CommandUiDefaultDecorationBinder.from(snapshot);
+    }
+
+    /** Updates the retained default decoration state and every currently rendered card. */
+    void updateDefaultDecorations(@Nonnull CommandUiSnapshot snapshot,
+                                  @Nonnull UICommandBuilder commands) {
+        configureDefaultDecorations(snapshot);
+        linkedPanelRuntime.bindDefaultDecorations(commands);
+    }
+
+    CommandUiDefaultDecorationBinder.State defaultDecorations() {
+        return defaultDecorations;
     }
 
     @Override

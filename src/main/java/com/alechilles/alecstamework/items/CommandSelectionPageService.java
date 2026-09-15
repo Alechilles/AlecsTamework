@@ -413,7 +413,7 @@ final class CommandSelectionPageService {
                         pageContext, buildNpcCallbacks(pageContext),
                         buildFeatureCallbacks(pageContext),
                         buildPanelCallbacks(pageContext))),
-                config.getUiContributors(), actionCatalog.genericBindings(),
+                forceStandard ? List.of() : config.getUiContributors(), actionCatalog.genericBindings(),
                 actionCatalog.bondedBindings(),
                 actionCatalog::attach,
                 refreshRequest,
@@ -436,7 +436,7 @@ final class CommandSelectionPageService {
             LOGGER.log(Level.WARNING,
                     "[tw-command-menu] refresh subscription failed", failure);
         }
-        if (created.custom()) {
+        if (created.custom() || created.composition() != null) {
             CommandUiAutomaticRefresh automaticRefresh =
                     new CommandUiAutomaticRefresh(created.session());
             if (created.host().own(automaticRefresh)) automaticRefresh.start();

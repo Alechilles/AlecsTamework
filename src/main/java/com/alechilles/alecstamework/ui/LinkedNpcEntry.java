@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.api.ProgressionView;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Objects;
@@ -58,6 +59,7 @@ public final class LinkedNpcEntry {
     private final FutureStat futureStatA;
     private final FutureStat futureStatB;
     private final LinkedNpcTraitIndicator[] traitIndicators;
+    private final ProgressionView.TraitsView traitValues;
     private final boolean traitsActionVisible;
     private final boolean traitsActionEnabled;
     private final boolean talentsActionVisible;
@@ -492,6 +494,7 @@ public final class LinkedNpcEntry {
         this.futureStatA = futureStatA;
         this.futureStatB = futureStatB;
         this.traitIndicators = sanitizeTraitIndicators(traitIndicators);
+        this.traitValues = null;
         this.traitsActionVisible = traitsActionVisible;
         this.traitsActionEnabled = traitsActionEnabled;
         this.talentsActionVisible = talentsActionVisible;
@@ -859,6 +862,21 @@ public final class LinkedNpcEntry {
         return traitIndicators;
     }
 
+    /** Resolved detached traits when the card source has the underlying values. */
+    public ProgressionView.TraitsView traitValues() {
+        return traitValues;
+    }
+
+    /** Returns an immutable presentation copy with detached resolved trait values. */
+    public LinkedNpcEntry withTraitValues(ProgressionView.TraitsView values) {
+        return Objects.equals(traitValues, values) ? this
+                : new LinkedNpcEntry(this, recoveryHeld, recoveryIncidentId,
+                        flightToggleAvailable, flightToggleAirborne,
+                        shoulderRideAvailable, shoulderRideMounted,
+                        breedingHappinessRatio, ownedActions, roleSubtitle,
+                        portraitIcon, location, values);
+    }
+
     public boolean hasAnyFutureAction() {
         return traitsActionVisible || talentsActionVisible;
     }
@@ -974,6 +992,18 @@ public final class LinkedNpcEntry {
                           boolean shoulderRideAvailable, boolean shoulderRideMounted,
                           double breedingHappinessRatio, boolean ownedActions,
                           String roleSubtitle, String portraitIcon, Location location) {
+        this(source, recoveryHeld, incidentId, flightToggleAvailable,
+                flightToggleAirborne, shoulderRideAvailable, shoulderRideMounted,
+                breedingHappinessRatio, ownedActions, roleSubtitle, portraitIcon,
+                location, source.traitValues);
+    }
+
+    private LinkedNpcEntry(LinkedNpcEntry source, boolean recoveryHeld, String incidentId,
+                          boolean flightToggleAvailable, boolean flightToggleAirborne,
+                          boolean shoulderRideAvailable, boolean shoulderRideMounted,
+                          double breedingHappinessRatio, boolean ownedActions,
+                          String roleSubtitle, String portraitIcon, Location location,
+                          ProgressionView.TraitsView traitValues) {
         this.portraitIcon = portraitIcon;
         this.npcUuid = source.npcUuid;
         this.displayName = source.displayName;
@@ -1021,6 +1051,7 @@ public final class LinkedNpcEntry {
         this.futureStatA = source.futureStatA;
         this.futureStatB = source.futureStatB;
         this.traitIndicators = source.traitIndicators.clone();
+        this.traitValues = traitValues;
         this.traitsActionVisible = source.traitsActionVisible;
         this.traitsActionEnabled = source.traitsActionEnabled;
         this.talentsActionVisible = source.talentsActionVisible;

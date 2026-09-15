@@ -188,6 +188,7 @@ Group #TameworkLinkedPanelSubtitleRadiusSlot {
  Group #Content {
  Anchor: (Top: 44, Left: 10, Right: 10, Bottom: 10);
  LayoutMode: Top;
+Label #TameworkContributorCapacity { Anchor: (Height: 22); Visible: false; Text: ""; Style: (FontSize: 12, TextColor: #d6d9d0, HorizontalAlignment: End, VerticalAlignment: Center); TextTooltipStyle: $C.@DefaultTextTooltipStyle; }
  Group #TameworkLinkedPanelToolbar { Anchor: (Height: 0); Visible: false;
  Group #TameworkLinkedPanelSubtitleRow { Visible: false; Anchor: (Top: 0, Left: 0, Width: 158, Height: 28);
 DropdownBox #TameworkLinkedPanelGroupSelectorDropdown {

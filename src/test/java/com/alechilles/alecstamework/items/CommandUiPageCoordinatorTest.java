@@ -449,6 +449,56 @@ class CommandUiPageCoordinatorTest {
     }
 
     @Test
+    void optionalContributorComposesAndRefreshesOnStandardPage() {
+        CommandUiRegistry registry = new CommandUiRegistry();
+        CommandUiContributorId contributorId = CommandUiContributorId.of(
+                "runeteria:decorations");
+        AtomicReference<com.alechilles.alecstamework.api.commandui.CommandUiContributorDirtySink>
+                sink = new AtomicReference<>();
+        AtomicInteger revisions = new AtomicInteger();
+        registry.registerContributor(contributorId.value(), context -> {
+            sink.set(context.dirtySink());
+            return (base, previous, scope) -> new CommandUiContribution(
+                    contributorId,
+                    Map.of("revision", CommandUiValue.of(
+                            (long) revisions.incrementAndGet())),
+                    Map.of());
+        });
+        CommandUiPageCoordinator coordinator = new CommandUiPageCoordinator(
+                registry, new CommandSelectionPageService(
+                        null, null, null, null, null));
+        PlayerRef playerRef = new PlayerRef(
+                null, UUID.randomUUID(), "CoordinatorTester", "en-US", null, null);
+        CommandUiOpenContext context = new CommandUiOpenContext(
+                playerRef.getUuid(), "en-US", "tool-1", "config-1",
+                (CommandUiRendererId) null, "generic");
+        RecordingController standard = new RecordingController();
+
+        CommandUiPageCoordinator.Created created = coordinator.create(
+                playerRef, context, snapshot(), () -> standard,
+                List.of(new CommandUiContributorRequirement(
+                        contributorId, false)),
+                List.of(), List.of(), (current, handles) -> current,
+                directDispatcher(), ignored -> { });
+
+        created.host().build(null, new UICommandBuilder(),
+                new UIEventBuilder(), null);
+        assertFalse(created.custom());
+        assertEquals(1L, standard.initialSnapshot.contribution(contributorId)
+                .pageValue("revision").longValue());
+        assertTrue(created.host().takePageOwnership());
+        assertTrue(created.host().finishPageOpening(true));
+        created.pageOpened();
+
+        sink.get().markPageDirty();
+
+        assertNotNull(standard.updatedSnapshot);
+        assertEquals(2L, standard.updatedSnapshot.contribution(contributorId)
+                .pageValue("revision").longValue());
+        created.session().close();
+    }
+
+    @Test
     void rendererSessionCloseAlsoClosesHostAndController() {
         CommandUiRegistry registry = new CommandUiRegistry();
         RecordingController controller = new RecordingController();
