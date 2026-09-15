@@ -69,3 +69,23 @@ Each subview is optional and only present when the target NPC has that system ac
 - [Apply Attachment Preset from Custom UI Recipe](/mod/alecs-tamework/apply-attachment-preset-from-custom-ui-recipe)
 
 
+
+## Productive trait read data (development)
+
+`TraitValueView` retains `id`, `value`, `effectKey` and its original three-argument
+constructor. The development view also supplies `defaultValue`, `breedingMin`,
+`breedingMax`, `meritDirection`, `signedMerit`, and `outputYieldBonus`.
+
+- `meritDirection` is +1 for higher-is-better, -1 for lower-is-better, or 0 for
+  an unknown/unscored effect. Appetite and thirst decay use -1.
+- `signedMerit` normalizes the stored value around the definition default toward
+  its corresponding breeding endpoint, then clamps to [-1,1] and applies the
+  useful direction. It does not mutate the stored value.
+- `outputYieldBonus` is the authoritative Size meat/hide delta, bounded to
+  [-0.25,0.25]; it is zero for other traits. Size changes no food cost, fleece,
+  egg, or milk output. This field is not an animal star rating.
+
+Missing definitions return neutral display data. Existing integrations may keep
+using the original constructor and accessors; their new fields are neutral.
+The pure `TraitModifierService.resolveSizeMeatHideYieldBonus(definition, value)`
+helper and the component-based reward resolver use the same formula as this view.

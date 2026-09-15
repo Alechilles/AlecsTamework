@@ -37,6 +37,28 @@ class TraitModifierServiceTest {
         assertEquals(1.5, fallback, 0.000001);
     }
 
+    @Test
+    void resolvesSignedMeritForInverseNeedsAndBoundedSizeYield() throws Exception {
+        TwTraitConfig.TraitDefinition appetite = trait(
+                "Trait_Appetite", "NeedsHungerDecayMultiplier", 0.75, 1.25, 1.0
+        );
+        TwTraitConfig.TraitDefinition size = trait(
+                "Trait_Size", "SizeMultiplier", 0.75, 1.25, 1.0
+        );
+        TwTraitConfig config = createConfig(appetite, size);
+        TameworkTraitsComponent component = new TameworkTraitsComponent(
+                "Traits_Test",
+                123L,
+                new TameworkTraitsComponent.TraitValue[] {
+                        new TameworkTraitsComponent.TraitValue("Trait_Appetite", 0.75),
+                        new TameworkTraitsComponent.TraitValue("Trait_Size", 1.25)
+                }
+        );
+
+        assertEquals(1.0, TraitModifierService.resolveSignedMerit(appetite, 0.75), 0.000001);
+        assertEquals(0.25, TraitModifierService.resolveSizeMeatHideYieldBonus(component, config), 0.000001);
+    }
+
     private TwTraitConfig createConfig(TwTraitConfig.TraitDefinition... definitions) throws Exception {
         Constructor<TwTraitConfig> ctor = TwTraitConfig.class.getDeclaredConstructor();
         ctor.setAccessible(true);
@@ -47,6 +69,12 @@ class TraitModifierServiceTest {
     }
 
     private TwTraitConfig.TraitDefinition trait(String id, String effectKey) throws Exception {
+        return trait(id, effectKey, 1.0, 1.0, 1.0);
+    }
+
+    private TwTraitConfig.TraitDefinition trait(String id, String effectKey,
+                                                 double breedingMin, double breedingMax, double defaultValue)
+            throws Exception {
         TwTraitConfig.TraitDefinition definition = new TwTraitConfig.TraitDefinition();
         setField(definition, "id", id);
         setField(definition, "displayName", id);
@@ -54,9 +82,9 @@ class TraitModifierServiceTest {
         setField(definition, "weight", 1.0);
         setField(definition, "naturalMin", 1.0);
         setField(definition, "naturalMax", 1.0);
-        setField(definition, "breedingMin", 1.0);
-        setField(definition, "breedingMax", 1.0);
-        setField(definition, "defaultValue", 1.0);
+        setField(definition, "breedingMin", breedingMin);
+        setField(definition, "breedingMax", breedingMax);
+        setField(definition, "defaultValue", defaultValue);
         return definition;
     }
 

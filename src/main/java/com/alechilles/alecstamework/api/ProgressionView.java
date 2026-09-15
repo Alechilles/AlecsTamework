@@ -107,7 +107,17 @@ public record ProgressionView(@Nullable String profileId,
 
     public record TraitValueView(@Nonnull String id,
                                  double value,
-                                 @Nullable String effectKey) {
+                                 @Nullable String effectKey,
+                                 double defaultValue,
+                                 double breedingMin,
+                                 double breedingMax,
+                                 int meritDirection,
+                                 double signedMerit,
+                                 double outputYieldBonus) {
+        /** Compatibility constructor for integrations compiled against the original trait read view. */
+        public TraitValueView(@Nonnull String id, double value, @Nullable String effectKey) {
+            this(id, value, effectKey, 1.0, 1.0, 1.0, 0, 0.0, 0.0);
+        }
     }
 
     public record AttachmentsView(@Nullable String configId,

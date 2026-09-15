@@ -180,6 +180,22 @@ class CompanionNeedsConsumeServiceTest {
     }
 
     @Test
+    void appetiteAndThirstTraitsIndependentlyScaleTheirMatchingNeedDecay() throws Exception {
+        try (NeedsFixture fixture = new NeedsFixture()) {
+            fixture.setTraits(fixture.firstRef, new TameworkTraitsComponent.TraitValue[] {
+                    new TameworkTraitsComponent.TraitValue("Trait_Appetite", 0.5),
+                    new TameworkTraitsComponent.TraitValue("Trait_Thirst", 1.5)
+            });
+            fixture.prepareDecayState(fixture.firstRef, true);
+            CompanionRuntimeClock.advanceByDeltaSeconds(30.002f);
+
+            assertTrue(runNeedsUpdate(fixture.firstRef, fixture.store));
+            assertEquals(95.0, fixture.firstNeeds().getHunger(), 0.000001);
+            assertEquals(85.0, fixture.firstNeeds().getThirst(), 0.000001);
+        }
+    }
+
+    @Test
     void careRequiresSatisfiedNeedsAndDoesNotMultiplyStoredDisposition() throws Exception {
         try (NeedsFixture fixture = new NeedsFixture()) {
             TwHappinessConfig config = TwHappinessConfig.CODEC.decode(
@@ -340,6 +356,10 @@ class CompanionNeedsConsumeServiceTest {
             }
         }
 
+        private void setTraits(Ref<EntityStore> ref, TameworkTraitsComponent.TraitValue[] values) {
+            store.put(ref, traitsType, new TameworkTraitsComponent("trait-test", 1L, values));
+        }
+
         private void installConfig() throws Exception {
             TwNeedsConfig config = TwNeedsConfig.CODEC.decode(
                     org.bson.BsonDocument.parse("""
@@ -394,14 +414,22 @@ class CompanionNeedsConsumeServiceTest {
             TwTraitConfig config = constructor.newInstance();
             setField(config, "id", "trait-test");
             setField(config, "enabled", true);
-            TwTraitConfig.TraitDefinition definition = new TwTraitConfig.TraitDefinition();
-            setField(definition, "id", "Trait_Decay");
-            setField(definition, "displayName", "Trait Decay");
-            setField(definition, "effectKey", "NeedsDecayMultiplier");
-            setField(config, "traits", new TwTraitConfig.TraitDefinition[] {definition});
+            setField(config, "traits", new TwTraitConfig.TraitDefinition[] {
+                    traitDefinition("Trait_Decay", "NeedsDecayMultiplier"),
+                    traitDefinition("Trait_Appetite", "NeedsHungerDecayMultiplier"),
+                    traitDefinition("Trait_Thirst", "NeedsThirstDecayMultiplier")
+            });
             staticField(TwTraitConfig.class, "ASSET_STORE").set(null,
                     new TestTraitAssetStore(new DefaultAssetMap<>(Map.of("trait-test", config))));
             TwTraitConfig.clearRoleCache();
+        }
+
+        private TwTraitConfig.TraitDefinition traitDefinition(String id, String effectKey) throws Exception {
+            TwTraitConfig.TraitDefinition definition = new TwTraitConfig.TraitDefinition();
+            setField(definition, "id", id);
+            setField(definition, "displayName", id);
+            setField(definition, "effectKey", effectKey);
+            return definition;
         }
 
         @Override

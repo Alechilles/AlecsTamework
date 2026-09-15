@@ -15,6 +15,9 @@ import javax.annotation.Nullable;
  * Resolves trait-driven numeric multipliers for gameplay systems.
  */
 public final class TraitModifierService {
+    private static final String SIZE_MULTIPLIER_EFFECT_KEY = "SizeMultiplier";
+    private static final double SIZE_MEAT_HIDE_YIELD_LIMIT = 0.25;
+
     private TraitModifierService() {
     }
 
@@ -76,6 +79,76 @@ public final class TraitModifierService {
         return matched ? multiplier : defaultMultiplier;
     }
 
+    /** Resolves Size's bounded meat and hide yield delta without changing visual scale. */
+    public static double resolveSizeMeatHideYieldBonus(@Nullable Ref<EntityStore> npcRef,
+                                                        @Nullable Store<EntityStore> store) {
+        if (npcRef == null || store == null || !npcRef.isValid()) {
+            return 0.0;
+        }
+        ComponentType<EntityStore, TameworkTraitsComponent> type = TameworkTraitsComponent.getComponentType();
+        TameworkTraitsComponent component = type == null ? null : store.getComponent(npcRef, type);
+        return resolveSizeMeatHideYieldBonus(component, resolveTraitConfig(component, npcRef, store));
+    }
+
+    static double resolveSizeMeatHideYieldBonus(@Nullable TameworkTraitsComponent component,
+                                                @Nullable TwTraitConfig config) {
+        if (component == null || config == null) {
+            return 0.0;
+        }
+        Map<String, TwTraitConfig.TraitDefinition> definitions = buildDefinitionMap(config);
+        for (TameworkTraitsComponent.TraitValue value : component.getTraitValues()) {
+            if (value == null) {
+                continue;
+            }
+            TwTraitConfig.TraitDefinition definition = definitions.get(normalize(value.getId()));
+            if (definition == null || !SIZE_MULTIPLIER_EFFECT_KEY.equalsIgnoreCase(definition.getEffectKey())) {
+                continue;
+            }
+            return resolveSizeMeatHideYieldBonus(definition, value.getValue());
+        }
+        return 0.0;
+    }
+
+    /** Resolves one Size definition and stored value to its bounded meat/hide yield delta. */
+    public static double resolveSizeMeatHideYieldBonus(@Nullable TwTraitConfig.TraitDefinition definition,
+                                                        double value) {
+        if (definition == null || !SIZE_MULTIPLIER_EFFECT_KEY.equalsIgnoreCase(definition.getEffectKey())) {
+            return 0.0;
+        }
+        return resolveSignedMerit(definition, value) * SIZE_MEAT_HIDE_YIELD_LIMIT;
+    }
+
+    /** Returns a display-safe signed merit normalized against a trait's breeding endpoints. */
+    public static double resolveSignedMerit(@Nullable TwTraitConfig.TraitDefinition definition, double value) {
+        if (definition == null || !Double.isFinite(value)) {
+            return 0.0;
+        }
+        int direction = resolveMeritDirection(definition.getEffectKey());
+        if (direction == 0) {
+            return 0.0;
+        }
+        double defaultValue = definition.getDefaultValue();
+        double endpoint = value >= defaultValue ? definition.getBreedingMax() : definition.getBreedingMin();
+        double denominator = Math.abs(endpoint - defaultValue);
+        if (!Double.isFinite(defaultValue) || !Double.isFinite(endpoint) || denominator <= 0.0) {
+            return 0.0;
+        }
+        return clamp((value - defaultValue) / denominator, -1.0, 1.0) * direction;
+    }
+
+    /** Identifies whether a productive trait is better when its value is higher or lower. */
+    public static int resolveMeritDirection(@Nullable String effectKey) {
+        if (effectKey == null || effectKey.isBlank()) {
+            return 0;
+        }
+        return switch (effectKey.trim().toLowerCase(Locale.ROOT)) {
+            case "happinessgainmultiplier", "fertilitymultiplier", "maxhealthmultiplier",
+                    "fleecefiberyieldmultiplier", "harvestrecoveryspeedmultiplier", "sizemultiplier" -> 1;
+            case "needsdecaymultiplier", "needshungerdecaymultiplier", "needsthirstdecaymultiplier" -> -1;
+            default -> 0;
+        };
+    }
+
     @Nullable
     private static TwTraitConfig resolveTraitConfig(@Nullable TameworkTraitsComponent component,
                                                     @Nullable Ref<EntityStore> npcRef,
@@ -112,6 +185,10 @@ public final class TraitModifierService {
             map.put(normalized, definition);
         }
         return map;
+    }
+
+    private static double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     @Nullable

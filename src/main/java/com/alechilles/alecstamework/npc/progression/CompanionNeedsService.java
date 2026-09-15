@@ -51,6 +51,8 @@ public final class CompanionNeedsService {
     private static final long REGEN_HARD_BLOCK_MIN_FUTURE_SECONDS = 30L;
     private static final long REGEN_HARD_BLOCK_TARGET_FUTURE_SECONDS = 120L;
     private static final String NEEDS_DECAY_MULTIPLIER_EFFECT_KEY = "NeedsDecayMultiplier";
+    private static final String NEEDS_HUNGER_DECAY_MULTIPLIER_EFFECT_KEY = "NeedsHungerDecayMultiplier";
+    private static final String NEEDS_THIRST_DECAY_MULTIPLIER_EFFECT_KEY = "NeedsThirstDecayMultiplier";
     public static final String NEEDS_DAMAGE_SOURCE_TYPE = "tamework.needs";
     private static final CompanionNeedsEnvironmentService ENVIRONMENT_SERVICE = new CompanionNeedsEnvironmentService();
 
@@ -643,9 +645,9 @@ public final class CompanionNeedsService {
         if (effectiveElapsedMs > 0L) {
             double elapsedMinutes = effectiveElapsedMs / MILLIS_PER_MINUTE;
             TwNeedsConfig.DecaySettings decay = config.getDecay();
-            double needsDecayMultiplier = resolveNeedsDecayMultiplier(npcRef, store, roleId);
-            double hungerDecay = decay.getHungerPerMinute() * elapsedMinutes * needsDecayMultiplier;
-            double thirstDecay = decay.getThirstPerMinute() * elapsedMinutes * needsDecayMultiplier;
+            NeedsDecayMultipliers needsDecayMultipliers = resolveNeedsDecayMultipliers(npcRef, store, roleId);
+            double hungerDecay = decay.getHungerPerMinute() * elapsedMinutes * needsDecayMultipliers.hunger();
+            double thirstDecay = decay.getThirstPerMinute() * elapsedMinutes * needsDecayMultipliers.thirst();
             hunger = clamp(hunger - hungerDecay, values.getHungerMin(), values.getHungerMax());
             thirst = clamp(thirst - thirstDecay, values.getThirstMin(), values.getThirstMax());
             componentChanged = true;
@@ -1447,14 +1449,20 @@ public final class CompanionNeedsService {
         return Math.min(MAX_REGEN_SUPPRESSION_ALLOWED_HEAL, allowedExternalHeal);
     }
 
-    private static double resolveNeedsDecayMultiplier(@Nullable Ref<EntityStore> npcRef,
-                                                      @Nullable Store<EntityStore> store,
-                                                      @Nullable String roleId) {
-        double traitMultiplier = CompanionProgressionModifierService.resolveMultiplier(
+    private static NeedsDecayMultipliers resolveNeedsDecayMultipliers(@Nullable Ref<EntityStore> npcRef,
+                                                                      @Nullable Store<EntityStore> store,
+                                                                      @Nullable String roleId) {
+        double commonTraitMultiplier = CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,
                 store,
                 NEEDS_DECAY_MULTIPLIER_EFFECT_KEY,
                 1.0
+        );
+        double hungerTraitMultiplier = CompanionProgressionModifierService.resolveMultiplier(
+                npcRef, store, NEEDS_HUNGER_DECAY_MULTIPLIER_EFFECT_KEY, 1.0
+        );
+        double thirstTraitMultiplier = CompanionProgressionModifierService.resolveMultiplier(
+                npcRef, store, NEEDS_THIRST_DECAY_MULTIPLIER_EFFECT_KEY, 1.0
         );
         HusbandryOutcomeModifiers husbandryModifiers = HusbandryOutcomeRuntime.resolve(
                 HusbandryOutcomeKind.NEEDS_DECAY,
@@ -1463,11 +1471,22 @@ public final class CompanionNeedsService {
                 roleId,
                 null
         );
-        double value = traitMultiplier * husbandryModifiers.needsDecayMultiplier();
+        return new NeedsDecayMultipliers(
+                normalizeNeedsDecayMultiplier(commonTraitMultiplier * hungerTraitMultiplier
+                        * husbandryModifiers.needsDecayMultiplier()),
+                normalizeNeedsDecayMultiplier(commonTraitMultiplier * thirstTraitMultiplier
+                        * husbandryModifiers.needsDecayMultiplier())
+        );
+    }
+
+    private static double normalizeNeedsDecayMultiplier(double value) {
         if (!Double.isFinite(value) || value <= 0.0) {
             return 1.0;
         }
         return value;
+    }
+
+    private record NeedsDecayMultipliers(double hunger, double thirst) {
     }
 
     private static double normalizeManagedHealth(double managedHealth) {

@@ -30,6 +30,7 @@ import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
+import com.alechilles.alecstamework.npc.progression.TraitModifierService;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.google.gson.ExclusionStrategy;
 import com.google.gson.FieldAttributes;
@@ -209,28 +210,47 @@ final class ApiMapper {
     @Nonnull
     static ProgressionView.TraitsView mapTraits(@Nonnull TameworkTraitsComponent component,
                                                 @Nullable TwTraitConfig config) {
-        LinkedHashMap<String, String> effectKeys = new LinkedHashMap<>();
+        LinkedHashMap<String, TwTraitConfig.TraitDefinition> definitions = new LinkedHashMap<>();
         if (config != null) {
             for (TwTraitConfig.TraitDefinition definition : config.getTraits()) {
                 if (definition == null || definition.getId() == null || definition.getId().isBlank()) {
                     continue;
                 }
-                effectKeys.putIfAbsent(definition.getId().trim().toLowerCase(), definition.getEffectKey());
+                definitions.putIfAbsent(definition.getId().trim().toLowerCase(), definition);
             }
         }
         List<ProgressionView.TraitValueView> values = Arrays.stream(component.getTraitValues())
                 .filter(Objects::nonNull)
                 .filter(value -> value.getId() != null && !value.getId().isBlank())
-                .map(value -> new ProgressionView.TraitValueView(
-                        value.getId(),
-                        value.getValue(),
-                        effectKeys.get(value.getId().trim().toLowerCase())
-                ))
+                .map(value -> mapTraitValue(value, definitions.get(value.getId().trim().toLowerCase())))
                 .toList();
         return new ProgressionView.TraitsView(
                 component.getConfigId(),
                 component.getRollSeed(),
                 values
+        );
+    }
+
+    @Nonnull
+    private static ProgressionView.TraitValueView mapTraitValue(
+            @Nonnull TameworkTraitsComponent.TraitValue value,
+            @Nullable TwTraitConfig.TraitDefinition definition
+    ) {
+        if (definition == null) {
+            return new ProgressionView.TraitValueView(value.getId(), value.getValue(), null);
+        }
+        double signedMerit = TraitModifierService.resolveSignedMerit(definition, value.getValue());
+        double outputYieldBonus = TraitModifierService.resolveSizeMeatHideYieldBonus(definition, value.getValue());
+        return new ProgressionView.TraitValueView(
+                value.getId(),
+                value.getValue(),
+                definition.getEffectKey(),
+                definition.getDefaultValue(),
+                definition.getBreedingMin(),
+                definition.getBreedingMax(),
+                TraitModifierService.resolveMeritDirection(definition.getEffectKey()),
+                signedMerit,
+                outputYieldBonus
         );
     }
 
