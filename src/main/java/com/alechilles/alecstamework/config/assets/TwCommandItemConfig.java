@@ -348,12 +348,12 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         )
         .documentation("Maximum number of active linked NPCs allowed for this command item.")
         .add()
-        .<Integer>append(
-            new KeyedCodec<>("CooldownSeconds", Codec.INTEGER),
+        .<Double>append(
+            new KeyedCodec<>("CooldownSeconds", Codec.DOUBLE),
             (asset, value) -> asset.cooldownSeconds = value == null ? 2 : Math.max(0, value),
             asset -> asset.cooldownSeconds
         )
-        .documentation("Cooldown duration in seconds before this can be used again.")
+        .documentation("Cooldown duration in seconds, including fractional seconds, before this can be used again. Inherits the parent value when omitted.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireLineOfSight", Codec.BOOLEAN),
@@ -402,7 +402,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     private Boolean requireOwner;
     private int maxTargets = 25;
     private int maxActive;
-    private int cooldownSeconds = 2;
+    private double cooldownSeconds = 2;
     private boolean requireLineOfSight;
     private AllowedRoles allowedRoles = new AllowAllRoles();
     private CommandEntry[] commandList = EMPTY_COMMAND_LIST;
@@ -658,7 +658,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         return maxActive;
     }
 
-    public int getCooldownSeconds() {
+    public double getCooldownSeconds() {
         return cooldownSeconds;
     }
 

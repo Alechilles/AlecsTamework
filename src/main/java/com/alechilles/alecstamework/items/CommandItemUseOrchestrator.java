@@ -229,7 +229,7 @@ final class CommandItemUseOrchestrator {
     private boolean executeCommand(CommandPreparedUse use,
                                    Ref<EntityStore> targetRef,
                                    String commandIdOverride) {
-        int cooldownMs = Math.max(0, use.config.getCooldownSeconds()) * 1000;
+        long cooldownMs = Math.round(Math.max(0, use.config.getCooldownSeconds()) * 1000);
         if (isCooldownActive(use.workingItem, cooldownMs)) {
             use.flushHeldItem();
             feedbackService.showWarningKey(
@@ -250,7 +250,7 @@ final class CommandItemUseOrchestrator {
     private boolean dispatchResolvedCommand(CommandPreparedUse use,
                                             Ref<EntityStore> targetRef,
                                             CommandEntry command,
-                                            int cooldownMs) {
+                                            long cooldownMs) {
         Context context = createContext(use, targetRef, command);
         List<Candidate> recipients = recipientService.queryRecipients(context);
         List<LinkedNpcRecord> unloaded = recipientService.queryUnloadedLinkedRecords(context, recipients);
@@ -316,7 +316,7 @@ final class CommandItemUseOrchestrator {
                                        Context context,
                                        List<Candidate> recipients,
                                        List<LinkedNpcRecord> unloaded,
-                                       int cooldownMs) {
+                                       long cooldownMs) {
         LoadedDispatch loaded = executeLoadedRecipients(context, recipients);
         refreshLinkedPositions(use, context, recipients, loaded.appliedCommandStates());
         int queued = relocationDispatchService.queueRelocationsForUnloaded(context, unloaded).queued();
@@ -380,7 +380,7 @@ final class CommandItemUseOrchestrator {
         }
     }
 
-    private void applyCooldown(CommandPreparedUse use, Context context, int cooldownMs) {
+    private void applyCooldown(CommandPreparedUse use, Context context, long cooldownMs) {
         if (cooldownMs <= 0) {
             return;
         }
@@ -431,7 +431,7 @@ final class CommandItemUseOrchestrator {
                 && left.trim().equalsIgnoreCase(right.trim());
     }
 
-    private boolean isCooldownActive(ItemStack stack, int cooldownMs) {
+    private boolean isCooldownActive(ItemStack stack, long cooldownMs) {
         if (cooldownMs <= 0) {
             return false;
         }

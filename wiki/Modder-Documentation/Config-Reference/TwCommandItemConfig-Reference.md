@@ -104,7 +104,7 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 - `RequireOwner`: requires the using player to own the target. If omitted, `/tw settings` provides the global linking owner requirement.
 - `MaxTargets`: max recipients per command dispatch.
 - `MaxActive`: max linked NPCs that can be marked active. `0` means unlimited.
-- `CooldownSeconds`: item cooldown after command use.
+- `CooldownSeconds`: item cooldown after command use, in seconds. Supports fractions such as `0.25` (250 ms); defaults to `2` and inherits the parent value when omitted.
 - `RequireLineOfSight`: requires line of sight for selection or targeting logic that uses it.
 - `AllowedRoles`: role filter for commandable targets.
 - `CommandList`: authored commands shown in the radial and executed at runtime.
