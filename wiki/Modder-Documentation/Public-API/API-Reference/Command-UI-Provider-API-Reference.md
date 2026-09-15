@@ -73,7 +73,7 @@ Return a ready contribution using these presentation keys:
 | --- | --- | --- | --- |
 | Page | `capacity.text` | String | Summary on the panel controls row |
 | Page | `capacity.tooltip` | String | Summary hover text |
-| Row | `portrait.stars` | Long, 1 through 5 | One to five gold star images at the portrait top-left |
+| Row | `portrait.stars` | Long, 1 through 5 | One to five gold star images at the portrait top-right |
 
 Key row data by `CommandUiCompanionRow.rowId()`. The nullable `traits()` view
 contains detached resolved trait values for live and saved animals, including

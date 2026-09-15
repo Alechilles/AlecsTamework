@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Portrait quality ratings now use gold star images at the top-left, without a tooltip.
+- Portrait quality ratings now use gold star images at the top-right, without a tooltip.
   Animal capacity appears on the controls row.
 
 - The standard animal panel can display optional plugin-provided portrait stars
