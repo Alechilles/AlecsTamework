@@ -34,7 +34,7 @@ public final class TameworkDebugPlayerInputCommand extends AbstractPlayerCommand
             return;
         }
 
-        String arg = getFirstArg(commandContext);
+        String arg = getFirstArg(commandContext.getInputString());
         if ("status".equals(arg)) {
             commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugPlayerInput.tamework.player.input.diagnostics.for.you.total").param("0", String.valueOf((PlayerInputDebugProbe.isEnabled(playerUuid) ? "enabled" : "disabled"))).param("1", String.valueOf(PlayerInputDebugProbe.enabledCount())));
             return;
@@ -58,12 +58,8 @@ public final class TameworkDebugPlayerInputCommand extends AbstractPlayerCommand
         commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugPlayerInput.tamework.player.input.diagnostics").param("0", String.valueOf((enabled ? "enabled" : "disabled"))));
     }
 
-    private static String getFirstArg(CommandContext commandContext) {
-        String input = commandContext.getInputString();
-        if (input == null) {
-            return "";
-        }
-        String[] tokens = input.trim().split("\\s+");
-        return tokens.length < 3 ? "" : tokens[2].toLowerCase(Locale.ROOT);
+    static String getFirstArg(String input) {
+        String argument = TameworkCommandInput.firstArgument(input, "input");
+        return argument == null ? "" : argument.toLowerCase(Locale.ROOT);
     }
 }

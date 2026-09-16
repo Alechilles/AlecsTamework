@@ -19,7 +19,8 @@ final class TameworkCommandInput {
             return new String[0];
         }
         String[] tokens = input.trim().split("\\s+");
-        for (int index = tokens.length - 1; index >= 0; index--) {
+        // The command precedes its arguments, which may themselves equal the command token.
+        for (int index = 0; index < tokens.length; index++) {
             if (commandToken.equalsIgnoreCase(tokens[index])) {
                 return Arrays.copyOfRange(tokens, index + 1, tokens.length);
             }

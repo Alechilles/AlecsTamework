@@ -48,7 +48,7 @@ Define these in `Server/Languages/en-US/server.lang` without the `server.` prefi
 - Alarm id format: `<InteractionCooldownAlarmPrefix>_<ConfigId>_<index>`.
 - Prefix comes from `TwGlobalConfig.InteractionDefaults.InteractionCooldownAlarmPrefix`.
 
-Use `/tw getalarm` to inspect cooldown/harvest alarms.
+Use `/tw debug get alarm` to inspect cooldown/harvest alarms.
 
 ## Preset interactions
 Preset entries provide default behavior plus optional `Requires` + `Effects` add-ons.

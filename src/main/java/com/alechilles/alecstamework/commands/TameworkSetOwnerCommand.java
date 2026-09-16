@@ -38,7 +38,7 @@ public final class TameworkSetOwnerCommand extends AbstractPlayerCommand {
         }
 
         // Default: set owner to the executing player when no argument is provided.
-        String raw = getFirstArg(commandContext);
+        String raw = getFirstArg(commandContext.getInputString());
         UUID newOwner = parseOwner(raw, player.getUuid());
         if (newOwner == null && raw != null && !raw.isBlank() && !isClear(raw)) {
             commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setOwner.invalid.uuid.use.clear.or.a.valid"));
@@ -83,16 +83,8 @@ public final class TameworkSetOwnerCommand extends AbstractPlayerCommand {
         }
     }
 
-    private static String getFirstArg(CommandContext commandContext) {
-        String input = commandContext.getInputString();
-        if (input == null) {
-            return null;
-        }
-        String[] tokens = input.trim().split("\s+");
-        if (tokens.length < 3) {
-            return null;
-        }
-        return tokens[2];
+    static String getFirstArg(String input) {
+        return TameworkCommandInput.firstArgument(input, "owner");
     }
 
     private static boolean isClear(String raw) {

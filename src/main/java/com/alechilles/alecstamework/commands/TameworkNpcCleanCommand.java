@@ -32,7 +32,7 @@ public final class TameworkNpcCleanCommand extends AbstractWorldCommand {
     protected void execute(@Nonnull CommandContext commandContext,
                            @Nonnull World world,
                            @Nonnull Store<EntityStore> store) {
-        String requestedRole = getArg(commandContext, 2);
+        String requestedRole = getArg(commandContext.getInputString(), 0);
         if (requestedRole == null || requestedRole.isBlank()) {
             commandContext.sender().sendMessage(Message.translation("server.tamework.commands.npcClean.usage.tw.npcclean.roleid"));
             return;
@@ -128,15 +128,8 @@ public final class TameworkNpcCleanCommand extends AbstractWorldCommand {
     }
 
     @Nullable
-    private static String getArg(@Nonnull CommandContext commandContext, int index) {
-        String input = commandContext.getInputString();
-        if (input == null || input.isBlank()) {
-            return null;
-        }
-        String[] tokens = input.trim().split("\\s+");
-        if (tokens.length <= index) {
-            return null;
-        }
-        return tokens[index];
+    static String getArg(String input, int index) {
+        String[] arguments = TameworkCommandInput.argumentsAfter(input, "clean");
+        return index < 0 || index >= arguments.length ? null : arguments[index];
     }
 }

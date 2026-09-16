@@ -43,7 +43,7 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractTameworkSe
             return;
         }
 
-        String action = normalizeAction(getFirstArg(commandContext));
+        String action = normalizeAction(getFirstArg(commandContext.getInputString()));
         if ("flush".equals(action)) {
             boolean scheduled = crashTelemetryService.triggerFlushAsync();
             commandContext.sender().sendMessage(scheduled ? Message.translation("server.tamework.commands.debugCrashTelemetry.crash.telemetry.flush.scheduled") : Message.translation("server.tamework.commands.debugCrashTelemetry.crash.telemetry.flush.was.not.scheduled.disabled"));
@@ -58,12 +58,12 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractTameworkSe
                     "debug_command_error",
                     new IllegalStateException("Simulated Tamework telemetry error event (" + token + ")"),
                     TameworkTelemetryEvents.commandContext(
-                                    "/tw debugcrashtelemetry",
+                                    "/tw debug telemetry crash",
                                     "telemetry_debug",
                                     "crash_telemetry_debug"
                             )
                             .operation("eventerror")
-                            .detail("Triggered by /tw debugcrashtelemetry eventerror.")
+                            .detail("Triggered by /tw debug telemetry crash eventerror.")
                             .detail("source", "debug_command")
                             .detail("debugAction", "eventerror")
                             .detail("debugToken", token)
@@ -82,12 +82,12 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractTameworkSe
                     123,
                     true,
                     TameworkTelemetryEvents.commandContext(
-                                    "/tw debugcrashtelemetry",
+                                    "/tw debug telemetry crash",
                                     "telemetry_debug",
                                     "crash_telemetry_debug"
                             )
                             .operation("eventlifecycle")
-                            .detail("Triggered by /tw debugcrashtelemetry eventlifecycle.")
+                            .detail("Triggered by /tw debug telemetry crash eventlifecycle.")
                             .detail("source", "debug_command")
                             .detail("debugAction", "eventlifecycle")
                             .detail("debugToken", token)
@@ -126,16 +126,8 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractTameworkSe
     }
 
     @Nullable
-    private static String getFirstArg(@Nonnull CommandContext commandContext) {
-        String input = commandContext.getInputString();
-        if (input == null) {
-            return null;
-        }
-        String[] tokens = input.trim().split("\\s+");
-        if (tokens.length < 3) {
-            return null;
-        }
-        return tokens[2];
+    static String getFirstArg(String input) {
+        return TameworkCommandInput.firstArgument(input, "crash");
     }
 
     @Nullable

@@ -33,7 +33,7 @@ public final class TameworkFindNpcCommand extends AbstractWorldCommand {
     protected void execute(@Nonnull CommandContext commandContext,
                            @Nonnull World world,
                            @Nonnull Store<EntityStore> store) {
-        String uuidArg = getArg(commandContext, 2);
+        String uuidArg = getArg(commandContext.getInputString(), 0);
         UUID targetUuid = parseUuid(uuidArg);
         if (targetUuid == null) {
             commandContext.sender().sendMessage(Message.translation("server.tamework.commands.findNpc.usage.tw.findnpc.uuid.mark.on.off"));
@@ -62,7 +62,7 @@ public final class TameworkFindNpcCommand extends AbstractWorldCommand {
         double scale = CompanionModelScaleService.resolveCurrentScale(targetRef, store, 1.0);
         double distance = resolveDistance(targetTransform, playerTransform);
 
-        boolean shouldMark = parseOptionalMark(getArg(commandContext, 3));
+        boolean shouldMark = parseOptionalMark(getArg(commandContext.getInputString(), 1));
         if (shouldMark && targetTransform != null) {
             spawnMarker(targetTransform.getPosition(), store);
         }
@@ -109,16 +109,9 @@ public final class TameworkFindNpcCommand extends AbstractWorldCommand {
         return true;
     }
 
-    private static String getArg(CommandContext commandContext, int index) {
-        String input = commandContext.getInputString();
-        if (input == null) {
-            return null;
-        }
-        String[] tokens = input.trim().split("\\s+");
-        if (tokens.length <= index) {
-            return null;
-        }
-        return tokens[index];
+    static String getArg(String input, int index) {
+        String[] arguments = TameworkCommandInput.argumentsAfter(input, "find");
+        return index < 0 || index >= arguments.length ? null : arguments[index];
     }
 
     private static UUID parseUuid(String raw) {

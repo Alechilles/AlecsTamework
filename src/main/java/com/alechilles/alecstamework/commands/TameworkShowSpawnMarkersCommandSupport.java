@@ -25,8 +25,8 @@ final class TameworkShowSpawnMarkersCommandSupport {
     private TameworkShowSpawnMarkersCommandSupport() {
     }
 
-    static ParseResult parse(String input) {
-        String arg = getArg(input, 2);
+    static ParseResult parse(String input, String commandToken) {
+        String arg = TameworkCommandInput.firstArgument(input, commandToken);
         if (arg == null || arg.isBlank()) {
             return new ParseResult(Mode.SHOW, DEFAULT_RADIUS);
         }
@@ -80,17 +80,6 @@ final class TameworkShowSpawnMarkersCommandSupport {
 
     private static double clamp(double value, double min, double max) {
         return Math.max(min, Math.min(max, value));
-    }
-
-    private static String getArg(String input, int index) {
-        if (input == null) {
-            return null;
-        }
-        String[] tokens = input.trim().split("\\s+");
-        if (tokens.length <= index) {
-            return null;
-        }
-        return tokens[index];
     }
 
     enum Mode {

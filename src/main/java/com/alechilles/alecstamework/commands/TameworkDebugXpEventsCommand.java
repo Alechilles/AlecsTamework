@@ -24,22 +24,14 @@ public final class TameworkDebugXpEventsCommand extends AbstractTameworkServerCo
             commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugXpEvents.tamework.xp.event.debug.service.is.not"));
             return;
         }
-        Boolean explicit = parseBoolean(getFirstArg(commandContext));
+        Boolean explicit = parseBoolean(getFirstArg(commandContext.getInputString()));
         boolean enabled = explicit != null ? service.setEnabled(explicit) : service.toggle();
         commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugXpEvents.tamework.xp.event.debug.logging.events.seen").param("0", String.valueOf((enabled ? "enabled" : "disabled"))).param("1", String.valueOf(service.getEventCount())));
     }
 
     @Nullable
-    private static String getFirstArg(@Nonnull CommandContext commandContext) {
-        String input = commandContext.getInputString();
-        if (input == null) {
-            return null;
-        }
-        String[] tokens = input.trim().split("\\s+");
-        if (tokens.length < 3) {
-            return null;
-        }
-        return tokens[2];
+    static String getFirstArg(String input) {
+        return TameworkCommandInput.firstArgument(input, "xp-events");
     }
 
     @Nullable

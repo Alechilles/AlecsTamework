@@ -27,9 +27,9 @@ The `commands/` package contains the public `/tw` command surface, with `Tamewor
 
 Additional diagnostics that are command-driven (not startup-toggle defaults) include:
 
-- `/tw showhitboxes`
-- `/tw showspawnbeacons [radius|off]`
-- `/tw debugcrashtelemetry`
+- `/tw debug view hitboxes`
+- `/tw debug view spawn-beacons [radius|off]`
+- `/tw debug telemetry crash`
 - `/tw debug persistence [status|health|detail|export]`
 
 `TameworkShowSpawnBeaconsCommand` maintains per-player radius sessions while

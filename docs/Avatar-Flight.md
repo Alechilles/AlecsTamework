@@ -118,11 +118,11 @@ While grounded and holding the charged launch input, the compact avatar-flight H
 
 ## Debugging
 
-Use `/tw debugdragonflight inputprobe on` or `/tw debugplayerinput on` for input logs without changing player movement capability. `/tw debugdragonflight flightprobe on` is a separate client-flight capability probe and can change native movement states, so it should not be used for normal launch tuning unless client flight behavior is the thing being tested.
+Use `/tw debug avatar dragon-flight inputprobe on` or `/tw debug avatar input on` for input logs without changing player movement capability. `/tw debug avatar dragon-flight flightprobe on` is a separate client-flight capability probe and can change native movement states, so it should not be used for normal launch tuning unless client flight behavior is the thing being tested.
 
 Avatar-flight logs use `TameworkAvatarFlight debug` only when the active `TwDebugConfig.DebugCommands.AvatarFlight` toggle and the avatar-flight asset's `Debug.LogControllerTicks` setting are enabled. The global toggle is disabled by default. These lines include controller input/output, raw packet sprint and input staleness, movement-state flags, client flying sync, forced movement/pose animation IDs, visual-override ownership, VFX emission, rider attachment state, and overlay-suppression state. For grounded sprint or stuck-animation issues, enable the global avatar-flight debug toggle and capture both `TameworkInput debug` and `TameworkAvatarFlight debug` lines from the same reproduction.
 
-Normal avatar flight does not enable the client's native `canFly` movement setting. The standalone `/tw debugdragonflight flightprobe` command remains available when client flight behavior itself needs investigation, but default avatar-flight activation avoids the native double-jump flight path entirely.
+Normal avatar flight does not enable the client's native `canFly` movement setting. The standalone `/tw debug avatar dragon-flight flightprobe` command remains available when client flight behavior itself needs investigation, but default avatar-flight activation avoids the native double-jump flight path entirely.
 
 ## Fake Rider Model Variants
 

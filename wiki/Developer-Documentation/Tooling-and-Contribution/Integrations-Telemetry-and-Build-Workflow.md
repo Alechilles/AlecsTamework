@@ -34,7 +34,7 @@ Parent: [Tooling and Contribution](/mod/alecs-tamework/tooling-and-contribution)
   - throwable stack trace must contain the Tamework package prefix
 - Crash and event queues, deduplication, attribution, HTTP delivery, breadcrumbs, and persistence are owned by `beacon-runtime`.
 - Upload behavior follows the shared runtime: queued first, flushed asynchronously, and never allowed to throw into runtime/gameplay threads
-- Debug command: `/tw debugcrashtelemetry` (status), `/tw debugcrashtelemetry flush` (manual async upload pass), `/tw debugcrashtelemetry simulate` (manual simulation path for privileged users)
+- Debug command: `/tw debug telemetry crash` (status), `/tw debug telemetry crash flush` (manual async upload pass), `/tw debug telemetry crash simulate` (manual simulation path for privileged users)
 - Privacy: payload excludes player-identifying gameplay data by default (stack trace + runtime metadata only)
 - Disabling Tamework consent does not disable Patchwork consent. Use the `/beacon consent` menu to manage each project independently.
 - Restart the server after replacing an elected project contribution before you expect the new candidate to write.

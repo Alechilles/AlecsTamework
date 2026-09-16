@@ -46,7 +46,7 @@ public final class TameworkSetTamedCommand extends AbstractPlayerCommand {
             current = existing.isTamed();
         }
 
-        String raw = getFirstArg(commandContext);
+        String raw = getFirstArg(commandContext.getInputString());
         Boolean parsed = parseBoolean(raw);
         boolean next = parsed != null ? parsed : !current;
 
@@ -54,16 +54,8 @@ public final class TameworkSetTamedCommand extends AbstractPlayerCommand {
         commandContext.sender().sendMessage(Message.translation("server.tamework.commands.setTamed.set.tamed.for.npc.to").param("0", String.valueOf(candidate.npcUuid)).param("1", String.valueOf(next)));
     }
 
-    private static String getFirstArg(CommandContext commandContext) {
-        String input = commandContext.getInputString();
-        if (input == null) {
-            return null;
-        }
-        String[] tokens = input.trim().split("\\s+");
-        if (tokens.length < 3) {
-            return null;
-        }
-        return tokens[2];
+    static String getFirstArg(String input) {
+        return TameworkCommandInput.firstArgument(input, "tamed");
     }
 
     private static Boolean parseBoolean(String raw) {

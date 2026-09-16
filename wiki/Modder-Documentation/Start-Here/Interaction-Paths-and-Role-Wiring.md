@@ -111,7 +111,7 @@ This keeps the interaction authoring simple while preserving full custom behavio
 1. Confirm the expected config actually resolves.
 2. If multiple configs could match, set `ConfigId`.
 3. Confirm role params referenced by `TwGlobalConfig.InteractionDefaults` exist.
-4. Use `/tw getalarm` for harvest or cooldown issues.
+4. Use `/tw debug get alarm` for harvest or cooldown issues.
 5. Use `/tw debugprompt` when prompt output is stale or missing.
 6. Use `/tw debughook` if a hook bridge is not firing or being consumed.
 

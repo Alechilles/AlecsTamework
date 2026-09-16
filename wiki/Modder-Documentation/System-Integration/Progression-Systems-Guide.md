@@ -144,7 +144,7 @@ That means incomplete progression configs usually show up as missing or flat UI 
 ## Fast Debug Workflow
 Use:
 - `/tw gethappiness`
-- `/tw sethappiness`
+- `/tw debug set happiness`
 - `/tw getneeds`
 - `/tw setneeds`
 - `/tw gettraits`

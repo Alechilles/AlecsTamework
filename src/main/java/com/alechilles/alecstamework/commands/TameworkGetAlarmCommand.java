@@ -139,8 +139,8 @@ public final class TameworkGetAlarmCommand extends AbstractWorldCommand {
     }
 
     private static ParsedArgs parseArgs(CommandContext commandContext) {
-        String arg1 = getArg(commandContext, 2);
-        String arg2 = getArg(commandContext, 3);
+        String arg1 = getArg(commandContext.getInputString(), 0);
+        String arg2 = getArg(commandContext.getInputString(), 1);
 
         UUID uuid1 = parseUuid(arg1);
         UUID uuid2 = parseUuid(arg2);
@@ -154,16 +154,9 @@ public final class TameworkGetAlarmCommand extends AbstractWorldCommand {
         return new ParsedArgs(null, arg1);
     }
 
-    private static String getArg(CommandContext commandContext, int index) {
-        String input = commandContext.getInputString();
-        if (input == null) {
-            return null;
-        }
-        String[] tokens = input.trim().split("\\s+");
-        if (tokens.length <= index) {
-            return null;
-        }
-        return tokens[index];
+    static String getArg(String input, int index) {
+        String[] arguments = TameworkCommandInput.argumentsAfter(input, "alarm");
+        return index < 0 || index >= arguments.length ? null : arguments[index];
     }
 
     private static UUID parseUuid(String raw) {

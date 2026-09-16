@@ -18,7 +18,7 @@ Server-wide diagnostics and controls do not require a player identity. This
 includes `/patchwork status`, `/patchwork reload`, `/patchwork selftest`, and
 the server-global `debug*` logging toggles. Patchwork administration requires
 the `patchwork.admin` permission.
-`/tw debugcrashtelemetry` status and `flush` are also console-safe; its simulated
+`/tw debug telemetry crash` status and `flush` are also console-safe; its simulated
 event/crash actions remain restricted to the existing allowlisted player identities.
 `/tw debug persistence [status|health|detail|export]` is console-safe.
 Status and detail actions are read-only. `export` writes a bounded, redacted
@@ -31,7 +31,7 @@ unique token. It does not read or change the SQLite database.
 
 Commands that operate on a world but not a player use Hytale's optional world
 argument. Console callers must provide the target world for `/tw reloadconfig`,
-`/tw npcclean`, `/tw findnpc`, and `/tw getalarm`. The last
+`/tw npc clean`, `/tw npc find`, and `/tw debug get alarm`. The last
 two require an NPC UUID when no player gaze target exists; player-relative distance
 is reported as `n/a` from the console.
 
@@ -42,14 +42,14 @@ restarted.
 
 Player UI, held-item, gaze-only, player-overlay, and live API fixture commands remain
 player-scoped. In particular, `/tw config`, `/tw settings`, `/tw news`,
-`/tw api test prepare|reset|run|status`, `/tw spawntamed`, `/tw showhitboxes`,
-`/tw showspawnbeacons`, and `/tw showspawnmarkers` need a live player.
+`/tw api test prepare|reset|run|status`, `/tw spawntamed`, `/tw debug view hitboxes`,
+`/tw debug view spawn-beacons`, and `/tw debug view spawn-markers` need a live player.
 
 ## Interaction troubleshooting
 - Verify matching enabled `TwInteractionConfig` with expected `RoleIds` and `Priority`.
 - If multiple configs apply, set explicit `ConfigId` on `TameworkInteract` for deterministic selection.
 - Confirm role params referenced by `TwGlobalConfig.InteractionDefaults` exist and have expected values.
-- Use `/tw getalarm` for harvest/cooldown alarm state.
+- Use `/tw debug get alarm` for harvest/cooldown alarm state.
 - If prompt behavior is stale/wrong, ensure `TameworkInteractPrompt` is running and use `/tw debug log prompt`.
 - If custom item checks fail unexpectedly, verify `ItemsInHand.Operator` (`AnyOf` vs `NoneOf`) and quantity requirements.
 - For `NpcHealthPercent` requirements, confirm health scaling assumptions (`0-100`).
@@ -149,7 +149,7 @@ player-scoped. In particular, `/tw config`, `/tw settings`, `/tw news`,
 - If radial UI does not open, ensure secondary interaction uses `CommandId: OpenSelectionMenu`.
 - If move/home commands do not move NPCs, verify `Component_Tamework_Instruction_Command_Move` is present.
 - For panel confusion, verify mode (`LinkedMode`/`NearbyMode`), filter mode/value, and active/inactive row state.
-- For unloaded relocation, use linked panel status + `/tw findnpc <uuid>` and check relocation timing config.
+- For unloaded relocation, use linked panel status + `/tw npc find <uuid>` and check relocation timing config.
 
 ## Spawner/naming troubleshooting
 - Spawner failures: check role filters, tame/owner policy, range/cooldown, and captured metadata.
@@ -254,11 +254,11 @@ When enabled, it also logs `TameworkHarvestDrop` attempts before the public even
 XP can be diagnosed with a reason such as not tamed or owned, disabled harvest XP, or missing drop output.
 
 ## Useful quick checks
-- `/tw getowner`, `/tw setowner`
-- `/tw gettamed`, `/tw settamed`
-- `/tw getalarm [AlarmName] [NpcUuid]`
+- `/tw getowner`, `/tw debug set owner`
+- `/tw gettamed`, `/tw debug set tamed`
+- `/tw debug get alarm [AlarmName] [NpcUuid]`
 - `/tw getflockdebug`
-- `/tw npcclean <roleId>`
+- `/tw npc clean <roleId>`
 - `/tw reloadconfig` (item-feature assets only)
 
 ## Timestamp note

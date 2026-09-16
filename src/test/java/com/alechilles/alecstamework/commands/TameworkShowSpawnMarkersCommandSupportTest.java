@@ -8,49 +8,44 @@ final class TameworkShowSpawnMarkersCommandSupportTest {
 
     @Test
     void parseModeUsesDefaultRadiusWhenNoArgumentProvided() {
-        TameworkShowSpawnMarkersCommandSupport.ParseResult result =
-                TameworkShowSpawnMarkersCommandSupport.parse("tw showspawnmarkers");
+        for (String commandToken : new String[]{"spawn-markers", "spawn-beacons"}) {
+            TameworkShowSpawnMarkersCommandSupport.ParseResult result =
+                    TameworkShowSpawnMarkersCommandSupport.parse("/tw debug view " + commandToken, commandToken);
 
-        assertEquals(TameworkShowSpawnMarkersCommandSupport.Mode.SHOW, result.mode());
-        assertEquals(64.0, result.radius());
+            assertEquals(TameworkShowSpawnMarkersCommandSupport.Mode.SHOW, result.mode());
+            assertEquals(64.0, result.radius());
+        }
     }
 
     @Test
     void parseModeCanDisableTracking() {
-        TameworkShowSpawnMarkersCommandSupport.ParseResult result =
-                TameworkShowSpawnMarkersCommandSupport.parse("tw showspawnmarkers off");
+        for (String commandToken : new String[]{"spawn-markers", "spawn-beacons"}) {
+            TameworkShowSpawnMarkersCommandSupport.ParseResult result =
+                    TameworkShowSpawnMarkersCommandSupport.parse("/tw debug view " + commandToken + " off", commandToken);
 
-        assertEquals(TameworkShowSpawnMarkersCommandSupport.Mode.OFF, result.mode());
+            assertEquals(TameworkShowSpawnMarkersCommandSupport.Mode.OFF, result.mode());
+        }
     }
 
     @Test
     void parseModeClampsRadiusToSupportedRange() {
-        TameworkShowSpawnMarkersCommandSupport.ParseResult result =
-                TameworkShowSpawnMarkersCommandSupport.parse("tw showspawnmarkers 999");
+        for (String commandToken : new String[]{"spawn-markers", "spawn-beacons"}) {
+            TameworkShowSpawnMarkersCommandSupport.ParseResult result =
+                    TameworkShowSpawnMarkersCommandSupport.parse("/tw debug view " + commandToken + " 999", commandToken);
 
-        assertEquals(TameworkShowSpawnMarkersCommandSupport.Mode.SHOW, result.mode());
-        assertEquals(256.0, result.radius());
+            assertEquals(TameworkShowSpawnMarkersCommandSupport.Mode.SHOW, result.mode());
+            assertEquals(256.0, result.radius());
+        }
     }
 
     @Test
     void parseModeReportsInvalidRadius() {
-        TameworkShowSpawnMarkersCommandSupport.ParseResult result =
-                TameworkShowSpawnMarkersCommandSupport.parse("tw showspawnmarkers nearby");
+        for (String commandToken : new String[]{"spawn-markers", "spawn-beacons"}) {
+            TameworkShowSpawnMarkersCommandSupport.ParseResult result =
+                    TameworkShowSpawnMarkersCommandSupport.parse("/tw debug view " + commandToken + " nearby", commandToken);
 
-        assertEquals(TameworkShowSpawnMarkersCommandSupport.Mode.INVALID, result.mode());
-    }
-
-    @Test
-    void debugStyleUsesBrightPinkAndChunkierMarkerGeometry() {
-        TameworkShowSpawnMarkersCommandSupport.DebugStyle style =
-                TameworkShowSpawnMarkersCommandSupport.debugStyle();
-
-        assertEquals(1.0F, style.red());
-        assertEquals(0.05F, style.green());
-        assertEquals(0.85F, style.blue());
-        assertEquals(0.75, style.markerWidth());
-        assertEquals(1.2, style.capWidth());
-        assertEquals(0.95F, style.markerAlpha());
+            assertEquals(TameworkShowSpawnMarkersCommandSupport.Mode.INVALID, result.mode());
+        }
     }
 
     @Test

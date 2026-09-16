@@ -15,7 +15,7 @@ final class TameworkDeleteSpawnMarkerCommandSupport {
     }
 
     static ParseResult parse(String input) {
-        String arg = getArg(input, 2);
+        String arg = TameworkCommandInput.firstArgument(input, "delete");
         if (arg == null || arg.isBlank()) {
             return new ParseResult(Mode.DELETE, DEFAULT_RANGE);
         }
@@ -72,17 +72,6 @@ final class TameworkDeleteSpawnMarkerCommandSupport {
 
     private static double length(double x, double y, double z) {
         return Math.sqrt((x * x) + (y * y) + (z * z));
-    }
-
-    private static String getArg(String input, int index) {
-        if (input == null) {
-            return null;
-        }
-        String[] tokens = input.trim().split("\\s+");
-        if (tokens.length <= index) {
-            return null;
-        }
-        return tokens[index];
     }
 
     enum Mode {

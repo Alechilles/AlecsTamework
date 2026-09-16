@@ -68,7 +68,7 @@ public final class TameworkShowSpawnMarkersCommand extends AbstractPlayerCommand
         }
 
         TameworkShowSpawnMarkersCommandSupport.ParseResult parse =
-                TameworkShowSpawnMarkersCommandSupport.parse(commandContext.getInputString());
+                TameworkShowSpawnMarkersCommandSupport.parse(commandContext.getInputString(), "spawn-markers");
         if (parse.mode() == TameworkShowSpawnMarkersCommandSupport.Mode.INVALID) {
             commandContext.sender().sendMessage(Message.translation("server.tamework.commands.showSpawnMarkers.usage.tw.showspawnmarkers.radius.off"));
             return;

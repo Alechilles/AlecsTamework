@@ -12,7 +12,6 @@ import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayer
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import java.util.Arrays;
 import java.util.Locale;
 import java.util.UUID;
 import javax.annotation.Nonnull;
@@ -41,7 +40,7 @@ public final class TameworkDebugDragonFlightCommand extends AbstractPlayerComman
             commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugDragonFlight.player.uuid.is.not.available"));
             return;
         }
-        String[] args = getArgs(commandContext);
+        String[] args = getArgs(commandContext.getInputString());
         String action = args.length == 0 ? "toggle" : args[0].toLowerCase(Locale.ROOT);
         if ("inputprobe".equals(action) || "inputlog".equals(action)) {
             String probeAction = args.length > 1 ? args[1].toLowerCase(Locale.ROOT) : "toggle";
@@ -229,12 +228,7 @@ public final class TameworkDebugDragonFlightCommand extends AbstractPlayerComman
     }
 
     @Nonnull
-    private static String[] getArgs(@Nonnull CommandContext commandContext) {
-        String input = commandContext.getInputString();
-        if (input == null || input.isBlank()) {
-            return new String[0];
-        }
-        String[] tokens = input.trim().split("\\s+");
-        return tokens.length <= 2 ? new String[0] : Arrays.copyOfRange(tokens, 2, tokens.length);
+    static String[] getArgs(String input) {
+        return TameworkCommandInput.argumentsAfter(input, "dragon-flight");
     }
 }

@@ -14,7 +14,7 @@ public final class TameworkDebugTargetHudCommand extends AbstractTameworkServerC
 
     @Override
     protected void executeServer(@Nonnull CommandContext commandContext) {
-        String raw = getFirstArg(commandContext);
+        String raw = getFirstArg(commandContext.getInputString());
         Boolean explicit = parseBoolean(raw);
         boolean enabled = explicit != null
                 ? CommandTargetHudDebugLog.setEnabled(explicit)
@@ -22,16 +22,8 @@ public final class TameworkDebugTargetHudCommand extends AbstractTameworkServerC
         commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugTargetHud.tamework.command.target.hud.diagnostics.logging").param("0", String.valueOf((enabled ? "enabled" : "disabled"))));
     }
 
-    private static String getFirstArg(CommandContext commandContext) {
-        String input = commandContext.getInputString();
-        if (input == null) {
-            return null;
-        }
-        String[] tokens = input.trim().split("\\s+");
-        if (tokens.length < 3) {
-            return null;
-        }
-        return tokens[2];
+    static String getFirstArg(String input) {
+        return TameworkCommandInput.firstArgument(input, "target-hud");
     }
 
     private static Boolean parseBoolean(String raw) {

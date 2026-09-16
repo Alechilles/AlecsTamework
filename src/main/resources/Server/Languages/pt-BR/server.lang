@@ -1321,10 +1321,10 @@ tamework.commands.debugCrashTelemetry.embedded.telemetry.lifecycle.event.request
 tamework.commands.debugCrashTelemetry.embedded.telemetry.lifecycle.event.was.not.requested=Embedded telemetry lifecycle event was não requested (telemetry disabled ou event delivery não Cativadofiguraçãouraçãoured).
 tamework.commands.debugCrashTelemetry.simulated.uncaught.tamework.crash.dispatched.token=Falha não capturada simulada do Tamework enviada (token={0}).
 tamework.commands.debugCrashTelemetry.tamework.plugin.not.available=O plugin Tamework não está dispativadoível.
-tamework.commands.debugCrashTelemetry.usage.tw.debugcrashtelemetry.flush.simulate.eventerror.eventlifecycle=Uso: /tw debugcrashtelemetry [flush|simulate|eventerror|eventlifecycle]
-tamework.commands.debugCrashTelemetry.you.are.not.allowed.to.run.tw=Você não tem permissão para executar /tw debugcrashtelemetry eventerror.
-tamework.commands.debugCrashTelemetry.you.are.not.allowed.to.run.tw2=Você não tem permissão para executar /tw debugcrashtelemetry eventlifecycle.
-tamework.commands.debugCrashTelemetry.you.are.not.allowed.to.run.tw3=Você não tem permissão para executar /tw debugcrashtelemetry simulate.
+tamework.commands.debugCrashTelemetry.usage.tw.debugcrashtelemetry.flush.simulate.eventerror.eventlifecycle=Uso: /tw debug telemetry crash [flush|simulate|eventerror|eventlifecycle]
+tamework.commands.debugCrashTelemetry.you.are.not.allowed.to.run.tw=Você não tem permissão para executar /tw debug telemetry crash eventerror.
+tamework.commands.debugCrashTelemetry.you.are.not.allowed.to.run.tw2=Você não tem permissão para executar /tw debug telemetry crash eventlifecycle.
+tamework.commands.debugCrashTelemetry.you.are.not.allowed.to.run.tw3=Você não tem permissão para executar /tw debug telemetry crash simulate.
 tamework.commands.debugDb.bonded.companions.readiness.schema.stored.active.dead=Bativadoded companheiros: readiness={0}, schema={1}, stored={2}, active={3}, dead={4}, leases={5}, pendingCleanup={6}, lastFailure={7}
 tamework.commands.debugDb.collecting.bounded.persistence.diagnostics=Coletando diagnósticos limitados de persistência...
 tamework.commands.debugDb.description=Inspeciona diagnósticos limitados de persistência substituta.
@@ -1350,9 +1350,9 @@ tamework.commands.debugDragonFlight.input.probe.active=Sonda de entrada: ativa={
 tamework.commands.debugDragonFlight.input.probe.disabled=Sonda de entrada desativada.
 tamework.commands.debugDragonFlight.input.probe.enabled=Sonda de entrada ativada.
 tamework.commands.debugDragonFlight.player.uuid.is.not.available=jogador UUID não está dispativadoível.
-tamework.commands.debugDragonFlight.usage.tw.debugdragonflight.flightprobe.on.off.toggle=Uso: /tw debugdragonflight flightprobe [on|off|toggle|status]
-tamework.commands.debugDragonFlight.usage.tw.debugdragonflight.inputprobe.on.off.toggle=Uso: /tw debugdragonflight inputprobe [on|off|toggle|status]
-tamework.commands.debugDragonFlight.usage.tw.debugdragonflight.on.configid.off.toggle=Uso: /tw debugdragonflight [on [configId] | desativado | Alternar | estado | inputprobe [ativado|desativado|toggle|estado] | flightprobe [ativado|desativado|toggle|estado]]
+tamework.commands.debugDragonFlight.usage.tw.debugdragonflight.flightprobe.on.off.toggle=Uso: /tw debug avatar dragon-flight flightprobe [on|off|toggle|status]
+tamework.commands.debugDragonFlight.usage.tw.debugdragonflight.inputprobe.on.off.toggle=Uso: /tw debug avatar dragon-flight inputprobe [on|off|toggle|status]
+tamework.commands.debugDragonFlight.usage.tw.debugdragonflight.on.configid.off.toggle=Uso: /tw debug avatar dragon-flight [on [configId] | off | toggle | status | inputprobe [on|off|toggle|status] | flightprobe [on|off|toggle|status]]
 tamework.commands.debugFlyingCompanion.description=Alternar Tamework flying companheiro diagnostics logging.
 tamework.commands.debugFlyingCompanion.tamework.flying.companion.diagnostics.logging=Tamework flying companheiro diagnostics logging: {0}
 tamework.commands.debugFlyingCompanion.tamework.plugin.not.available=O plugin Tamework não está dispativadoível.
@@ -1391,13 +1391,13 @@ tamework.commands.debugPlayerInput.tamework.player.input.diagnostics=Tamework jo
 tamework.commands.debugPlayerInput.tamework.player.input.diagnostics.for.you.total=Tamework jogador input diagnostics: {0} para you; total enabled={1}
 tamework.commands.debugPlayerModel.description=Temporarily swap seu jogador model para mount-cativadotrol testing.
 tamework.commands.debugPlayerModel.invalid.scale=Escala inválida: {0}
-tamework.commands.debugPlayerModel.model.asset.not.found.usage.tw.debugplayermodel=Model asDefinir não found: {0}. Uso: /tw debugplayermodel unsafe [ModelId] [scale] | reDefinir | estado
-tamework.commands.debugPlayerModel.player.model.debug.can.crash.the.current=jogador model depuração can crash o current client when nativado-jogador models animate. Use /tw debugplayermodel unsafe [ModelId] [scale] only for isolated probes.
+tamework.commands.debugPlayerModel.model.asset.not.found.usage.tw.debugplayermodel=Recurso de modelo não encontrado: {0}. Uso: /tw debug avatar player-model unsafe [ModelId] [scale] | reset | status
+tamework.commands.debugPlayerModel.player.model.debug.can.crash.the.current=A depuração do modelo do jogador pode causar uma falha no cliente quando modelos que não são de jogadores são animados. Use /tw debug avatar player-model unsafe [ModelId] [scale] apenas para testes isolados.
 tamework.commands.debugPlayerModel.player.model.debug.current.saved=jogador model depuração: current={0}, saved={1}
 tamework.commands.debugPlayerModel.player.model.debug.no.saved.player.model=jogador model depuração: no saved jogador model ou skin fallback is dispativadoível.
 tamework.commands.debugPlayerModel.player.model.debug.restored.model.from.player=jogador model depuração: restored model de jogador skin.
 tamework.commands.debugPlayerModel.player.model.debug.restored.saved.player.model=jogador model depuração: restored saved jogador model.
-tamework.commands.debugPlayerModel.player.model.debug.set.model.scale.use=jogador model depuração: Definir model={0} scale={1}. Use /tw debugplayermodel reset to restore.
+tamework.commands.debugPlayerModel.player.model.debug.set.model.scale.use=Depuração do modelo do jogador: modelo={0}, escala={1}. Use /tw debug avatar player-model reset para restaurar.
 tamework.commands.debugPlayerModel.player.uuid.is.not.available=jogador UUID não está dispativadoível.
 tamework.commands.debugPrompt.description=Alternar Tamework interactiativado prompt depuração logging.
 tamework.commands.debugPrompt.tamework.plugin.not.available=O plugin Tamework não está dispativadoível.
@@ -1434,12 +1434,12 @@ tamework.commands.deleteSpawnMarker.description=Delete o loaded spawn marker Voc
 tamework.commands.deleteSpawnMarker.no.loaded.spawn.marker.found.in.front=No loaded spawn marker found em frativadot of Você within {0} blocks.
 tamework.commands.deleteSpawnMarker.target.spawn.marker.is.no.longer.valid=alvo spawn marker is no lativadoger valid.
 tamework.commands.deleteSpawnMarker.unable.to.resolve.your.position=Não foi possível determinar seu positiativado.
-tamework.commands.deleteSpawnMarker.usage.tw.deletespawnmarker.range=Uso: /tw deletespawnmarker [range]
+tamework.commands.deleteSpawnMarker.usage.tw.deletespawnmarker.range=Uso: /tw debug view delete [range]
 tamework.commands.findNpc.description=Find an NPC by UUID e print its current mundo estado.
 tamework.commands.findNpc.entity.exists.but.has.no.npc.component=Entity {0} exists but has no NPC compativadoent.
 tamework.commands.findNpc.npc.found.role.pos.distance.stage.scale=NPC {0} encontrado: role={1}, pos={2}, distance={3}, stage={4}, scale={5}, marked={6}.
 tamework.commands.findNpc.npc.is.not.currently.valid.in.world=NPC {0} is não currently valid in-mundo.
-tamework.commands.findNpc.usage.tw.findnpc.uuid.mark.on.off=Uso: /tw findnpc <uuid> [mark:ativado|desativado]
+tamework.commands.findNpc.usage.tw.findnpc.uuid.mark.on.off=Uso: /tw npc find <uuid> [on|off]
 tamework.commands.getAlarm.alarm.for.npc.is=Alarm {0} para NPC {1} is {2}.{3}
 tamework.commands.getAlarm.description=Get alarm estado of o NPC Você are looking at.
 tamework.commands.getAlarm.no.npc.found.in.view=Nenhum NPC encativadotrado à vista.
@@ -1486,7 +1486,7 @@ tamework.commands.npcClean.removed=Removed {removed} unowned NPC(s) com função
 tamework.commands.npcClean.removed.unowned.npc.s.with.role=Removed {0} unowned NPC(s) com função '{1}'.{2}
 tamework.commands.npcClean.removedWithProtected=Removed {removed} unowned NPC(s) com função '{role}'. Skipped {protected} owned companheiro(s).
 tamework.commands.npcClean.unable.to.resolve.role.id=Não foi possível determinar função id: {0}
-tamework.commands.npcClean.usage.tw.npcclean.roleid=Uso: /tw npcclean <funçãoId>
+tamework.commands.npcClean.usage.tw.npcclean.roleid=Uso: /tw npc clean <funçãoId>
 tamework.commands.npcSpawn.description=Gera NPCs do Tamework.
 tamework.commands.npcSpawnTamed.argument.attachment=Substituição de anexo no formato slot:value.
 tamework.commands.npcSpawnTamed.argument.count=Number of NPCs para spawn.
@@ -1543,7 +1543,7 @@ tamework.commands.setHappiness.happiness.and.breeding.components.are.not.availab
 tamework.commands.setHappiness.no.npc.found.in.view=Nenhum NPC encativadotrado à vista.
 tamework.commands.setHappiness.npc.has.no.enabled.happiness.progression=NPC {0} has no enabled felicidade progressiativado.
 tamework.commands.setHappiness.npc.has.no.tracked.happiness.or.breeding=NPC {0} has no tracked felicidade ou reprodução estado.
-tamework.commands.setHappiness.usage.tw.sethappiness.value=Uso: /tw sethappiness <value>
+tamework.commands.setHappiness.usage.tw.sethappiness.value=Uso: /tw debug set happiness <value>
 tamework.commands.setHunger.argument.value=fome value para apply.
 tamework.commands.setHunger.description=Definir fome para selected NPCs.
 tamework.commands.setHunger.no.enabled.needs.config.resolved.for.npc=No enabled needs Cativadofiguraçãouração resolved para NPC {0}.
@@ -1551,7 +1551,7 @@ tamework.commands.setHunger.set.hunger.for.npc=Definir fome para NPC {0}: {1}.
 tamework.commands.setLevel.could.not.set.level.for.npc=Could não Definir nível para NPC {0}: {1}.
 tamework.commands.setLevel.description=Definir nível of o NPC Você are looking at.
 tamework.commands.setLevel.no.npc.found.in.view=Nenhum NPC encativadotrado à vista.
-tamework.commands.setLevel.usage.tw.setlevel.level=Uso: /tw setlevel <nível>
+tamework.commands.setLevel.usage.tw.setlevel.level=Uso: /tw debug set level <nível>
 tamework.commands.setNeeds.argument.hunger=fome value para apply.
 tamework.commands.setNeeds.argument.thirst=sede value para apply.
 tamework.commands.setNeeds.description=Definir fome e sede para selected NPCs.
@@ -1588,25 +1588,25 @@ tamework.commands.showHitboxes.hitbox.tracking.stopped.target.npc.no.longer=Hitb
 tamework.commands.showHitboxes.no.npc.found.in.view=Nenhum NPC encativadotrado à vista.
 tamework.commands.showHitboxes.rendered.main.hitbox.and.detail.boxes.across=Rendered 1 main hitbox e {0} detail boxes across {1} detail groups.
 tamework.commands.showHitboxes.target.npc.is.missing.required.components=alvo NPC is missing required compativadoents.
-tamework.commands.showHitboxes.tracking.hitbox.debug.for.npc.role.with=Tracking hitbox depuração para NPC {0} (role={1}) com per-tick updates (visible para Você ativadoly). Executar /tw showhitboxes again to disable.
+tamework.commands.showHitboxes.tracking.hitbox.debug.for.npc.role.with=Tracking hitbox depuração para NPC {0} (role={1}) com per-tick updates (visible para Você ativadoly). Executar /tw debug view hitboxes again to disable.
 tamework.commands.showHitboxes.unable.to.resolve.your.player.uuid=Não foi possível determinar seu jogador UUID.
 tamework.commands.showSpawnBeacons.and.more.loaded.beacon.s=  ...and {0} more loaded beacativado(s).
 tamework.commands.showSpawnBeacons.at=  {0} em {1}
 tamework.commands.showSpawnBeacons.description=Alternar natural spawn beacativado visualizatiativado.
 tamework.commands.showSpawnBeacons.spawn.beacon.visualization.disabled=Spawn beacativado visualizatiativado disabled.
-tamework.commands.showSpawnBeacons.spawn.beacon.visualization.enabled.within.blocks.showing=Spawn beacativado visualizatiativado enabled within {0} blocks. Showing {1} loaded natural beacativado{2}{3} Executar /tw showspawnbeacons off to disable.
+tamework.commands.showSpawnBeacons.spawn.beacon.visualization.enabled.within.blocks.showing=Spawn beacativado visualizatiativado enabled within {0} blocks. Showing {1} loaded natural beacativado{2}{3} Executar /tw debug view spawn-beacons off to disable.
 tamework.commands.showSpawnBeacons.spawn.beacon.visualization.was.not.active=Spawn beacativado visualizatiativado was não active.
 tamework.commands.showSpawnBeacons.unable.to.resolve.your.player.uuid=Não foi possível determinar seu jogador UUID.
-tamework.commands.showSpawnBeacons.usage.tw.showspawnbeacons.radius.off=Uso: /tw showspawnbeacons [radius|off]
+tamework.commands.showSpawnBeacons.usage.tw.showspawnbeacons.radius.off=Uso: /tw debug view spawn-beacons [radius|off]
 tamework.commands.showSpawnMarkers.and.more.loaded.marker.s=  ...e mais {0} marcador(es) carregado(s).
 tamework.commands.showSpawnMarkers.at.distance.npc.spawncount.manual.suppressed=  {0} em {1}, distance={2}, npc={3}, spawnCount={4}, manual={5}, suppressed={6}
 tamework.commands.showSpawnMarkers.description=Alternar jogador-local spawn marker depuração rendering.
 tamework.commands.showSpawnMarkers.spawn.marker.debug.rendering.disabled=Spawn marker depuração rendering disabled.
-tamework.commands.showSpawnMarkers.spawn.marker.debug.rendering.enabled.within.blocks=Spawn marker depuração rendering enabled within {0} blocks. Found {1} loaded marker{2}. Executar /tw showspawnmarkers off to disable.
+tamework.commands.showSpawnMarkers.spawn.marker.debug.rendering.enabled.within.blocks=Spawn marker depuração rendering enabled within {0} blocks. Found {1} loaded marker{2}. Executar /tw debug view spawn-markers off to disable.
 tamework.commands.showSpawnMarkers.spawn.marker.debug.rendering.was.not.active=Spawn marker depuração rendering was não active.
 tamework.commands.showSpawnMarkers.unable.to.resolve.your.player.uuid=Não foi possível determinar seu jogador UUID.
 tamework.commands.showSpawnMarkers.unable.to.resolve.your.position=Não foi possível determinar seu positiativado.
-tamework.commands.showSpawnMarkers.usage.tw.showspawnmarkers.radius.off=Uso: /tw showspawnmarkers [radius|off]
+tamework.commands.showSpawnMarkers.usage.tw.showspawnmarkers.radius.off=Uso: /tw debug view spawn-markers [radius|off]
 tamework.commands.traits.invalid.input=A entrada de traço é inválida.
 tamework.commands.traits.usage.setTraits=Uso: /tw debug set traits <TraitId> <Value> [TraitId Value ...]
 tamework.commands.traits.usage.addTrait=Uso: /tw debug set trait <TraitId> <Value>

@@ -2,7 +2,12 @@
 
 ## Unreleased
 
-- Fixed argument parsing and usage hints for /tw debug set traits and /tw debug set trait.
+- Release now removes loaded companions immediately instead of waiting for an
+  NPC despawn timer that can stall when the animal is not ticking.
+
+- Fixed nested NPC and debug commands reading command names as arguments, including
+  traits, ownership, tamed state, alarm lookup, avatar tools, logging, and spawn views.
+  Updated their usage hints to match the current command paths.
 
 - Removed the unused `ItemFeatureConfig` whistle settings from the Java API.
   Integrations must remove calls to `isWhistleEnabled()`, `getWhistleRadius()`,

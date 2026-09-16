@@ -13,7 +13,6 @@ import com.hypixel.hytale.server.core.modules.entity.player.PlayerSkinComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import java.util.Arrays;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -43,7 +42,7 @@ public final class TameworkDebugPlayerModelCommand extends AbstractPlayerCommand
             return;
         }
 
-        String[] args = getArgs(commandContext);
+        String[] args = getArgs(commandContext.getInputString());
         if (args.length > 0 && isResetArg(args[0])) {
             restoreModel(commandContext, store, ref, playerUuid);
             return;
@@ -119,16 +118,8 @@ public final class TameworkDebugPlayerModelCommand extends AbstractPlayerCommand
         commandContext.sender().sendMessage(Message.translation("server.tamework.commands.debugPlayerModel.player.model.debug.current.saved").param("0", String.valueOf(currentId)).param("1", String.valueOf(savedId)));
     }
 
-    private static String[] getArgs(CommandContext commandContext) {
-        String input = commandContext.getInputString();
-        if (input == null || input.isBlank()) {
-            return new String[0];
-        }
-        String[] tokens = input.trim().split("\\s+");
-        if (tokens.length <= 2) {
-            return new String[0];
-        }
-        return Arrays.copyOfRange(tokens, 2, tokens.length);
+    static String[] getArgs(String input) {
+        return TameworkCommandInput.argumentsAfter(input, "player-model");
     }
 
     private static boolean isResetArg(String raw) {

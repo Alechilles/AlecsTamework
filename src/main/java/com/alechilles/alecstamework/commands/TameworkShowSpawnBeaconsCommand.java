@@ -42,7 +42,7 @@ public final class TameworkShowSpawnBeaconsCommand extends AbstractPlayerCommand
         }
 
         TameworkShowSpawnMarkersCommandSupport.ParseResult parse =
-                TameworkShowSpawnMarkersCommandSupport.parse(commandContext.getInputString());
+                TameworkShowSpawnMarkersCommandSupport.parse(commandContext.getInputString(), "spawn-beacons");
         if (parse.mode() == TameworkShowSpawnMarkersCommandSupport.Mode.INVALID) {
             commandContext.sender().sendMessage(Message.translation("server.tamework.commands.showSpawnBeacons.usage.tw.showspawnbeacons.radius.off"));
             return;

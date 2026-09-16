@@ -314,13 +314,13 @@ specific to each NPC.
 
 ## `/tw` Commands
 - `/tw getowner`
-- `/tw setowner`
+- `/tw debug set owner`
 - `/tw gettamed`
-- `/tw settamed`
-- `/tw getalarm [AlarmName] [NpcUuid]`
+- `/tw debug set tamed`
+- `/tw debug get alarm [AlarmName] [NpcUuid]`
 - `/tw reloadconfig`
 - `/tw gethappiness`
-- `/tw sethappiness <value>`
+- `/tw debug set happiness <value>`
 - `/tw debug get needs [--entity=<uuid>|--ray|--cone|--coneAll|--sphere] [--world=<world>] [--angle=<degrees>] [--range=<blocks>] [--roles=<role,...>] [--nearest]`
 - `/tw debug set needs <hunger> <thirst> [NPC selectors]`
 - `/tw debug set hunger <value> [NPC selectors]`
@@ -331,19 +331,19 @@ specific to each NPC.
 - `/tw debug set traits <TraitId> <Value> [TraitId Value ...]`
 - `/tw debug set trait <TraitId> <Value>`
 - `/tw getlifestage`
-- `/tw findnpc <uuid> [mark:on|off]`
+- `/tw npc find <uuid> [on|off]`
 - `/tw getflockdebug`
 - `/tw debughook [on|off]`
 - `/tw debugprompt [on|off]`
 - `/tw debugspawner [on|off]`
 - `/tw debugspawnerlocation [on|off]`
 - `/tw debugdespawn [on|off] [RoleName|all|clear]`
-- `/tw debugplayermodel unsafe [ModelId] [scale] | reset | status`
-- `/tw debugplayerinput [on|off|status]`
+- `/tw debug avatar player-model unsafe [ModelId] [scale] | reset | status`
+- `/tw debug avatar input [on|off|status]`
 - `/tw debuglag [on|off]`
-- `/tw showspawnbeacons [radius|off]`
-- `/tw showspawnmarkers [radius|off]`
-- `/tw deletespawnmarker [range]`
+- `/tw debug view spawn-beacons [radius|off]`
+- `/tw debug view spawn-markers [radius|off]`
+- `/tw debug view delete [range]`
 
 `NPC selectors` use Hytale's standard NPC debug selection: `--world`, `--entity`, `--angle`,
 `--range`, `--roles`, `--nearest`, `--ray`, `--cone`, `--coneAll`, and `--sphere`.

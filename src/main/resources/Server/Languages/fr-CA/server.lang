@@ -1301,11 +1301,11 @@ tamework.commands.debugCoop.tamework.coop.debug.logging=Journalisation de débog
 tamework.commands.debugCoop.description=Activer ou désactiver la journalisation de débogage d'identité de coop Tamework.
 tamework.commands.debugCrashTelemetry.tamework.plugin.not.available=Le plugin Tamework n'est pas disponible.
 tamework.commands.debugCrashTelemetry.crash.telemetry.service.is.not.initialized=Le service de télémétrie des plantages n'est pas initialisé.
-tamework.commands.debugCrashTelemetry.you.are.not.allowed.to.run.tw=Vous n'êtes pas autorisé à exécuter /tw debugcrashtelemetry eventerror.
-tamework.commands.debugCrashTelemetry.you.are.not.allowed.to.run.tw2=Vous n'êtes pas autorisé à exécuter /tw debugcrashtelemetry eventlifecycle.
-tamework.commands.debugCrashTelemetry.you.are.not.allowed.to.run.tw3=Vous n'êtes pas autorisé à exécuter /tw debugcrashtelemetry simulate.
+tamework.commands.debugCrashTelemetry.you.are.not.allowed.to.run.tw=Vous n'êtes pas autorisé à exécuter /tw debug telemetry crash eventerror.
+tamework.commands.debugCrashTelemetry.you.are.not.allowed.to.run.tw2=Vous n'êtes pas autorisé à exécuter /tw debug telemetry crash eventlifecycle.
+tamework.commands.debugCrashTelemetry.you.are.not.allowed.to.run.tw3=Vous n'êtes pas autorisé à exécuter /tw debug telemetry crash simulate.
 tamework.commands.debugCrashTelemetry.simulated.uncaught.tamework.crash.dispatched.token=Plantage Tamework non intercepté simulé envoyé (token={0}).
-tamework.commands.debugCrashTelemetry.usage.tw.debugcrashtelemetry.flush.simulate.eventerror.eventlifecycle=Utilisation : /tw debugcrashtelemetry [flush|simulate|eventerror|eventlifecycle]
+tamework.commands.debugCrashTelemetry.usage.tw.debugcrashtelemetry.flush.simulate.eventerror.eventlifecycle=Utilisation : /tw debug telemetry crash [flush|simulate|eventerror|eventlifecycle]
 tamework.commands.debugCrashTelemetry.crash.telemetry.enabled.endpoint.pending.flushinprogress=Télémétrie des plantages : enabled={0}, endpoint={1}, pending={2}, flushInProgress={3}
 tamework.commands.debugCrashTelemetry.crash.telemetry.last.flush=Dernier vidage de télémétrie des plantages : {0} | {1}
 tamework.commands.debugCrashTelemetry.description=Afficher les diagnostics de télémétrie des plantages. Facultatif : flush|simulate|eventerror|eventlifecycle
@@ -1313,13 +1313,13 @@ tamework.commands.debugDespawn.tamework.plugin.not.available=Le plugin Tamework 
 tamework.commands.debugDespawn.tamework.despawn.diagnostics.logging.role.filter=Journalisation des diagnostics de disparition Tamework : {0} (filtre de rôle : {1})
 tamework.commands.debugDespawn.description=Activer ou désactiver la journalisation des diagnostics de disparition des compagnons Tamework (filtre de rôle facultatif).
 tamework.commands.debugDragonFlight.player.uuid.is.not.available=L'UUID du joueur n'est pas disponible.
-tamework.commands.debugDragonFlight.usage.tw.debugdragonflight.on.configid.off.toggle=Utilisation : /tw debugdragonflight [on [configId] | off | toggle | status | inputprobe [on|off|toggle|status] | flightprobe [on|off|toggle|status]]
+tamework.commands.debugDragonFlight.usage.tw.debugdragonflight.on.configid.off.toggle=Utilisation : /tw debug avatar dragon-flight [on [configId] | off | toggle | status | inputprobe [on|off|toggle|status] | flightprobe [on|off|toggle|status]]
 tamework.commands.debugDragonFlight.client.flight.probe.active.inputlog=Sonde de vol client : active={0} inputLog={1}
-tamework.commands.debugDragonFlight.usage.tw.debugdragonflight.flightprobe.on.off.toggle=Utilisation : /tw debugdragonflight flightprobe [on|off|toggle|status]
+tamework.commands.debugDragonFlight.usage.tw.debugdragonflight.flightprobe.on.off.toggle=Utilisation : /tw debug avatar dragon-flight flightprobe [on|off|toggle|status]
 tamework.commands.debugDragonFlight.input.probe.active=Sonde d'entrée : active={0}
 tamework.commands.debugDragonFlight.input.probe.disabled=Sonde d'entrée désactivée.
 tamework.commands.debugDragonFlight.input.probe.enabled=Sonde d'entrée activée.
-tamework.commands.debugDragonFlight.usage.tw.debugdragonflight.inputprobe.on.off.toggle=Utilisation : /tw debugdragonflight inputprobe [on|off|toggle|status]
+tamework.commands.debugDragonFlight.usage.tw.debugdragonflight.inputprobe.on.off.toggle=Utilisation : /tw debug avatar dragon-flight inputprobe [on|off|toggle|status]
 tamework.commands.debugDragonFlight.description=Activer ou désactiver le test de vol de dragon du joueur transformé.
 tamework.commands.debugFlyingCompanion.tamework.plugin.not.available=Le plugin Tamework n'est pas disponible.
 tamework.commands.debugFlyingCompanion.tamework.flying.companion.diagnostics.logging=Journalisation des diagnostics de compagnon volant Tamework : {0}
@@ -1358,10 +1358,10 @@ tamework.commands.debugPlayerInput.tamework.player.input.diagnostics.for.you.tot
 tamework.commands.debugPlayerInput.tamework.player.input.diagnostics=Diagnostics d'entrée du joueur Tamework : {0}
 tamework.commands.debugPlayerInput.description=Activer ou désactiver les diagnostics d'entrée du joueur pour les expériences d'avatar monté.
 tamework.commands.debugPlayerModel.player.uuid.is.not.available=L'UUID du joueur n'est pas disponible.
-tamework.commands.debugPlayerModel.player.model.debug.can.crash.the.current=Le débogage du modèle de joueur peut faire planter le client actuel lorsque des modèles non-joueurs s'animent. Utilisez /tw debugplayermodel unsafe [ModelId] [scale] uniquement pour des sondes isolées.
-tamework.commands.debugPlayerModel.model.asset.not.found.usage.tw.debugplayermodel=Actif de modèle introuvable : {0}. Utilisation : /tw debugplayermodel unsafe [ModelId] [scale] | reset | status
+tamework.commands.debugPlayerModel.player.model.debug.can.crash.the.current=Le débogage du modèle de joueur peut faire planter le client actuel lorsque des modèles non-joueurs s'animent. Utilisez /tw debug avatar player-model unsafe [ModelId] [scale] uniquement pour des sondes isolées.
+tamework.commands.debugPlayerModel.model.asset.not.found.usage.tw.debugplayermodel=Actif de modèle introuvable : {0}. Utilisation : /tw debug avatar player-model unsafe [ModelId] [scale] | reset | status
 tamework.commands.debugPlayerModel.invalid.scale=Échelle non valide : {0}
-tamework.commands.debugPlayerModel.player.model.debug.set.model.scale.use=Débogage du modèle de joueur : modèle défini={0} échelle={1}. Utilisez /tw debugplayermodel reset pour restaurer.
+tamework.commands.debugPlayerModel.player.model.debug.set.model.scale.use=Débogage du modèle de joueur : modèle défini={0} échelle={1}. Utilisez /tw debug avatar player-model reset pour restaurer.
 tamework.commands.debugPlayerModel.player.model.debug.restored.saved.player.model=Débogage du modèle de joueur : modèle de joueur enregistré restauré.
 tamework.commands.debugPlayerModel.player.model.debug.restored.model.from.player=Débogage du modèle de joueur : modèle restauré depuis l'apparence du joueur.
 tamework.commands.debugPlayerModel.player.model.debug.no.saved.player.model=Débogage du modèle de joueur : aucun modèle de joueur enregistré ou solution de repli d'apparence n'est disponible.
@@ -1392,13 +1392,13 @@ tamework.commands.debugView.description=Commandes de visualisation de débogage 
 tamework.commands.debugXpEvents.tamework.xp.event.debug.service.is.not=Le service de débogage des événements d'XP Tamework n'est pas disponible.
 tamework.commands.debugXpEvents.tamework.xp.event.debug.logging.events.seen=Journalisation de débogage des événements d'XP des compagnons Tamework : {0} (événements vus cette session : {1})
 tamework.commands.debugXpEvents.description=Activer ou désactiver la journalisation de débogage des événements d'API d'XP des compagnons Tamework.
-tamework.commands.deleteSpawnMarker.usage.tw.deletespawnmarker.range=Utilisation : /tw deletespawnmarker [range]
+tamework.commands.deleteSpawnMarker.usage.tw.deletespawnmarker.range=Utilisation : /tw debug view delete [range]
 tamework.commands.deleteSpawnMarker.unable.to.resolve.your.position=Impossible de résoudre votre position.
 tamework.commands.deleteSpawnMarker.no.loaded.spawn.marker.found.in.front=Aucun marqueur d'apparition chargé trouvé devant vous dans un rayon de {0} blocs.
 tamework.commands.deleteSpawnMarker.target.spawn.marker.is.no.longer.valid=Le marqueur d'apparition ciblé n'est plus valide.
 tamework.commands.deleteSpawnMarker.deleted.loaded.spawn.marker.at.npc.distance=Marqueur d'apparition chargé supprimé {0} à {1}, npc={2}, distance={3}{4}.
 tamework.commands.deleteSpawnMarker.description=Supprimer le marqueur d'apparition chargé que vous regardez.
-tamework.commands.findNpc.usage.tw.findnpc.uuid.mark.on.off=Utilisation : /tw findnpc <uuid> [mark:on|off]
+tamework.commands.findNpc.usage.tw.findnpc.uuid.mark.on.off=Utilisation : /tw npc find <uuid> [on|off]
 tamework.commands.findNpc.npc.is.not.currently.valid.in.world=Le PNJ {0} n'est pas actuellement valide dans le monde.
 tamework.commands.findNpc.entity.exists.but.has.no.npc.component=L'entité {0} existe, mais n'a aucun composant PNJ.
 tamework.commands.findNpc.npc.found.role.pos.distance.stage.scale=PNJ {0} trouvé : role={1}, pos={2}, distance={3}, stage={4}, scale={5}, marked={6}.
@@ -1434,7 +1434,7 @@ tamework.commands.news.tamework.news.is.not.available=Les actualités Tamework n
 tamework.commands.news.you.do.not.have.permission.to.use=Vous n'avez pas l'autorisation d'utiliser /tw news.
 tamework.commands.news.unable.to.open.tamework.news.right.now=Impossible d'ouvrir les actualités Tamework pour le moment.
 tamework.commands.news.description=Ouvrir l'annonce actuelle des paramètres Tamework.
-tamework.commands.npcClean.usage.tw.npcclean.roleid=Utilisation : /tw npcclean <roleId>
+tamework.commands.npcClean.usage.tw.npcclean.roleid=Utilisation : /tw npc clean <roleId>
 tamework.commands.npcClean.unable.to.resolve.role.id=Impossible de résoudre l'identifiant de rôle : {0}
 tamework.commands.npcClean.npc.cleanup.is.unavailable.while.companion.ownership=Le nettoyage des PNJ n'est pas disponible tant que les données de propriété des compagnons ne sont pas disponibles.
 tamework.commands.npcClean.no.unowned.npcs.were.removed.for.role=Aucun PNJ non possédé n'a été supprimé pour le rôle « {0} ». {1} compagnon(s) possédé(s) ignoré(s).
@@ -1467,7 +1467,7 @@ tamework.commands.setBreedingReady.could.not.clear.the.breeding.cooldown.alarm=I
 tamework.commands.setBreedingReady.set.breeding.readiness.for.npc.readynow=État de préparation à la reproduction défini pour le PNJ {0} : readyNow {1} -> {2}.
 tamework.commands.setBreedingReady.argument.mode=Mode de préparation : true, false ou toggle.
 tamework.commands.setBreedingReady.description=Définir la préparation à la reproduction des PNJ sélectionnés.
-tamework.commands.setHappiness.usage.tw.sethappiness.value=Utilisation : /tw sethappiness <value>
+tamework.commands.setHappiness.usage.tw.sethappiness.value=Utilisation : /tw debug set happiness <value>
 tamework.commands.setHappiness.no.npc.found.in.view=Aucun PNJ trouvé dans le champ de vision.
 tamework.commands.setHappiness.happiness.and.breeding.components.are.not.available=Les composants de bonheur et de reproduction ne sont pas disponibles.
 tamework.commands.setHappiness.npc.has.no.tracked.happiness.or.breeding=Le PNJ {0} n'a aucun état de bonheur ou de reproduction suivi.
@@ -1477,7 +1477,7 @@ tamework.commands.setHunger.no.enabled.needs.config.resolved.for.npc=Aucune conf
 tamework.commands.setHunger.set.hunger.for.npc=Faim définie pour le PNJ {0} : {1}.
 tamework.commands.setHunger.argument.value=Valeur de faim à appliquer.
 tamework.commands.setHunger.description=Définir la faim des PNJ sélectionnés.
-tamework.commands.setLevel.usage.tw.setlevel.level=Utilisation : /tw setlevel <level>
+tamework.commands.setLevel.usage.tw.setlevel.level=Utilisation : /tw debug set level <level>
 tamework.commands.setLevel.no.npc.found.in.view=Aucun PNJ trouvé dans le champ de vision.
 tamework.commands.setLevel.could.not.set.level.for.npc=Impossible de définir le niveau du PNJ {0} : {1}.
 tamework.commands.setLevel.description=Définir le niveau du PNJ que vous regardez.
@@ -1513,19 +1513,19 @@ tamework.commands.showHitboxes.unable.to.resolve.your.player.uuid=Impossible de 
 tamework.commands.showHitboxes.hitbox.tracking.disabled=Suivi des boîtes de collision désactivé.
 tamework.commands.showHitboxes.no.npc.found.in.view=Aucun PNJ trouvé dans le champ de vision.
 tamework.commands.showHitboxes.target.npc.is.missing.required.components=Le PNJ ciblé n'a pas les composants requis.
-tamework.commands.showHitboxes.tracking.hitbox.debug.for.npc.role.with=Suivi de débogage des boîtes de collision pour le PNJ {0} (role={1}) avec mises à jour à chaque tick (visible uniquement pour vous). Exécutez /tw showhitboxes à nouveau pour désactiver.
+tamework.commands.showHitboxes.tracking.hitbox.debug.for.npc.role.with=Suivi de débogage des boîtes de collision pour le PNJ {0} (role={1}) avec mises à jour à chaque tick (visible uniquement pour vous). Exécutez /tw debug view hitboxes à nouveau pour désactiver.
 tamework.commands.showHitboxes.rendered.main.hitbox.and.detail.boxes.across=1 boîte de collision principale et {0} boîtes détaillées rendues dans {1} groupes détaillés.
 tamework.commands.showHitboxes.description=Activer ou désactiver le suivi en direct des boîtes de collision détaillées du PNJ en vue.
 tamework.commands.showSpawnBeacons.unable.to.resolve.your.player.uuid=Impossible de résoudre l'UUID de votre joueur.
-tamework.commands.showSpawnBeacons.usage.tw.showspawnbeacons.radius.off=Utilisation : /tw showspawnbeacons [radius|off]
-tamework.commands.showSpawnBeacons.spawn.beacon.visualization.enabled.within.blocks.showing=Visualisation des balises d'apparition activée dans un rayon de {0} blocs. Affichage de {1} balise(s) naturelle(s) chargée(s){2}{3} Exécutez /tw showspawnbeacons off pour désactiver.
+tamework.commands.showSpawnBeacons.usage.tw.showspawnbeacons.radius.off=Utilisation : /tw debug view spawn-beacons [radius|off]
+tamework.commands.showSpawnBeacons.spawn.beacon.visualization.enabled.within.blocks.showing=Visualisation des balises d'apparition activée dans un rayon de {0} blocs. Affichage de {1} balise(s) naturelle(s) chargée(s){2}{3} Exécutez /tw debug view spawn-beacons off pour désactiver.
 tamework.commands.showSpawnBeacons.at=  {0} à {1}
 tamework.commands.showSpawnBeacons.and.more.loaded.beacon.s=  ...et {0} balise(s) chargée(s) supplémentaire(s).
 tamework.commands.showSpawnBeacons.description=Activer ou désactiver la visualisation des balises d'apparition naturelles.
 tamework.commands.showSpawnMarkers.unable.to.resolve.your.player.uuid=Impossible de résoudre l'UUID de votre joueur.
-tamework.commands.showSpawnMarkers.usage.tw.showspawnmarkers.radius.off=Utilisation : /tw showspawnmarkers [radius|off]
+tamework.commands.showSpawnMarkers.usage.tw.showspawnmarkers.radius.off=Utilisation : /tw debug view spawn-markers [radius|off]
 tamework.commands.showSpawnMarkers.unable.to.resolve.your.position=Impossible de résoudre votre position.
-tamework.commands.showSpawnMarkers.spawn.marker.debug.rendering.enabled.within.blocks=Rendu de débogage des marqueurs d'apparition activé dans un rayon de {0} blocs. {1} marqueur(s) chargé(s){2}. Exécutez /tw showspawnmarkers off pour désactiver.
+tamework.commands.showSpawnMarkers.spawn.marker.debug.rendering.enabled.within.blocks=Rendu de débogage des marqueurs d'apparition activé dans un rayon de {0} blocs. {1} marqueur(s) chargé(s){2}. Exécutez /tw debug view spawn-markers off pour désactiver.
 tamework.commands.showSpawnMarkers.at.distance.npc.spawncount.manual.suppressed=  {0} à {1}, distance={2}, npc={3}, spawnCount={4}, manual={5}, suppressed={6}
 tamework.commands.showSpawnMarkers.and.more.loaded.marker.s=  ...et {0} marqueur(s) chargé(s) supplémentaire(s).
 tamework.commands.showSpawnMarkers.description=Activer ou désactiver le rendu de débogage local des marqueurs d'apparition.
