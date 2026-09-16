@@ -4,30 +4,18 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 /**
- * Preflights and installs active Tamework runtime participants.
+ * Compatibility adapter for registry-owned runtime registration.
  *
- * <p>All active preflight actions run before the first target mutation. A
- * failed preflight therefore leaves the host registry unchanged. The returned
- * handle owns every installed resource.</p>
+ * <p>New startup paths should use {@link TameworkRuntimeParticipantRegistry}
+ * directly. This adapter preserves the public context-based contract.</p>
  */
 public final class TameworkRuntimeRegistrar {
     /** Constructs every active prepared resource without changing the target. */
     public void preflight(TameworkRuntimeRegistrationContext context) {
         TameworkRuntimeRegistrationContext checked = Objects.requireNonNull(
-                context,
-                "Runtime registration context is required"
+                context, "Runtime registration context is required"
         );
-        for (TameworkRuntimeRegistrationContext.Participant participant
-                : checked.activeParticipants()) {
-            try {
-                participant.preflight();
-            } catch (Exception exception) {
-                throw new IllegalStateException(
-                        "Runtime participant preflight failed: " + participant.id(),
-                        exception
-                );
-            }
-        }
+        TameworkRuntimeParticipantRegistry.preflight(checked.plan(), checked.participants());
     }
 
     /** Registers the active participants from one frozen context. */
@@ -41,28 +29,11 @@ public final class TameworkRuntimeRegistrar {
             Consumer<TameworkRuntimeRegistrationContext.Participant> installed
     ) {
         TameworkRuntimeRegistrationContext checked = Objects.requireNonNull(
-                context,
-                "Runtime registration context is required"
+                context, "Runtime registration context is required"
         );
-        Consumer<TameworkRuntimeRegistrationContext.Participant> observer =
-                Objects.requireNonNull(installed, "Registration observer is required");
-        preflight(checked);
-
-        TameworkRuntimeHandle handle = new TameworkRuntimeHandle();
-        try {
-            for (TameworkRuntimeRegistrationContext.Participant participant : checked.activeParticipants()) {
-                AutoCloseable resource = participant.register(checked.target());
-                handle.add(resource);
-                observer.accept(participant);
-            }
-            return handle;
-        } catch (Exception exception) {
-            try {
-                handle.close();
-            } catch (RuntimeException closeFailure) {
-                exception.addSuppressed(closeFailure);
-            }
-            throw new IllegalStateException("Runtime participant registration failed", exception);
-        }
+        return TameworkRuntimeParticipantRegistry.register(
+                checked.plan(), checked.target(), checked.participants(), installed
+        );
     }
+
 }

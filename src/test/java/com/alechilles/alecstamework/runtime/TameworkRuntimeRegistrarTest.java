@@ -14,6 +14,7 @@ import com.hypixel.hytale.component.dependency.Dependency;
 import com.hypixel.hytale.component.dependency.Order;
 import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.system.ISystem;
+import com.hypixel.hytale.logger.HytaleLogger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -33,14 +34,16 @@ class TameworkRuntimeRegistrarTest {
         RecordingTarget target = new RecordingTarget();
         List<String> observed = new ArrayList<>();
 
-        TameworkRuntimeHandle handle = new TameworkRuntimeRegistrar().register(
-                TameworkRuntimeRegistrationContext.builder(plan, target)
-                        .participant(participant(module, "system", RegistrationKind.ECS_SYSTEM, target))
-                        .participant(participant(module, "listener", RegistrationKind.LISTENER, target))
-                        .participant(participant(module, "subscription", RegistrationKind.SUBSCRIPTION, target))
-                        .participant(participant(module, "worker", RegistrationKind.WORKER, target))
-                        .build(),
-                participant -> observed.add(participant.id())
+        TameworkRuntimeParticipantRegistry participants = registry();
+        participants.entitySystem(module, "system", Object::new);
+        participants.listener(module, "listener", () -> { });
+        participants.subscription(module, "subscription", () -> { });
+
+        TameworkRuntimeHandle handle = participants.register(
+                plan,
+                target,
+                participant -> observed.add(participant.id()),
+                Participant.of(module, "worker", RegistrationKind.WORKER, ignored -> target.resource("worker"))
         );
 
         assertEquals(List.of(), target.registered);
@@ -64,12 +67,14 @@ class TameworkRuntimeRegistrarTest {
         RecordingTarget target = new RecordingTarget();
         List<String> observed = new ArrayList<>();
 
-        new TameworkRuntimeRegistrar().register(
-                TameworkRuntimeRegistrationContext.builder(plan, target)
-                        .participant(participant(active, "active", RegistrationKind.LISTENER, target))
-                        .participant(participant(dormant, "dormant", RegistrationKind.WORKER, target))
-                        .participant(participant(dependency, "dependency", RegistrationKind.ECS_SYSTEM, target))
-                        .build(),
+        TameworkRuntimeParticipantRegistry participants = registry();
+        participants.entitySystem(active, "active", Object::new);
+        participants.entitySystem(dormant, "dormant", Object::new);
+        participants.entitySystem(dependency, "dependency", Object::new);
+
+        participants.register(
+                plan,
+                target,
                 participant -> observed.add(participant.id())
         );
 
@@ -86,18 +91,11 @@ class TameworkRuntimeRegistrarTest {
         );
         ComponentRegistry<Object> registry = new ComponentRegistry<>();
 
-        new TameworkRuntimeRegistrar().register(
-                TameworkRuntimeRegistrationContext.builder(plan, systemTarget(registry))
-                        .participant(Participant.prepared(
-                                module, "z-dependency", RegistrationKind.ECS_SYSTEM,
-                                DependencySystem::new
-                        ))
-                        .participant(Participant.prepared(
-                                module, "a-consumer", RegistrationKind.ECS_SYSTEM,
-                                ConsumerSystem::new
-                        ))
-                        .build()
-        );
+        TameworkRuntimeParticipantRegistry participants = registry();
+        participants.entitySystem(module, "z-dependency", DependencySystem::new);
+        participants.entitySystem(module, "a-consumer", ConsumerSystem::new);
+
+        participants.register(plan, systemTarget(registry), ignored -> { });
 
         assertTrue(registry.hasSystemClass(DependencySystem.class));
         assertTrue(registry.hasSystemClass(ConsumerSystem.class));
@@ -117,11 +115,13 @@ class TameworkRuntimeRegistrarTest {
         TameworkRuntimeDiagnostics diagnostics = new TameworkRuntimeDiagnostics(plan);
         RecordingTarget target = new RecordingTarget();
 
-        new TameworkRuntimeRegistrar().register(
-                TameworkRuntimeRegistrationContext.builder(plan, target)
-                        .participant(participant(active, "animal-system", RegistrationKind.ECS_SYSTEM, target))
-                        .participant(participant(dormant, "unused-system", RegistrationKind.ECS_SYSTEM, target))
-                        .build(),
+        TameworkRuntimeParticipantRegistry participants = registry();
+        participants.entitySystem(active, "animal-system", Object::new);
+        participants.entitySystem(dormant, "unused-system", Object::new);
+
+        participants.register(
+                plan,
+                target,
                 participant -> TameworkRuntimeRegistrationTelemetry.record(diagnostics, participant)
         );
 
@@ -148,19 +148,20 @@ class TameworkRuntimeRegistrarTest {
         RecordingTarget target = new RecordingTarget();
         AtomicInteger preflightCalls = new AtomicInteger();
 
-        assertThrows(IllegalStateException.class, () -> new TameworkRuntimeRegistrar().register(
-                TameworkRuntimeRegistrationContext.builder(plan, target)
-                        .participant(Participant.of(
-                                module,
-                                "failing",
-                                RegistrationKind.WORKER,
-                                () -> {
-                                    preflightCalls.incrementAndGet();
-                                    throw new IllegalStateException("missing dependency");
-                                },
-                                ignored -> target.resource("failing")
-                        ))
-                        .build()
+        assertThrows(IllegalStateException.class, () -> registry().register(
+                plan,
+                target,
+                ignored -> { },
+                Participant.of(
+                        module,
+                        "failing",
+                        RegistrationKind.WORKER,
+                        () -> {
+                            preflightCalls.incrementAndGet();
+                            throw new IllegalStateException("missing dependency");
+                        },
+                        ignored -> target.resource("failing")
+                )
         ));
 
         assertEquals(1, preflightCalls.get());
@@ -212,25 +213,19 @@ class TameworkRuntimeRegistrarTest {
         );
         RecordingTarget target = new RecordingTarget();
 
-        TameworkRuntimeHandle handle = new TameworkRuntimeRegistrar().register(
-                TameworkRuntimeRegistrationContext.builder(plan, target)
-                        .participant(participant(first, "first", RegistrationKind.ECS_SYSTEM, target))
-                        .participant(participant(second, "second", RegistrationKind.WORKER, target))
-                        .build()
-        );
+        TameworkRuntimeParticipantRegistry participants = registry();
+        participants.entitySystem(first, "first", Object::new);
+        participants.entitySystem(second, "second", Object::new);
+
+        TameworkRuntimeHandle handle = participants.register(plan, target, ignored -> { });
 
         handle.close();
         assertEquals(List.of("first", "second", "second", "first"), target.lifecycle);
         assertEquals(0, handle.size());
     }
 
-    private static Participant participant(
-            TameworkRuntimeModule module,
-            String id,
-            RegistrationKind kind,
-            RecordingTarget target
-    ) {
-        return Participant.of(module, id, kind, ignored -> target.resource(id));
+    private static TameworkRuntimeParticipantRegistry registry() {
+        return new TameworkRuntimeParticipantRegistry(ignored -> { }, HytaleLogger.getLogger());
     }
 
     @SuppressWarnings("unchecked")

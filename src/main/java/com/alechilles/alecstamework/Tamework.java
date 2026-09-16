@@ -155,7 +155,6 @@ import com.alechilles.alecstamework.runtime.TameworkActiveAssetInitializer;
 import com.alechilles.alecstamework.runtime.TameworkRuntimeParticipantRegistry;
 import com.alechilles.alecstamework.runtime.TameworkRuntimeRegistrationTarget;
 import com.alechilles.alecstamework.runtime.TameworkRuntimeRegistrationTelemetry;
-import com.alechilles.alecstamework.runtime.TameworkRuntimeRegistrar;
 import com.alechilles.alecstamework.runtime.TameworkRuntimeRegistrationContext;
 import com.alechilles.alecstamework.persistence.runtime.player.TameworkInventoryOperationReceiptsComponent;
 import com.alechilles.alecstamework.npc.TameworkNpcBuilderRegistrar;
@@ -1519,16 +1518,7 @@ public class Tamework extends JavaPlugin {
 
     /** Validates setup-declared factories before persistence can mutate state. */
     private void preflightDeclaredRuntimeParticipants() {
-        TameworkRuntimeRegistrationContext.Builder builder =
-                TameworkRuntimeRegistrationContext.builder(
-                        runtimeStartupPlan,
-                        (kind, participantId) -> () -> { }
-                );
-        for (TameworkRuntimeRegistrationContext.Participant participant
-                : runtimeParticipants.participants()) {
-            builder.participant(participant);
-        }
-        new TameworkRuntimeRegistrar().preflight(builder.build());
+        runtimeParticipants.preflight(runtimeStartupPlan);
     }
 
     /** Installs optional workers through the same preflight and ownership boundary as ECS work. */
@@ -1544,14 +1534,13 @@ public class Tamework extends JavaPlugin {
                         system -> getChunkStoreRegistry().registerSystem(
                                 (ISystem<ChunkStore>) system)
                 );
-        TameworkRuntimeRegistrationContext.Builder contextBuilder =
-                TameworkRuntimeRegistrationContext.builder(runtimeStartupPlan, target);
-        for (TameworkRuntimeRegistrationContext.Participant participant
-                : runtimeParticipants.participants()) {
-            contextBuilder.participant(participant);
-        }
-        TameworkRuntimeRegistrationContext context = contextBuilder
-                .participant(TameworkRuntimeRegistrationContext.Participant.prepared(
+        runtimeHandle = runtimeParticipants.register(
+                runtimeStartupPlan,
+                target,
+                participant -> TameworkRuntimeRegistrationTelemetry.record(
+                        runtimeStartupDiagnostics, participant
+                ),
+                TameworkRuntimeRegistrationContext.Participant.prepared(
                         TameworkRuntimeModule.HSTATS,
                         "hstats-worker",
                         TameworkRuntimeRegistrationContext.RegistrationKind.WORKER,
@@ -1561,12 +1550,6 @@ public class Tamework extends JavaPlugin {
                             hStatsIntegration.initialize();
                             return hStatsIntegration;
                         }
-                ))
-                .build();
-        runtimeHandle = new TameworkRuntimeRegistrar().register(
-                context,
-                participant -> TameworkRuntimeRegistrationTelemetry.record(
-                        runtimeStartupDiagnostics, participant
                 )
         );
     }

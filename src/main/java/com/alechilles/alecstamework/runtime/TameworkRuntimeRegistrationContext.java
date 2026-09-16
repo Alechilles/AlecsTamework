@@ -3,22 +3,17 @@ package com.alechilles.alecstamework.runtime;
 import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeActivationPlan;
 import com.alechilles.alecstamework.runtime.activation.TameworkRuntimeModule;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Immutable input for one Tamework runtime registration pass.
+ * Compatibility snapshot for one Tamework runtime registration pass.
  *
- * <p>The context contains only a frozen activation plan, a target supplied by
- * the host, and declared participants. It does not retain a mutable registry
- * or start work while it is being built.</p>
+ * <p>New runtime startup paths register directly through
+ * {@link TameworkRuntimeParticipantRegistry}. This type keeps the original
+ * public builder and declaration contracts while freezing a registry-owned
+ * declaration snapshot for existing callers.</p>
  */
 public final class TameworkRuntimeRegistrationContext {
     /** The kinds of runtime work that a participant may install. */
@@ -217,7 +212,7 @@ public final class TameworkRuntimeRegistrationContext {
     ) {
         this.plan = Objects.requireNonNull(plan, "Activation plan is required");
         this.target = Objects.requireNonNull(target, "Registration target is required");
-        this.participants = orderedParticipants(participants, plan);
+        this.participants = TameworkRuntimeParticipantRegistry.snapshot(plan, participants);
     }
 
     /** Starts a builder for one registration pass. */
@@ -243,13 +238,7 @@ public final class TameworkRuntimeRegistrationContext {
 
     /** Returns only participants whose owning module is active. */
     public List<Participant> activeParticipants() {
-        List<Participant> active = new ArrayList<>();
-        for (Participant participant : participants) {
-            if (plan.isActive(participant.module())) {
-                active.add(participant);
-            }
-        }
-        return Collections.unmodifiableList(active);
+        return TameworkRuntimeParticipantRegistry.activeParticipants(plan, participants);
     }
 
     /** Mutable builder that freezes all declarations at build time. */
@@ -275,65 +264,4 @@ public final class TameworkRuntimeRegistrationContext {
         }
     }
 
-    private static List<Participant> orderedParticipants(
-            List<Participant> source,
-            TameworkRuntimeActivationPlan plan
-    ) {
-        Objects.requireNonNull(source, "Participants are required");
-        Map<String, Participant> byId = new LinkedHashMap<>();
-        for (Participant participant : source) {
-            Participant checked = Objects.requireNonNull(participant, "Participant cannot be null");
-            if (!plan.modules().contains(checked.module())) {
-                throw new IllegalArgumentException(
-                        "Participant " + checked.id() + " names a module outside the activation plan: "
-                                + checked.module().id()
-                );
-            }
-            if (byId.putIfAbsent(checked.id(), checked) != null) {
-                throw new IllegalArgumentException("Duplicate runtime participant ID: " + checked.id());
-            }
-        }
-
-        Map<TameworkRuntimeModule, Integer> moduleOrder = moduleOrder(plan);
-        List<Participant> ordered = new ArrayList<>(byId.values());
-        // Hytale validates referenced system types during registration.
-        // Preserve declaration order within one module.
-        ordered.sort(Comparator.comparingInt(
-                (Participant participant) -> moduleOrder.get(participant.module())
-        ));
-        return Collections.unmodifiableList(ordered);
-    }
-
-    private static Map<TameworkRuntimeModule, Integer> moduleOrder(
-            TameworkRuntimeActivationPlan plan
-    ) {
-        Map<TameworkRuntimeModule, Integer> order = new LinkedHashMap<>();
-        Set<TameworkRuntimeModule> visiting = new TreeSet<>();
-        Set<TameworkRuntimeModule> visited = new TreeSet<>();
-        for (TameworkRuntimeModule module : new TreeSet<>(plan.modules())) {
-            appendModule(module, plan, visiting, visited, order);
-        }
-        return order;
-    }
-
-    private static void appendModule(
-            TameworkRuntimeModule module,
-            TameworkRuntimeActivationPlan plan,
-            Set<TameworkRuntimeModule> visiting,
-            Set<TameworkRuntimeModule> visited,
-            Map<TameworkRuntimeModule, Integer> order
-    ) {
-        if (visited.contains(module)) {
-            return;
-        }
-        if (!visiting.add(module)) {
-            throw new IllegalArgumentException("Runtime participant dependency cycle at " + module.id());
-        }
-        for (TameworkRuntimeModule dependency : new TreeSet<>(plan.dependenciesFor(module))) {
-            appendModule(dependency, plan, visiting, visited, order);
-        }
-        visiting.remove(module);
-        visited.add(module);
-        order.put(module, order.size());
-    }
 }
