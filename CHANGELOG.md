@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Reduced database growth from repeated entity checkpoints by compacting old,
+  consumed checkpoint history while preserving current saves and retry safety.
+
 ## 4.0.0 - Companion Commands, Formations, and Localization - 2026-09-14
 
 **Upgrade compatibility:** Dependent mods whose manifests require Tamework

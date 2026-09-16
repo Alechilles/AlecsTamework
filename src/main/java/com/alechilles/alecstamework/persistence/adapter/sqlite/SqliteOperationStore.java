@@ -314,7 +314,7 @@ public final class SqliteOperationStore implements OperationStore {
         return existing.kind().equals(requested.kind())
                 && existing.idempotencyKey().equals(requested.idempotencyKey())
                 && existing.payloadVersion() == requested.payloadVersion()
-                && existing.payloadJson().equals(requested.payloadJson())
+                && SqliteCheckpointReceipt.matchesPayload(existing, requested.payloadJson())
                 && existing.featureScope().equals(requested.featureScope())
                 && java.util.Objects.equals(
                         existing.expectedLifecycleRevision(),

@@ -65,21 +65,24 @@ class ReplacementPersistenceArchitectureGuardTest {
     }
 
     @Test
-    void lifecycleHasOneSqlMutationPathAndOutboxHasNoCompactionPath() throws Exception {
+    void lifecycleHasOneSqlMutationPathAndOutboxCompactionStaysInItsProvenAuthority() throws Exception {
         int lifecycleUpdates = 0;
         ArrayList<String> outboxDeletes = new ArrayList<>();
         for (Path root : REPLACEMENT_ROOTS) {
             for (Path file : javaFiles(root)) {
                 String source = Files.readString(file);
                 lifecycleUpdates += occurrences(source, "UPDATE companion_lifecycle");
-                if (source.contains("DELETE FROM projection_outbox")) {
+                // ADR 0010 proves canonical rebuild only for internal entity checkpoints.
+                // Other consumers may still require their history to recover after a crash.
+                if (source.contains("DELETE FROM projection_outbox")
+                        && !file.equals(SQLITE.resolve("SqliteCheckpointHistoryStore.java"))) {
                     outboxDeletes.add(relative(file));
                 }
             }
         }
         assertEquals(1, lifecycleUpdates, "Canonical lifecycle must have one update statement");
         assertTrue(outboxDeletes.isEmpty(),
-                () -> "Outbox compaction is not proven: " + outboxDeletes);
+                () -> "Outbox compaction outside the checkpoint authority: " + outboxDeletes);
     }
 
     @Test

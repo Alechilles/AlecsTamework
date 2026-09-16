@@ -52,6 +52,20 @@ The canonical lifecycle vocabulary is `ACTIVE`, `UNLOADED`, `CAPTURED`,
 provisioning, roster, and coop code read that lifecycle; they do not maintain
 separate status authorities.
 
+## Entity checkpoint history retention
+
+Internal entity checkpoints retain current canonical state and small permanent
+idempotency records. Superseded checkpoints published at least one hour ago can
+discard their large operation payload and consumed outbox event after the
+extension index acknowledges them. Incomplete operations, active quarantine,
+public extension data, and other operation families keep their evidence.
+
+Cleanup runs in bounded batches as new checkpoints publish. Existing databases
+gradually gain reusable free pages; their file size does not shrink automatically.
+Returning those pages to disk requires an offline SQLite `VACUUM` after cleanup,
+with the server stopped and a complete backup retained. Small retry records still
+accumulate, so this reduces growth rather than imposing a fixed database-size cap.
+
 ## Dormant transitions require positive evidence
 
 Tamework authors a dormant transition only when it has one of these exact
