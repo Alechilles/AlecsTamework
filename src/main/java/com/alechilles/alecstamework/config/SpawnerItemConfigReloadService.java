@@ -14,12 +14,17 @@ import javax.annotation.Nonnull;
 /** Compiles and validates one complete spawner generation before publishing it atomically. */
 public final class SpawnerItemConfigReloadService {
     private final ItemFeatureRegistry registry;
-    private final ItemAssetLookup items;
 
+    public SpawnerItemConfigReloadService(@Nonnull ItemFeatureRegistry registry) {
+        this.registry = Objects.requireNonNull(registry, "registry");
+    }
+
+    /** @deprecated Item assets are not needed to compile a spawner generation. */
+    @Deprecated
     public SpawnerItemConfigReloadService(@Nonnull ItemFeatureRegistry registry,
                                           @Nonnull ItemAssetLookup items) {
-        this.registry = Objects.requireNonNull(registry, "registry");
-        this.items = Objects.requireNonNull(items, "items");
+        this(registry);
+        Objects.requireNonNull(items, "items");
     }
 
     /**

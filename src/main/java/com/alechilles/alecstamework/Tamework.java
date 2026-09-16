@@ -352,7 +352,6 @@ public class Tamework extends JavaPlugin {
     private final Object itemFeatureReloadSuppressionLock = new Object();
     private int itemFeatureReloadSuppressionDepth;
     private boolean itemFeatureReloadPending;
-    private volatile boolean spawnerReloadPendingOnItemAssets;
     private final Object overrideAssetEventSuppressionLock = new Object();
     private final OwnerPopulationLiveIndex ownerPopulationLiveIndex =
             new OwnerPopulationLiveIndex();
@@ -449,15 +448,7 @@ public class Tamework extends JavaPlugin {
                 getLogger()
         );
         itemFeatureRegistry = new ItemFeatureRegistry();
-        spawnerItemConfigReloadService = new SpawnerItemConfigReloadService(
-                itemFeatureRegistry,
-                itemId -> {
-                    DefaultAssetMap<String, Item> itemMap = Item.getAssetMap();
-                    Item item = itemMap == null ? null : itemMap.getAsset(itemId);
-                    return item == null || item.getMaxStack() <= 0
-                            ? java.util.OptionalInt.empty()
-                            : java.util.OptionalInt.of(item.getMaxStack());
-                });
+        spawnerItemConfigReloadService = new SpawnerItemConfigReloadService(itemFeatureRegistry);
         nameItemRegistry = new NameItemRegistry();
         bondedCompanionRosterRegistry = new BondedCompanionRosterRegistry();
         commandItemRegistry = new CommandItemRegistry(
@@ -2835,15 +2826,6 @@ public class Tamework extends JavaPlugin {
 
     private void onItemAssetsLoaded(
             LoadedAssetsEvent<String, Item, DefaultAssetMap<String, Item>> event) {
-        if (spawnerReloadPendingOnItemAssets) {
-            int loaded = loadSpawnerItemAssets();
-            if (loaded > 0) {
-                getLogger().at(Level.INFO).log(
-                        "Recovered deferred spawner config reload after referenced Item assets loaded: "
-                                + loaded + " config(s)."
-                );
-            }
-        }
         reconcileNpcPortraitAssets();
     }
 
@@ -3270,7 +3252,6 @@ public class Tamework extends JavaPlugin {
         SpawnerItemConfigReloadService.ReloadResult result =
                 spawnerItemConfigReloadService.reload(assetMap.getAssetMap().values());
         if (!result.applied()) {
-            spawnerReloadPendingOnItemAssets = result.retryableAfterItemAssetsLoad();
             for (String error : result.errors()) {
                 getLogger().at(Level.WARNING).log(
                         "Spawner config reload rejected at active revision "
@@ -3278,7 +3259,6 @@ public class Tamework extends JavaPlugin {
             }
             return 0;
         }
-        spawnerReloadPendingOnItemAssets = false;
         return result.loadedCount();
     }
 
