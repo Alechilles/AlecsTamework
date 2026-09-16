@@ -96,5 +96,10 @@ public interface TameworkApi {
     default HusbandryOutcomeApi husbandryOutcomes() {
         return HusbandryOutcomeApi.unavailable();
     }
+
+    /** Returns the optional synchronous captured-item display provider facade. */
+    default CapturedItemDisplayApi capturedItemDisplay() {
+        return CapturedItemDisplayApi.unavailable();
+    }
 }
 

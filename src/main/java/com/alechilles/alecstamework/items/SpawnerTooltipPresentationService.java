@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
+import com.alechilles.alecstamework.api.ProgressionView;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
@@ -8,6 +9,7 @@ import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.npc.attachments.ResolvedAttachmentDisplay;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
+import com.alechilles.alecstamework.npc.progression.TraitPresentationViewMapper;
 import com.hypixel.hytale.server.core.Message;
 import java.util.ArrayList;
 import java.util.List;
@@ -198,6 +200,22 @@ final class SpawnerTooltipPresentationService {
             lines.add(buildTraitLine(value, definition));
         }
         return lines;
+    }
+
+    /** Uses the same detached trait facts as companion portraits. */
+    @Nullable
+    ProgressionView.TraitsView capturedTraits(@Nullable String roleId, BsonDocument metadata) {
+        String configId = readString(metadata, TameworkMetadataKeys.TRAITS_CONFIG_ID);
+        String encoded = readString(metadata, TameworkMetadataKeys.TRAITS_VALUES);
+        if (configId == null && encoded == null) {
+            return null;
+        }
+        BsonValue seed = metadata.get(TameworkMetadataKeys.TRAITS_ROLL_SEED);
+        long rollSeed = seed != null && (seed.isInt64() || seed.isInt32())
+                ? seed.asNumber().longValue() : 0L;
+        return TraitPresentationViewMapper.map(
+                new TameworkTraitsComponent(configId, rollSeed, TraitValueCodec.decode(encoded)),
+                resolveTraitConfig(configId, roleId));
     }
 
     private Message buildTraitLine(TameworkTraitsComponent.TraitValue traitValue,

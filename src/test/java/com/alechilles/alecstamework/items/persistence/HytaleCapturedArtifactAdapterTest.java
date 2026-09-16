@@ -21,6 +21,25 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Exact Hytale item-to-captured-artifact boundary contracts. */
 class HytaleCapturedArtifactAdapterTest {
+    private Field itemAssetStore;
+    private Object previousItemAssetStore;
+
+    @org.junit.jupiter.api.BeforeEach
+    void initializeItemAssets() throws Exception {
+        var itemType = com.hypixel.hytale.server.core.asset.type.item.config.Item.class;
+        itemAssetStore = itemType.getDeclaredField("ASSET_STORE");
+        itemAssetStore.setAccessible(true);
+        previousItemAssetStore = itemAssetStore.get(null);
+        itemAssetStore.set(null, new com.hypixel.hytale.assetstore.TestItemAssetStore(
+                new com.hypixel.hytale.assetstore.map.DefaultAssetMap<>(java.util.Map.of(
+                        "capture-device-filled", new com.hypixel.hytale.server.core.asset.type.item.config.Item(
+                                "capture-device-filled")))));
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void restoreItemAssets() throws Exception {
+        itemAssetStore.set(null, previousItemAssetStore);
+    }
     private static final HytaleCapturedArtifactAdapter ADAPTER =
             new HytaleCapturedArtifactAdapter(
                     HytaleCapturedArtifactAdapterTest::itemStack
@@ -134,11 +153,22 @@ class HytaleCapturedArtifactAdapterTest {
     }
 
     @Test
-    void releasedReceiptMetadataSpellingRemainsStable() {
-        assertEquals(
-                "Tamework.CaptureSnapshotId",
-                TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID
-        );
+    void captureQualitySurvivesArtifactRecreationAndReceiptMetadataWithoutChangingIdentity() {
+        var adapter = new HytaleCapturedArtifactAdapter(
+                HytaleCapturedArtifactAdapterTest::itemStack, id -> "Rare".equals(id) ? 17 : -1);
+        var source = stackWithMetadata(new BsonDocument(
+                TameworkMetadataKeys.CAPTURE_ITEM_QUALITY_ID, new BsonString("Rare")));
+        var artifact = adapter.toArtifact(source);
+        var restored = adapter.toItemStack(artifact);
+        assertEquals(17, restored.getQualityIndex());
+        assertTrue(adapter.matches(restored, artifact));
+        var receipt = adapter.withMetadata(restored, new BsonDocument("receipt", new BsonString("ok")));
+        assertEquals(17, receipt.getQualityIndex());
+        assertEquals("ok", receipt.getMetadata().getString("receipt").getValue());
+
+        var missingQuality = new HytaleCapturedArtifactAdapter(
+                HytaleCapturedArtifactAdapterTest::itemStack, id -> -1);
+        assertTrue(missingQuality.matches(missingQuality.toItemStack(artifact), artifact));
     }
 
     private ItemStack stackWithMetadata(BsonDocument metadata) {

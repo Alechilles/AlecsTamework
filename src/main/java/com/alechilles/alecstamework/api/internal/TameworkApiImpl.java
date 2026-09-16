@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.api.DiagnosticsApi;
 import com.alechilles.alecstamework.api.DamagePolicyDecisionView;
 import com.alechilles.alecstamework.api.ActivityFeedApi;
 import com.alechilles.alecstamework.api.GlobalConfigView;
+import com.alechilles.alecstamework.api.CapturedItemDisplayApi;
 import com.alechilles.alecstamework.api.HusbandryOutcomeApi;
 import com.alechilles.alecstamework.api.InteractionConfigView;
 import com.alechilles.alecstamework.api.InteractionExtensionApi;
@@ -141,6 +142,8 @@ public final class TameworkApiImpl
     private final CommandHudRegistry commandHudRegistry;
     private final HusbandryOutcomeRegistry husbandryOutcomeRegistry =
             new HusbandryOutcomeRegistry();
+    private final CapturedItemDisplayRegistry capturedItemDisplayRegistry =
+            new CapturedItemDisplayRegistry();
     private final BreedingCooldownResetService breedingCooldownResetService =
             new BreedingCooldownResetService();
     private final CommandLinksApi commandLinksApi = new CommandLinksApi() {
@@ -294,7 +297,8 @@ public final class TameworkApiImpl
             TameworkApiCapability.HUSBANDRY_TOOL_BONUSES,
             TameworkApiCapability.HUSBANDRY_CARE_BONUSES,
             TameworkApiCapability.HUSBANDRY_FLAT_CARE_BONUS,
-            TameworkApiCapability.HUSBANDRY_BREEDING_GENETICS
+            TameworkApiCapability.HUSBANDRY_BREEDING_GENETICS,
+            TameworkApiCapability.CAPTURED_ITEM_DISPLAY
     );
     private final Gson gson = new Gson();
     @Nullable
@@ -410,6 +414,9 @@ public final class TameworkApiImpl
                 current.remove(TameworkApiCapability.HUSBANDRY_FLAT_CARE_BONUS);
                 current.remove(TameworkApiCapability.HUSBANDRY_BREEDING_GENETICS);
             }
+            if (!capturedItemDisplayRegistry.available()) {
+                current.remove(TameworkApiCapability.CAPTURED_ITEM_DISPLAY);
+            }
             return current;
         }
     }
@@ -437,6 +444,7 @@ public final class TameworkApiImpl
             commandHudRegistry.close();
             husbandryOutcomeRegistry.close();
             HusbandryOutcomeRuntime.clear(husbandryOutcomeRegistry);
+            capturedItemDisplayRegistry.close();
             synchronized (capabilities) {
                 capabilities.remove(TameworkApiCapability.COMMAND_UI_RENDERERS);
                 capabilities.remove(TameworkApiCapability.COMMAND_UI_CONTRIBUTORS);
@@ -450,6 +458,7 @@ public final class TameworkApiImpl
                 capabilities.remove(TameworkApiCapability.HUSBANDRY_CARE_BONUSES);
                 capabilities.remove(TameworkApiCapability.HUSBANDRY_FLAT_CARE_BONUS);
                 capabilities.remove(TameworkApiCapability.HUSBANDRY_BREEDING_GENETICS);
+                capabilities.remove(TameworkApiCapability.CAPTURED_ITEM_DISPLAY);
             }
         } finally {
             damagePolicy.close();
@@ -479,6 +488,11 @@ public final class TameworkApiImpl
     @Override
     public HusbandryOutcomeApi husbandryOutcomes() {
         return husbandryOutcomeRegistry;
+    }
+
+    @Override
+    public CapturedItemDisplayApi capturedItemDisplay() {
+        return capturedItemDisplayRegistry;
     }
 
     @Override

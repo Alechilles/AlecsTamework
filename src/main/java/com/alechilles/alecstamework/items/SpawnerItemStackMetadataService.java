@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.hypixel.hytale.codec.Codec;
+import com.hypixel.hytale.assetstore.map.AssetMapWithIndexes;
 import com.hypixel.hytale.server.core.asset.type.item.config.metadata.ItemDisplayMetadata;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.npc.metadata.CapturedNPCMetadata;
@@ -90,7 +91,10 @@ final class SpawnerItemStackMetadataService {
         if (stack == null) {
             return null;
         }
+        boolean contributedQuality = stack.getMetadata() != null
+                && stack.getMetadata().containsKey(TameworkMetadataKeys.CAPTURE_ITEM_QUALITY_ID);
         ItemStack updated = clearMetadataKey(stack, TameworkMetadataKeys.CAPTURED);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_ITEM_QUALITY_ID);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.COMPANION_PROFILE_ID);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TARGET_UUID);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TARGET_ENTITY_ID);
@@ -111,7 +115,7 @@ final class SpawnerItemStackMetadataService {
         updated = captureMetadataService.clearNameMetadata(updated);
         updated = updated.withMetadata(CapturedNPCMetadata.KEYED_CODEC, null);
         updated = updated.withMetadata(ItemDisplayMetadata.KEYED_CODEC, null);
-        return updated;
+        return contributedQuality ? updated.withQuality(AssetMapWithIndexes.NOT_FOUND) : updated;
     }
 
     String resolveEmptyItemId(String currentItemId) {

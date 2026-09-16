@@ -27,6 +27,84 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SpawnerItemDisplayMetadataServiceTest {
+    private Field itemAssetStore;
+    private Object previousItemAssetStore;
+
+    @org.junit.jupiter.api.BeforeEach
+    void initializeItemAssets() throws Exception {
+        var itemType = com.hypixel.hytale.server.core.asset.type.item.config.Item.class;
+        itemAssetStore = itemType.getDeclaredField("ASSET_STORE");
+        itemAssetStore.setAccessible(true);
+        previousItemAssetStore = itemAssetStore.get(null);
+        itemAssetStore.set(null, new com.hypixel.hytale.assetstore.TestItemAssetStore(
+                new com.hypixel.hytale.assetstore.map.DefaultAssetMap<>(Map.of(
+                        "Spawner_Test_State_Filled", new com.hypixel.hytale.server.core.asset.type.item.config.Item(
+                                "Spawner_Test_State_Filled")))));
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void restoreItemAssets() throws Exception {
+        itemAssetStore.set(null, previousItemAssetStore);
+    }
+
+    @Test
+    void releaseClearsContributedTooltipAndRestoresConfiguredItemQuality() {
+        var metadata = capturedMetadata("Fluffy", "Mob_Cat", "Fluffy")
+                .append(TameworkMetadataKeys.CAPTURE_ITEM_QUALITY_ID, new BsonString("Rare"));
+        var source = stack(metadata).withQuality(17).withMetadata(ItemDisplayMetadata.KEYED_CODEC,
+                new ItemDisplayMetadata(Message.raw("Fluffy"), Message.raw("***")));
+        var service = new SpawnerItemStackMetadataService(null,
+                new SpawnerCaptureMetadataService(null, null), null);
+
+        var cleared = service.clearCapturedMetadata(source);
+
+        assertEquals(cleared.getItem().getQualityIndex(), cleared.getQualityIndex());
+        org.junit.jupiter.api.Assertions.assertNull(cleared.getFromMetadataOrNull(
+                TameworkMetadataKeys.CAPTURE_ITEM_QUALITY_ID, com.hypixel.hytale.codec.Codec.STRING));
+        org.junit.jupiter.api.Assertions.assertNull(cleared.getFromMetadataOrNull(ItemDisplayMetadata.KEYED_CODEC));
+    }
+
+    @Test
+    void optionalProviderDecoratesCapturedTooltipAndActualStackQuality() throws Exception {
+        CapturingDisplayMetadataWriter writer = new CapturingDisplayMetadataWriter();
+        TwTraitConfig traits = traitConfig("Test_Traits", trait("Health", "Health", .75, 1, 1.25));
+        SpawnerTooltipPresentationService tooltip = new SpawnerTooltipPresentationService(
+                null, id -> traits, role -> traits, id -> null, role -> null);
+        var service = new SpawnerItemDisplayMetadataService(null, null, stack -> Message.raw("Base"),
+                writer, tooltip, context -> {
+                    assertEquals("Mob_Cat", context.roleId());
+                    assertEquals("Test_Traits", context.traits().configId());
+                    assertEquals(1.25, context.traits().values().getFirst().value());
+                    return new com.alechilles.alecstamework.api.CapturedItemDisplayContribution(
+                            Message.raw("***"), "TestQuality");
+                }, id -> "TestQuality".equals(id) ? 17 : -1);
+        var metadata = capturedMetadata("Fluffy", "Mob_Cat", "Fluffy")
+                .append(TameworkMetadataKeys.TRAITS_CONFIG_ID, new BsonString("Test_Traits"))
+                .append(TameworkMetadataKeys.TRAITS_VALUES, new BsonString("[{\"id\":\"Health\",\"value\":1.25}]"));
+
+        var updated = service.applyCapturedDisplayMetadata(stack(metadata),
+                config(ItemFeatureConfig.SpawnerTooltipMode.ADDITIVE));
+
+        assertTrue(plainText(writer.metadata.getDescription()).startsWith("***\nBase\n\nFluffy"));
+        assertEquals(17, updated.getQualityIndex());
+        assertEquals("TestQuality", updated.getMetadata()
+                .getString(TameworkMetadataKeys.CAPTURE_ITEM_QUALITY_ID).getValue());
+        assertEquals(metadata.get(TameworkMetadataKeys.TRAITS_VALUES),
+                updated.getMetadata().get(TameworkMetadataKeys.TRAITS_VALUES));
+    }
+
+    @Test
+    void unknownOptionalQualityKeepsOriginalQualityAndStillShowsTooltip() {
+        CapturingDisplayMetadataWriter writer = new CapturingDisplayMetadataWriter();
+        var service = new SpawnerItemDisplayMetadataService(null, null, stack -> null, writer, null,
+                context -> new com.alechilles.alecstamework.api.CapturedItemDisplayContribution(
+                        Message.raw("***"), "Missing"), id -> -1);
+        var source = stack(capturedMetadata("Fluffy", "Mob_Cat", "Fluffy"));
+        var updated = service.applyCapturedDisplayMetadata(source,
+                config(ItemFeatureConfig.SpawnerTooltipMode.REPLACE));
+        assertSame(source, updated);
+        assertEquals("***\nFluffy - Mob_Cat", plainText(writer.metadata.getDescription()));
+    }
 
     @Test
     void additiveModeWritesBaseDescriptionAndCapturedLines() {

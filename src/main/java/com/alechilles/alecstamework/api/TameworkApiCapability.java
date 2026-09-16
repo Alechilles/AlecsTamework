@@ -77,6 +77,8 @@ public enum TameworkApiCapability {
     /** Unconditional, unscaled happiness bonus supplied by husbandry outcome providers. */
     HUSBANDRY_FLAT_CARE_BONUS,
     /** Owner-scoped inheritance bonuses and harmful-mutation reroll chances. */
-    HUSBANDRY_BREEDING_GENETICS
+    HUSBANDRY_BREEDING_GENETICS,
+    /** External providers can contribute captured-item tooltip and quality presentation. */
+    CAPTURED_ITEM_DISPLAY
 }
 

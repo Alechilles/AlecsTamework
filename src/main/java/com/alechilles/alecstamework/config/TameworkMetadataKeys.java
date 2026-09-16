@@ -12,6 +12,8 @@ public final class TameworkMetadataKeys {
     public static final String CAPTURE_ROLE_ID = "Tamework.CaptureRoleId";
     public static final String CAPTURE_NAME_KEY = "Tamework.CaptureNameKey";
     public static final String CAPTURE_MODEL_ID = "Tamework.CaptureModelId";
+    /** Optional presentation quality asset ID, retained when capture artifacts recreate a stack. */
+    public static final String CAPTURE_ITEM_QUALITY_ID = "Tamework.CaptureItemQualityId";
     /** Exact captured-artifact receipt, equal to the authoritative capture snapshot ID. */
     public static final String CAPTURE_SNAPSHOT_ID = "Tamework.CaptureSnapshotId";
     /** Operation-scoped receipt proving a captured artifact was consumed for release. */

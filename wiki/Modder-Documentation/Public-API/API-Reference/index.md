@@ -28,6 +28,7 @@ This subsection contains the reference contract for each public API family.
 - [Husbandry Outcomes API Reference](/mod/alecs-tamework/husbandry-outcomes-api-reference)
 - [Diagnostics API Reference](/mod/alecs-tamework/diagnostics-api-reference)
 - [Capture Policy API Reference](/mod/alecs-tamework/capture-policy-api-reference)
+- [Captured Item Display API Reference](/mod/alecs-tamework/captured-item-display-api-reference)
 - [Population Groups API Reference](/mod/alecs-tamework/population-groups-api-reference)
 - [Command Family Rosters API Reference](/mod/alecs-tamework/command-family-rosters-api-reference)
 - [Timed Summoning API Reference](/mod/alecs-tamework/timed-summoning-api-reference)

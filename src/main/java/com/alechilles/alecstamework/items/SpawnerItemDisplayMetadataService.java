@@ -1,5 +1,8 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.api.CapturedItemDisplayContext;
+import com.alechilles.alecstamework.api.CapturedItemDisplayContribution;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.localization.RoleNameResolver;
@@ -9,13 +12,16 @@ import com.alechilles.alecstamework.npc.attachments.ResolvedAttachmentDisplay;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.server.core.asset.type.item.config.metadata.ItemDisplayMetadata;
+import com.hypixel.hytale.server.core.asset.type.item.config.ItemQuality;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.i18n.I18nModule;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.function.ToIntFunction;
 import javax.annotation.Nullable;
 import org.bson.BsonDocument;
 import org.bson.BsonValue;
@@ -37,6 +43,8 @@ final class SpawnerItemDisplayMetadataService {
     private final Function<ItemStack, Message> baseDescriptionResolver;
     private final ItemDisplayMetadataWriter displayMetadataWriter;
     private final SpawnerTooltipPresentationService tooltipPresentationService;
+    private final Function<CapturedItemDisplayContext, CapturedItemDisplayContribution> contributionResolver;
+    private final ToIntFunction<String> qualityResolver;
 
     SpawnerItemDisplayMetadataService(@Nullable TranslationRegistry translationRegistry) {
         this(translationRegistry, AttachmentDisplayResolver.ASSET_BACKED, SpawnerItemDisplayMetadataService::baseDescription);
@@ -71,6 +79,19 @@ final class SpawnerItemDisplayMetadataService {
                                       @Nullable Function<ItemStack, Message> baseDescriptionResolver,
                                       @Nullable ItemDisplayMetadataWriter displayMetadataWriter,
                                       @Nullable SpawnerTooltipPresentationService tooltipPresentationService) {
+        this(translationRegistry, attachmentDisplayResolver, baseDescriptionResolver,
+                displayMetadataWriter, tooltipPresentationService,
+                SpawnerItemDisplayMetadataService::resolveContribution,
+                SpawnerItemDisplayMetadataService::resolveQuality);
+    }
+
+    SpawnerItemDisplayMetadataService(@Nullable TranslationRegistry translationRegistry,
+                                      @Nullable AttachmentDisplayResolver attachmentDisplayResolver,
+                                      @Nullable Function<ItemStack, Message> baseDescriptionResolver,
+                                      @Nullable ItemDisplayMetadataWriter displayMetadataWriter,
+                                      @Nullable SpawnerTooltipPresentationService tooltipPresentationService,
+                                      Function<CapturedItemDisplayContext, CapturedItemDisplayContribution> contributionResolver,
+                                      ToIntFunction<String> qualityResolver) {
         this.translationRegistry = translationRegistry;
         this.attachmentDisplayResolver = attachmentDisplayResolver == null
                 ? AttachmentDisplayResolver.ASSET_BACKED
@@ -84,6 +105,8 @@ final class SpawnerItemDisplayMetadataService {
         this.tooltipPresentationService = tooltipPresentationService == null
                 ? new SpawnerTooltipPresentationService(translationRegistry)
                 : tooltipPresentationService;
+        this.contributionResolver = contributionResolver;
+        this.qualityResolver = qualityResolver;
     }
 
     @Nullable
@@ -100,11 +123,27 @@ final class SpawnerItemDisplayMetadataService {
         if (payload == null) {
             return clearDisplayMetadata(stack);
         }
+        CapturedItemDisplayContribution contribution = contributionResolver.apply(
+                new CapturedItemDisplayContext(stack.getItemId(), payload.roleId(),
+                        tooltipPresentationService.capturedTraits(payload.roleId(), metadataDoc)));
+        Message description = payload.description();
+        if (contribution != null && contribution.descriptionPrefix() != null) {
+            description = description == null ? contribution.descriptionPrefix()
+                    : Message.join(contribution.descriptionPrefix(), Message.raw("\n"), description);
+        }
         ItemDisplayMetadata metadata = new ItemDisplayMetadata(
                 Message.raw(payload.name()),
-                payload.description()
+                description
         );
-        return displayMetadataWriter.write(stack, metadata);
+        ItemStack updated = displayMetadataWriter.write(stack, metadata);
+        if (contribution != null && contribution.qualityId() != null) {
+            int quality = qualityResolver.applyAsInt(contribution.qualityId());
+            if (quality >= 0) {
+                updated = updated.withMetadata(TameworkMetadataKeys.CAPTURE_ITEM_QUALITY_ID,
+                        Codec.STRING, contribution.qualityId()).withQuality(quality);
+            }
+        }
+        return updated;
     }
 
     @Nullable
@@ -147,7 +186,7 @@ final class SpawnerItemDisplayMetadataService {
                 metadataDoc,
                 attachments
         );
-        return new DisplayPayload(itemName, description);
+        return new DisplayPayload(itemName, description, roleId);
     }
 
     @Nullable
@@ -335,11 +374,26 @@ final class SpawnerItemDisplayMetadataService {
         return stack.withMetadata(ItemDisplayMetadata.KEYED_CODEC, metadata);
     }
 
+    private static CapturedItemDisplayContribution resolveContribution(CapturedItemDisplayContext context) {
+        Tamework plugin = Tamework.getInstance();
+        return plugin == null || plugin.getApi() == null ? CapturedItemDisplayContribution.none()
+                : plugin.getApi().capturedItemDisplay().resolve(context);
+    }
+
+    private static int resolveQuality(String qualityId) {
+        try {
+            return ItemQuality.getAssetMap().getIndexOrDefault(qualityId, -1);
+        } catch (RuntimeException | LinkageError unavailable) {
+            // An unavailable optional quality must never prevent capture.
+            return -1;
+        }
+    }
+
     @FunctionalInterface
     interface ItemDisplayMetadataWriter {
         ItemStack write(ItemStack stack, @Nullable ItemDisplayMetadata metadata);
     }
 
-    private record DisplayPayload(String name, @Nullable Message description) {
+    private record DisplayPayload(String name, @Nullable Message description, @Nullable String roleId) {
     }
 }

@@ -1,8 +1,11 @@
 package com.alechilles.alecstamework.items.persistence;
 
 import com.alechilles.alecstamework.companion.capture.CapturedArtifact;
+import com.alechilles.alecstamework.config.TameworkMetadataKeys;
+import com.hypixel.hytale.server.core.asset.type.item.config.ItemQuality;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import java.util.Objects;
+import java.util.function.ToIntFunction;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.bson.BsonDocument;
@@ -18,19 +21,25 @@ public final class HytaleCapturedArtifactAdapter {
                     .outputMode(JsonMode.EXTENDED)
                     .build();
     private final ItemStackFactory stackFactory;
+    private final ToIntFunction<String> qualityResolver;
 
     public HytaleCapturedArtifactAdapter() {
         this(ItemStack::new);
     }
 
     HytaleCapturedArtifactAdapter(ItemStackFactory stackFactory) {
+        this(stackFactory, HytaleCapturedArtifactAdapter::resolveQuality);
+    }
+
+    HytaleCapturedArtifactAdapter(ItemStackFactory stackFactory, ToIntFunction<String> qualityResolver) {
         this.stackFactory = Objects.requireNonNull(
                 stackFactory,
                 "stackFactory"
         );
+        this.qualityResolver = Objects.requireNonNull(qualityResolver, "qualityResolver");
     }
 
-    /** Freezes every persisted Hytale stack field into one hashed artifact. */
+    /** Freezes capture identity and metadata; optional display quality is carried by asset ID in metadata. */
     @Nonnull
     public CapturedArtifact toArtifact(@Nonnull ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
@@ -81,13 +90,13 @@ public final class HytaleCapturedArtifactAdapter {
             metadata.putAll(stack.getMetadata());
         }
         metadata.putAll(additions);
-        return stackFactory.create(
+        return restoreDisplayQuality(stackFactory.create(
                 stack.getItemId(),
                 stack.getQuantity(),
                 stack.getDurability(),
                 stack.getMaxDurability(),
                 metadata
-        );
+        ));
     }
 
     /** Copies an engine-neutral artifact with the supplied persisted metadata additions. */
@@ -111,7 +120,7 @@ public final class HytaleCapturedArtifactAdapter {
         );
     }
 
-    /** Recreates the exact persisted item value without consulting mutable item assets. */
+    /** Recreates the persisted item and resolves its optional display quality asset ID. */
     @Nonnull
     public ItemStack toItemStack(@Nonnull CapturedArtifact artifact) {
         if (artifact == null) {
@@ -119,13 +128,29 @@ public final class HytaleCapturedArtifactAdapter {
                     "Captured artifact is required"
             );
         }
-        return stackFactory.create(
+        return restoreDisplayQuality(stackFactory.create(
                 artifact.itemId(),
                 artifact.quantity(),
                 artifact.durability(),
                 artifact.maxDurability(),
                 BsonDocument.parse(artifact.metadataExtendedJson())
-        );
+        ));
+    }
+
+    private ItemStack restoreDisplayQuality(ItemStack stack) {
+        BsonDocument metadata = stack.getMetadata();
+        var quality = metadata == null ? null : metadata.get(TameworkMetadataKeys.CAPTURE_ITEM_QUALITY_ID);
+        if (quality == null || !quality.isString()) return stack;
+        int index = qualityResolver.applyAsInt(quality.asString().getValue());
+        return index < 0 ? stack : stack.withQuality(index);
+    }
+
+    private static int resolveQuality(String qualityId) {
+        try {
+            return ItemQuality.getAssetMap().getIndexOrDefault(qualityId, -1);
+        } catch (RuntimeException | LinkageError unavailable) {
+            return -1;
+        }
     }
 
     @FunctionalInterface

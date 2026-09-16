@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added an optional captured-item display API for plugin-provided tooltip
+  prefixes and item rarity. Tamework preserves the quality through capture
+  delivery and clears it on release; integrating packs own the rating policy.
+
 - Release now removes loaded companions immediately instead of waiting for an
   NPC despawn timer that can stall when the animal is not ticking.
 

@@ -48,6 +48,10 @@ authorize optional behavior.
   namespaced presentation contributors with detached snapshots and partial UI
   updates.
 
+Development addition: `capturedItemDisplay()` (`CAPTURED_ITEM_DISPLAY`) lets an
+optional provider add a tooltip prefix and per-stack quality when a capture item
+is prepared. See [Captured Item Display API Reference](/mod/alecs-tamework/captured-item-display-api-reference).
+
 The current capability enum contains `PROFILES`, `COMMAND_LINKS`,
 `PROGRESSION`, `PROGRESSION_MUTATIONS`, `POLICY`,
 `INTERACTION_EXTENSIONS`, `TRAIT_EFFECTS`, `HUSBANDRY_OUTCOMES`,
