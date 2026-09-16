@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwAttachmentDisplayConfig;
+import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
@@ -245,21 +246,25 @@ class SpawnerItemDisplayMetadataServiceTest {
     }
 
     @Test
-    void writesColoredProgressionSummaryTraitsAndAppearance() throws Exception {
+    void capturedTraitTooltipShowsEffectsInsteadOfBreedingRanges() throws Exception {
         TranslationRegistry translations = new TranslationRegistry();
         CapturingDisplayMetadataWriter writer = new CapturingDisplayMetadataWriter();
         TwTraitConfig traitConfig = traitConfig(
                 "Traits_Sheep",
-                trait("Trait_Size", "tamework.traits.size.name", 0.65, 1.0, 1.35),
-                trait("Trait_Temperament", "Temperament", 0.5, 1.0, 1.5)
+                trait("Trait_Size", "tamework.traits.size.name", 0.65, 1.0, 1.35, "SizeMultiplier"),
+                trait("Trait_Appetite", "Appetite", 0.75, 1.0, 1.25, "NeedsHungerDecayMultiplier"),
+                trait("Trait_Attitude", "Attitude", 0.75, 1.0, 1.3, "HappinessGainMultiplier"),
+                trait("Trait_Fertility", "Fertility", 0.5, 1.0, 2.0, "FertilityMultiplier")
         );
         TwLevelingConfig levelingConfig = levelingConfig("Levels_Sheep", 25);
+        TwHappinessConfig happinessConfig = flatHappinessConfig();
         SpawnerTooltipPresentationService presentation = new SpawnerTooltipPresentationService(
                 translations,
                 id -> traitConfig,
                 role -> traitConfig,
                 id -> levelingConfig,
-                role -> levelingConfig
+                role -> levelingConfig,
+                role -> happinessConfig
         );
         SpawnerItemDisplayMetadataService service = new SpawnerItemDisplayMetadataService(
                 translations,
@@ -281,8 +286,10 @@ class SpawnerItemDisplayMetadataServiceTest {
                 .append(TameworkMetadataKeys.LEVELING_LEVEL, new BsonInt32(15))
                 .append(TameworkMetadataKeys.TRAITS_CONFIG_ID, new BsonString("Traits_Sheep"))
                 .append(TameworkMetadataKeys.TRAITS_VALUES, new BsonString(
-                        "[{\"id\":\"Trait_Size\",\"value\":1.1925},"
-                                + "{\"id\":\"Trait_Temperament\",\"value\":0.75}]"
+                        "[{\"id\":\"Trait_Size\",\"value\":1.35},"
+                                + "{\"id\":\"Trait_Appetite\",\"value\":0.95},"
+                                + "{\"id\":\"Trait_Attitude\",\"value\":1.15},"
+                                + "{\"id\":\"Trait_Fertility\",\"value\":1.2}]"
                 ))
                 .append(TameworkMetadataKeys.ATTACHMENTS, new BsonString("{\"Fleece\":\"White\"}"));
 
@@ -295,25 +302,27 @@ class SpawnerItemDisplayMetadataServiceTest {
         assertEquals(
                 "Jane - Mob_Sheep (F) - Level 15/25\n\n"
                         + "-- Traits --\n"
-                        + "Size: 1.19/1.35 (+55%)\n"
-                        + "Temperament: 0.75/1.50 (-50%)\n\n"
+                        + "Size: +35%\n"
+                        + "Meat and hide yield: +25%.\n"
+                        + "Appetite: 5% less food\n"
+                        + "Attitude: Increases happiness by 5 points.\n"
+                        + "Fertility: This animal tends to have more babies. Both parents matter.\n\n"
                         + "-- Appearance --\n"
                         + "Size: Unknown",
                 plainText(description)
         );
         assertEquals("#FF8FBD", messageWithText(description, "F").getColor());
-        assertEquals("#A2E8AE", messageWithText(description, "1.19").getColor());
-        assertEquals("#A2E8AE", messageWithText(description, "+55%").getColor());
-        assertEquals("#FFAEAE", messageWithText(description, "0.75").getColor());
-        assertEquals("#FFAEAE", messageWithText(description, "-50%").getColor());
-        assertEquals("#FFFFFF", messageWithText(description, "/1.35 (").getColor());
+        assertEquals("#A2E8AE", messageWithText(description, "+35%").getColor());
         assertEquals("#F6C453", messageWithText(description, "-- Traits --").getColor());
         assertEquals("#74D7E8", messageWithText(description, "-- Appearance --").getColor());
         // The same item's deferred messages must render for a different recipient.
         assertEquals(
                 "Jane - Mob_Sheep (F) - Nivel 15/25\n\n"
-                        + "-- Rasgos --\nTamaño: 1.19/1.35 (+55%)\n"
-                        + "Temperament: 0.75/1.50 (-50%)\n\n"
+                        + "-- Rasgos --\nTamaño: +35%\n"
+                        + "Rendimiento de carne y pieles: +25%.\n"
+                        + "Appetite: 5% menos comida\n"
+                        + "Attitude: Aumenta la felicidad en 5 puntos.\n"
+                        + "Fertility: Este animal suele tener más crías. Ambos padres importan.\n\n"
                         + "-- Apariencia --\nTamaño: Desconocido",
                 plainText(description, "es-ES"));
     }
@@ -499,13 +508,36 @@ class SpawnerItemDisplayMetadataServiceTest {
                                                        double min,
                                                        double defaultValue,
                                                        double max) throws Exception {
+        return trait(id, displayName, min, defaultValue, max, null);
+    }
+
+    private static TwTraitConfig.TraitDefinition trait(String id,
+                                                       String displayName,
+                                                       double min,
+                                                       double defaultValue,
+                                                       double max,
+                                                       String effectKey) throws Exception {
         TwTraitConfig.TraitDefinition definition = construct(TwTraitConfig.TraitDefinition.class);
         setField(definition, "id", id);
         setField(definition, "displayName", displayName);
         setField(definition, "breedingMin", min);
         setField(definition, "defaultValue", defaultValue);
         setField(definition, "breedingMax", max);
+        setField(definition, "effectKey", effectKey);
         return definition;
+    }
+
+    private static TwHappinessConfig flatHappinessConfig() throws Exception {
+        TwHappinessConfig config = construct(TwHappinessConfig.class);
+        TwHappinessConfig.DispositionSettings disposition = construct(TwHappinessConfig.DispositionSettings.class);
+        setField(disposition, "mode", "FLAT");
+        setField(disposition, "traitMin", 0.75d);
+        setField(disposition, "traitNeutral", 1.0d);
+        setField(disposition, "traitMax", 1.3d);
+        setField(disposition, "minOffset", -10.0d);
+        setField(disposition, "maxOffset", 10.0d);
+        setField(config, "disposition", disposition);
+        return config;
     }
 
     private static TwLevelingConfig levelingConfig(String id, int maxLevel) throws Exception {
@@ -565,6 +597,13 @@ class SpawnerItemDisplayMetadataServiceTest {
                         default -> throw new AssertionError("Unsupported tooltip parameter");
                     };
                     translated = translated.replace("{" + entry.getKey() + "}", value);
+                }
+            }
+            var messageParams = message.getFormattedMessage().messageParams;
+            if (messageParams != null) {
+                for (var entry : messageParams.entrySet()) {
+                    translated = translated.replace("{" + entry.getKey() + "}",
+                            plainText(new Message(entry.getValue()), language));
                 }
             }
             text.append(translated);

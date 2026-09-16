@@ -1733,3 +1733,7 @@ tamework.ui.linkedLocation.relative.south.east={0} m ao sul, {1} m a leste
 tamework.ui.linkedLocation.relative.south.west={0} m ao sul, {1} m a oeste
 tamework.credits.license=Alec's Tamework é licenciado sob a GNU GPLv3 com uma cláusula de atribuição.
 tamework.traits.description.sizeYield = Rendimento de carne e couro: {0}%.
+tamework.ui.spawnerTooltip.trait.foodLess={0}% menos comida
+tamework.ui.spawnerTooltip.trait.foodMore={0}% mais comida
+tamework.ui.spawnerTooltip.trait.waterLess={0}% menos água
+tamework.ui.spawnerTooltip.trait.waterMore={0}% mais água

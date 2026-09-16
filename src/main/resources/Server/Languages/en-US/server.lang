@@ -1745,3 +1745,7 @@ tamework.ui.linkedLocation.relative.south.east={0}m south, {1}m east
 tamework.ui.linkedLocation.relative.south.west={0}m south, {1}m west
 tamework.credits.license=Alec's Tamework is licensed under GNU GPLv3 with an attribution clause.
 tamework.traits.description.sizeYield = Meat and hide yield: {0}%.
+tamework.ui.spawnerTooltip.trait.foodLess={0}% less food
+tamework.ui.spawnerTooltip.trait.foodMore={0}% more food
+tamework.ui.spawnerTooltip.trait.waterLess={0}% less water
+tamework.ui.spawnerTooltip.trait.waterMore={0}% more water

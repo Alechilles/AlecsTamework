@@ -3,11 +3,14 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.api.ProgressionView;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
+import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.npc.attachments.ResolvedAttachmentDisplay;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
+import com.alechilles.alecstamework.npc.progression.TraitModifierService;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.alechilles.alecstamework.npc.progression.TraitPresentationViewMapper;
 import com.hypixel.hytale.server.core.Message;
@@ -28,17 +31,12 @@ final class SpawnerTooltipPresentationService {
     private static final String MALE = "#63A9FF";
     private static final String TRAITS_HEADER = "#F6C453";
     private static final String APPEARANCE_HEADER = "#74D7E8";
-    private static final int POSITIVE_RED = 0x55;
-    private static final int POSITIVE_GREEN = 0xD6;
-    private static final int POSITIVE_BLUE = 0x6B;
-    private static final int NEGATIVE_RED = 0xFF;
-    private static final int NEGATIVE_GREEN = 0x5C;
-    private static final int NEGATIVE_BLUE = 0x5C;
 
     private final Function<String, TwTraitConfig> traitConfigById;
     private final Function<String, TwTraitConfig> traitConfigByRole;
     private final Function<String, TwLevelingConfig> levelingConfigById;
     private final Function<String, TwLevelingConfig> levelingConfigByRole;
+    private final Function<String, TwHappinessConfig> happinessConfigByRole;
 
     SpawnerTooltipPresentationService(@Nullable TranslationRegistry translationRegistry) {
         this(
@@ -46,7 +44,8 @@ final class SpawnerTooltipPresentationService {
                 TwTraitConfig::resolveById,
                 TwTraitConfig::resolveForRole,
                 TwLevelingConfig::resolveById,
-                TwLevelingConfig::resolveForRole
+                TwLevelingConfig::resolveForRole,
+                TwHappinessConfig::resolveForRole
         );
     }
 
@@ -55,10 +54,21 @@ final class SpawnerTooltipPresentationService {
                                       Function<String, TwTraitConfig> traitConfigByRole,
                                       Function<String, TwLevelingConfig> levelingConfigById,
                                       Function<String, TwLevelingConfig> levelingConfigByRole) {
+        this(translationRegistry, traitConfigById, traitConfigByRole, levelingConfigById,
+                levelingConfigByRole, TwHappinessConfig::resolveForRole);
+    }
+
+    SpawnerTooltipPresentationService(@Nullable TranslationRegistry translationRegistry,
+                                      Function<String, TwTraitConfig> traitConfigById,
+                                      Function<String, TwTraitConfig> traitConfigByRole,
+                                      Function<String, TwLevelingConfig> levelingConfigById,
+                                      Function<String, TwLevelingConfig> levelingConfigByRole,
+                                      Function<String, TwHappinessConfig> happinessConfigByRole) {
         this.traitConfigById = traitConfigById;
         this.traitConfigByRole = traitConfigByRole;
         this.levelingConfigById = levelingConfigById;
         this.levelingConfigByRole = levelingConfigByRole;
+        this.happinessConfigByRole = happinessConfigByRole;
     }
 
     @Nullable
@@ -197,7 +207,7 @@ final class SpawnerTooltipPresentationService {
                 continue;
             }
             TwTraitConfig.TraitDefinition definition = findDefinition(config, value.getId());
-            lines.add(buildTraitLine(value, definition));
+            lines.add(buildTraitLine(value, definition, roleId));
         }
         return lines;
     }
@@ -219,27 +229,81 @@ final class SpawnerTooltipPresentationService {
     }
 
     private Message buildTraitLine(TameworkTraitsComponent.TraitValue traitValue,
-                                   @Nullable TwTraitConfig.TraitDefinition definition) {
+                                   @Nullable TwTraitConfig.TraitDefinition definition,
+                                   @Nullable String roleId) {
         Message label = resolveTraitLabel(traitValue.getId(), definition);
-        String formattedValue = formatDecimal(traitValue.getValue());
         if (definition == null) {
-            return Message.join(label, white(": " + formattedValue));
+            return label;
         }
-        double min = Math.min(definition.getBreedingMin(), definition.getBreedingMax());
-        double max = Math.max(definition.getBreedingMin(), definition.getBreedingMax());
-        double defaultValue = clamp(definition.getDefaultValue(), min, max);
-        double ratio = relativeRatio(traitValue.getValue(), min, defaultValue, max);
-        boolean negative = traitValue.getValue() < defaultValue;
-        int percent = (int) Math.round(ratio * 100.0) * (negative ? -1 : 1);
-        String valueColor = gradientColor(ratio, negative);
+        String effect = normalizeEffectKey(definition.getEffectKey());
+        double value = traitValue.getValue();
+        return switch (effect) {
+            case "needshungerdecaymultiplier" -> needUseLine(label, 1.0 - value, "food");
+            case "needsthirstdecaymultiplier" -> needUseLine(label, 1.0 - value, "water");
+            case "fertilitymultiplier" -> Message.join(label, white(": "), fertilityDescription(value));
+            case "happinessgainmultiplier" -> happinessLine(label, value, roleId);
+            case "sizemultiplier" -> sizeLine(label, definition, value);
+            case "damagetakenmultiplier" -> Message.join(label, white(": "),
+                    effectDescription("damageTaken", inverseDelta(value)));
+            case "harvestdoubledropchancemultiplier" -> Message.join(label, white(": "),
+                    effectDescription("harvest", Math.max(0.0, Math.min(1.0, value - 1.0))));
+            case "damagedealtmultiplier" -> percentageLine(label, value - 1.0);
+            case "maxhealthmultiplier", "movespeedmultiplier",
+                    "harvestrecoveryspeedmultiplier", "fleecefiberyieldmultiplier",
+                    "animalproductyieldmultiplier" -> percentageLine(label, value - 1.0);
+            default -> label;
+        };
+    }
+
+    private Message sizeLine(Message label, TwTraitConfig.TraitDefinition definition, double value) {
+        double yieldBonus = TraitModifierService.resolveSizeMeatHideYieldBonus(definition, value);
         return Message.join(
-                label,
-                white(": "),
-                Message.raw(formattedValue).color(valueColor),
-                white("/" + formatDecimal(max) + " ("),
-                Message.raw(formatPercent(percent)).color(valueColor),
-                white(")")
+                percentageLine(label, value - 1.0),
+                Message.raw("\n"),
+                Message.translation("server.tamework.traits.description.sizeYield")
+                        .param("0", (yieldBonus > 0 ? "+" : "") + formatPercentMagnitude(yieldBonus))
         );
+    }
+
+    private Message happinessLine(Message label, double value, @Nullable String roleId) {
+        TwHappinessConfig config = apply(happinessConfigByRole, roleId);
+        if (config != null && config.getDisposition().getMode() == TwHappinessConfig.DispositionMode.FLAT) {
+            double points = CompanionHappinessModifierService.resolveFlatDispositionOffset(
+                    value, config.getDisposition());
+            return Message.join(label, white(": "), effectDescription("happinessFlat", points, true));
+        }
+        return percentageLine(label, value - 1.0);
+    }
+
+    private static Message needUseLine(Message label, double savings, String resource) {
+        String key = savings > 0.0
+                ? "server.tamework.ui.spawnerTooltip.trait." + resource + "Less"
+                : "server.tamework.ui.spawnerTooltip.trait." + resource + "More";
+        return Message.join(label, white(": "), Message.translation(key)
+                .param("0", formatPercentMagnitude(Math.abs(savings))));
+    }
+
+    private static Message percentageLine(Message label, double delta) {
+        return Message.join(label, white(": "),
+                Message.raw(signedPercent(delta)).color(deltaColor(delta)));
+    }
+
+    private static Message fertilityDescription(double value) {
+        String key = value > 1.0 ? "fertilityPositive" : value < 1.0 ? "fertilityNegative" : "fertilityNeutral";
+        return Message.translation("server.tamework.traits.description." + key);
+    }
+
+    private static Message effectDescription(String suffix, double delta) {
+        return effectDescription(suffix, delta, false);
+    }
+
+    private static Message effectDescription(String suffix, double delta, boolean points) {
+        String direction = delta > 0.0 ? "increase" : delta < 0.0 ? "decrease" : "neutral";
+        Message description = Message.translation("server.tamework.traits.description." + suffix)
+                .param("direction", Message.translation("server.tamework.traits.description.direction." + direction));
+        return points
+                ? description.param("points", formatDecimal(Math.abs(delta)))
+                : description.param("percent", formatPercentMagnitude(Math.abs(delta)));
     }
 
     private List<Message> buildAppearanceLines(List<ResolvedAttachmentDisplay> attachments) {
@@ -342,42 +406,31 @@ final class SpawnerTooltipPresentationService {
         return null;
     }
 
-    private static double relativeRatio(double value, double min, double defaultValue, double max) {
-        if (value < defaultValue) {
-            double distance = defaultValue - min;
-            return distance <= 0.0 ? 0.0 : clamp((defaultValue - value) / distance, 0.0, 1.0);
-        }
-        double distance = max - defaultValue;
-        return distance <= 0.0 ? 0.0 : clamp((value - defaultValue) / distance, 0.0, 1.0);
-    }
-
-    private static String gradientColor(double ratio, boolean negative) {
-        double clampedRatio = clamp(ratio, 0.0, 1.0);
-        int red = negative ? NEGATIVE_RED : POSITIVE_RED;
-        int green = negative ? NEGATIVE_GREEN : POSITIVE_GREEN;
-        int blue = negative ? NEGATIVE_BLUE : POSITIVE_BLUE;
-        return String.format(
-                Locale.ROOT,
-                "#%02X%02X%02X",
-                interpolate(0xFF, red, clampedRatio),
-                interpolate(0xFF, green, clampedRatio),
-                interpolate(0xFF, blue, clampedRatio)
-        );
-    }
-
-    private static int interpolate(int start, int end, double ratio) {
-        return (int) Math.round(start + (end - start) * ratio);
-    }
-
     private static String formatDecimal(double value) {
-        return String.format(Locale.ROOT, "%.2f", value);
+        return String.format(Locale.ROOT, "%.2f", value)
+                .replaceFirst("\\.00$", "")
+                .replaceFirst("(\\.\\d)0$", "$1");
     }
 
-    private static String formatPercent(int percent) {
-        if (percent > 0) {
-            return "+" + percent + "%";
-        }
-        return percent + "%";
+    private static String formatPercentMagnitude(double value) {
+        return formatDecimal(value * 100.0);
+    }
+
+    private static String signedPercent(double value) {
+        String prefix = value > 0.0 ? "+" : value < 0.0 ? "-" : "";
+        return prefix + formatPercentMagnitude(Math.abs(value)) + "%";
+    }
+
+    private static String deltaColor(double delta) {
+        return delta < 0.0 ? "#FFAEAE" : delta > 0.0 ? "#A2E8AE" : WHITE;
+    }
+
+    private static double inverseDelta(double value) {
+        return value > 0.0 && Double.isFinite(value) ? 1.0 / value - 1.0 : 0.0;
+    }
+
+    private static String normalizeEffectKey(@Nullable String effectKey) {
+        return effectKey == null ? "" : effectKey.trim().toLowerCase(Locale.ROOT);
     }
 
     private static String prettifyId(String id) {
@@ -430,10 +483,6 @@ final class SpawnerTooltipPresentationService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
-    }
-
-    private static double clamp(double value, double min, double max) {
-        return Math.max(min, Math.min(max, value));
     }
 
     private static Message white(String text) {
