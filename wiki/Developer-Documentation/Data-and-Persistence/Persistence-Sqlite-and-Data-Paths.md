@@ -78,6 +78,16 @@ The command also enables incremental vacuum. New databases already enable it, so
 later checkpoint cleanup returns free pages in small batches. Small retry records
 still accumulate; this reduces growth rather than imposing a fixed size cap.
 
+
+### Checking compaction in game
+
+Use a disposable copy of a world with a backed-up database. After the world has
+loaded, run `/tw debug persistence compact` and check the completion message's
+before/after MiB. A database with few free pages may shrink very little, and zero
+compacted operations is valid when no checkpoint history is eligible. Afterward,
+use a companion and reopen the test world to check that ordinary saves still work.
+Retain the server log if maintenance fails.
+
 ## Dormant transitions require positive evidence
 
 Tamework authors a dormant transition only when it has one of these exact
