@@ -39,8 +39,8 @@ offline time, restoration, and presentation.
 - Keep system classes as scheduling and ECS orchestration.
 - Put needs, happiness, breeding, traits, talents, level, and life-stage rules
   in their focused services.
-- Do not add another responsibility to a progression service that is already
-  over the repository size limit. Extract the new policy or calculation.
+- Extract a policy or calculation when it has a distinct responsibility or
+  ownership boundary. Class length alone does not require extraction.
 - Avoid per-tick scans and allocations. Reuse the current indexes, cadence
   policies, and dirty-state boundaries.
 

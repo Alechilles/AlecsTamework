@@ -108,7 +108,8 @@ lifecycle authority.
 
 ## Complexity constraints
 
-- Replacement core classes must remain at or below 500 lines.
+- Split replacement core classes when responsibilities or safety boundaries differ.
+  Class length alone does not require extraction; there is no fixed line limit.
 - Canonical lifecycle has one SQL update statement and one revision-fenced transition path.
 - Durable operation work receives only the transaction context and operation envelope.
 - Filesystem, network, ECS, inventory, cache, and projection callbacks cannot run inside a
@@ -117,9 +118,9 @@ lifecycle authority.
 - Feature-specific phases, transaction runners, recovery queues, and projection journals are
   prohibited; feature differences belong in registered payload codecs and focused detail ports.
 
-These constraints are enforced by
+The executable safety constraints are enforced by
 `ReplacementPersistenceArchitectureGuardTest` and the persistence inventory
-gate.
+gate. Responsibility boundaries are assessed during review.
 
 ## Verification
 

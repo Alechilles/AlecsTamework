@@ -30,8 +30,8 @@ Treat each config family as a runtime contract, not as one Java codec.
   adding UI code.
 - Verify current load/remove and cache invalidation behavior before changing
   `/tw reloadconfig`. Do not assume that command owns every config family.
-- If a class is over the repository size limit, keep it orchestration-only and
-  extract the new domain concern.
+- Extract a domain concern when it makes the config contract clearer or safer.
+  Class length alone does not require extraction.
 
 ## Route Related Work
 

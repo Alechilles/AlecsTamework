@@ -38,8 +38,8 @@ Do not restore:
 - old feature switches, dual writes, service locators, direct repository
   consumers, per-feature SQLite connection ownership, or pre-commit projection
   callbacks;
-- classes over the current architecture ceiling without responsibility-based
-  decomposition.
+- classes that combine unrelated responsibilities without clear ownership
+  boundaries.
 
 ## Initial architecture budget
 

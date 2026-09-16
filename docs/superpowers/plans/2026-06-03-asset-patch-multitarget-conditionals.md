@@ -363,7 +363,7 @@ Create a final class with:
 - `boolean matches(AssetPatchConditionContext context)`
 - `String describe()`
 
-Internally, use private leaf/composite implementations or an enum-backed type. Keep this file under 500 lines and do not touch `AssetPatchEngine`.
+Internally, use private leaf/composite implementations or an enum-backed type. Keep condition matching focused in this class and do not touch `AssetPatchEngine`.
 
 - [ ] **Step 3: Wire scanner condition evaluation**
 

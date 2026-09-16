@@ -65,7 +65,8 @@ bash ../gradlew -p .. :alecstamework:test \
 
 The architecture guard enforces one canonical lifecycle mutation path, connection-bound stores,
 transaction callback isolation, no dependency on the superseded SQLite package, no premature
-outbox compaction, and a 500-line replacement-core class ceiling. The forked-process matrix
+outbox compaction. Class boundaries follow responsibility and runtime ownership;
+there is no fixed class line limit. The forked-process matrix
 verifies recovery from each shared prepare, live-apply, durable, publication, compensation, and
 shutdown crash boundary.
 

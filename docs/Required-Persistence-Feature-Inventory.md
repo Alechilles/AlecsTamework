@@ -205,16 +205,15 @@ intermediate artifact.
 | Production Java files | 2,195 | 1,865 | 330 (15.0%) |
 | Production Java lines | 384,446 | 302,208 | 82,238 (21.4%) |
 
-The replacement-focused persistence and companion roots contain 451 Java
-files and 60,590 lines. Their largest class is 499 lines; none exceeds the
-500-line target. Central composition remains bounded:
+At this recovery checkpoint, the replacement-focused persistence and companion
+roots contained 451 Java files and 60,590 lines. The central composition counts were:
 
 - `TameworkPersistenceComposition`: 476 lines;
 - `TameworkRestoredFeatureComposition`: 220 lines.
 
-The full project still contains older large classes outside this replacement
-slice. They remain refactor candidates, but they were not enlarged to host the
-restored persistence features.
+These counts describe the recovery checkpoint; they do not set class size limits.
+Review classes for clear responsibilities and runtime ownership. Extract code when
+it improves clarity or safety, regardless of class length.
 
 Generated consolidation inventory reports:
 
