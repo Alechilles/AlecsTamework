@@ -40,12 +40,14 @@ final class LinkedNpcPanelVitalsBinder {
             commands.setObject(needs[i] + " #MeterFill.Anchor", hudFill(ratios[i], 100));
             commands.set(needs[i] + " #NeedValueText.Style", Value.ref("TameworkCommandTargetHud.ui", "MeterValue"));
         }
-        Anchor marker = hudFill(0, 2);
-        marker.setLeft(Value.of((int) Math.round(clamp(entry.breedingHappinessRatio()) * 98)));
-        marker.setTop(Value.of(24));
-        marker.setWidth(Value.of(2));
-        marker.setHeight(Value.of(10));
-        commands.setObject("#NeedHappiness #BreedingThresholdMarker.Anchor", marker);
+        commands.setObject("#NeedHappiness #BreedingThresholdMarker.Anchor",
+                LinkedNpcPanelStatusMeter.buildBreedingHeartAnchor(entry.breedingHappinessRatio(), 0, 24, 100));
+        Anchor target = hudFill(0, 2);
+        target.setLeft(Value.of((int) Math.round(clamp(entry.targetHappinessPercent() / 100.0) * 98)));
+        target.setTop(Value.of(24));
+        target.setWidth(Value.of(2));
+        target.setHeight(Value.of(10));
+        commands.setObject("#NeedHappiness #HappinessTargetMarker.Anchor", target);
         commands.setObject("#BreedingCooldown #MeterFill.Anchor", hudFill(
                 entry.breedingCooldownRemainingMs() < 0 ? 0 : entry.breedingCooldownActive() ? entry.breedingCooldownRatio() : 1, 156));
         commands.setObject("#HarvestCooldown #MeterFill.Anchor", hudFill(
@@ -178,7 +180,13 @@ final class LinkedNpcPanelVitalsBinder {
         commandBuilder.set(markerSelector + ".Visible", showMarker);
         if (showMarker) {
             commandBuilder.setObject(markerSelector + ".Anchor",
-                    LinkedNpcPanelStatusMeter.buildNeedThresholdAnchor(entry.breedingHappinessRatio()));
+                    LinkedNpcPanelStatusMeter.buildBreedingHeartAnchor(entry.breedingHappinessRatio(), 92, 6, 92));
+        }
+        String targetSelector = entrySelector + " #NeedHappiness #HappinessTargetMarker";
+        commandBuilder.set(targetSelector + ".Visible", shouldShowHappiness(entry) && entry.hasHappiness());
+        if (entry.hasHappiness()) {
+            commandBuilder.setObject(targetSelector + ".Anchor",
+                    LinkedNpcPanelStatusMeter.buildNeedThresholdAnchor(entry.targetHappinessPercent() / 100.0));
         }
         bindNeedMeter(
                 commandBuilder,
@@ -218,8 +226,7 @@ final class LinkedNpcPanelVitalsBinder {
                 tooltip = LocalizedText.format(
                         language,
                         "tamework.ui.linkedPanel.happiness.tooltip",
-                        percent(entry.happinessRatio()),
-                        entry.targetHappinessPercent()
+                        percent(entry.happinessRatio())
                 );
             }
             tooltip = LinkedNpcPanelStatusTextService.appendLastKnownTooltip(tooltip, entry, language);
@@ -337,7 +344,7 @@ final class LinkedNpcPanelVitalsBinder {
                 visual.available() ? percent(visual.fillRatio()) + "%" : "—");
         commandBuilder.set(slotSelector + " #NeedValueText.Style", Value.ref(
                 "TameworkLinkedNpcPanelCard.ui",
-                visual.muted() ? "CooldownTextMuted" : "CooldownTextNormal"));
+                visual.muted() ? "NeedValueMuted" : "NeedValueNormal"));
         commandBuilder.setObject(
                 slotSelector + " #MeterFill.Anchor",
                 LinkedNpcPanelStatusMeter.buildNeedFillAnchor(visual.available() ? visual.fillRatio() : 0.0)
@@ -422,7 +429,7 @@ final class LinkedNpcPanelVitalsBinder {
                 spans.add(Message.raw(prefix + line).color(TOOLTIP_WHITE));
                 continue;
             }
-            if (inactive) {
+            if (inactive || line.startsWith("  ")) {
                 spans.add(Message.raw(prefix + line).color(TOOLTIP_GRAY));
                 continue;
             }

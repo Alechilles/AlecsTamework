@@ -73,8 +73,8 @@ class LinkedNpcPanelVitalsBinderTest {
     @Test
     void colorsActiveSignedEffectsAndMutesInactiveEffectsInHappinessTooltip() {
         Message tooltip = LinkedNpcPanelVitalsBinder.happinessTooltipSpans(
-                "Happiness: 60% (base 50%, target 65%)\nActive effects\nOwner nearby: +5.00"
-                        + "\nHungry: -8.00\nAll effects\nBerry: +2.00",
+                "Happiness: 60%\nActive effects\nOwner nearby: +5.00"
+                        + "\nHungry: -8.00\n  Starving\nOther effects\nLast food eaten: -",
                 "en-US"
         );
 
@@ -83,7 +83,9 @@ class LinkedNpcPanelVitalsBinderTest {
                 && sameColor(span, new Color(0x6f, 0xc5, 0x76))));
         Assertions.assertTrue(spans.stream().anyMatch(span -> "-8.00".equals(span.getRawText())
                 && sameColor(span, new Color(0xd4, 0x5f, 0x5f))));
-        Assertions.assertTrue(spans.stream().anyMatch(span -> span.getRawText().contains("Berry: +2.00")
+        Assertions.assertTrue(spans.stream().anyMatch(span -> span.getRawText().contains("  Starving")
+                && sameColor(span, new Color(0xaf, 0xb6, 0xb0))));
+        Assertions.assertTrue(spans.stream().anyMatch(span -> span.getRawText().contains("Last food eaten: -")
                 && sameColor(span, new Color(0xaf, 0xb6, 0xb0))));
     }
 
@@ -136,16 +138,16 @@ class LinkedNpcPanelVitalsBinderTest {
         );
     }
 
-    // Catches a tick placed on the wrong side of the meter,
+    // Catches a heart placed on the wrong side of the meter,
     // including threshold data lost while normalizing or copying the panel entry.
     @Test
     void rendersBreedingThresholdAtItsHappinessFillPosition() {
-        assertMarker(0.10, 101, 6, 2, 10);
-        assertMarker(0.25, 115, 6, 2, 10);
-        assertMarker(0.50, 137, 6, 2, 10);
-        assertMarker(0.70, 155, 6, 2, 10);
-        assertMarker(0.95, 178, 6, 2, 10);
-        assertMarker(1.0, 182, 6, 2, 10);
+        assertMarker(0.10, 96, 6, 11, 10);
+        assertMarker(0.25, 110, 6, 11, 10);
+        assertMarker(0.50, 133, 6, 11, 10);
+        assertMarker(0.70, 151, 6, 11, 10);
+        assertMarker(0.95, 174, 6, 11, 10);
+        assertMarker(1.0, 179, 6, 11, 10);
     }
 
     private static void assertMarker(
@@ -164,8 +166,18 @@ class LinkedNpcPanelVitalsBinderTest {
         expected.set(MARKER + ".Visible", true);
         Assertions.assertEquals(data(expected, MARKER + ".Anchor"), data(commands, MARKER + ".Anchor"));
         Assertions.assertEquals(data(expected, MARKER + ".Visible"), data(commands, MARKER + ".Visible"));
+        Anchor target = new Anchor();
+        target.setLeft(Value.of(137));
+        target.setTop(Value.of(6));
+        target.setWidth(Value.of(2));
+        target.setHeight(Value.of(10));
+        String targetSelector = "#Card #NeedHappiness #HappinessTargetMarker";
+        expected.setObject(targetSelector + ".Anchor", target);
+        expected.set(targetSelector + ".Visible", true);
+        Assertions.assertEquals(data(expected, targetSelector + ".Anchor"), data(commands, targetSelector + ".Anchor"));
+        Assertions.assertEquals(data(expected, targetSelector + ".Visible"), data(commands, targetSelector + ".Visible"));
         UICommandBuilder tooltip = new UICommandBuilder();
-        tooltip.set("#Card #NeedHappiness #NeedTooltip.TooltipText", "Happiness - 50% -> 50%");
+        tooltip.set("#Card #NeedHappiness #NeedTooltip.TooltipText", "Happiness: 50%");
         Assertions.assertEquals(data(tooltip, "#Card #NeedHappiness #NeedTooltip.TooltipText"),
                 data(commands, "#Card #NeedHappiness #NeedTooltip.TooltipText"));
     }

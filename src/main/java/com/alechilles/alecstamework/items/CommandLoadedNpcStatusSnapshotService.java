@@ -42,6 +42,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -461,27 +462,130 @@ final class CommandLoadedNpcStatusSnapshotService {
         ArrayList<String> lines = new ArrayList<>();
         lines.add(LocalizedText.format(
                 language,
-                "tamework.ui.linkedPanel.happiness.explanation",
-                computePercent(presentation.current(), presentation.min(), presentation.max()),
-                computePercent(presentation.base(), presentation.min(), presentation.max()),
-                computePercent(presentation.target(), presentation.min(), presentation.max())
+                "tamework.ui.linkedPanel.happiness.tooltip",
+                computePercent(presentation.current(), presentation.min(), presentation.max())
         ));
-        if (!presentation.activeEffects().isEmpty()) {
+        var activeCategories = new java.util.EnumMap<HappinessSummaryCategory,
+                List<CompanionHappinessPresentationService.EffectEntry>>(HappinessSummaryCategory.class);
+        ArrayList<CompanionHappinessPresentationService.EffectEntry> activeOther = new ArrayList<>();
+        for (CompanionHappinessPresentationService.EffectEntry effect : presentation.activeEffects()) {
+            HappinessSummaryCategory category = summaryCategory(effect, presentation.foodEffectsExclusive());
+            if (category == null) {
+                activeOther.add(effect);
+            } else {
+                activeCategories.computeIfAbsent(category, ignored -> new ArrayList<>()).add(effect);
+            }
+        }
+        if (!activeCategories.isEmpty() || !activeOther.isEmpty()) {
             lines.add(LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.activeEffects"));
-            for (CompanionHappinessPresentationService.EffectEntry effect : presentation.activeEffects()) {
-                lines.add(resolvePresentationEffectLabel(effect, language) + ": " + formatSigned(effect.value()));
+            appendActiveHappinessCategories(lines, activeCategories, language);
+            appendHappinessEffects(lines, activeOther, language);
+        }
+        var inactiveCategories = java.util.EnumSet.noneOf(HappinessSummaryCategory.class);
+        ArrayList<CompanionHappinessPresentationService.EffectEntry> inactiveOther = new ArrayList<>();
+        for (CompanionHappinessPresentationService.EffectEntry effect : presentation.inactiveEffects()) {
+            HappinessSummaryCategory category = summaryCategory(effect, presentation.foodEffectsExclusive());
+            if (category == null) {
+                inactiveOther.add(effect);
+            } else if (!activeCategories.containsKey(category)) {
+                inactiveCategories.add(category);
             }
         }
-        if (!presentation.inactiveEffects().isEmpty()) {
+        if (!inactiveCategories.isEmpty() || !inactiveOther.isEmpty()) {
             lines.add(LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.allEffects"));
-            for (CompanionHappinessPresentationService.EffectEntry effect : presentation.inactiveEffects()) {
-                lines.add(resolvePresentationEffectLabel(effect, language) + ": " + formatSigned(effect.value()));
+            for (HappinessSummaryCategory category : HappinessSummaryCategory.values()) {
+                if (inactiveCategories.contains(category)) {
+                    lines.add(summaryCategoryLabel(category, language) + ": -");
+                }
+            }
+            appendInactiveHappinessEffects(lines, inactiveOther, language);
+        }
+        return lines.isEmpty() ? null : String.join("\n", lines);
+    }
+
+    private void appendActiveHappinessCategories(
+            @Nonnull List<String> lines,
+            @Nonnull java.util.Map<HappinessSummaryCategory,
+                    List<CompanionHappinessPresentationService.EffectEntry>> categories,
+            @Nullable String language) {
+        for (HappinessSummaryCategory category : HappinessSummaryCategory.values()) {
+            List<CompanionHappinessPresentationService.EffectEntry> effects = categories.get(category);
+            if (effects == null || effects.isEmpty()) {
+                continue;
+            }
+            double total = 0.0;
+            java.util.LinkedHashSet<String> details = new java.util.LinkedHashSet<>();
+            for (CompanionHappinessPresentationService.EffectEntry effect : effects) {
+                total += effect.value();
+                String detail = resolvePresentationEffectLabel(effect, language);
+                if (detail != null && !detail.isBlank()) {
+                    details.add(detail);
+                }
+            }
+            lines.add(summaryCategoryLabel(category, language) + ": " + formatSigned(total));
+            for (String detail : details) {
+                lines.add("  " + detail);
             }
         }
-        if (presentation.foodEffectsExclusive()) {
-            lines.add(LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.foodExclusive"));
+    }
+
+    private void appendHappinessEffects(@Nonnull List<String> lines,
+                                        @Nonnull List<CompanionHappinessPresentationService.EffectEntry> effects,
+                                        @Nullable String language) {
+        for (CompanionHappinessPresentationService.EffectEntry effect : effects) {
+            lines.add(resolvePresentationEffectLabel(effect, language) + ": " + formatSigned(effect.value()));
         }
-        return String.join("\n", lines);
+    }
+
+    private void appendInactiveHappinessEffects(@Nonnull List<String> lines,
+                                                @Nonnull List<CompanionHappinessPresentationService.EffectEntry> effects,
+                                                @Nullable String language) {
+        for (CompanionHappinessPresentationService.EffectEntry effect : effects) {
+            lines.add(resolvePresentationEffectLabel(effect, language) + ": -");
+        }
+    }
+
+    @Nullable
+    private HappinessSummaryCategory summaryCategory(
+            @Nullable CompanionHappinessPresentationService.EffectEntry effect,
+            boolean foodEffectsExclusive) {
+        if (effect == null) {
+            return null;
+        }
+        String id = normalize(effect.id());
+        if (id != null && id.startsWith("hunger_")) {
+            return HappinessSummaryCategory.HUNGER;
+        }
+        if (id != null && id.startsWith("thirst_")) {
+            return HappinessSummaryCategory.THIRST;
+        }
+        if (id != null && id.startsWith("population_")) {
+            return HappinessSummaryCategory.SOCIAL_NEEDS;
+        }
+        if (effect.kind() == CompanionHappinessPresentationService.EffectKind.FOOD
+                || id != null && id.startsWith("food_")) {
+            return foodEffectsExclusive ? HappinessSummaryCategory.LAST_FOOD : HappinessSummaryCategory.FOOD;
+        }
+        return null;
+    }
+
+    @Nonnull
+    private String summaryCategoryLabel(@Nonnull HappinessSummaryCategory category, @Nullable String language) {
+        return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.category." + category.key);
+    }
+
+    private enum HappinessSummaryCategory {
+        HUNGER("hunger"),
+        THIRST("thirst"),
+        SOCIAL_NEEDS("socialNeeds"),
+        LAST_FOOD("lastFood"),
+        FOOD("food");
+
+        private final String key;
+
+        HappinessSummaryCategory(String key) {
+            this.key = key;
+        }
     }
 
     @Nonnull

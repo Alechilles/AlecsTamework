@@ -14,6 +14,8 @@ $C = "Common.ui";
 @HealthTextMuted = LabelStyle(FontSize: 13, RenderBold: true, TextColor: #c0c5c0, HorizontalAlignment: Center, VerticalAlignment: Center);
 @HealthTextShadowNormal = LabelStyle(FontSize: 13, RenderBold: true, TextColor: #101510, HorizontalAlignment: Center, VerticalAlignment: Center);
 @HealthTextShadowMuted = LabelStyle(FontSize: 13, RenderBold: true, TextColor: #171c17, HorizontalAlignment: Center, VerticalAlignment: Center);
+@NeedValueNormal = LabelStyle(FontSize: 9, TextColor: #d3d7cf, HorizontalAlignment: End, VerticalAlignment: Center);
+@NeedValueMuted = LabelStyle(FontSize: 9, TextColor: #858b85, HorizontalAlignment: End, VerticalAlignment: Center);
 @CooldownTextNormal = LabelStyle(FontSize: 9, TextColor: #d3d7cf);
 @CooldownLabelNormal = LabelStyle(FontSize: 9, TextColor: #b9beb8);
 @CooldownTextMuted = LabelStyle(FontSize: 9, TextColor: #858b85);
@@ -208,7 +210,15 @@ Group {
             Group { Anchor: (Top: 8, Left: 92, Width: 92, Height: 6); Background: #3c443e; }
             Group #MeterFill { Anchor: (Top: 8, Left: 92, Width: 0, Height: 6); Background: #d7ba77; }
             Label #NeedValueText { Anchor: (Top: 0, Left: 188, Width: 44, Height: 22); Text: ""; Style: (FontSize: 9, TextColor: #d3d7cf, HorizontalAlignment: End, VerticalAlignment: Center); }
-            Group #BreedingThresholdMarker { Anchor: (Top: 6, Left: 92, Width: 2, Height: 10); Background: #d88679; Visible: false; }
+            Group #HappinessTargetMarker { Anchor: (Top: 6, Left: 92, Width: 2, Height: 10); Background: #e1be73; Visible: false; HitTestVisible: false; }
+            Group #BreedingThresholdMarker { Anchor: (Top: 6, Left: 92, Width: 11, Height: 10); Visible: false; HitTestVisible: false;
+              Group { Anchor: (Left: 1, Top: 0, Width: 3, Height: 2); Background: #ed8eae; HitTestVisible: false; }
+              Group { Anchor: (Left: 7, Top: 0, Width: 3, Height: 2); Background: #ed8eae; HitTestVisible: false; }
+              Group { Anchor: (Left: 0, Top: 2, Width: 11, Height: 3); Background: #ed8eae; HitTestVisible: false; }
+              Group { Anchor: (Left: 1, Top: 5, Width: 9, Height: 2); Background: #ed8eae; HitTestVisible: false; }
+              Group { Anchor: (Left: 3, Top: 7, Width: 5, Height: 2); Background: #ed8eae; HitTestVisible: false; }
+              Group { Anchor: (Left: 5, Top: 9, Width: 1, Height: 1); Background: #ed8eae; HitTestVisible: false; }
+            }
             TextButton #NeedTooltip { Anchor: (Top: 0, Left: 0, Width: 234, Height: 22); Style: @TraitTooltipButtonStyle; Text: ""; TextTooltipStyle: @LinkedActionTooltipStyle; }
         }
         Group #NeedHunger { Anchor: (Width: 234, Height: 22);
