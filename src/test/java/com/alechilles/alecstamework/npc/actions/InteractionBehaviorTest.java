@@ -253,7 +253,6 @@ class InteractionBehaviorTest {
                 paramAccess,
                 "InteractionConfigId"
         );
-        InteractionResolution resolution = new InteractionResolution(paramAccess, configResolver);
         InteractionFeedHelper feedHelper = new InteractionFeedHelper(paramAccess);
         InteractionAlarmHelper alarmHelper = new InteractionAlarmHelper(interact);
         InteractionItemRequirementResolver itemRequirements = new InteractionItemRequirementResolver(resolver);
@@ -267,27 +266,30 @@ class InteractionBehaviorTest {
                 new InteractionSelector(interact, requirements, cooldowns, alarmHelper, "Harvest_Ready");
         InteractionDiagnostics diagnostics =
                 new InteractionDiagnostics(interact, alarmHelper, "Harvest_Ready");
-        InteractionSelection selection = new InteractionSelection(
-                itemRequirements,
-                matchHelpers,
-                paramMatcher,
-                ownershipHelper,
-                requirements,
-                selector,
-                diagnostics
-        );
         InteractionExecutor executor = new InteractionExecutor(new TameworkInteractEffects(interact, null), feedHelper);
-        InteractionExecution execution = new InteractionExecution(executor, cooldowns);
-
-        Field resolutionField = ActionTameworkInteract.class.getDeclaredField("resolution");
-        resolutionField.setAccessible(true);
-        resolutionField.set(interact, resolution);
-        Field selectionField = ActionTameworkInteract.class.getDeclaredField("selection");
-        selectionField.setAccessible(true);
-        selectionField.set(interact, selection);
-        Field executionField = ActionTameworkInteract.class.getDeclaredField("execution");
-        executionField.setAccessible(true);
-        executionField.set(interact, execution);
+        InteractionParamAccess neutralParamAccess = new InteractionParamAccess(
+                new InteractionParamResolver(null, null, null),
+                false,
+                null,
+                null,
+                null,
+                "LovedItems",
+                "IsHarvestable",
+                "IsMountable"
+        );
+        setField(interact, "paramAccess", paramAccess);
+        setField(interact, "configResolver", configResolver);
+        setField(interact, "neutralChainParamAccess", neutralParamAccess);
+        setField(interact, "neutralChainConfigResolver", new InteractionConfigResolver(
+                null, neutralParamAccess, "InteractionConfigId"));
+        setField(interact, "itemRequirements", itemRequirements);
+        setField(interact, "matchHelpers", matchHelpers);
+        setField(interact, "paramMatcher", paramMatcher);
+        setField(interact, "ownershipHelper", ownershipHelper);
+        setField(interact, "selector", selector);
+        setField(interact, "diagnostics", diagnostics);
+        setField(interact, "cooldowns", cooldowns);
+        setField(interact, "executor", executor);
         return interact;
     }
 

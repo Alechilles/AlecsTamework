@@ -54,10 +54,18 @@ public class ActionTameworkInteract extends TameworkActionBase {
     private final String harvestAlarmName;
     private final String cooldownAlarmPrefix;
     private final InteractionAlarmHelper alarmHelper;
-    private final InteractionResolution resolution;
-    private final InteractionResolution neutralChainResolution;
-    private final InteractionSelection selection;
-    private final InteractionExecution execution;
+    private final InteractionParamAccess paramAccess;
+    private final InteractionConfigResolver configResolver;
+    private final InteractionParamAccess neutralChainParamAccess;
+    private final InteractionConfigResolver neutralChainConfigResolver;
+    private final InteractionItemRequirementResolver itemRequirements;
+    private final InteractionMatchHelpers matchHelpers;
+    private final InteractionParamMatcher paramMatcher;
+    private final InteractionOwnershipHelper ownershipHelper;
+    private final InteractionSelector selector;
+    private final InteractionDiagnostics diagnostics;
+    private final InteractionCooldowns cooldowns;
+    private final InteractionExecutor executor;
     private final InteractionLegacyAdoptionService legacyAdoptionService;
 
     public ActionTameworkInteract(BuilderActionTameworkInteract builder, BuilderSupport support) {
@@ -161,33 +169,31 @@ public class ActionTameworkInteract extends TameworkActionBase {
         InteractionSelector selector =
                 new InteractionSelector(this, requirements, cooldowns, alarmHelper, harvestAlarmName);
         InteractionDiagnostics diagnostics = new InteractionDiagnostics(this, alarmHelper, harvestAlarmName);
-        this.resolution = new InteractionResolution(paramAccess, configResolver);
+        this.paramAccess = paramAccess;
+        this.configResolver = configResolver;
         InteractionParamResolver neutralParamResolver = new InteractionParamResolver(
                 null, null, null, null);
         InteractionParamAccess neutralParamAccess = new InteractionParamAccess(
                 neutralParamResolver, false, null, null, null,
                 lovedItemsParamName, isHarvestableParamName, isMountableParamName);
-        this.neutralChainResolution = new InteractionResolution(
-                neutralParamAccess,
-                new InteractionConfigResolver(null, neutralParamAccess, configParamName));
-        this.selection = new InteractionSelection(
-                itemRequirements,
-                matchHelpers,
-                paramMatcher,
-                ownershipHelper,
-                requirements,
-                selector,
-                diagnostics
-        );
+        this.neutralChainParamAccess = neutralParamAccess;
+        this.neutralChainConfigResolver =
+                new InteractionConfigResolver(null, neutralParamAccess, configParamName);
+        this.itemRequirements = itemRequirements;
+        this.matchHelpers = matchHelpers;
+        this.paramMatcher = paramMatcher;
+        this.ownershipHelper = ownershipHelper;
+        this.selector = selector;
+        this.diagnostics = diagnostics;
+        this.cooldowns = cooldowns;
         if (includeExecutionEffects) {
             TameworkInteractEffects effects =
                     new TameworkInteractEffects(this, interactionExtensionRuntime);
-            InteractionExecutor executor = new InteractionExecutor(effects, feedHelper);
-            this.execution = new InteractionExecution(executor, cooldowns);
+            this.executor = new InteractionExecutor(effects, feedHelper);
         } else {
-            this.execution = null;
+            this.executor = null;
         }
-        this.legacyAdoptionService = new InteractionLegacyAdoptionService(selection::logDebug);
+        this.legacyAdoptionService = new InteractionLegacyAdoptionService(diagnostics::logDebug);
     }
 
     @Override
@@ -196,7 +202,7 @@ public class ActionTameworkInteract extends TameworkActionBase {
                            InfoProvider infoProvider,
                            double dt,
                            Store<EntityStore> store) {
-        selection.logDebug("TameworkInteract: execute called. source=" + describeTriggerSource());
+        diagnostics.logDebug("TameworkInteract: execute called. source=" + describeTriggerSource());
         if (npcRef == null || !npcRef.isValid()) {
             return false;
         }
@@ -206,12 +212,12 @@ public class ActionTameworkInteract extends TameworkActionBase {
         }
         Ref<EntityStore> interactionTarget = stateSupport.getInteractionIterationTarget();
         if (interactionTarget == null || !interactionTarget.isValid()) {
-            selection.logDebug("TameworkInteract: no interaction target recorded.");
+            diagnostics.logDebug("TameworkInteract: no interaction target recorded.");
             return false;
         }
         Player player = store.getComponent(interactionTarget, Player.getComponentType());
         if (player == null) {
-            selection.logDebug("TameworkInteract: no player resolved for interaction.");
+            diagnostics.logDebug("TameworkInteract: no player resolved for interaction.");
             return false;
         }
         return executeWithPlayer(npcRef, role, infoProvider, store, interactionTarget, player, true);
@@ -224,20 +230,20 @@ public class ActionTameworkInteract extends TameworkActionBase {
                                       Ref<EntityStore> playerRef,
                                       Player player,
                                       boolean allowLegacyAdoption) {
-        InteractionContextSnapshot ctx = resolution.buildContextSnapshot(player, playerRef, role);
+        InteractionContextSnapshot ctx = paramAccess.buildContextSnapshot(player, playerRef, role);
         String roleName = role != null ? role.getRoleName() : "<null>";
         String roleOverride = getRoleStringParam(role, ctx, configParamName);
-        selection.logDebug(String.format(
+        diagnostics.logDebug(String.format(
                 "TameworkInteract: source=%s role=%s configOverride=%s roleParam=%s heldItem=%s",
                 describeTriggerSource(),
                 roleName,
                 configIdOverride,
                 roleOverride,
-                selection.describeHeldItem(ctx)
+                diagnostics.describeHeldItem(ctx)
         ));
-        TwInteractionConfig config = resolution.resolveConfig(role, ctx);
+        TwInteractionConfig config = configResolver.resolveConfig(role, ctx);
         if (config == null || !config.isEnabled()) {
-            selection.logDebug(String.format(
+            diagnostics.logDebug(String.format(
                     "TameworkInteract: no config resolved or config disabled (role=%s).",
                     roleName
             ));
@@ -255,17 +261,33 @@ public class ActionTameworkInteract extends TameworkActionBase {
                 return attempt.succeeded();
             }
         }
-        ResolvedInteraction interaction = selection.selectInteraction(config, npcRef, role, infoProvider, store, player, ctx);
+        ResolvedInteraction interaction = selector.selectInteraction(config, npcRef, role, infoProvider, store, player, ctx);
         if (interaction == null) {
-            selection.maybeNotifyOwnerDenied(npcRef, store, player);
-            selection.logDebug(selection.buildNoMatchSummary(config, npcRef, role, infoProvider, store, player, ctx));
+            ownershipHelper.maybeNotifyOwnerDenied(npcRef, store, player);
+            diagnostics.logDebug(diagnostics.buildNoMatchSummary(config, npcRef, role, infoProvider, store, player, ctx));
             return false;
         }
         if (interaction.blockedByCooldown) {
             return false;
         }
-        return execution != null
-                && execution.applyInteraction(interaction, npcRef, role, infoProvider, store, player, ctx);
+        return applyInteraction(interaction, npcRef, role, infoProvider, store, player, ctx);
+    }
+
+    private boolean applyInteraction(ResolvedInteraction interaction,
+                                     Ref<EntityStore> npcRef,
+                                     Role role,
+                                     InfoProvider infoProvider,
+                                     Store<EntityStore> store,
+                                     Player player,
+                                     InteractionContextSnapshot ctx) {
+        if (executor == null || interaction == null) {
+            return false;
+        }
+        boolean applied = executor.applyInteraction(interaction, npcRef, role, infoProvider, store, player, ctx);
+        if (applied) {
+            cooldowns.applyInteractionCooldown(interaction, npcRef, store);
+        }
+        return applied;
     }
 
     /** Re-selects and executes the target's own Harvest interaction without source action overrides. */
@@ -280,19 +302,19 @@ public class ActionTameworkInteract extends TameworkActionBase {
         ActionTameworkInteract previous = NEUTRAL_CHAIN_ACTION.get();
         NEUTRAL_CHAIN_ACTION.set(this);
         try {
-            InteractionContextSnapshot ctx = neutralChainResolution.buildContextSnapshot(player, playerRef, role);
-            TwInteractionConfig config = neutralChainResolution.resolveConfig(role, ctx);
+            InteractionContextSnapshot ctx = neutralChainParamAccess.buildContextSnapshot(player, playerRef, role);
+            TwInteractionConfig config = neutralChainConfigResolver.resolveConfig(role, ctx);
             if (config == null || !config.isEnabled()) {
                 return false;
             }
-            ResolvedInteraction interaction = selection.selectInteraction(
+            ResolvedInteraction interaction = selector.selectInteraction(
                     config, npcRef, role, infoProvider, store, player, ctx);
             if (interaction == null || interaction.blockedByCooldown
                     || !(interaction.entry instanceof HarvestInteraction)) {
                 return false;
             }
-            return execution != null && InteractionExecutor.withChainSuppressed(
-                    () -> execution.applyInteraction(interaction, npcRef, role, infoProvider, store, player, ctx));
+            return InteractionExecutor.withChainSuppressed(
+                    () -> applyInteraction(interaction, npcRef, role, infoProvider, store, player, ctx));
         } finally {
             if (previous == null) {
                 NEUTRAL_CHAIN_ACTION.remove();
@@ -302,8 +324,8 @@ public class ActionTameworkInteract extends TameworkActionBase {
         }
     }
 
-    private InteractionResolution activeResolution() {
-        return isNeutralChainSelection() ? neutralChainResolution : resolution;
+    private InteractionParamAccess activeParamAccess() {
+        return isNeutralChainSelection() ? neutralChainParamAccess : paramAccess;
     }
 
     private boolean isNeutralChainSelection() {
@@ -314,7 +336,7 @@ public class ActionTameworkInteract extends TameworkActionBase {
     InteractionContextSnapshot buildContextSnapshot(Player player,
                                                     Ref<EntityStore> playerRef,
                                                     Role role) {
-        return activeResolution().buildContextSnapshot(player, playerRef, role);
+        return activeParamAccess().buildContextSnapshot(player, playerRef, role);
     }
 
     InteractionContextSnapshot buildContextSnapshot(Player player,
@@ -322,12 +344,12 @@ public class ActionTameworkInteract extends TameworkActionBase {
                                                     Role role,
                                                     ItemStack activeItem,
                                                     UUID playerId) {
-        return activeResolution().buildContextSnapshot(player, playerRef, role, activeItem, playerId);
+        return activeParamAccess().buildContextSnapshot(player, playerRef, role, activeItem, playerId);
     }
 
     // Resolves the interaction config for prompt/selection helpers.
     TwInteractionConfig resolveConfig(Role role, InteractionContextSnapshot ctx) {
-        return activeResolution().resolveConfig(role, ctx);
+        return (isNeutralChainSelection() ? neutralChainConfigResolver : configResolver).resolveConfig(role, ctx);
     }
 
     // Selects an interaction entry without executing it.
@@ -338,7 +360,7 @@ public class ActionTameworkInteract extends TameworkActionBase {
                                           Store<EntityStore> store,
                                           Player player,
                                           InteractionContextSnapshot ctx) {
-        return selection.selectInteraction(config, npcRef, role, infoProvider, store, player, ctx);
+        return selector.selectInteraction(config, npcRef, role, infoProvider, store, player, ctx);
     }
 
     // Selects an interaction for prompts, prioritizing contextual and conditional entries.
@@ -349,11 +371,11 @@ public class ActionTameworkInteract extends TameworkActionBase {
                                                    Store<EntityStore> store,
                                                    Player player,
                                                    InteractionContextSnapshot ctx) {
-        return selection.selectInteractionForPrompt(config, npcRef, role, infoProvider, store, player, ctx);
+        return selector.selectInteractionForPrompt(config, npcRef, role, infoProvider, store, player, ctx);
     }
 
     String describeHeldItem(InteractionContextSnapshot ctx) {
-        return selection.describeHeldItem(ctx);
+        return diagnostics.describeHeldItem(ctx);
     }
 
     String buildNoMatchSummary(TwInteractionConfig config,
@@ -363,45 +385,45 @@ public class ActionTameworkInteract extends TameworkActionBase {
                                Store<EntityStore> store,
                                Player player,
                                InteractionContextSnapshot ctx) {
-        return selection.buildNoMatchSummary(config, npcRef, role, infoProvider, store, player, ctx);
+        return diagnostics.buildNoMatchSummary(config, npcRef, role, infoProvider, store, player, ctx);
     }
 
     boolean isTamed(Ref<EntityStore> npcRef, Store<EntityStore> store, InteractionContextSnapshot ctx) {
-        return selection.isTamed(npcRef, store, ctx);
+        return ownershipHelper.isTamed(npcRef, store, ctx);
     }
 
     boolean isOwner(Ref<EntityStore> npcRef, Store<EntityStore> store, Player player, InteractionContextSnapshot ctx) {
-        return selection.isOwner(npcRef, store, player, ctx);
+        return ownershipHelper.isOwner(npcRef, store, player, ctx);
     }
 
     // Delegates item-in-hand requirements to the shared resolver.
     boolean matchesItemsInHand(ItemsInHandRequirement requirement, Role role, InteractionContextSnapshot ctx) {
-        return selection.matchesItemsInHand(requirement, role, ctx);
+        return itemRequirements.matchesItemsInHand(requirement, role, ctx);
     }
 
     // Delegates inventory-based requirements to the shared resolver.
     boolean matchesItemsInInventory(ItemsInInventoryRequirement requirement, Role role, InteractionContextSnapshot ctx) {
-        return selection.matchesItemsInInventory(requirement, role, ctx);
+        return itemRequirements.matchesItemsInInventory(requirement, role, ctx);
     }
 
     // Delegates equipped-item requirements to the shared resolver.
     boolean matchesItemsEquipped(ItemsEquippedRequirement requirement, Role role, InteractionContextSnapshot ctx) {
-        return selection.matchesItemsEquipped(requirement, role, ctx);
+        return itemRequirements.matchesItemsEquipped(requirement, role, ctx);
     }
 
     // Delegates held-item matching for requirement checks.
     boolean isHeldItemInList(String[] items, InteractionContextSnapshot ctx) {
-        return selection.isHeldItemInList(items, ctx);
+        return itemRequirements.isHeldItemInList(items, ctx);
     }
 
     // Returns true if the interacting player is not holding any item.
     boolean isPlayerHandEmpty(InteractionContextSnapshot ctx) {
-        return selection.isPlayerHandEmpty(ctx);
+        return itemRequirements.isPlayerHandEmpty(ctx);
     }
 
     // Delegates item param resolution for requirement parsing.
     String[] resolveItemsParam(Role role, InteractionContextSnapshot ctx, String itemsParam) {
-        return selection.resolveItemsParam(role, ctx, itemsParam);
+        return itemRequirements.resolveItemsParam(role, ctx, itemsParam);
     }
 
     boolean matchesHarvestContext(Role role,
@@ -410,7 +432,7 @@ public class ActionTameworkInteract extends TameworkActionBase {
         String context = !isNeutralChainSelection() && hasHarvestContextOverride
                 ? harvestContextOverride
                 : getRoleStringParam(role, ctx, harvestContextParamName);
-        return selection.matchesInteractionContext(context, role, infoProvider, true);
+        return matchHelpers.matchesInteractionContext(context, role, infoProvider, true);
     }
 
     boolean matchesHarvestContextForPrompt(Role role,
@@ -419,28 +441,28 @@ public class ActionTameworkInteract extends TameworkActionBase {
         String context = !isNeutralChainSelection() && hasHarvestContextOverride
                 ? harvestContextOverride
                 : getRoleStringParam(role, ctx, harvestContextParamName);
-        return selection.matchesInteractionContextForPrompt(context, role, infoProvider, ctx, true);
+        return matchHelpers.matchesInteractionContextForPrompt(context, role, infoProvider, ctx, true);
     }
 
     boolean matchesInteractionContext(InteractionContextRequirement requirement,
                                       Role role,
                                       InfoProvider infoProvider,
                                       InteractionContextSnapshot ctx) {
-        return selection.matchesInteractionContext(requirement, role, infoProvider, ctx);
+        return matchHelpers.matchesInteractionContext(requirement, role, infoProvider, ctx);
     }
 
     boolean matchesInteractionContextForPrompt(InteractionContextRequirement requirement,
                                                Role role,
                                                InfoProvider infoProvider,
                                                InteractionContextSnapshot ctx) {
-        return selection.matchesInteractionContextForPrompt(requirement, role, infoProvider, ctx);
+        return matchHelpers.matchesInteractionContextForPrompt(requirement, role, infoProvider, ctx);
     }
 
     boolean matchesInteractionContext(String context,
                                       Role role,
                                       InfoProvider infoProvider,
                                       boolean allowBlank) {
-        return selection.matchesInteractionContext(context, role, infoProvider, allowBlank);
+        return matchHelpers.matchesInteractionContext(context, role, infoProvider, allowBlank);
     }
 
     boolean matchesMovementState(MovementStateRequirement requirement,
@@ -448,14 +470,14 @@ public class ActionTameworkInteract extends TameworkActionBase {
                                           InfoProvider infoProvider,
                                           Store<EntityStore> store,
                                           InteractionContextSnapshot ctx) {
-        return selection.matchesMovementState(requirement, role, infoProvider, store, ctx);
+        return matchHelpers.matchesMovementState(requirement, role, infoProvider, store, ctx);
     }
 
     boolean isPlayerCrouching(Role role,
                               InfoProvider infoProvider,
                               Store<EntityStore> store,
                               InteractionContextSnapshot ctx) {
-        return selection.isPlayerCrouching(role, infoProvider, store, ctx);
+        return matchHelpers.isPlayerCrouching(role, infoProvider, store, ctx);
     }
 
     boolean matchesAlarmState(AlarmRequirement requirement,
@@ -463,17 +485,17 @@ public class ActionTameworkInteract extends TameworkActionBase {
                               Store<EntityStore> store,
                               Role role,
                               InteractionContextSnapshot ctx) {
-        return selection.matchesAlarmState(requirement, npcRef, store, role, ctx);
+        return matchHelpers.matchesAlarmState(requirement, npcRef, store, role, ctx);
     }
 
     boolean matchesParamRequirement(ParamRequirement requirement, Role role) {
-        return selection.matchesParamRequirement(requirement, role);
+        return paramMatcher.matchesParamRequirement(requirement, role);
     }
 
     boolean matchesNpcHealthPercent(NpcHealthPercentRequirement requirement,
                                     Ref<EntityStore> npcRef,
                                     Store<EntityStore> store) {
-        return selection.matchesNpcHealthPercent(requirement, npcRef, store);
+        return matchHelpers.matchesNpcHealthPercent(requirement, npcRef, store);
     }
 
     boolean matchesNpcState(StringRequirement requirement, Role role) {
@@ -508,69 +530,69 @@ public class ActionTameworkInteract extends TameworkActionBase {
     }
 
     String[] resolveLovedItems(Role role, InteractionContextSnapshot ctx) {
-        return activeResolution().resolveLovedItems(role, ctx);
+        return activeParamAccess().resolveLovedItems(role, ctx);
     }
 
     InteractionRequiredItems resolveFeedRequirementItems(FeedInteraction interaction,
                                                          Role role,
                                                          InteractionContextSnapshot ctx) {
-        return activeResolution().resolveFeedRequirementItems(interaction, role, ctx);
+        return activeParamAccess().resolveFeedRequirementItems(interaction, role, ctx);
     }
 
     boolean resolveIsHarvestable(Role role, InteractionContextSnapshot ctx) {
-        return activeResolution().resolveIsHarvestable(role, ctx);
+        return activeParamAccess().resolveIsHarvestable(role, ctx);
     }
 
     boolean resolveIsMountable(Role role, InteractionContextSnapshot ctx) {
-        return activeResolution().resolveIsMountable(role, ctx);
+        return activeParamAccess().resolveIsMountable(role, ctx);
     }
 
     String getRoleStringParam(Role role, String paramName) {
-        return activeResolution().getRoleStringParam(role, null, paramName);
+        return activeParamAccess().getRoleStringParam(role, null, paramName);
     }
 
     String getRoleStringParam(Role role, InteractionContextSnapshot ctx, String paramName) {
-        return activeResolution().getRoleStringParam(role, ctx, paramName);
+        return activeParamAccess().getRoleStringParam(role, ctx, paramName);
     }
 
     StdScope[] resolveRoleScopes(Role role) {
-        return activeResolution().resolveRoleScopes(role);
+        return activeParamAccess().resolveRoleScopes(role);
     }
 
     String[] getRoleStringArrayParam(Role role, String paramName) {
-        return activeResolution().getRoleStringArrayParam(role, null, paramName);
+        return activeParamAccess().getRoleStringArrayParam(role, null, paramName);
     }
 
     String[] getRoleStringArrayParam(Role role, InteractionContextSnapshot ctx, String paramName) {
-        return activeResolution().getRoleStringArrayParam(role, ctx, paramName);
+        return activeParamAccess().getRoleStringArrayParam(role, ctx, paramName);
     }
 
     private boolean getRoleBooleanParam(Role role, InteractionContextSnapshot ctx, String paramName) {
-        return activeResolution().getRoleBooleanParam(role, ctx, paramName);
+        return activeParamAccess().getRoleBooleanParam(role, ctx, paramName);
     }
 
     double getRoleNumberParam(Role role, String paramName, double defaultValue) {
-        return activeResolution().getRoleNumberParam(role, null, paramName, defaultValue);
+        return activeParamAccess().getRoleNumberParam(role, null, paramName, defaultValue);
     }
 
     double getRoleNumberParam(Role role, InteractionContextSnapshot ctx, String paramName, double defaultValue) {
-        return activeResolution().getRoleNumberParam(role, ctx, paramName, defaultValue);
+        return activeParamAccess().getRoleNumberParam(role, ctx, paramName, defaultValue);
     }
 
     double[] getRoleNumberArrayParam(Role role, String paramName) {
-        return activeResolution().getRoleNumberArrayParam(role, null, paramName);
+        return activeParamAccess().getRoleNumberArrayParam(role, null, paramName);
     }
 
     double[] getRoleNumberArrayParam(Role role, InteractionContextSnapshot ctx, String paramName) {
-        return activeResolution().getRoleNumberArrayParam(role, ctx, paramName);
+        return activeParamAccess().getRoleNumberArrayParam(role, ctx, paramName);
     }
 
     void logUnsupported(String message) {
-        selection.logUnsupported(message);
+        diagnostics.logUnsupported(message);
     }
 
     void logDebug(String message) {
-        selection.logDebug(message);
+        diagnostics.logDebug(message);
     }
 
     boolean isHarvestAlarmReady(Ref<EntityStore> npcRef, Store<EntityStore> store) {

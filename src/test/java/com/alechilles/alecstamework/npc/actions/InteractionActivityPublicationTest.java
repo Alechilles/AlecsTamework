@@ -293,11 +293,7 @@ class InteractionActivityPublicationTest {
         InteractionParamAccess params = new InteractionParamAccess(
                 resolver, false, null, null, null,
                 "LovedItems", "IsHarvestable", "IsMountable");
-        InteractionResolution resolution = new InteractionResolution(
-                params,
-                new InteractionConfigResolver(
-                        null, params, "InteractionConfigId"));
-        set(owner, "resolution", resolution);
+        set(owner, "paramAccess", params);
         return new InteractionExecutor(
                 new TameworkInteractEffects(owner, null),
                 new InteractionFeedHelper(params));
