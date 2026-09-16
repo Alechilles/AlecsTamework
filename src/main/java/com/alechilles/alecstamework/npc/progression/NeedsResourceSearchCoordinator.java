@@ -13,6 +13,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -307,48 +308,18 @@ public final class NeedsResourceSearchCoordinator {
         @Nonnull
         private final List<String> itemIds;
 
-        private Request(@Nonnull NeedsResourceRequestTemplate template,
-                        @Nonnull NeedsResourceAreaSearchCache.AreaKey areaKey) {
-            this.resourceKind = template.resourceKind();
+        private Request(@Nonnull String resourceKind,
+                        @Nonnull NeedsResourceAreaSearchCache.AreaKey areaKey,
+                        double radius,
+                        int verticalRadius,
+                        double consumeRadius,
+                        @Nonnull List<String> itemIds) {
+            this.resourceKind = resourceKind;
             this.areaKey = Objects.requireNonNull(areaKey, "areaKey");
-            this.radius = template.radius();
-            this.verticalRadius = template.verticalRadius();
-            this.consumeRadius = template.consumeRadius();
-            this.itemIds = template.itemIds();
-        }
-
-        @Nonnull
-        static Request fromTemplate(@Nonnull NeedsResourceRequestTemplate template,
-                                    @Nonnull String worldName,
-                                    double originX,
-                                    double originY,
-                                    double originZ) {
-            Objects.requireNonNull(template, "template");
-            if (!NeedsResourceSearchCachePolicy.hasSafeOrigin(
-                    originX,
-                    originY,
-                    originZ,
-                    Math.max(1, (int) Math.ceil(template.radius())),
-                    template.verticalRadius()
-            )) {
-                throw new IllegalArgumentException("request bounds are invalid");
-            }
-            NeedsResourceAreaSearchCache.AreaKey areaKey =
-                    NeedsResourceAreaSearchCache.AreaKey.fromCanonical(
-                            worldName,
-                            template.resourceKind(),
-                            originX,
-                            originY,
-                            originZ,
-                            template.radius(),
-                            template.verticalRadius(),
-                            template.consumeRadius(),
-                            template.itemIds()
-                    );
-            if (areaKey == null) {
-                throw new IllegalArgumentException("area key cannot be built from the supplied origin");
-            }
-            return new Request(template, areaKey);
+            this.radius = radius;
+            this.verticalRadius = verticalRadius;
+            this.consumeRadius = consumeRadius;
+            this.itemIds = itemIds;
         }
 
         /**
@@ -379,8 +350,8 @@ public final class NeedsResourceSearchCoordinator {
         }
 
         /*
-         * The template bounds values before the trusted area-key path so a
-         * malformed finite request cannot widen the integer traversal.
+         * Canonicalizes values before the trusted area-key path so a malformed
+         * finite request cannot widen the integer traversal.
          */
         private static Request createForArea(@Nonnull String resourceKind,
                                              @Nonnull String worldName,
@@ -391,14 +362,80 @@ public final class NeedsResourceSearchCoordinator {
                                              int verticalRadius,
                                              double consumeRadius,
                                              @Nonnull List<String> itemIds) {
-            NeedsResourceRequestTemplate template = NeedsResourceRequestTemplate.from(
-                    resourceKind,
-                    radius,
-                    verticalRadius,
-                    consumeRadius,
-                    itemIds
+            String normalizedResourceKind = normalizeResourceKind(resourceKind);
+            double boundedRadius = requirePositiveFinite(
+                    NeedsResourceSearchCachePolicy.boundedSearchRadius(radius),
+                    "radius"
             );
-            return fromTemplate(template, worldName, originX, originY, originZ);
+            int boundedVerticalRadius =
+                    NeedsResourceSearchCachePolicy.boundedVerticalScanRadius(verticalRadius);
+            double boundedConsumeRadius = requireNonNegativeFinite(
+                    NeedsResourceSearchCachePolicy.boundedConsumeRadius(consumeRadius),
+                    "consumeRadius"
+            );
+            List<String> canonicalItemIds = normalizedResourceKind.equals(RESOURCE_KIND_WATER)
+                    ? List.of()
+                    : canonicalItemIds(itemIds);
+            if (!NeedsResourceSearchCachePolicy.hasSafeOrigin(
+                    originX,
+                    originY,
+                    originZ,
+                    Math.max(1, (int) Math.ceil(boundedRadius)),
+                    boundedVerticalRadius
+            )) {
+                throw new IllegalArgumentException("request bounds are invalid");
+            }
+            NeedsResourceAreaSearchCache.AreaKey areaKey =
+                    NeedsResourceAreaSearchCache.AreaKey.fromCanonical(
+                            worldName,
+                            normalizedResourceKind,
+                            originX,
+                            originY,
+                            originZ,
+                            boundedRadius,
+                            boundedVerticalRadius,
+                            boundedConsumeRadius,
+                            canonicalItemIds
+                    );
+            if (areaKey == null) {
+                throw new IllegalArgumentException("area key cannot be built from the supplied origin");
+            }
+            return new Request(
+                    normalizedResourceKind,
+                    areaKey,
+                    boundedRadius,
+                    boundedVerticalRadius,
+                    boundedConsumeRadius,
+                    canonicalItemIds
+            );
+        }
+
+        @Nonnull
+        private static List<String> canonicalItemIds(@Nullable List<String> itemIds) {
+            if (itemIds == null || itemIds.isEmpty()) {
+                return List.of();
+            }
+            TreeSet<String> canonical = new TreeSet<>();
+            for (String itemId : itemIds) {
+                if (itemId != null && !itemId.isBlank()) {
+                    canonical.add(itemId.trim().toLowerCase(Locale.ROOT));
+                }
+            }
+            return List.copyOf(canonical);
+        }
+
+        private static double requirePositiveFinite(double value, @Nonnull String name) {
+            if (!Double.isFinite(value) || value <= 0.0) {
+                throw new IllegalArgumentException(name + " must be finite and positive");
+            }
+            return value;
+        }
+
+        private static double requireNonNegativeFinite(double value, @Nonnull String name) {
+            if (!Double.isFinite(value) || value < 0.0) {
+                throw new IllegalArgumentException(name + " must be finite and non-negative");
+            }
+            return value;
         }
 
         @Nonnull
@@ -429,6 +466,29 @@ public final class NeedsResourceSearchCoordinator {
 
         public double searchRadius() {
             return radius;
+        }
+
+        /**
+         * Returns whether an origin is valid and resolves to this request's
+         * normalized world and shared area cell.
+         */
+        public boolean matchesArea(@Nonnull String worldName,
+                                   double originX,
+                                   double originY,
+                                   double originZ) {
+            if (!NeedsResourceSearchCachePolicy.hasSafeOrigin(
+                    originX,
+                    originY,
+                    originZ,
+                    Math.max(1, (int) Math.ceil(radius)),
+                    verticalRadius
+            )) {
+                return false;
+            }
+            return worldName != null && !worldName.isBlank()
+                    && areaKey.worldName().equals(
+                            NeedsResourceAreaSearchCache.AreaKey.normalizeWorldName(worldName))
+                    && areaKey.containsPosition(originX, originY, originZ);
         }
 
         /** Returns whether a current waiter position remains in the queued area cell. */

@@ -6,7 +6,6 @@ import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceFastModePolicy;
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService;
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService.PathPreflightResult;
-import com.alechilles.alecstamework.npc.progression.NeedsResourceRequestTemplate;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceSearchCoordinator;
 import com.alechilles.alecstamework.npc.progression.NeedsSeekDiagnostics;
 import com.alechilles.alecstamework.npc.progression.NeedsTelemetryDiagnostics;
@@ -44,6 +43,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     private static final int MAX_ACTIVE_SEEK_VERTICAL_SCAN_RADIUS = 16;
     private static final double DEFAULT_APPROACH_RADIUS = 2.0;
     private static final double EPSILON = 0.000001;
+    private static final String[] NO_ITEM_IDS = new String[0];
     private static final SearchEligibility UNGATED_ELIGIBILITY =
             SearchEligibility.allowed(Double.NaN, null);
 
@@ -58,21 +58,8 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     private final TameworkTargetPositionInfoProvider infoProvider =
             new TameworkTargetPositionInfoProvider(null, positionInfo);
     private final NeedsResourceTargetCacheAdapter targetCache = new NeedsResourceTargetCacheAdapter();
-    private final NeedsResourceRequestTemplate.AreaRequestMemo areaRequestMemo =
-            new NeedsResourceRequestTemplate.AreaRequestMemo();
     @Nullable
-    private NeedsResourceRequestTemplate requestTemplate;
-    @Nullable
-    private TwNeedsConfig requestTemplateConfig;
-    @Nullable
-    private String[] requestTemplatePassiveItemIds;
-    private double requestTemplateRadius;
-    private int requestTemplateVerticalRadius;
-    private double requestTemplateConsumeRadius;
-    private double requestTemplateConfiguredSearchRadius;
-    private int requestTemplateConfiguredVerticalRadius;
-    private double requestTemplateConfiguredConsumeRadius;
-    private boolean requestTemplateSignatureInitialized;
+    private CachedRequest cachedRequest;
 
     public SensorTameworkNeedsResourceTarget(@Nonnull BuilderSensorTameworkNeedsResourceTarget builder,
                                              @Nonnull BuilderSupport support) {
@@ -317,113 +304,128 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                                                                  double originX,
                                                                  double originY,
                                                                  double originZ) {
-        NeedsResourceRequestTemplate template = resolveRequestTemplate(config);
-        if (template == null) {
-            return null;
-        }
         try {
-            return areaRequestMemo.resolve(template, worldName, originX, originY, originZ);
+            double searchRadius = range;
+            int verticalRadius = 8;
+            double consumeRadius = 0.0;
+            double configuredSearchRadius = Double.NaN;
+            int configuredVerticalRadius = -1;
+            double configuredConsumeRadius = Double.NaN;
+            String[] passiveItemIds = null;
+            if (config != null) {
+                TwNeedsConfig.PassiveRefillSettings passive = config.getPassiveRefill();
+                if (resourceType == ResourceType.WATER) {
+                    configuredSearchRadius = passive.getWaterSearchRadius();
+                    configuredVerticalRadius = passive.getWaterVerticalScanRadius();
+                    configuredConsumeRadius = passive.getWaterConsumeRadius();
+                    searchRadius = Math.max(searchRadius, configuredSearchRadius);
+                    verticalRadius = activeSeekVerticalScanRadius(configuredVerticalRadius, searchRadius);
+                    consumeRadius = configuredConsumeRadius;
+                } else {
+                    configuredSearchRadius = passive.getContainerSearchRadius();
+                    configuredVerticalRadius = passive.getContainerVerticalScanRadius();
+                    configuredConsumeRadius = passive.getContainerConsumeRadius();
+                    searchRadius = Math.max(searchRadius, configuredSearchRadius);
+                    verticalRadius = activeSeekVerticalScanRadius(configuredVerticalRadius, searchRadius);
+                    consumeRadius = configuredConsumeRadius;
+                    passiveItemIds = passive.getContainerFoodItemIds();
+                }
+            }
+
+            if (resourceType == ResourceType.FOOD_CONTAINER
+                    && !hasConfiguredItemIds
+                    && !hasAnyItemId(passiveItemIds)) {
+                return null;
+            }
+
+            CachedRequest cached = cachedRequest;
+            if (cached != null && cached.matches(
+                    config,
+                    searchRadius,
+                    verticalRadius,
+                    consumeRadius,
+                    configuredSearchRadius,
+                    configuredVerticalRadius,
+                    configuredConsumeRadius,
+                    passiveItemIds,
+                    worldName,
+                    originX,
+                    originY,
+                    originZ
+            )) {
+                return cached.request();
+            }
+            String[] effectiveItemIds = resourceType == ResourceType.WATER
+                    ? NO_ITEM_IDS
+                    : resolveEffectiveFoodItemIds(passiveItemIds);
+            NeedsResourceSearchCoordinator.Request next = NeedsResourceSearchCoordinator.Request.forArea(
+                    resourceType.kind,
+                    worldName,
+                    originX,
+                    originY,
+                    originZ,
+                    searchRadius,
+                    verticalRadius,
+                    consumeRadius,
+                    Arrays.asList(effectiveItemIds)
+            );
+            cachedRequest = new CachedRequest(
+                    config,
+                    searchRadius,
+                    verticalRadius,
+                    consumeRadius,
+                    configuredSearchRadius,
+                    configuredVerticalRadius,
+                    configuredConsumeRadius,
+                    passiveItemIds,
+                    next
+            );
+            return next;
         } catch (IllegalArgumentException ignored) {
             return null;
         }
     }
 
-    @Nullable
-    private NeedsResourceRequestTemplate resolveRequestTemplate(@Nullable TwNeedsConfig config) {
-        double searchRadius = range;
-        int verticalRadius = 8;
-        double consumeRadius = 0.0;
-        double configuredSearchRadius = Double.NaN;
-        int configuredVerticalRadius = -1;
-        double configuredConsumeRadius = Double.NaN;
-        String[] passiveItemIds = null;
-        if (config != null) {
-            TwNeedsConfig.PassiveRefillSettings passive = config.getPassiveRefill();
-            if (resourceType == ResourceType.WATER) {
-                configuredSearchRadius = passive.getWaterSearchRadius();
-                configuredVerticalRadius = passive.getWaterVerticalScanRadius();
-                configuredConsumeRadius = passive.getWaterConsumeRadius();
-                searchRadius = Math.max(searchRadius, configuredSearchRadius);
-                verticalRadius = activeSeekVerticalScanRadius(configuredVerticalRadius, searchRadius);
-                consumeRadius = configuredConsumeRadius;
-            } else {
-                configuredSearchRadius = passive.getContainerSearchRadius();
-                configuredVerticalRadius = passive.getContainerVerticalScanRadius();
-                configuredConsumeRadius = passive.getContainerConsumeRadius();
-                searchRadius = Math.max(searchRadius, configuredSearchRadius);
-                verticalRadius = activeSeekVerticalScanRadius(configuredVerticalRadius, searchRadius);
-                consumeRadius = configuredConsumeRadius;
-                passiveItemIds = passive.getContainerFoodItemIds();
-            }
+    private record CachedRequest(@Nullable TwNeedsConfig config,
+                                 double searchRadius,
+                                 int verticalRadius,
+                                 double consumeRadius,
+                                 double configuredSearchRadius,
+                                 int configuredVerticalRadius,
+                                 double configuredConsumeRadius,
+                                 @Nullable String[] passiveItemIds,
+                                 @Nonnull NeedsResourceSearchCoordinator.Request request) {
+        private CachedRequest {
+            passiveItemIds = passiveItemIds == null ? null : Arrays.copyOf(passiveItemIds, passiveItemIds.length);
         }
 
-        if (resourceType == ResourceType.FOOD_CONTAINER
-                && !hasConfiguredItemIds
-                && !hasAnyItemId(passiveItemIds)) {
-            return null;
+        private boolean matches(@Nullable TwNeedsConfig candidateConfig,
+                                double candidateSearchRadius,
+                                int candidateVerticalRadius,
+                                double candidateConsumeRadius,
+                                double candidateConfiguredSearchRadius,
+                                int candidateConfiguredVerticalRadius,
+                                double candidateConfiguredConsumeRadius,
+                                @Nullable String[] candidatePassiveItemIds,
+                                @Nonnull String candidateWorldName,
+                                double candidateOriginX,
+                                double candidateOriginY,
+                                double candidateOriginZ) {
+            return config == candidateConfig
+                    && Double.compare(searchRadius, candidateSearchRadius) == 0
+                    && verticalRadius == candidateVerticalRadius
+                    && Double.compare(consumeRadius, candidateConsumeRadius) == 0
+                    && Double.compare(configuredSearchRadius, candidateConfiguredSearchRadius) == 0
+                    && configuredVerticalRadius == candidateConfiguredVerticalRadius
+                    && Double.compare(configuredConsumeRadius, candidateConfiguredConsumeRadius) == 0
+                    && Arrays.equals(passiveItemIds, candidatePassiveItemIds)
+                    && request.matchesArea(
+                            candidateWorldName,
+                            candidateOriginX,
+                            candidateOriginY,
+                            candidateOriginZ
+                    );
         }
-
-        if (requestTemplateSignatureMatches(
-                config,
-                passiveItemIds,
-                searchRadius,
-                verticalRadius,
-                consumeRadius,
-                configuredSearchRadius,
-                configuredVerticalRadius,
-                configuredConsumeRadius
-        )) {
-            return requestTemplate;
-        }
-
-        String[] effectiveItemIds = resourceType == ResourceType.WATER
-                ? new String[0]
-                : resolveEffectiveFoodItemIds(passiveItemIds);
-        NeedsResourceRequestTemplate next = NeedsResourceRequestTemplate.from(
-                resourceType.kind,
-                searchRadius,
-                verticalRadius,
-                consumeRadius,
-                effectiveItemIds
-        );
-        requestTemplate = next;
-        requestTemplateConfig = config;
-        requestTemplatePassiveItemIds = passiveItemIds == null
-                ? null
-                : Arrays.copyOf(passiveItemIds, passiveItemIds.length);
-        requestTemplateRadius = searchRadius;
-        requestTemplateVerticalRadius = verticalRadius;
-        requestTemplateConsumeRadius = consumeRadius;
-        requestTemplateConfiguredSearchRadius = configuredSearchRadius;
-        requestTemplateConfiguredVerticalRadius = configuredVerticalRadius;
-        requestTemplateConfiguredConsumeRadius = configuredConsumeRadius;
-        requestTemplateSignatureInitialized = true;
-        return next;
-    }
-
-    private boolean requestTemplateSignatureMatches(@Nullable TwNeedsConfig config,
-                                                     @Nullable String[] passiveItemIds,
-                                                     double searchRadius,
-                                                     int verticalRadius,
-                                                     double consumeRadius,
-                                                     double configuredSearchRadius,
-                                                     int configuredVerticalRadius,
-                                                     double configuredConsumeRadius) {
-        if (!requestTemplateSignatureInitialized
-                || requestTemplate == null
-                || requestTemplateConfig != config
-                || Double.compare(requestTemplateRadius, searchRadius) != 0
-                || requestTemplateVerticalRadius != verticalRadius
-                || Double.compare(requestTemplateConsumeRadius, consumeRadius) != 0
-                || Double.compare(requestTemplateConfiguredSearchRadius, configuredSearchRadius) != 0
-                || requestTemplateConfiguredVerticalRadius != configuredVerticalRadius
-                || Double.compare(requestTemplateConfiguredConsumeRadius, configuredConsumeRadius) != 0) {
-            return false;
-        }
-        if (resourceType != ResourceType.FOOD_CONTAINER || config == null) {
-            return true;
-        }
-        return Arrays.equals(requestTemplatePassiveItemIds, passiveItemIds);
     }
 
     @Nonnull
