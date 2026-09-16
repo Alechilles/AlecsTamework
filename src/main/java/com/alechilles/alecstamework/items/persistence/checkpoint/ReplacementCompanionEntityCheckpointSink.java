@@ -242,7 +242,13 @@ public final class ReplacementCompanionEntityCheckpointSink
     ) {
         CompletionStage<MaintenanceWorkOutcome<CheckpointWork>> persistence;
         try {
-            persistence = persist(work);
+            persistence = this.persistence.operations().afterMaintenance(() ->
+                    persist(work).thenCompose(outcome -> {
+                        if (outcome instanceof MaintenanceWorkOutcome.Failed<CheckpointWork> failed) {
+                            return CompletableFuture.failedFuture(failed.failure());
+                        }
+                        return CompletableFuture.completedFuture(outcome);
+                    }));
         } catch (Throwable failure) {
             warnFailure(alias, failure);
             return CompletableFuture.completedFuture(

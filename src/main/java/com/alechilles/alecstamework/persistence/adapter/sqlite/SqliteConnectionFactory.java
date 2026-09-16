@@ -104,6 +104,7 @@ public final class SqliteConnectionFactory {
 
     private void configureWriter(Connection connection) throws SQLException {
         try (Statement statement = connection.createStatement()) {
+            configureAutoVacuumForEmptyDatabase(statement);
             assertTextPragma(statement, "PRAGMA journal_mode=WAL", "wal", "journal_mode");
             statement.execute("PRAGMA synchronous=FULL");
             statement.execute("PRAGMA foreign_keys=ON");
@@ -111,6 +112,23 @@ public final class SqliteConnectionFactory {
             statement.execute("PRAGMA wal_autocheckpoint=1000");
         }
         assertIntegerPragma(connection, "PRAGMA foreign_keys", 1, "foreign_keys");
+    }
+
+    /** Sets the persistent reclamation mode only before the first user table is created. */
+    private void configureAutoVacuumForEmptyDatabase(Statement statement) throws SQLException {
+        try (ResultSet rows = statement.executeQuery("""
+                SELECT COUNT(*) FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'
+                """)) {
+            if (!rows.next() || rows.getInt(1) != 0) {
+                return;
+            }
+        }
+        statement.execute("PRAGMA auto_vacuum=INCREMENTAL");
+        try (ResultSet rows = statement.executeQuery("PRAGMA auto_vacuum")) {
+            if (!rows.next() || rows.getInt(1) != 2) {
+                throw new SQLException("sqlite_pragma_auto_vacuum_not_applied");
+            }
+        }
     }
 
     private void configureRead(Connection connection) throws SQLException {

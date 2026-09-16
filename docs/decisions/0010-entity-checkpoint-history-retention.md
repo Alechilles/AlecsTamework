@@ -53,10 +53,26 @@ canonical state but cannot replay compacted checkpoint requests successfully.
 
 ## Space reclamation
 
-SQLite reuses pages freed by compaction, so ongoing writes can reuse an existing
-large file. The file itself does not shrink automatically. Offline `VACUUM`
-after compaction can return free pages to the filesystem; keep a complete backup
-and stop the server first. Do not vacuum on the gameplay writer or during
-shutdown, where a multi-gigabyte rebuild could delay gameplay or exceed the drain
-deadline. Small idempotency records remain, so growth is reduced rather than
-strictly capped at a fixed file size.
+Administrators can run `/tw debug persistence compact` while the server stays
+online. The runtime pauses new persistence mutations, drains accepted workflows,
+and reserves shutdown ownership before queueing maintenance on the existing
+single writer. Automatic profile snapshots and entity checkpoints wait on the
+maintenance completion inside their existing bounded coordinators, retaining
+one-off unload captures. Deferral starts before reads and authoring; a failed save
+that crosses a maintenance generation restarts its reads after maintenance to
+avoid stale revision fences. No new worker or durable queue is introduced. Pending durable operations prevent the rebuild. A drain timeout
+or maintenance failure is reported; ordinary admission resumes unless shutdown
+or a database integrity failure prevents it.
+
+Maintenance compacts eligible history in committed batches, checks temporary disk
+headroom, enables incremental auto-vacuum, rebuilds with `VACUUM`, and truncates
+the WAL. A busy reader can prevent the final checkpoint and cause a retryable
+command failure. Rebuilding a large database may take several minutes and requires
+up to twice the original database size in additional free space. Tamework saves
+and companion mutations are unavailable during maintenance; the game server keeps
+running. Maintenance is explicit and never starts automatically at shutdown.
+
+New databases enable incremental auto-vacuum before schema creation. Converted
+and new databases reclaim up to 512 free pages per eligible history cleanup batch.
+WAL checkpointing makes those reductions visible on disk. Small idempotency records
+remain, so growth is reduced rather than capped at a fixed file size.

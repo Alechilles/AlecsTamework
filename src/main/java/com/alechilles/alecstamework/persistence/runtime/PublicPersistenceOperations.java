@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.runtime;
 
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteDatabaseCompactionResult;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseRequest;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembershipRequest;
@@ -46,6 +47,77 @@ public final class PublicPersistenceOperations {
     private final Supplier<SqlitePublicPersistenceAdapter> adapters;
     private final PublicPersistenceLiveBoundaries boundaries;
     private final PublicPersistenceWorkflowTracker workflows;
+    private boolean maintenancePaused;
+    private long maintenanceGeneration;
+    private java.util.concurrent.CompletableFuture<Void> maintenanceFinished;
+    private Supplier<CompletionStage<SqliteDatabaseCompactionResult>> maintenance;
+
+    void bindMaintenance(Supplier<CompletionStage<SqliteDatabaseCompactionResult>> maintenance) {
+        this.maintenance = java.util.Objects.requireNonNull(maintenance);
+    }
+
+    /** Requests serialized database maintenance without stopping the server. */
+    public CompletionStage<SqliteDatabaseCompactionResult> compactDatabase() {
+        if (maintenance == null) {
+            return java.util.concurrent.CompletableFuture.failedFuture(
+                    new IllegalStateException("database_maintenance_unavailable"));
+        }
+        return maintenance.get();
+    }
+
+    // The caller holds this facade's monitor to make pausing atomic with submit + track.
+    void pauseMaintenance() {
+        if (maintenancePaused) throw new IllegalStateException("database_maintenance_already_running");
+        maintenancePaused = true;
+        maintenanceGeneration++;
+        maintenanceFinished = new java.util.concurrent.CompletableFuture<>();
+    }
+
+    synchronized java.util.concurrent.CompletableFuture<Void> resumeMaintenance() {
+        maintenancePaused = false;
+        return maintenanceFinished;
+    }
+
+    /**
+     * Keeps an immutable automatic save in its existing coordinator until maintenance ends.
+     * The supplier must only submit asynchronous work; it must not access live game state.
+     * Failed work that crosses a maintenance pause restarts from its reads afterward,
+     * so revision-fenced mutations are rebuilt from current state.
+     */
+    @Nonnull
+    public synchronized <T> CompletionStage<T> afterMaintenance(
+            @Nonnull Supplier<CompletionStage<T>> work
+    ) {
+        if (maintenancePaused) {
+            return maintenanceFinished.thenCompose(ignored -> afterMaintenance(work));
+        }
+        long generation = maintenanceGeneration;
+        CompletionStage<T> started;
+        try {
+            started = work.get();
+        } catch (RuntimeException failure) {
+            started = java.util.concurrent.CompletableFuture.failedFuture(failure);
+        }
+        return started.handle((value, failure) -> {
+            if (failure == null) {
+                return java.util.concurrent.CompletableFuture.completedFuture(value);
+            }
+            synchronized (this) {
+                // Re-read revision-fenced state if maintenance interrupted this save.
+                if (maintenancePaused || generation != maintenanceGeneration) {
+                    return afterMaintenance(work);
+                }
+            }
+            return java.util.concurrent.CompletableFuture.<T>failedFuture(failure);
+        }).thenCompose(result -> result);
+    }
+
+    private PublicOperationSubmission maintenanceRejected() {
+        return new PublicOperationSubmission(PublicOperationSubmission.Admission.REJECTED,
+                java.util.concurrent.CompletableFuture.completedFuture(new OperationWorkflowResult(
+                        OperationWorkflowResult.Status.PREPARE_FAILED, null, java.util.List.of(),
+                        new IllegalStateException("database_maintenance_in_progress"))));
+    }
 
     PublicPersistenceOperations(
             SqlitePublicPersistenceAdapter adapter,
@@ -74,11 +146,12 @@ public final class PublicPersistenceOperations {
     }
 
     @Nonnull
-    public PublicOperationSubmission mutateProfile(
+    public synchronized PublicOperationSubmission mutateProfile(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull CompanionProfileMutation mutation
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted = adapter().profileOperations().submit(
                 operationId, idempotencyKey, mutation
         );
@@ -88,11 +161,12 @@ public final class PublicPersistenceOperations {
     /**
      * Narrow internal path for the startup graph's evidence-backed resolution.
      */
-    PublicOperationSubmission reconcileProfileDuringStartup(
+    synchronized PublicOperationSubmission reconcileProfileDuringStartup(
             OperationId operationId,
             IdempotencyKey idempotencyKey,
             CompanionProfileMutation.StartupReconciliation reconciliation
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted = adapter().reconcileProfileAtStartup(
                 operationId,
                 idempotencyKey,
@@ -102,11 +176,12 @@ public final class PublicPersistenceOperations {
     }
 
     @Nonnull
-    public PublicOperationSubmission rotateAlias(
+    public synchronized PublicOperationSubmission rotateAlias(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull CompanionAliasRotation rotation
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted = adapter().aliasOperations().submit(
                 operationId,
                 idempotencyKey,
@@ -116,11 +191,12 @@ public final class PublicPersistenceOperations {
     }
 
     @Nonnull
-    public PublicOperationSubmission capture(
+    public synchronized PublicOperationSubmission capture(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull CompanionCaptureRequest capture
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted = adapter().captureOperations().submit(
                 operationId,
                 idempotencyKey,
@@ -131,11 +207,12 @@ public final class PublicPersistenceOperations {
     }
 
     @Nonnull
-    public PublicOperationSubmission releaseCapturedCompanion(
+    public synchronized PublicOperationSubmission releaseCapturedCompanion(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull CompanionCaptureReleaseRequest release
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted = adapter().captureReleaseOperations().submit(
                 operationId,
                 idempotencyKey,
@@ -146,11 +223,12 @@ public final class PublicPersistenceOperations {
     }
 
     @Nonnull
-    public PublicOperationSubmission makeDormant(
+    public synchronized PublicOperationSubmission makeDormant(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull CompanionDormantTransitionRequest dormant
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted = adapter().dormantOperations().submit(
                 operationId, idempotencyKey, dormant
         );
@@ -158,11 +236,12 @@ public final class PublicPersistenceOperations {
     }
 
     @Nonnull
-    public PublicOperationSubmission restore(
+    public synchronized PublicOperationSubmission restore(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull CompanionRestorationRequest restoration
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted = adapter().restorationOperations().submit(
                 operationId,
                 idempotencyKey,
@@ -173,11 +252,12 @@ public final class PublicPersistenceOperations {
     }
 
     @Nonnull
-    public PublicOperationSubmission mutateTimedSummonLease(
+    public synchronized PublicOperationSubmission mutateTimedSummonLease(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull TimedSummonLeaseMutationRequest mutation
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted = adapter().timedSummonOperations().submit(
                 operationId, idempotencyKey, mutation
         );
@@ -185,11 +265,12 @@ public final class PublicPersistenceOperations {
     }
 
     @Nonnull
-    public PublicOperationSubmission transitionTimedSummon(
+    public synchronized PublicOperationSubmission transitionTimedSummon(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull TimedSummonTransitionRequest transition
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted = adapter().timedSummonTransitionOperations().submit(
                 operationId,
                 idempotencyKey,
@@ -200,11 +281,12 @@ public final class PublicPersistenceOperations {
     }
 
     @Nonnull
-    public PublicOperationSubmission registerCoopSlot(
+    public synchronized PublicOperationSubmission registerCoopSlot(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull CoopSlotRegistration registration
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted = adapter().coopSlotOperations().submit(
                 operationId, idempotencyKey, registration
         );
@@ -212,11 +294,12 @@ public final class PublicPersistenceOperations {
     }
 
     @Nonnull
-    public PublicOperationSubmission captureToCoop(
+    public synchronized PublicOperationSubmission captureToCoop(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull CompanionCoopCaptureRequest capture
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted = adapter().coopCaptureOperations().submit(
                 operationId,
                 idempotencyKey,
@@ -227,11 +310,12 @@ public final class PublicPersistenceOperations {
     }
 
     @Nonnull
-    public PublicOperationSubmission releaseFromCoop(
+    public synchronized PublicOperationSubmission releaseFromCoop(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull CompanionCoopReleaseRequest release
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted = adapter().coopReleaseOperations().submit(
                 operationId,
                 idempotencyKey,
@@ -242,11 +326,12 @@ public final class PublicPersistenceOperations {
     }
 
     @Nonnull
-    public PublicOperationSubmission reviveCompanion(
+    public synchronized PublicOperationSubmission reviveCompanion(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull PaidRevivalRequest revival
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted = adapter().paidRevivalOperations().submit(
                 operationId,
                 idempotencyKey,
@@ -259,11 +344,12 @@ public final class PublicPersistenceOperations {
     }
 
     @Nonnull
-    public PublicOperationSubmission markReviveReady(
+    public synchronized PublicOperationSubmission markReviveReady(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull ReviveReadyRequest request
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted = adapter().reviveReadyOperations().submit(
                 operationId, idempotencyKey, request);
         return submission(submitted.acceptance(), submitted.completion());
@@ -275,11 +361,12 @@ public final class PublicPersistenceOperations {
      * callers must inspect that outcome because domain denials also finish publication.
      */
     @Nonnull
-    public PublicOperationSubmission updateSavedTalents(
+    public synchronized PublicOperationSubmission updateSavedTalents(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull SavedCompanionTalentRequest request
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted = adapter().savedCompanionTalentOperations().submit(
                 operationId, idempotencyKey, request
         );
@@ -287,11 +374,12 @@ public final class PublicPersistenceOperations {
     }
 
     @Nonnull
-    public PublicOperationSubmission mutateExtension(
+    public synchronized PublicOperationSubmission mutateExtension(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull ProfileExtensionMutation mutation
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         SqliteDatabaseOperationCoordinator.Submission submitted =
                 adapter().extensionOperations().submit(
                         operationId, idempotencyKey, mutation
@@ -300,11 +388,12 @@ public final class PublicPersistenceOperations {
     }
 
     @Nonnull
-    public PublicOperationSubmission transitionOwnerPopulation(
+    public synchronized PublicOperationSubmission transitionOwnerPopulation(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull OwnerPopulationTransitionRequest transition
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted = adapter().ownerPopulationOperations().submit(
                 operationId, idempotencyKey, transition
         );
@@ -312,11 +401,12 @@ public final class PublicPersistenceOperations {
     }
 
     @Nonnull
-    public PublicOperationSubmission reconcileOwnerPopulation(
+    public synchronized PublicOperationSubmission reconcileOwnerPopulation(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull OwnerPopulationReconciliationRequest reconciliation
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted =
                 adapter().ownerPopulationReconciliationOperations().submit(
                         operationId, idempotencyKey, reconciliation
@@ -325,11 +415,12 @@ public final class PublicPersistenceOperations {
     }
 
     @Nonnull
-    public PublicOperationSubmission assignPopulationGroups(
+    public synchronized PublicOperationSubmission assignPopulationGroups(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull PopulationGroupAssignmentRequest assignment
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted = adapter().populationGroupOperations().submit(
                 operationId, idempotencyKey, assignment
         );
@@ -344,24 +435,26 @@ public final class PublicPersistenceOperations {
 
     /** Prepares one durable litter job before any world-thread spawn work. */
     @Nonnull
-    public CompletionStage<Boolean>
+    public synchronized CompletionStage<Boolean>
     prepareBreedingLitter(@Nonnull BreedingLitterOperation litter) {
+        if (maintenancePaused) return java.util.concurrent.CompletableFuture.completedFuture(false);
         var submitted = adapter().breedingLitterOperations().prepare(litter);
         if (submitted.acceptance()
                 != SqliteSingleWriter.WriteAcceptance.ACCEPTED) {
             return java.util.concurrent.CompletableFuture
                     .completedFuture(false);
         }
-        return submitted.completion().thenApply(result ->
+        return workflows.track(submitted.completion().thenApply(result ->
                 result instanceof PersistenceTransactionResult.Committed<?>
-        );
+        ));
     }
 
     /** Submits or resumes one exact durable litter job at its live boundary. */
     @Nonnull
-    public PublicOperationSubmission submitBreedingLitter(
+    public synchronized PublicOperationSubmission submitBreedingLitter(
             @Nonnull BreedingLitterOperation litter
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted = adapter().breedingLitterOperations().submit(
                 litter,
                 boundaries.breedingLitters()
@@ -370,11 +463,12 @@ public final class PublicPersistenceOperations {
     }
 
     @Nonnull
-    public PublicOperationSubmission mutateCommandRoster(
+    public synchronized PublicOperationSubmission mutateCommandRoster(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull CommandRosterMembershipRequest request
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted = adapter().commandRosterOperations().submit(
                 operationId, idempotencyKey, request
         );
@@ -382,11 +476,12 @@ public final class PublicPersistenceOperations {
     }
 
     @Nonnull
-    public PublicOperationSubmission transitionCommandRoster(
+    public synchronized PublicOperationSubmission transitionCommandRoster(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull CommandRosterTransitionRequest transition
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted = adapter().commandRosterTransitionOperations().submit(
                 operationId, idempotencyKey, transition
         );
@@ -394,10 +489,11 @@ public final class PublicPersistenceOperations {
     }
 
     @Nonnull
-    public PublicOperationSubmission provisionCompanion(
+    public synchronized PublicOperationSubmission provisionCompanion(
             @Nonnull OperationId operationId,
             @Nonnull CompanionProvisioningRequest request
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted = adapter().provisioningOperations().submit(
                 operationId, request
         );
@@ -405,10 +501,11 @@ public final class PublicPersistenceOperations {
     }
 
     @Nonnull
-    public PublicOperationSubmission activateProvisionedCompanion(
+    public synchronized PublicOperationSubmission activateProvisionedCompanion(
             @Nonnull OperationId operationId,
             @Nonnull ProvisioningActivationRequest request
     ) {
+        if (maintenancePaused) return maintenanceRejected();
         var submitted = adapter().provisioningActivationOperations().submit(
                 operationId,
                 request,

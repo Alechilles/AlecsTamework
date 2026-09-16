@@ -162,7 +162,7 @@ public final class ReplacementProfileSnapshotSink
             LiveSnapshot snapshot
     ) {
         try {
-            CompletionStage<Void> result = resolve(snapshot);
+            CompletionStage<Void> result = operations.afterMaintenance(() -> resolve(snapshot));
             if (result == null) {
                 throw new NullPointerException(
                         "Profile snapshot resolution returned no completion"
@@ -373,9 +373,7 @@ public final class ReplacementProfileSnapshotSink
     ) {
         OperationId operationId = OperationId.create();
         PublicOperationSubmission submitted = operations.mutateProfile(
-                operationId,
-                idempotency("live-profile", operationId),
-                mutation
+                operationId, idempotency("live-profile", operationId), mutation
         );
         return completion("profile_snapshot_metadata", submitted);
     }

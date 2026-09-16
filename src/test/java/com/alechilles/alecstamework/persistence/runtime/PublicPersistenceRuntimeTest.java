@@ -649,6 +649,86 @@ class PublicPersistenceRuntimeTest {
         );
     }
 
+    @Test
+    void maintenanceDrainsAcceptedWorkAndResumesAdmission() throws Exception {
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        PublicPersistenceRuntime runtime = runtime(
+                PublicPersistenceWorldReconciliation.alreadyComplete(), event -> {
+                    entered.countDown();
+                    try {
+                        if (!release.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("test_timeout");
+                    } catch (InterruptedException failure) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException(failure);
+                    }
+                });
+        try {
+            assertTrue(runtime.start().toCompletableFuture().join().complete());
+            var first = runtime.operations().mutateProfile(OperationId.create(),
+                    new IdempotencyKey("maintenance-create"), profileCreate());
+            assertTrue(entered.await(5, TimeUnit.SECONDS));
+            var maintenance = runtime.operations().compactDatabase().toCompletableFuture();
+            assertFalse(maintenance.isDone());
+            assertThrows(java.util.concurrent.CompletionException.class,
+                    () -> runtime.operations().compactDatabase().toCompletableFuture().join());
+            var rejected = runtime.operations().mutateProfile(OperationId.create(),
+                    new IdempotencyKey("maintenance-rejected"), profileCreate());
+            assertEquals(OperationWorkflowResult.Status.PREPARE_FAILED,
+                    rejected.completion().toCompletableFuture().join().status());
+            release.countDown();
+            assertEquals(OperationWorkflowResult.Status.PUBLISHED,
+                    first.completion().toCompletableFuture().get(5, TimeUnit.SECONDS).status());
+            var result = maintenance.get(15, TimeUnit.SECONDS);
+            assertTrue(result.bytesAfter() > 0);
+            // Retrying the published operation proves normal admission resumed without duplicating state.
+            assertEquals(OperationWorkflowResult.Status.PUBLISHED,
+                    runtime.operations().mutateProfile(OperationId.create(),
+                            new IdempotencyKey("maintenance-create"), profileCreate())
+                            .completion().toCompletableFuture().get(5, TimeUnit.SECONDS).status());
+        } finally {
+            release.countDown();
+            runtime.shutdown(Duration.ofSeconds(5));
+        }
+    }
+
+    @Test
+    void shutdownWaitsForMaintenanceDrainAndCancelsPendingRebuild() throws Exception {
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        PublicPersistenceRuntime runtime = runtime(
+                PublicPersistenceWorldReconciliation.alreadyComplete(), event -> {
+                    entered.countDown();
+                    try {
+                        release.await(10, TimeUnit.SECONDS);
+                    } catch (InterruptedException failure) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException(failure);
+                    }
+                });
+        try {
+            assertTrue(runtime.start().toCompletableFuture().join().complete());
+            var first = runtime.operations().mutateProfile(OperationId.create(),
+                    new IdempotencyKey("maintenance-shutdown-create"), profileCreate());
+            assertTrue(entered.await(5, TimeUnit.SECONDS));
+            var maintenance = runtime.operations().compactDatabase().toCompletableFuture();
+            var stopped = runtime.shutdown(Duration.ZERO);
+            assertEquals(PublicPersistenceShutdownReport.Status.FEATURE_DRAIN_TIMED_OUT,
+                    stopped.status());
+            assertEquals(2, stopped.outstandingWorkflows());
+            assertNull(stopped.kernel());
+            release.countDown();
+            first.completion().toCompletableFuture().get(5, TimeUnit.SECONDS);
+            assertThrows(java.util.concurrent.ExecutionException.class,
+                    () -> maintenance.get(5, TimeUnit.SECONDS));
+            assertEquals(PublicPersistenceShutdownReport.Status.COMPLETE,
+                    runtime.shutdown(Duration.ofSeconds(5)).status());
+        } finally {
+            release.countDown();
+            runtime.shutdown(Duration.ofSeconds(5));
+        }
+    }
+
     private PublicPersistenceRuntime runtime(
             PublicPersistenceWorldReconciliation world
     ) {

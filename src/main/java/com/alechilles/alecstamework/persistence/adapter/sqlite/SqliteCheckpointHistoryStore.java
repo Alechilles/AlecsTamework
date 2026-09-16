@@ -100,6 +100,38 @@ final class SqliteCheckpointHistoryStore {
                 }
             }
         }
+        if (!batch.receipts().isEmpty() && autoVacuumMode() == 2) {
+            runIncrementalVacuum();
+        }
+    }
+
+    private int autoVacuumMode() throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("PRAGMA auto_vacuum");
+             ResultSet rows = statement.executeQuery()) {
+            if (!rows.next()) {
+                throw new SQLException("checkpoint_compaction_auto_vacuum_unknown");
+            }
+            return rows.getInt(1);
+        }
+    }
+
+    /** SQLite may return result rows for pragma commands; consume them before committing this batch. */
+    private void runIncrementalVacuum() throws SQLException {
+        try (java.sql.Statement statement = connection.createStatement()) {
+            boolean hasRows = statement.execute("PRAGMA incremental_vacuum(512)");
+            while (true) {
+                if (hasRows) {
+                    try (ResultSet rows = statement.getResultSet()) {
+                        while (rows.next()) {
+                            // The pragma's rows are informational only.
+                        }
+                    }
+                } else if (statement.getUpdateCount() == -1) {
+                    return;
+                }
+                hasRows = statement.getMoreResults();
+            }
+        }
     }
 
     /** Exact receipt and event readback after an uncertain maintenance commit. */
