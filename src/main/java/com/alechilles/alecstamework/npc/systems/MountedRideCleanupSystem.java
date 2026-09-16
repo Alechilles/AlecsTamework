@@ -3,7 +3,6 @@ package com.alechilles.alecstamework.npc.systems;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
-import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.alechilles.alecstamework.npc.network.MountedRidePacketHandler;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
@@ -16,14 +15,11 @@ import com.hypixel.hytale.component.dependency.Order;
 import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
-import com.hypixel.hytale.protocol.AnimationSlot;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import com.hypixel.hytale.server.npc.role.Role;
-import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import com.hypixel.hytale.server.npc.systems.RoleSystems;
 import java.util.Set;
 import java.util.UUID;
@@ -187,30 +183,14 @@ public final class MountedRideCleanupSystem extends EntityTickingSystem<EntitySt
                                  @Nonnull NPCEntity npc,
                                  @Nonnull TameworkRideMountComponent mount,
                                  @Nonnull Store<EntityStore> store) {
-        Role role = npc.getRole();
-        if (role == null) {
-            return;
-        }
-        npc.playAnimation(mountRef, AnimationSlot.Movement, null, store);
-        if (!mount.getPreviousMotionController().isBlank()) {
-            role.setActiveMotionController(mountRef, npc, mount.getPreviousMotionController(), store);
-        }
-        applyState(role, mountRef, store, mount.getPreviousState(), mount.getPreviousSubState());
-    }
-
-    private void applyState(@Nonnull Role role,
-                            @Nonnull Ref<EntityStore> mountRef,
-                            @Nonnull Store<EntityStore> store,
-                            @Nonnull String state,
-                            @Nonnull String subState) {
-        StateSupport support = NpcSupportAccess.state(role, mountRef, store);
-        if (state.isBlank() || support == null) {
-            return;
-        }
-        if (support.getStateHelper() != null && support.getStateHelper().getStateIndex(state) == StateSupport.NO_STATE) {
-            return;
-        }
-        support.setState(mountRef, state, subState, store);
+        MountedNpcStateRestorer.restore(
+                mountRef,
+                npc,
+                mount.getPreviousMotionController(),
+                mount.getPreviousState(),
+                mount.getPreviousSubState(),
+                store
+        );
     }
 
     @Nonnull

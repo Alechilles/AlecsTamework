@@ -43,11 +43,10 @@ final class AvatarFlightAbilityAudioService {
     private void play(@Nonnull String soundEventId,
                       @Nonnull Vector3d position,
                       @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
-        playbackSink.play(
+        AvatarFlightAudioPlayback.play(
+                playbackSink,
                 soundEventId,
-                position.x,
-                position.y,
-                position.z,
+                position,
                 1.0F,
                 1.0F,
                 componentAccessor
@@ -55,13 +54,6 @@ final class AvatarFlightAbilityAudioService {
     }
 
     @FunctionalInterface
-    interface PlaybackSink {
-        boolean play(@Nonnull String soundEventId,
-                     double x,
-                     double y,
-                     double z,
-                     float volume,
-                     float pitch,
-                     @Nonnull ComponentAccessor<EntityStore> componentAccessor);
+    interface PlaybackSink extends AvatarFlightAudioPlayback.PlaybackSink {
     }
 }

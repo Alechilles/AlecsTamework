@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideRiderComponent;
-import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
 import com.hypixel.hytale.builtin.mounts.MountPlugin;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
@@ -23,7 +22,6 @@ import com.hypixel.hytale.server.core.modules.entity.component.Interactable;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
-import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import com.hypixel.hytale.server.npc.systems.RoleChangeSystem;
 import com.hypixel.hytale.server.npc.systems.RoleSystems;
 import java.util.Set;
@@ -175,8 +173,8 @@ public final class MountedGlideCleanupSystem extends EntityTickingSystem<EntityS
         if (role == null) {
             return;
         }
-        npc.playAnimation(mountRef, AnimationSlot.Movement, null, store);
         if (nativeMount != null) {
+            npc.playAnimation(mountRef, AnimationSlot.Movement, null, store);
             String state = mount.getPreviousState().isBlank() ? "Idle" : mount.getPreviousState();
             String subState = mount.getPreviousSubState().isBlank() ? null : mount.getPreviousSubState();
             RoleChangeSystem.requestRoleChange(
@@ -197,30 +195,14 @@ public final class MountedGlideCleanupSystem extends EntityTickingSystem<EntityS
                                  @Nonnull NPCEntity npc,
                                  @Nonnull TameworkMountedGlideComponent mount,
                                  @Nonnull Store<EntityStore> store) {
-        Role role = npc.getRole();
-        if (role == null) {
-            return;
-        }
-        npc.playAnimation(mountRef, AnimationSlot.Movement, null, store);
-        if (!mount.getPreviousMotionController().isBlank()) {
-            role.setActiveMotionController(mountRef, npc, mount.getPreviousMotionController(), store);
-        }
-        applyState(role, mountRef, store, mount.getPreviousState(), mount.getPreviousSubState());
-    }
-
-    private void applyState(@Nonnull Role role,
-                            @Nonnull Ref<EntityStore> mountRef,
-                            @Nonnull Store<EntityStore> store,
-                            @Nonnull String state,
-                            @Nonnull String subState) {
-        StateSupport support = NpcSupportAccess.state(role, mountRef, store);
-        if (state.isBlank() || support == null) {
-            return;
-        }
-        if (support.getStateHelper() != null && support.getStateHelper().getStateIndex(state) == StateSupport.NO_STATE) {
-            return;
-        }
-        support.setState(mountRef, state, subState, store);
+        MountedNpcStateRestorer.restore(
+                mountRef,
+                npc,
+                mount.getPreviousMotionController(),
+                mount.getPreviousState(),
+                mount.getPreviousSubState(),
+                store
+        );
     }
 
     @Nonnull

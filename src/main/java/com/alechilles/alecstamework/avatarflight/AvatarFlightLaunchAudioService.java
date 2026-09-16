@@ -15,9 +15,7 @@ import org.joml.Vector3d;
 public final class AvatarFlightLaunchAudioService {
 
     @FunctionalInterface
-    interface PlaybackSink {
-        boolean play(String soundEventId, double x, double y, double z, float volume, float pitch,
-                     ComponentAccessor<EntityStore> componentAccessor);
+    interface PlaybackSink extends AvatarFlightAudioPlayback.PlaybackSink {
     }
 
     private final PlaybackSink playbackSink;
@@ -120,8 +118,14 @@ public final class AvatarFlightLaunchAudioService {
                       float volume,
                       float pitch,
                       @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
-        if (soundEventId.isBlank()) return;
-        playbackSink.play(soundEventId, position.x, position.y, position.z, volume, pitch, componentAccessor);
+        AvatarFlightAudioPlayback.play(
+                playbackSink,
+                soundEventId,
+                position,
+                volume,
+                pitch,
+                componentAccessor
+        );
     }
 
     private static boolean isPulseDue(@Nonnull AvatarFlightComponent flight, long nowMs) {

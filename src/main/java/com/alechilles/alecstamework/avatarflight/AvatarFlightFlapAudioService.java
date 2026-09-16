@@ -57,11 +57,10 @@ final class AvatarFlightFlapAudioService {
         if (now < flight.getNextFlightFlapAudioAtMs()) return;
 
         Vector3d position = transform.getPosition();
-        playbackSink.play(
+        AvatarFlightAudioPlayback.play(
+                playbackSink,
                 soundEventId,
-                position.x,
-                position.y,
-                position.z,
+                position,
                 1.0F,
                 1.0F,
                 componentAccessor
@@ -76,13 +75,6 @@ final class AvatarFlightFlapAudioService {
     }
 
     @FunctionalInterface
-    interface PlaybackSink {
-        boolean play(@Nonnull String soundEventId,
-                     double x,
-                     double y,
-                     double z,
-                     float volume,
-                     float pitch,
-                     @Nonnull ComponentAccessor<EntityStore> componentAccessor);
+    interface PlaybackSink extends AvatarFlightAudioPlayback.PlaybackSink {
     }
 }
