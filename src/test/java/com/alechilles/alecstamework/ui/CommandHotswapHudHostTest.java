@@ -47,6 +47,7 @@ class CommandHotswapHudHostTest {
         assertEquals(1, controller.updates.get());
         CustomHud updatePacket = assertInstanceOf(CustomHud.class, packets.lastPacket);
         assertEquals(CommandHotswapHudHost.HUD_KEY, updatePacket.hudId);
+        assertEquals(1, updatePacket.zOrder);
         assertFalse(updatePacket.clear);
     }
 

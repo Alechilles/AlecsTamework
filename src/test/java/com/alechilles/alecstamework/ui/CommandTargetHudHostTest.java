@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies fixed-key target HUD hosting and controller failure isolation. */
@@ -51,7 +52,54 @@ class CommandTargetHudHostTest {
         assertEquals(1, controller.updates.get());
         CustomHud updatePacket = assertInstanceOf(CustomHud.class, packets.lastPacket);
         assertEquals(CommandTargetHudHost.HUD_KEY, updatePacket.hudId);
+        assertEquals(0, updatePacket.zOrder);
         assertFalse(updatePacket.clear);
+    }
+
+    @Test
+    void rejectedInitialGateDoesNotBuildOrSendAndReportsFailureOnce() {
+        CapturingPacketHandler packets = new CapturingPacketHandler();
+        PlayerRef playerRef = new PlayerRef(
+                null, UUID.randomUUID(), "HudTester", "en-US", packets, null);
+        RecordingController controller = new RecordingController();
+        AtomicInteger failures = new AtomicInteger();
+        CommandTargetHudHost host = new CommandTargetHudHost(
+                playerRef, new CommandHudOpenContext(), controller,
+                new CommandTargetHudView(snapshot(1), null),
+                (phase, failure) -> failures.incrementAndGet(),
+                update -> { update.run(); return true; },
+                (build, update) -> false);
+
+        host.show();
+        host.show();
+
+        assertFalse(host.isOpen());
+        assertEquals(1, failures.get());
+        assertEquals(0, controller.initialBuilds.get());
+        assertNull(packets.lastPacket);
+    }
+
+    @Test
+    void rejectedUpdateGateDoesNotSendRenderedUpdate() {
+        CapturingPacketHandler packets = new CapturingPacketHandler();
+        PlayerRef playerRef = new PlayerRef(
+                null, UUID.randomUUID(), "HudTester", "en-US", packets, null);
+        RecordingController controller = new RecordingController();
+        CommandTargetHudHost host = new CommandTargetHudHost(
+                playerRef, new CommandHudOpenContext(), controller,
+                new CommandTargetHudView(snapshot(1), null),
+                (phase, failure) -> { }, update -> false);
+        host.build(new UICommandBuilder());
+
+        boolean sent = host.applyUpdate(new CommandTargetHudUpdate(
+                new CommandTargetHudView(snapshot(2), null),
+                new CommandTargetHudView(snapshot(1), null),
+                com.alechilles.alecstamework.api.commandhud.CommandTargetHudChangeSet.full()));
+
+        assertFalse(sent);
+        assertTrue(host.isOpen());
+        assertEquals(1, controller.updates.get());
+        assertNull(packets.lastPacket);
     }
 
     @Test
