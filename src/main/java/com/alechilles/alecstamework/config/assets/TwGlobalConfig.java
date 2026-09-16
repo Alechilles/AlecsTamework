@@ -516,8 +516,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
             .build();
 
     private static AssetStore<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> ASSET_STORE;
-    private static final Object INHERITANCE_CACHE_LOCK = new Object();
-    private static volatile boolean INHERITANCE_CACHE_DIRTY = true;
+    private static final TwAssetInheritanceGate INHERITANCE_GATE = new TwAssetInheritanceGate();
     private static final Object CACHE_LOCK = new Object();
     private static volatile boolean CACHE_DIRTY = true;
     private static volatile TwGlobalConfig ACTIVE_CONFIG;
@@ -595,7 +594,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
 
     // Clears the cached active global config.
     public static void clearCache() {
-        INHERITANCE_CACHE_DIRTY = true;
+        INHERITANCE_GATE.markDirty();
         CACHE_DIRTY = true;
     }
 
@@ -768,16 +767,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     }
 
     private static void ensureInheritanceFallbackApplied(@Nullable DefaultAssetMap<String, TwGlobalConfig> assetMap) {
-        if (!INHERITANCE_CACHE_DIRTY || assetMap == null || assetMap.getAssetMap() == null) {
-            return;
-        }
-        synchronized (INHERITANCE_CACHE_LOCK) {
-            if (!INHERITANCE_CACHE_DIRTY || assetMap.getAssetMap() == null) {
-                return;
-            }
-            TwAssetInheritanceFallback.repairAll(assetMap);
-            INHERITANCE_CACHE_DIRTY = false;
-        }
+        INHERITANCE_GATE.repairIfDirty(assetMap);
     }
 
     protected TwGlobalConfig() {

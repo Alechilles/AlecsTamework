@@ -96,8 +96,7 @@ public class TwNamesConfig implements JsonAssetWithMap<String, DefaultAssetMap<S
                     .build();
 
     private static AssetStore<String, TwNamesConfig, DefaultAssetMap<String, TwNamesConfig>> ASSET_STORE;
-    private static final Object INHERITANCE_CACHE_LOCK = new Object();
-    private static volatile boolean INHERITANCE_CACHE_DIRTY = true;
+    private static final TwAssetInheritanceGate INHERITANCE_GATE = new TwAssetInheritanceGate();
 
     private AssetExtraInfo.Data data;
     private String id;
@@ -129,7 +128,7 @@ public class TwNamesConfig implements JsonAssetWithMap<String, DefaultAssetMap<S
     }
 
     public static void clearInheritanceFallbackCache() {
-        INHERITANCE_CACHE_DIRTY = true;
+        INHERITANCE_GATE.markDirty();
     }
 
     @Nonnull
@@ -154,16 +153,7 @@ public class TwNamesConfig implements JsonAssetWithMap<String, DefaultAssetMap<S
     }
 
     private static void ensureInheritanceFallbackApplied(@Nullable DefaultAssetMap<String, TwNamesConfig> assetMap) {
-        if (!INHERITANCE_CACHE_DIRTY || assetMap == null || assetMap.getAssetMap() == null) {
-            return;
-        }
-        synchronized (INHERITANCE_CACHE_LOCK) {
-            if (!INHERITANCE_CACHE_DIRTY || assetMap.getAssetMap() == null) {
-                return;
-            }
-            TwAssetInheritanceFallback.repairAll(assetMap);
-            INHERITANCE_CACHE_DIRTY = false;
-        }
+        INHERITANCE_GATE.repairIfDirty(assetMap);
     }
 
     protected TwNamesConfig() {

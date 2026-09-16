@@ -273,8 +273,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         .build();
 
     private static AssetStore<String, TwSpawnerConfig, DefaultAssetMap<String, TwSpawnerConfig>> ASSET_STORE;
-    private static final Object INHERITANCE_CACHE_LOCK = new Object();
-    private static volatile boolean INHERITANCE_CACHE_DIRTY = true;
+    private static final TwAssetInheritanceGate INHERITANCE_GATE = new TwAssetInheritanceGate();
 
     private AssetExtraInfo.Data data;
     private String id;
@@ -306,21 +305,12 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
     }
 
     public static void clearInheritanceFallbackCache() {
-        INHERITANCE_CACHE_DIRTY = true;
+        INHERITANCE_GATE.markDirty();
     }
 
     private static void ensureInheritanceFallbackApplied(
             @Nullable DefaultAssetMap<String, TwSpawnerConfig> assetMap) {
-        if (!INHERITANCE_CACHE_DIRTY || assetMap == null || assetMap.getAssetMap() == null) {
-            return;
-        }
-        synchronized (INHERITANCE_CACHE_LOCK) {
-            if (!INHERITANCE_CACHE_DIRTY || assetMap.getAssetMap() == null) {
-                return;
-            }
-            TwAssetInheritanceFallback.repairAll(assetMap);
-            INHERITANCE_CACHE_DIRTY = false;
-        }
+        INHERITANCE_GATE.repairIfDirty(assetMap);
     }
 
     protected TwSpawnerConfig() {

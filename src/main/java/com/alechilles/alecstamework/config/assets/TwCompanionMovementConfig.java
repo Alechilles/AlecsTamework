@@ -31,8 +31,7 @@ public final class TwCompanionMovementConfig
 
     private static AssetStore<String, TwCompanionMovementConfig,
             DefaultAssetMap<String, TwCompanionMovementConfig>> ASSET_STORE;
-    private static final Object INHERITANCE_CACHE_LOCK = new Object();
-    private static volatile boolean INHERITANCE_CACHE_DIRTY = true;
+    private static final TwAssetInheritanceGate INHERITANCE_GATE = new TwAssetInheritanceGate();
     private static final Object ROLE_CACHE_LOCK = new Object();
     private static volatile boolean ROLE_CACHE_DIRTY = true;
     private static volatile Map<String, ResolvedMovement> ROLE_CACHE = Map.of();
@@ -72,7 +71,7 @@ public final class TwCompanionMovementConfig
     }
 
     public static void clearRoleCache() {
-        INHERITANCE_CACHE_DIRTY = true;
+        INHERITANCE_GATE.markDirty();
         ROLE_CACHE_DIRTY = true;
     }
 
@@ -162,16 +161,7 @@ public final class TwCompanionMovementConfig
 
     private static void ensureInheritanceFallbackApplied(
             @Nullable DefaultAssetMap<String, TwCompanionMovementConfig> assetMap) {
-        if (!INHERITANCE_CACHE_DIRTY || assetMap == null || assetMap.getAssetMap() == null) {
-            return;
-        }
-        synchronized (INHERITANCE_CACHE_LOCK) {
-            if (!INHERITANCE_CACHE_DIRTY || assetMap.getAssetMap() == null) {
-                return;
-            }
-            TwAssetInheritanceFallback.repairAll(assetMap);
-            INHERITANCE_CACHE_DIRTY = false;
-        }
+        INHERITANCE_GATE.repairIfDirty(assetMap);
     }
 
     @Override

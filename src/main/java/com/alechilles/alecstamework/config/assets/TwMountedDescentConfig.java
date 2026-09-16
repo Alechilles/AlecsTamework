@@ -31,8 +31,7 @@ public final class TwMountedDescentConfig
 
     private static AssetStore<String, TwMountedDescentConfig,
             DefaultAssetMap<String, TwMountedDescentConfig>> ASSET_STORE;
-    private static final Object INHERITANCE_CACHE_LOCK = new Object();
-    private static volatile boolean INHERITANCE_CACHE_DIRTY = true;
+    private static final TwAssetInheritanceGate INHERITANCE_GATE = new TwAssetInheritanceGate();
     private static final Object PROFILE_CACHE_LOCK = new Object();
     private static volatile boolean PROFILE_CACHE_DIRTY = true;
     private static volatile Map<String, NativeMountedDescentPhysics.Settings> PROFILE_CACHE = Map.of();
@@ -69,7 +68,7 @@ public final class TwMountedDescentConfig
 
     /** Clears cached profile selection after an asset load, removal, or reload. */
     public static void clearProfileCache() {
-        INHERITANCE_CACHE_DIRTY = true;
+        INHERITANCE_GATE.markDirty();
         PROFILE_CACHE_DIRTY = true;
     }
 
@@ -132,16 +131,7 @@ public final class TwMountedDescentConfig
 
     private static void ensureInheritanceFallbackApplied(
             @Nullable DefaultAssetMap<String, TwMountedDescentConfig> assetMap) {
-        if (!INHERITANCE_CACHE_DIRTY || assetMap == null || assetMap.getAssetMap() == null) {
-            return;
-        }
-        synchronized (INHERITANCE_CACHE_LOCK) {
-            if (!INHERITANCE_CACHE_DIRTY || assetMap.getAssetMap() == null) {
-                return;
-            }
-            TwAssetInheritanceFallback.repairAll(assetMap);
-            INHERITANCE_CACHE_DIRTY = false;
-        }
+        INHERITANCE_GATE.repairIfDirty(assetMap);
     }
 
     @Override

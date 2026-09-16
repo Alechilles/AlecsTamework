@@ -149,8 +149,7 @@ public final class TwAttachmentDisplayConfig
             .build();
 
     private static AssetStore<String, TwAttachmentDisplayConfig, DefaultAssetMap<String, TwAttachmentDisplayConfig>> ASSET_STORE;
-    private static final Object INHERITANCE_CACHE_LOCK = new Object();
-    private static volatile boolean INHERITANCE_CACHE_DIRTY = true;
+    private static final TwAssetInheritanceGate INHERITANCE_GATE = new TwAssetInheritanceGate();
 
     private AssetExtraInfo.Data data;
     private String id;
@@ -180,7 +179,7 @@ public final class TwAttachmentDisplayConfig
     }
 
     public static void clearInheritanceFallbackCache() {
-        INHERITANCE_CACHE_DIRTY = true;
+        INHERITANCE_GATE.markDirty();
     }
 
     public static void clearCache() {
@@ -189,16 +188,7 @@ public final class TwAttachmentDisplayConfig
 
     private static void ensureInheritanceFallbackApplied(
             @Nullable DefaultAssetMap<String, TwAttachmentDisplayConfig> assetMap) {
-        if (!INHERITANCE_CACHE_DIRTY || assetMap == null || assetMap.getAssetMap() == null) {
-            return;
-        }
-        synchronized (INHERITANCE_CACHE_LOCK) {
-            if (!INHERITANCE_CACHE_DIRTY) {
-                return;
-            }
-            TwAssetInheritanceFallback.repairAll(assetMap);
-            INHERITANCE_CACHE_DIRTY = false;
-        }
+        INHERITANCE_GATE.repairIfDirty(assetMap);
     }
 
     @Override

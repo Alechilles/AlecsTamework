@@ -11,11 +11,10 @@ import javax.annotation.Nullable;
  */
 final class TwAvatarFlightConfigRegistry {
     private static final Object CACHE_LOCK = new Object();
-    private static final Object INHERITANCE_CACHE_LOCK = new Object();
+    private static final TwAssetInheritanceGate INHERITANCE_GATE = new TwAssetInheritanceGate();
 
     private static AssetStore<String, TwAvatarFlightConfig, DefaultAssetMap<String, TwAvatarFlightConfig>> assetStore;
     private static volatile boolean cacheDirty = true;
-    private static volatile boolean inheritanceCacheDirty = true;
     private static volatile TwAvatarFlightConfig activeConfig;
 
     private TwAvatarFlightConfigRegistry() {
@@ -41,7 +40,7 @@ final class TwAvatarFlightConfigRegistry {
 
     static void clearCache() {
         cacheDirty = true;
-        inheritanceCacheDirty = true;
+        INHERITANCE_GATE.markDirty();
     }
 
     @Nonnull
@@ -93,12 +92,7 @@ final class TwAvatarFlightConfigRegistry {
     }
 
     private static void ensureInheritanceFallbackApplied(@Nullable DefaultAssetMap<String, TwAvatarFlightConfig> assetMap) {
-        if (!inheritanceCacheDirty || assetMap == null || assetMap.getAssetMap() == null) return;
-        synchronized (INHERITANCE_CACHE_LOCK) {
-            if (!inheritanceCacheDirty || assetMap.getAssetMap() == null) return;
-            TwAssetInheritanceFallback.repairAll(assetMap);
-            inheritanceCacheDirty = false;
-        }
+        INHERITANCE_GATE.repairIfDirty(assetMap);
     }
 
     private static String safe(@Nullable String value) {

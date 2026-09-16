@@ -296,8 +296,7 @@ public final class TwManagedActivityConfig
             TwManagedActivityConfig,
             DefaultAssetMap<String, TwManagedActivityConfig>
             > assetStore;
-    private static final Object INHERITANCE_CACHE_LOCK = new Object();
-    private static volatile boolean inheritanceCacheDirty = true;
+    private static final TwAssetInheritanceGate INHERITANCE_GATE = new TwAssetInheritanceGate();
 
     private AssetExtraInfo.Data data;
     private String id;
@@ -347,22 +346,13 @@ public final class TwManagedActivityConfig
     }
 
     public static void clearInheritanceFallbackCache() {
-        inheritanceCacheDirty = true;
+        INHERITANCE_GATE.markDirty();
     }
 
     private static void ensureInheritanceFallbackApplied(
             @Nullable DefaultAssetMap<String, TwManagedActivityConfig> map
     ) {
-        if (!inheritanceCacheDirty || map == null || map.getAssetMap() == null) {
-            return;
-        }
-        synchronized (INHERITANCE_CACHE_LOCK) {
-            if (!inheritanceCacheDirty || map.getAssetMap() == null) {
-                return;
-            }
-            TwAssetInheritanceFallback.repairAll(map);
-            inheritanceCacheDirty = false;
-        }
+        INHERITANCE_GATE.repairIfDirty(map);
     }
 
     @Override

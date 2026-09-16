@@ -304,32 +304,15 @@ public final class SimpleClaimsDamageAdapterMatrix {
     /** Installs one deterministic TwGlobalConfig for both adapter calls. */
     public static final class GlobalConfigScope implements AutoCloseable {
         private final Object oldStore;
-        private final Object oldActive;
-        private final boolean oldCacheDirty;
-        private final boolean oldInheritanceDirty;
 
-        private GlobalConfigScope(Object oldStore,
-                                  Object oldActive,
-                                  boolean oldCacheDirty,
-                                  boolean oldInheritanceDirty) {
+        private GlobalConfigScope(Object oldStore) {
             this.oldStore = oldStore;
-            this.oldActive = oldActive;
-            this.oldCacheDirty = oldCacheDirty;
-            this.oldInheritanceDirty = oldInheritanceDirty;
         }
 
         @Nonnull
         public static GlobalConfigScope install(@Nonnull Scenario scenario) throws Exception {
             Field storeField = staticField(TwGlobalConfig.class, "ASSET_STORE");
-            Field activeField = staticField(TwGlobalConfig.class, "ACTIVE_CONFIG");
-            Field dirtyField = staticField(TwGlobalConfig.class, "CACHE_DIRTY");
-            Field inheritanceDirtyField = staticField(TwGlobalConfig.class, "INHERITANCE_CACHE_DIRTY");
-            GlobalConfigScope scope = new GlobalConfigScope(
-                    storeField.get(null),
-                    activeField.get(null),
-                    dirtyField.getBoolean(null),
-                    inheritanceDirtyField.getBoolean(null)
-            );
+            GlobalConfigScope scope = new GlobalConfigScope(storeField.get(null));
 
             TwGlobalConfig config = TwGlobalConfig.defaultConfig();
             setField(config, "id", "Damage_Adapter_Matrix");
@@ -345,19 +328,14 @@ public final class SimpleClaimsDamageAdapterMatrix {
             AssetStore<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> store =
                     new TestTwGlobalAssetStore(map);
             storeField.set(null, store);
-            activeField.set(null, null);
-            dirtyField.setBoolean(null, true);
-            inheritanceDirtyField.setBoolean(null, true);
+            TwGlobalConfig.clearCache();
             return scope;
         }
 
         @Override
         public void close() throws Exception {
             staticField(TwGlobalConfig.class, "ASSET_STORE").set(null, oldStore);
-            staticField(TwGlobalConfig.class, "ACTIVE_CONFIG").set(null, oldActive);
-            staticField(TwGlobalConfig.class, "CACHE_DIRTY").setBoolean(null, oldCacheDirty);
-            staticField(TwGlobalConfig.class, "INHERITANCE_CACHE_DIRTY")
-                    .setBoolean(null, oldInheritanceDirty);
+            TwGlobalConfig.clearCache();
         }
     }
 

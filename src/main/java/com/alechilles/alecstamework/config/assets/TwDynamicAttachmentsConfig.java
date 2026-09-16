@@ -197,8 +197,7 @@ public final class TwDynamicAttachmentsConfig
 
     private static AssetStore<String, TwDynamicAttachmentsConfig, DefaultAssetMap<String, TwDynamicAttachmentsConfig>>
             ASSET_STORE;
-    private static final Object INHERITANCE_CACHE_LOCK = new Object();
-    private static volatile boolean INHERITANCE_CACHE_DIRTY = true;
+    private static final TwAssetInheritanceGate INHERITANCE_GATE = new TwAssetInheritanceGate();
     private static final Object ROLE_RULE_INDEX_LOCK = new Object();
     private static volatile boolean ROLE_RULE_INDEX_DIRTY = true;
     private static volatile Map<String, List<RoleRuleEntry>> ROLE_RULE_INDEX = Map.of();
@@ -232,7 +231,7 @@ public final class TwDynamicAttachmentsConfig
     }
 
     public static void clearRoleRuleIndexCache() {
-        INHERITANCE_CACHE_DIRTY = true;
+        INHERITANCE_GATE.markDirty();
         ROLE_RULE_INDEX_DIRTY = true;
     }
 
@@ -301,16 +300,7 @@ public final class TwDynamicAttachmentsConfig
 
     private static void ensureInheritanceFallbackApplied(
             @Nullable DefaultAssetMap<String, TwDynamicAttachmentsConfig> assetMap) {
-        if (!INHERITANCE_CACHE_DIRTY || assetMap == null || assetMap.getAssetMap() == null) {
-            return;
-        }
-        synchronized (INHERITANCE_CACHE_LOCK) {
-            if (!INHERITANCE_CACHE_DIRTY || assetMap.getAssetMap() == null) {
-                return;
-            }
-            TwAssetInheritanceFallback.repairAll(assetMap);
-            INHERITANCE_CACHE_DIRTY = false;
-        }
+        INHERITANCE_GATE.repairIfDirty(assetMap);
     }
 
     @Nonnull

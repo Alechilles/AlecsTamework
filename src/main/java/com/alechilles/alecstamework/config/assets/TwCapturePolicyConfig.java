@@ -110,8 +110,7 @@ public final class TwCapturePolicyConfig
             .build();
 
     private static AssetStore<String, TwCapturePolicyConfig, DefaultAssetMap<String, TwCapturePolicyConfig>> ASSET_STORE;
-    private static final Object INHERITANCE_CACHE_LOCK = new Object();
-    private static volatile boolean INHERITANCE_CACHE_DIRTY = true;
+    private static final TwAssetInheritanceGate INHERITANCE_GATE = new TwAssetInheritanceGate();
 
     private AssetExtraInfo.Data data;
     private String id;
@@ -140,16 +139,11 @@ public final class TwCapturePolicyConfig
     }
 
     public static void clearInheritanceFallbackCache() {
-        INHERITANCE_CACHE_DIRTY = true;
+        INHERITANCE_GATE.markDirty();
     }
 
     private static void ensureInheritanceFallbackApplied(@Nullable DefaultAssetMap<String, TwCapturePolicyConfig> map) {
-        if (!INHERITANCE_CACHE_DIRTY || map == null || map.getAssetMap() == null) return;
-        synchronized (INHERITANCE_CACHE_LOCK) {
-            if (!INHERITANCE_CACHE_DIRTY || map.getAssetMap() == null) return;
-            TwAssetInheritanceFallback.repairAll(map);
-            INHERITANCE_CACHE_DIRTY = false;
-        }
+        INHERITANCE_GATE.repairIfDirty(map);
     }
 
     @Override
