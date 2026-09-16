@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.persistence.runtime;
 
+import com.alechilles.alecstamework.persistence.control.PersistenceReadinessLevel;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteDatabaseCompactionResult;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteKernelShutdownReport;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePersistenceKernel;
@@ -51,7 +53,7 @@ final class PublicPersistenceRuntimeState {
     private PublicPersistenceWorldReconciliation worldReconciliation;
     private SqlitePublicCanonicalSnapshot canonical;
     private boolean worldQuiesced;
-    private boolean shutdownStarted;
+    private volatile boolean shutdownStarted;
     private SqliteKernelShutdownReport lastKernelShutdown;
     private PublicPersistenceShutdownReport terminalShutdown;
 
@@ -72,6 +74,7 @@ final class PublicPersistenceRuntimeState {
                 configuration.liveBoundaries(),
                 workflows
         );
+        operations.bindMaintenance(this::compactDatabase);
         queries = new PublicPersistenceQueries(this::requireCanonicalAdapter);
     }
 
@@ -223,6 +226,43 @@ final class PublicPersistenceRuntimeState {
         return requireAdapter().diagnostics().thenApply(
                 diagnostics::assemble
         );
+    }
+
+    private synchronized CompletionStage<SqliteDatabaseCompactionResult>
+    compactDatabase() {
+        if (shutdownStarted || kernel == null || !startup.report().complete()
+                || startup.report().readiness() != PersistenceReadinessLevel.MUTATION_READY) {
+            return CompletableFuture.failedFuture(new IllegalStateException("database_maintenance_not_ready"));
+        }
+        final CompletionStage<Void> drained;
+        synchronized (operations) {
+            try {
+                operations.pauseMaintenance();
+            } catch (IllegalStateException busy) {
+                return CompletableFuture.failedFuture(busy);
+            }
+            control.pauseMaintenance(true);
+            drained = workflows.beginMaintenance();
+        }
+        return drained.toCompletableFuture().orTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                .thenCompose(ignored -> {
+                    if (shutdownStarted) {
+                        return CompletableFuture.failedFuture(new IllegalStateException("database_maintenance_shutdown"));
+                    }
+                    return kernel.compactDatabase(configuration.clock().getAsLong());
+                }).whenComplete((result, failure) -> {
+                    try {
+                        if (failure != null) control.maintenanceFailed(failure);
+                    } finally {
+                        CompletableFuture<Void> resumed;
+                        synchronized (operations) {
+                            workflows.endMaintenance();
+                            control.pauseMaintenance(false);
+                            resumed = operations.resumeMaintenance();
+                        }
+                        resumed.complete(null);
+                    }
+                });
     }
 
     synchronized PublicPersistenceShutdownReport shutdown(Duration timeout) {

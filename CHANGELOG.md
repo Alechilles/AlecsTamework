@@ -4,6 +4,9 @@
 
 - Reduced database growth from repeated entity checkpoints by compacting old,
   consumed checkpoint history while preserving current saves and retry safety.
+- Added `/tw debug persistence compact` to reclaim database disk space while the
+  server stays online, temporarily pausing Tamework saves during maintenance.
+  New and compacted databases also reclaim space incrementally.
 
 ## 4.0.0 - Companion Commands, Formations, and Localization - 2026-09-14
 

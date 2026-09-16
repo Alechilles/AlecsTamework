@@ -66,6 +66,7 @@ public final class TameworkDebugPersistenceCommand extends AbstractCommandCollec
                 persistenceQueries, persistenceOperations
         ));
         addSubCommand(new TameworkDebugPersistenceFailureCommand(failureSink));
+        addSubCommand(new TameworkDebugCompactDatabaseCommand(persistenceOperations));
     }
 
     private TameworkDebugDbCommand diagnostic(

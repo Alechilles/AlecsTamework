@@ -103,6 +103,18 @@ public final class SqlitePersistenceKernel implements AutoCloseable {
         return units;
     }
 
+    /** Queues physical compaction after runtime admission has paused and workflows drained. */
+    @Nonnull
+    public CompletionStage<SqliteDatabaseCompactionResult> compactDatabase(long nowMs) {
+        return writer.compactDatabase(nowMs).completion().thenCompose(result -> {
+            if (result instanceof com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult.Committed<SqliteDatabaseCompactionResult> committed) {
+                return java.util.concurrent.CompletableFuture.completedFuture(committed.value());
+            }
+            return java.util.concurrent.CompletableFuture.failedFuture(
+                    new IllegalStateException("database_maintenance_writer_unavailable"));
+        });
+    }
+
     /** Stops admission and closes components in writer, checkpoint, then read order. */
     @Nonnull
     public synchronized SqliteKernelShutdownReport shutdown(@Nonnull Duration timeout) {

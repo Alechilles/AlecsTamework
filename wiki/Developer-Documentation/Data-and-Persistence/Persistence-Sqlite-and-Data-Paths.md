@@ -60,11 +60,23 @@ discard their large operation payload and consumed outbox event after the
 extension index acknowledges them. Incomplete operations, active quarantine,
 public extension data, and other operation families keep their evidence.
 
-Cleanup runs in bounded batches as new checkpoints publish. Existing databases
-gradually gain reusable free pages; their file size does not shrink automatically.
-Returning those pages to disk requires an offline SQLite `VACUUM` after cleanup,
-with the server stopped and a complete backup retained. Small retry records still
-accumulate, so this reduces growth rather than imposing a fixed database-size cap.
+Cleanup runs in bounded batches as new checkpoints publish. To reclaim existing
+file space, an administrator can run `/tw debug persistence compact` on the running
+server. This temporarily pauses Tamework saves and companion mutations, drains
+accepted work, removes eligible history, and rebuilds the database. Automatic
+profile snapshots and unload checkpoints wait in their existing save coordinators
+and resume afterward. Completion
+reports the before/after disk usage. Allow several minutes for large databases and
+up to twice the database size in additional free disk space. Keep a current backup.
+
+If work cannot drain, unfinished operations remain, or a reader blocks the final
+WAL checkpoint, the command reports failure in the server log; retry after the
+cause clears. Database integrity failures keep mutations blocked. Avoid stopping
+the server during maintenance.
+
+The command also enables incremental vacuum. New databases already enable it, so
+later checkpoint cleanup returns free pages in small batches. Small retry records
+still accumulate; this reduces growth rather than imposing a fixed size cap.
 
 ## Dormant transitions require positive evidence
 

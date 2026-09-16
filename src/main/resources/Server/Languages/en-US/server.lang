@@ -1314,6 +1314,11 @@ tamework.commands.debugNeedsTelemetry.tamework.plugin.not.available=Tamework plu
 tamework.commands.debugNeedsTelemetry.tamework.needs.telemetry.context.events=Tamework needs telemetry context events: {0}
 tamework.commands.debugNeedsTelemetry.description=Toggle Tamework needs telemetry context events.
 tamework.commands.debugPersistence.description=Tamework persistence diagnostics.
+tamework.commands.debugCompactDatabase.description=Compact retained persistence history and reclaim disk space.
+tamework.commands.debugCompactDatabase.persistence.runtime.is.not.available=Database maintenance is not available.
+tamework.commands.debugCompactDatabase.maintenance.started=Database maintenance started. Persistence-dependent actions are paused while maintenance runs; the server stays online.
+tamework.commands.debugCompactDatabase.maintenance.completed=Database maintenance completed: {0} MiB before, {1} MiB after; compacted {2} operations.
+tamework.commands.debugCompactDatabase.maintenance.failed.see.server.log=Database maintenance failed. Persistence may remain paused; check the server log.
 tamework.commands.debugPersistenceFailure.persistence.diagnostics.are.not.initialized=Persistence diagnostics are not initialized.
 tamework.commands.debugPersistenceFailure.synthetic.persistence.diagnostic.requested.token.no.persistence=Synthetic persistence diagnostic requested (token={0}). No persistence data was changed.
 tamework.commands.debugPersistenceFailure.synthetic.persistence.diagnostic.could.not.be.requested=Synthetic persistence diagnostic could not be requested.

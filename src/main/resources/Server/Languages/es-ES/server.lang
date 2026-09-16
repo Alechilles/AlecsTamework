@@ -1261,6 +1261,11 @@ tamework.commands.debugNeedsTelemetry.tamework.plugin.not.available=El complemen
 tamework.commands.debugNeedsTelemetry.tamework.needs.telemetry.context.events=Tamework necesita eventos de contexto de telemetría: {0}
 tamework.commands.debugNeedsTelemetry.description=Toggle Tamework necesita eventos de contexto de telemetría.
 tamework.commands.debugPersistence.description=Diagnóstico de persistencia de Tamework.
+tamework.commands.debugCompactDatabase.description=El mantenimiento de la base de datos compacta el historial de persistencia retenido y recupera espacio en disco.
+tamework.commands.debugCompactDatabase.persistence.runtime.is.not.available=El mantenimiento de la base de datos no está disponible.
+tamework.commands.debugCompactDatabase.maintenance.started=Mantenimiento iniciado. Las acciones que dependen de la persistencia se pausan mientras se ejecuta; el servidor sigue en línea.
+tamework.commands.debugCompactDatabase.maintenance.completed=Mantenimiento completado: {0} MiB antes, {1} MiB después; se compactaron {2} operaciones.
+tamework.commands.debugCompactDatabase.maintenance.failed.see.server.log=El mantenimiento de la base de datos falló. La persistencia puede permanecer pausada; consulta el registro del servidor.
 tamework.commands.debugPersistenceFailure.persistence.diagnostics.are.not.initialized=Los diagnósticos de persistencia no se inicializan.
 tamework.commands.debugPersistenceFailure.synthetic.persistence.diagnostic.requested.token.no.persistence=Se solicitó diagnóstico de persistencia sintética (token={0}). No se cambiaron datos de persistencia.
 tamework.commands.debugPersistenceFailure.synthetic.persistence.diagnostic.could.not.be.requested=No se pudo solicitar el diagnóstico de persistencia sintética.

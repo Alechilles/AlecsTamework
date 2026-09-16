@@ -1345,6 +1345,11 @@ tamework.commands.debugNeedsTelemetry.tamework.plugin.not.available=Le plugin Ta
 tamework.commands.debugNeedsTelemetry.tamework.needs.telemetry.context.events=Événements de contexte de télémétrie des besoins Tamework : {0}
 tamework.commands.debugNeedsTelemetry.description=Activer ou désactiver les événements de contexte de télémétrie des besoins Tamework.
 tamework.commands.debugPersistence.description=Diagnostics de persistance Tamework.
+tamework.commands.debugCompactDatabase.description=La maintenance de la base de données compacte l’historique de persistance conservé et récupère de l’espace disque.
+tamework.commands.debugCompactDatabase.persistence.runtime.is.not.available=La maintenance de la base de données n’est pas disponible.
+tamework.commands.debugCompactDatabase.maintenance.started=Maintenance démarrée. Les actions dépendantes de la persistance sont suspendues pendant la maintenance; le serveur reste en ligne.
+tamework.commands.debugCompactDatabase.maintenance.completed=Maintenance terminée : {0} Mio avant, {1} Mio après; {2} opérations compactées.
+tamework.commands.debugCompactDatabase.maintenance.failed.see.server.log=La maintenance de la base de données a échoué. La persistance peut rester suspendue; consultez le journal du serveur.
 tamework.commands.debugPersistenceFailure.persistence.diagnostics.are.not.initialized=Les diagnostics de persistance ne sont pas initialisés.
 tamework.commands.debugPersistenceFailure.synthetic.persistence.diagnostic.requested.token.no.persistence=Diagnostic de persistance synthétique demandé (token={0}). Aucune donnée de persistance n'a été modifiée.
 tamework.commands.debugPersistenceFailure.synthetic.persistence.diagnostic.could.not.be.requested=Le diagnostic de persistance synthétique n'a pas pu être demandé.

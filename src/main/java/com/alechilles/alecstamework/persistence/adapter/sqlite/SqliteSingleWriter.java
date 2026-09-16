@@ -75,6 +75,21 @@ public final class SqliteSingleWriter implements AutoCloseable {
     @Nonnull
     public <T> WriteSubmission<T> submit(@Nonnull SqliteTransactionCommand<T> command,
                                          @Nonnull PersistenceCancellation cancellation) {
+        return submit(command, cancellation, false);
+    }
+
+    /** Serialized physical maintenance; VACUUM must execute outside a transaction. */
+    WriteSubmission<SqliteDatabaseCompactionResult> compactDatabase(long nowMs) {
+        return submit(new SqliteTransactionCommand<>(
+                com.alechilles.alecstamework.persistence.operation.OperationId.create(),
+                new com.alechilles.alecstamework.persistence.operation.OperationKind("database_compaction"),
+                TransactionReplayPolicy.SAFE_DATABASE_ONLY,
+                connection -> SqliteDatabaseCompaction.run(connection, connections.databasePath(), nowMs)),
+                PersistenceCancellation.NONE, true);
+    }
+
+    private <T> WriteSubmission<T> submit(SqliteTransactionCommand<T> command,
+                                         PersistenceCancellation cancellation, boolean maintenance) {
         if (command == null || cancellation == null) {
             throw new IllegalArgumentException("Transaction command and cancellation are required");
         }
@@ -91,7 +106,7 @@ public final class SqliteSingleWriter implements AutoCloseable {
                         ? PersistenceWriteRejection.DRAINING
                         : PersistenceWriteRejection.CLOSED);
             }
-            Task<T> task = new Task<>(command);
+            Task<T> task = new Task<>(command, maintenance);
             if (!queue.offer(task)) {
                 return rejected(command, PersistenceWriteRejection.SATURATED);
             }
@@ -166,6 +181,10 @@ public final class SqliteSingleWriter implements AutoCloseable {
 
     private <T> void executeTask(Task<T> task) {
         active.set(task);
+        if (task.maintenance) {
+            executeMaintenance(task);
+            return;
+        }
         long executionStarted = System.nanoTime();
         long queueWait = Math.max(
                 0, executionStarted - task.acceptedAtNanos
@@ -187,6 +206,24 @@ public final class SqliteSingleWriter implements AutoCloseable {
         try {
             task.completion.complete(result);
             recordWriteCompleted(task.command, result);
+        } finally {
+            active.set(null);
+            outstanding.decrementAndGet();
+        }
+    }
+
+    private <T> void executeMaintenance(Task<T> task) {
+        try {
+            final T result;
+            try (Connection connection = connections.openWriterConnection()) {
+                result = task.command.work().execute(connection);
+            }
+            task.completion.complete(new PersistenceTransactionResult.Committed<>(result));
+        } catch (Throwable failure) {
+            // Cleanup may already have committed some batches. Do not call this a rollback
+            // or retry physical maintenance as an unknown canonical operation.
+            task.completion.completeExceptionally(failure);
+            recordCheckpointFailure(PersistenceCheckpoint.CLOSE, failure);
         } finally {
             active.set(null);
             outstanding.decrementAndGet();
@@ -450,9 +487,11 @@ public final class SqliteSingleWriter implements AutoCloseable {
         private final CompletableFuture<PersistenceTransactionResult<T>> completion =
                 new CompletableFuture<>();
         private int acceptedQueueDepth;
+        private final boolean maintenance;
 
-        private Task(SqliteTransactionCommand<T> command) {
+        private Task(SqliteTransactionCommand<T> command, boolean maintenance) {
             this.command = command;
+            this.maintenance = maintenance;
         }
     }
 }

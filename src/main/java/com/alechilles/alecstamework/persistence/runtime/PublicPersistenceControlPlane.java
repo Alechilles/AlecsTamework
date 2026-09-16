@@ -76,6 +76,20 @@ final class PublicPersistenceControlPlane
     private volatile MaintenanceMetricsSnapshot profileMaintenance =
             emptyMaintenanceMetrics();
     private volatile PersistenceStartupCoordinator startup;
+    private volatile boolean maintenancePaused;
+
+    void pauseMaintenance(boolean paused) {
+        maintenancePaused = paused;
+    }
+
+    void maintenanceFailed(Throwable failure) {
+        Throwable cause = failure instanceof java.util.concurrent.CompletionException
+                && failure.getCause() != null ? failure.getCause() : failure;
+        StorageFailure classified = com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteFailureClassifier
+                .classify(cause, "database_compaction");
+        if (requiresGlobalReadOnly(classified)) enterGlobal(classified);
+        failures.checkpoint("database_compaction", cause);
+    }
 
     PublicPersistenceControlPlane(PersistenceFeatureRegistry registry) {
         this(registry, ignored -> { });
@@ -125,6 +139,9 @@ final class PublicPersistenceControlPlane
             String featureScope,
             List<OperationScope> participants
     ) {
+        if (maintenancePaused) {
+            throw new IllegalStateException("database_maintenance_in_progress");
+        }
         requireStartup().requireAdmission(
                 kind, featureScope, participants
         );

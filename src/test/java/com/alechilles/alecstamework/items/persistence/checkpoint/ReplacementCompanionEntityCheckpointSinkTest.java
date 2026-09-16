@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items.persistence.checkpoint;
 
+import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotation;
@@ -23,10 +24,13 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -131,6 +135,99 @@ class ReplacementCompanionEntityCheckpointSinkTest {
                             found.value()).jsonPayload());
             assertEquals(finalCheckpoint, decoded);
             assertTrue(sink.shutdown(Duration.ofSeconds(1)).drained());
+        }
+    }
+
+    /**
+     * Regression: automatic saves submitted while live compaction drains must
+     * wait for maintenance to finish instead of being rejected or lost.
+     */
+    @Test
+    void defersAutomaticProfileAndCheckpointSavesUntilCompactionCompletes()
+            throws Exception {
+        AtomicLong clock = new AtomicLong(-100L);
+        CountDownLatch firstPublication = new CountDownLatch(1);
+        CountDownLatch releasePublication = new CountDownLatch(1);
+        AtomicBoolean holdFirstPublication = new AtomicBoolean(true);
+        Consumer<NpcProfileChangedEvent> profileListener = event -> {
+            if (holdFirstPublication.compareAndSet(true, false)) {
+                firstPublication.countDown();
+                awaitLatch(releasePublication);
+            }
+        };
+        try (PersistenceBootstrap persistence = new PersistenceBootstrap(
+                configuration(clock, profileListener))) {
+            assertTrue(persistence.start().toCompletableFuture().join().complete());
+            var facades = persistence.facades();
+            NpcAlias alias = new NpcAlias(NPC);
+            ReplacementProfileSnapshotSink seedProfiles =
+                    new ReplacementProfileSnapshotSink(
+                            facades.queries(), facades.operations(), clock::get,
+                            ignored -> { }
+                    );
+            ReplacementProfileSnapshotSink profiles =
+                    new ReplacementProfileSnapshotSink(
+                            facades.queries(), facades.operations(), clock::get,
+                            ignored -> { }
+                    );
+            ReplacementCompanionEntityCheckpointSink checkpoints =
+                    new ReplacementCompanionEntityCheckpointSink(
+                            facades,
+                            ignored -> { },
+                            null,
+                            ignored -> { },
+                            ignored -> false
+                    );
+            try {
+                CompletionStage<Void> seed = seedProfiles.publish(
+                        snapshot(NPC, UUID.fromString(
+                                "20000000-0000-0000-0000-000000000101"
+                        ), "Seed"),
+                        "world"
+                );
+                assertTrue(firstPublication.await(5, TimeUnit.SECONDS));
+
+                CompletionStage<?> compaction =
+                        facades.operations().compactDatabase();
+                CompletionStage<Void> updated = profiles.publish(
+                        snapshot(NPC, UUID.fromString(
+                                "20000000-0000-0000-0000-000000000101"
+                        ), "Updated"),
+                        "world"
+                );
+                CompletionStage<Void> checkpoint = checkpoints.publish(
+                        capture(
+                                alias, 9,
+                                CompanionEntityCheckpoint.CaptureBoundary.UNLOAD,
+                                -91L
+                        )
+                );
+
+                assertFalse(updated.toCompletableFuture().isDone());
+                assertFalse(checkpoint.toCompletableFuture().isDone());
+                assertFalse(compaction.toCompletableFuture().isDone());
+
+                releasePublication.countDown();
+                seed.toCompletableFuture().get(10, TimeUnit.SECONDS);
+                compaction.toCompletableFuture().get(10, TimeUnit.SECONDS);
+                updated.toCompletableFuture().get(10, TimeUnit.SECONDS);
+                checkpoint.toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+                var projected = facades.queries().projectedProfile(alias)
+                        .orElseThrow();
+                assertEquals("Updated", projected.customName());
+                CompanionEntityCheckpoint saved = readCheckpoint(facades, alias);
+                assertEquals(9.0D, saved.x());
+                assertEquals(
+                        CompanionEntityCheckpoint.CaptureBoundary.UNLOAD,
+                        saved.boundary()
+                );
+            } finally {
+                releasePublication.countDown();
+                assertTrue(seedProfiles.shutdown(Duration.ofSeconds(1)).drained());
+                assertTrue(profiles.shutdown(Duration.ofSeconds(1)).drained());
+                assertTrue(checkpoints.shutdown(Duration.ofSeconds(1)).drained());
+            }
         }
     }
 
@@ -677,12 +774,19 @@ class ReplacementCompanionEntityCheckpointSinkTest {
     private PublicPersistenceRuntimeConfiguration configuration(
             AtomicLong clock
     ) {
+        return configuration(clock, ignored -> { });
+    }
+
+    private PublicPersistenceRuntimeConfiguration configuration(
+            AtomicLong clock,
+            java.util.function.Consumer<NpcProfileChangedEvent> profileListener
+    ) {
         return new PublicPersistenceRuntimeConfiguration(
                 tempDir,
                 "checkpoint-sink-test",
                 clock::get,
                 (claim, operation) -> confirmed("refund"),
-                event -> { },
+                profileListener,
                 boundaries(),
                 PublicPersistenceWorldReconciliation.alreadyComplete(),
                 Duration.ofSeconds(5)
