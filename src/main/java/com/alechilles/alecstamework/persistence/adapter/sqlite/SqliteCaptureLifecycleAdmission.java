@@ -159,7 +159,7 @@ final class SqliteCaptureLifecycleAdmission {
                     SqliteLifecycleAdmissionSourceReader.SourceReadModel> failed) {
                 return CompletableFuture.failedFuture(
                         failed.failure().cause() == null
-                                ? new IllegalStateException("capture_source_read_failed")
+                                ? new IllegalStateException(failed.failure().code())
                                 : failed.failure().cause()
                 );
             }

@@ -145,7 +145,9 @@ final class SqliteLifecycleAdmissionSourceReader {
                         .profileEvidence(profileId, null);
         if (!evidence.currentOperationPending().isEmpty()
                 || !evidence.foreignPending().isEmpty()) {
-            return failed("profile_domain_pending");
+            // Another operation still owns this profile's capacity evidence. This
+            // blocks this admission, but does not prove the database is corrupt.
+            return unavailable("profile_domain_pending");
         }
         return PersistenceReadResult.found(
                 new SourceReadModel(
@@ -163,6 +165,16 @@ final class SqliteLifecycleAdmissionSourceReader {
                 code,
                 READ_KIND.value(),
                 false,
+                null
+        ));
+    }
+
+    private PersistenceReadResult<SourceReadModel> unavailable(String code) {
+        return PersistenceReadResult.failed(new StorageFailure(
+                StorageFailureKind.UNAVAILABLE,
+                code,
+                READ_KIND.value(),
+                true,
                 null
         ));
     }
