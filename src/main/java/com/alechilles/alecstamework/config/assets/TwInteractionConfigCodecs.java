@@ -120,51 +120,9 @@ public final class TwInteractionConfigCodecs {
         }
     };
 
-    private static final Codec<String> ITEM_ASSET_CODEC = new TwSilentCodec<>() {
-        @Override
-        public String decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
-            return TwCodecLenient.asStringOrNull(bsonValue);
-        }
+    private static final Codec<String> ITEM_ASSET_CODEC = TwCodecLenient.assetReferenceCodec("Item");
 
-        @Override
-        public BsonValue encode(String value, ExtraInfo extraInfo) {
-            if (value == null) {
-                return new BsonNull();
-            }
-            return Codec.STRING.encode(value, extraInfo);
-        }
-
-        @Nonnull
-        @Override
-        public Schema toSchema(@Nonnull SchemaContext context) {
-            StringSchema schema = new StringSchema();
-            schema.setHytaleAssetRef("Item");
-            return schema;
-        }
-    };
-
-    private static final Codec<String> NPC_ROLE_ASSET_CODEC = new TwSilentCodec<>() {
-        @Override
-        public String decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
-            return TwCodecLenient.asStringOrNull(bsonValue);
-        }
-
-        @Override
-        public BsonValue encode(String value, ExtraInfo extraInfo) {
-            if (value == null) {
-                return new BsonNull();
-            }
-            return Codec.STRING.encode(value, extraInfo);
-        }
-
-        @Nonnull
-        @Override
-        public Schema toSchema(@Nonnull SchemaContext context) {
-            StringSchema schema = new StringSchema();
-            schema.setHytaleAssetRef("NPCRole");
-            return schema;
-        }
-    };
+    private static final Codec<String> NPC_ROLE_ASSET_CODEC = TwCodecLenient.assetReferenceCodec("NPCRole");
 
     private static final Codec<Boolean> NULLABLE_BOOLEAN_CODEC = new TwSilentCodec<>() {
         @Override
@@ -237,34 +195,9 @@ public final class TwInteractionConfigCodecs {
         }
     };
 
-    private static Codec<String> assetRefCodec(String assetType) {
-        return new TwSilentCodec<>() {
-            @Override
-            public String decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
-                return TwCodecLenient.asStringOrNull(bsonValue);
-            }
-
-            @Override
-            public BsonValue encode(String value, ExtraInfo extraInfo) {
-                if (value == null) {
-                    return new BsonNull();
-                }
-                return Codec.STRING.encode(value, extraInfo);
-            }
-
-            @Nonnull
-            @Override
-            public Schema toSchema(@Nonnull SchemaContext context) {
-                StringSchema schema = new StringSchema();
-                schema.setHytaleAssetRef(assetType);
-                return schema;
-            }
-        };
-    }
-
-    private static final Codec<String> PARTICLE_SYSTEM_CODEC = assetRefCodec("ParticleSystem");
-    private static final Codec<String> SOUND_EVENT_CODEC = assetRefCodec("SoundEvent");
-    private static final Codec<String> ITEM_DROP_LIST_CODEC = assetRefCodec("ItemDropList");
+    private static final Codec<String> PARTICLE_SYSTEM_CODEC = TwCodecLenient.assetReferenceCodec("ParticleSystem");
+    private static final Codec<String> SOUND_EVENT_CODEC = TwCodecLenient.assetReferenceCodec("SoundEvent");
+    private static final Codec<String> ITEM_DROP_LIST_CODEC = TwCodecLenient.assetReferenceCodec("ItemDropList");
 
     private static final Codec<String[]> EQUIPPED_SLOT_ARRAY_OR_SINGLE_CODEC = new TwSilentCodec<>() {
         @Override

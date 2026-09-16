@@ -12,8 +12,6 @@ import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
 import com.hypixel.hytale.codec.codecs.map.MapCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
-import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
@@ -155,7 +153,7 @@ public final class TwAttachmentMigrationConfig
                 cache = ROLE_CACHE;
             }
         }
-        return cache.get(roleId.trim().toLowerCase(Locale.ROOT));
+        return cache.get(TwConfigLookup.normalizeRoleId(roleId));
     }
 
     @Nullable
@@ -167,65 +165,22 @@ public final class TwAttachmentMigrationConfig
         if (assetMap == null || assetMap.getAssetMap() == null) {
             return null;
         }
-        Map<String, TwAttachmentMigrationConfig> map = assetMap.getAssetMap();
-        TwAttachmentMigrationConfig direct = map.get(configId);
-        if (direct != null) {
-            return direct;
-        }
-        String normalized = configId.trim();
-        for (TwAttachmentMigrationConfig candidate : map.values()) {
-            if (candidate == null || candidate.getId() == null) {
-                continue;
-            }
-            if (candidate.getId().equalsIgnoreCase(normalized)) {
-                return candidate;
-            }
-        }
-        return null;
+        return TwConfigLookup.resolveById(
+                assetMap.getAssetMap(),
+                configId,
+                TwAttachmentMigrationConfig::getId
+        );
     }
 
     private static Map<String, TwAttachmentMigrationConfig> buildRoleCache(
             @Nullable DefaultAssetMap<String, TwAttachmentMigrationConfig> assetMap) {
-        HashMap<String, TwAttachmentMigrationConfig> cache = new HashMap<>();
-        if (assetMap == null || assetMap.getAssetMap() == null) {
-            return cache;
-        }
-        for (TwAttachmentMigrationConfig candidate : assetMap.getAssetMap().values()) {
-            if (candidate == null || !candidate.isEnabled()) {
-                continue;
-            }
-            for (String roleId : candidate.getRoleIds()) {
-                if (roleId == null || roleId.isBlank()) {
-                    continue;
-                }
-                String normalizedRole = roleId.trim().toLowerCase(Locale.ROOT);
-                TwAttachmentMigrationConfig existing = cache.get(normalizedRole);
-                if (shouldReplaceCandidate(candidate, existing)) {
-                    cache.put(normalizedRole, candidate);
-                }
-            }
-        }
-        return cache;
-    }
-
-    private static boolean shouldReplaceCandidate(@Nullable TwAttachmentMigrationConfig candidate,
-                                                  @Nullable TwAttachmentMigrationConfig existing) {
-        if (candidate == null) {
-            return false;
-        }
-        if (existing == null) {
-            return true;
-        }
-        if (candidate.getPriority() != existing.getPriority()) {
-            return candidate.getPriority() > existing.getPriority();
-        }
-        return compareIds(candidate.getId(), existing.getId()) < 0;
-    }
-
-    private static int compareIds(@Nullable String left, @Nullable String right) {
-        String safeLeft = left == null ? "" : left;
-        String safeRight = right == null ? "" : right;
-        return safeLeft.compareToIgnoreCase(safeRight);
+        return TwConfigLookup.buildRoleIndex(
+                assetMap == null || assetMap.getAssetMap() == null ? null : assetMap.getAssetMap().values(),
+                TwAttachmentMigrationConfig::isEnabled,
+                TwAttachmentMigrationConfig::getRoleIds,
+                TwAttachmentMigrationConfig::getPriority,
+                TwAttachmentMigrationConfig::getId
+        );
     }
 
     private static void ensureInheritanceFallbackApplied(

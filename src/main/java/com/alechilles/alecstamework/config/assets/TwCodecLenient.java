@@ -1,11 +1,17 @@
 package com.alechilles.alecstamework.config.assets;
 
 import com.hypixel.hytale.codec.Codec;
+import com.hypixel.hytale.codec.ExtraInfo;
+import com.hypixel.hytale.codec.schema.SchemaContext;
+import com.hypixel.hytale.codec.schema.config.Schema;
+import com.hypixel.hytale.codec.schema.config.StringSchema;
 import com.hypixel.hytale.common.util.ArrayUtil;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.bson.BsonDocument;
+import org.bson.BsonNull;
 import org.bson.BsonValue;
 
 /**
@@ -103,6 +109,28 @@ final class TwCodecLenient {
             return ArrayUtil.EMPTY_STRING_ARRAY;
         }
         return values.toArray(ArrayUtil.EMPTY_STRING_ARRAY);
+    }
+
+    static Codec<String> assetReferenceCodec(String assetType) {
+        return new TwSilentCodec<>() {
+            @Override
+            public String decode(@Nonnull BsonValue value, ExtraInfo extraInfo) {
+                return asStringOrNull(value);
+            }
+
+            @Override
+            public BsonValue encode(String value, ExtraInfo extraInfo) {
+                return value == null ? new BsonNull() : Codec.STRING.encode(value, extraInfo);
+            }
+
+            @Nonnull
+            @Override
+            public Schema toSchema(@Nonnull SchemaContext context) {
+                StringSchema schema = new StringSchema();
+                schema.setHytaleAssetRef(assetType);
+                return schema;
+            }
+        };
     }
 
     private static void appendStrings(@Nullable BsonValue value, List<String> destination) {

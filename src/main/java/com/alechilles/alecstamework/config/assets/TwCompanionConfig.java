@@ -10,8 +10,6 @@ import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
-import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
@@ -162,7 +160,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         }
         ensureRoleCacheBuilt(assetMap);
         Map<String, TwCompanionConfig> cache = ROLE_CACHE;
-        return cache.get(roleId.trim().toLowerCase(Locale.ROOT));
+        return cache.get(TwConfigLookup.normalizeRoleId(roleId));
     }
 
     @Nullable
@@ -184,21 +182,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         if (assetMap == null || assetMap.getAssetMap() == null) {
             return null;
         }
-        Map<String, TwCompanionConfig> map = assetMap.getAssetMap();
-        TwCompanionConfig direct = map.get(configId);
-        if (direct != null) {
-            return direct;
-        }
-        String normalized = configId.trim();
-        for (TwCompanionConfig candidate : map.values()) {
-            if (candidate == null || candidate.getId() == null) {
-                continue;
-            }
-            if (candidate.getId().equalsIgnoreCase(normalized)) {
-                return candidate;
-            }
-        }
-        return null;
+        return TwConfigLookup.resolveById(assetMap.getAssetMap(), configId, TwCompanionConfig::getId);
     }
 
     public static EffectiveSettings resolveEffectiveForRole(@Nullable String roleId) {
@@ -229,30 +213,13 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
     }
 
     private static Map<String, TwCompanionConfig> buildRoleCache(@Nullable DefaultAssetMap<String, TwCompanionConfig> assetMap) {
-        Map<String, TwCompanionConfig> cache = new HashMap<>();
-        if (assetMap == null || assetMap.getAssetMap() == null) {
-            return cache;
-        }
-        for (TwCompanionConfig candidate : assetMap.getAssetMap().values()) {
-            if (candidate == null || !candidate.isEnabled()) {
-                continue;
-            }
-            String[] candidateRoles = candidate.getRoleIds();
-            if (!hasAnyRoleIds(candidateRoles)) {
-                continue;
-            }
-            for (String roleId : candidateRoles) {
-                if (roleId == null || roleId.isBlank()) {
-                    continue;
-                }
-                String normalizedRole = roleId.trim().toLowerCase(Locale.ROOT);
-                TwCompanionConfig existing = cache.get(normalizedRole);
-                if (shouldReplaceCandidate(candidate, existing)) {
-                    cache.put(normalizedRole, candidate);
-                }
-            }
-        }
-        return cache;
+        return TwConfigLookup.buildRoleIndex(
+                assetMap == null || assetMap.getAssetMap() == null ? null : assetMap.getAssetMap().values(),
+                TwCompanionConfig::isEnabled,
+                TwCompanionConfig::getRoleIds,
+                TwCompanionConfig::getPriority,
+                TwCompanionConfig::getId
+        );
     }
 
     @Nullable
@@ -269,7 +236,12 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             if (hasAnyRoleIds(candidate.getRoleIds())) {
                 continue;
             }
-            if (shouldReplaceCandidate(candidate, best)) {
+            if (TwConfigLookup.prefers(
+                    candidate,
+                    best,
+                    TwCompanionConfig::getPriority,
+                    TwCompanionConfig::getId
+            )) {
                 best = candidate;
             }
         }
@@ -286,28 +258,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             }
         }
         return false;
-    }
-
-    private static boolean shouldReplaceCandidate(@Nullable TwCompanionConfig candidate,
-                                                  @Nullable TwCompanionConfig existing) {
-        if (candidate == null) {
-            return false;
-        }
-        if (existing == null) {
-            return true;
-        }
-        int candidatePriority = candidate.getPriority();
-        int existingPriority = existing.getPriority();
-        if (candidatePriority != existingPriority) {
-            return candidatePriority > existingPriority;
-        }
-        return compareIds(candidate.getId(), existing.getId()) < 0;
-    }
-
-    private static int compareIds(@Nullable String left, @Nullable String right) {
-        String safeLeft = left == null ? "" : left;
-        String safeRight = right == null ? "" : right;
-        return safeLeft.compareToIgnoreCase(safeRight);
     }
 
     private static void ensureInheritanceFallbackApplied(@Nullable DefaultAssetMap<String, TwCompanionConfig> assetMap) {

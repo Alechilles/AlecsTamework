@@ -499,7 +499,7 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
                 cache = ROLE_CACHE;
             }
         }
-        return cache.get(roleId.trim().toLowerCase(Locale.ROOT));
+        return cache.get(TwConfigLookup.normalizeRoleId(roleId));
     }
 
     public static boolean isEnabledForRole(@Nullable String roleId) {
@@ -517,7 +517,7 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
                                                               @Nonnull DefaultAssetMap<String, TwHappinessConfig> assetMap) {
         TwHappinessConfig bestRoleMatch = null;
         TwHappinessConfig bestRoleless = null;
-        String normalizedRoleId = roleId == null ? "" : roleId.trim().toLowerCase(Locale.ROOT);
+        String normalizedRoleId = TwConfigLookup.normalizeRoleId(roleId);
         for (TwHappinessConfig candidate : assetMap.getAssetMap().values()) {
             if (candidate == null) {
                 continue;
@@ -536,7 +536,7 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
                 if (candidateRoleId == null || candidateRoleId.isBlank()) {
                     continue;
                 }
-                if (normalizedRoleId.equals(candidateRoleId.trim().toLowerCase(Locale.ROOT))
+                if (normalizedRoleId.equals(TwConfigLookup.normalizeRoleId(candidateRoleId))
                         && shouldReplaceCandidate(candidate, bestRoleMatch)) {
                     bestRoleMatch = candidate;
                 }
@@ -554,71 +554,28 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
         if (assetMap == null || assetMap.getAssetMap() == null) {
             return null;
         }
-        Map<String, TwHappinessConfig> map = assetMap.getAssetMap();
-        TwHappinessConfig direct = map.get(configId);
-        if (direct != null) {
-            return direct;
-        }
-        String normalized = configId.trim();
-        for (TwHappinessConfig candidate : map.values()) {
-            if (candidate == null || candidate.getId() == null) {
-                continue;
-            }
-            if (candidate.getId().equalsIgnoreCase(normalized)) {
-                return candidate;
-            }
-        }
-        return null;
+        return TwConfigLookup.resolveById(assetMap.getAssetMap(), configId, TwHappinessConfig::getId);
     }
 
     private static Map<String, TwHappinessConfig> buildRoleCache(
             @Nullable DefaultAssetMap<String, TwHappinessConfig> assetMap) {
-        Map<String, TwHappinessConfig> cache = new HashMap<>();
-        if (assetMap == null || assetMap.getAssetMap() == null) {
-            return cache;
-        }
-        for (TwHappinessConfig candidate : assetMap.getAssetMap().values()) {
-            if (candidate == null || !candidate.isConfiguredEnabled()) {
-                continue;
-            }
-            String[] candidateRoles = candidate.getRoleIds();
-            if (candidateRoles == null || candidateRoles.length == 0) {
-                continue;
-            }
-            for (String roleId : candidateRoles) {
-                if (roleId == null || roleId.isBlank()) {
-                    continue;
-                }
-                String normalizedRole = roleId.trim().toLowerCase(Locale.ROOT);
-                TwHappinessConfig existing = cache.get(normalizedRole);
-                if (shouldReplaceCandidate(candidate, existing)) {
-                    cache.put(normalizedRole, candidate);
-                }
-            }
-        }
-        return cache;
+        return TwConfigLookup.buildRoleIndex(
+                assetMap == null || assetMap.getAssetMap() == null ? null : assetMap.getAssetMap().values(),
+                TwHappinessConfig::isConfiguredEnabled,
+                TwHappinessConfig::getRoleIds,
+                TwHappinessConfig::getPriority,
+                TwHappinessConfig::getId
+        );
     }
 
     private static boolean shouldReplaceCandidate(@Nullable TwHappinessConfig candidate,
                                                   @Nullable TwHappinessConfig existing) {
-        if (candidate == null) {
-            return false;
-        }
-        if (existing == null) {
-            return true;
-        }
-        int candidatePriority = candidate.getPriority();
-        int existingPriority = existing.getPriority();
-        if (candidatePriority != existingPriority) {
-            return candidatePriority > existingPriority;
-        }
-        return compareIds(candidate.getId(), existing.getId()) < 0;
-    }
-
-    private static int compareIds(@Nullable String left, @Nullable String right) {
-        String safeLeft = left == null ? "" : left;
-        String safeRight = right == null ? "" : right;
-        return safeLeft.compareToIgnoreCase(safeRight);
+        return TwConfigLookup.prefers(
+                candidate,
+                existing,
+                TwHappinessConfig::getPriority,
+                TwHappinessConfig::getId
+        );
     }
 
     private static void ensureInheritanceFallbackApplied(@Nullable DefaultAssetMap<String, TwHappinessConfig> assetMap) {

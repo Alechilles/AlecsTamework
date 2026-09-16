@@ -15,7 +15,6 @@ import com.hypixel.hytale.math.codec.Vector3dArrayCodec;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nonnull;
-import org.bson.BsonNull;
 import org.bson.BsonValue;
 import org.joml.Vector3d;
 
@@ -28,9 +27,9 @@ import org.joml.Vector3d;
  */
 final class TwCommandItemCodecs {
     private static final Codec<String> PARTICLE_SYSTEM_CODEC =
-            assetRefCodec("ParticleSystem");
+            TwCodecLenient.assetReferenceCodec("ParticleSystem");
     private static final Codec<String> SOUND_EVENT_CODEC =
-            assetRefCodec("SoundEvent");
+            TwCodecLenient.assetReferenceCodec("SoundEvent");
     private static final Codec<Vector3d> VECTOR3D_CODEC =
             new Vector3dArrayCodec();
 
@@ -460,30 +459,4 @@ final class TwCommandItemCodecs {
     private TwCommandItemCodecs() {
     }
 
-    private static Codec<String> assetRefCodec(String assetType) {
-        return new TwSilentCodec<>() {
-            @Override
-            public String decode(
-                    @Nonnull BsonValue bsonValue,
-                    ExtraInfo extraInfo
-            ) {
-                return TwCodecLenient.asStringOrNull(bsonValue);
-            }
-
-            @Override
-            public BsonValue encode(String value, ExtraInfo extraInfo) {
-                return value == null
-                        ? new BsonNull()
-                        : Codec.STRING.encode(value, extraInfo);
-            }
-
-            @Nonnull
-            @Override
-            public Schema toSchema(@Nonnull SchemaContext context) {
-                StringSchema schema = new StringSchema();
-                schema.setHytaleAssetRef(assetType);
-                return schema;
-            }
-        };
-    }
 }

@@ -11,8 +11,6 @@ import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
-import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
@@ -412,7 +410,7 @@ public final class TwLevelingConfig implements JsonAssetWithMap<String, DefaultA
                 cache = ROLE_CACHE;
             }
         }
-        return cache.get(roleId.trim().toLowerCase(Locale.ROOT));
+        return cache.get(TwConfigLookup.normalizeRoleId(roleId));
     }
 
     @Nullable
@@ -424,64 +422,17 @@ public final class TwLevelingConfig implements JsonAssetWithMap<String, DefaultA
         if (assetMap == null || assetMap.getAssetMap() == null) {
             return null;
         }
-        Map<String, TwLevelingConfig> map = assetMap.getAssetMap();
-        TwLevelingConfig direct = map.get(configId);
-        if (direct != null) {
-            return direct;
-        }
-        String normalized = configId.trim();
-        for (TwLevelingConfig candidate : map.values()) {
-            if (candidate == null || candidate.getId() == null) {
-                continue;
-            }
-            if (candidate.getId().equalsIgnoreCase(normalized)) {
-                return candidate;
-            }
-        }
-        return null;
+        return TwConfigLookup.resolveById(assetMap.getAssetMap(), configId, TwLevelingConfig::getId);
     }
 
     private static Map<String, TwLevelingConfig> buildRoleCache(@Nullable DefaultAssetMap<String, TwLevelingConfig> assetMap) {
-        Map<String, TwLevelingConfig> cache = new HashMap<>();
-        if (assetMap == null || assetMap.getAssetMap() == null) {
-            return cache;
-        }
-        for (TwLevelingConfig candidate : assetMap.getAssetMap().values()) {
-            if (candidate == null || !candidate.isEnabled()) {
-                continue;
-            }
-            for (String roleId : candidate.getRoleIds()) {
-                if (roleId == null || roleId.isBlank()) {
-                    continue;
-                }
-                String normalized = roleId.trim().toLowerCase(Locale.ROOT);
-                TwLevelingConfig existing = cache.get(normalized);
-                if (shouldReplaceCandidate(candidate, existing)) {
-                    cache.put(normalized, candidate);
-                }
-            }
-        }
-        return cache;
-    }
-
-    private static boolean shouldReplaceCandidate(@Nullable TwLevelingConfig candidate,
-                                                  @Nullable TwLevelingConfig existing) {
-        if (candidate == null) {
-            return false;
-        }
-        if (existing == null) {
-            return true;
-        }
-        if (candidate.getPriority() != existing.getPriority()) {
-            return candidate.getPriority() > existing.getPriority();
-        }
-        return compareIds(candidate.getId(), existing.getId()) < 0;
-    }
-
-    private static int compareIds(@Nullable String left, @Nullable String right) {
-        String safeLeft = left == null ? "" : left;
-        String safeRight = right == null ? "" : right;
-        return safeLeft.compareToIgnoreCase(safeRight);
+        return TwConfigLookup.buildRoleIndex(
+                assetMap == null || assetMap.getAssetMap() == null ? null : assetMap.getAssetMap().values(),
+                TwLevelingConfig::isEnabled,
+                TwLevelingConfig::getRoleIds,
+                TwLevelingConfig::getPriority,
+                TwLevelingConfig::getId
+        );
     }
 
     private static void ensureInheritanceFallbackApplied(@Nullable DefaultAssetMap<String, TwLevelingConfig> assetMap) {

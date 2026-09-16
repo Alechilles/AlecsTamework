@@ -10,7 +10,6 @@ import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
-import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -494,7 +493,7 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
                 cache = ROLE_CACHE;
             }
         }
-        return cache.get(roleId.trim().toLowerCase(Locale.ROOT));
+        return cache.get(TwConfigLookup.normalizeRoleId(roleId));
     }
 
     @Nullable
@@ -506,70 +505,17 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
         if (assetMap == null || assetMap.getAssetMap() == null) {
             return null;
         }
-        Map<String, TwNeedsConfig> map = assetMap.getAssetMap();
-        TwNeedsConfig direct = map.get(configId);
-        if (direct != null) {
-            return direct;
-        }
-        String normalized = configId.trim();
-        for (TwNeedsConfig candidate : map.values()) {
-            if (candidate == null || candidate.getId() == null) {
-                continue;
-            }
-            if (candidate.getId().equalsIgnoreCase(normalized)) {
-                return candidate;
-            }
-        }
-        return null;
+        return TwConfigLookup.resolveById(assetMap.getAssetMap(), configId, TwNeedsConfig::getId);
     }
 
     private static Map<String, TwNeedsConfig> buildRoleCache(@Nullable DefaultAssetMap<String, TwNeedsConfig> assetMap) {
-        Map<String, TwNeedsConfig> cache = new HashMap<>();
-        if (assetMap == null || assetMap.getAssetMap() == null) {
-            return cache;
-        }
-        for (TwNeedsConfig candidate : assetMap.getAssetMap().values()) {
-            if (candidate == null || !candidate.isConfiguredEnabled()) {
-                continue;
-            }
-            String[] candidateRoles = candidate.getRoleIds();
-            if (candidateRoles == null || candidateRoles.length == 0) {
-                continue;
-            }
-            for (String roleId : candidateRoles) {
-                if (roleId == null || roleId.isBlank()) {
-                    continue;
-                }
-                String normalizedRole = roleId.trim().toLowerCase(Locale.ROOT);
-                TwNeedsConfig existing = cache.get(normalizedRole);
-                if (shouldReplaceCandidate(candidate, existing)) {
-                    cache.put(normalizedRole, candidate);
-                }
-            }
-        }
-        return cache;
-    }
-
-    private static boolean shouldReplaceCandidate(@Nullable TwNeedsConfig candidate,
-                                                  @Nullable TwNeedsConfig existing) {
-        if (candidate == null) {
-            return false;
-        }
-        if (existing == null) {
-            return true;
-        }
-        int candidatePriority = candidate.getPriority();
-        int existingPriority = existing.getPriority();
-        if (candidatePriority != existingPriority) {
-            return candidatePriority > existingPriority;
-        }
-        return compareIds(candidate.getId(), existing.getId()) < 0;
-    }
-
-    private static int compareIds(@Nullable String left, @Nullable String right) {
-        String safeLeft = left == null ? "" : left;
-        String safeRight = right == null ? "" : right;
-        return safeLeft.compareToIgnoreCase(safeRight);
+        return TwConfigLookup.buildRoleIndex(
+                assetMap == null || assetMap.getAssetMap() == null ? null : assetMap.getAssetMap().values(),
+                TwNeedsConfig::isConfiguredEnabled,
+                TwNeedsConfig::getRoleIds,
+                TwNeedsConfig::getPriority,
+                TwNeedsConfig::getId
+        );
     }
 
     private static void ensureInheritanceFallbackApplied(@Nullable DefaultAssetMap<String, TwNeedsConfig> assetMap) {

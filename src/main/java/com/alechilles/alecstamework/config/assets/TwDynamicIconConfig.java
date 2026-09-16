@@ -8,8 +8,6 @@ import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.assetstore.map.JsonAssetWithMap;
 import com.hypixel.hytale.common.util.ArrayUtil;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
@@ -72,7 +70,7 @@ public final class TwDynamicIconConfig
     /** Resolves the configured icon for one role and its current model attachments. */
     @Nullable
     public static String resolveIcon(@Nullable String roleId, @Nullable Map<String, String> attachments) {
-        String normalizedRoleId = normalizeRoleId(roleId);
+        String normalizedRoleId = TwConfigLookup.normalizeRoleId(roleId);
         if (normalizedRoleId.isEmpty()) {
             return null;
         }
@@ -98,7 +96,7 @@ public final class TwDynamicIconConfig
     static String resolveIconForTest(@Nullable Collection<TwDynamicIconConfig> configs,
                                      @Nullable String roleId,
                                      @Nullable Map<String, String> attachments) {
-        TwDynamicIconConfig config = buildRoleCache(configs).get(normalizeRoleId(roleId));
+        TwDynamicIconConfig config = buildRoleCache(configs).get(TwConfigLookup.normalizeRoleId(roleId));
         return config == null ? null : config.resolve(attachments);
     }
 
@@ -107,40 +105,13 @@ public final class TwDynamicIconConfig
         if (configs == null || configs.isEmpty()) {
             return Map.of();
         }
-        Map<String, TwDynamicIconConfig> selected = new HashMap<>();
-        for (TwDynamicIconConfig candidate : configs) {
-            if (candidate == null || !candidate.enabled) {
-                continue;
-            }
-            for (String roleId : candidate.getRoleIds()) {
-                String normalizedRoleId = normalizeRoleId(roleId);
-                if (normalizedRoleId.isEmpty()) {
-                    continue;
-                }
-                TwDynamicIconConfig current = selected.get(normalizedRoleId);
-                if (shouldReplaceCandidate(candidate, current)) {
-                    selected.put(normalizedRoleId, candidate);
-                }
-            }
-        }
-        return Map.copyOf(selected);
-    }
-
-    private static boolean shouldReplaceCandidate(@Nonnull TwDynamicIconConfig candidate,
-                                                  @Nullable TwDynamicIconConfig current) {
-        if (current == null) {
-            return true;
-        }
-        if (candidate.priority != current.priority) {
-            return candidate.priority > current.priority;
-        }
-        return compareIds(candidate.id, current.id) < 0;
-    }
-
-    private static int compareIds(@Nullable String left, @Nullable String right) {
-        String safeLeft = left == null ? "" : left;
-        String safeRight = right == null ? "" : right;
-        return safeLeft.compareToIgnoreCase(safeRight);
+        return Map.copyOf(TwConfigLookup.buildRoleIndex(
+                configs,
+                TwDynamicIconConfig::isEnabled,
+                TwDynamicIconConfig::getRoleIds,
+                TwDynamicIconConfig::getPriority,
+                TwDynamicIconConfig::getId
+        ));
     }
 
     @Nullable
@@ -228,11 +199,6 @@ public final class TwDynamicIconConfig
     void setIconDefault(@Nullable String value) { iconDefault = value; }
     void setIconOverrides(@Nullable IconOverride[] value) {
         iconOverrides = value == null ? EMPTY_ICON_OVERRIDES : value;
-    }
-
-    @Nonnull
-    private static String normalizeRoleId(@Nullable String roleId) {
-        return roleId == null ? "" : roleId.trim().toLowerCase(Locale.ROOT);
     }
 
     @Nullable
