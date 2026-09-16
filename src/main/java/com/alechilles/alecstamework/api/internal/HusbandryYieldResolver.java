@@ -17,6 +17,7 @@ import javax.annotation.Nullable;
 /** Resolves the additive yield and recovery terms used by shared husbandry actions. */
 public final class HusbandryYieldResolver {
     private static final String FLEECE_FIBER_YIELD_EFFECT = "FleeceFiberYieldMultiplier";
+    private static final String ANIMAL_PRODUCT_YIELD_EFFECT = "AnimalProductYieldMultiplier";
     private static final String HARVEST_RECOVERY_EFFECT = "HarvestRecoverySpeedMultiplier";
 
     private HusbandryYieldResolver() {
@@ -63,10 +64,7 @@ public final class HusbandryYieldResolver {
             HusbandryOutcomeModifiers modifiers,
             double legacyDropDuplicateBonus
     ) {
-        double traitBonus = isFleeceOrFiberProduct(productId)
-                ? TraitModifierService.resolveMultiplier(
-                        npcRef, store, FLEECE_FIBER_YIELD_EFFECT, 1.0) - 1.0
-                : 0.0;
+        double traitBonus = resolveTraitHarvestYieldBonus(npcRef, store, productId);
         return boundedBonus(traitBonus)
                 + boundedBonus(legacyDropDuplicateBonus)
                 + expectedLegacyProviderBonusCopies(modifiers)
@@ -130,6 +128,63 @@ public final class HusbandryYieldResolver {
         return normalized.contains("fleece") || normalized.contains("wool") || normalized.contains("fiber")
                 || normalized.contains("fibre") || normalized.contains("silk")
                 || normalized.contains("cindercloth") || normalized.contains("shadoweave");
+    }
+
+    /** Renewable harvest products receive general animal-product traits; legacy fleece traits stay fleece-only. */
+    static boolean isRenewableAnimalProduct(@Nullable String productId) {
+        if (isFleeceOrFiberProduct(productId)) {
+            return true;
+        }
+        if (productId == null || productId.isBlank()) {
+            return false;
+        }
+        String normalized = productId.toLowerCase(Locale.ROOT);
+        return normalized.contains("egg") || normalized.contains("milk");
+    }
+
+    private static double resolveTraitHarvestYieldBonus(
+            Ref<EntityStore> npcRef,
+            Store<EntityStore> store,
+            @Nullable String productId
+    ) {
+        if (!isRenewableAnimalProduct(productId)) {
+            return 0.0;
+        }
+        double generalMultiplier = TraitModifierService.resolveMultiplier(
+                npcRef, store, ANIMAL_PRODUCT_YIELD_EFFECT, 1.0);
+        double legacyFleeceMultiplier = isFleeceOrFiberProduct(productId)
+                ? TraitModifierService.resolveMultiplier(npcRef, store, FLEECE_FIBER_YIELD_EFFECT, 1.0)
+                : 1.0;
+        return combineTraitHarvestYieldBonuses(productId, generalMultiplier, legacyFleeceMultiplier);
+    }
+
+    /** Internal trait resolver shared by the production path and its output-boundary behavior tests. */
+    static double resolveTraitHarvestYieldBonus(
+            @Nullable com.alechilles.alecstamework.npc.components.TameworkTraitsComponent traits,
+            @Nullable com.alechilles.alecstamework.config.assets.TwTraitConfig traitConfig,
+            @Nullable String productId
+    ) {
+        if (!isRenewableAnimalProduct(productId)) {
+            return 0.0;
+        }
+        double generalMultiplier = TraitModifierService.resolveMultiplier(
+                traits, traitConfig, ANIMAL_PRODUCT_YIELD_EFFECT, 1.0);
+        double legacyFleeceMultiplier = isFleeceOrFiberProduct(productId)
+                ? TraitModifierService.resolveMultiplier(traits, traitConfig, FLEECE_FIBER_YIELD_EFFECT, 1.0)
+                : 1.0;
+        return combineTraitHarvestYieldBonuses(productId, generalMultiplier, legacyFleeceMultiplier);
+    }
+
+    private static double combineTraitHarvestYieldBonuses(@Nullable String productId,
+                                                           double generalMultiplier,
+                                                           double legacyFleeceMultiplier) {
+        if (!isRenewableAnimalProduct(productId)) {
+            return 0.0;
+        }
+        double general = Double.isFinite(generalMultiplier) ? generalMultiplier - 1.0 : 0.0;
+        double legacy = isFleeceOrFiberProduct(productId) && Double.isFinite(legacyFleeceMultiplier)
+                ? legacyFleeceMultiplier - 1.0 : 0.0;
+        return general + legacy;
     }
 
     /** Applies a provider conversion only after all additive harvest quantities are final. */

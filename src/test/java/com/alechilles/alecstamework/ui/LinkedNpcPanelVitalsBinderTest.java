@@ -142,12 +142,12 @@ class LinkedNpcPanelVitalsBinderTest {
     // including threshold data lost while normalizing or copying the panel entry.
     @Test
     void rendersBreedingThresholdAtItsHappinessFillPosition() {
-        assertMarker(0.10, 96, 6, 11, 10);
-        assertMarker(0.25, 110, 6, 11, 10);
-        assertMarker(0.50, 133, 6, 11, 10);
-        assertMarker(0.70, 151, 6, 11, 10);
-        assertMarker(0.95, 174, 6, 11, 10);
-        assertMarker(1.0, 179, 6, 11, 10);
+        assertMarker(0.10, 98, 0, 7, 6);
+        assertMarker(0.25, 112, 0, 7, 6);
+        assertMarker(0.50, 135, 0, 7, 6);
+        assertMarker(0.70, 153, 0, 7, 6);
+        assertMarker(0.95, 176, 0, 7, 6);
+        assertMarker(1.0, 181, 0, 7, 6);
     }
 
     private static void assertMarker(

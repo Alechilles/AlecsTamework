@@ -73,22 +73,22 @@ Group #Root {
  }
  Group #StatusRingRow { Anchor: (Top: 80, Left: 0, Width: 324, Height: 48); LayoutMode: Left;
   Group #NeedHappiness { Anchor: (Width: 112, Height: 48);
-   Group #NeedIconImage { Anchor: (Top: 0, Left: 0, Width: 22, Height: 22); Visible: false; }
-   Label #NeedIcon { Anchor: (Top: 0, Left: 0, Width: 22, Height: 22); Text: ""; Style: (FontSize: 14, TextColor: #f7ecd0); }
-   Label #NeedValueText { Anchor: (Top: 0, Left: 26, Width: 74, Height: 22); Text: ""; Style: @MeterValue; }
+   Group #NeedIconImage { Anchor: (Top: 0, Left: 0, Width: 16, Height: 16); Visible: false; }
+   Label #NeedIcon { Anchor: (Top: 0, Left: 0, Width: 16, Height: 16); Text: ""; Style: (FontSize: 14, TextColor: #f7ecd0); }
+   Label #NeedValueText { Anchor: (Top: 0, Left: 26, Width: 74, Height: 16); Text: ""; Style: @MeterValue; }
    Group { Anchor: (Top: 26, Left: 0, Width: 100, Height: 6); Background: #3d4840; }
    Group #MeterFill { Anchor: (Top: 26, Left: 0, Width: 0, Height: 6); Background: #d7ba77; }
    Label { Anchor: (Top: 34, Left: 0, Width: 100, Height: 12); Text: %server.tamework.ui.linkedPanel.meter.happiness; Style: (FontSize: 10, TextColor: #b9beb8); }
    Group #HappinessTargetMarker { Anchor: (Top: 24, Left: 0, Width: 2, Height: 10); Background: #e1be73; Visible: false; HitTestVisible: false; }
-            Group #BreedingThresholdMarker { Anchor: (Top: 24, Left: 0, Width: 11, Height: 10); Visible: false; HitTestVisible: false;
-              Group { Anchor: (Left: 1, Top: 0, Width: 3, Height: 2); Background: #ed8eae; HitTestVisible: false; }
-              Group { Anchor: (Left: 7, Top: 0, Width: 3, Height: 2); Background: #ed8eae; HitTestVisible: false; }
-              Group { Anchor: (Left: 0, Top: 2, Width: 11, Height: 3); Background: #ed8eae; HitTestVisible: false; }
-              Group { Anchor: (Left: 1, Top: 5, Width: 9, Height: 2); Background: #ed8eae; HitTestVisible: false; }
-              Group { Anchor: (Left: 3, Top: 7, Width: 5, Height: 2); Background: #ed8eae; HitTestVisible: false; }
-              Group { Anchor: (Left: 5, Top: 9, Width: 1, Height: 1); Background: #ed8eae; HitTestVisible: false; }
+            Group #BreedingThresholdMarker { Anchor: (Top: 18, Left: 0, Width: 7, Height: 6); Visible: false; HitTestVisible: false;
+              Group { Anchor: (Left: 1, Top: 0, Width: 2, Height: 1); Background: #ed8eae; HitTestVisible: false; }
+              Group { Anchor: (Left: 4, Top: 0, Width: 2, Height: 1); Background: #ed8eae; HitTestVisible: false; }
+              Group { Anchor: (Left: 0, Top: 1, Width: 7, Height: 2); Background: #ed8eae; HitTestVisible: false; }
+              Group { Anchor: (Left: 1, Top: 3, Width: 5, Height: 1); Background: #ed8eae; HitTestVisible: false; }
+              Group { Anchor: (Left: 2, Top: 4, Width: 3, Height: 1); Background: #ed8eae; HitTestVisible: false; }
+              Group { Anchor: (Left: 3, Top: 5, Width: 1, Height: 1); Background: #ed8eae; HitTestVisible: false; }
             }
-   TextButton #NeedTooltip { Anchor: (Top: 0, Left: 0, Width: 100, Height: 48); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
+            TextButton #NeedTooltip { Anchor: (Top: 0, Left: 0, Width: 100, Height: 48); Text: ""; Style: @HudTooltipButtonStyle; TextTooltipStyle: @HudTooltipStyle; }
   }
   Group #NeedHunger { Anchor: (Width: 112, Height: 48);
    Group #NeedIconImage { Anchor: (Top: 0, Left: 0, Width: 22, Height: 22); Visible: false; }

@@ -38,6 +38,9 @@ class CommandLoadedNpcStatusSnapshotServiceHappinessPresentationTest {
                                 "thirst_quenched", "Thirst: Quenched", 4.0,
                                 CompanionHappinessPresentationService.EffectKind.EQUILIBRIUM),
                         new CompanionHappinessPresentationService.EffectEntry(
+                                "thirst_dehydrated", "Thirst: Dehydrated", -6.0,
+                                CompanionHappinessPresentationService.EffectKind.EQUILIBRIUM),
+                        new CompanionHappinessPresentationService.EffectEntry(
                                 "population_lonely", "Population: Lonely", -4.0,
                                 CompanionHappinessPresentationService.EffectKind.EQUILIBRIUM),
                         new CompanionHappinessPresentationService.EffectEntry(
@@ -55,11 +58,11 @@ class CommandLoadedNpcStatusSnapshotServiceHappinessPresentationTest {
         assertTrue(tooltip.startsWith("Happiness: 62%"));
         assertTrue(tooltip.indexOf("Active effects") < tooltip.indexOf("Other effects"));
         assertTrue(tooltip.contains("Hunger: -8.00\n  Hungry"));
-        assertTrue(tooltip.contains("Social needs: -3.00\n  Crowded"));
-        assertTrue(tooltip.contains("Last food eaten: +7.00\n  Apple"));
+        assertTrue(tooltip.contains("Social: -3.00\n  Crowded"));
+        assertTrue(tooltip.contains("Food preference: +7.00\n  Apple"));
         assertTrue(tooltip.contains("Petted: +2.00"));
-        assertTrue(tooltip.contains("Thirst: -"));
-        assertTrue(tooltip.contains("Attacked: -"));
+        assertTrue(tooltip.contains("Thirst: -6.00 to +4.00"));
+        assertTrue(tooltip.contains("Attacked: -3.00"));
         assertFalse(tooltip.contains("Well-fed"));
         assertFalse(tooltip.contains("Lonely"));
         assertFalse(tooltip.contains("Berry"));
@@ -76,7 +79,7 @@ class CommandLoadedNpcStatusSnapshotServiceHappinessPresentationTest {
                         CompanionHappinessPresentationService.EffectKind.FOOD)),
                 List.of(), true);
         String tooltip = newService().buildHappinessPresentation(presentation, "en-US");
-        assertTrue(tooltip.contains("Last food eaten: +5.00\n  Apple"));
+        assertTrue(tooltip.contains("Food preference: +5.00\n  Apple"));
         assertFalse(tooltip.contains("Other effects"));
     }
 
@@ -98,6 +101,22 @@ class CommandLoadedNpcStatusSnapshotServiceHappinessPresentationTest {
 
         assertTrue(tooltip.contains("Food: +7.00\n  Apple\n  Berry"));
         assertFalse(tooltip.contains("Last food eaten"));
+    }
+
+    @Test
+    void showsOneInactiveCategoryValueWithoutAFalseRange() {
+        var presentation = new CompanionHappinessPresentationService.PresentationSnapshot(
+                62, 0, 100, 50, 55,
+                List.of(),
+                List.of(new CompanionHappinessPresentationService.EffectEntry(
+                        "thirst_quenched", "Thirst: Quenched", 4,
+                        CompanionHappinessPresentationService.EffectKind.EQUILIBRIUM)),
+                false);
+
+        String tooltip = newService().buildHappinessPresentation(presentation, "en-US");
+
+        assertTrue(tooltip.contains("Thirst: +4.00"));
+        assertFalse(tooltip.contains("+4.00 to +4.00"));
     }
 
     private static CommandLoadedNpcStatusSnapshotService newService() {

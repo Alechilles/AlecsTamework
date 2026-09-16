@@ -481,21 +481,24 @@ final class CommandLoadedNpcStatusSnapshotService {
             appendActiveHappinessCategories(lines, activeCategories, language);
             appendHappinessEffects(lines, activeOther, language);
         }
-        var inactiveCategories = java.util.EnumSet.noneOf(HappinessSummaryCategory.class);
+        var inactiveCategories = new java.util.EnumMap<HappinessSummaryCategory,
+                List<CompanionHappinessPresentationService.EffectEntry>>(HappinessSummaryCategory.class);
         ArrayList<CompanionHappinessPresentationService.EffectEntry> inactiveOther = new ArrayList<>();
         for (CompanionHappinessPresentationService.EffectEntry effect : presentation.inactiveEffects()) {
             HappinessSummaryCategory category = summaryCategory(effect, presentation.foodEffectsExclusive());
             if (category == null) {
                 inactiveOther.add(effect);
             } else if (!activeCategories.containsKey(category)) {
-                inactiveCategories.add(category);
+                inactiveCategories.computeIfAbsent(category, ignored -> new ArrayList<>()).add(effect);
             }
         }
         if (!inactiveCategories.isEmpty() || !inactiveOther.isEmpty()) {
             lines.add(LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.allEffects"));
             for (HappinessSummaryCategory category : HappinessSummaryCategory.values()) {
-                if (inactiveCategories.contains(category)) {
-                    lines.add(summaryCategoryLabel(category, language) + ": -");
+                List<CompanionHappinessPresentationService.EffectEntry> effects = inactiveCategories.get(category);
+                if (effects != null && !effects.isEmpty()) {
+                    lines.add(summaryCategoryLabel(category, language) + ": "
+                            + formatEffectRange(effects, language));
                 }
             }
             appendInactiveHappinessEffects(lines, inactiveOther, language);
@@ -541,8 +544,29 @@ final class CommandLoadedNpcStatusSnapshotService {
                                                 @Nonnull List<CompanionHappinessPresentationService.EffectEntry> effects,
                                                 @Nullable String language) {
         for (CompanionHappinessPresentationService.EffectEntry effect : effects) {
-            lines.add(resolvePresentationEffectLabel(effect, language) + ": -");
+            lines.add(resolvePresentationEffectLabel(effect, language) + ": " + formatSigned(effect.value()));
         }
+    }
+
+    @Nonnull
+    private String formatEffectRange(@Nonnull List<CompanionHappinessPresentationService.EffectEntry> effects,
+                                     @Nullable String language) {
+        double minimum = Double.POSITIVE_INFINITY;
+        double maximum = Double.NEGATIVE_INFINITY;
+        for (CompanionHappinessPresentationService.EffectEntry effect : effects) {
+            if (effect != null && Double.isFinite(effect.value())) {
+                minimum = Math.min(minimum, effect.value());
+                maximum = Math.max(maximum, effect.value());
+            }
+        }
+        if (!Double.isFinite(minimum) || !Double.isFinite(maximum)) {
+            return formatSigned(0.0);
+        }
+        String lower = formatSigned(minimum);
+        if (Math.abs(maximum - minimum) <= 0.000001) {
+            return lower;
+        }
+        return LocalizedText.format(language, "tamework.ui.linkedPanel.happiness.range", lower, formatSigned(maximum));
     }
 
     @Nullable

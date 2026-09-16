@@ -228,13 +228,15 @@ final class CommandLinkedPanelProgressionPresentationService {
             Double flatOffset = flatDisposition && "HappinessGainMultiplier".equalsIgnoreCase(definition.getEffectKey())
                     ? CompanionHappinessModifierService.resolveFlatDispositionOffset(value, happinessConfig.getDisposition())
                     : null;
+            String traitTooltip = TraitDescriptionFormatter.append(label, definition, value, flatOffset, language);
+            if (traitTooltip.equals(label)) {
+                traitTooltip = buildTraitTooltip(language, label, value, min, defaultValue, max, flatOffset);
+            }
             indicators.add(new LinkedNpcTraitIndicator(
                     resolveIconGlyph(label),
                     resolveIconTexturePath(definition),
                     label,
-                    TraitDescriptionFormatter.append(
-                            buildTraitTooltip(language, label, value, min, defaultValue, max, flatOffset),
-                            definition, value, flatOffset, language),
+                    traitTooltip,
                     fillRatio,
                     !belowDefault,
                     belowDefault

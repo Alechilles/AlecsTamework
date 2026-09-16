@@ -30,18 +30,29 @@ public final class TraitDescriptionFormatter {
             case "movespeedmultiplier" -> "moveSpeed";
             case "happinessgainmultiplier" -> flatDispositionOffset == null ? "happinessGain" : "happinessFlat";
             case "fertilitymultiplier" -> "fertility";
+            case "needshungerdecaymultiplier" -> "hungerDecay";
+            case "needsthirstdecaymultiplier" -> "thirstDecay";
+            case "harvestrecoveryspeedmultiplier" -> "harvestRecovery";
+            case "fleecefiberyieldmultiplier" -> "fleeceYield";
+            case "animalproductyieldmultiplier" -> "productYield";
             case "harvestdoubledropchancemultiplier" -> "harvest";
             default -> null;
         };
-        String fallback = suffix == null ? "" : LocalizedText.resolve(language, "tamework.traits.description." + suffix);
-        String template = LocalizedText.resolveConfigValue(language, definition.getDescription(), fallback);
-        if (template.isBlank()) {
-            return header;
-        }
         double delta = value - 1.0;
         if ("damagetakenmultiplier".equals(effect)) {
             double inverse = value > 0.0 ? 1.0 / value : 1.0;
             delta = Double.isFinite(inverse) ? inverse - 1.0 : 0.0;
+        }
+        String fallback = suffix == null ? "" : LocalizedText.resolve(language, "tamework.traits.description." + suffix);
+        if ("fertilitymultiplier".equals(effect)
+                && (definition.getDescription() == null || definition.getDescription().isBlank())) {
+            String fertilityState = delta > 0.0 ? "fertilityPositive"
+                    : delta < 0.0 ? "fertilityNegative" : "fertilityNeutral";
+            fallback = LocalizedText.resolve(language, "tamework.traits.description." + fertilityState);
+        }
+        String template = LocalizedText.resolveConfigValue(language, definition.getDescription(), fallback);
+        if (template.isBlank()) {
+            return header;
         }
         if ("harvestdoubledropchancemultiplier".equals(effect)) {
             delta = Math.max(0.0, Math.min(1.0, delta));

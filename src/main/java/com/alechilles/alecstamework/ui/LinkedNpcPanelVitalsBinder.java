@@ -41,7 +41,7 @@ final class LinkedNpcPanelVitalsBinder {
             commands.set(needs[i] + " #NeedValueText.Style", Value.ref("TameworkCommandTargetHud.ui", "MeterValue"));
         }
         commands.setObject("#NeedHappiness #BreedingThresholdMarker.Anchor",
-                LinkedNpcPanelStatusMeter.buildBreedingHeartAnchor(entry.breedingHappinessRatio(), 0, 24, 100));
+                LinkedNpcPanelStatusMeter.buildBreedingHeartAnchor(entry.breedingHappinessRatio(), 0, 18, 100));
         Anchor target = hudFill(0, 2);
         target.setLeft(Value.of((int) Math.round(clamp(entry.targetHappinessPercent() / 100.0) * 98)));
         target.setTop(Value.of(24));
@@ -180,7 +180,7 @@ final class LinkedNpcPanelVitalsBinder {
         commandBuilder.set(markerSelector + ".Visible", showMarker);
         if (showMarker) {
             commandBuilder.setObject(markerSelector + ".Anchor",
-                    LinkedNpcPanelStatusMeter.buildBreedingHeartAnchor(entry.breedingHappinessRatio(), 92, 6, 92));
+                    LinkedNpcPanelStatusMeter.buildBreedingHeartAnchor(entry.breedingHappinessRatio(), 92, 0, 92));
         }
         String targetSelector = entrySelector + " #NeedHappiness #HappinessTargetMarker";
         commandBuilder.set(targetSelector + ".Visible", shouldShowHappiness(entry) && entry.hasHappiness());
@@ -422,11 +422,11 @@ final class LinkedNpcPanelVitalsBinder {
             String prefix = index == 0 ? "" : "\n";
             if (line.equals(allHeading)) {
                 inactive = true;
-                spans.add(Message.raw(prefix + line).color(TOOLTIP_GRAY));
+                spans.add(Message.raw("\n\n" + line).color("#e1be73").bold(true));
                 continue;
             }
             if (line.equals(activeHeading)) {
-                spans.add(Message.raw(prefix + line).color(TOOLTIP_WHITE));
+                spans.add(Message.raw("\n\n" + line).color("#e1be73").bold(true));
                 continue;
             }
             if (inactive || line.startsWith("  ")) {
@@ -438,7 +438,7 @@ final class LinkedNpcPanelVitalsBinder {
                 String value = line.substring(delimiter + 2);
                 Color valueColor = value.startsWith("+") ? TOOLTIP_GREEN
                         : value.startsWith("-") ? TOOLTIP_RED : TOOLTIP_WHITE;
-                spans.add(Message.raw(prefix + line.substring(0, delimiter + 2)).color(TOOLTIP_WHITE));
+                spans.add(Message.raw(prefix + line.substring(0, delimiter + 2)).color(TOOLTIP_WHITE).bold(true));
                 spans.add(Message.raw(value).color(valueColor));
                 continue;
             }

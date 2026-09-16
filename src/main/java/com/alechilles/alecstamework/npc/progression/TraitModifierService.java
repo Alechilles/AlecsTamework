@@ -143,7 +143,8 @@ public final class TraitModifierService {
         }
         return switch (effectKey.trim().toLowerCase(Locale.ROOT)) {
             case "happinessgainmultiplier", "fertilitymultiplier", "maxhealthmultiplier",
-                    "fleecefiberyieldmultiplier", "harvestrecoveryspeedmultiplier", "sizemultiplier" -> 1;
+                    "fleecefiberyieldmultiplier", "animalproductyieldmultiplier",
+                    "harvestrecoveryspeedmultiplier", "sizemultiplier" -> 1;
             case "needsdecaymultiplier", "needshungerdecaymultiplier", "needsthirstdecaymultiplier" -> -1;
             default -> 0;
         };

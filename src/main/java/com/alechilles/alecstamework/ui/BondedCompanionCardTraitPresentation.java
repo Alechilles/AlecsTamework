@@ -51,11 +51,13 @@ final class BondedCompanionCardTraitPresentation {
                     && "HappinessGainMultiplier".equalsIgnoreCase(definition.getEffectKey())
                     ? CompanionHappinessModifierService.resolveFlatDispositionOffset(value, happinessConfig.getDisposition())
                     : null;
+            String traitTooltip = TraitDescriptionFormatter.append(label, definition, value, flatOffset, language);
+            if (traitTooltip.equals(label)) {
+                traitTooltip = tooltip(language, label, current, minimum, baseline, maximum, belowDefault);
+            }
             indicators.add(new LinkedNpcTraitIndicator(iconGlyph(label),
                     definition.getIconPath(), label,
-                    TraitDescriptionFormatter.append(
-                            tooltip(language, label, current, minimum, baseline, maximum, belowDefault),
-                            definition, value, flatOffset, language),
+                    traitTooltip,
                     belowDefault ? ratio(baseline - current, baseline - minimum)
                             : ratio(current - baseline, maximum - baseline),
                     !belowDefault, belowDefault));

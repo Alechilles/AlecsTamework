@@ -34,6 +34,26 @@ class TraitDescriptionFormatterTest {
     }
 
     @Test
+    void husbandryTraitDescriptionsExplainEachLiveEffect() {
+        assertEquals("Strength\nDecreases how quickly hunger falls by 20%.",
+                describe(definition("NeedsHungerDecayMultiplier", null), 0.8));
+        assertEquals("Strength\nIncreases how quickly thirst falls by 20%.",
+                describe(definition("NeedsThirstDecayMultiplier", null), 1.2));
+        assertEquals("Strength\nIncreases how quickly harvests grow back by 20%.",
+                describe(definition("HarvestRecoverySpeedMultiplier", null), 1.2));
+        assertEquals("Strength\nDecreases wool and fiber yield by 20%.",
+                describe(definition("FleeceFiberYieldMultiplier", null), 0.8));
+        assertEquals("Strength\nIncreases wool, egg, and milk yield by 20%.",
+                describe(definition("AnimalProductYieldMultiplier", null), 1.2));
+        assertEquals("Strength\nThis animal tends to have more babies. Both parents matter.",
+                describe(definition("FertilityMultiplier", null), 1.2));
+        assertEquals("Strength\nThis animal tends to have fewer babies. Both parents matter.",
+                describe(definition("FertilityMultiplier", null), 0.8));
+        assertEquals("Strength\nThis animal has no bonus to the number of babies.",
+                describe(definition("FertilityMultiplier", null), 1.0));
+    }
+
+    @Test
     void harvestDescriptionsNeverPromiseNegativeOrAboveCertainBonusChances() {
         TwTraitConfig.TraitDefinition harvest = definition("HarvestDoubleDropChanceMultiplier",
                 "{direction} {percent}% ({signedPercent}%)");
