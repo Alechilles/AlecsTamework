@@ -36,10 +36,10 @@ final class LinkedNpcPanelStatusMeter {
 
     static Anchor buildBreedingHeartAnchor(double ratio, int left, int top, int barWidth) {
         Anchor anchor = new Anchor();
-        anchor.setLeft(Value.of(left + (int) Math.round(clamp(ratio) * barWidth) - 3));
+        anchor.setLeft(Value.of(left + (int) Math.round(clamp(ratio) * barWidth) - 4));
         anchor.setTop(Value.of(top));
-        anchor.setWidth(Value.of(7));
-        anchor.setHeight(Value.of(6));
+        anchor.setWidth(Value.of(9));
+        anchor.setHeight(Value.of(7));
         return anchor;
     }
 

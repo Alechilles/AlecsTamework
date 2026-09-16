@@ -235,10 +235,12 @@ final class CommandTargetHudBinder {
             commandBuilder.set(slot + " #TraitIcon.Visible", !trait.hasIconTexturePath());
             if (trait.hasIconTexturePath()) {
                 commandBuilder.set(slot + " #TraitIconImage.Background", trait.iconTexturePath());
+                commandBuilder.setObject(slot + " #TraitIconImage.Anchor", LinkedNpcTraitIndicatorBinder.iconAnchor(trait.iconTexturePath(), 2, 5, 20));
             } else {
                 commandBuilder.set(slot + " #TraitIcon.Text", trait.iconText());
             }
             commandBuilder.set(slot + " #TraitTooltip.TooltipText", trait.tooltipText());
+            commandBuilder.set(slot + " #TraitTooltip.TooltipTextSpans", LinkedNpcTraitIndicatorBinder.tooltipSpans(trait.tooltipText()));
             commandBuilder.set(slot + " #TraitTick.Background", trait.belowDefault() ? "#d45f5f" : "#6fc576");
             Anchor tick = leftAnchor(0, Math.max(2, (int) Math.round(trait.fillRatio() * 20)), 3);
             tick.setLeft(Value.of(2));
