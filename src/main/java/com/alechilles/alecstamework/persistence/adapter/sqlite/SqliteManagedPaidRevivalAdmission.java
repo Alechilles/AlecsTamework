@@ -10,8 +10,6 @@ import com.alechilles.alecstamework.api.PopulationCompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
-import com.alechilles.alecstamework.companion.population.domain.PopulationDomainConvergencePlan;
-import com.alechilles.alecstamework.companion.population.domain.PopulationDomainConvergencePlanner;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalDefinition;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalRequest;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
@@ -246,59 +244,16 @@ final class SqliteManagedPaidRevivalAdmission {
             CompanionLifecycle target,
             OperationId operationId
     ) {
-        if (evidence == null) {
-            throw new IllegalStateException(
-                    "Lifecycle admission returned no evidence"
-            );
-        }
-        if (evidence.status() != LifecycleAdmissionEvidence.Status.MANAGED) {
-            return requested.withAdmissionEvidence(evidence);
-        }
-        var payload = evidence.payload();
-        if (payload == null
-                || !payload.profileId().equals(source.lifecycle().profileId())
-                || !Objects.equals(
-                payload.expectedLifecycleRevision(), source.lifecycle().revision()
-        )
-                || payload.sourceLifecycle() != source.lifecycle().state()
-                || !Objects.equals(
-                payload.sourceOwnerId(), source.lifecycle().ownerId()
-        )
-                || !Objects.equals(
-                payload.sourceWorldKey(), source.lifecycle().ownerWorldKey()
-        )
-                || payload.targetLifecycle() != LifecycleState.ACTIVE
-                || !Objects.equals(payload.ownerId(), target.ownerId())
-                || !Objects.equals(
-                payload.ownerWorldKey(), target.ownerWorldKey()
-        )) {
-            throw new IllegalStateException(
-                    "paid_revival_admission_canonical_evidence_mismatch"
-            );
-        }
-        PopulationDomainConvergencePlan plan =
-                PopulationDomainConvergencePlanner.plan(
-                        source.lifecycle().profileId(),
-                        source.lifecycle().revision(),
-                        source.lifecycle().ownerId(),
-                        source.lifecycle().ownerWorldKey(),
-                        source.lifecycle().state(),
-                        target.ownerId(),
-                        target.ownerWorldKey(),
-                        LifecycleState.ACTIVE,
-                        source.committedDomainRows(),
-                        payload.reservations(operationId)
-                );
-        if (evidence.convergencePlan() != null
-                && !evidence.convergencePlan().equals(plan)) {
-            throw new IllegalStateException(
-                    "paid_revival_admission_convergence_mismatch"
-            );
-        }
         return requested.withAdmissionEvidence(
-                LifecycleAdmissionEvidence.managed(
-                        payload, evidence.composition(), plan
-                )
+                SqliteManagedLifecycleAdmissionEvidence
+                        .normalizeActiveTransition(
+                                evidence,
+                                source,
+                                target,
+                                operationId,
+                                "paid_revival_admission_canonical_evidence_mismatch",
+                                "paid_revival_admission_convergence_mismatch"
+                        )
         );
     }
 

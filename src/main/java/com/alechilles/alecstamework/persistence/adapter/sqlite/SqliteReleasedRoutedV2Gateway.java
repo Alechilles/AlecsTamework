@@ -46,13 +46,13 @@ public final class SqliteReleasedRoutedV2Gateway {
     /** Verifies all table and index contents plus every foreign-key edge. */
     public static void verifyIntegrity(Connection connection)
             throws SQLException {
-        requireSingleValue(
+        SqliteSchemaVerificationChecks.requireSingleValue(
                 connection,
                 "PRAGMA integrity_check",
                 "ok",
                 "replacement_integrity_check_failed"
         );
-        requireNoRows(
+        SqliteSchemaVerificationChecks.requireNoRows(
                 connection,
                 "PRAGMA foreign_key_check",
                 "replacement_foreign_key_check_failed"
@@ -131,32 +131,4 @@ public final class SqliteReleasedRoutedV2Gateway {
         return Map.copyOf(definitions);
     }
 
-    private static void requireSingleValue(
-            Connection connection,
-            String sql,
-            String expected,
-            String failureCode
-    ) throws SQLException {
-        try (Statement statement = connection.createStatement();
-             ResultSet rows = statement.executeQuery(sql)) {
-            if (!rows.next()
-                    || !expected.equalsIgnoreCase(rows.getString(1))
-                    || rows.next()) {
-                throw new SQLException(failureCode);
-            }
-        }
-    }
-
-    private static void requireNoRows(
-            Connection connection,
-            String sql,
-            String failureCode
-    ) throws SQLException {
-        try (Statement statement = connection.createStatement();
-             ResultSet rows = statement.executeQuery(sql)) {
-            if (rows.next()) {
-                throw new SQLException(failureCode);
-            }
-        }
-    }
 }

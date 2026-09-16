@@ -43,13 +43,13 @@ public final class SqliteSchemaV1ReadOnlyGateway {
                 throw new SQLException("replacement_schema_definition_mismatch");
             }
             verifyHistory(connection);
-            requireSingleValue(
+            SqliteSchemaVerificationChecks.requireSingleValue(
                     connection,
                     "PRAGMA quick_check(1)",
                     "ok",
                     "replacement_integrity_check_failed"
             );
-            requireNoRows(
+            SqliteSchemaVerificationChecks.requireNoRows(
                     connection,
                     "PRAGMA foreign_key_check",
                     "replacement_foreign_key_check_failed"
@@ -89,32 +89,4 @@ public final class SqliteSchemaV1ReadOnlyGateway {
         }
     }
 
-    private static void requireSingleValue(
-            Connection connection,
-            String sql,
-            String expected,
-            String failureCode
-    ) throws SQLException {
-        try (Statement statement = connection.createStatement();
-             ResultSet rows = statement.executeQuery(sql)) {
-            if (!rows.next()
-                    || !expected.equalsIgnoreCase(rows.getString(1))
-                    || rows.next()) {
-                throw new SQLException(failureCode);
-            }
-        }
-    }
-
-    private static void requireNoRows(
-            Connection connection,
-            String sql,
-            String failureCode
-    ) throws SQLException {
-        try (Statement statement = connection.createStatement();
-             ResultSet rows = statement.executeQuery(sql)) {
-            if (rows.next()) {
-                throw new SQLException(failureCode);
-            }
-        }
-    }
 }

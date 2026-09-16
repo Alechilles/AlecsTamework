@@ -4,13 +4,9 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -36,8 +32,11 @@ public final class SqliteSchemaV2ReadOnlyGateway {
         try {
             String v2Script = loadScript(V2_RESOURCE);
             String v1Script = loadScript(V1_RESOURCE);
-            if (!schemaObjects(connection).equals(
-                    expectedSchemaObjects(v2Script)
+            if (!SqliteSchemaDefinitionCatalog
+                    .inspectReadOnlyCompatibility(connection).equals(
+                    SqliteSchemaDefinitionCatalog.expectedReadOnlySchema(
+                            v2Script
+                    )
             )) {
                 throw new SQLException(
                         "replacement_schema_definition_mismatch"
@@ -48,13 +47,13 @@ public final class SqliteSchemaV2ReadOnlyGateway {
                     sha256(v1Script),
                     sha256(v2Script)
             );
-            requireSingleValue(
+            SqliteSchemaVerificationChecks.requireSingleValue(
                     connection,
                     "PRAGMA quick_check(1)",
                     "ok",
                     "replacement_integrity_check_failed"
             );
-            requireNoRows(
+            SqliteSchemaVerificationChecks.requireNoRows(
                     connection,
                     "PRAGMA foreign_key_check",
                     "replacement_foreign_key_check_failed"
@@ -102,75 +101,6 @@ public final class SqliteSchemaV2ReadOnlyGateway {
         }
     }
 
-    private static Map<String, String> expectedSchemaObjects(String script)
-            throws Exception {
-        try (Connection authority = DriverManager.getConnection(
-                "jdbc:sqlite::memory:"
-        )) {
-            for (String sql : SqlScriptParser.statements(script)) {
-                if (!sql.isBlank()) {
-                    try (Statement statement = authority.createStatement()) {
-                        statement.execute(sql);
-                    }
-                }
-            }
-            return schemaObjects(authority);
-        }
-    }
-
-    private static Map<String, String> schemaObjects(Connection connection)
-            throws SQLException {
-        HashMap<String, String> objects = new HashMap<>();
-        try (Statement statement = connection.createStatement();
-             ResultSet rows = statement.executeQuery("""
-                     SELECT type, name, sql
-                     FROM sqlite_master
-                     WHERE name NOT LIKE 'sqlite_%'
-                     ORDER BY type, name
-                     """)) {
-            while (rows.next()) {
-                String sql = rows.getString("sql");
-                if (sql == null) {
-                    throw new SQLException("replacement_schema_sql_missing");
-                }
-                objects.put(
-                        rows.getString("type") + ":" + rows.getString("name"),
-                        normalizeDdl(sql)
-                );
-            }
-        }
-        return Map.copyOf(objects);
-    }
-
-    private static void requireSingleValue(
-            Connection connection,
-            String sql,
-            String expected,
-            String failureCode
-    ) throws SQLException {
-        try (Statement statement = connection.createStatement();
-             ResultSet rows = statement.executeQuery(sql)) {
-            if (!rows.next()
-                    || !expected.equalsIgnoreCase(rows.getString(1))
-                    || rows.next()) {
-                throw new SQLException(failureCode);
-            }
-        }
-    }
-
-    private static void requireNoRows(
-            Connection connection,
-            String sql,
-            String failureCode
-    ) throws SQLException {
-        try (Statement statement = connection.createStatement();
-             ResultSet rows = statement.executeQuery(sql)) {
-            if (rows.next()) {
-                throw new SQLException(failureCode);
-            }
-        }
-    }
-
     private static String loadScript(String resource) throws Exception {
         try (InputStream stream =
                      SqliteSchemaV2ReadOnlyGateway.class
@@ -193,12 +123,4 @@ public final class SqliteSchemaV2ReadOnlyGateway {
         );
     }
 
-    private static String normalizeDdl(String sql) {
-        String normalized = sql.trim()
-                .replaceAll("\\s+", " ")
-                .toLowerCase(Locale.ROOT);
-        return normalized.endsWith(";")
-                ? normalized.substring(0, normalized.length() - 1).trim()
-                : normalized;
-    }
 }

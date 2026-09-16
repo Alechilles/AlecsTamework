@@ -148,6 +148,31 @@ class SqliteSchemaV2ManagerTest {
         }
     }
 
+    @Test
+    void readOnlyGatewayRetainsHistoricalQuotedDdlCaseNormalization()
+            throws Exception {
+        SqliteConnectionFactory connections = connections("ddl-case.sqlite");
+        assertInstanceOf(PersistenceTransactionResult.Committed.class,
+                new SqliteSchemaV2Manager(connections, () -> -5_000).initialize());
+
+        try (Connection connection = connections.openWriterConnection();
+             Statement statement = connection.createStatement()) {
+            statement.execute("PRAGMA writable_schema = ON");
+            statement.executeUpdate("""
+                    UPDATE sqlite_master
+                    SET sql = replace(sql, '''PREPARED''', '''prepared''')
+                    WHERE type = 'table' AND name = 'operation_envelope'
+                    """);
+            statement.execute("PRAGMA writable_schema = OFF");
+        }
+
+        try (Connection connection = connections.openReadConnection()) {
+            assertDoesNotThrow(() -> SqliteSchemaV2ReadOnlyGateway.verify(
+                    connection
+            ));
+        }
+    }
+
     private SqliteConnectionFactory connections(String fileName) {
         return new SqliteConnectionFactory(tempDir.resolve(fileName));
     }

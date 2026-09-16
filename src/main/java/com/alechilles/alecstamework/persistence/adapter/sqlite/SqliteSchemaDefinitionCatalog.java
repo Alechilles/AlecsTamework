@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -64,6 +65,18 @@ final class SqliteSchemaDefinitionCatalog {
     }
 
     static Inspection inspect(Connection connection) throws SQLException {
+        return inspect(connection, false);
+    }
+
+    /** Preserves the shipped v2 gateway's historical DDL comparison rules. */
+    static Inspection inspectReadOnlyCompatibility(Connection connection)
+            throws SQLException {
+        return inspect(connection, true);
+    }
+
+    private static Inspection inspect(
+            Connection connection, boolean readOnlyCompatibility
+    ) throws SQLException {
         Set<SchemaObject> objects = new HashSet<>();
         Map<SchemaObject, String> definitions = new HashMap<>();
         try (Statement statement = connection.createStatement();
@@ -76,16 +89,39 @@ final class SqliteSchemaDefinitionCatalog {
                         rows.getString("type"), rows.getString("name")
                 );
                 objects.add(object);
-                if ("table".equals(object.type())
-                        || "index".equals(object.type())) {
-                    String sql = rows.getString("sql");
-                    if (sql != null) {
-                        definitions.put(object, normalize(sql));
-                    }
+                String sql = rows.getString("sql");
+                if (readOnlyCompatibility && sql == null) {
+                    throw new SQLException("replacement_schema_sql_missing");
+                }
+                if (sql != null && (readOnlyCompatibility
+                        || "table".equals(object.type())
+                        || "index".equals(object.type()))) {
+                    definitions.put(
+                            object,
+                            readOnlyCompatibility
+                                    ? normalizeReadOnlyDdl(sql)
+                                    : normalize(sql)
+                    );
                 }
             }
         }
         return new Inspection(Set.copyOf(objects), Map.copyOf(definitions));
+    }
+
+    static Inspection expectedReadOnlySchema(String script)
+            throws SQLException {
+        try (Connection authority = DriverManager.getConnection(
+                "jdbc:sqlite::memory:"
+        )) {
+            for (String statement : SqlScriptParser.statements(script)) {
+                if (!statement.isBlank()) {
+                    try (Statement executor = authority.createStatement()) {
+                        executor.execute(statement);
+                    }
+                }
+            }
+            return inspectReadOnlyCompatibility(authority);
+        }
     }
 
     static String normalize(String sql) {
@@ -122,6 +158,15 @@ final class SqliteSchemaDefinitionCatalog {
             };
         }
         return normalized.toString();
+    }
+
+    private static String normalizeReadOnlyDdl(String sql) {
+        String normalized = sql.trim()
+                .replaceAll("\\s+", " ")
+                .toLowerCase(Locale.ROOT);
+        return normalized.endsWith(";")
+                ? normalized.substring(0, normalized.length() - 1).trim()
+                : normalized;
     }
 
     record SchemaObject(String type, String name) {
