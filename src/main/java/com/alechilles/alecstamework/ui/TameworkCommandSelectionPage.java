@@ -38,7 +38,8 @@ import static com.alechilles.alecstamework.ui.CommandSelectionPageEventBinder.*;
 
 /** Interactive command-selection page for command items and linked NPC cards. */
 public final class TameworkCommandSelectionPage
-        extends InteractiveCustomUIPage<CommandSelectionEventData> {
+        extends InteractiveCustomUIPage<CommandSelectionEventData>
+        implements StandardCommandUiController.Delegate {
     public static final String UI_PATH = "TameworkCommandRadialMenu.ui";
     public static final String LINKED_PANEL_UI_PATH = "TameworkLinkedNpcPanel.ui";
     public static final String LINKED_PANEL_CARD_UI_PATH = "TameworkLinkedNpcPanelCard.ui";
@@ -392,18 +393,21 @@ public final class TameworkCommandSelectionPage
     }
 
     /** Routes background panel updates through the owning command UI host. */
-    void configureHostPacketSender(@Nonnull LinkedNpcPanelPacketSender sender) {
+    @Override
+    public void configureHostPacketSender(@Nonnull LinkedNpcPanelPacketSender sender) {
         this.packetSender = Objects.requireNonNull(sender, "sender");
     }
 
     /** Accepts detached optional contributor presentation on this page's world thread. */
-    void configureDefaultDecorations(@Nonnull CommandUiSnapshot snapshot) {
+    @Override
+    public void configureDefaultDecorations(@Nonnull CommandUiSnapshot snapshot) {
         defaultDecorations = CommandUiDefaultDecorationBinder.from(snapshot);
     }
 
     /** Updates the retained default decoration state and every currently rendered card. */
-    void updateDefaultDecorations(@Nonnull CommandUiSnapshot snapshot,
-                                  @Nonnull UICommandBuilder commands) {
+    @Override
+    public void updateDefaultDecorations(@Nonnull CommandUiSnapshot snapshot,
+                                         @Nonnull UICommandBuilder commands) {
         configureDefaultDecorations(snapshot);
         linkedPanelRuntime.bindDefaultDecorations(commands);
     }
@@ -1177,7 +1181,8 @@ public final class TameworkCommandSelectionPage
     }
 
     /** Releases standard renderer state when its owning host closes. */
-    void closeForHost() {
+    @Override
+    public void closeForHost() {
         dismissed = true;
         navigationPending = false;
         removalConfirmOverlay.clear();

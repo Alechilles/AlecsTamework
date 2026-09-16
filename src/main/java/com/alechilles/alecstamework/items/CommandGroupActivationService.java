@@ -111,7 +111,7 @@ final class CommandGroupActivationService {
                 continue;
             }
             boolean nextActive = shouldActivate(record, normalizedValue, groupId);
-            updated.add(withActive(record, nextActive));
+            updated.add(record.withActive(nextActive));
             changed |= record.active != nextActive;
         }
         return changed ? updated : records;
@@ -201,22 +201,5 @@ final class CommandGroupActivationService {
             return false;
         }
         return recordGroupId.trim().equalsIgnoreCase(targetGroupId.trim());
-    }
-
-    private LinkedNpcRecord withActive(LinkedNpcRecord record, boolean active) {
-        return new LinkedNpcRecord(
-                record.npcUuid,
-                record.profileId,
-                record.lastKnownPosition,
-                record.lastKnownWorldName,
-                record.homePosition,
-                record.cachedDisplayName,
-                record.cachedNameKey,
-                record.cachedRoleId,
-                record.cachedCommandState,
-                active,
-                record.breedingEnabled,
-                record.groupId
-        );
     }
 }

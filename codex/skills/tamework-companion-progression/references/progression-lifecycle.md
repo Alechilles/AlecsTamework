@@ -35,7 +35,7 @@ Verify all names in current source:
 - `CompanionNeedsSystem`, `CompanionNeedsService`, and
   `CompanionNeedsRuntimePolicy`
 - `CompanionHappinessService`, `CompanionLifeStageService`,
-  `CompanionTraitEffectService`, and `CompanionTalentService`
+  `CompanionStatModifierService`, and `CompanionTalentService`
 - companion checkpoint, coop snapshot, bonded snapshot, and progression
   metadata services
 - `CompanionNeedsSignedTimeTest` for the negative world-time invariant

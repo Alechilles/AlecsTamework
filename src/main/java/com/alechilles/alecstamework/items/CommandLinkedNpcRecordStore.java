@@ -186,20 +186,7 @@ final class CommandLinkedNpcRecordStore {
             if (record.active == active) {
                 break;
             }
-            records.set(i, new LinkedNpcRecord(
-                    record.npcUuid,
-                    record.profileId,
-                    record.lastKnownPosition,
-                    record.lastKnownWorldName,
-                    record.homePosition,
-                    record.cachedDisplayName,
-                    record.cachedNameKey,
-                    record.cachedRoleId,
-                    record.cachedCommandState,
-                    active,
-                    record.breedingEnabled,
-                    record.groupId
-            ));
+            records.set(i, record.withActive(active));
             changed = true;
             break;
         }
@@ -224,20 +211,7 @@ final class CommandLinkedNpcRecordStore {
             if (record.breedingEnabled == breedingEnabled) {
                 break;
             }
-            records.set(i, new LinkedNpcRecord(
-                    record.npcUuid,
-                    record.profileId,
-                    record.lastKnownPosition,
-                    record.lastKnownWorldName,
-                    record.homePosition,
-                    record.cachedDisplayName,
-                    record.cachedNameKey,
-                    record.cachedRoleId,
-                    record.cachedCommandState,
-                    record.active,
-                    breedingEnabled,
-                    record.groupId
-            ));
+            records.set(i, record.withBreedingEnabled(breedingEnabled));
             changed = true;
             break;
         }
@@ -263,20 +237,7 @@ final class CommandLinkedNpcRecordStore {
             if (equalsIgnoreCase(record.groupId, normalizedGroupId)) {
                 break;
             }
-            records.set(i, new LinkedNpcRecord(
-                    record.npcUuid,
-                    record.profileId,
-                    record.lastKnownPosition,
-                    record.lastKnownWorldName,
-                    record.homePosition,
-                    record.cachedDisplayName,
-                    record.cachedNameKey,
-                    record.cachedRoleId,
-                    record.cachedCommandState,
-                    record.active,
-                    record.breedingEnabled,
-                    normalizedGroupId
-            ));
+            records.set(i, record.withGroupId(normalizedGroupId));
             changed = true;
             break;
         }

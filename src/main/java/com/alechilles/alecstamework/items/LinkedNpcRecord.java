@@ -122,5 +122,56 @@ final class LinkedNpcRecord {
         this.breedingEnabled = breedingEnabled;
         this.groupId = (groupId != null && !groupId.isBlank()) ? groupId : null;
     }
+
+    LinkedNpcRecord withActive(boolean active) {
+        return new LinkedNpcRecord(
+                npcUuid,
+                profileId,
+                lastKnownPosition,
+                lastKnownWorldName,
+                homePosition,
+                cachedDisplayName,
+                cachedNameKey,
+                cachedRoleId,
+                cachedCommandState,
+                active,
+                breedingEnabled,
+                groupId
+        );
+    }
+
+    LinkedNpcRecord withBreedingEnabled(boolean breedingEnabled) {
+        return new LinkedNpcRecord(
+                npcUuid,
+                profileId,
+                lastKnownPosition,
+                lastKnownWorldName,
+                homePosition,
+                cachedDisplayName,
+                cachedNameKey,
+                cachedRoleId,
+                cachedCommandState,
+                active,
+                breedingEnabled,
+                groupId
+        );
+    }
+
+    LinkedNpcRecord withGroupId(String groupId) {
+        return new LinkedNpcRecord(
+                npcUuid,
+                profileId,
+                lastKnownPosition,
+                lastKnownWorldName,
+                homePosition,
+                cachedDisplayName,
+                cachedNameKey,
+                cachedRoleId,
+                cachedCommandState,
+                active,
+                breedingEnabled,
+                groupId
+        );
+    }
 }
 

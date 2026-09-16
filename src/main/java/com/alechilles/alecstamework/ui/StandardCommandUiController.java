@@ -23,43 +23,7 @@ public final class StandardCommandUiController
     /** Creates the standard controller around Tamework's existing renderer. */
     public StandardCommandUiController(
             @Nonnull TameworkCommandSelectionPage page) {
-        this(new Delegate() {
-            @Override
-            public void configurePacketSender(LinkedNpcPanelPacketSender sender) {
-                page.configureHostPacketSender(sender);
-            }
-
-            @Override
-            public void configureSnapshot(CommandUiSnapshot snapshot) {
-                page.configureDefaultDecorations(snapshot);
-            }
-
-            @Override
-            public void updateSnapshot(CommandUiSnapshot snapshot,
-                                       UICommandBuilder commands) {
-                page.updateDefaultDecorations(snapshot, commands);
-            }
-
-            @Override
-            public void build(Ref<EntityStore> ref,
-                              UICommandBuilder commands,
-                              UIEventBuilder events,
-                              Store<EntityStore> store) {
-                page.build(ref, commands, events, store);
-            }
-
-            @Override
-            public void handle(Ref<EntityStore> ref,
-                               Store<EntityStore> store,
-                               CommandSelectionEventData event) {
-                page.handleDataEvent(ref, store, event);
-            }
-
-            @Override
-            public void close() {
-                page.closeForHost();
-            }
-        });
+        this((Delegate) page);
     }
 
     StandardCommandUiController(@Nonnull Delegate delegate) {
@@ -83,8 +47,8 @@ public final class StandardCommandUiController
             UIEventBuilder events
     ) {
         if (closed.get()) return;
-        delegate.configureSnapshot(snapshot);
-        delegate.configurePacketSender((partialCommands, partialEvents) ->
+        delegate.configureDefaultDecorations(snapshot);
+        delegate.configureHostPacketSender((partialCommands, partialEvents) ->
                 session.updateSink().submit(
                         partialCommands, partialEvents, false));
         delegate.build(ref, commands, events, store);
@@ -94,7 +58,7 @@ public final class StandardCommandUiController
     public void update(CommandUiUpdate update, UICommandBuilder commands,
                        UIEventBuilder events) {
         if (closed.get()) return;
-        delegate.updateSnapshot(update.snapshot(), commands);
+        delegate.updateDefaultDecorations(update.snapshot(), commands);
     }
 
     @Override
@@ -108,34 +72,34 @@ public final class StandardCommandUiController
             UIEventBuilder events
     ) {
         if (closed.get()) return;
-        delegate.handle(ref, store, event);
+        delegate.handleDataEvent(ref, store, event);
     }
 
     @Override
     public void close() {
-        if (closed.compareAndSet(false, true)) delegate.close();
+        if (closed.compareAndSet(false, true)) delegate.closeForHost();
     }
 
     /** Narrow adapter that keeps the legacy renderer behind the controller. */
     interface Delegate {
-        default void configureSnapshot(CommandUiSnapshot snapshot) {
+        default void configureDefaultDecorations(CommandUiSnapshot snapshot) {
         }
 
-        default void updateSnapshot(CommandUiSnapshot snapshot,
-                                    UICommandBuilder commands) {
+        default void updateDefaultDecorations(CommandUiSnapshot snapshot,
+                                              UICommandBuilder commands) {
         }
 
-        void configurePacketSender(LinkedNpcPanelPacketSender sender);
+        void configureHostPacketSender(LinkedNpcPanelPacketSender sender);
 
         void build(Ref<EntityStore> ref,
                    UICommandBuilder commands,
                    UIEventBuilder events,
                    Store<EntityStore> store);
 
-        void handle(Ref<EntityStore> ref,
-                    Store<EntityStore> store,
-                    CommandSelectionEventData event);
+        void handleDataEvent(Ref<EntityStore> ref,
+                             Store<EntityStore> store,
+                             CommandSelectionEventData event);
 
-        void close();
+        void closeForHost();
     }
 }

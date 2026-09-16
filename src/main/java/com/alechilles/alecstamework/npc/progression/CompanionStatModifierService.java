@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.npc.progression;
 
+import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.api.internal.TraitEffectRuntime;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -33,7 +35,12 @@ public final class CompanionStatModifierService {
             return;
         }
         applyMaxHealthModifier(npcRef, store);
-        CompanionTraitEffectService.applyTraitEffects(npcRef, store);
+        CompanionMovementSpeedEffectService.apply(npcRef, store);
+        Tamework instance = Tamework.getInstance();
+        TraitEffectRuntime runtime = instance != null ? instance.getTraitEffectRuntime() : null;
+        if (runtime != null) {
+            runtime.applyRegisteredEffects(npcRef, store);
+        }
     }
 
     private static void applyMaxHealthModifier(Ref<EntityStore> npcRef, Store<EntityStore> store) {

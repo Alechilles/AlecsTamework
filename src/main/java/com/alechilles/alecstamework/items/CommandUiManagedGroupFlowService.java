@@ -203,7 +203,7 @@ final class CommandUiManagedGroupFlowService {
             if (record == null) continue;
             if (record.groupId != null && groupId != null
                     && record.groupId.equalsIgnoreCase(groupId)) {
-                updated.add(withoutGroup(record));
+                updated.add(record.withGroupId(null));
                 changed = true;
             } else {
                 updated.add(record);
@@ -211,15 +211,6 @@ final class CommandUiManagedGroupFlowService {
         }
         return changed ? linkedRecords.write(withoutGroup, updated)
                 : withoutGroup;
-    }
-
-    private static LinkedNpcRecord withoutGroup(LinkedNpcRecord record) {
-        return new LinkedNpcRecord(
-                record.npcUuid, record.profileId, record.lastKnownPosition,
-                record.lastKnownWorldName, record.homePosition,
-                record.cachedDisplayName, record.cachedNameKey,
-                record.cachedRoleId, record.cachedCommandState, record.active,
-                record.breedingEnabled, null);
     }
 
     private static boolean validColor(@Nullable String input) {

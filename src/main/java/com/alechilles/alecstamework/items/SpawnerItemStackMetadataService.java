@@ -56,21 +56,6 @@ final class SpawnerItemStackMetadataService {
         return Boolean.TRUE.equals(captured);
     }
 
-    boolean isFilledItem(ItemStack itemStack, ItemFeatureConfig config) {
-        if (itemStack == null || itemStack.getItemId() == null) {
-            return false;
-        }
-        String itemId = itemStack.getItemId();
-        if (itemId.contains("_State_")) {
-            return true;
-        }
-        Boolean captured = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.CAPTURED, Codec.BOOLEAN);
-        if (captured != null) {
-            return captured;
-        }
-        return false;
-    }
-
     ItemStack swapItemId(ItemStack stack, String itemId) {
         if (stack == null || itemId == null || itemId.isBlank()) {
             return stack;

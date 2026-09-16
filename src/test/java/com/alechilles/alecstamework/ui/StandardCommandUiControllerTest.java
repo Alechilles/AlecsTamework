@@ -39,6 +39,7 @@ class StandardCommandUiControllerTest {
                 new UICommandBuilder(), new UIEventBuilder());
         delegate.sendBackgroundUpdate();
         controller.close();
+        controller.close();
 
         assertSame(initialCommands, delegate.initialCommands);
         assertSame(initialEvents, delegate.initialEvents);
@@ -76,18 +77,18 @@ class StandardCommandUiControllerTest {
         private int closeCount;
 
         @Override
-        public void configurePacketSender(LinkedNpcPanelPacketSender sender) {
+        public void configureHostPacketSender(LinkedNpcPanelPacketSender sender) {
             packetSender = sender;
         }
 
         @Override
-        public void configureSnapshot(CommandUiSnapshot snapshot) {
+        public void configureDefaultDecorations(CommandUiSnapshot snapshot) {
             initialSnapshot = snapshot;
         }
 
         @Override
-        public void updateSnapshot(CommandUiSnapshot snapshot,
-                                   UICommandBuilder commands) {
+        public void updateDefaultDecorations(CommandUiSnapshot snapshot,
+                                             UICommandBuilder commands) {
             refreshSnapshot = snapshot;
         }
 
@@ -101,14 +102,14 @@ class StandardCommandUiControllerTest {
         }
 
         @Override
-        public void handle(com.hypixel.hytale.component.Ref<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> ref,
-                           com.hypixel.hytale.component.Store<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> store,
-                           CommandSelectionEventData event) {
+        public void handleDataEvent(com.hypixel.hytale.component.Ref<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> ref,
+                                    com.hypixel.hytale.component.Store<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> store,
+                                    CommandSelectionEventData event) {
             this.event = event;
         }
 
         @Override
-        public void close() {
+        public void closeForHost() {
             closeCount++;
         }
 

@@ -464,20 +464,7 @@ final class CommandPanelActionService {
                 continue;
             }
             if (record.groupId != null && record.groupId.equalsIgnoreCase(groupId.trim())) {
-                updated.add(new LinkedNpcRecord(
-                        record.npcUuid,
-                        record.profileId,
-                        record.lastKnownPosition,
-                        record.lastKnownWorldName,
-                        record.homePosition,
-                        record.cachedDisplayName,
-                        record.cachedNameKey,
-                        record.cachedRoleId,
-                        record.cachedCommandState,
-                        record.active,
-                        record.breedingEnabled,
-                        null
-                ));
+                updated.add(record.withGroupId(null));
                 changed = true;
             } else {
                 updated.add(record);

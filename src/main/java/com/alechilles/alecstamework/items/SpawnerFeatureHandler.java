@@ -431,7 +431,7 @@ public final class SpawnerFeatureHandler {
         );
         if (source == null || source.isEmpty() || config == null
                 || !config.isSpawnerEnabled()
-                || !itemMetadata.isFilledItem(source, config)) {
+                || source.getItemId() == null || !itemMetadata.isAlreadyCaptured(source)) {
             return false;
         }
         String roleId = roles.resolveSpawnRoleId(source);
