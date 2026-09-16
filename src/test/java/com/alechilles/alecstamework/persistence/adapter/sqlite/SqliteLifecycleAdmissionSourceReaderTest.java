@@ -182,7 +182,7 @@ class SqliteLifecycleAdmissionSourceReaderTest {
                             "{}",
                             "population_domains",
                             null,
-                            java.util.List.of(OperationScope.profile(PROFILE)),
+                            java.util.List.of(OperationScope.profile(PROFILE), OperationScope.owner(OWNER)),
                             -100
                     )
             ).applied());
