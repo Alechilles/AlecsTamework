@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.api.ActivityIds;
 import com.alechilles.alecstamework.api.ActivityParticipantView;
 import com.alechilles.alecstamework.api.CareCreditOutcomeView;
 import com.alechilles.alecstamework.api.ManagedActivityView;
+import com.alechilles.alecstamework.api.HusbandryToolContext;
 import com.alechilles.alecstamework.api.NeedSatisfiedActivityView;
 import com.alechilles.alecstamework.api.internal.LiveActivityFeed;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
@@ -79,6 +80,22 @@ public final class ManagedActivityPublisher {
             @Nullable Map<String, Integer> itemQuantities,
             @Nullable CompanionXpTransition xpTransition
     ) {
+        publishHarvest(operationId, roleId, harvestContext, ownerId, companionId,
+                itemQuantities, xpTransition, null, null);
+    }
+
+    /** Publishes one committed harvest activity with its authorization-time tool receipt. */
+    public void publishHarvest(
+            @Nonnull UUID operationId,
+            @Nullable String roleId,
+            @Nullable String harvestContext,
+            @Nullable UUID ownerId,
+            @Nullable UUID companionId,
+            @Nullable Map<String, Integer> itemQuantities,
+            @Nullable CompanionXpTransition xpTransition,
+            @Nullable HusbandryToolContext tool,
+            @Nullable UUID actorId
+    ) {
         if (ownerId == null || companionId == null) {
             return;
         }
@@ -103,7 +120,9 @@ public final class ManagedActivityPublisher {
                 itemQuantities,
                 List.of(),
                 xpTransition,
-                null
+                null,
+                tool,
+                actorId
         );
     }
 
@@ -153,6 +172,19 @@ public final class ManagedActivityPublisher {
             @Nullable UUID companionId,
             @Nullable Map<String, Integer> itemQuantities
     ) {
+        publishCull(operationId, roleId, ownerId, companionId, itemQuantities, null, null);
+    }
+
+    /** Publishes one authorized cull with the tool snapshot that approved it. */
+    public void publishCull(
+            @Nonnull UUID operationId,
+            @Nullable String roleId,
+            @Nullable UUID ownerId,
+            @Nullable UUID companionId,
+            @Nullable Map<String, Integer> itemQuantities,
+            @Nullable HusbandryToolContext tool,
+            @Nullable UUID actorId
+    ) {
         if (ownerId == null || companionId == null) {
             return;
         }
@@ -171,7 +203,9 @@ public final class ManagedActivityPublisher {
                 itemQuantities,
                 List.of(),
                 null,
-                null
+                null,
+                tool,
+                actorId
         );
     }
 
@@ -252,6 +286,24 @@ public final class ManagedActivityPublisher {
             CompanionXpTransition xpTransition,
             CareCreditOutcomeView careCredit
     ) {
+        publish(operationId, actionId, profile, groupIds, participants, mappedActivityId,
+                itemQuantities, offspringIds, xpTransition, careCredit, null, null);
+    }
+
+    private void publish(
+            UUID operationId,
+            String actionId,
+            ManagedActivityProfile profile,
+            Set<String> groupIds,
+            List<ActivityParticipantView> participants,
+            String mappedActivityId,
+            Map<String, Integer> itemQuantities,
+            List<UUID> offspringIds,
+            CompanionXpTransition xpTransition,
+            CareCreditOutcomeView careCredit,
+            @Nullable HusbandryToolContext tool,
+            @Nullable UUID actorId
+    ) {
         if (operationId == null || profile == null
                 || groupIds == null || groupIds.isEmpty()
                 || participants == null || participants.isEmpty()
@@ -269,7 +321,9 @@ public final class ManagedActivityPublisher {
                     itemQuantities == null ? Map.of() : itemQuantities,
                     offspringIds == null ? List.of() : offspringIds,
                     xpTransition == null ? null : xpTransition.toOutcomeView(),
-                    careCredit
+                    careCredit,
+                    tool,
+                    actorId
             );
             publisher.publish(activity);
         } catch (RuntimeException | LinkageError ignored) {

@@ -2,13 +2,16 @@ package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.HusbandryOutcomeKind;
 import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
+import com.alechilles.alecstamework.api.HusbandryOutputConversion;
 import com.alechilles.alecstamework.api.HusbandryToolContext;
 import com.alechilles.alecstamework.npc.progression.TraitModifierService;
+import com.alechilles.alecstamework.output.CompanionOutputService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.function.DoubleSupplier;
 import javax.annotation.Nullable;
 
 /** Resolves the additive yield and recovery terms used by shared husbandry actions. */
@@ -127,6 +130,40 @@ public final class HusbandryYieldResolver {
         return normalized.contains("fleece") || normalized.contains("wool") || normalized.contains("fiber")
                 || normalized.contains("fibre") || normalized.contains("silk")
                 || normalized.contains("cindercloth") || normalized.contains("shadoweave");
+    }
+
+    /** Applies a provider conversion only after all additive harvest quantities are final. */
+    public static CompanionOutputService.FinalizedOutput applyHarvestConversions(
+            CompanionOutputService.FinalizedOutput output,
+            Ref<EntityStore> npcRef,
+            Store<EntityStore> store,
+            @Nullable String roleId,
+            @Nullable HusbandryToolContext tool,
+            @Nullable UUID actorId,
+            DoubleSupplier random
+    ) {
+        return CompanionOutputService.applyOutputConversions(output, productId -> {
+            HusbandryOutcomeModifiers modifiers = resolveHarvest(
+                    npcRef, store, roleId, productId, tool, actorId);
+            return modifiers.toolAuthorized() ? modifiers.outputConversion() : null;
+        }, random);
+    }
+
+    /** Applies a provider conversion only after all additive cull quantities are final. */
+    public static CompanionOutputService.FinalizedOutput applyCullConversions(
+            CompanionOutputService.FinalizedOutput output,
+            Ref<EntityStore> npcRef,
+            Store<EntityStore> store,
+            @Nullable String roleId,
+            @Nullable HusbandryToolContext tool,
+            @Nullable UUID actorId,
+            DoubleSupplier random
+    ) {
+        return CompanionOutputService.applyOutputConversions(output, productId -> {
+            HusbandryOutcomeModifiers modifiers = resolveCull(
+                    npcRef, store, roleId, productId, tool, actorId);
+            return modifiers.toolAuthorized() ? modifiers.outputConversion() : null;
+        }, random);
     }
 
     /** Preserves the historical gated provider-roll expectation without replaying rolls. */

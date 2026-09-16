@@ -78,6 +78,8 @@ final class CullRewardService {
                     return HusbandryYieldResolver.cullYieldBonus(npcRef, store, stack.getItemId(), modifiers);
                 },
                 random::nextDouble);
+        output = HusbandryYieldResolver.applyCullConversions(
+                output, npcRef, store, roleId, tool, actorId, random::nextDouble);
         return new PreparedOutcome(true, output.itemStacks(), output.itemQuantities(), wearMultiplier[0]);
     }
 

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Integrations can apply tool-based harvest conversions and chain shearing to one
+  nearby eligible owned animal. Harvest and cull activities include the acting
+  player and captured tool so profession bonuses use the tool that performed the action.
+
 - Portrait quality ratings now use gold star images at the top-right, without a tooltip.
   Animal capacity appears on the controls row.
 

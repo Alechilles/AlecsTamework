@@ -13,29 +13,39 @@ import com.alechilles.alecstamework.activity.ActivityRuntime;
 import com.alechilles.alecstamework.items.CommandAutoLinkResult;
 import com.alechilles.alecstamework.items.CommandAutoLinkService;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
+import com.alechilles.alecstamework.npc.compat.NpcSupportAccess;
+import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService.AwardResult;
 import com.alechilles.alecstamework.output.CompanionOutputService;
 import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
 import com.alechilles.alecstamework.api.internal.HusbandryYieldResolver;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.ArchetypeChunk;
+import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.item.ItemModule;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 /** Executes a resolved interaction entry using shared effect handlers. */
 final class InteractionExecutor {
+    private static final ThreadLocal<Boolean> CHAIN_SUPPRESSED = ThreadLocal.withInitial(() -> false);
     private final TameworkInteractEffects effects;
     private final InteractionFeedHelper feedHelper;
 
@@ -236,6 +246,11 @@ final class InteractionExecutor {
                             player,
                             ctx
                     );
+            if (!CHAIN_SUPPRESSED.get() && shearContext && authorization.chainHarvestChance() > 0.0
+                    && java.util.concurrent.ThreadLocalRandom.current().nextDouble()
+                    < authorization.chainHarvestChance()) {
+                applyChainShear(npcRef, role, infoProvider, store, player, resolvedToolUse);
+            }
             boolean dropActionExpected = hasHarvestDropAction(role, ctx);
             if (isInteractingOwner(npcRef, store, player)
                     && !dropActionExpected
@@ -251,7 +266,9 @@ final class InteractionExecutor {
                         containerOutcome,
                         false,
                         () -> CompanionLevelingService.awardHarvestXp(npcRef, store),
-                        customOutcome.itemQuantities()
+                        customOutcome.itemQuantities(),
+                        resolvedToolUse.tool(),
+                        resolvedToolUse.actorId()
                 );
             }
             return true | customOutcome.applied();
@@ -379,7 +396,9 @@ final class InteractionExecutor {
                 outcome,
                 dropActionExpected,
                 awardSupplier,
-                Map.of()
+                Map.of(),
+                null,
+                null
         );
     }
 
@@ -393,6 +412,23 @@ final class InteractionExecutor {
             boolean dropActionExpected,
             Supplier<AwardResult> awardSupplier,
             Map<String, Integer> looseItemQuantities
+    ) {
+        publishContainerHarvest(operationId, roleId, harvestContext, ownerId, companionId,
+                outcome, dropActionExpected, awardSupplier, looseItemQuantities, null, null);
+    }
+
+    void publishContainerHarvest(
+            UUID operationId,
+            String roleId,
+            String harvestContext,
+            UUID ownerId,
+            UUID companionId,
+            TameworkInteractEffects.HarvestContainerOutcome outcome,
+            boolean dropActionExpected,
+            Supplier<AwardResult> awardSupplier,
+            Map<String, Integer> looseItemQuantities,
+            com.alechilles.alecstamework.api.HusbandryToolContext tool,
+            UUID actorId
     ) {
         if (outcome == null || dropActionExpected) {
             return;
@@ -413,7 +449,9 @@ final class InteractionExecutor {
                 ownerId,
                 companionId,
                 CompanionOutputService.finalizeQuantities(itemQuantities).itemQuantities(),
-                award
+                award,
+                tool,
+                actorId
         );
     }
 
@@ -472,7 +510,102 @@ final class InteractionExecutor {
                             : -1.0;
                 },
                 java.util.concurrent.ThreadLocalRandom.current()::nextDouble);
+        output = HusbandryYieldResolver.applyHarvestConversions(
+                output, npcRef, store, role == null ? null : role.getRoleName(),
+                use.tool(), use.actorId(), java.util.concurrent.ThreadLocalRandom.current()::nextDouble);
         return use.withPreparedOutput(dropList, output);
+    }
+
+    /** Starts at most one nearby owned ready shear using its own role state and cooldown. */
+    private void applyChainShear(
+            Ref<EntityStore> source,
+            Role sourceRole,
+            InfoProvider infoProvider,
+            Store<EntityStore> store,
+            Player player,
+            HusbandryHarvestUseContext.CapturedUse sourceUse
+    ) {
+        if (source == null || !source.isValid() || store == null || player == null
+                || !HusbandryHarvestUseContext.stillMatches(player, sourceUse)) {
+            return;
+        }
+        com.hypixel.hytale.server.npc.role.support.StateSupport sourceState =
+                NpcSupportAccess.state(sourceRole, source, store);
+        Ref<EntityStore> playerRef = sourceState == null
+                ? null : sourceState.getInteractionIterationTarget();
+        TransformComponent sourceTransform = store.getComponent(
+                source, TransformComponent.getComponentType());
+        ComponentType<EntityStore, TameworkOwnerComponent> ownerType =
+                TameworkOwnerComponent.getComponentType();
+        if (sourceTransform == null || ownerType == null || playerRef == null || !playerRef.isValid()) {
+            return;
+        }
+        UUID playerId = player.getUuid();
+        if (playerId == null) {
+            return;
+        }
+        List<ChainCandidate> candidates = new ArrayList<>();
+        double maxDistanceSquared = 36.0;
+        store.forEachChunk(Query.any(), (ArchetypeChunk<EntityStore> chunk,
+                                         CommandBuffer<EntityStore> ignored) -> {
+            for (int index = 0; index < chunk.size(); index++) {
+                NPCEntity candidateNpc = chunk.getComponent(index, NPCEntity.getComponentType());
+                if (candidateNpc == null || candidateNpc.getUuid() == null) {
+                    continue;
+                }
+                Ref<EntityStore> candidate = chunk.getReferenceTo(index);
+                if (candidate == null || !candidate.isValid() || candidate.equals(source)) {
+                    continue;
+                }
+                TameworkOwnerComponent owner = chunk.getComponent(index, ownerType);
+                if (owner == null || !playerId.equals(owner.getOwnerId())
+                        || !TamedStateResolver.isTamed(candidate, store)) {
+                    continue;
+                }
+                TransformComponent transform = chunk.getComponent(
+                        index, TransformComponent.getComponentType());
+                if (transform == null) {
+                    continue;
+                }
+                double distanceSquared = transform.getPosition().distanceSquared(
+                        sourceTransform.getPosition());
+                if (distanceSquared <= 0.000001 || distanceSquared > maxDistanceSquared) {
+                    continue;
+                }
+                Role candidateRole = candidateNpc.getRole();
+                if (candidateRole == null) {
+                    continue;
+                }
+                candidates.add(new ChainCandidate(candidate, candidateRole, distanceSquared));
+            }
+        });
+        candidates.sort(java.util.Comparator.comparingDouble(candidate -> candidate.distanceSquared));
+        for (ChainCandidate candidate : candidates) {
+            if (!HusbandryHarvestUseContext.stillMatches(player, sourceUse)) {
+                return;
+            }
+            if (effects.executeNeutralChainHarvest(
+                    candidate.ref, candidate.role, infoProvider, store, playerRef, player)) {
+                return;
+            }
+        }
+    }
+
+    static boolean withChainSuppressed(BooleanSupplier action) {
+        boolean previous = CHAIN_SUPPRESSED.get();
+        CHAIN_SUPPRESSED.set(true);
+        try {
+            return action != null && action.getAsBoolean();
+        } finally {
+            CHAIN_SUPPRESSED.set(previous);
+        }
+    }
+
+    private record ChainCandidate(
+            Ref<EntityStore> ref,
+            Role role,
+            double distanceSquared
+    ) {
     }
 
     private boolean isInteractingOwner(

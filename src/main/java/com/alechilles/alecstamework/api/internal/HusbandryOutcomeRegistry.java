@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.api.internal;
 import com.alechilles.alecstamework.api.HusbandryOutcomeApi;
 import com.alechilles.alecstamework.api.HusbandryOutcomeContext;
 import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
+import com.alechilles.alecstamework.api.HusbandryOutputConversion;
 import com.alechilles.alecstamework.api.HusbandryOutcomeProvider;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -104,7 +105,8 @@ public final class HusbandryOutcomeRegistry implements HusbandryOutcomeApi, Auto
                 || !Double.isFinite(modifiers.happinessFlatBonus())
                 || !Double.isFinite(modifiers.yieldBonus())
                 || !Double.isFinite(modifiers.harvestRecoverySpeedBonus())
-                || !Double.isFinite(modifiers.toolWearMultiplier())) {
+                || !Double.isFinite(modifiers.toolWearMultiplier())
+                || !Double.isFinite(modifiers.chainHarvestChance())) {
             HusbandryOutcomeModifiers identity = HusbandryOutcomeModifiers.identity();
             return new HusbandryOutcomeModifiers(
                     identity.needsDecayMultiplier(), identity.happinessDispositionMultiplier(),
@@ -113,7 +115,8 @@ public final class HusbandryOutcomeRegistry implements HusbandryOutcomeApi, Auto
                     identity.happinessThirstBonus(), identity.happinessPopulationBonus(),
                     identity.breedingInheritanceChanceBonus(), identity.harmfulMutationRerollChance(),
                     identity.happinessFlatBonus(), identity.yieldBonus(),
-                    identity.harvestRecoverySpeedBonus(), false, identity.toolWearMultiplier());
+                    identity.harvestRecoverySpeedBonus(), false, identity.toolWearMultiplier(),
+                    identity.chainHarvestChance(), null);
         }
         HusbandryOutcomeModifiers identity = HusbandryOutcomeModifiers.identity();
         return new HusbandryOutcomeModifiers(
@@ -142,7 +145,9 @@ public final class HusbandryOutcomeRegistry implements HusbandryOutcomeApi, Auto
                 clamp(modifiers.harvestRecoverySpeedBonus(), -0.75, 1.0,
                         identity.harvestRecoverySpeedBonus()),
                 modifiers.toolAuthorized(),
-                clamp(modifiers.toolWearMultiplier(), 0.1, 1.0, identity.toolWearMultiplier())
+                clamp(modifiers.toolWearMultiplier(), 0.1, 1.0, identity.toolWearMultiplier()),
+                clamp(modifiers.chainHarvestChance(), 0.0, 1.0, identity.chainHarvestChance()),
+                normalizeConversion(modifiers.outputConversion())
         );
     }
 
@@ -159,7 +164,21 @@ public final class HusbandryOutcomeRegistry implements HusbandryOutcomeApi, Auto
                 identity.happinessThirstBonus(), identity.happinessPopulationBonus(),
                 identity.breedingInheritanceChanceBonus(), identity.harmfulMutationRerollChance(),
                 identity.happinessFlatBonus(), identity.yieldBonus(),
-                identity.harvestRecoverySpeedBonus(), false, identity.toolWearMultiplier());
+                identity.harvestRecoverySpeedBonus(), false, identity.toolWearMultiplier(),
+                identity.chainHarvestChance(), null);
+    }
+
+    @Nullable
+    private HusbandryOutputConversion normalizeConversion(
+            @Nullable HusbandryOutputConversion conversion
+    ) {
+        if (conversion == null || !conversion.valid()) {
+            return null;
+        }
+        return new HusbandryOutputConversion(
+                conversion.inputItemId().trim(), conversion.outputItemId().trim(),
+                conversion.inputQuantity(), conversion.outputQuantity(),
+                clamp(conversion.chance(), 0.0, 1.0, 0.0));
     }
 
     private double clamp(double value, double minimum, double maximum, double fallback) {

@@ -291,6 +291,7 @@ public final class TameworkApiImpl
             TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS,
             TameworkApiCapability.HUSBANDRY_OUTCOMES,
             TameworkApiCapability.HUSBANDRY_TOOL_CONTEXT,
+            TameworkApiCapability.HUSBANDRY_TOOL_BONUSES,
             TameworkApiCapability.HUSBANDRY_CARE_BONUSES,
             TameworkApiCapability.HUSBANDRY_FLAT_CARE_BONUS,
             TameworkApiCapability.HUSBANDRY_BREEDING_GENETICS
@@ -404,6 +405,7 @@ public final class TameworkApiImpl
             if (!husbandryOutcomeRegistry.available()) {
                 current.remove(TameworkApiCapability.HUSBANDRY_OUTCOMES);
                 current.remove(TameworkApiCapability.HUSBANDRY_TOOL_CONTEXT);
+                current.remove(TameworkApiCapability.HUSBANDRY_TOOL_BONUSES);
                 current.remove(TameworkApiCapability.HUSBANDRY_CARE_BONUSES);
                 current.remove(TameworkApiCapability.HUSBANDRY_FLAT_CARE_BONUS);
                 current.remove(TameworkApiCapability.HUSBANDRY_BREEDING_GENETICS);
@@ -444,6 +446,7 @@ public final class TameworkApiImpl
                 capabilities.remove(TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS);
                 capabilities.remove(TameworkApiCapability.HUSBANDRY_OUTCOMES);
                 capabilities.remove(TameworkApiCapability.HUSBANDRY_TOOL_CONTEXT);
+                capabilities.remove(TameworkApiCapability.HUSBANDRY_TOOL_BONUSES);
                 capabilities.remove(TameworkApiCapability.HUSBANDRY_CARE_BONUSES);
                 capabilities.remove(TameworkApiCapability.HUSBANDRY_FLAT_CARE_BONUS);
                 capabilities.remove(TameworkApiCapability.HUSBANDRY_BREEDING_GENETICS);

@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.api.HusbandryOutcomeContext;
 import com.alechilles.alecstamework.api.HusbandryOutcomeKind;
 import com.alechilles.alecstamework.api.HusbandryOutcomeModifiers;
 import com.alechilles.alecstamework.api.HusbandryToolContext;
+import com.alechilles.alecstamework.api.HusbandryOutputConversion;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Set;
@@ -102,6 +103,22 @@ class HusbandryOutcomeRegistryTest {
             ));
 
             assertFalse(registry.resolve(context()).toolAuthorized());
+        }
+    }
+
+    @Test
+    void normalizesToolBonusFieldsAndDropsInvalidConversion() throws Exception {
+        try (HusbandryOutcomeRegistry registry = new HusbandryOutcomeRegistry()) {
+            registry.register(ignored -> new HusbandryOutcomeModifiers(
+                    1.0, 1.0, 0.0, 0.0, 1.0,
+                    0.0, 0.0, 0.0, 0.0, 0.0,
+                    0.0, 0.0, 0.0, true, 1.0,
+                    3.0, new HusbandryOutputConversion("wool", "cloth", 0, 1, 1.0)
+            ));
+
+            HusbandryOutcomeModifiers resolved = registry.resolve(context());
+            assertEquals(1.0, resolved.chainHarvestChance());
+            assertEquals(null, resolved.outputConversion());
         }
     }
 

@@ -251,6 +251,9 @@ final class InteractionInventoryEffects {
                                 : -1.0;
                     },
                     ThreadLocalRandom.current()::nextDouble);
+            finalized = HusbandryYieldResolver.applyHarvestConversions(
+                    finalized, npcRef, store, role == null ? null : role.getRoleName(),
+                    toolUse.tool(), toolUse.actorId(), ThreadLocalRandom.current()::nextDouble);
             output = new DropItemOutcome(!finalized.itemStacks().isEmpty(), finalized.itemStacks(),
                     finalized.itemQuantities());
         } else {
@@ -301,6 +304,24 @@ final class InteractionInventoryEffects {
             return copies;
         }
         return Math.max(0, copies - Math.max(0, remainder.getQuantity()));
+    }
+
+    /** Removes committed output items before a successful auto-process conversion adds its replacement. */
+    int removeOutputCopies(Player player, String itemId, int copies) {
+        if (player == null || itemId == null || itemId.isBlank() || copies <= 0) {
+            return 0;
+        }
+        CombinedItemContainer container = resolveInventoryContainer(player);
+        if (container == null) {
+            return 0;
+        }
+        ItemStackTransaction transaction = container.removeItemStack(new ItemStack(itemId, copies));
+        if (transaction == null) {
+            return 0;
+        }
+        ItemStack remainder = transaction.getRemainder();
+        return remainder == null || remainder.isEmpty()
+                ? copies : Math.max(0, copies - Math.max(0, remainder.getQuantity()));
     }
 
     private String resolveProductId(List<ItemStack> drops) {

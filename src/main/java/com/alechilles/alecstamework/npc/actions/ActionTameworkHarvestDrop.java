@@ -87,6 +87,13 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
                         },
                         java.util.concurrent.ThreadLocalRandom.current()::nextDouble
                 );
+        if (preparedOutput == null) {
+            output = HusbandryYieldResolver.applyHarvestConversions(
+                    output, ref, store, role == null ? null : role.getRoleName(),
+                    usesCapturedTool ? toolUse.tool() : null,
+                    usesCapturedTool ? toolUse.actorId() : null,
+                    java.util.concurrent.ThreadLocalRandom.current()::nextDouble);
+        }
         List<ItemStack> drops = output.itemStacks();
         UUID operationId = UUID.randomUUID();
         String activityContext = resolveActivityContext(
@@ -126,7 +133,9 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
                     ActivityRuntime.resolveOwnerId(ref, store),
                     ActivityRuntime.resolveCompanionId(ref, store),
                     output.itemQuantities(),
-                    result
+                    result,
+                    usesCapturedTool ? toolUse.tool() : null,
+                    usesCapturedTool ? toolUse.actorId() : null
             );
         } else if (dropped) {
             ActivityRuntime.publishHarvest(
@@ -136,7 +145,9 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
                     ActivityRuntime.resolveOwnerId(ref, store),
                     ActivityRuntime.resolveCompanionId(ref, store),
                     output.itemQuantities(),
-                    null
+                    null,
+                    usesCapturedTool ? toolUse.tool() : null,
+                    usesCapturedTool ? toolUse.actorId() : null
             );
         } else if (!dropped) {
             logHarvestDropAttempt("skipped reason=resolved-drops-empty baseDrops=" + baseDrops.size()

@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.output;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.alechilles.alecstamework.api.HusbandryOutputConversion;
 import java.util.List;
 import java.util.Map;
 import org.bson.BsonDocument;
@@ -77,6 +78,33 @@ class CompanionOutputServiceTest {
 
         assertEquals(Map.of("Ingredient_Fabric_Scrap_Wool", 3, "Animal_Manure", 3),
                 output.itemQuantities());
+    }
+
+    @Test
+    void conversionConsumesOnlySuccessfulCompleteBatchesAndLeavesTheRemainder() {
+        Map<String, Integer> output = CompanionOutputService.resolveOutputConversions(
+                Map.of("wool", 5),
+                itemId -> new HusbandryOutputConversion("wool", "cloth", 2, 1, 0.5),
+                sequence(0.25, 0.75)
+        );
+
+        assertEquals(Map.of("wool", 3, "cloth", 1), output);
+    }
+
+    @Test
+    void conversionNeverCreatesOutputWhenItsChanceFails() {
+        Map<String, Integer> output = CompanionOutputService.resolveOutputConversions(
+                Map.of("wool", 2),
+                itemId -> new HusbandryOutputConversion("wool", "cloth", 2, 1, 0.25),
+                () -> 0.25
+        );
+
+        assertEquals(Map.of("wool", 2), output);
+    }
+
+    private static java.util.function.DoubleSupplier sequence(double... values) {
+        java.util.concurrent.atomic.AtomicInteger index = new java.util.concurrent.atomic.AtomicInteger();
+        return () -> values[Math.min(index.getAndIncrement(), values.length - 1)];
     }
 
     private static final class TestItemStack extends ItemStack {

@@ -14,7 +14,8 @@ Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/a
 
 Capabilities: `HUSBANDRY_OUTCOMES`; require `HUSBANDRY_TOOL_CONTEXT` before
 using captured-tool fields or the expected-yield, recovery, authorization, and
-wear modifiers below.
+wear modifiers below. Require `HUSBANDRY_TOOL_BONUSES` before returning output
+conversions or chain-harvest chances.
 
 Development addition: `HUSBANDRY_CARE_BONUSES` advertises conditional happiness
 bonuses. Check it before requiring the eight-argument outcome contract.
@@ -74,6 +75,14 @@ The provider returns `HusbandryOutcomeModifiers`:
   and consume no tool wear.
 - `toolWearMultiplier`, clamped to `0.1..1.0`, scales one actual successful
   tool use after authorization.
+- `chainHarvestChance`, clamped to `0.0..1.0`, may start one additional nearby
+  owned, ready manual shear. It never chains again, and the second animal uses
+  its own cooldown, output action, and tool wear.
+- `outputConversion` is an optional `HusbandryOutputConversion(inputItemId,
+  outputItemId, inputQuantity, outputQuantity, chance)`. Valid quantities are
+  `1..64` and chance is `0..1`. The conversion runs after yield resolution,
+  removes input only from successful complete batches, and ignores invalid
+  conversions.
 
 `HusbandryOutcomeModifiers.identity()` supplies neutral numeric values and
 allows tool use. Legacy constructors remain supported with neutral new fields.
@@ -95,6 +104,9 @@ Standard manual shear and item-cull actions resolve their actual product batch
 before deferred completion. That accepted batch survives actor disconnects and
 later tool changes. A matching moved hotbar tool receives wear; unrelated
 automatic drops cannot consume a pending manual batch or wear its tool.
+Harvest and cull activity receipts include the immutable captured `tool` and
+`actorId` when a manual tool action supplied them, so subscribers do not need
+to inspect the player's current inventory after delayed output completes.
 Tamework applies the breeding multiplier to parent cooldowns only. Renewable
 harvest converts the legacy duration multiplier to a speed contribution, adds
 the new recovery-speed bonuses, then divides the base duration once by

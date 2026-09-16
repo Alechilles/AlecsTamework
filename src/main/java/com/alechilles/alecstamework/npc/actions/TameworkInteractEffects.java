@@ -362,6 +362,18 @@ final class TameworkInteractEffects {
         return ownerContinuationEffects.refreshContext(player, role);
     }
 
+    /** Selects and applies the target's own Harvest interaction for a non-recursive chain proc. */
+    boolean executeNeutralChainHarvest(
+            Ref<EntityStore> npcRef,
+            Role role,
+            InfoProvider infoProvider,
+            Store<EntityStore> store,
+            Ref<EntityStore> playerRef,
+            Player player
+    ) {
+        return owner.executeNeutralChainHarvest(npcRef, role, infoProvider, store, playerRef, player);
+    }
+
     boolean applyTameRoleChange(TameInteraction interaction,
                                 Ref<EntityStore> npcRef,
                                 Role role,
@@ -537,7 +549,52 @@ final class TameworkInteractEffects {
                 baseQuantity, bonus, ThreadLocalRandom.current()::nextDouble) - baseQuantity);
         int committedCopies = inventoryEffects.addOutputCopies(
                 player, productId, requestedCopies);
-        return outcome.withOutputCopies(productId, committedCopies);
+        int resolvedQuantity = Math.max(0, baseQuantity + committedCopies);
+        CompanionOutputService.FinalizedOutput converted = HusbandryYieldResolver.applyHarvestConversions(
+                CompanionOutputService.finalizeQuantities(Map.of(productId, resolvedQuantity)),
+                npcRef, store, role == null ? null : role.getRoleName(),
+                toolUse == null ? null : toolUse.tool(),
+                player == null ? null : player.getUuid(), ThreadLocalRandom.current()::nextDouble);
+        int convertedInput = Math.max(0, resolvedQuantity
+                - converted.itemQuantities().getOrDefault(productId, 0));
+        LinkedHashMap<String, Integer> convertedOutputs = new LinkedHashMap<>();
+        for (Map.Entry<String, Integer> entry : converted.itemQuantities().entrySet()) {
+            String itemId = entry.getKey();
+            int quantity = entry.getValue() == null ? 0 : entry.getValue();
+            if (quantity <= 0 || itemId.equalsIgnoreCase(productId)) {
+                continue;
+            }
+            convertedOutputs.put(itemId, quantity);
+        }
+        LinkedHashMap<String, Integer> addedOutputs = new LinkedHashMap<>();
+        for (Map.Entry<String, Integer> entry : convertedOutputs.entrySet()) {
+            int committed = inventoryEffects.addOutputCopies(player, entry.getKey(), entry.getValue());
+            if (committed != entry.getValue()) {
+                if (committed > 0) {
+                    inventoryEffects.removeOutputCopies(player, entry.getKey(), committed);
+                }
+                rollbackConvertedOutputs(player, addedOutputs);
+                return outcome.withOutputCopies(productId, committedCopies);
+            }
+            addedOutputs.put(entry.getKey(), committed);
+        }
+        int removedInput = inventoryEffects.removeOutputCopies(player, productId, convertedInput);
+        if (removedInput != convertedInput) {
+            rollbackConvertedOutputs(player, addedOutputs);
+            return outcome.withOutputCopies(productId, committedCopies);
+        }
+        LinkedHashMap<String, Integer> committedQuantities = new LinkedHashMap<>(addedOutputs);
+        int remaining = converted.itemQuantities().getOrDefault(productId, 0);
+        if (remaining > 0) {
+            committedQuantities.put(productId, remaining);
+        }
+        return outcome.withItemQuantities(committedQuantities);
+    }
+
+    private void rollbackConvertedOutputs(Player player, Map<String, Integer> addedOutputs) {
+        for (Map.Entry<String, Integer> entry : addedOutputs.entrySet()) {
+            inventoryEffects.removeOutputCopies(player, entry.getKey(), entry.getValue());
+        }
     }
 
     // Mounts the interacting player using the mount helper.
@@ -763,6 +820,10 @@ final class TameworkInteractEffects {
             }
             LinkedHashMap<String, Integer> quantities = new LinkedHashMap<>(itemQuantities);
             quantities.merge(productId, copies, Integer::sum);
+            return new HarvestContainerOutcome(result, preserveCooldown, quantities);
+        }
+
+        HarvestContainerOutcome withItemQuantities(Map<String, Integer> quantities) {
             return new HarvestContainerOutcome(result, preserveCooldown, quantities);
         }
     }

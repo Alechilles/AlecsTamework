@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.api.CareCreditOutcomeView;
 import com.alechilles.alecstamework.api.CombatContributionView;
 import com.alechilles.alecstamework.api.CombatParticipantView;
 import com.alechilles.alecstamework.api.CompanionXpOutcomeView;
+import com.alechilles.alecstamework.api.HusbandryToolContext;
 import com.alechilles.alecstamework.api.internal.LiveActivityFeed;
 import com.alechilles.alecstamework.config.managed.ManagedActivityConfigRegistry;
 import com.alechilles.alecstamework.damage.CompanionCombatActivityPublisher;
@@ -162,6 +163,22 @@ public final class ActivityRuntime {
             @Nullable Map<String, Integer> itemQuantities,
             @Nullable AwardResult award
     ) {
+        publishHarvest(operationId, roleId, harvestContext, ownerId, companionId,
+                itemQuantities, award, null, null);
+    }
+
+    /** Publishes a harvest with the immutable tool and actor captured at authorization. */
+    public static void publishHarvest(
+            @Nonnull UUID operationId,
+            @Nullable String roleId,
+            @Nullable String harvestContext,
+            @Nullable UUID ownerId,
+            @Nullable UUID companionId,
+            @Nullable Map<String, Integer> itemQuantities,
+            @Nullable AwardResult award,
+            @Nullable HusbandryToolContext tool,
+            @Nullable UUID actorId
+    ) {
         RuntimeState state = CURRENT.get();
         if (state.publisher != null) {
             state.publisher.publishHarvest(
@@ -171,7 +188,9 @@ public final class ActivityRuntime {
                     ownerId,
                     companionId,
                     itemQuantities,
-                    transition(award)
+                    transition(award),
+                    tool,
+                    actorId
             );
         }
     }
@@ -217,6 +236,19 @@ public final class ActivityRuntime {
             @Nullable UUID companionId,
             @Nullable Map<String, Integer> itemQuantities
     ) {
+        publishCull(operationId, roleId, ownerId, companionId, itemQuantities, null, null);
+    }
+
+    /** Publishes a cull with the immutable tool and actor captured at authorization. */
+    public static void publishCull(
+            @Nonnull UUID operationId,
+            @Nullable String roleId,
+            @Nullable UUID ownerId,
+            @Nullable UUID companionId,
+            @Nullable Map<String, Integer> itemQuantities,
+            @Nullable HusbandryToolContext tool,
+            @Nullable UUID actorId
+    ) {
         ManagedActivityPublisher publisher = CURRENT.get().publisher;
         if (publisher != null) {
             publisher.publishCull(
@@ -224,7 +256,9 @@ public final class ActivityRuntime {
                     roleId,
                     ownerId,
                     companionId,
-                    itemQuantities
+                    itemQuantities,
+                    tool,
+                    actorId
             );
         }
     }

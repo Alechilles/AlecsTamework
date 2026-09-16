@@ -433,7 +433,9 @@ public final class TameworkNpcCullService {
                     roleId,
                     ownerUuid,
                     npc == null ? null : npc.getUuid(),
-                    rewards.itemQuantities()
+                    rewards.itemQuantities(),
+                    itemUse.tool().present() ? itemUse.tool() : null,
+                    itemUse.tool().present() ? itemUse.actorId() : null
             );
         }
         return Outcome.CULLED;

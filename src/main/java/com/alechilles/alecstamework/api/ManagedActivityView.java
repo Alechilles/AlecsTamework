@@ -20,7 +20,9 @@ public record ManagedActivityView(
         @Nonnull Map<String, Integer> itemQuantities,
         @Nonnull List<UUID> offspringIds,
         @Nullable CompanionXpOutcomeView companionXpOutcome,
-        @Nullable CareCreditOutcomeView careCreditOutcome
+        @Nullable CareCreditOutcomeView careCreditOutcome,
+        @Nullable HusbandryToolContext tool,
+        @Nullable UUID actorId
 ) implements ActivityView {
     public ManagedActivityView {
         header = Objects.requireNonNull(header, "header");
@@ -31,6 +33,23 @@ public record ManagedActivityView(
                 mappedActivityId, "mappedActivityId");
         itemQuantities = immutablePositiveQuantities(itemQuantities);
         offspringIds = immutableIds(offspringIds, "offspringIds");
+    }
+
+    /** Compatibility constructor for activity producers before husbandry tool receipts. */
+    public ManagedActivityView(
+            @Nonnull ActivityHeader header,
+            @Nonnull String profileId,
+            @Nonnull Set<String> groupIds,
+            @Nonnull List<ActivityParticipantView> participants,
+            @Nonnull String mappedActivityId,
+            @Nonnull Map<String, Integer> itemQuantities,
+            @Nonnull List<UUID> offspringIds,
+            @Nullable CompanionXpOutcomeView companionXpOutcome,
+            @Nullable CareCreditOutcomeView careCreditOutcome
+    ) {
+        this(header, profileId, groupIds, participants, mappedActivityId,
+                itemQuantities, offspringIds, companionXpOutcome, careCreditOutcome,
+                null, null);
     }
 
     @Override
@@ -45,7 +64,7 @@ public record ManagedActivityView(
         return new ManagedActivityView(
                 nextHeader, profileId, groupIds, participants,
                 mappedActivityId, itemQuantities, offspringIds,
-                companionXpOutcome, careCreditOutcome);
+                companionXpOutcome, careCreditOutcome, tool, actorId);
     }
 
     /** Alias retained for consumers that name the optional outcome by type. */

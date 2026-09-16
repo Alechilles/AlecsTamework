@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.api.ActivityParticipantView;
 import com.alechilles.alecstamework.api.ActivityView;
 import com.alechilles.alecstamework.api.CareCreditOutcomeView;
 import com.alechilles.alecstamework.api.ManagedActivityView;
+import com.alechilles.alecstamework.api.HusbandryToolContext;
 import com.alechilles.alecstamework.api.CompanionXpSource;
 import com.alechilles.alecstamework.api.NeedSatisfiedActivityView;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
@@ -70,7 +71,9 @@ class ManagedActivityPublisherTest {
                 OWNER,
                 COMPANION,
                 Map.of("Milk", 2),
-                null
+                null,
+                new HusbandryToolContext("RH_Shears_Iron", 1, 12.0, 100.0, null),
+                OWNER
         );
         publisher.publishBreeding(
                 litterId,
@@ -124,6 +127,8 @@ class ManagedActivityPublisherTest {
                 harvest.participants()
         );
         assertNull(harvest.careCreditOutcome());
+        assertEquals("RH_Shears_Iron", harvest.tool().itemId());
+        assertEquals(OWNER, harvest.actorId());
 
         ManagedActivityView breeding = assertInstanceOf(
                 ManagedActivityView.class, published.get(2));

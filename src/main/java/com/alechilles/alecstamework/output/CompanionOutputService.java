@@ -1,17 +1,20 @@
 package com.alechilles.alecstamework.output;
 
+import com.alechilles.alecstamework.api.HusbandryOutputConversion;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.DoubleSupplier;
+import java.util.function.Function;
 import java.util.function.ToDoubleFunction;
 import javax.annotation.Nonnull;
 
 /** Finalizes companion item output before materialization and activity publication. */
 public final class CompanionOutputService {
     private static final int MAX_BONUS_COPIES = 3;
+    private static final int MAX_CONVERSION_BATCH_ROLLS = 128;
 
     private CompanionOutputService() {
     }
@@ -71,6 +74,68 @@ public final class CompanionOutputService {
             }
         }
         return new FinalizedOutput(finalDrops, quantities(finalDrops));
+    }
+
+    /**
+     * Converts complete resolved-output batches without creating free output.
+     *
+     * <p>The resolver is called only after additive quantity resolution. Each
+     * successful roll consumes its full input batch; incomplete and unrolled
+     * batches remain as the input item. The per-stack roll cap keeps malformed
+     * output quantities from creating an unbounded action-time loop.
+     */
+    @Nonnull
+    public static FinalizedOutput applyOutputConversions(
+            @Nonnull FinalizedOutput resolved,
+            Function<String, HusbandryOutputConversion> conversionResolver,
+            DoubleSupplier random
+    ) {
+        if (resolved == null || conversionResolver == null || random == null) {
+            return resolved == null ? new FinalizedOutput(List.of(), Map.of()) : resolved;
+        }
+        Map<String, Integer> quantities = resolveOutputConversions(
+                resolved.itemQuantities(), conversionResolver, random);
+        ArrayList<ItemStack> converted = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : quantities.entrySet()) {
+            addItem(converted, entry.getKey(), entry.getValue());
+        }
+        return new FinalizedOutput(converted, quantities);
+    }
+
+    /** Resolves conversion quantities before item stacks are materialized. */
+    @Nonnull
+    public static Map<String, Integer> resolveOutputConversions(
+            Map<String, Integer> resolvedQuantities,
+            Function<String, HusbandryOutputConversion> conversionResolver,
+            DoubleSupplier random
+    ) {
+        if (resolvedQuantities == null || resolvedQuantities.isEmpty()
+                || conversionResolver == null || random == null) {
+            return normalizeQuantities(resolvedQuantities);
+        }
+        LinkedHashMap<String, Integer> converted = new LinkedHashMap<>();
+        for (Map.Entry<String, Integer> entry : resolvedQuantities.entrySet()) {
+            String inputId = entry.getKey();
+            int quantity = entry.getValue() == null ? 0 : entry.getValue();
+            HusbandryOutputConversion conversion = conversionResolver.apply(inputId);
+            if (quantity <= 0 || !matchesInput(inputId, conversion)) {
+                mergeQuantity(converted, inputId, quantity);
+                continue;
+            }
+            int completeBatches = quantity / conversion.inputQuantity();
+            int rolls = Math.min(completeBatches, MAX_CONVERSION_BATCH_ROLLS);
+            int convertedBatches = 0;
+            for (int index = 0; index < rolls; index++) {
+                if (random.getAsDouble() < conversion.chance()) {
+                    convertedBatches++;
+                }
+            }
+            long consumed = (long) convertedBatches * conversion.inputQuantity();
+            long produced = (long) convertedBatches * conversion.outputQuantity();
+            mergeQuantity(converted, inputId, safeQuantity((long) quantity - consumed));
+            mergeQuantity(converted, conversion.outputItemId(), safeQuantity(produced));
+        }
+        return Map.copyOf(converted);
     }
 
     /** Resolves floor(expected) plus one fractional Bernoulli roll. */
@@ -133,6 +198,9 @@ public final class CompanionOutputService {
             String itemId,
             int quantity
     ) {
+        if (itemId == null || itemId.isBlank() || quantity <= 0) {
+            return;
+        }
         quantities.merge(itemId, quantity, (left, right) ->
                 (int) Math.min(Integer.MAX_VALUE, (long) left + right));
     }
@@ -141,6 +209,21 @@ public final class CompanionOutputService {
         return stack != null && !stack.isEmpty()
                 && stack.getItemId() != null && !stack.getItemId().isBlank()
                 && stack.getQuantity() > 0;
+    }
+
+    private static boolean matchesInput(String inputId, HusbandryOutputConversion conversion) {
+        return conversion != null && conversion.valid()
+                && inputId != null && inputId.equalsIgnoreCase(conversion.inputItemId());
+    }
+
+    private static void addItem(List<ItemStack> target, String itemId, int quantity) {
+        if (itemId != null && !itemId.isBlank() && quantity > 0) {
+            target.add(new ItemStack(itemId, quantity));
+        }
+    }
+
+    private static int safeQuantity(long quantity) {
+        return quantity <= 0L ? 0 : (int) Math.min(Integer.MAX_VALUE, quantity);
     }
 
     private static ItemStack copy(ItemStack stack) {

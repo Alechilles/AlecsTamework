@@ -100,7 +100,8 @@ class ReplacementTameworkApiFactoryTest {
                         TameworkApiCapability.COMMAND_UI_CUSTOM_FLOWS,
                         TameworkApiCapability.COMMAND_HUD_RENDERERS,
                         TameworkApiCapability.COMMAND_HUD_CONTRIBUTORS,
-                        TameworkApiCapability.HUSBANDRY_TOOL_CONTEXT
+                        TameworkApiCapability.HUSBANDRY_TOOL_CONTEXT,
+                        TameworkApiCapability.HUSBANDRY_TOOL_BONUSES
                 )));
                 assertTrue(api.commandUi().available());
                 assertTrue(api.commandHud().available());

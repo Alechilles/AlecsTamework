@@ -70,6 +70,8 @@ public enum TameworkApiCapability {
     HUSBANDRY_OUTCOMES,
     /** Husbandry outcome contexts include the captured tool and support authorization, yield, and wear fields. */
     HUSBANDRY_TOOL_CONTEXT,
+    /** Tool outcomes support one bounded output conversion and one extra manual shear. */
+    HUSBANDRY_TOOL_BONUSES,
     /** External husbandry providers can supply bounded care bonuses for eligible mood bands. */
     HUSBANDRY_CARE_BONUSES,
     /** Unconditional, unscaled happiness bonus supplied by husbandry outcome providers. */

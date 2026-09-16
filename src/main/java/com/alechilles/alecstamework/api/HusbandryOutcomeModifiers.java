@@ -22,8 +22,22 @@ public record HusbandryOutcomeModifiers(
         double yieldBonus,
         double harvestRecoverySpeedBonus,
         boolean toolAuthorized,
-        double toolWearMultiplier
+        double toolWearMultiplier,
+        double chainHarvestChance,
+        @javax.annotation.Nullable HusbandryOutputConversion outputConversion
 ) {
+    /** Compatibility constructor for providers compiled against the first tool contract. */
+    public HusbandryOutcomeModifiers(double needsDecayMultiplier, double happinessDispositionMultiplier,
+            double bonusOutputChance, double tripleOutputChance, double breedingCooldownMultiplier,
+            double happinessHungerBonus, double happinessThirstBonus, double happinessPopulationBonus,
+            double breedingInheritanceChanceBonus, double harmfulMutationRerollChance,
+            double happinessFlatBonus, double yieldBonus, double harvestRecoverySpeedBonus,
+            boolean toolAuthorized, double toolWearMultiplier) {
+        this(needsDecayMultiplier, happinessDispositionMultiplier, bonusOutputChance, tripleOutputChance,
+                breedingCooldownMultiplier, happinessHungerBonus, happinessThirstBonus, happinessPopulationBonus,
+                breedingInheritanceChanceBonus, harmfulMutationRerollChance, happinessFlatBonus,
+                yieldBonus, harvestRecoverySpeedBonus, toolAuthorized, toolWearMultiplier, 0.0, null);
+    }
     /** Compatibility constructor for the pre-tool outcome contract. */
     public HusbandryOutcomeModifiers(double needsDecayMultiplier, double happinessDispositionMultiplier,
             double bonusOutputChance, double tripleOutputChance, double breedingCooldownMultiplier,
