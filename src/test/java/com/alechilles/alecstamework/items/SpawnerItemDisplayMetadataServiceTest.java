@@ -239,7 +239,7 @@ class SpawnerItemDisplayMetadataServiceTest {
         String description = plainText(writer.metadata.getDescription());
 
         assertEquals(
-                "Fluffy - Mob_Cat (M)\n\n-- Appearance --\nCoat: Black Coat",
+                "Fluffy - Mob_Cat (M)\n\nAppearance\nCoat: Black Coat",
                 description
         );
         assertEquals("#63A9FF", messageWithText(writer.metadata.getDescription(), "M").getColor());
@@ -252,6 +252,7 @@ class SpawnerItemDisplayMetadataServiceTest {
         TwTraitConfig traitConfig = traitConfig(
                 "Traits_Sheep",
                 trait("Trait_Size", "tamework.traits.size.name", 0.65, 1.0, 1.35, "SizeMultiplier"),
+                trait("Trait_Productivity", "Productivity", 0.75, 1.0, 1.25, "AnimalProductYieldMultiplier"),
                 trait("Trait_Appetite", "Appetite", 0.75, 1.0, 1.25, "NeedsHungerDecayMultiplier"),
                 trait("Trait_Attitude", "Attitude", 0.75, 1.0, 1.3, "HappinessGainMultiplier"),
                 trait("Trait_Fertility", "Fertility", 0.5, 1.0, 2.0, "FertilityMultiplier")
@@ -287,6 +288,7 @@ class SpawnerItemDisplayMetadataServiceTest {
                 .append(TameworkMetadataKeys.TRAITS_CONFIG_ID, new BsonString("Traits_Sheep"))
                 .append(TameworkMetadataKeys.TRAITS_VALUES, new BsonString(
                         "[{\"id\":\"Trait_Size\",\"value\":1.35},"
+                                + "{\"id\":\"Trait_Productivity\",\"value\":0.93},"
                                 + "{\"id\":\"Trait_Appetite\",\"value\":0.95},"
                                 + "{\"id\":\"Trait_Attitude\",\"value\":1.15},"
                                 + "{\"id\":\"Trait_Fertility\",\"value\":1.2}]"
@@ -301,29 +303,33 @@ class SpawnerItemDisplayMetadataServiceTest {
 
         assertEquals(
                 "Jane - Mob_Sheep (F) - Level 15/25\n\n"
-                        + "-- Traits --\n"
-                        + "Size: +35%\n"
-                        + "Meat and hide yield: +25%.\n"
-                        + "Appetite: 5% less food\n"
-                        + "Attitude: Increases happiness by 5 points.\n"
-                        + "Fertility: This animal tends to have more babies. Both parents matter.\n\n"
-                        + "-- Appearance --\n"
+                        + "Traits\n"
+                        + "Size: +35% size · +25% meat and hide\n"
+                        + "Productivity: -7% product yield\n"
+                        + "Appetite: 5% less food needed\n"
+                        + "Attitude: +5 happiness\n"
+                        + "Fertility: +20% average litter size\n\n"
+                        + "Appearance\n"
                         + "Size: Unknown",
                 plainText(description)
         );
         assertEquals("#FF8FBD", messageWithText(description, "F").getColor());
-        assertEquals("#A2E8AE", messageWithText(description, "+35%").getColor());
-        assertEquals("#F6C453", messageWithText(description, "-- Traits --").getColor());
-        assertEquals("#74D7E8", messageWithText(description, "-- Appearance --").getColor());
+        assertEquals("#FFFFFF", messageWithText(description, "Size").getColor());
+        assertEquals("#A2E8AE", messageWithText(description, "+35% size · +25% meat and hide").getColor());
+        assertEquals("#FFAEAE", messageWithText(description, "-7% product yield").getColor());
+        assertEquals("#F6C453", messageWithText(description, "Traits").getColor());
+        assertEquals("#74D7E8", messageWithText(description, "Appearance").getColor());
+        assertEquals(Boolean.TRUE, messageWithText(description, "Traits").getFormattedMessage().bold);
+        assertEquals(Boolean.TRUE, messageWithText(description, "Appearance").getFormattedMessage().bold);
         // The same item's deferred messages must render for a different recipient.
         assertEquals(
                 "Jane - Mob_Sheep (F) - Nivel 15/25\n\n"
-                        + "-- Rasgos --\nTamaño: +35%\n"
-                        + "Rendimiento de carne y pieles: +25%.\n"
-                        + "Appetite: 5% menos comida\n"
-                        + "Attitude: Aumenta la felicidad en 5 puntos.\n"
-                        + "Fertility: Este animal suele tener más crías. Ambos padres importan.\n\n"
-                        + "-- Apariencia --\nTamaño: Desconocido",
+                        + "Rasgos\nTamaño: +35% de tamaño · +25% de carne y pieles\n"
+                        + "Productivity: -7% de producción\n"
+                        + "Appetite: 5% menos comida necesaria\n"
+                        + "Attitude: +5 de felicidad\n"
+                        + "Fertility: +20% de tamaño medio de camada\n\n"
+                        + "Apariencia\nTamaño: Desconocido",
                 plainText(description, "es-ES"));
     }
 

@@ -115,13 +115,13 @@ final class SpawnerTooltipPresentationService {
         List<Message> traitLines = buildTraitLines(roleId, metadata);
         if (!traitLines.isEmpty()) {
             sections.add(buildSection(
-                    Message.translation("server.tamework.ui.spawnerTooltip.traits").color(TRAITS_HEADER),
+                    Message.translation("server.tamework.ui.spawnerTooltip.traits").color(TRAITS_HEADER).bold(true),
                     traitLines));
         }
         List<Message> appearanceLines = buildAppearanceLines(attachments);
         if (!appearanceLines.isEmpty()) {
             sections.add(buildSection(
-                    Message.translation("server.tamework.ui.spawnerTooltip.appearance").color(APPEARANCE_HEADER),
+                    Message.translation("server.tamework.ui.spawnerTooltip.appearance").color(APPEARANCE_HEADER).bold(true),
                     appearanceLines));
         }
         if (sections.isEmpty()) {
@@ -240,29 +240,39 @@ final class SpawnerTooltipPresentationService {
         return switch (effect) {
             case "needshungerdecaymultiplier" -> needUseLine(label, 1.0 - value, "food");
             case "needsthirstdecaymultiplier" -> needUseLine(label, 1.0 - value, "water");
-            case "fertilitymultiplier" -> Message.join(label, white(": "), fertilityDescription(value));
+            case "fertilitymultiplier" -> percentageEffectLine(label, value - 1.0,
+                    "server.tamework.ui.spawnerTooltip.trait.fertility");
             case "happinessgainmultiplier" -> happinessLine(label, value, roleId);
             case "sizemultiplier" -> sizeLine(label, definition, value);
-            case "damagetakenmultiplier" -> Message.join(label, white(": "),
-                    effectDescription("damageTaken", inverseDelta(value)));
-            case "harvestdoubledropchancemultiplier" -> Message.join(label, white(": "),
-                    effectDescription("harvest", Math.max(0.0, Math.min(1.0, value - 1.0))));
-            case "damagedealtmultiplier" -> percentageLine(label, value - 1.0);
-            case "maxhealthmultiplier", "movespeedmultiplier",
-                    "harvestrecoveryspeedmultiplier", "fleecefiberyieldmultiplier",
-                    "animalproductyieldmultiplier" -> percentageLine(label, value - 1.0);
+            case "damagetakenmultiplier" -> percentageEffectLine(label, -inverseDelta(value),
+                    "server.tamework.ui.spawnerTooltip.trait.damageTaken");
+            case "harvestdoubledropchancemultiplier" -> percentageEffectLine(label,
+                    Math.max(0.0, Math.min(1.0, value - 1.0)),
+                    "server.tamework.ui.spawnerTooltip.trait.harvest");
+            case "damagedealtmultiplier" -> percentageEffectLine(label, value - 1.0,
+                    "server.tamework.ui.spawnerTooltip.trait.damageDealt");
+            case "maxhealthmultiplier" -> percentageEffectLine(label, value - 1.0,
+                    "server.tamework.ui.spawnerTooltip.trait.maxHealth");
+            case "movespeedmultiplier" -> percentageEffectLine(label, value - 1.0,
+                    "server.tamework.ui.spawnerTooltip.trait.moveSpeed");
+            case "harvestrecoveryspeedmultiplier" -> percentageEffectLine(label, value - 1.0,
+                    "server.tamework.ui.spawnerTooltip.trait.recovery");
+            case "fleecefiberyieldmultiplier" -> percentageEffectLine(label, value - 1.0,
+                    "server.tamework.ui.spawnerTooltip.trait.fleeceYield");
+            case "animalproductyieldmultiplier" -> percentageEffectLine(label, value - 1.0,
+                    "server.tamework.ui.spawnerTooltip.trait.productYield");
             default -> label;
         };
     }
 
     private Message sizeLine(Message label, TwTraitConfig.TraitDefinition definition, double value) {
         double yieldBonus = TraitModifierService.resolveSizeMeatHideYieldBonus(definition, value);
-        return Message.join(
-                percentageLine(label, value - 1.0),
-                Message.raw("\n"),
-                Message.translation("server.tamework.traits.description.sizeYield")
-                        .param("0", (yieldBonus > 0 ? "+" : "") + formatPercentMagnitude(yieldBonus))
-        );
+        double sizeDelta = value - 1.0;
+        return Message.join(label, white(": "),
+                Message.translation("server.tamework.ui.spawnerTooltip.trait.size")
+                        .param("0", signedPercent(sizeDelta))
+                        .param("1", signedPercent(yieldBonus))
+                        .color(deltaColor(sizeDelta)));
     }
 
     private Message happinessLine(Message label, double value, @Nullable String roleId) {
@@ -270,9 +280,10 @@ final class SpawnerTooltipPresentationService {
         if (config != null && config.getDisposition().getMode() == TwHappinessConfig.DispositionMode.FLAT) {
             double points = CompanionHappinessModifierService.resolveFlatDispositionOffset(
                     value, config.getDisposition());
-            return Message.join(label, white(": "), effectDescription("happinessFlat", points, true));
+            return valueEffectLine(label, points, "server.tamework.ui.spawnerTooltip.trait.happiness");
         }
-        return percentageLine(label, value - 1.0);
+        return percentageEffectLine(label, value - 1.0,
+                "server.tamework.ui.spawnerTooltip.trait.happinessGain");
     }
 
     private static Message needUseLine(Message label, double savings, String resource) {
@@ -280,30 +291,17 @@ final class SpawnerTooltipPresentationService {
                 ? "server.tamework.ui.spawnerTooltip.trait." + resource + "Less"
                 : "server.tamework.ui.spawnerTooltip.trait." + resource + "More";
         return Message.join(label, white(": "), Message.translation(key)
-                .param("0", formatPercentMagnitude(Math.abs(savings))));
+                .param("0", formatPercentMagnitude(Math.abs(savings))).color(deltaColor(savings)));
     }
 
-    private static Message percentageLine(Message label, double delta) {
+    private static Message percentageEffectLine(Message label, double delta, String key) {
         return Message.join(label, white(": "),
-                Message.raw(signedPercent(delta)).color(deltaColor(delta)));
+                Message.translation(key).param("0", signedPercent(delta)).color(deltaColor(delta)));
     }
 
-    private static Message fertilityDescription(double value) {
-        String key = value > 1.0 ? "fertilityPositive" : value < 1.0 ? "fertilityNegative" : "fertilityNeutral";
-        return Message.translation("server.tamework.traits.description." + key);
-    }
-
-    private static Message effectDescription(String suffix, double delta) {
-        return effectDescription(suffix, delta, false);
-    }
-
-    private static Message effectDescription(String suffix, double delta, boolean points) {
-        String direction = delta > 0.0 ? "increase" : delta < 0.0 ? "decrease" : "neutral";
-        Message description = Message.translation("server.tamework.traits.description." + suffix)
-                .param("direction", Message.translation("server.tamework.traits.description.direction." + direction));
-        return points
-                ? description.param("points", formatDecimal(Math.abs(delta)))
-                : description.param("percent", formatPercentMagnitude(Math.abs(delta)));
+    private static Message valueEffectLine(Message label, double value, String key) {
+        return Message.join(label, white(": "),
+                Message.translation(key).param("0", signedNumber(value)).color(deltaColor(value)));
     }
 
     private List<Message> buildAppearanceLines(List<ResolvedAttachmentDisplay> attachments) {
@@ -407,9 +405,7 @@ final class SpawnerTooltipPresentationService {
     }
 
     private static String formatDecimal(double value) {
-        return String.format(Locale.ROOT, "%.2f", value)
-                .replaceFirst("\\.00$", "")
-                .replaceFirst("(\\.\\d)0$", "$1");
+        return String.format(Locale.ROOT, "%.1f", value).replaceFirst("\\.0$", "");
     }
 
     private static String formatPercentMagnitude(double value) {
@@ -417,8 +413,12 @@ final class SpawnerTooltipPresentationService {
     }
 
     private static String signedPercent(double value) {
+        return signedNumber(value * 100.0);
+    }
+
+    private static String signedNumber(double value) {
         String prefix = value > 0.0 ? "+" : value < 0.0 ? "-" : "";
-        return prefix + formatPercentMagnitude(Math.abs(value)) + "%";
+        return prefix + formatDecimal(Math.abs(value));
     }
 
     private static String deltaColor(double delta) {
