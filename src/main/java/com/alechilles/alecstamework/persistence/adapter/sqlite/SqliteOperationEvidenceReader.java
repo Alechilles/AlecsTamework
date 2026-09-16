@@ -61,4 +61,26 @@ public final class SqliteOperationEvidenceReader {
                 }
         ));
     }
+
+    /** Reads one published envelope when retained outbox evidence has been compacted. */
+    @Nonnull
+    CompletionStage<PersistenceReadResult<OperationEnvelope>> findPublished(
+            @Nonnull OperationId operationId
+    ) {
+        if (operationId == null) {
+            throw new IllegalArgumentException("Operation ID is required");
+        }
+        return reads.execute(new SqliteReadCommand<>(
+                READ_KIND,
+                PersistenceReadPriority.GAMEPLAY_CRITICAL,
+                connection -> {
+                    OperationEnvelope operation = new SqlitePersistenceTransactionContext(connection)
+                            .operations().find(operationId).orElse(null);
+                    if (operation == null || operation.phase() != OperationPhase.PUBLISHED) {
+                        return PersistenceReadResult.absent();
+                    }
+                    return PersistenceReadResult.found(operation, operation.attemptCount());
+                }
+        ));
+    }
 }

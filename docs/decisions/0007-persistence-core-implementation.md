@@ -94,8 +94,8 @@ quarantine. Active quarantine does not remove other recoverable operations from 
 
 Projection events use one monotonic SQLite sequence and per-consumer monotonic checkpoints.
 Delivery is sequential and at least once; consumers distinguish a newly applied aggregate
-revision from a duplicate. Deletion and compaction remain disabled until a canonical rebuild has
-been proved equivalent and a later ADR enables retention.
+revision from a duplicate. Deletion and compaction remain disabled except for the internal entity
+checkpoint retention proved and enabled by [ADR 0010](0010-entity-checkpoint-history-retention.md).
 
 Reconciliation generation is canonical lifecycle evidence. It is not an operation-envelope
 coordinate, and zero is valid.

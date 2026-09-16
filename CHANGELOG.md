@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Reduced database growth from repeated entity checkpoints by compacting old,
+  consumed checkpoint history while preserving current saves and retry safety.
+
 - Added an optional captured-item display API for plugin-provided tooltip
   prefixes and item rarity. Tamework preserves the quality through capture
   delivery and clears it on release; integrating packs own the rating policy.

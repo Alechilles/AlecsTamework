@@ -160,21 +160,48 @@ public final class SqliteOperationPublisher {
     private CompletionStage<OperationWorkflowResult> loadPublished(
             OperationEnvelope operation
     ) {
-        return evidence.find(operation.operationId()).thenApply(read -> {
+        if (SqliteCheckpointReceipt.isReceipt(operation)) {
+            return SqliteOperationResults.completed(new OperationWorkflowResult(
+                    OperationWorkflowResult.Status.PUBLISHED,
+                    operation,
+                    List.of(),
+                    null
+            ));
+        }
+        return evidence.find(operation.operationId()).thenCompose(read -> {
             if (read instanceof PersistenceReadResult.Found<DurableCommitEvidence> found) {
-                return new OperationWorkflowResult(
+                return SqliteOperationResults.completed(new OperationWorkflowResult(
                         OperationWorkflowResult.Status.PUBLISHED,
                         operation,
                         found.value().events(),
                         null
-                );
+                ));
             }
-            return SqliteOperationResults.failed(
-                    OperationWorkflowResult.Status.DURABLE_READ_FAILED,
-                    operation,
-                    List.of(),
-                    readFailure(read)
-            );
+            if (!(read instanceof PersistenceReadResult.Absent<DurableCommitEvidence>)) {
+                return SqliteOperationResults.completed(SqliteOperationResults.failed(
+                        OperationWorkflowResult.Status.DURABLE_READ_FAILED,
+                        operation,
+                        List.of(),
+                        readFailure(read)
+                ));
+            }
+            return evidence.findPublished(operation.operationId()).thenApply(current -> {
+                if (current instanceof PersistenceReadResult.Found<OperationEnvelope> found
+                        && SqliteCheckpointReceipt.isReceipt(found.value())) {
+                    return new OperationWorkflowResult(
+                            OperationWorkflowResult.Status.PUBLISHED,
+                            found.value(),
+                            List.of(),
+                            null
+                    );
+                }
+                return SqliteOperationResults.failed(
+                        OperationWorkflowResult.Status.DURABLE_READ_FAILED,
+                        operation,
+                        List.of(),
+                        readFailure(read)
+                );
+            });
         });
     }
 

@@ -47,6 +47,7 @@ public final class SqliteOperationEngine {
     private final PersistenceContainmentListener containmentListener;
     private final SqliteOperationCompensationEngine compensations;
     private final SqliteOperationContainmentEngine containment;
+    private final SqliteCheckpointHistoryMaintenance checkpointHistory;
 
     public SqliteOperationEngine(@Nonnull OperationDefinitionRegistry definitions,
                                  @Nonnull SqliteUnitOfWorkRunner units) {
@@ -87,6 +88,7 @@ public final class SqliteOperationEngine {
         this.containmentListener = containmentListener;
         this.compensations = new SqliteOperationCompensationEngine(units);
         this.containment = new SqliteOperationContainmentEngine(units);
+        this.checkpointHistory = new SqliteCheckpointHistoryMaintenance(units);
     }
 
     /** Encodes and durably prepares one idempotent operation. */
@@ -248,11 +250,19 @@ public final class SqliteOperationEngine {
                     return result;
                 }
         );
-        return units.execute(new SqliteUnitOfWork<>(
+        SqliteUnitOfWorkRunner.Submission<OperationEnvelope> submitted = units.execute(new SqliteUnitOfWork<>(
                 command,
                 TRANSITION_READBACK,
                 connection -> exactTransitionReadback(connection, transition)
         ));
+        return new SqliteUnitOfWorkRunner.Submission<>(submitted.acceptance(),
+                submitted.completion().thenApply(result -> {
+                    if (nextPhase == OperationPhase.PUBLISHED
+                            && result instanceof PersistenceTransactionResult.Committed<OperationEnvelope> committed) {
+                        checkpointHistory.published(committed.value());
+                    }
+                    return result;
+                }));
     }
 
     /**
@@ -407,7 +417,7 @@ public final class SqliteOperationEngine {
         return existing.kind().equals(requested.kind())
                 && existing.idempotencyKey().equals(requested.idempotencyKey())
                 && existing.payloadVersion() == requested.payloadVersion()
-                && existing.payloadJson().equals(requested.payloadJson())
+                && SqliteCheckpointReceipt.matchesPayload(existing, requested.payloadJson())
                 && existing.featureScope().equals(requested.featureScope())
                 && java.util.Objects.equals(
                         existing.expectedLifecycleRevision(),
